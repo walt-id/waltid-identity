@@ -100,7 +100,6 @@ public enum class KeyUseAuthorizationUnsupportedReason {
     UnsupportedCombination,
     BiometricUnavailable,
     BiometricNotEnrolled,
-    InteractionContextUnavailable,
 }
 
 /**
@@ -129,5 +128,4 @@ internal fun KeyUseAuthorizationUnsupportedReason.toAuthorizationFailure(): KeyU
     KeyUseAuthorizationUnsupportedReason.UnsupportedCombination -> KeyUseAuthorizationFailure.UnsupportedCombination
     KeyUseAuthorizationUnsupportedReason.BiometricUnavailable -> KeyUseAuthorizationFailure.BiometricUnavailable
     KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled -> KeyUseAuthorizationFailure.BiometricNotEnrolled
-    KeyUseAuthorizationUnsupportedReason.InteractionContextUnavailable -> KeyUseAuthorizationFailure.InteractionContextUnavailable
 }

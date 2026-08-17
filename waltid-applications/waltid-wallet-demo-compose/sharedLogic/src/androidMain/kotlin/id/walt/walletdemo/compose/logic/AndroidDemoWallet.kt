@@ -33,10 +33,11 @@ data class AndroidDemoMobileWallet(
 suspend fun createAndroidDemoMobileWallet(
     context: Context,
     config: DemoWalletConfig = DemoWalletConfig(),
+    interactionContextProvider: () -> FragmentActivity? = { null },
 ): AndroidDemoMobileWallet {
     val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
     return AndroidDemoMobileWallet(
-        wallet = MobileWalletFactory(context).create(
+        wallet = MobileWalletFactory(context, interactionContextProvider).create(
             MobileWalletConfig(
                 walletId = config.walletId,
                 attestationConfig = config.toWalletAttestationConfig(),
@@ -44,6 +45,15 @@ suspend fun createAndroidDemoMobileWallet(
                 preferredLocales = LocaleList.getDefault().let { locales ->
                     List(locales.size()) { index -> locales[index].toLanguageTag() }
                 },
+                defaultKeyUseAuthorizationPolicy = if (config.biometricEnabled) {
+                    KeyUseAuthorizationPolicy.BiometricCurrentSet
+                } else {
+                    KeyUseAuthorizationPolicy.None
+                },
+                keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
+                    reason = "Authorize wallet signing",
+                    cancelText = "Cancel",
+                ),
             )
         ),
         transactionDataProfilesWarning = transactionDataProfiles.warning,
@@ -57,28 +67,8 @@ fun createAndroidDemoWallet(
 ): DemoWallet {
 
     return LazyDemoWallet {
-        val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
-        MobileDemoWallet(
-            MobileWalletFactory(context, interactionContextProvider).create(
-                MobileWalletConfig(
-                    walletId = config.walletId,
-                    attestationConfig = config.toWalletAttestationConfig(),
-                    transactionDataProfiles = transactionDataProfiles.profiles,
-                    preferredLocales = LocaleList.getDefault().let { locales ->
-                        List(locales.size()) { index -> locales[index].toLanguageTag() }
-                    },
-                    defaultKeyUseAuthorizationPolicy = if (config.biometricEnabled) {
-                        KeyUseAuthorizationPolicy.BiometricCurrentSet
-                    } else {
-                        KeyUseAuthorizationPolicy.None
-                    },
-                    keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
-                        reason = "Authorize wallet signing",
-                        cancelText = "Cancel",
-                    ),
-                )
-            ),
-            warning = transactionDataProfiles.warning,
-        )
+        createAndroidDemoMobileWallet(context, config, interactionContextProvider).let { created ->
+            MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning)
+        }
     }
 }

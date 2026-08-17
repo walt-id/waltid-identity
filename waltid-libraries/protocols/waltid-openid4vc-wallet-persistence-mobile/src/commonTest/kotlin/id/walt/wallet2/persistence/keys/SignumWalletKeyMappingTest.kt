@@ -16,6 +16,9 @@ import id.walt.crypto2.signum.SignumInteractionContextUnavailableException
 import id.walt.crypto2.signum.SignumKeyInvalidatedException
 import id.walt.crypto2.signum.SignumKeyNotFoundException
 import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
+import id.walt.crypto2.signum.SignumKeyPolicy
+import id.walt.crypto2.signum.SignumHardwarePolicy
+import id.walt.crypto2.signum.SignumAuthenticationPolicy
 import id.walt.crypto2.signum.SignumStoredKeyMetadataException
 import id.walt.crypto2.signum.SignumUserCancelledException
 import kotlin.test.Test
@@ -111,4 +114,40 @@ class SignumWalletKeyMappingTest {
     fun `leaves unexpected failures unchanged`() {
         assertNull(IllegalStateException("unexpected").toKeyUseAuthorizationException())
     }
+
+    @Test
+    fun `restored biometric policy requires the complete protected wallet key shape`() {
+        val policy = SignumKeyPolicy(
+            hardware = SignumHardwarePolicy.REQUIRED,
+            authentication = SignumAuthenticationPolicy.UserPresence(
+                biometric = true,
+                allowNewBiometrics = false,
+                deviceCredential = false,
+                timeoutSeconds = 0,
+            ),
+        )
+        val valid = storedManagedKey(KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+
+        assertEquals(KeyUseAuthorizationPolicy.BiometricCurrentSet, policy.toWalletPolicy(valid))
+
+        listOf(
+            storedManagedKey(KeySpec.Ec(EcCurve.P384), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)),
+            storedManagedKey(KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN)),
+        ).forEach { malformed ->
+            val failure = assertFailsWith<KeyUseAuthorizationException> {
+                policy.toWalletPolicy(malformed)
+            }
+            assertEquals(KeyUseAuthorizationFailure.InvalidStoredKeyMetadata, failure.failure)
+        }
+    }
+
+    private fun storedManagedKey(spec: KeySpec, usages: Set<KeyUsage>) = StoredKey.Managed(
+        version = StoredKey.CURRENT_VERSION,
+        id = KeyId("protected"),
+        spec = spec,
+        usages = usages,
+        provider = ProviderId("test"),
+        providerSchemaVersion = 1,
+        providerData = BinaryData("protected".encodeToByteArray()),
+    )
 }

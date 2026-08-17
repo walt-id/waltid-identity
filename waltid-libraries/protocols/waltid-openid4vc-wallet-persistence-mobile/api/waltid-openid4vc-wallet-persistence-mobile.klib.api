@@ -46,7 +46,6 @@ final enum class id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy : ko
 final enum class id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason : kotlin/Enum<id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason> { // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason|null[0]
     enum entry BiometricNotEnrolled // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled|null[0]
     enum entry BiometricUnavailable // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.BiometricUnavailable|null[0]
-    enum entry InteractionContextUnavailable // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.InteractionContextUnavailable|null[0]
     enum entry UnsupportedCombination // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.UnsupportedCombination|null[0]
 
     final val entries // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.entries|#static{}entries[0]

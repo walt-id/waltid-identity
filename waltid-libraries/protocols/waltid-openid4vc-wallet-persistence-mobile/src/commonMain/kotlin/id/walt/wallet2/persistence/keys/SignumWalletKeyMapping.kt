@@ -1,11 +1,18 @@
 package id.walt.wallet2.persistence.keys
 
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
+import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.signum.SignumInteractionContextUnavailableException
 import id.walt.crypto2.signum.SignumKeyInvalidatedException
 import id.walt.crypto2.signum.SignumKeyNotFoundException
 import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
+import id.walt.crypto2.signum.SignumKeyPolicy
+import id.walt.crypto2.signum.SignumHardwarePolicy
+import id.walt.crypto2.signum.SignumAuthenticationPolicy
 import id.walt.crypto2.signum.SignumStoredKeyMetadataException
 import id.walt.crypto2.signum.SignumUserCancelledException
 
@@ -87,3 +94,29 @@ internal fun ManagedKey.withWalletAuthorizationMapping(
         )
     }
 }
+
+/** Interprets persisted Signum policy only when the complete wallet protected-key shape matches. */
+internal fun SignumKeyPolicy.toWalletPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy =
+    when (val authentication = authentication) {
+        SignumAuthenticationPolicy.None -> KeyUseAuthorizationPolicy.None
+        else -> if (
+            stored.spec == KeySpec.Ec(EcCurve.P256) &&
+            stored.usages == setOf(KeyUsage.SIGN, KeyUsage.VERIFY) &&
+            hardware == SignumHardwarePolicy.REQUIRED &&
+            authentication.isWalletBiometricCurrentSet()
+        ) {
+            KeyUseAuthorizationPolicy.BiometricCurrentSet
+        } else {
+            throw KeyUseAuthorizationException(
+                KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+                "Stored Signum key uses an unsupported wallet authorization policy",
+            )
+        }
+    }
+
+private fun SignumAuthenticationPolicy.isWalletBiometricCurrentSet(): Boolean =
+    this is SignumAuthenticationPolicy.UserPresence &&
+        biometric &&
+        !allowNewBiometrics &&
+        !deviceCredential &&
+        timeoutSeconds == 0
