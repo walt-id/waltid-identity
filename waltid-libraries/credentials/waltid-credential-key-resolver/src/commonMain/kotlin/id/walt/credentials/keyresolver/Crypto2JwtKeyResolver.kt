@@ -125,7 +125,11 @@ class Crypto2JwtKeyResolver(
         val kidCandidates = idCandidates(kid)
         val matches = keys.filter { key -> idCandidates(key.id.value).any(kidCandidates::contains) }
         require(matches.size <= 1) { "Multiple DID verification keys match kid: $kid" }
-        return matches.singleOrNull() ?: throw NoSuchElementException("No DID verification key matches kid: $kid")
+        matches.singleOrNull()?.let { return it }
+        if (keys.size == 1 && did.startsWith("did:jwk:")) {
+            return keys.single()
+        }
+        throw NoSuchElementException("No DID verification key matches kid: $kid")
     }
 
     private fun idCandidates(id: String): Set<String> =

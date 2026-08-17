@@ -330,7 +330,9 @@ object Issuer {
         val rawId = issuerKey.id.value
         val keyId = when {
             DidUtils.isDidUrl(rawId) -> rawId
-            issuerDid != null && DidUtils.isDidUrl(issuerDid) && !issuerDid.startsWith("did:key:") ->
+            issuerDid != null && DidUtils.isDidUrl(issuerDid) &&
+                !issuerDid.startsWith("did:key:") &&
+                !issuerDid.startsWith("did:jwk:") ->
                 publicJwkThumbprint(issuerKey)
             else -> rawId
         }
@@ -349,6 +351,7 @@ object Issuer {
         DidUtils.isDidUrl(keyId) -> keyId
         keyId.startsWith("#") -> issuerDid + keyId
         issuerDid.startsWith("did:key:") -> "$issuerDid#${issuerDid.removePrefix("did:key:")}"
+        issuerDid.startsWith("did:jwk:") -> "$issuerDid#0"
         else -> "$issuerDid#$keyId"
     }
 }

@@ -31,6 +31,10 @@ object DidKeyResolver : BaseKeyResolver {
                 log.debug { "Matched key by kid '$kid' in DID document for $issuerId" }
                 return matched
             }
+            if (keys.size == 1 && issuerId.startsWith("did:jwk:")) {
+                log.debug { "Using the single did:jwk key for unmatched kid '$kid'" }
+                return keys.first()
+            }
             throw NoSuchElementException("No key with kid '$kid' found in DID document for $issuerId")
         }
 
