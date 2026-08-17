@@ -3,6 +3,9 @@ package id.walt.walletdemo.compose.logic
 import android.content.Context
 import android.os.LocaleList
 import id.walt.wallet2.mobile.MobileWallet
+import androidx.fragment.app.FragmentActivity
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
 
@@ -50,8 +53,32 @@ suspend fun createAndroidDemoMobileWallet(
 fun createAndroidDemoWallet(
     context: Context,
     config: DemoWalletConfig = DemoWalletConfig(),
-): DemoWallet = LazyDemoWallet {
-    createAndroidDemoMobileWallet(context, config).let { created ->
-        MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning)
+    interactionContextProvider: () -> FragmentActivity? = { null },
+): DemoWallet {
+
+    return LazyDemoWallet {
+        val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
+        MobileDemoWallet(
+            MobileWalletFactory(context, interactionContextProvider).create(
+                MobileWalletConfig(
+                    walletId = config.walletId,
+                    attestationConfig = config.toWalletAttestationConfig(),
+                    transactionDataProfiles = transactionDataProfiles.profiles,
+                    preferredLocales = LocaleList.getDefault().let { locales ->
+                        List(locales.size()) { index -> locales[index].toLanguageTag() }
+                    },
+                    defaultKeyUseAuthorizationPolicy = if (config.biometricEnabled) {
+                        KeyUseAuthorizationPolicy.BiometricCurrentSet
+                    } else {
+                        KeyUseAuthorizationPolicy.None
+                    },
+                    keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
+                        reason = "Authorize wallet signing",
+                        cancelText = "Cancel",
+                    ),
+                )
+            ),
+            warning = transactionDataProfiles.warning,
+        )
     }
 }
