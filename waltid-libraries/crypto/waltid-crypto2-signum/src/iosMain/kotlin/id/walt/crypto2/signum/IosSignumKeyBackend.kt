@@ -37,7 +37,7 @@ import platform.Security.errSecItemNotFound
 import platform.Security.kSecAttrApplicationLabel
 import platform.Security.kSecAttrApplicationTag
 import platform.Security.kSecAttrKeyClass
-import platform.Security.kSecAttrKeyClassPublic
+import platform.Security.kSecAttrKeyClassPrivate
 import platform.Security.kSecAttrTokenID
 import platform.Security.kSecAttrTokenIDSecureEnclave
 import platform.Security.kSecClass
@@ -147,7 +147,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         return SignumPlatformKeyHandle(
             alias = alias,
             spec = spec,
-            // REQUIRED has already been independently checked against the Keychain public-key attributes above;
+            // REQUIRED has already been independently checked against the Keychain private-key attributes above;
             // only then may the backend report the observed Secure Enclave hardware level.
             protectionLevel = if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
                 SignumProtectionLevel.HARDWARE
@@ -218,14 +218,13 @@ class IosSignumKeyBackend : SignumPlatformBackend {
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     private fun isSecureEnclaveKey(alias: String): Boolean = memScoped {
         val keyRef = alloc<platform.CoreFoundation.CFTypeRefVar>()
-        publicKeyTags.any { tag ->
+        privateKeyTags.any { tag ->
             val query = RetainedDictionary(6)
             query.add(kSecClass, kSecClassKey)
-            // The public half exposes the token identifier without evaluating the
-            // private key's access-control prompt during restore. Matching the
-            // application tag as well as the label avoids selecting another key
-            // that happens to reuse the alias.
-            query.add(kSecAttrKeyClass, kSecAttrKeyClassPublic)
+            // The shared-Keychain public half does not reliably include kSecAttrTokenID.
+            // SecKeyCopyAttributes on the matching private key reads its attributes without
+            // performing an authentication-gated operation, and it exposes the actual backing.
+            query.add(kSecAttrKeyClass, kSecAttrKeyClassPrivate)
             query.addRetained(kSecAttrApplicationLabel, alias)
             query.addRetained(kSecAttrApplicationTag, tag)
             query.add(kSecReturnRef, kCFBooleanTrue)
@@ -235,12 +234,12 @@ class IosSignumKeyBackend : SignumPlatformBackend {
                     errSecItemNotFound -> false
                     errSecSuccess -> {
                         val result = keyRef.value
-                            ?: error("Secure Enclave public-key lookup returned success without a result")
+                            ?: error("Secure Enclave private-key lookup returned success without a result")
                         try {
                             val nativeKey = result as? SecKeyRef
-                                ?: error("Secure Enclave public-key lookup returned an unexpected result")
+                                ?: error("Secure Enclave private-key lookup returned an unexpected result")
                             val attributes = SecKeyCopyAttributes(nativeKey)
-                                ?: error("Secure Enclave public-key attributes were unavailable")
+                                ?: error("Secure Enclave private-key attributes were unavailable")
                             try {
                                 CFDictionaryGetValue(attributes, kSecAttrTokenID)?.let {
                                     waltCfEqual(it, kSecAttrTokenIDSecureEnclave)
@@ -254,7 +253,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
                         }
                     }
                     else -> throw CFCryptoOperationFailed(
-                        thing = "inspect Secure Enclave public key",
+                        thing = "inspect Secure Enclave private key",
                         osStatus = status,
                     )
                 }
@@ -292,10 +291,10 @@ class IosSignumKeyBackend : SignumPlatformBackend {
     }
 }
 
-private val publicKeyTags: List<String> by lazy {
+private val privateKeyTags: List<String> by lazy {
     listOfNotNull(
-        "supreme.publickey",
-        NSBundle.mainBundle.bundleIdentifier?.let { "supreme.publickey-$it" },
+        "supreme.privatekey",
+        NSBundle.mainBundle.bundleIdentifier?.let { "supreme.privatekey-$it" },
     )
 }
 

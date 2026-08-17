@@ -86,7 +86,7 @@ class AndroidSignumKeyBackendPolicyTest {
     }
 
     @Test
-    fun `biometric current set rejects inexact native policy`() {
+    fun `biometric current set rejects a non per-operation native policy`() {
         val policy = SignumKeyPolicy(
             hardware = SignumHardwarePolicy.REQUIRED,
             authentication = SignumAuthenticationPolicy.UserPresence(
@@ -116,7 +116,7 @@ class AndroidSignumKeyBackendPolicyTest {
                 isInsideSecureHardware = true,
                 securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
                 isUserAuthenticationRequired = true,
-                userAuthenticationValidityDurationSeconds = 0,
+                userAuthenticationValidityDurationSeconds = -2,
                 isInvalidatedByBiometricEnrollment = true,
                 userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
             )
@@ -160,25 +160,27 @@ class AndroidSignumKeyBackendPolicyTest {
     }
 
     @Test
-    fun `biometric current set accepts the exact native policy`() {
-        validateAndroidNativePolicy(
-            alias = "biometric",
-            policy = SignumKeyPolicy(
-                hardware = SignumHardwarePolicy.REQUIRED,
-                authentication = SignumAuthenticationPolicy.UserPresence(
-                    biometric = true,
-                    allowNewBiometrics = false,
-                    deviceCredential = false,
-                    timeoutSeconds = 0,
+    fun `biometric current set accepts both per-operation native representations`() {
+        listOf(-1, 0).forEach { duration ->
+            validateAndroidNativePolicy(
+                alias = "biometric-$duration",
+                policy = SignumKeyPolicy(
+                    hardware = SignumHardwarePolicy.REQUIRED,
+                    authentication = SignumAuthenticationPolicy.UserPresence(
+                        biometric = true,
+                        allowNewBiometrics = false,
+                        deviceCredential = false,
+                        timeoutSeconds = 0,
+                    ),
                 ),
-            ),
-            isInsideSecureHardware = true,
-            securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
-            isUserAuthenticationRequired = true,
-            userAuthenticationValidityDurationSeconds = -1,
-            isInvalidatedByBiometricEnrollment = true,
-            userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
-        )
+                isInsideSecureHardware = true,
+                securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
+                isUserAuthenticationRequired = true,
+                userAuthenticationValidityDurationSeconds = duration,
+                isInvalidatedByBiometricEnrollment = true,
+                userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
+            )
+        }
     }
 
     @Test
