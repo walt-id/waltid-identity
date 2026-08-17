@@ -596,13 +596,16 @@ sealed interface id.walt.wallet2.mobile/MobileWalletResponseEncryption { // id.w
 }
 
 final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration|null[0]
-    constructor <init>(kotlin.collections/List<kotlin/String> = ...) // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.<init>|<init>(kotlin.collections.List<kotlin.String>){}[0]
+    constructor <init>(kotlin.collections/List<kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ...) // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
 
+    final val preRegisteredClientMetadataJson // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.preRegisteredClientMetadataJson|{}preRegisteredClientMetadataJson[0]
+        final fun <get-preRegisteredClientMetadataJson>(): kotlin.collections/Map<kotlin/String, kotlin/String> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.preRegisteredClientMetadataJson.<get-preRegisteredClientMetadataJson>|<get-preRegisteredClientMetadataJson>(){}[0]
     final val x509TrustAnchorsPem // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.x509TrustAnchorsPem|{}x509TrustAnchorsPem[0]
         final fun <get-x509TrustAnchorsPem>(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.x509TrustAnchorsPem.<get-x509TrustAnchorsPem>|<get-x509TrustAnchorsPem>(){}[0]
 
     final fun component1(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.component1|component1(){}[0]
-    final fun copy(kotlin.collections/List<kotlin/String> = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.copy|copy(kotlin.collections.List<kotlin.String>){}[0]
+    final fun component2(): kotlin.collections/Map<kotlin/String, kotlin/String> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.component2|component2(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.toString|toString(){}[0]
