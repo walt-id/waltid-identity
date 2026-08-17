@@ -206,7 +206,9 @@ class WalletModuleApplicabilityTest {
         val unrestricted = AvailableTestModule(
             testName = "oid4vp-1final-wallet-happy-flow",
             variants = mapOf(
-                "client_id_prefix" to axis(listOf("redirect_uri", "x509_san_dns", "x509_hash")),
+                "client_id_prefix" to axis(
+                    listOf("redirect_uri", "x509_san_dns", "x509_hash", "decentralized_identifier")
+                ),
                 "request_method" to axis(listOf("url_query", "request_uri_unsigned", "request_uri_signed")),
                 "response_mode" to axis(listOf("direct_post", "direct_post.jwt")),
                 "vp_profile" to axis(listOf("plain_vp", "haip")),

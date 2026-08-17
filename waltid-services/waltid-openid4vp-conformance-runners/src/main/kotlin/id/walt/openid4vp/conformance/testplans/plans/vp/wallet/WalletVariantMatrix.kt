@@ -99,15 +99,14 @@ object WalletVariantMatrix {
      * Excluded, with reasons:
      * - `web-origin`: absent from `id.walt.openid4vp.clientidprefix.ClientIdPrefix`, so Wallet2
      *   cannot authenticate it at all. It is also DC-API-only in practice.
-     * - `decentralized_identifier`: needs the suite to sign request objects with a key resolvable
-     *   from a DID it controls, and no such fixture exists yet.
      * - `pre_registered`: needs the verifier's metadata in
      *   `OSSWallet2ServiceConfig.clientIdTrust.preRegisteredClients`, which the conformance wallet
      *   does not configure yet.
      *
      * Both remaining families are additive work rather than blockers - see the KDoc above.
      */
-    private val clientIdPrefixes = listOf("redirect_uri", "x509_san_dns", "x509_hash")
+    private val clientIdPrefixes =
+        listOf("redirect_uri", "x509_san_dns", "x509_hash", "decentralized_identifier")
 
     /**
      * Request methods driven against Wallet2.
@@ -185,7 +184,12 @@ object WalletVariantMatrix {
         // x509 prefixes authenticate the verifier through the request object's signature and x5c
         // chain (OID4VP 1.0 §5.9.3-3.5.1, -3.6.1). An unsigned request carries neither, so Wallet2
         // rejects it - correctly - and the module cannot pass as a positive test.
-        variant.clientIdPrefix in setOf("x509_san_dns", "x509_hash") && !variant.signedRequest -> false
+        // The x509 prefixes and decentralized_identifier all authenticate the verifier through the
+        // request object's signature - x5c chain or DID-resolved key respectively (OID4VP 1.0
+        // Section 5.9.3). An unsigned request carries neither, so Wallet2 rejects it, correctly, and
+        // the module cannot pass as a positive test.
+        variant.clientIdPrefix in setOf("x509_san_dns", "x509_hash", "decentralized_identifier") &&
+                !variant.signedRequest -> false
 
         else -> true
     }

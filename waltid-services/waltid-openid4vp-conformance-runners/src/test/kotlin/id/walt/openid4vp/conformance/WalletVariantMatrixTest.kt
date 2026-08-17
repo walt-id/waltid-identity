@@ -30,11 +30,11 @@ class WalletVariantMatrixTest {
         val all = WalletVariantMatrix.all()
 
         // redirect_uri x {url_query, request_uri_unsigned} x 2 response modes x 2 formats = 8
-        // (x509_san_dns + x509_hash) x request_uri_signed x 2 response modes x 2 formats = 8
-        // plus 2 HAIP points.
-        assertEquals(18, all.size)
+        // (x509_san_dns + x509_hash + decentralized_identifier) x request_uri_signed
+        //   x 2 response modes x 2 formats = 12, plus 2 HAIP points.
+        assertEquals(22, all.size)
         assertEquals(all.size, all.distinctBy { it.id }.size, "variant ids must be unique")
-        assertEquals(16, WalletVariantMatrix.plainVp().size)
+        assertEquals(20, WalletVariantMatrix.plainVp().size)
         assertEquals(2, WalletVariantMatrix.haip().size)
     }
 

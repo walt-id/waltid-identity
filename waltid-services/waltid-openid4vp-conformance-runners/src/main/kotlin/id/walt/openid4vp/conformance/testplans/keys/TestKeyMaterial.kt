@@ -72,6 +72,23 @@ xtEgGXjHNMaUj7FOpC4tJyGlg2DSpXSOlCkl
         get() = """{"keys":[$SUITE_VERIFIER_SIGNING_KEY]}"""
 
     /**
+     * [VERIFIER_SIGNING_JWKS] with `kid` set to the DID URL of [SUITE_VERIFIER_DID_JWK]'s verification
+     * method.
+     *
+     * `DecentralizedIdentifier` selects the verification key by matching the JWS `kid` against the DID
+     * document, where a `did:jwk` verification method is identified as `<did>#0` (OID4VP 1.0 Section
+     * 5.9.3). Signing with the suite's own `kid` - or with the key's RFC 7638 thumbprint - is rejected
+     * as "Key ID '...' from JWS not found in DID document".
+     */
+    val VERIFIER_SIGNING_JWKS_FOR_DID: String
+        get() = """{"keys":[${
+            SUITE_VERIFIER_SIGNING_KEY.replace(
+                """"kid":"conformance-suite-verifier"""",
+                """"kid":"$SUITE_VERIFIER_DID_JWK#0"""",
+            )
+        }]}"""
+
+    /**
      * Signing key the conformance suite uses when it plays the verifier in wallet test plans.
      *
      * Distinct from [VERIFIER_KEY_JWK]: Wallet2 authenticates an `x509_san_dns` / `x509_hash` client
@@ -83,6 +100,17 @@ xtEgGXjHNMaUj7FOpC4tJyGlg2DSpXSOlCkl
      * [CREDENTIAL_ISSUER_CA_PEM]. Only the leaf goes in `x5c`: per OID4VP-1FINAL-5.9.3 the trust
      * anchor is configured out of band, and including it makes chain validation reject the request.
      */
+    /**
+     * `did:jwk` of [SUITE_VERIFIER_SIGNING_KEY]'s public half, for the `decentralized_identifier`
+     * Client Identifier Prefix.
+     *
+     * `did:jwk` (not `did:web`) because it needs nothing hosted: the DID *is* the base64url-encoded
+     * public JWK, so `DidService`'s `DidJwkResolver` resolves it offline and arrives at exactly the key
+     * the suite signs its request objects with. That makes this prefix drivable with no new fixture -
+     * the earlier assumption that one was needed was wrong.
+     */
+    const val SUITE_VERIFIER_DID_JWK = "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6InJkYkl1WkhjekpEdnUxcjhXZExJU0NtNjBDcmtjMm4wSTAzd3JDZEI2ZWsiLCJ5IjoiQ1JyQ2FlbDAyWjNxa1B1dWoxeFZtQ3FYcEtfR2NLY2FIMnQtQW5HRWpTYyJ9"
+
     const val SUITE_VERIFIER_SIGNING_KEY =
         """{"kty":"EC","crv":"P-256","alg":"ES256","use":"sig","kid":"conformance-suite-verifier","d":"xSG28uAwFg66brJLL6mM7cFxRxBpPW94OcRDSnH6U_I","x":"rdbIuZHczJDvu1r8WdLISCm60Crkc2n0I03wrCdB6ek","y":"CRrCael02Z3qkPuuj1xVmCqXpK_GcKcaH2t-AnGEjSc","x5c":["MIICGTCCAb6gAwIBAgIBAjAKBggqhkjOPQQDAjBQMS8wLQYDVQQDDCZ3YWx0LmlkIE9wZW5JRDRWQ0kgQ29uZm9ybWFuY2UgVGVzdCBDQTEQMA4GA1UECgwHd2FsdC5pZDELMAkGA1UEBhMCVVQwHhcNMjYwODExMTUyNDU1WhcNMzYwODA4MTUyNDU1WjA+MQswCQYDVQQGEwJVVDEQMA4GA1UECgwHd2FsdC5pZDEdMBsGA1UEAwwUdmVyaWZpZXIuZXhhbXBsZS5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASt1si5kdzMkO+7WvxZ0shIKbrQKuRzafQjTfCsJ0Hp6QkawmnpdNmd6pD7ro9cVZgql6SvxnCnGh9rfgJxhI0no4GaMIGXMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgeAMBYGA1UdJQEB/wQMMAoGCCsGAQUFBwMCMB8GA1UdEQQYMBaCFHZlcmlmaWVyLmV4YW1wbGUuY29tMB0GA1UdDgQWBBS9L0MCwYBRFR/2zhXvclIucH8x0TAfBgNVHSMEGDAWgBRQZ/DWHFTxa0sdrlGc/51VEg1VNjAKBggqhkjOPQQDAgNJADBGAiEAqOyuorenm73UuDECNQzYDqaPTv1ZC9JMWlboIbKowdACIQDllusv3QC+JO7cJIy3vwj+DsqPGK5OIZyOVRNPWKFd9w=="]}"""
 

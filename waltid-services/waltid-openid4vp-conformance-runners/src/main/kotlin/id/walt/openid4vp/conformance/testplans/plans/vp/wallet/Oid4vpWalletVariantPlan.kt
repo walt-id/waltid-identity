@@ -50,8 +50,21 @@ class Oid4vpWalletVariantPlan(
      * identifier from the certificate itself and needs no declaration, which is why it passed while
      * `x509_san_dns` failed every module without this.
      */
-    private val clientIdConfigEntry =
-        if (walletVariant.clientIdPrefix == "x509_san_dns") """"client_id": "$VERIFIER_SAN_DNS",""" else ""
+    /** The DID prefix needs the signing `kid` to be a DID URL; see [TestKeyMaterial.VERIFIER_SIGNING_JWKS_FOR_DID]. */
+    private val verifierJwks =
+        if (walletVariant.clientIdPrefix == "decentralized_identifier") {
+            TestKeyMaterial.VERIFIER_SIGNING_JWKS_FOR_DID
+        } else {
+            TestKeyMaterial.VERIFIER_SIGNING_JWKS
+        }
+
+    private val clientIdConfigEntry = when (walletVariant.clientIdPrefix) {
+        "x509_san_dns" -> """"client_id": "$VERIFIER_SAN_DNS","""
+        // AbstractVP1FinalWalletTest declares client.client_id required for this prefix too. The value
+        // is the did:jwk of the key the suite signs with, which the wallet resolves offline.
+        "decentralized_identifier" -> """"client_id": "${TestKeyMaterial.SUITE_VERIFIER_DID_JWK}","""
+        else -> ""
+    }
 
     /**
      * Suite configuration.
@@ -81,7 +94,7 @@ class Oid4vpWalletVariantPlan(
             },
             "client": {
                 $clientIdConfigEntry
-                "jwks": ${TestKeyMaterial.VERIFIER_SIGNING_JWKS},
+                "jwks": $verifierJwks,
                 "dcql": ${WalletCredentialFixture.dcqlFor(walletVariant.credentialFormat)},
                 "authorization_encrypted_response_alg": "ECDH-ES",
                 "authorization_encrypted_response_enc": "A256GCM"
