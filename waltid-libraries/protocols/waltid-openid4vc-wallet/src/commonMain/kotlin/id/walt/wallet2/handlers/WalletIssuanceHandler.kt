@@ -698,7 +698,7 @@ object WalletIssuanceHandler {
             ?: error("Authorization server metadata contains no token_endpoint")
         log.trace { "Requesting token from $tokenEndpoint" }
 
-        val attestationHeaders = buildTokenEndpointAttestationHeaders(
+        val attestationHeaders = buildClientAttestationHeaders(
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
@@ -1001,7 +1001,7 @@ object WalletIssuanceHandler {
             metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         }
         val attestationHeaders = asMetadata?.let {
-            buildTokenEndpointAttestationHeaders(
+            buildClientAttestationHeaders(
                 asMetadata = it,
                 clientId = request.clientId,
                 attestationAssembler = attestationAssembler,
@@ -1273,6 +1273,7 @@ object WalletIssuanceHandler {
         credentialConfigurationId: String,
         parEndpoint: String,
         keyMaterial: WalletKeyStoreEntry?,
+        attestationAssembler: ClientAttestationAssembler?,
     ): GenerateAuthorizationUrlResult {
         // Binds the eventual access token to this wallet's key at authorization time (RFC 9449
         // Section 10). Only offered when the key can actually sign an advertised algorithm.
@@ -1295,17 +1296,33 @@ object WalletIssuanceHandler {
             },
         )
 
+        // A pushed authorization request authenticates the client exactly as the token request does
+        // (RFC 9126 Section 2), so it needs the same credential. Under HAIP that is the only one on
+        // offer: the authorization server advertises attest_jwt_client_auth alone and requires PAR, so
+        // without this the flow cannot authenticate at all and the suite answers 401.
+        val attestationHeaders = buildClientAttestationHeaders(
+            asMetadata = asMetadata,
+            clientId = request.clientId,
+            attestationAssembler = attestationAssembler,
+            resolveInstanceKey = { keyMaterial?.crypto2AttestationKey() },
+        )
+
         val response = PushedAuthorizationRequestExecutor.execute(
             httpClient = httpClient,
             parEndpoint = parEndpoint,
             parameters = pushed.parameters,
-            clientAssertionFactory = keyMaterial?.let { material ->
-                clientAssertionFactory(
-                    asMetadata = asMetadata,
-                    clientId = request.clientId,
-                    keyMaterial = material,
-                )
-            },
+            // Mutually exclusive with the attestation headers: presenting two client credentials is
+            // what "token_endpoint_auth_methods_supported: [attest_jwt_client_auth]" excludes.
+            clientAssertionFactory = keyMaterial
+                ?.takeIf { attestationHeaders == null }
+                ?.let { material ->
+                    clientAssertionFactory(
+                        asMetadata = asMetadata,
+                        clientId = request.clientId,
+                        keyMaterial = material,
+                    )
+                },
+            attestationHeaders = attestationHeaders,
         )
 
         return GenerateAuthorizationUrlResult(
@@ -1485,7 +1502,13 @@ object WalletIssuanceHandler {
         }
     }
 
-    private suspend fun buildTokenEndpointAttestationHeaders(
+    /**
+     * Client attestation headers for any request that authenticates this client to the authorization
+     * server - the token request and the pushed authorization request alike. Both take the
+     * authorization server's issuer as the PoP audience (OAuth 2.0 Attestation-Based Client
+     * Authentication Section 5.2), so one builder serves both.
+     */
+    private suspend fun buildClientAttestationHeaders(
         asMetadata: AuthorizationServerMetadata,
         clientId: String,
         attestationAssembler: ClientAttestationAssembler?,
@@ -1593,9 +1616,11 @@ object WalletIssuanceHandler {
     suspend fun generateAuthorizationUrl(
         wallet: Wallet,
         request: GenerateAuthorizationUrlRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
     ): GenerateAuthorizationUrlResult = generateAuthorizationUrl(
         request = request,
         keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)),
+        attestationAssembler = attestationAssembler,
     )
 
     suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult =
@@ -1604,6 +1629,7 @@ object WalletIssuanceHandler {
     private suspend fun generateAuthorizationUrl(
         request: GenerateAuthorizationUrlRequest,
         keyMaterial: WalletKeyStoreEntry?,
+        attestationAssembler: ClientAttestationAssembler? = null,
     ): GenerateAuthorizationUrlResult {
         val offer = resolveOffer(request, httpClient)
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
@@ -1639,6 +1665,7 @@ object WalletIssuanceHandler {
                 credentialConfigurationId = credentialConfigurationId,
                 parEndpoint = parEndpoint,
                 keyMaterial = keyMaterial,
+                attestationAssembler = attestationAssembler,
             )
         }
 
@@ -1707,7 +1734,7 @@ object WalletIssuanceHandler {
         val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
-        val attestationHeaders = buildTokenEndpointAttestationHeaders(
+        val attestationHeaders = buildClientAttestationHeaders(
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,

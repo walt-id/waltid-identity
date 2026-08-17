@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.adapter
 
+import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.testplans.keys.ClientAttestationTestAuthority
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -31,6 +33,7 @@ import kotlinx.serialization.json.*
  * - `GET/POST /credential-offer` - Receives credential offers from conformance suite
  * - `GET /callback` - OAuth authorization callback
  * - `GET /health` - Health check
+ * - `POST /wallet-instance-attestation/jwk` - Test attester, when one is supplied
  *
  * ## Configuration
  *
@@ -43,13 +46,17 @@ import kotlinx.serialization.json.*
  * @param walletId Optional existing wallet ID (auto-creates if null)
  * @param testDid Optional DID to use for credential requests
  * @param testKeyId Optional key ID to use for proof signing
+ * @param attestationAuthority Test attester for plans using attestation-based client authentication
+ * @param useScope Authorize by `scope` instead of `authorization_details`, as HAIP requires
  */
 class VciWalletConformanceAdapter(
     private val walletApiUrl: String = "http://127.0.0.1:7005",
     private val adapterPort: Int = 7007,
     private var walletId: String? = null,
     private val testDid: String? = null,
-    private val testKeyId: String? = null
+    private val testKeyId: String? = null,
+    private val attestationAuthority: ClientAttestationTestAuthority? = null,
+    private val useScope: Boolean = false,
 ) {
 
     private var server: EmbeddedServer<*, *>? = null
@@ -99,6 +106,7 @@ class VciWalletConformanceAdapter(
 
                 post("/credential-offer") { handleCredentialOfferApi(call) }
                 get("/callback") { handleAuthCallback(call) }
+                post(WALLET_INSTANCE_ATTESTATION_PATH) { handleWalletInstanceAttestation(call) }
             }
         }.start(wait = false)
 
@@ -226,6 +234,37 @@ class VciWalletConformanceAdapter(
         }
     }
 
+    /**
+     * Stand in for the wallet's attester, minting a client attestation for the key the wallet presents.
+     *
+     * Hosted here rather than as a separate service because the wallet reaches its attester over HTTP
+     * ([GenericHttpWalletAttestationProvider]), so exercising the real configuration path means
+     * something must actually serve that URL. Only the HAIP plan configures an attester, so this stays
+     * unused - and unreachable - for the other plans.
+     */
+    private suspend fun handleWalletInstanceAttestation(call: ApplicationCall) {
+        val authority = attestationAuthority
+        if (authority == null) {
+            call.respondText("No attestation authority configured", status = HttpStatusCode.NotFound)
+            return
+        }
+        val instancePublicJwk = runCatching {
+            Json.parseToJsonElement(call.receiveText()).jsonObject.getValue(PUBLIC_JWK_FIELD).jsonObject
+        }.getOrElse {
+            call.respondText("Body must carry a '$PUBLIC_JWK_FIELD' JWK object", status = HttpStatusCode.BadRequest)
+            return
+        }
+
+        println("[VCI Adapter] Issuing wallet instance attestation")
+        // respondText rather than respond: the adapter's Ktor server installs no ContentNegotiation.
+        call.respondText(
+            text = buildJsonObject {
+                put(WALLET_INSTANCE_ATTESTATION_FIELD, authority.issueAttestationJwt(instancePublicJwk))
+            }.toString(),
+            contentType = ContentType.Application.Json,
+        )
+    }
+
     // ─────────────────────────────────────────────────────────────────────────────
     // Wallet API Calls
     // ─────────────────────────────────────────────────────────────────────────────
@@ -270,6 +309,11 @@ class VciWalletConformanceAdapter(
                     put("clientId", CLIENT_ID)
                     put("redirectUri", getRedirectUri())
                     put("usePkce", true)
+                    // HAIP fixes authorization_request_type=simple, which authorizes by scope rather
+                    // than by authorization_details; the suite's ExtractRequestedScopes then rejects a
+                    // request that carries none. Not derivable from metadata - nothing an issuer
+                    // publishes says which of the two it expects - so it is selected per plan.
+                    if (useScope) put("useScope", true)
                 }.toString()
             )
         }
@@ -505,7 +549,7 @@ class VciWalletConformanceAdapter(
             } else {
                 put("offerUrl", offer)
             }
-            put("clientId", "wallet-conformance-test")
+            put("clientId", CLIENT_ID)
             put("redirectUri", getRedirectUri())
             if (includeAuthParams) {
                 put("usePkce", true)
@@ -537,7 +581,16 @@ class VciWalletConformanceAdapter(
 
     private companion object {
         /** Client identifier the VCI wallet plans register with the conformance suite. */
-        const val CLIENT_ID = "wallet-conformance-test"
+        const val CLIENT_ID = ConformanceConfig.VCI_WALLET_CLIENT_ID
+
+        /** Attester path the HAIP plan's wallet configuration points at. */
+        const val WALLET_INSTANCE_ATTESTATION_PATH = ConformanceConfig.VCI_WALLET_ATTESTATION_PATH
+
+        /** Request field carrying the wallet instance's public JWK; see the wallet's request template. */
+        const val PUBLIC_JWK_FIELD = "jwk"
+
+        /** Response field [GenericHttpWalletAttestationProvider] reads the attestation from. */
+        const val WALLET_INSTANCE_ATTESTATION_FIELD = "walletInstanceAttestation"
 
         /** Redirects tolerated on the authorization leg before concluding interaction is required. */
         const val MAX_AUTHORIZATION_REDIRECTS = 5

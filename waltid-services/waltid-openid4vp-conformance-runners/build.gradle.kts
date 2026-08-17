@@ -105,6 +105,10 @@ dependencies {
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
     // Used directly to derive x509_hash client identifiers, so declared rather than relied on transitively
     api(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
+    // Used directly to mint the test attester's certificate chain for HAIP client attestation
+    api(project(":waltid-libraries:crypto:waltid-x509"))
+    // Used directly for client attestation JWT claim and type constants
+    api(project(":waltid-libraries:protocols:waltid-openid4vci"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier-openapi"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
 }

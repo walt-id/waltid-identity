@@ -5,12 +5,14 @@ import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.openid4vp.conformance.adapter.VciWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.testplans.keys.ClientAttestationTestAuthority
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.*
 import id.walt.openid4vp.conformance.testplans.runner.VciWalletTestPlanRunner
 import id.walt.wallet2.OSSWallet2FeatureCatalog
 import id.walt.wallet2.OSSWallet2ServiceConfig
+import id.walt.wallet2.WalletAttestationConfig
 import id.walt.wallet2.server.handlers.CreateWalletRequest
 import id.walt.wallet2.server.handlers.ImportKeyRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
@@ -23,7 +25,10 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
+import id.waltid.openid4vci.wallet.attestation.PUBLIC_JWK_PLACEHOLDER
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
@@ -76,6 +81,9 @@ import kotlin.time.Duration.Companion.minutes
 class VciWalletConformanceTests {
 
     companion object {
+        /** Request field the adapter's attester reads the wallet's public JWK from. */
+        private const val ATTESTER_REQUEST_JWK_FIELD = "jwk"
+
         private const val WALLET_HOST = "127.0.0.1"
         private const val WALLET_PORT = 7016
 
@@ -142,9 +150,14 @@ class VciWalletConformanceTests {
         }
     }
 
-    private suspend fun runPlan(plan: VciWalletTestPlan, walletId: String) {
+    private suspend fun runPlan(
+        plan: VciWalletTestPlan,
+        walletId: String,
+        attestationAuthority: ClientAttestationTestAuthority? = null,
+        useScope: Boolean = false,
+    ) {
         val httpClient = createHttpClient()
-        val adapter = startAdapterIfNeeded(httpClient, walletId)
+        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority, useScope)
         val adapterBaseUrl = "http://127.0.0.1:$adapterPort"
 
         try {
@@ -166,6 +179,8 @@ class VciWalletConformanceTests {
     private suspend fun startAdapterIfNeeded(
         httpClient: HttpClient,
         walletId: String,
+        attestationAuthority: ClientAttestationTestAuthority?,
+        useScope: Boolean,
     ): VciWalletConformanceAdapter? {
         val adapterAlreadyRunning = try {
             val response = httpClient.get("http://127.0.0.1:$adapterPort/health")
@@ -184,6 +199,8 @@ class VciWalletConformanceTests {
             walletApiUrl = walletApiUrl,
             adapterPort = adapterPort,
             walletId = walletId,
+            attestationAuthority = attestationAuthority,
+            useScope = useScope,
         ).also { it.start(httpClient) }
     }
 
@@ -277,6 +294,11 @@ class VciWalletConformanceTests {
     @Test
     @EnabledIf("isConformanceAvailable")
     fun vciWalletSdJwtVcAuthorizationCodeHaipFullTarget() = withInProcessWallet { walletId ->
+        // Minted per run: the suite is told the trust anchor, and the adapter signs with the matching
+        // leaf, so nothing about the attester has to be committed or kept in sync by hand.
+        val attestationAuthority = ClientAttestationTestAuthority.create(
+            clientId = ConformanceConfig.VCI_WALLET_CLIENT_ID,
+        )
         runPlan(
             VciWalletSdJwtHaip(
                 walletApiUrl = walletApiUrl,
@@ -284,9 +306,13 @@ class VciWalletConformanceTests {
                 redirectUri = "http://127.0.0.1:$adapterPort/callback",
                 conformanceHost = conformanceHost,
                 conformancePort = conformancePort,
-                adapterHost = adapterHostIp
+                adapterHost = adapterHostIp,
+                attestationAuthority = attestationAuthority,
             ),
             walletId,
+            attestationAuthority,
+            // The HAIP plan fixes authorization_request_type=simple.
+            useScope = true,
         )
     }
 
@@ -313,7 +339,20 @@ class VciWalletConformanceTests {
             preload = {
                 ConfigManager.preloadConfig(
                     "wallet-service",
-                    OSSWallet2ServiceConfig(publicBaseUrl = Url(walletApiUrl)),
+                    OSSWallet2ServiceConfig(
+                        publicBaseUrl = Url(walletApiUrl),
+                        // Configured for every plan, but inert unless the authorization server
+                        // advertises attest_jwt_client_auth - only the HAIP plan does. Going through
+                        // the real config path is the point: it is what builds the assembler the
+                        // wallet uses, so a broken attestationConfig would otherwise pass unnoticed.
+                        attestationConfig = WalletAttestationConfig(
+                            attesterUrl = "http://127.0.0.1:$adapterPort" +
+                                ConformanceConfig.VCI_WALLET_ATTESTATION_PATH,
+                            requestBody = buildJsonObject {
+                                put(ATTESTER_REQUEST_JWK_FIELD, PUBLIC_JWK_PLACEHOLDER)
+                            },
+                        ),
+                    ),
                 )
             },
             init = { DidService.minimalInit() },

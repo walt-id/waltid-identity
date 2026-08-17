@@ -700,9 +700,14 @@ object Wallet2RouteHandler {
                     }) {
                         // Wallet-aware overload: PAR is a client-authenticated endpoint, so the
                         // authorization request can only be pushed when a signing key is available.
+                        // The assembler goes with it because a pushed request authenticates the client
+                        // just as the token request does, and under HAIP attestation is the only
+                        // client authentication the authorization server accepts.
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<GenerateAuthorizationUrlRequest>()
-                        call.respond(WalletIssuanceHandler.generateAuthorizationUrl(wallet, req))
+                        call.respond(
+                            WalletIssuanceHandler.generateAuthorizationUrl(wallet, req, attestationAssembler)
+                        )
                     }
 
                     post("/exchange-code", {

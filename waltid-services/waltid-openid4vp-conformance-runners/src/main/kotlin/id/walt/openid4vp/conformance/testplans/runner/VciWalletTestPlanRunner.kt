@@ -130,6 +130,25 @@ class VciWalletTestPlanRunner(
 
         println("   Test ID: $testId")
         println("   View: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
+
+        if (module.testModule.startsWith(FAPI2_CLIENT_MODULE_PREFIX)) {
+            // The HAIP plan bundles the FAPI 2.0 client tests, which exercise the wallet as an OAuth
+            // client rather than as a credential recipient: the suite is only an authorization server,
+            // publishes no credential offer, and waits for the client to start an authorization
+            // request by itself. Driving them needs wallet-initiated issuance, which this harness has
+            // no entry point for, so they are recorded as skipped rather than reported as wallet
+            // failures. Cancelled explicitly because a module left WAITING holds the plan alias and
+            // would take the next module down with it.
+            println("   Not a credential-issuance module - skipping")
+            conformance.cancelTest(testId)
+            return TestPlanResult(
+                conformanceTestId = testId,
+                conformanceResult = "SKIPPED",
+                skipReason = "FAPI 2.0 client test: needs wallet-initiated issuance, which the " +
+                    "harness cannot yet trigger",
+            )
+        }
+
         println("   Credential Offer Endpoint: $walletAdapterUrl/credential-offer")
 
         deliverCredentialOfferToWallet(testId)
@@ -240,11 +259,15 @@ class VciWalletTestPlanRunner(
         // Poll for the offer URL rather than for a status: the authorization-code grant parks the test
         // in WAITING, but the pre-authorized code grant does not, so waiting on WAITING would time out
         // for a perfectly healthy pre-auth run.
+        // A plain loop rather than repeat {}: `return@repeat` continues with the next iteration
+        // instead of leaving the loop, so the previous version always polled the full budget and
+        // could overwrite an offer it had already found with a later empty read.
         var offerUrl: String? = null
-        repeat(OFFER_POLL_ATTEMPTS) {
+        var attempt = 0
+        while (offerUrl == null && attempt < OFFER_POLL_ATTEMPTS) {
             offerUrl = conformance.getTestRun(testId).getBrowserUrls().firstOrNull()
-            if (offerUrl != null) return@repeat
-            delay(POLL_INTERVAL_MILLISECONDS)
+            if (offerUrl == null) delay(POLL_INTERVAL_MILLISECONDS)
+            attempt++
         }
         val resolvedOfferUrl = offerUrl
             ?: error("Conformance suite published no credential offer URL to hand to the wallet")
@@ -269,6 +292,9 @@ class VciWalletTestPlanRunner(
     }
 
     private companion object {
+        /** Module-name prefix of the FAPI 2.0 client tests the HAIP plan bundles. */
+        const val FAPI2_CLIENT_MODULE_PREFIX = "fapi2-security-profile-final-client-test-"
+
         /** Offer delivery is either by value or by reference, per OpenID4VCI 1.0. */
         val OFFER_PARAMETER_NAMES = listOf("credential_offer", "credential_offer_uri")
 

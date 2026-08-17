@@ -70,6 +70,24 @@ object ConformanceConfig {
     const val WALLET_ADAPTER_PORT = 7006
 
     /**
+     * OAuth client identifier the VCI wallet plans register with the suite as `client.client_id`.
+     *
+     * Shared rather than repeated per plan because the suite cross-checks it: under
+     * attestation-based client authentication the attestation's `sub` and the PoP's `iss` must both
+     * equal this value, so a plan disagreeing with the wallet fails as a signature/subject mismatch
+     * rather than as an obvious configuration error.
+     */
+    const val VCI_WALLET_CLIENT_ID = "wallet-conformance-test"
+
+    /**
+     * Path the VCI wallet adapter serves its test attester on.
+     *
+     * Shared because the wallet is configured with this URL before the adapter exists, so the two
+     * would otherwise repeat the same path in different files.
+     */
+    const val VCI_WALLET_ATTESTATION_PATH = "/wallet-instance-attestation/jwk"
+
+    /**
      * Host name the conformance suite has to use to reach an adapter started by the tests.
      *
      * The suite calls back into the machine running the tests. With the docker-compose topology
