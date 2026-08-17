@@ -525,7 +525,10 @@ private extension MetadataTrustType {
 
 private extension WalletClientIDTrustConfiguration {
     func toKMPClientIDTrustConfiguration() -> WalletBridgeClientIdTrustConfiguration {
-        WalletBridgeClientIdTrustConfiguration(x509TrustAnchorsPem: x509TrustAnchorsPEM)
+        WalletBridgeClientIdTrustConfiguration(
+            x509TrustAnchorsPem: x509TrustAnchorsPEM,
+            preRegisteredClientMetadataJson: preRegisteredClientMetadataJSON
+        )
     }
 }
 

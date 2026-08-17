@@ -6,6 +6,7 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -68,14 +69,21 @@ public data class WalletBridgeConfiguration(
  * Verifier Request Object trust configuration exposed to the Swift wallet bridge.
  *
  * @property x509TrustAnchorsPem PEM-encoded trust anchors pinned by the hosting application.
+ * @property preRegisteredClientMetadataJson Explicit pre-registered client metadata, keyed by client ID.
  */
 public data class WalletBridgeClientIdTrustConfiguration(
     public val x509TrustAnchorsPem: List<String> = emptyList(),
+    public val preRegisteredClientMetadataJson: Map<String, String> = emptyMap(),
 )
 
 internal fun WalletBridgeClientIdTrustConfiguration.toClientIdTrustConfiguration(): ClientIdTrustConfiguration =
     ClientIdTrustConfiguration(
         x509TrustAnchors = x509TrustAnchorsPem.map(CertificateDer::fromPEMEncodedString),
+        preRegisteredClients = preRegisteredClientMetadataJson.mapValues { (clientId, metadataJson) ->
+            ClientMetadata.fromJson(metadataJson).getOrElse { cause ->
+                throw IllegalArgumentException("Malformed pre-registered client metadata for '$clientId'", cause)
+            }
+        },
     )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {

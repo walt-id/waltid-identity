@@ -137,12 +137,20 @@ public struct WalletClientIDTrustConfiguration: Sendable, Equatable {
     /// PEM-encoded X.509 trust anchors pinned by the hosting application.
     public var x509TrustAnchorsPEM: [String]
 
+    /// Explicit pre-registered client metadata JSON, keyed by client ID.
+    public var preRegisteredClientMetadataJSON: [String: String]
+
     /// Creates client-ID trust configuration.
     ///
-    /// - Parameter x509TrustAnchorsPEM: PEM-encoded X.509 trust anchors pinned
-    ///   by the hosting application.
-    public init(x509TrustAnchorsPEM: [String] = []) {
+    /// - Parameters:
+    ///   - x509TrustAnchorsPEM: PEM-encoded X.509 trust anchors pinned by the hosting application.
+    ///   - preRegisteredClientMetadataJSON: Client metadata JSON for explicit pre-registered verifiers.
+    public init(
+        x509TrustAnchorsPEM: [String] = [],
+        preRegisteredClientMetadataJSON: [String: String] = [:]
+    ) {
         self.x509TrustAnchorsPEM = x509TrustAnchorsPEM
+        self.preRegisteredClientMetadataJSON = preRegisteredClientMetadataJSON
     }
 }
 

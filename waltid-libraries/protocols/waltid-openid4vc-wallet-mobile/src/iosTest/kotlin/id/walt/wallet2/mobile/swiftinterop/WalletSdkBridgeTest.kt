@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -341,6 +342,7 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    @OptIn(ExperimentalSerializationApi::class)
     fun factoryMapsSwiftFriendlyConfigurationToMobileWalletConfig() = runTest {
         var capturedConfig: MobileWalletConfig? = null
         var capturedTrustConfiguration: ClientIdTrustConfiguration? = null
@@ -366,6 +368,9 @@ class WalletSdkBridgeTest {
                 ),
                 clientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(
                     x509TrustAnchorsPem = listOf(trustAnchor),
+                    preRegisteredClientMetadataJson = mapOf(
+                        "demo-verifier" to """{"jwks":{"keys":[{"kty":"EC","crv":"P-256","x":"x","y":"y"}]}}""",
+                    ),
                 ),
                 preferredLocales = listOf("de-AT", "en"),
                 transactionDataProfiles = listOf(
@@ -390,6 +395,7 @@ class WalletSdkBridgeTest {
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
         assertEquals("attestation.example", capturedConfig?.attestationConfig?.hostHeader)
         assertEquals(listOf(CertificateDer(byteArrayOf(1, 2, 3))), capturedTrustConfiguration?.x509TrustAnchors)
+        assertEquals(setOf("demo-verifier"), capturedTrustConfiguration?.preRegisteredClients?.keys)
         assertEquals(listOf("de-AT", "en"), capturedConfig?.preferredLocales)
         assertEquals(
             listOf(
