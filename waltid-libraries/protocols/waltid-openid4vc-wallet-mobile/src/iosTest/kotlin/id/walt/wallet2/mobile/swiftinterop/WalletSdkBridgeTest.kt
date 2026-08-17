@@ -30,6 +30,7 @@ import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
+import id.walt.wallet2.mobile.MobileWalletRequestAuthentication
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
@@ -203,6 +204,7 @@ class WalletSdkBridgeTest {
                     policyUri = null,
                     termsOfServiceUri = null,
                 ),
+                requestAuthentication = MobileWalletRequestAuthentication.Unauthenticated,
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = null,
@@ -681,6 +683,7 @@ class WalletSdkBridgeTest {
                         policyUri = null,
                         termsOfServiceUri = null,
                     ),
+                    requestAuthentication = MobileWalletRequestAuthentication.Unauthenticated,
                     responseUri = "https://verifier.example/direct-post",
                     state = "state-1",
                     nonce = "nonce-1",

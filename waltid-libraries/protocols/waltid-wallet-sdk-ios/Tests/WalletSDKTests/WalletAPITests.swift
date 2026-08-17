@@ -139,6 +139,7 @@ final class WalletAPITests: XCTestCase {
             request: .init(
                 clientID: "https://verifier.example",
                 verifierMetadata: testVerifierMetadata,
+                requestAuthentication: .unauthenticated,
                 responseURI: URL(string: "https://verifier.example/direct-post"),
                 state: "state-1",
                 nonce: "nonce-1",
@@ -331,6 +332,7 @@ final class WalletAPITests: XCTestCase {
                 request: .init(
                     clientID: "https://verifier.example",
                     verifierMetadata: testVerifierMetadata,
+                    requestAuthentication: .unauthenticated,
                     responseURI: nil,
                     state: nil,
                     nonce: "nonce-1",
@@ -387,6 +389,7 @@ final class WalletAPITests: XCTestCase {
         let requestInfo = PresentationRequestContext(
             clientID: "https://verifier.example",
             verifierMetadata: testVerifierMetadata,
+            requestAuthentication: .unauthenticated,
             responseEncryption: .notRequired
         )
         let bridge = FakeWalletCoreBridge()
@@ -770,7 +773,14 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         id: "issuance-session-1",
         offer: IssuanceOfferPreview(
             grant: .preAuthorizedCode,
-            issuer: .init(identifier: "https://issuer.example", name: nil, locale: nil, logoURI: nil, logoAltText: nil),
+            issuer: .init(
+                identifier: "https://issuer.example",
+                name: nil,
+                locale: nil,
+                logoURI: nil,
+                logoAltText: nil,
+                metadataProvenance: .unsigned
+            ),
             credentials: [],
             transactionCode: nil
         )
@@ -783,6 +793,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             previewHandle: PresentationPreviewHandle(value: "fake-presentation-preview"),
             request: .init(
                 clientID: "https://verifier.example",
+                requestAuthentication: .unauthenticated,
                 nonce: "nonce-1",
                 responseEncryption: .notRequired,
             ),

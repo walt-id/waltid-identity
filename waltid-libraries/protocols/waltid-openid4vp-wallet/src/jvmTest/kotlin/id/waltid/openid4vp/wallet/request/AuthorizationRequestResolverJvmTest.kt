@@ -177,7 +177,7 @@ class AuthorizationRequestResolverJvmTest {
             }
         }
 
-        assertIs<ResolvedAuthorizationRequest.WithRequestObject>(resolved)
+        assertIs<ResolvedAuthorizationRequest.UnsignedRequestObject>(resolved)
         assertEquals("verifier2", resolved.authorizationRequest.clientId)
         assertEquals(requestObject, resolved.requestObject)
     }
@@ -243,7 +243,11 @@ class AuthorizationRequestResolverJvmTest {
             ),
         )
 
-        assertIs<ResolvedAuthorizationRequest.WithRequestObject>(resolved)
+        val authenticated = assertIs<ResolvedAuthorizationRequest.AuthenticatedRequestObject>(resolved)
+        assertEquals(requestObject, authenticated.requestObject)
+        assertEquals("EdDSA", authenticated.authentication.algorithm)
+        assertEquals(trustedKey.getKeyId(), authenticated.authentication.keyId)
+        assertIs<id.walt.openid4vp.clientidprefix.prefixes.PreRegistered>(authenticated.authentication.clientId)
     }
 
     @Test
@@ -300,7 +304,10 @@ class AuthorizationRequestResolverJvmTest {
             put("client_id", "verifier2")
             put("nonce", "nonce-123")
         }.toString().encodeToByteArray(),
-        mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+        mapOf(
+            "typ" to JsonPrimitive("oauth-authz-req+jwt"),
+            "kid" to JsonPrimitive(key.getKeyId()),
+        ),
     )
 
     private fun jsonObjectOf(vararg pairs: Pair<String, kotlinx.serialization.json.JsonElement>) =

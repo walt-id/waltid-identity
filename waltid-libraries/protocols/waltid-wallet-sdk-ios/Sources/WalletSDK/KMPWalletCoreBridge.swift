@@ -348,8 +348,29 @@ private extension Waltid_openid4vc_walletWalletIssuanceIssuerPreview {
             name: name,
             locale: locale,
             logoURI: logoUri.flatMap(URL.init(string:)),
-            logoAltText: logoAltText
+            logoAltText: logoAltText,
+            metadataProvenance: metadataProvenance.toSwiftMetadataProvenance()
         )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceMetadataProvenance {
+    func toSwiftMetadataProvenance() -> MetadataProvenance {
+        switch self {
+        case is Waltid_openid4vc_walletWalletIssuanceMetadataProvenanceUnsigned:
+            return .unsigned
+        case let signed as Waltid_openid4vc_walletWalletIssuanceMetadataProvenanceSigned:
+            return .signed(
+                SignedMetadataProvenance(
+                    compactJWT: signed.compactJwt,
+                    algorithm: signed.algorithm,
+                    keyID: signed.keyId,
+                    trustType: signed.trustType == .trustedIssuer ? .trustedIssuer : .trustedDelegate
+                )
+            )
+        default:
+            preconditionFailure("Unsupported issuer metadata provenance: \(type(of: self))")
+        }
     }
 }
 
@@ -459,12 +480,46 @@ private extension WalletConfiguration {
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
+            issuerMetadataTrustResolver: issuerMetadataTrustResolver.map {
+                KMPIssuerMetadataTrustResolverAdapter(resolver: $0)
+            },
             preferredLocales: preferredLocales,
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
             clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration(),
             appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
             keychainAccessGroup: crossProcessAccess?.keychainAccessGroup
         )
+    }
+}
+
+private final class KMPIssuerMetadataTrustResolverAdapter: WalletBridgeIssuerMetadataTrustResolver, @unchecked Sendable {
+    private let resolver: any IssuerMetadataTrustResolver
+
+    init(resolver: any IssuerMetadataTrustResolver) {
+        self.resolver = resolver
+    }
+
+    func __verify(compactJwt: String, expectedCredentialIssuer: String) async throws -> WalletBridgeIssuerMetadataSigner {
+        let signer = try await resolver.verify(
+            compactJWT: compactJwt,
+            expectedCredentialIssuer: expectedCredentialIssuer
+        )
+        return WalletBridgeIssuerMetadataSigner(
+            keyId: signer.keyID,
+            algorithm: signer.algorithm,
+            trustType: signer.trustType.toKMPTrustType()
+        )
+    }
+}
+
+private extension MetadataTrustType {
+    func toKMPTrustType() -> WalletBridgeIssuerMetadataSignerTrustType {
+        switch self {
+        case .trustedIssuer:
+            return .trustedIssuer
+        case .trustedDelegate:
+            return .trustedDelegate
+        }
     }
 }
 
@@ -795,6 +850,7 @@ private extension MobileWalletPresentationRequestContext {
         PresentationRequestContext(
             clientID: clientId,
             verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
+            requestAuthentication: requestAuthentication.toSwiftRequestAuthentication(),
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
             nonce: nonce,
@@ -808,6 +864,7 @@ private extension MobileWalletPresentationRequestInfo {
         PresentationRequestInfo(
             clientID: clientId,
             verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
+            requestAuthentication: requestAuthentication.toSwiftRequestAuthentication(),
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
             nonce: nonce,
@@ -815,6 +872,45 @@ private extension MobileWalletPresentationRequestInfo {
             transactionData: swiftArray(transactionData, of: MobileWalletTransactionDataItem.self)
                 .map { $0.toSwiftTransactionData() }
         )
+    }
+}
+
+private extension MobileWalletRequestAuthentication {
+    func toSwiftRequestAuthentication() -> PresentationRequestAuthentication {
+        switch self {
+        case is MobileWalletRequestAuthenticationUnauthenticated:
+            return .unauthenticated
+        case let authenticated as MobileWalletRequestAuthenticationAuthenticated:
+            return .authenticated(
+                compactRequestObject: authenticated.compactRequestObject,
+                algorithm: authenticated.algorithm,
+                keyID: authenticated.keyId,
+                clientIDScheme: authenticated.clientIdScheme.toSwiftClientIDScheme()
+            )
+        default:
+            preconditionFailure("Unsupported request authentication: \(type(of: self))")
+        }
+    }
+}
+
+private extension MobileWalletClientIdScheme {
+    func toSwiftClientIDScheme() -> PresentationClientIDScheme {
+        switch self {
+        case .preRegistered:
+            return .preRegistered
+        case .redirectUri:
+            return .redirectURI
+        case .x509SanDns:
+            return .x509SanDNS
+        case .x509Hash:
+            return .x509Hash
+        case .decentralizedIdentifier:
+            return .decentralizedIdentifier
+        case .verifierAttestation:
+            return .verifierAttestation
+        case .openIdFederation:
+            return .openIDFederation
+        }
     }
 }
 

@@ -299,21 +299,35 @@ object AuthorizationRequestResolver {
             }
         }
         val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.contentOrNull
-        if (jwtAlg.equals("none", ignoreCase = true)) {
+        val authentication = if (jwtAlg.equals("none", ignoreCase = true)) {
             if (unsignedRequestObjectPolicy != UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) {
                 throw UnsignedAuthorizationRequestNotAllowedException()
             }
+            return ResolvedAuthorizationRequest.UnsignedRequestObject(
+                authorizationRequest = json.decodeFromJsonElement(
+                    deserializer = AuthorizationRequest.serializer(),
+                    element = authReqJws.payload,
+                ),
+                requestObject = requestObject,
+            )
         } else {
             log.trace { "Authenticating signed AuthorizationRequest object" }
-            authenticateSignedRequestObject(requestObject, authReqJws.payload, trustConfiguration)
+            authenticateSignedRequestObject(
+                requestObject = requestObject,
+                payload = authReqJws.payload,
+                algorithm = requireNotNull(jwtAlg) { "Signed AuthorizationRequest is missing alg" },
+                keyId = authReqJws.header["kid"]?.jsonPrimitive?.contentOrNull,
+                trustConfiguration = trustConfiguration,
+            )
         }
 
-        return ResolvedAuthorizationRequest.WithRequestObject(
+        return ResolvedAuthorizationRequest.AuthenticatedRequestObject(
             authorizationRequest = json.decodeFromJsonElement(
                 deserializer = AuthorizationRequest.serializer(),
                 element = authReqJws.payload,
             ),
             requestObject = requestObject,
+            authentication = authentication,
         )
     }
 
@@ -321,12 +335,14 @@ object AuthorizationRequestResolver {
     private suspend fun authenticateSignedRequestObject(
         requestObject: String,
         payload: JsonObject,
+        algorithm: String,
+        keyId: String?,
         trustConfiguration: ClientIdTrustConfiguration,
-    ) {
+    ): RequestObjectAuthentication {
         val clientId = requireNotNull(payload["client_id"]?.jsonPrimitive?.contentOrNull) {
             "Missing client_id for signed AuthorizationRequest"
         }
-        val clientIdPrefix = ClientIdPrefixParser.parse(clientId)
+        val parsedClientId = ClientIdPrefixParser.parse(clientId)
             .getOrElse { error -> throw IllegalArgumentException("Could not parse client_id prefix: $clientId", error) }
         val clientMetadata = payload["client_metadata"]?.let {
             ClientMetadata.fromJson(it)
@@ -342,7 +358,7 @@ object AuthorizationRequestResolver {
         )
 
         when (val validationResult = ClientIdPrefixAuthenticator.authenticate(
-            clientIdPrefix,
+            parsedClientId,
             context,
             preRegisteredMetadataProvider = { clientId ->
                 trustConfiguration.preRegisteredClients[clientId]?.let {
@@ -352,11 +368,16 @@ object AuthorizationRequestResolver {
             trustConfiguration = trustConfiguration,
         )) {
             is ClientValidationResult.Success -> {
-                log.trace { "Signed AuthorizationRequest authentication succeeded for client_id prefix ${clientIdPrefix::class.simpleName}" }
+                log.trace { "Signed AuthorizationRequest authentication succeeded for client_id scheme ${parsedClientId::class.simpleName}" }
             }
 
             is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(validationResult.error)
         }
+        return RequestObjectAuthentication(
+            clientId = parsedClientId,
+            algorithm = algorithm,
+            keyId = keyId,
+        )
     }
 
     private fun parseRequestUriMethod(value: String): RequestUriHttpMethod = when (value) {

@@ -65,8 +65,8 @@ class IssuerMetadataResolverTest {
         val resolver = IssuerMetadataResolver(client)
         val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl)
 
-        assertEquals(issuerUrl, metadata.credentialIssuer)
-        assertEquals(1, metadata.credentialConfigurationsSupported?.size)
+        assertEquals(issuerUrl, metadata.metadata.credentialIssuer)
+        assertEquals(1, metadata.metadata.credentialConfigurationsSupported.size)
     }
     @Test
     fun testResolveCredentialIssuerMetadataWithIssuerPath() = runTest {
@@ -101,8 +101,8 @@ class IssuerMetadataResolverTest {
         val resolver = IssuerMetadataResolver(client)
         val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl)
 
-        assertEquals(issuerUrl, metadata.credentialIssuer)
-        assertEquals("$issuerUrl/credential", metadata.credentialEndpoint)
+        assertEquals(issuerUrl, metadata.metadata.credentialIssuer)
+        assertEquals("$issuerUrl/credential", metadata.metadata.credentialEndpoint)
     }
 
     @Test

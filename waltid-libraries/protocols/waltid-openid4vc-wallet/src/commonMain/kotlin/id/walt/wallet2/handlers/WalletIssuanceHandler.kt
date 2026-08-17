@@ -35,6 +35,7 @@ import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
@@ -532,6 +533,7 @@ object WalletIssuanceHandler {
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): Flow<StoredCredential> = receiveCredentialFlowInternal(
         wallet = wallet,
         request = request,
@@ -542,6 +544,7 @@ object WalletIssuanceHandler {
         onDeferredTransactionId = onDeferredTransactionId,
         beforeCredentialsStored = beforeCredentialsStored,
         onCredentialStored = onCredentialStored,
+        metadataTrustResolver = metadataTrustResolver,
     )
 
     /**
@@ -588,6 +591,7 @@ object WalletIssuanceHandler {
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit,
         beforeCredentialsStored: suspend (Int) -> Unit,
         onCredentialStored: suspend (StoredCredential) -> Unit,
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver?,
     ): Flow<StoredCredential> = channelFlow {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -607,6 +611,7 @@ object WalletIssuanceHandler {
         val effectiveResolvedOffer = resolvedOffer ?: resolveIssuanceOffer(
             request.toResolveOfferRequest(),
             httpClient,
+            metadataTrustResolver,
         )
 
         // 2. Reuse issuer metadata and offered configurations from that resolution.
@@ -737,6 +742,7 @@ object WalletIssuanceHandler {
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
         val deferredIds = mutableMapOf<String, String>()
@@ -749,6 +755,7 @@ object WalletIssuanceHandler {
             onDeferredTransactionId = { configId, txId -> deferredIds[configId] = txId },
             beforeCredentialsStored = beforeCredentialsStored,
             onCredentialStored = onCredentialStored,
+            metadataTrustResolver = metadataTrustResolver,
         ).collect { ids += it.id }
         return ReceiveCredentialResult(credentialIds = ids, deferredTransactionIds = deferredIds)
     }
@@ -794,8 +801,9 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: ResolveOfferRequest,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): WalletOfferPreviewResult {
-        val resolvedOffer = resolveIssuanceOffer(request, httpClient)
+        val resolvedOffer = resolveIssuanceOffer(request, httpClient, metadataTrustResolver)
         val previewHandle = IssuancePreviewHandle(
             previewedOffers.create(walletId = wallet.id, value = resolvedOffer)
         )
@@ -820,10 +828,11 @@ object WalletIssuanceHandler {
     private suspend fun resolveIssuanceOffer(
         request: ResolveOfferRequest,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): ResolvedIssuanceOffer {
         val offer = resolveOffer(request, httpClient)
-        val metadataResolver = IssuerMetadataResolver(httpClient)
-        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        val metadataResolver = IssuerMetadataResolver(httpClient, metadataTrustResolver)
+        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer).metadata
         val asMetadata = metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         return ResolvedIssuanceOffer(
@@ -916,7 +925,7 @@ object WalletIssuanceHandler {
         val credentialIssuer = request.credentialIssuer?.takeIf { it.isNotBlank() }
         val asMetadata = credentialIssuer?.let {
             val metadataResolver = IssuerMetadataResolver(httpClient)
-            val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(it)
+            val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(it).metadata
             metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         }
         val attestationHeaders = asMetadata?.let {
@@ -973,7 +982,7 @@ object WalletIssuanceHandler {
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestNonceResult {
         val issuerMetadata = IssuerMetadataResolver(httpClient)
-            .resolveCredentialIssuerMetadata(request.credentialIssuer.toString())
+            .resolveCredentialIssuerMetadata(request.credentialIssuer.toString()).metadata
         return RequestNonceResult(
             nonce = requestProofNonce(
                 httpClient = httpClient,
@@ -991,7 +1000,7 @@ object WalletIssuanceHandler {
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for signing proof")
         val issuerMetadata = IssuerMetadataResolver(httpClient)
-            .resolveCredentialIssuerMetadata(request.issuerUrl.toString())
+            .resolveCredentialIssuerMetadata(request.issuerUrl.toString()).metadata
         val configuration = issuerMetadata.credentialConfigurationsSupported[request.credentialConfigurationId]
             ?: error(
                 "Unknown credential configuration '${request.credentialConfigurationId}' " +
@@ -1236,7 +1245,7 @@ object WalletIssuanceHandler {
     ): CredentialStorageContext {
         val resolvedIssuerMetadata = issuerMetadata
             ?: credentialIssuerBaseUrl?.let {
-                IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(it)
+                IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(it).metadata
             }
         return CredentialStorageContext(
             label = labelOverride
@@ -1280,7 +1289,7 @@ object WalletIssuanceHandler {
         httpClient: HttpClient,
     ): AuthorizationServerMetadata {
         val metadataResolver = IssuerMetadataResolver(httpClient)
-        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(credentialIssuerBaseUrl)
+        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(credentialIssuerBaseUrl).metadata
         return metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
     }
 
@@ -1346,7 +1355,7 @@ object WalletIssuanceHandler {
     suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult {
         val httpClient = defaultHttpClient()
         val offer = resolveOffer(request, httpClient)
-        val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer).metadata
         val asMetadata =
             IssuerMetadataResolver(httpClient).resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
 
@@ -1586,7 +1595,7 @@ object WalletIssuanceHandler {
 
         // Resolve issuer metadata again at continuation time and use only its advertised nonce endpoint.
         val issuerMetadata = IssuerMetadataResolver(httpClient)
-            .resolveCredentialIssuerMetadata(credentialIssuerBaseUrl)
+            .resolveCredentialIssuerMetadata(credentialIssuerBaseUrl).metadata
         nonceEndpoint?.let { expected ->
             require(expected == issuerMetadata.nonceEndpoint) {
                 "Provided nonce endpoint does not match credential issuer metadata"

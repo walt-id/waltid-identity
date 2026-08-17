@@ -86,7 +86,8 @@ class OpenId4VpPresentationService(
         resolvedRequest: ResolvedAuthorizationRequest,
     ): Url = when (resolvedRequest) {
         is ResolvedAuthorizationRequest.Plain -> buildWalletPresentationRequest(request, resolvedRequest.authorizationRequest)
-        is ResolvedAuthorizationRequest.WithRequestObject -> buildWalletPresentationRequest(request, resolvedRequest.requestObject)
+        is ResolvedAuthorizationRequest.UnsignedRequestObject -> buildWalletPresentationRequest(request, resolvedRequest.requestObject)
+        is ResolvedAuthorizationRequest.AuthenticatedRequestObject -> buildWalletPresentationRequest(request, resolvedRequest.requestObject)
     }
 
     suspend fun matchCredentialsForPresentationRequest(
