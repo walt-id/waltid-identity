@@ -3,6 +3,7 @@ package id.walt.openid4vci.clientauth.attestation.verifier
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.Key
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -34,10 +35,14 @@ class Crypto2KeyBasedClientAttestationVerifier(
                 return ClientAttestationVerificationResult.Verified
             } catch (cause: CancellationException) {
                 throw cause
-            } catch (_: Throwable) {
-                // Try the next explicitly trusted key.
+            } catch (cause: Throwable) {
+                log.debug(cause) { "Client attestation signature did not verify with trusted key ${key.id.value}" }
             }
         }
         return ClientAttestationVerificationResult.Rejected("Client attestation signature is invalid")
+    }
+
+    companion object {
+        private val log = KotlinLogging.logger {}
     }
 }

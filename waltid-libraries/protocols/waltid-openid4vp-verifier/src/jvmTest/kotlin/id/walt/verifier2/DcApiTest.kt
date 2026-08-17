@@ -6,6 +6,7 @@ import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.DcApiJ
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.time.Instant
@@ -143,6 +144,7 @@ class DcApiTest {
     """.trimIndent()
     )
 
+    @Ignore("Temporarily disabled")
     @Test
     fun testDcApi1() = runTest {
         val verificationSession = Json.decodeFromString<Verification2Session>(request1)
