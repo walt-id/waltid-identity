@@ -9,10 +9,12 @@ import id.walt.issuer2.controller.Issuer2ManagementController
 import id.walt.issuer2.controller.OpenId4VciController
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.repository.ConfiguredIssuanceSessionRepository
+import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPARRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredRefreshTokenRepository
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.CredentialOfferService
@@ -27,10 +29,10 @@ class Issuer2Module @JvmOverloads constructor(
     profilesConfig: Issuer2ProfilesConfig,
     credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
     credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
+    issuanceSessionRepository: IssuanceSessionRepository = ConfiguredIssuanceSessionRepository(),
+    preAuthorizedCodeRepository: PreAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository(),
 ) {
-    private val issuanceSessionRepository = ConfiguredIssuanceSessionRepository()
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
-    private val preAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository()
     private val parRepository = ConfiguredPARRepository()
     private val refreshTokenRepository = ConfiguredRefreshTokenRepository()
     private val notificationService = IssuanceNotificationService()
