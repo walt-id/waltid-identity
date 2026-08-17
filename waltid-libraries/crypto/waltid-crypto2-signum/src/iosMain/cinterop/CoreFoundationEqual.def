@@ -1,0 +1,6 @@
+language = Objective-C
+package = id.walt.crypto2.signum.corefoundation
+headers = CoreFoundationEqual.h
+headerFilter = CoreFoundationEqual.h
+compilerOpts = -framework CoreFoundation
+linkerOpts = -framework CoreFoundation

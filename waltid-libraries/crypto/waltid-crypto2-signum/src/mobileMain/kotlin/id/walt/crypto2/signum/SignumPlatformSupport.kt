@@ -113,10 +113,10 @@ internal class SignumPlatformKeyHandle(
     override val attestation: SignumKeyAttestation?,
     private val authentication: SignumAuthenticationPolicy,
     private val signerFor: suspend (SignatureAlgorithm) -> PlatformSigningProviderSigner<*, *>,
-    defaultSigner: PlatformSigningProviderSigner<*, *>,
+    private val nativePublicKey: CryptoPublicKey,
     keyAgreementEnabled: Boolean,
 ) : SignumPlatformKey {
-    override val publicKey = EncodedKey.SpkiDer(BinaryData(defaultSigner.publicKey.encodeToTlv().derEncoded))
+    override val publicKey = EncodedKey.SpkiDer(BinaryData(nativePublicKey.encodeToTlv().derEncoded))
     override val signatureAlgorithms = spec.nativeSignatureAlgorithms()
     override val keyAgreementAlgorithms = if (keyAgreementEnabled) setOf(KeyAgreementAlgorithm.Ecdh) else emptySet()
 
@@ -137,7 +137,7 @@ internal class SignumPlatformKeyHandle(
             is KeySpec.Rsa -> CryptoSignature.RSA(signature)
             else -> error("Unsupported Signum key specification")
         }
-        return signumAlgorithm.verifierFor(signerFor(algorithm).publicKey).getOrThrow()
+        return signumAlgorithm.verifierFor(nativePublicKey).getOrThrow()
             .verify(SignatureInput(data), cryptoSignature).isSuccess
     }
 
