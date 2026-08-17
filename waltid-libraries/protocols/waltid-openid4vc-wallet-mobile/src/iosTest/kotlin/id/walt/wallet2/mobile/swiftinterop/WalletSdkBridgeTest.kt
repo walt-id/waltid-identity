@@ -36,6 +36,8 @@ import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.waltid.openid4vci.wallet.metadata.MetadataSigner
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
@@ -214,6 +216,40 @@ class WalletSdkBridgeTest {
             ),
             preview.request.requestAuthentication,
         )
+    }
+
+    @Test
+    fun bridgeIssuerMetadataTrustResolverPreservesSignerFacts() = runTest {
+        listOf(
+            WalletBridgeIssuerMetadataSignerTrustType.TrustedIssuer to MetadataSignerTrustType.TRUSTED_ISSUER,
+            WalletBridgeIssuerMetadataSignerTrustType.TrustedDelegate to MetadataSignerTrustType.TRUSTED_DELEGATE,
+        ).forEach { (bridgeTrustType, expectedTrustType) ->
+            val configured = WalletBridgeConfiguration(
+                issuerMetadataTrustResolver = object : WalletBridgeIssuerMetadataTrustResolver {
+                    override suspend fun verify(
+                        compactJwt: String,
+                        expectedCredentialIssuer: String,
+                    ) = WalletBridgeIssuerMetadataSigner(
+                        keyId = "issuer-key",
+                        algorithm = "ES256",
+                        trustType = bridgeTrustType,
+                    ).also {
+                        assertEquals("signed-metadata-jwt", compactJwt)
+                        assertEquals("https://issuer.example", expectedCredentialIssuer)
+                    }
+                },
+            ).toMobileWalletConfig()
+
+            val signer = requireNotNull(configured.credentialIssuerMetadataTrustResolver).verify(
+                "signed-metadata-jwt",
+                "https://issuer.example",
+            )
+
+            assertEquals(
+                MetadataSigner("issuer-key", "ES256", expectedTrustType),
+                signer,
+            )
+        }
     }
 
     @Test

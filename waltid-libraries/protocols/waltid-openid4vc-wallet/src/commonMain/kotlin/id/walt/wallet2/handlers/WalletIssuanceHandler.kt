@@ -900,12 +900,19 @@ object WalletIssuanceHandler {
      *
      * Use this for stateless "resolve for display" flows that render an issuer/credential preview and then
      * complete issuance by re-sending the offer (e.g. via the pre-authorized or authorization-code endpoints).
+     *
+     * @param request Credential offer URL or inline offer JSON to resolve.
+     * @param httpClient HTTP client used for offer and metadata resolution.
+     * @param metadataTrustResolver Optional trust boundary for signed Credential Issuer Metadata. When
+     * absent, only unsigned metadata is accepted.
+     * @return Resolved offer summary, issuer metadata resolution, offered credentials, and transaction code.
      */
     suspend fun resolveOfferDetailed(
         request: ResolveOfferRequest,
         httpClient: HttpClient = defaultHttpClient(),
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): WalletOfferResolution {
-        val resolved = resolveIssuanceOffer(request, httpClient)
+        val resolved = resolveIssuanceOffer(request, httpClient, metadataTrustResolver)
         return WalletOfferResolution(
             summary = resolved.summary,
             resolvedIssuerMetadata = resolved.resolvedIssuerMetadata,

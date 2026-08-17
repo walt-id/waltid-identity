@@ -269,6 +269,101 @@ class WalletIssuanceHandlerPreviewTest {
     }
 
     @Test
+    fun detailedOfferResolutionRetainsUnsignedMetadataWithoutTrustResolver() = runTest {
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.toString()) {
+                        OFFER_URL -> respondJson(CREDENTIAL_OFFER)
+                        "$ISSUER/.well-known/openid-credential-issuer" -> respondJson(ISSUER_METADATA)
+                        "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
+                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        val resolution = WalletIssuanceHandler.resolveOfferDetailed(
+            request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
+            httpClient = client,
+        )
+
+        assertIs<ResolvedCredentialIssuerMetadata.Unsigned>(resolution.resolvedIssuerMetadata)
+        assertEquals(ISSUER, resolution.resolvedIssuerMetadata.metadata.credentialIssuer)
+        assertEquals("pid", resolution.offeredCredentials.single().credentialConfigurationId)
+    }
+
+    @Test
+    fun detailedOfferResolutionRetainsExactSignedMetadataAndSigner() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val compactJwt = signedIssuerMetadata().toSignedJwt(key)
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.toString()) {
+                        OFFER_URL -> respondJson(CREDENTIAL_OFFER)
+                        "$ISSUER/.well-known/openid-credential-issuer" -> respond(
+                            content = compactJwt,
+                            headers = headersOf(HttpHeaders.ContentType, "application/jwt"),
+                        )
+                        "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
+                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        val signer = MetadataSigner(key.getKeyId(), "EdDSA", MetadataSignerTrustType.TRUSTED_ISSUER)
+        val resolution = WalletIssuanceHandler.resolveOfferDetailed(
+            request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
+            httpClient = client,
+            metadataTrustResolver = { candidate, expectedIssuer ->
+                assertEquals(compactJwt, candidate)
+                assertEquals(ISSUER, expectedIssuer)
+                key.getPublicKey().verifyJws(candidate).getOrThrow()
+                signer
+            },
+        )
+
+        val signed = assertIs<ResolvedCredentialIssuerMetadata.Signed>(resolution.resolvedIssuerMetadata)
+        assertEquals(compactJwt, signed.compactJwt)
+        assertEquals(signer, signed.signer)
+        assertEquals(ISSUER, signed.metadata.credentialIssuer)
+    }
+
+    @Test
+    fun detailedOfferResolutionRejectsUntrustedSignedMetadata() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val compactJwt = signedIssuerMetadata().toSignedJwt(key)
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.toString()) {
+                        OFFER_URL -> respondJson(CREDENTIAL_OFFER)
+                        "$ISSUER/.well-known/openid-credential-issuer" -> respond(
+                            content = compactJwt,
+                            headers = headersOf(HttpHeaders.ContentType, "application/jwt"),
+                        )
+                        "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
+                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        assertFails {
+            WalletIssuanceHandler.resolveOfferDetailed(
+                request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
+                httpClient = client,
+                metadataTrustResolver = { _, _ -> error("untrusted signer") },
+            )
+        }
+    }
+
+    @Test
     fun successfulIssuanceConsumesPreview() = runTest {
         val client = HttpClient(MockEngine) {
             engine {
