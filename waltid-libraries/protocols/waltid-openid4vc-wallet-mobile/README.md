@@ -34,6 +34,18 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 - Present credentials using OpenID4VP.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
 
+## Key-use authorization
+
+New wallet keys default to `BiometricCurrentSet`; callers that need unprotected
+signing must explicitly select `KeyUseAuthorizationPolicy.None`. The protected
+policy is P-256 only, requires a current resumed Android `FragmentActivity` for
+each signing prompt, rejects device-credential fallback, and invalidates the key
+when the biometric enrollment set changes. iOS protected keys require a physical
+Secure Enclave device and an `NSFaceIDUsageDescription` host-app entry.
+
+The policy is chosen only while creating a new key. Restored keys retain their
+persisted policy; changing the default never weakens or recreates an existing key.
+
 ## Receiving credentials
 
 Start an issuance session to resolve the offer and retain the exact reviewed

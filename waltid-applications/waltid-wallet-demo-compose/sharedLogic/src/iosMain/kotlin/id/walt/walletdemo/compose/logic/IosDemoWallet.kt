@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
 import id.walt.wallet2.mobile.MobileWalletFactory
@@ -34,6 +36,15 @@ fun createIosDemoWallet(
                     preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },
                     crossProcessAccess = crossProcessAccess,
                     onDigitalCredentialRegistryChanged = onDigitalCredentialRegistryChanged,
+                    defaultKeyUseAuthorizationPolicy = if (config.biometricEnabled) {
+                        KeyUseAuthorizationPolicy.BiometricCurrentSet
+                    } else {
+                        KeyUseAuthorizationPolicy.None
+                    },
+                    keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
+                        reason = "Authorize wallet signing",
+                        cancelText = "Cancel",
+                    ),
                 )
             ),
             warning = transactionDataProfiles.warning,

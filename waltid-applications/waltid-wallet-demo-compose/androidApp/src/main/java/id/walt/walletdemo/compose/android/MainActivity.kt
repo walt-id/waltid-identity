@@ -4,11 +4,11 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
+import androidx.fragment.app.FragmentActivity
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
@@ -16,7 +16,9 @@ import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
 import id.walt.walletdemo.compose.ui.WalletDemoApp
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+const val WALLET_BIOMETRIC_ENABLED_EXTRA = "id.walt.walletdemo.compose.android.WALLET_BIOMETRIC_ENABLED"
+
+class MainActivity : FragmentActivity() {
     private lateinit var controller: WalletDemoController
     private val onCredentialStoreChanged: () -> Unit = {
         if (::controller.isInitialized) {
@@ -31,11 +33,17 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
 
-        val config = demoWalletConfig()
+        val config = demoWalletConfig().copy(
+            biometricEnabled = intent.getBooleanExtra(
+                WALLET_BIOMETRIC_ENABLED_EXTRA,
+                BuildConfig.WALLET_BIOMETRIC_ENABLED,
+            ),
+        )
         controller = WalletDemoController(
             wallet = createAndroidDemoWallet(
                 context = applicationContext,
                 config = config,
+                interactionContextProvider = { this@MainActivity },
             ),
             pinStore = createAndroidDemoPinStore(applicationContext, config.walletId),
         )

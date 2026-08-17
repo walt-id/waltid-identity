@@ -105,6 +105,15 @@ Issuance uses DPoP consistently for authorization binding, token exchange, and
 protected credential requests whenever the authorization server advertises
 supported DPoP signing algorithms.
 
+## Protected keys
+
+New signing keys default to `.biometricCurrentSet`. Select `.none` explicitly
+when an unprotected key is required, such as simulator-only development. Protected
+keys are P-256, Secure Enclave-backed on a qualifying physical device, require
+biometric authorization for every signature, and do not allow device-passcode
+fallback. The host app must declare `NSFaceIDUsageDescription` in its Info.plist.
+Changing the configured default never changes an existing persisted key.
+
 ## Local persistence
 
 `WalletConfiguration()` uses managed persistence by default. The SDK opens an encrypted SQLDelight database through SQLCipher and manages the per-wallet database key internally in iOS Keychain. Apps using the normal Swift facade do not pass database key material.

@@ -15,4 +15,5 @@ internal fun demoWalletConfig(): DemoWalletConfig = DemoWalletConfig(
     attestationBearerToken = BuildConfig.ATTESTATION_BEARER_TOKEN,
     attestationHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
     transactionDataProfilesUrl = BuildConfig.TRANSACTION_DATA_PROFILES_URL,
+    biometricEnabled = BuildConfig.WALLET_BIOMETRIC_ENABLED,
 )
