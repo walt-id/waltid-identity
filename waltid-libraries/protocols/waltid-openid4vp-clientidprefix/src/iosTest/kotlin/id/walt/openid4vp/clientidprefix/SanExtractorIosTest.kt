@@ -1,6 +1,10 @@
 package id.walt.openid4vp.clientidprefix
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
+import id.walt.certificate.x509.model.GeneralName
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import kotlinx.io.bytestring.ByteString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -14,7 +18,12 @@ class SanExtractorIosTest {
 
         assertEquals(
             expected = listOf("verifier.example.com"),
-            actual = extractSanDnsNamesFromDer(der).getOrThrow(),
+            actual = X509CertificateUtil.parseCertificateDerEncoded(ByteString(der))
+                .data.extensionSan
+                ?.alternativeNames
+                ?.filter { it.type == GeneralName.NameType.dNSName }
+                ?.map { it.value }
+                ?: emptyList(),
         )
     }
 }
