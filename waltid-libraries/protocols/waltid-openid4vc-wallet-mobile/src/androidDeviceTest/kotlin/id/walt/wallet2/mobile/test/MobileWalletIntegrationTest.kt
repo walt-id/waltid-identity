@@ -150,7 +150,7 @@ class MobileWalletIntegrationTest {
         val offer = DemoTestBackend.createOffer(scenario)
 
         val issuanceSession = client.startIssuance(
-            MobileWalletIssuanceRequest(offerUrl = offer.offerUrl),
+            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offer.offerUrl)),
         )
         val issuerProvenance = assertIs<WalletIssuanceMetadataProvenance.Signed>(
             issuanceSession.offer.issuer.metadataProvenance,
