@@ -153,8 +153,6 @@ public enum WalletKeyUseAuthorizationUnsupportedReason: Equatable, Sendable {
     case biometricUnavailable
     /// No biometric is enrolled on the device.
     case biometricNotEnrolled
-    /// The host application did not provide a usable interaction context.
-    case interactionContextUnavailable
 }
 
 /// Result of checking whether an exact protected-key request can be enforced.

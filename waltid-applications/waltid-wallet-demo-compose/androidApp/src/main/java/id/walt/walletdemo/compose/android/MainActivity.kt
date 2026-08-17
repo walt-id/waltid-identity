@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
 import androidx.fragment.app.FragmentActivity
+import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
@@ -20,6 +21,7 @@ const val WALLET_BIOMETRIC_ENABLED_EXTRA = "id.walt.walletdemo.compose.android.W
 
 class MainActivity : FragmentActivity() {
     private lateinit var controller: WalletDemoController
+    private lateinit var walletConfig: DemoWalletConfig
     private val onCredentialStoreChanged: () -> Unit = {
         if (::controller.isInitialized) {
             controller.refreshCredentialsFromStore()
@@ -33,7 +35,7 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
 
-        val config = demoWalletConfig().copy(
+        walletConfig = demoWalletConfig().copy(
             biometricEnabled = intent.getBooleanExtra(
                 WALLET_BIOMETRIC_ENABLED_EXTRA,
                 BuildConfig.WALLET_BIOMETRIC_ENABLED,
@@ -42,10 +44,10 @@ class MainActivity : FragmentActivity() {
         controller = WalletDemoController(
             wallet = createAndroidDemoWallet(
                 context = applicationContext,
-                config = config,
+                config = walletConfig,
                 interactionContextProvider = { this@MainActivity },
             ),
-            pinStore = createAndroidDemoPinStore(applicationContext, config.walletId),
+            pinStore = createAndroidDemoPinStore(applicationContext, walletConfig.walletId),
         )
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         handleIntent(intent)
@@ -94,7 +96,7 @@ class MainActivity : FragmentActivity() {
             runCatching {
                 val created = createAndroidDemoMobileWallet(
                     context = applicationContext,
-                    config = demoWalletConfig(),
+                    config = walletConfig,
                     interactionContextProvider = { this@MainActivity },
                 )
                 created.wallet.bootstrap()
