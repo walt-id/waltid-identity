@@ -93,7 +93,6 @@ Some popular libraries you may want to look at are:
 
 - Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
 - Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
-- See what's new: [Changelog](https://github.com/walt-id/waltid-identity/blob/main/CHANGELOG.md) | [Breaking Changes](https://github.com/walt-id/waltid-identity/blob/main/BREAKING_CHANGES.md)
 - Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 
