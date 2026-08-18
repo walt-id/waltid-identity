@@ -137,12 +137,20 @@ final class WalletAPITests: XCTestCase {
         let policy = WalletKeyUseAuthorizationPolicy.biometricTimedReuse(timeoutSeconds: 10)
         let preflight = WalletKeyUseAuthorizationPreflight.supported(
             effectivePolicy: policy,
-            reuseEnforcement: .providerProcess
+            reuseEnforcement: .providerProcess,
+            timeoutVerification: .providerConfigured
         )
 
         acceptsSendable(policy)
         acceptsSendable(preflight)
-        XCTAssertEqual(preflight, .supported(effectivePolicy: policy, reuseEnforcement: .providerProcess))
+        XCTAssertEqual(
+            preflight,
+            .supported(
+                effectivePolicy: policy,
+                reuseEnforcement: .providerProcess,
+                timeoutVerification: .providerConfigured
+            )
+        )
     }
 
     func testPresentationPreviewModelsAreValueTypesAndEquatable() {
@@ -883,7 +891,8 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         }
         return keyUseAuthorizationPreflightResult ?? .supported(
             effectivePolicy: policy,
-            reuseEnforcement: nil
+            reuseEnforcement: nil,
+            timeoutVerification: nil
         )
     }
 

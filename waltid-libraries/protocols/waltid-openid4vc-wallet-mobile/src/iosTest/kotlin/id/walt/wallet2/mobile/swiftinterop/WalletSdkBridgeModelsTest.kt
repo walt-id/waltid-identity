@@ -7,6 +7,7 @@ import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutVerification
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import kotlinx.coroutines.CancellationException
@@ -88,7 +89,7 @@ class WalletSdkBridgeModelsTest {
     }
 
     @Test
-    fun bridgeTimedAuthorizationPolicyPreservesTimeoutAndProviderEnforcement() {
+    fun bridgeTimedAuthorizationPolicyPreservesTimeoutAndProviderVerification() {
         val timed = WalletBridgeKeyUseAuthorizationPolicy(
             type = WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse,
             timeoutSeconds = 10,
@@ -99,6 +100,7 @@ class WalletSdkBridgeModelsTest {
         val preflight = KeyUseAuthorizationSupport.Supported(
             effectivePolicy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10),
             reuseEnforcement = KeyUseAuthorizationReuseEnforcement.ProviderProcess,
+            timeoutVerification = KeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured,
         ).toBridgeModel()
 
         assertEquals(timed, preflight.effectivePolicy)
@@ -106,6 +108,30 @@ class WalletSdkBridgeModelsTest {
             WalletBridgeKeyUseAuthorizationReuseEnforcement.ProviderProcess,
             preflight.reuseEnforcement,
         )
+        assertEquals(
+            WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured,
+            preflight.timeoutVerification,
+        )
+    }
+
+    @Test
+    fun bridgePreflightRejectsIncompleteOrMismatchedTimedMetadata() {
+        val policy = WalletBridgeKeyUseAuthorizationPolicy(
+            type = WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse,
+            timeoutSeconds = 10,
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeKeyPreflight(supported = true, effectivePolicy = policy)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeKeyPreflight(
+                supported = true,
+                effectivePolicy = policy,
+                reuseEnforcement = WalletBridgeKeyUseAuthorizationReuseEnforcement.PlatformKeyStore,
+                timeoutVerification = WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured,
+            )
+        }
     }
 
     @Test

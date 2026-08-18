@@ -77,9 +77,12 @@ simulator cannot validate Secure Enclave or Face ID behavior.
 Use `.biometricTimedReuse(timeoutSeconds:)` for a fixed 1–30 second interval
 after successful strong-biometric authorization. The interval does not slide on
 signing and new biometric enrollment does not invalidate the key. Check the
-preflight result's `reuseEnforcement`: iOS reports provider-process enforcement,
-which can expire earlier but never runs longer than the requested interval. This
-policy has no action, session, or batch scope.
+preflight result's `reuseEnforcement` and `timeoutVerification`: iOS reports
+provider-process enforcement with provider-configured timeout verification.
+Signum receives the requested interval, but its pinned public API cannot
+independently expose the effective positive timeout after restoration. Timed
+reuse is recent provider authentication, not issuance, presentation, or other
+wallet-action consent, and is not guaranteed to be key-local.
 
 Use the returned ``WalletBootstrapResult/did`` when a verifier flow needs an
 explicit wallet DID.

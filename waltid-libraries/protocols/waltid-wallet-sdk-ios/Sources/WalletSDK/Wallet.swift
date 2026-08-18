@@ -65,7 +65,7 @@ public actor Wallet {
         )
     }
 
-    /// Checks whether an exact key-use authorization request can be enforced without creating a key.
+    /// Checks whether a key-use authorization request is supported without creating a key.
     ///
     /// - Parameters:
     ///   - keyType: Optional key type override. When omitted, the configured default is used.

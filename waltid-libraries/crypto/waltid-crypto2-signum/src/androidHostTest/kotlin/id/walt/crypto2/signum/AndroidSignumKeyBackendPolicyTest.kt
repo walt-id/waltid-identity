@@ -14,6 +14,8 @@ import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AndroidSignumKeyBackendPolicyTest {
@@ -51,7 +53,7 @@ class AndroidSignumKeyBackendPolicyTest {
             isUserAuthenticationRequired = false,
             userAuthenticationValidityDurationSeconds = -1,
             isInvalidatedByBiometricEnrollment = false,
-            userAuthenticationType = null,
+            userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
         )
     }
 
@@ -65,7 +67,7 @@ class AndroidSignumKeyBackendPolicyTest {
             isUserAuthenticationRequired = false,
             userAuthenticationValidityDurationSeconds = -1,
             isInvalidatedByBiometricEnrollment = false,
-            userAuthenticationType = null,
+            userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
         )
     }
 
@@ -80,7 +82,7 @@ class AndroidSignumKeyBackendPolicyTest {
                 isUserAuthenticationRequired = false,
                 userAuthenticationValidityDurationSeconds = -1,
                 isInvalidatedByBiometricEnrollment = false,
-                userAuthenticationType = null,
+                userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
             )
         }
     }
@@ -225,6 +227,32 @@ class AndroidSignumKeyBackendPolicyTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun `expired timed reuse without interaction context maps to stable boundary failure`() {
+        val cause = UnsupportedOperationException("A prompt host is unavailable")
+
+        val mapped = cause.mapTimedReuseInteractionContextFailure(
+            alias = "timed-biometric",
+            hasInteractionContext = false,
+        )
+
+        assertIs<SignumInteractionContextUnavailableException>(mapped)
+        assertSame(cause, mapped.cause)
+    }
+
+    @Test
+    fun `timed reuse preserves provider failure when an interaction context can prompt`() {
+        val cause = UnsupportedOperationException("Timed authorization expired")
+
+        assertSame(
+            cause,
+            cause.mapTimedReuseInteractionContextFailure(
+                alias = "timed-biometric",
+                hasInteractionContext = true,
+            ),
+        )
     }
 
     @Test

@@ -126,6 +126,11 @@ private fun KeyUseAuthorizationPolicy.supportedOnIos(): KeyUseAuthorizationSuppo
         } else {
             null
         },
+        timeoutVerification = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
+            KeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured
+        } else {
+            null
+        },
     )
 
 private val isSimulator: Boolean by lazy {

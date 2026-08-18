@@ -74,6 +74,22 @@ final enum class id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthoriza
     }
 }
 
+final enum class id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification : kotlin/Enum<id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification> { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification|null[0]
+    enum entry PlatformVerified // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.PlatformVerified|null[0]
+    enum entry ProviderConfigured // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured|null[0]
+
+    final val entries // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 final enum class id.walt.wallet2.mobile/IosIdentityDocumentRegistrationStatus : kotlin/Enum<id.walt.wallet2.mobile/IosIdentityDocumentRegistrationStatus> { // id.walt.wallet2.mobile/IosIdentityDocumentRegistrationStatus|null[0]
     enum entry AUTHORIZED // id.walt.wallet2.mobile/IosIdentityDocumentRegistrationStatus.AUTHORIZED|null[0]
     enum entry NOT_AUTHORIZED // id.walt.wallet2.mobile/IosIdentityDocumentRegistrationStatus.NOT_AUTHORIZED|null[0]
@@ -672,11 +688,14 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight { // id
         final fun <get-reuseEnforcement>(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseEnforcement? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.reuseEnforcement.<get-reuseEnforcement>|<get-reuseEnforcement>(){}[0]
     final val supported // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.supported|{}supported[0]
         final fun <get-supported>(): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.supported.<get-supported>|<get-supported>(){}[0]
+    final val timeoutVerification // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.timeoutVerification|{}timeoutVerification[0]
+        final fun <get-timeoutVerification>(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.timeoutVerification.<get-timeoutVerification>|<get-timeoutVerification>(){}[0]
 
     final fun component1(): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.component1|component1(){}[0]
     final fun component2(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicy? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.component2|component2(){}[0]
     final fun component3(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseEnforcement? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.component3|component3(){}[0]
-    final fun component4(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.component4|component4(){}[0]
+    final fun component4(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationReuseTimeoutVerification? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.component4|component4(){}[0]
+    final fun component5(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.component5|component5(){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.toString|toString(){}[0]

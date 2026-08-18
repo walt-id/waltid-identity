@@ -2,6 +2,7 @@ package id.walt.crypto2.signum
 
 import android.os.Build
 import android.security.keystore.KeyProperties
+import android.security.keystore.UserNotAuthenticatedException
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
@@ -31,8 +32,7 @@ public class AndroidSignumKeyBackend(
         spec.isSupportedSignumSpec() &&
             usages.all { it == KeyUsage.SIGN || it == KeyUsage.VERIFY || it == KeyUsage.KEY_AGREEMENT } &&
             (KeyUsage.KEY_AGREEMENT !in usages || spec is KeySpec.Ec) &&
-            (KeyUsage.KEY_AGREEMENT in usages) == policy.keyAgreement &&
-            (!policy.authentication.isBiometricTimedReuse() || Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+            (KeyUsage.KEY_AGREEMENT in usages) == policy.keyAgreement
 
     override suspend fun create(
         alias: String,
@@ -118,6 +118,13 @@ public class AndroidSignumKeyBackend(
                     throw failure.mapSignumFailure(alias)
                 }
             },
+            operationFailureMapper = { failure ->
+                if (policy.authentication.isBiometricTimedReuse()) {
+                    failure.mapTimedReuseInteractionContextFailure(alias, availableInteractionContext() != null)
+                } else {
+                    failure
+                }
+            },
             nativePublicKey = signer.publicKey,
             keyAgreementEnabled = KeyUsage.KEY_AGREEMENT in usages && policy.keyAgreement,
         )
@@ -144,9 +151,7 @@ public class AndroidSignumKeyBackend(
             isUserAuthenticationRequired = info.isUserAuthenticationRequired,
             userAuthenticationValidityDurationSeconds = info.userAuthenticationValidityDurationSeconds,
             isInvalidatedByBiometricEnrollment = info.isInvalidatedByBiometricEnrollment,
-            userAuthenticationType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                info.userAuthenticationType
-            } else null,
+            userAuthenticationType = info.userAuthenticationType,
         )
     }
 
@@ -176,7 +181,7 @@ internal fun validateAndroidNativePolicy(
     isUserAuthenticationRequired: Boolean,
     userAuthenticationValidityDurationSeconds: Int,
     isInvalidatedByBiometricEnrollment: Boolean,
-    userAuthenticationType: Int?,
+    userAuthenticationType: Int,
 ) {
     if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
         if (!isInsideSecureHardware) {
@@ -201,7 +206,7 @@ internal fun validateAndroidNativePolicy(
                 "the native key does not require biometric authentication for every use",
             )
         }
-        if (userAuthenticationType != null && userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG) {
+        if (userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG) {
             throw SignumKeyPolicyMismatchException(alias, "the native key does not require BIOMETRIC_STRONG")
         }
     }
@@ -216,9 +221,26 @@ internal fun validateAndroidNativePolicy(
                 "the native key does not enforce the requested biometric authorization reuse interval",
             )
         }
-        if (userAuthenticationType != null && userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG) {
+        if (userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG) {
             throw SignumKeyPolicyMismatchException(alias, "the native key does not require BIOMETRIC_STRONG")
         }
+    }
+}
+
+/**
+ * Converts an expired timed-reuse operation with no viable AndroidX prompt host into the stable
+ * wallet boundary failure before a provider-specific exception can escape.
+ */
+internal fun Throwable.mapTimedReuseInteractionContextFailure(alias: String, hasInteractionContext: Boolean): Throwable {
+    if (hasInteractionContext) return this
+    val causes = generateSequence(this) { it.cause }.toList()
+    return if (causes.any { it is UserNotAuthenticatedException || it is UnsupportedOperationException }) {
+        SignumInteractionContextUnavailableException(
+            "A resumed FragmentActivity is required to reauthorize timed Signum key $alias",
+            this,
+        )
+    } else {
+        this
     }
 }
 

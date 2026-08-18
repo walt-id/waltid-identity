@@ -12,7 +12,7 @@ import id.walt.crypto2.keys.StoredKey
  * exceptions.
  */
 public interface PlatformManagedKeyProvider {
-    /** Checks whether the exact requirements can be enforced without fallback. */
+    /** Checks whether the requested requirements are supported without fallback. */
     public suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport
 
     /** Generates a managed key in the platform key store. */

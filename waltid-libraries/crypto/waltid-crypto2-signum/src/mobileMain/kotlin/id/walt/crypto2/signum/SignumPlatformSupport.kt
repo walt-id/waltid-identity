@@ -113,6 +113,7 @@ internal class SignumPlatformKeyHandle(
     override val attestation: SignumKeyAttestation?,
     private val authentication: SignumAuthenticationPolicy,
     private val signerFor: suspend (SignatureAlgorithm) -> PlatformSigningProviderSigner<*, *>,
+    private val operationFailureMapper: (Throwable) -> Throwable = { it },
     private val nativePublicKey: CryptoPublicKey,
     keyAgreementEnabled: Boolean,
 ) : SignumPlatformKey {
@@ -122,10 +123,14 @@ internal class SignumPlatformKeyHandle(
 
     override suspend fun sign(data: ByteArray, algorithm: SignatureAlgorithm): ByteArray {
         require(algorithm in signatureAlgorithms) { "Unsupported Signum signature algorithm" }
-        return when (val result = signerFor(algorithm).sign(data)) {
-            is SignatureResult.Success -> result.signature.rawByteArray
-            is SignatureResult.Failure -> throw SignumUserCancelledException(result.problem)
-            is SignatureResult.Error -> throw result.exception
+        return try {
+            when (val result = signerFor(algorithm).sign(data)) {
+                is SignatureResult.Success -> result.signature.rawByteArray
+                is SignatureResult.Failure -> throw SignumUserCancelledException(result.problem)
+                is SignatureResult.Error -> throw result.exception
+            }
+        } catch (cause: Throwable) {
+            throw operationFailureMapper(cause)
         }
     }
 
