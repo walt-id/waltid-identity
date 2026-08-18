@@ -2,20 +2,8 @@ package id.walt.issuer2.repository
 
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.commons.persistence.Persistence
-import id.walt.crypto.keys.KeyManager
-import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toPublicJwk
-import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.issuer2.domain.IssuanceSession
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -35,14 +23,12 @@ class ConfiguredIssuanceSessionRepository(
         decoding = { it },
     ),
 ) : IssuanceSessionRepository {
-    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
-    private val migration = V1KeyMigration()
     override suspend fun save(session: IssuanceSession): IssuanceSession {
         val ttl = ttlUntil(session.expiresAt)
         val existingSidecar = crypto2Keys[session.sessionId]
-        val sidecar = session.crypto2IssuerStoredKey ?: migrateLegacyKey(session)
+        val sidecar = session.crypto2IssuerStoredKey ?: IssuanceSessionCrypto2Keys.migrateLegacyKey(session)
         sidecar?.let {
-            require(sidecarMatchesSession(session, it)) {
+            require(IssuanceSessionCrypto2Keys.sidecarMatchesSession(session, it)) {
                 "Issuer2 crypto2 sidecar does not match the legacy session key"
             }
         }
@@ -84,10 +70,10 @@ class ConfiguredIssuanceSessionRepository(
     private suspend fun attachCrypto2Key(session: IssuanceSession, backfill: Boolean): IssuanceSession {
         val persisted = crypto2Keys[session.sessionId]
         if (persisted != null) {
-            if (sidecarMatchesSession(session, persisted)) {
+            if (IssuanceSessionCrypto2Keys.sidecarMatchesSession(session, persisted)) {
                 return session.copy(crypto2IssuerStoredKey = persisted)
             }
-            val repaired = migrateLegacyKey(session)
+            val repaired = IssuanceSessionCrypto2Keys.migrateLegacyKey(session)
             if (repaired != null) {
                 if (backfill) crypto2Keys.set(session.sessionId, repaired, ttlUntil(session.expiresAt))
                 return session.copy(crypto2IssuerStoredKey = repaired)
@@ -95,37 +81,9 @@ class ConfiguredIssuanceSessionRepository(
             if (backfill) crypto2Keys.remove(session.sessionId)
             return session
         }
-        val migrated = migrateLegacyKey(session) ?: return session
+        val migrated = IssuanceSessionCrypto2Keys.migrateLegacyKey(session) ?: return session
         if (backfill) crypto2Keys.set(session.sessionId, migrated, ttlUntil(session.expiresAt))
         return session.copy(crypto2IssuerStoredKey = migrated)
-    }
-
-    private suspend fun migrateLegacyKey(session: IssuanceSession): String? {
-        if (session.issuerKey["type"]?.jsonPrimitive?.content != "jwk") return null
-        val legacyKey = KeyManager.resolveSerializedKey(session.issuerKey)
-        val stored = migration.migrate(
-            recordId = KeyId(legacyKey.getKeyId()),
-            serialized = session.issuerKey,
-            usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-        )
-        crypto2Runtime.restore(stored)
-        return StoredKeyCodec.encodeToString(stored)
-    }
-
-    private suspend fun sidecarMatchesSession(session: IssuanceSession, encoded: String): Boolean {
-        val stored = StoredKeyCodec.decodeFromString(encoded)
-        val crypto2Key = crypto2Runtime.restore(stored)
-        require(KeyUsage.SIGN in stored.usages) { "Issuer2 crypto2 sidecar key does not permit signing" }
-        val legacyKey = KeyManager.resolveSerializedKey(session.issuerKey)
-        if (stored.id.value != legacyKey.getKeyId()) return false
-        val legacyPublicJwk = EncodedKey.Jwk(
-            data = BinaryData(Json.encodeToString(legacyKey.getPublicKey().exportJWKObject()).encodeToByteArray()),
-            privateMaterial = false,
-        )
-        val crypto2PublicJwk = requireNotNull(crypto2Key.capabilities.publicKeyExporter) {
-            "Issuer2 crypto2 sidecar key does not export public material"
-        }.exportPublicKey().toPublicJwk(crypto2Key.spec)
-        return Jwk.sha256Thumbprint(legacyPublicJwk) == Jwk.sha256Thumbprint(crypto2PublicJwk)
     }
 }
 
