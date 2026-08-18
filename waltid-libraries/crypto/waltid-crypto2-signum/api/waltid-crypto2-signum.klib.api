@@ -1,6 +1,5 @@
 // Klib ABI Dump
-// Targets: [iosArm64, iosSimulatorArm64, js]
-// Alias: ios => [iosArm64, iosSimulatorArm64]
+// Targets: [js]
 // Rendering settings:
 // - Signature version: 2
 // - Show manifest properties: true
@@ -287,17 +286,4 @@ final class id.walt.crypto2.signum/SignumUserCancelledException : kotlin.corouti
 
     final val reason // id.walt.crypto2.signum/SignumUserCancelledException.reason|{}reason[0]
         final fun <get-reason>(): kotlin/Throwable // id.walt.crypto2.signum/SignumUserCancelledException.reason.<get-reason>|<get-reason>(){}[0]
-}
-
-// Targets: [ios]
-final class id.walt.crypto2.signum/IosSignumKeyBackend : id.walt.crypto2.signum/SignumPlatformBackend { // id.walt.crypto2.signum/IosSignumKeyBackend|null[0]
-    constructor <init>() // id.walt.crypto2.signum/IosSignumKeyBackend.<init>|<init>(){}[0]
-
-    final val id // id.walt.crypto2.signum/IosSignumKeyBackend.id|{}id[0]
-        final fun <get-id>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.signum/IosSignumKeyBackend.id.<get-id>|<get-id>(){}[0]
-
-    final fun supports(id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy): kotlin/Boolean // id.walt.crypto2.signum/IosSignumKeyBackend.supports|supports(id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
-    final suspend fun create(kotlin/String, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy): id.walt.crypto2.signum/SignumPlatformKey // id.walt.crypto2.signum/IosSignumKeyBackend.create|create(kotlin.String;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
-    final suspend fun delete(kotlin/String) // id.walt.crypto2.signum/IosSignumKeyBackend.delete|delete(kotlin.String){}[0]
-    final suspend fun load(kotlin/String, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy): id.walt.crypto2.signum/SignumPlatformKey? // id.walt.crypto2.signum/IosSignumKeyBackend.load|load(kotlin.String;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
 }
