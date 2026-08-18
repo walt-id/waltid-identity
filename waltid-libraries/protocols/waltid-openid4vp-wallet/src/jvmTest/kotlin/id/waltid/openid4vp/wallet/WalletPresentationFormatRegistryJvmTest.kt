@@ -81,7 +81,7 @@ class WalletPresentationFormatRegistryJvmTest {
 
         assertEquals(setOf("ES256", "Ed25519"), capabilities.supportedJwsAlgorithms.toSet())
         assertEquals(
-            listOf(Cose.Algorithm.ESP256, Cose.Algorithm.EdDSA).sorted(),
+            listOf(Cose.Algorithm.ES256, Cose.Algorithm.ESP256, Cose.Algorithm.EdDSA).sorted(),
             capabilities.supportedMdocCoseAlgorithms,
         )
         assertEquals(WalletPresentationFormatRegistry.SupportedFormat.entries.toSet(), capabilities.supportedFormats)
