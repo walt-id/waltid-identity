@@ -2,6 +2,7 @@ package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
@@ -34,7 +35,6 @@ import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.mobile.WalletAttestationConfig
-import id.walt.x509.CertificateDer
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
@@ -48,6 +48,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class WalletSdkBridgeTest {
@@ -282,7 +283,7 @@ class WalletSdkBridgeTest {
             capturedTrustConfiguration = trustConfiguration
             FakeWalletSdkBridgeOperations()
         }
-        val trustAnchor = CertificateDer(byteArrayOf(1, 2, 3)).toPEMEncodedString()
+        val expectedTrustAnchor = X509CertificateUtil.parseCertificatePem(validTrustAnchorPem)
 
         val result = factory.create(
             WalletBridgeConfiguration(
@@ -298,7 +299,7 @@ class WalletSdkBridgeTest {
                     hostHeader = "attestation.example",
                 ),
                 clientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(
-                    x509TrustAnchorsPem = listOf(trustAnchor),
+                    x509TrustAnchorsPem = listOf(validTrustAnchorPem),
                 ),
                 preferredLocales = listOf("de-AT", "en"),
                 transactionDataProfiles = listOf(
@@ -322,7 +323,11 @@ class WalletSdkBridgeTest {
         assertEquals("/wallet-attestation", capturedConfig?.attestationConfig?.attesterPath)
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
         assertEquals("attestation.example", capturedConfig?.attestationConfig?.hostHeader)
-        assertEquals(listOf(CertificateDer(byteArrayOf(1, 2, 3))), capturedTrustConfiguration?.x509TrustAnchors)
+        val capturedTrustStore = assertNotNull(capturedTrustConfiguration?.x509TrustAnchors)
+        val capturedTrustAnchor = capturedTrustStore
+            .findCertificateBySubjectDn(expectedTrustAnchor.data.subjectDn)
+            .single()
+        assertEquals(expectedTrustAnchor.encodedDer, capturedTrustAnchor.encodedDer)
         assertEquals(listOf("de-AT", "en"), capturedConfig?.preferredLocales)
         assertEquals(
             listOf(
@@ -799,3 +804,19 @@ class WalletSdkBridgeTest {
     }
 
 }
+
+private val validTrustAnchorPem = """
+    -----BEGIN CERTIFICATE-----
+    MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD
+    VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG
+    A1UEAxMLR1RTIFJvb3QgUjQwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw
+    WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz
+    IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjQwdjAQBgcqhkjOPQIBBgUrgQQAIgNi
+    AATzdHOnaItgrkO4NcWBMHtLSZ37wWHO5t5GvWvVYRg1rkDdc/eJkTBa6zzuhXyi
+    QHY7qca4R9gq55KRanPpsXI5nymfopjTX15YhmUPoYRlBtHci8nHc8iMai/lxKvR
+    HYqjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW
+    BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D
+    9J+uHXqnLrmvT/aDHQ4thQEd0dlq7A/Cr8deVl5c1RxYIigL9zC2L7F8AjEA8GE8
+    p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD
+    -----END CERTIFICATE-----
+""".trimIndent()
