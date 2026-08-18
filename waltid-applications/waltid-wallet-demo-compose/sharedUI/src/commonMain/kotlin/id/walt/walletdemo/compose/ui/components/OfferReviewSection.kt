@@ -51,13 +51,32 @@ internal fun OfferReviewSection(
             title = "Issuer",
             modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerSection),
         ) {
+            val issuerName = preview.issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
+            val issuerIdentifier = preview.issuer.credentialIssuer.trim()
+            val issuerDetails = listOf(
+                MetadataDetailItem(
+                    label = "Credential Issuer",
+                    value = issuerIdentifier.takeIf { issuerName != null && it != issuerName },
+                    linkUri = issuerIdentifier,
+                ),
+            ).filter { !it.value.isNullOrBlank() }
             MetadataIdentityRow(
                 display = preview.issuer.display,
-                fallbackName = preview.issuer.credentialIssuer,
-                supportingText = preview.issuer.credentialIssuer.takeIf {
-                    it.isNotBlank() && it != preview.issuer.display?.name
-                },
+                fallbackName = issuerIdentifier,
             )
+            if (issuerDetails.isNotEmpty()) {
+                MetadataRowDivider()
+                MetadataDisclosure(
+                    title = "Issuer details",
+                    initiallyExpanded = false,
+                    modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerDetailsToggle),
+                ) {
+                    MetadataDetailList(
+                        issuerDetails,
+                        modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerDetails),
+                    )
+                }
+            }
         }
 
         if (preview.offeredCredentials.isNotEmpty()) {

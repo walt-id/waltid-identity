@@ -20,12 +20,27 @@ struct OfferReviewView: View {
                 title: "Issuer",
                 titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection
             ) {
-                Text(preview.issuer.name ?? preview.issuer.identifier)
-                    .font(.body.weight(.semibold))
-                if preview.issuer.name != preview.issuer.identifier {
-                    Text(preview.issuer.identifier)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                MetadataIdentityView(
+                    display: issuerDisplay,
+                    fallbackName: preview.issuer.identifier,
+                    supportingText: nil
+                )
+                if issuerHasFriendlyName {
+                    Divider()
+                    MetadataDisclosure(
+                        title: "Issuer details",
+                        initiallyExpanded: false,
+                        accessibilityIdentifier: WalletAccessibilityID.offerIssuerDetailsToggle
+                    ) {
+                        MetadataDetailList(items: [
+                            MetadataDetailItem(
+                                label: "Credential Issuer",
+                                value: preview.issuer.identifier,
+                                linkURI: preview.issuer.identifier
+                            ),
+                        ])
+                        .accessibilityIdentifier(WalletAccessibilityID.offerIssuerDetails)
+                    }
                 }
             }
 
@@ -102,6 +117,22 @@ struct OfferReviewView: View {
             }
         }
     }
+
+    private var issuerDisplay: MetadataDisplay? {
+        MetadataDisplay(
+            name: preview.issuer.name,
+            locale: preview.issuer.locale,
+            logoURI: preview.issuer.logoURI?.absoluteString,
+            logoAltText: preview.issuer.logoAltText
+        )
+    }
+
+    private var issuerHasFriendlyName: Bool {
+        guard let name = preview.issuer.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            return false
+        }
+        return name != preview.issuer.identifier
+    }
 }
 
 private struct OfferedCredentialView: View {
@@ -113,10 +144,16 @@ private struct OfferedCredentialView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.body.weight(.semibold))
-            if let description = credential.descriptionText, !description.isEmpty {
-                Text(description).font(.caption).foregroundStyle(.secondary)
-            }
+            MetadataIdentityView(
+                display: MetadataDisplay(
+                    name: credential.name,
+                    locale: nil,
+                    logoURI: credential.logoURI?.absoluteString,
+                    logoAltText: nil
+                ),
+                fallbackName: title,
+                supportingText: credential.descriptionText
+            )
             let details = [
                 MetadataDetailItem(label: "Format", value: credential.format),
             ].filter(\.isVisible)
