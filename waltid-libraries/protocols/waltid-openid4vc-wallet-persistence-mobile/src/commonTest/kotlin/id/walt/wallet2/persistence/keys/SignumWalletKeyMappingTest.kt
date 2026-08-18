@@ -181,6 +181,29 @@ class SignumWalletKeyMappingTest {
         }
     }
 
+    @Test
+    fun `support metadata must match the effective policy shape without coupling its axes`() {
+        val timed = KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
+
+        assertFailsWith<IllegalArgumentException> {
+            KeyUseAuthorizationSupport.Supported(effectivePolicy = timed)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            KeyUseAuthorizationSupport.Supported(
+                effectivePolicy = KeyUseAuthorizationPolicy.None,
+                reuseEnforcement = KeyUseAuthorizationReuseEnforcement.PlatformKeyStore,
+                timeoutValidation = KeyUseAuthorizationReuseTimeoutValidation.IndependentReadback,
+            )
+        }
+
+        val support = KeyUseAuthorizationSupport.Supported(
+            effectivePolicy = timed,
+            reuseEnforcement = KeyUseAuthorizationReuseEnforcement.ProviderProcess,
+            timeoutValidation = KeyUseAuthorizationReuseTimeoutValidation.IndependentReadback,
+        )
+        assertEquals(timed, support.effectivePolicy)
+    }
+
     private fun storedManagedKey(spec: KeySpec, usages: Set<KeyUsage>) = StoredKey.Managed(
         version = StoredKey.CURRENT_VERSION,
         id = KeyId("protected"),

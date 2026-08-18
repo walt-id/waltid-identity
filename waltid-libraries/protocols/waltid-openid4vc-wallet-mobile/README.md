@@ -50,10 +50,11 @@ persisted policy; changing the default never weakens or recreates an existing ke
 non-sliding reuse interval. It also requires P-256, strong biometrics, and no
 device-credential fallback, but intentionally permits new biometric enrollment
 without invalidating the key. Android reports `PlatformKeyStore` with
-`PlatformVerified`: native KeyStore metadata must exactly match the requested
-interval. iOS reports `ProviderProcess` with `ProviderConfigured`: Signum
-receives the requested interval, but its pinned public API cannot independently
-expose the effective positive timeout after restoration. Timed reuse is recent
+`IndependentReadback`: native KeyStore metadata can be read back and compared
+with the requested interval after creation or restoration. iOS reports
+`ProviderProcess` with `ProviderConfigurationOnly`: Signum receives the
+requested interval, but its pinned public API cannot independently expose the
+effective positive timeout after restoration. Timed reuse is recent
 platform or provider authentication, not issuance, presentation, or other
 wallet-action consent, and is not guaranteed to be key-local.
 

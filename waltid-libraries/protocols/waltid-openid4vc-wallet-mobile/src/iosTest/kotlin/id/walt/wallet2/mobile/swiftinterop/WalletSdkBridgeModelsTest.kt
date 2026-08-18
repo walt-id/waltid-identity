@@ -7,7 +7,7 @@ import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutVerification
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutValidation
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import kotlinx.coroutines.CancellationException
@@ -89,7 +89,7 @@ class WalletSdkBridgeModelsTest {
     }
 
     @Test
-    fun bridgeTimedAuthorizationPolicyPreservesTimeoutAndProviderVerification() {
+    fun bridgeTimedAuthorizationPolicyPreservesTimeoutAndProviderValidation() {
         val timed = WalletBridgeKeyUseAuthorizationPolicy(
             type = WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse,
             timeoutSeconds = 10,
@@ -100,7 +100,7 @@ class WalletSdkBridgeModelsTest {
         val preflight = KeyUseAuthorizationSupport.Supported(
             effectivePolicy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10),
             reuseEnforcement = KeyUseAuthorizationReuseEnforcement.ProviderProcess,
-            timeoutVerification = KeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured,
+            timeoutValidation = KeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly,
         ).toBridgeModel()
 
         assertEquals(timed, preflight.effectivePolicy)
@@ -109,13 +109,13 @@ class WalletSdkBridgeModelsTest {
             preflight.reuseEnforcement,
         )
         assertEquals(
-            WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured,
-            preflight.timeoutVerification,
+            WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly,
+            preflight.timeoutValidation,
         )
     }
 
     @Test
-    fun bridgePreflightRejectsIncompleteOrMismatchedTimedMetadata() {
+    fun bridgePreflightRejectsIncompleteTimedMetadataButKeepsAxesOrthogonal() {
         val policy = WalletBridgeKeyUseAuthorizationPolicy(
             type = WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse,
             timeoutSeconds = 10,
@@ -124,14 +124,16 @@ class WalletSdkBridgeModelsTest {
         assertFailsWith<IllegalArgumentException> {
             WalletBridgeKeyPreflight(supported = true, effectivePolicy = policy)
         }
-        assertFailsWith<IllegalArgumentException> {
-            WalletBridgeKeyPreflight(
-                supported = true,
-                effectivePolicy = policy,
-                reuseEnforcement = WalletBridgeKeyUseAuthorizationReuseEnforcement.PlatformKeyStore,
-                timeoutVerification = WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured,
-            )
-        }
+        val valid = WalletBridgeKeyPreflight(
+            supported = true,
+            effectivePolicy = policy,
+            reuseEnforcement = WalletBridgeKeyUseAuthorizationReuseEnforcement.PlatformKeyStore,
+            timeoutValidation = WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly,
+        )
+        assertEquals(
+            WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly,
+            valid.timeoutValidation,
+        )
     }
 
     @Test

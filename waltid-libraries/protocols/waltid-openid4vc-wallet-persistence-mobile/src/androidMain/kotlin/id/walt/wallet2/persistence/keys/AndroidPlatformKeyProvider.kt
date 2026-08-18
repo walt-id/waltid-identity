@@ -113,8 +113,8 @@ private fun KeyUseAuthorizationPolicy.supportedOnAndroid(): KeyUseAuthorizationS
         } else {
             null
         },
-        timeoutVerification = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
-            KeyUseAuthorizationReuseTimeoutVerification.PlatformVerified
+        timeoutValidation = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
+            KeyUseAuthorizationReuseTimeoutValidation.IndependentReadback
         } else {
             null
         },

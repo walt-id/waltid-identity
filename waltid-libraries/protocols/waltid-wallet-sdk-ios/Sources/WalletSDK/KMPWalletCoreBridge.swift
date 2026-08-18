@@ -75,17 +75,15 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             as: WalletBridgeKeyPreflight.self,
             operation: "key authorization preflight"
         )
-        switch (value.supported, value.effectivePolicy, value.reuseEnforcement, value.timeoutVerification, value.failure) {
-        case (true, let policy?, let reuseEnforcement?, let timeoutVerification?, nil):
-            guard policy.type == .biometricTimedReuse,
-                  (reuseEnforcement == .platformKeyStore && timeoutVerification == .platformVerified) ||
-                  (reuseEnforcement == .providerProcess && timeoutVerification == .providerConfigured) else {
+        switch (value.supported, value.effectivePolicy, value.reuseEnforcement, value.timeoutValidation, value.failure) {
+        case (true, let policy?, let reuseEnforcement?, let timeoutValidation?, nil):
+            guard policy.type == .biometricTimedReuse else {
                 throw WalletError.internalFailure("Invalid timed key authorization preflight result")
             }
             return .supported(
                 effectivePolicy: policy.toSwiftAuthorizationPolicy(),
                 reuseEnforcement: reuseEnforcement.toSwiftAuthorizationReuseEnforcement(),
-                timeoutVerification: timeoutVerification.toSwiftAuthorizationTimeoutVerification()
+                timeoutValidation: timeoutValidation.toSwiftAuthorizationTimeoutValidation()
             )
         case (true, let policy?, nil, nil, nil):
             guard policy.type != .biometricTimedReuse else {
@@ -94,7 +92,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             return .supported(
                 effectivePolicy: policy.toSwiftAuthorizationPolicy(),
                 reuseEnforcement: nil,
-                timeoutVerification: nil
+                timeoutValidation: nil
             )
         case (false, nil, nil, nil, let failure?): return .unsupported(failure.toSwiftAuthorizationUnsupportedReason())
         default: throw WalletError.internalFailure("Invalid key authorization preflight result")
@@ -772,11 +770,11 @@ private extension WalletBridgeKeyUseAuthorizationReuseEnforcement {
     }
 }
 
-private extension WalletBridgeKeyUseAuthorizationReuseTimeoutVerification {
-    func toSwiftAuthorizationTimeoutVerification() -> WalletKeyUseAuthorizationReuseTimeoutVerification {
+private extension WalletBridgeKeyUseAuthorizationReuseTimeoutValidation {
+    func toSwiftAuthorizationTimeoutValidation() -> WalletKeyUseAuthorizationReuseTimeoutValidation {
         switch self {
-        case .platformVerified: return .platformVerified
-        case .providerConfigured: return .providerConfigured
+        case .independentReadback: return .independentReadback
+        case .providerConfigurationOnly: return .providerConfigurationOnly
         }
     }
 }

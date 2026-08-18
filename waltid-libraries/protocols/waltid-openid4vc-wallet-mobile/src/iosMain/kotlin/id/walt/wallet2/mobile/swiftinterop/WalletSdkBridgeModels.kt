@@ -27,7 +27,7 @@ import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutVerification
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutValidation
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
@@ -143,8 +143,8 @@ public data class WalletBridgeKeyPreflight internal constructor(
     public val effectivePolicy: WalletBridgeKeyUseAuthorizationPolicy? = null,
     /** The enforcement boundary for timed reuse, when a timed policy is supported. */
     public val reuseEnforcement: WalletBridgeKeyUseAuthorizationReuseEnforcement? = null,
-    /** How the requested timed-reuse interval was validated, when a timed policy is supported. */
-    public val timeoutVerification: WalletBridgeKeyUseAuthorizationReuseTimeoutVerification? = null,
+    /** How a timed-reuse interval can be validated after key creation or restoration. */
+    public val timeoutValidation: WalletBridgeKeyUseAuthorizationReuseTimeoutValidation? = null,
     /** Core preflight reason when the request is unsupported. */
     public val failure: KeyUseAuthorizationUnsupportedReason? = null,
 ) {
@@ -153,18 +153,8 @@ public data class WalletBridgeKeyPreflight internal constructor(
             "Wallet bridge preflight must include an effective policy exactly when supported"
         }
         val timed = effectivePolicy?.type == WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse
-        require((reuseEnforcement != null) == timed && (timeoutVerification != null) == timed) {
-            "Timed bridge preflight must include enforcement and timeout verification only for timed policy"
-        }
-        if (timed) {
-            require(
-                (reuseEnforcement == WalletBridgeKeyUseAuthorizationReuseEnforcement.PlatformKeyStore &&
-                    timeoutVerification == WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.PlatformVerified) ||
-                    (reuseEnforcement == WalletBridgeKeyUseAuthorizationReuseEnforcement.ProviderProcess &&
-                        timeoutVerification == WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured),
-            ) {
-                "Timed bridge preflight must report a matching enforcement and timeout verification"
-            }
+        require((reuseEnforcement != null) == timed && (timeoutValidation != null) == timed) {
+            "Timed bridge preflight must include enforcement and timeout validation only for timed policy"
         }
     }
 }
@@ -174,7 +164,7 @@ internal fun KeyUseAuthorizationSupport.toBridgeModel(): WalletBridgeKeyPrefligh
         supported = true,
         effectivePolicy = effectivePolicy.toBridgePolicy(),
         reuseEnforcement = reuseEnforcement?.toBridgeModel(),
-        timeoutVerification = timeoutVerification?.toBridgeModel(),
+        timeoutValidation = timeoutValidation?.toBridgeModel(),
     )
     is KeyUseAuthorizationSupport.Unsupported -> WalletBridgeKeyPreflight(supported = false, failure = reason)
 }
@@ -186,11 +176,11 @@ public enum class WalletBridgeKeyUseAuthorizationReuseEnforcement {
     ProviderProcess,
 }
 
-/** Timeout-validation evidence reported for a supported timed-reuse key. */
+/** Timeout-validation capability reported for a supported timed-reuse key. */
 @Serializable
-public enum class WalletBridgeKeyUseAuthorizationReuseTimeoutVerification {
-    PlatformVerified,
-    ProviderConfigured,
+public enum class WalletBridgeKeyUseAuthorizationReuseTimeoutValidation {
+    IndependentReadback,
+    ProviderConfigurationOnly,
 }
 
 internal fun KeyUseAuthorizationReuseEnforcement.toBridgeModel(): WalletBridgeKeyUseAuthorizationReuseEnforcement = when (this) {
@@ -200,12 +190,12 @@ internal fun KeyUseAuthorizationReuseEnforcement.toBridgeModel(): WalletBridgeKe
         WalletBridgeKeyUseAuthorizationReuseEnforcement.ProviderProcess
 }
 
-internal fun KeyUseAuthorizationReuseTimeoutVerification.toBridgeModel():
-    WalletBridgeKeyUseAuthorizationReuseTimeoutVerification = when (this) {
-    KeyUseAuthorizationReuseTimeoutVerification.PlatformVerified ->
-        WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.PlatformVerified
-    KeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured ->
-        WalletBridgeKeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured
+internal fun KeyUseAuthorizationReuseTimeoutValidation.toBridgeModel():
+    WalletBridgeKeyUseAuthorizationReuseTimeoutValidation = when (this) {
+    KeyUseAuthorizationReuseTimeoutValidation.IndependentReadback ->
+        WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.IndependentReadback
+    KeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly ->
+        WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly
 }
 
 /**
