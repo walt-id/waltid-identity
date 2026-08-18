@@ -2,32 +2,24 @@
 
 package id.walt.openid4vp.clientidprefix.prefixes
 
-import id.walt.credentials.keyresolver.JwtKeyResolver
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
+import id.walt.certificate.x509.model.GeneralName
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
+import id.walt.credentials.keyresolver.JwtKeyResolver
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto2.jose.CompactJws
-import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.jose.Jwk
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.openid4vp.clientidprefix.ClientIdError
-import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
-import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.Serializable
+import io.ktor.http.*
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
-import id.walt.x509.CertificateDer
-import id.walt.x509.validateCertificateChain
-import id.walt.x509.validateClientAuthenticationCertificateUsage
-import io.ktor.http.Url
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 
 /**
@@ -111,31 +103,38 @@ data class VerifierAttestation(val sub: String, override val rawValue: String) :
             // 2. Resolve the attestation issuer's public key and verify the attestation JWT signature
             val x5c = decodedAttestation.protectedHeader["x5c"]?.jsonArray
             if (x5c != null) {
-                require(trustConfiguration.x509TrustAnchors.isNotEmpty()) {
-                    "Verifier Attestation x5c requires configured trust anchors"
+                val certificates = x5c.map {
+                    ClientIdCrypto2.parseCertificate(
+                        it.jsonPrimitive.content.decodeFromBase64()
+                    )
                 }
-                val certificates = x5c.map { CertificateDer(it.jsonPrimitive.content.decodeFromBase64()) }
-                val leaf = certificates.firstOrNull()
-                    ?: throw IllegalArgumentException("Verifier Attestation x5c cannot be empty")
-                validateCertificateChain(
-                    leaf = leaf,
-                    chain = certificates.drop(1),
-                    trustAnchors = trustConfiguration.x509TrustAnchors,
-                )
-                leaf.validateClientAuthenticationCertificateUsage()
+                require(certificates.isNotEmpty()) {
+                    "Verifier Attestation x5c cannot be empty"
+                }
+                val leaf = certificates.first()
+                ClientIdCrypto2.validateCertificateChain(certificates, trustConfiguration.x509TrustStore)?.let { error ->
+                    return error
+                }
                 require(attestationIssuer.startsWith("https://")) {
                     "Verifier Attestation x5c issuer must be an HTTPS URI"
                 }
                 val issuerHost = Url(attestationIssuer).host
-                val issuerDnsNames = extractSanDnsNamesFromDer(leaf.bytes.toByteArray()).getOrThrow()
+                val issuerDnsNames = leaf.data.extensionSan
+                    ?.alternativeNames
+                    ?.filter { it.type == GeneralName.NameType.dNSName }
+                    ?.map { it.value }
+                    ?: emptyList()
                 require(issuerHost in issuerDnsNames) {
                     "Verifier Attestation certificate SAN does not match issuer host"
                 }
                 if (decodedAttestation.algorithm == JwsAlgorithm.ES256K) {
-                    JWKKey.importFromDerCertificate(leaf.bytes.toByteArray()).getOrThrow()
+                    JWKKey.importFromDerCertificate(leaf.encodedDer.toByteArray()).getOrThrow()
                         .verifyJws(attestationJwtString).getOrThrow()
                 } else {
-                    ClientIdCrypto2.verify(attestationJwtString, ClientIdCrypto2.keyFromCertificate(leaf.bytes.toByteArray()))
+                    ClientIdCrypto2.verify(
+                        attestationJwtString,
+                        leaf.restoreSubjectPublicKey(ClientIdCrypto2.runtime)
+                    )
                 }
             } else if (decodedAttestation.algorithm == JwsAlgorithm.ES256K) {
                 requireNotNull(decodedAttestation.protectedHeader["kid"]?.jsonPrimitive?.contentOrNull) {
@@ -145,7 +144,8 @@ data class VerifierAttestation(val sub: String, override val rawValue: String) :
                     jwtHeader = JsonObject(decodedAttestation.protectedHeader - "jwk" - "x5c"),
                     jwtPayload = attestationPayload,
                 ) ?: throw IllegalArgumentException("Could not resolve ES256K Verifier Attestation issuer key")
-                val attestationKid = requireNotNull(decodedAttestation.protectedHeader["kid"]?.jsonPrimitive?.contentOrNull)
+                val attestationKid =
+                    requireNotNull(decodedAttestation.protectedHeader["kid"]?.jsonPrimitive?.contentOrNull)
                 require(attestationIssuerKey.getKeyId() == attestationKid) {
                     "Resolved ES256K Verifier Attestation key does not exactly match kid"
                 }
@@ -161,7 +161,7 @@ data class VerifierAttestation(val sub: String, override val rawValue: String) :
                     jwtPayload = attestationPayload,
                 )?.key ?: throw IllegalArgumentException(
                     "Could not resolve public key for Verifier Attestation issuer " +
-                        "(iss=${attestationPayload["iss"]?.jsonPrimitive?.contentOrNull})"
+                            "(iss=${attestationPayload["iss"]?.jsonPrimitive?.contentOrNull})"
                 )
                 ClientIdCrypto2.verify(attestationJwtString, attestationIssuerKey)
             }
@@ -197,8 +197,9 @@ data class VerifierAttestation(val sub: String, override val rawValue: String) :
 
             log.debug { "verifier_attestation: successfully validated for client_id=${clientId.sub}" }
 
-            ClientValidationResult.Success(context.clientMetadata
-                ?: throw IllegalArgumentException("client_metadata parameter is required for verifier_attestation")
+            ClientValidationResult.Success(
+                context.clientMetadata
+                    ?: throw IllegalArgumentException("client_metadata parameter is required for verifier_attestation")
             )
         } catch (cause: CancellationException) {
             throw cause

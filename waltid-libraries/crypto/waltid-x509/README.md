@@ -34,20 +34,21 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
   - IACA and Document Signer X.509 certificate generation and parsing.
   - Configurable validators with profile-compliant defaults.
 - **CSR Support**: Support for creating and fulfilling Certificate Signing Requests (CSRs) using the PKCS#10 standard.
-- **Crypto2 signing**: Generic, ISO IACA, and Document Signer certificates plus PKCS#10 CSRs use native crypto2 keys through `buildDer`.
-- **Crypto2 parsing**: Parsed certificate and CSR public keys are available as typed `EncodedKey.Jwk` values.
-- **JVM extensions**: helpers for `X500Name`, `KeyUsage`, and `X509Certificate` v3 extension extraction.
-- **Clear exceptions**: failures raise `X509ValidationException` with context.
+- **Crypto2 signing**: Generic, ISO IACA, and Document Signer certificates plus PKCS#10 CSRs use native crypto2 keys.
+- **Crypto2 parsing**: Parsed certificate and CSR public keys are available as typed `id.walt.crypto2.keys.Key` values.
+- **Certificate extensions**: Support of most common X509 certificate extensions `KeyUsage`, `Basic Constraints`and `Subject Alternative Names` and more.
+- **Extensible certificate chain validation**: Basic validation is platform independently implemented, easy to add additional checks.
 
 ---
 
 ## Targets
 
-- **JVM / Android**: Full chain validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
-- **iOS**: Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support.
-- **JS**: Chain validation stub; ISO tooling not implemented yet.
+- **JVM / Android**: Based on [Bouncy Castle library](https://www.bouncycastle.org/) - Full chain validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
+- **iOS**: Based on [Signum library](https://github.com/a-sit-plus/signum) - Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support. Limited set of supported key types.
+- **JS**: Based on [Signum library](https://github.com/a-sit-plus/signum) - Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support. Limited set of supported key types.
 
-> JS X.509 support is intentionally limited today. On iOS, system trust anchors and revocation checks are still not supported.
+> Certificate revocation checks are not yet supported. 
+> On iOS and JS system trust anchors are not supported.
 
 ---
 
@@ -67,67 +68,155 @@ include(":waltid-libraries:crypto:waltid-x509") // if used as a composite build/
 
 ---
 
-## PKIX Certificate Chain Validation
+## Quick start
 
 > Namespaces may differ slightly in your repo; adjust imports to your package.
 
+
+### Create self-signed root certificate
+
 ```kotlin
-// Common API (expect)
-import okio.ByteString
+import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.*
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.*
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.*
+// imports are shortended in this example
 
-data class CertificateDer(val bytes: ByteString)
-
-/** Validate a leaf X.509 cert against a provided chain and trust anchors. */
-@Throws(X509ValidationException::class)
-expect fun validateCertificateChain(
-    leaf: CertificateDer,
-    chain: List<CertificateDer>,
-    trustAnchors: List<CertificateDer>? = null,
-    enableTrustedChainRoot: Boolean = false,
-    enableSystemTrustAnchors: Boolean = false,
-    enableRevocation: Boolean = false
+private val cryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
+private val keyGen = GenerateSoftwareKeyRequest(
+  id = KeyId("ca"),
+  spec = KeySpec.Ec(EcCurve.P256),
+  usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
 )
+private val certSigningAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+val caKey = cryptoRuntime.generateSoftwareKey(keyGen)
 
-class X509ValidationException(message: String, cause: Throwable? = null) : Exception(message, cause)
-```
-
-### Quick start (JVM/Android)
-
-```kotlin
-import id.walt.x509.CertificateDer
-import id.walt.x509.validateCertificateChain
-import okio.ByteString.Companion.toByteString
-import java.util.Base64
-
-fun validateFromX5cExample(
-    x5cBase64: List<String>,             // JWT header "x5c": Base64 DER certs
-    trustAnchorsDer: List<ByteArray>?,   // null = use self-signed root from chain (pinning/private PKI)
-    enableRevocation: Boolean = false
-) {
-    val chain = x5cBase64.map { CertificateDer(Base64.getDecoder().decode(it).toByteString()) }
-    val leaf = chain.first()
-    val anchors = trustAnchorsDer?.map { CertificateDer(it.toByteString()) }
-
-    validateCertificateChain(
-        leaf = leaf,
-        chain = chain,
-        trustAnchors = anchors,
-        enableTrustedChainRoot = anchors.isNullOrEmpty(),
-        enableSystemTrustAnchors = false,
-        enableRevocation = enableRevocation
-    )
+//create self-signed root certificate
+//required extensions like 'basic constraints' and 'subject key identifier' are added automatically
+val caCert = X509CertificateUtil.createSelfSignedCertificate(caKey, certSigningAlg) {
+  subjectDn = "cn=My Root, o=Walt.id, c=AT"
+  //add key usage constraint
+  extensionKeyUsage {
+    addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature, KeyUsageExtension.KeyUsage.keyCertSign)
+  }
+  //add subject alternative names
+  extensionSan {
+    addEmail("office@walt.id")
+    addUri("https://walt.id")
+  }
 }
 ```
 
-### Loading trust anchors from a JVM KeyStore (JVM helper)
+### Create a certificate signed by the root
 
 ```kotlin
-import id.walt.x509.CertificateDer
-import id.walt.x509.loadTrustAnchorsFromKeyStore
+val leafKey = cryptoRuntime.generateSoftwareKey(keyGen)
+val leafCert = X509CertificateUtil.createCertificate(caKey, caCert, certSigningAlg) {
+  subjectDn = "cn=My Leaf Certificate, o=Walt.id, c=AT"
+  subjectPublicKey(leafKey)
+}
+```
+
+### Restore Subject Public Key Info (SPKI) from a certificate
+```kotlin
+val publicKey = leafCert.restoreSubjectPublicKey(cryptoRuntime)
+```
+
+### Validate a certificate chain
+```kotlin
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
+
+//trust our own root certificate
+val trustStore = InMemoryTrustStore(listOf(caCert))
+//validate the certificate chain (order in the chain does not matter)
+//root can be included in the chain,
+val validationResult = X509CertificateUtil.validateCertificateChain(listOf(leafCert), trustStore)
+println("Validation result: ${validationResult.valid}")
+validationResult.log.forEach { println("${it.severity} ${it.subjectDn}/${it.validatorId}: '${it.message}'") }
+```
+
+> `trustStore` here fully replaces `X509CertificateUtil.Default`'s configured trust store for this
+> call - it is not merged with it. See [Configure X509CertificateUtil](#configure-x509certificateutil)
+> below for what that means in practice.
+
+The result contains information about which validations are performed on which certificates and the outcome of each validation:
+```
+Validation result - isValid: true
+Validation result - log:
+WARN CN=My Root,O=Walt.id,C=AT/validityPeriod: 'Certificate will expire soon'
+INFO CN=My Root,O=Walt.id,C=AT/validityPeriod: 'DONE'
+INFO CN=My Root,O=Walt.id,C=AT/basicConstraints: 'DONE'
+INFO CN=My Root,O=Walt.id,C=AT/certificateSignature: 'DONE'
+WARN CN=My Leaf Certificate,O=Walt.id,C=AT/validityPeriod: 'Certificate will expire soon'
+INFO CN=My Leaf Certificate,O=Walt.id,C=AT/validityPeriod: 'DONE'
+INFO CN=My Leaf Certificate,O=Walt.id,C=AT/basicConstraints: 'DONE'
+INFO CN=My Leaf Certificate,O=Walt.id,C=AT/certificateSignature: '(BouncyCastle) Certificate Signature valid: ecPublicKey / ecdsa-with-SHA256'
+INFO CN=My Leaf Certificate,O=Walt.id,C=AT/certificateSignature: 'DONE'
+```
+
+## Configure X509CertificateUtil
+
+`X509CertificateUtil.Default` is a ready-to-use singleton configured with sensible platform
+defaults - on JVM/Android, that includes the platform's **system CA trust store**. Build a
+customized util with `X509CertificateUtil { ... }`, which starts from `Default` and lets you
+override its trust store and/or validators:
+
+```kotlin
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.X509CertificateTrustStore
+import id.walt.certificate.x509.truststore.CompositeTrustStore
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
+
+// your own X509CertificateTrustStore implementation, e.g. backed by a database or remote lookup
+object MyTrustStore : X509CertificateTrustStore {
+    override fun findCertificateBySubjectDn(subjectDn: String): List<X509Certificate> = listOf()
+}
+
+val trustAnchors = InMemoryTrustStore(listOf(caCert))
+
+// trust stores can be combined
+val combinedTrust = CompositeTrustStore(listOf(MyTrustStore, trustAnchors))
+
+val myUtil = X509CertificateUtil {
+    // fully REPLACES the configured trust store - it is not merged with Default's system CA store
+    setTrust(combinedTrust)
+    // add or override validators, keyed by validator id
+    addValidators(X509CertificateBasicConstraintsValidator(leafCanBeCa = true))
+}
+```
+
+**Trust store scoping.** `setTrust()` and the trust store you pass directly to a validation call
+(`validateCertificateChain(chain, trustStore)`, `validatePemCertificateChain(pem, trustStore)`)
+behave the same way: they **fully replace** the util's configured trust store for that call, they
+are never merged with it. Passing your own anchors on `X509CertificateUtil.Default` therefore
+does **not** also trust the platform's system CA store - you get exactly the trust boundary you
+asked for. If you want both, compose them explicitly first, e.g.
+`CompositeTrustStore(listOf(myAnchors, JavaDefaultTrustStore(...)))`, or `setTrust()` a util
+configured with the combined store once and reuse it.
+
+## Loading trust anchors from a JVM KeyStore (JVM helper)
+
+There is no dedicated helper for this in the current API - `X509CertificateTrustStore` is a
+small interface, so building an `InMemoryTrustStore` from an existing `java.security.KeyStore` is
+a few lines:
+
+```kotlin
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import kotlinx.io.bytestring.ByteString
 import java.security.KeyStore
 
-fun anchorsFromKeyStore(ks: KeyStore): List<CertificateDer> {
-    return loadTrustAnchorsFromKeyStore(ks)
+fun trustStoreFromKeyStore(ks: KeyStore): InMemoryTrustStore {
+    val certs = ks.aliases().asSequence()
+        .mapNotNull { alias -> ks.getCertificate(alias) as? java.security.cert.X509Certificate }
+        .map { X509CertificateUtil.parseCertificateDerEncoded(ByteString(it.encoded)) }
+        .toList()
+    return InMemoryTrustStore(certs)
 }
 ```
 
@@ -135,164 +224,90 @@ fun anchorsFromKeyStore(ks: KeyStore): List<CertificateDer> {
 
 ## [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificate tooling (IACA and Document Signer)
 
-The `id.walt.x509.iso` package provides the following:
+> `id.walt.x509.iso` (`IACACertificateBuilder`, `DocumentSignerCertificateBuilder`,
+> `IACAValidator`, `DocumentSignerValidator`, `CertificateDer`, ...) is **deprecated**. Use the
+> profile helpers in `id.walt.certificate.x509.profile` together with `X509CertificateUtil`,
+> documented below, for all new code.
 
-- Builder classes for IACA (via `IACACertificateBuilder`) and Document Signer (via `DocumentSignerCertificateBuilder`) X.509 certificates.
-- Parser classes for IACA (via `IACACertificateParser`) and Document Signer (via `DocumentSignerCertificateParser`) DER-encoded (via the `CertificateDer` platform-agnostic wrapper) X.509 certificates. **Note:** Decoded certificates **are not validated** by the parsers; use the validator classes for validation.
-- Validator classes for IACA (via `IACAValidator`) and Document Signer (via `DocumentSignerValidator`) decoded certificate instances (`IACADecodedCertificate` and `DocumentSignerDecodedCertificate` respectively) with a simple and flexible validation configuration tuning (refer to `IACAValidationConfig` and `DocumentSignerValidationConfig` for the respective configuration options).
-- VICAL-aligned IACA certificate info extraction (via `IACADecodedCertificate.toIacaCertificateInfo()`), returning structured certificate info data required for VICALs, including issuer/subject DER and issuing authority string (JVM).
+IACA root and Document Signer certificates are built with the same
+`X509CertificateUtil.createSelfSignedCertificate`/`createCertificate` calls used for any other
+certificate, using profile-specific DSL helpers to fill in the ISO-mandated fields/extensions, and
+validated by adding the profile object as a validator on a configured `X509CertificateUtil`.
 
-### IACA X.509 Certificate Generation
-
-Generating an IACA X.509 certificate with all the mandatory fields is achieved as follows: 
-
-```kotlin
-
-suspend fun buildIaca(signingKey: Key) = IACACertificateBuilder().build(
-    profileData = IACACertificateProfileData(
-        principalName = IACAPrincipalName(
-            country = "AT",
-            commonName = "Example IACA",
-            organizationName = "Example Org",
-        ),
-        validityPeriod = X509ValidityPeriod(
-            notBefore = Clock.System.now(),
-            notAfter = Clock.System.now() + 365.days,
-        ),
-        issuerAlternativeName = IssuerAlternativeName(
-            uri = "https://issuer.example"
-        ),
-        crlDistributionPointUri = "https://issuer.example/crl",
-    ),
-    signingKey = signingKey,
-)
-```
-
-### Document Signer X.509 Certificate Generation
-
-Generating Document Signer X.509 certificate with all the mandatory fields is achieved as follows:
+### IACA root certificate generation and validation
 
 ```kotlin
+import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile
+import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 
-suspend fun buildDocumentSigner(
-    dsPublicKey: Key,
-    iacaProfileData: IACACertificateProfileData,
-    iacaSigningKey: Key,
-) = DocumentSignerCertificateBuilder().build(
-    profileData = DocumentSignerCertificateProfileData(
-        principalName = DocumentSignerPrincipalName(
-            country = "AT",
-            commonName = "Example DS",
-            organizationName = "Example Org",
-        ),
-        validityPeriod = X509ValidityPeriod(
-            notBefore = Clock.System.now(),
-            notAfter = Clock.System.now() + 180.days,
-        ),
-        crlDistributionPointUri = "https://issuer.example/crl",
-    ),
-    publicKey = dsPublicKey,
-    iacaSignerSpec = IACASignerSpecification(
-        profileData = iacaProfileData,
-        signingKey = iacaSigningKey,
-    ),
-)
+// A util for validating a certificate presented as an IACA root, before trusting it as an anchor
+val iaCaRootCertUtil = X509CertificateUtil {
+    addValidators(
+        IsoIaCaRootX509CertificateProfile,
+        X509CertificateBasicConstraintsValidator(leafCanBeCa = true),
+        X509CertificateValidityValidator(allowValidityInFuture = true)
+    )
+}
+
+val iacaKey = cryptoRuntime.generateSoftwareKey(keyGen)
+val iacaRoot = X509CertificateUtil.createSelfSignedCertificate(iacaKey, certSigningAlg) {
+    profileIaCaRootCertificate(
+        issuerDnCountryCode = "AT",
+        issuerDnOrganizationName = "Walt.id",
+        issuerDnCommonName = "Walt ID IACA Root",
+        issuerEmailAddress = "office@walt.id",
+    )
+}
+
+val rootValidationResult = iaCaRootCertUtil.validateCertificateChain(listOf(iacaRoot), iacaRoot)
+check(rootValidationResult.valid) { "Not a valid IACA root: ${rootValidationResult.log}" }
 ```
 
-> Notes:
-> - Builder classes always generate profile compliant X.509 certificates. To achieve this, they perform internally all
-> the necessary validations and throw with an appropriate error message indicating the issue.
-> - Input certificate validity instants are stored with second-level precision. Any sub-second
-> precision (e.g., milliseconds) is discarded during certificate generation,
-> a fact that is also reflected in the decoded certificate returned by the builders.
+`profileIaCaRootCertificate` fills in the mandatory subject DN fields, sets `basicConstraints`
+(`CA=true`, `pathLenConstraint=0`, critical), `keyUsage` (`keyCertSign` + `cRLSign`, critical), and
+the mandatory `issuerAlternativeName` extension - all the ISO-mandated fields you'd otherwise have
+to set by hand. `IsoIaCaRootX509CertificateProfile` then re-validates all of that on demand.
 
-### Parsing \& Validation
-
-Parsing yields decoded data only. Validation is explicit via the validators.  
-By default, **all ISO profile constraints are enforced**. Clients can relax checks
-with the validation config classes (more info is provided below).
+### Document Signer certificate generation and validation
 
 ```kotlin
-val iacaDecoded = IACACertificateParser().parse(iacaDer) // certificate data decoding only - no validation performed here
-IACAValidator().validate(iacaDecoded) // strict ISO profile by default
+import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile
+import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile.profileDocumentSignerCertificate
 
-val relaxedIaca = IACAValidationConfig(signature = false) // turn-off certificate signature validation
-IACAValidator(relaxedIaca).validate(iacaDecoded)
+val documentSignerCertUtil = X509CertificateUtil {
+    addValidators(
+        IsoDocumentSignerX509CertificateProfile,
+        X509CertificateValidityValidator(allowValidityInFuture = true)
+    )
+}
+
+val documentSignerKey = cryptoRuntime.generateSoftwareKey(keyGen)
+val documentSignerCert = X509CertificateUtil.createCertificate(iacaKey, iacaRoot, certSigningAlg) {
+    profileDocumentSignerCertificate(
+        crlDistributionPointUri = "https://crl.walt.id/crl.der",
+        issuerEmailAddress = "office@walt.id",
+        subjectKey = documentSignerKey,
+        subjectDnCountryCode = "AT",
+        subjectDnOrganizationName = "Walt.id",
+        subjectDnCommonName = "Walt ID mDL DS",
+    )
+}
+
+val dsValidationResult = documentSignerCertUtil.validateCertificateChain(listOf(documentSignerCert), iacaRoot)
+check(dsValidationResult.valid) { "Not a valid Document Signer certificate: ${dsValidationResult.log}" }
 ```
 
-```kotlin
-val dsDecoded = DocumentSignerCertificateParser().parse(dsDer) // certificate data decoding only - no validation performed here
-DocumentSignerValidator().validate(dsDecoded, iacaDecoded) // strict ISO profile by default
-
-val relaxedDs = DocumentSignerValidationConfig(
-    signature = false,
-    profileDataAgainstIACAProfileData = false,
-) //turn-off certificate signature validation and cross-checking of profile data against that of the IACA
-DocumentSignerValidator(relaxedDs).validate(dsDecoded, iacaDecoded)
-```
-
-### IACA certificate info extraction (JVM)
-
-You can extract structured certificate info data required for VICALs from a decoded IACA certificate.
-The data uses `okio.ByteString` for binary fields and exposes a blocking variant for JVM callers.
-
-```kotlin
-val iacaDecoded = IACACertificateParser().parse(iacaDer)
-
-val info = iacaDecoded.toIacaCertificateInfo()
-val infoBlocking = iacaDecoded.toIacaCertificateInfoBlocking()
-```
-
-### Blocking API (JVM)
-
-Blocking variants are available for all ISO builders, parsers, and validators. These call the underlying suspend APIs
-via a platform bridge.
-
-```kotlin
-val iacaBundle = IACACertificateBuilder().buildBlocking(profileData, signingKey)
-val iacaDecoded = IACACertificateParser().parseBlocking(iacaBundle.certificateDer)
-IACAValidator().validateBlocking(iacaDecoded)
-
-val dsBundle = DocumentSignerCertificateBuilder().buildBlocking(dsProfileData, dsPublicKey, iacaSignerSpec)
-val dsDecoded = DocumentSignerCertificateParser().parseBlocking(dsBundle.certificateDer)
-DocumentSignerValidator().validateBlocking(dsDecoded, iacaDecoded)
-```
-
-> Note: blocking APIs are not supported on JS targets. Prefer suspend APIs in asynchronous contexts.
-
-#### Configurable validation system (flags map)
-
-Both `IACAValidator` and `DocumentSignerValidator` accept config objects that toggle
-cohesive groups of ISO/IEC 18013-5 checks. All flags default to `true` (strict profile).
-Failures throw `IllegalArgumentException` with a descriptive message.
-
-IACA validation flags (`IACAValidationConfig`):
-- `keyType`: enforce allowed IACA key types.
-- `principalName`: validate X.500 principal name fields and ISO 3166-1 country code.
-- `serialNo`: enforce ISO serial number size/entropy constraints.
-- `basicConstraints`: require CA=true and pathLengthConstraint=0.
-- `keyUsage`: require key usage set to KeyCertSign + CRLSign.
-- `issuerAlternativeName`: require at least one non-blank IssuerAlternativeName entry.
-- `validityPeriod`: enforce notBefore < notAfter, notAfter > now, and max 20 years.
-- `crlDistributionPointUri`: optional CRL distribution point must be non-blank when present.
-- `requiredCriticalExtensionOIDs`: require ISO-mandated critical extension OIDs.
-- `requiredNonCriticalExtensionOIDs`: require ISO-mandated non-critical extension OIDs.
-- `signature`: verify the certificate signature using the IACA public key.
-
-Document Signer validation flags (`DocumentSignerValidationConfig`):
-- `keyType`: enforce allowed Document Signer public key types.
-- `principalName`: validate X.500 principal name fields and ISO 3166-1 country code.
-- `serialNo`: enforce ISO serial number size/entropy constraints.
-- `basicConstraints`: require CA=false.
-- `keyUsage`: require key usage set to DigitalSignature.
-- `extendedKeyUsage`: require the Document Signer EKU OID to be present.
-- `authorityKeyIdentifier`: require AKI to match the issuing IACA SKI.
-- `validityPeriod`: enforce notBefore < notAfter, notAfter > now, and max 457 days.
-- `crlDistributionPointUri`: require CRL distribution point URI to be non-blank.
-- `profileDataAgainstIACAProfileData`: cross-validate country/state and validity window against the IACA.
-- `requiredCriticalExtensionOIDs`: require ISO-mandated critical extension OIDs.
-- `requiredNonCriticalExtensionOIDs`: require ISO-mandated non-critical extension OIDs.
-- `signature`: verify the certificate signature with the issuing IACA public key.
+> **Always validate a caller-supplied "root" against `IsoIaCaRootX509CertificateProfile` before
+> trusting it as a signing anchor.** A Document Signer certificate being profile-compliant and
+> correctly signed by a given key does not, by itself, guarantee that key's certificate is a valid
+> IACA root - it could be missing `CA=true`, have the wrong `pathLenConstraint`, or lack the
+> mandatory issuer-alt-name extension. Skipping the root validation step above would let anyone who
+> controls a certificate's private key get a Document Signer certificate issued "under" it,
+> regardless of whether that certificate was ever a legitimate IACA root. See
+> `IsoMdlOnboardingExample.kt` in [waltid-examples](https://github.com/walt-id/waltid-examples/tree/main/src/main/kotlin/x509)
+> for a runnable demonstration, including a rejected non-compliant root.
 
 ---
 
@@ -327,14 +342,10 @@ fun jvmExtensionsExample(cert: X509Certificate) {
 
 - **JVM / Android**
   - Uses `PKIX` builder/validator. Order of `chain` does not matter.
-  - **Revocation**: If you pass `enableRevocation = true`, enable CRL/OCSP in the JVM:
-    ```
-    -Dcom.sun.security.enableCRLDP=true
-    -Docsp.enable=true
-    # optional:
-    -Docsp.responderURL=https://ocsp.example.com
-    ```
-  - You can load the system/organizational trust store and pass anchors via `loadTrustAnchorsFromKeyStore`.
+  - Certificate revocation checks (CRL/OCSP) are not currently supported by
+    `X509CertificateChainValidator`.
+  - Load anchors from a `java.security.KeyStore` with a few lines of your own code - see
+    [Loading trust anchors from a JVM KeyStore](#loading-trust-anchors-from-a-jvm-keystore-jvm-helper).
 
 - **iOS**
   - Supports explicit trust anchors and trusted-chain-root validation.
@@ -350,7 +361,29 @@ fun jvmExtensionsExample(cert: X509Certificate) {
 
 - Prefer known trust anchors (system/org CA store) for public PKI.
 - Use pinned roots from `x5c` only for explicit trust scenarios (private PKI / trusted issuer).
-- For [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificates, **always** validate IACA and Document Signer certificates.
+- Passing a trust store to `setTrust()` or directly to a validation call **replaces** the
+  configured trust store for that scope, it is never merged with it (see
+  [Configure X509CertificateUtil](#configure-x509certificateutil)) - don't assume anchors you pass
+  to `X509CertificateUtil.Default` are being added on top of the platform's system CA store.
+- For [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificates, **always** validate IACA and Document Signer certificates - including a
+  caller-supplied IACA root against `IsoIaCaRootX509CertificateProfile` before trusting it as a
+  signing anchor, not just the certificate it signs.
+
+---
+
+## Examples
+
+Runnable, standalone examples live in [waltid-examples](https://github.com/walt-id/waltid-examples/tree/main/src/main/kotlin/x509):
+
+- [`SignCertificateExample.kt`](https://github.com/walt-id/waltid-examples/blob/main/src/main/kotlin/x509/SignCertificateExample.kt) - create a self-signed root, sign a leaf certificate, validate the chain.
+- [`ConfigureTrustStoreExample.kt`](https://github.com/walt-id/waltid-examples/blob/main/src/main/kotlin/x509/ConfigureTrustStoreExample.kt) - combine trust stores, configure a custom `X509CertificateUtil`, and see how trust store scoping behaves.
+- [`IsoMdlOnboardingExample.kt`](https://github.com/walt-id/waltid-examples/blob/main/src/main/kotlin/x509/IsoMdlOnboardingExample.kt) - build an ISO/IEC 18013-5 IACA root and Document Signer certificate, and see a non-compliant root get rejected.
+
+```bash
+git clone https://github.com/walt-id/waltid-examples.git
+cd waltid-examples
+./gradlew run -PmainClass=x509.SignCertificateExampleKt
+```
 
 ---
 

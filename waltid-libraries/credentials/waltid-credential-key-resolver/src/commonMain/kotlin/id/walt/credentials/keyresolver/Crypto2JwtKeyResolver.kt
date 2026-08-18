@@ -98,7 +98,7 @@ class Crypto2JwtKeyResolver(
     ): ResolvedJwtVerificationKey {
         val certificateChain = x5c.map { it.jsonPrimitive.content }
         return ResolvedJwtVerificationKey(
-            key = restore(X5CKeyResolver.resolveJwkFromX5c(x5c)),
+            key = X5CKeyResolver.restoreKeyFromX5c(x5c, runtime),
             source = JwtKeyResolutionSource.X5C,
             signerIdentifier = signerIdentifier,
             keyId = kid,

@@ -1,5 +1,6 @@
 package id.walt.openid4vci.handlers.credential
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.cose.CoseCertificate
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
@@ -18,10 +19,9 @@ import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.sdjwt.SDMap
-import id.walt.x509.CertificateDer
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonObject
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
@@ -45,7 +45,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
@@ -104,7 +104,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
@@ -150,7 +150,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         request: CredentialRequest,
         configuration: CredentialConfiguration,
         credentialData: JsonObject,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         validUntil: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
@@ -182,7 +182,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
 
         val issuerCertificateChain = requireNotNull(x5Chain?.takeIf { it.isNotEmpty() }) {
             "mDoc issuance requests require that the x5Chain parameter contains at least one entry"
-        }.map { CoseCertificate(it.bytes.toByteArray()) }
+        }.map { CoseCertificate(it.encodedDer.toByteArray()) }
 
         // Issues one credential per verified proof, or a single credential bound to the request proof.
         val effectiveValidUntil = resolveValidUntil(request, validUntil)
