@@ -36,13 +36,20 @@ line. See [Product Editions](#product-editions) below for how it compares to the
 
 ## Product Editions
 
-![Comparison of walt.id's Community Stack and Enterprise Stack](assets/Product-Editions3.png)
-
-<div align="center">
-
-**[Get started with the Community Stack](https://docs.walt.id/community-stack)** | **[Learn more about the Enterprise Stack](https://walt.id/pricing)**
-
-</div>
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="assets/Product-Editions3-community.png" alt="Community Stack: open-source, self-managed" width="100%" />
+<br />
+<strong><a href="https://docs.walt.id/community-stack">Get started with the Community Stack</a></strong>
+</td>
+<td align="center" width="50%">
+<img src="assets/Product-Editions3-enterprise.png" alt="Enterprise Stack: compliance and scale features for regulated deployments" width="100%" />
+<br />
+<strong><a href="https://walt.id/pricing">Learn more about the Enterprise Stack</a></strong>
+</td>
+</tr>
+</table>
 
 ## Getting Started
 
