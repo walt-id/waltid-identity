@@ -73,7 +73,7 @@ internal fun Throwable.toKeyUseAuthorizationException(
 internal fun ManagedKey.withWalletAuthorizationMapping(
     authorizationPolicy: KeyUseAuthorizationPolicy,
 ): ManagedKey {
-    if (authorizationPolicy == KeyUseAuthorizationPolicy.None) {
+    if (authorizationPolicy is KeyUseAuthorizationPolicy.None) {
         return this
     }
 
@@ -96,23 +96,52 @@ internal fun ManagedKey.withWalletAuthorizationMapping(
 }
 
 /** Interprets persisted Signum policy only when the complete wallet protected-key shape matches. */
-internal fun SignumKeyPolicy.toWalletPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy =
-    when (val authentication = authentication) {
-        SignumAuthenticationPolicy.None -> KeyUseAuthorizationPolicy.None
-        else -> if (
-            stored.spec == KeySpec.Ec(EcCurve.P256) &&
-            stored.usages == setOf(KeyUsage.SIGN, KeyUsage.VERIFY) &&
-            hardware == SignumHardwarePolicy.REQUIRED &&
-            authentication.isWalletBiometricCurrentSet()
-        ) {
-            KeyUseAuthorizationPolicy.BiometricCurrentSet
-        } else {
-            throw KeyUseAuthorizationException(
-                KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
-                "Stored Signum key uses an unsupported wallet authorization policy",
-            )
-        }
-    }
+internal fun SignumKeyPolicy.toWalletPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy = when {
+    authentication == SignumAuthenticationPolicy.None -> KeyUseAuthorizationPolicy.None
+    stored.spec == KeySpec.Ec(EcCurve.P256) &&
+        stored.usages == setOf(KeyUsage.SIGN, KeyUsage.VERIFY) &&
+        hardware == SignumHardwarePolicy.REQUIRED &&
+        authentication.isWalletBiometricCurrentSet() -> KeyUseAuthorizationPolicy.BiometricCurrentSet
+    stored.spec == KeySpec.Ec(EcCurve.P256) &&
+        stored.usages == setOf(KeyUsage.SIGN, KeyUsage.VERIFY) &&
+        hardware == SignumHardwarePolicy.REQUIRED &&
+        authentication.isWalletBiometricTimedReuse() -> KeyUseAuthorizationPolicy.BiometricTimedReuse(
+        requireNotNull(authentication as? SignumAuthenticationPolicy.UserPresence).timeoutSeconds,
+    )
+    else -> throw KeyUseAuthorizationException(
+        KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+        "Stored Signum key uses an unsupported wallet authorization policy",
+    )
+}
+
+/** Maps the complete immutable wallet policy to the protected Signum key policy. */
+internal fun KeyUseAuthorizationPolicy.toSignumPolicy(
+    prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
+): SignumKeyPolicy = when (this) {
+    KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
+    KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
+        hardware = SignumHardwarePolicy.REQUIRED,
+        authentication = SignumAuthenticationPolicy.UserPresence(
+            biometric = true,
+            allowNewBiometrics = false,
+            deviceCredential = false,
+            timeoutSeconds = 0,
+            prompt = prompt.reason,
+            cancelText = prompt.cancelText,
+        ),
+    )
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> SignumKeyPolicy(
+        hardware = SignumHardwarePolicy.REQUIRED,
+        authentication = SignumAuthenticationPolicy.UserPresence(
+            biometric = true,
+            allowNewBiometrics = true,
+            deviceCredential = false,
+            timeoutSeconds = timeoutSeconds,
+            prompt = prompt.reason,
+            cancelText = prompt.cancelText,
+        ),
+    )
+}
 
 private fun SignumAuthenticationPolicy.isWalletBiometricCurrentSet(): Boolean =
     this is SignumAuthenticationPolicy.UserPresence &&
@@ -120,3 +149,10 @@ private fun SignumAuthenticationPolicy.isWalletBiometricCurrentSet(): Boolean =
         !allowNewBiometrics &&
         !deviceCredential &&
         timeoutSeconds == 0
+
+private fun SignumAuthenticationPolicy.isWalletBiometricTimedReuse(): Boolean =
+    this is SignumAuthenticationPolicy.UserPresence &&
+        biometric &&
+        allowNewBiometrics &&
+        !deviceCredential &&
+        timeoutSeconds in 1..30

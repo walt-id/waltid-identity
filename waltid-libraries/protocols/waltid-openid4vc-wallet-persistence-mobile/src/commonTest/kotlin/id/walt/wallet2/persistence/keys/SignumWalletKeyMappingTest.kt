@@ -141,6 +141,46 @@ class SignumWalletKeyMappingTest {
         }
     }
 
+    @Test
+    fun `maps the complete timed biometric reuse policy`() {
+        val timed = KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
+        val expected = SignumKeyPolicy(
+            hardware = SignumHardwarePolicy.REQUIRED,
+            authentication = SignumAuthenticationPolicy.UserPresence(
+                biometric = true,
+                allowNewBiometrics = true,
+                deviceCredential = false,
+                timeoutSeconds = 10,
+                prompt = "Please authorize cryptographic signature",
+            ),
+        )
+        val valid = storedManagedKey(KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+
+        assertEquals(expected, timed.toSignumPolicy())
+        assertEquals(timed, expected.toWalletPolicy(valid))
+
+        listOf(
+            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(timeoutSeconds = 0)),
+            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(timeoutSeconds = 31)),
+            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(allowNewBiometrics = false)),
+            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(deviceCredential = true)),
+        ).forEach { malformed ->
+            val failure = assertFailsWith<KeyUseAuthorizationException> {
+                malformed.toWalletPolicy(valid)
+            }
+            assertEquals(KeyUseAuthorizationFailure.InvalidStoredKeyMetadata, failure.failure)
+        }
+    }
+
+    @Test
+    fun `rejects timed biometric reuse outside the supported interval`() {
+        listOf(0, 31).forEach { timeoutSeconds ->
+            assertFailsWith<IllegalArgumentException> {
+                KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds)
+            }
+        }
+    }
+
     private fun storedManagedKey(spec: KeySpec, usages: Set<KeyUsage>) = StoredKey.Managed(
         version = StoredKey.CURRENT_VERSION,
         id = KeyId("protected"),

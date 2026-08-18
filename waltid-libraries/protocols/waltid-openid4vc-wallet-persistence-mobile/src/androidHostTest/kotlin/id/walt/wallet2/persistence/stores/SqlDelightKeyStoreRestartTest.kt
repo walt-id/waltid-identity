@@ -144,7 +144,7 @@ class SqlDelightKeyStoreRestartTest {
             )
 
             assertEquals(
-                KeyUseAuthorizationSupport.Supported,
+                KeyUseAuthorizationSupport.Supported(KeyUseAuthorizationPolicy.None),
                 store.preflight(
                     WalletKeyRequirements(
                         spec = KeySpec.Rsa(2048),
@@ -246,6 +246,32 @@ class SqlDelightKeyStoreRestartTest {
                 store.getCrypto2Key(stored.id.value, KEY_USAGES)
             }
             assertEquals(KeyUseAuthorizationFailure.ProtectedKeyUnavailable, error.failure)
+        }
+    }
+
+    @Test
+    fun `timed authorization policy persists and restores through the same schema version`() = runTest {
+        database().use { database ->
+            val timed = KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
+            val provider = FakePlatformManagedKeyProvider(authorizationPolicy = timed)
+            val store = SqlDelightKeyStore(provider, database.queries)
+            val key = store.generateKey(
+                WalletKeyCreationRequest(
+                    id = KeyId("timed-reuse"),
+                    requirements = WalletKeyRequirements(
+                        spec = KeySpec.Ec(EcCurve.P256),
+                        usages = KEY_USAGES,
+                        authorizationPolicy = timed,
+                    ),
+                ),
+            )
+
+            assertEquals(listOf<KeyUseAuthorizationPolicy>(timed), provider.generatedPolicies)
+            provider.restoredPolicies.clear()
+            assertNotNull(
+                SqlDelightKeyStore(provider, database.queries).getCrypto2Key(key.id.value, KEY_USAGES),
+            )
+            assertEquals(listOf<KeyUseAuthorizationPolicy>(timed), provider.restoredPolicies)
         }
     }
 
@@ -417,7 +443,7 @@ class SqlDelightKeyStoreRestartTest {
     private class FakePlatformManagedKeyProvider : PlatformManagedKeyProvider {
         constructor(
             authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
-            preflightResult: KeyUseAuthorizationSupport = KeyUseAuthorizationSupport.Supported,
+            preflightResult: KeyUseAuthorizationSupport = KeyUseAuthorizationSupport.Supported(authorizationPolicy),
             restoreFailure: Throwable? = null,
             signFailure: Throwable? = null,
             metadataFailure: Throwable? = null,
@@ -440,6 +466,8 @@ class SqlDelightKeyStoreRestartTest {
         val managedIds = mutableSetOf<KeyId>()
         var generateCount = 0
         var deleteCount = 0
+        val generatedPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
+        val restoredPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
 
         override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport =
             preflightResult
@@ -447,6 +475,7 @@ class SqlDelightKeyStoreRestartTest {
         override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey {
             generateCount++
             managedIds += request.id
+            generatedPolicies += request.requirements.authorizationPolicy
             return managedKey(descriptor(request.id, request.requirements.spec, request.requirements.usages))
         }
 
@@ -456,6 +485,7 @@ class SqlDelightKeyStoreRestartTest {
             if (stored.id !in managedIds) {
                 return PlatformManagedKeyRestoration.Missing(authorizationPolicy)
             }
+            restoredPolicies += authorizationPolicy
             return PlatformManagedKeyRestoration.Restored(
                 key = managedKey(stored),
                 authorizationPolicy = authorizationPolicy,

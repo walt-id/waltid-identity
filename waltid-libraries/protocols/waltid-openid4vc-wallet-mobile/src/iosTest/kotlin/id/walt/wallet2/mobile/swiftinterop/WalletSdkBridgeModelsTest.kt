@@ -5,6 +5,9 @@ import id.walt.wallet2.handlers.PreviewSessionFailureReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
@@ -82,6 +85,27 @@ class WalletSdkBridgeModelsTest {
         assertFailsWith<IllegalArgumentException> {
             WalletBridgeKeyPreflight(supported = false)
         }
+    }
+
+    @Test
+    fun bridgeTimedAuthorizationPolicyPreservesTimeoutAndProviderEnforcement() {
+        val timed = WalletBridgeKeyUseAuthorizationPolicy(
+            type = WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse,
+            timeoutSeconds = 10,
+        )
+
+        assertEquals(KeyUseAuthorizationPolicy.BiometricTimedReuse(10), timed.toCorePolicy())
+
+        val preflight = KeyUseAuthorizationSupport.Supported(
+            effectivePolicy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10),
+            reuseEnforcement = KeyUseAuthorizationReuseEnforcement.ProviderProcess,
+        ).toBridgeModel()
+
+        assertEquals(timed, preflight.effectivePolicy)
+        assertEquals(
+            WalletBridgeKeyUseAuthorizationReuseEnforcement.ProviderProcess,
+            preflight.reuseEnforcement,
+        )
     }
 
     @Test

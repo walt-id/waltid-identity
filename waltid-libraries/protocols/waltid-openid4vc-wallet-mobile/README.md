@@ -46,6 +46,14 @@ Secure Enclave device and an `NSFaceIDUsageDescription` host-app entry.
 The policy is chosen only while creating a new key. Restored keys retain their
 persisted policy; changing the default never weakens or recreates an existing key.
 
+`BiometricTimedReuse(timeoutSeconds)` is available for a fixed 1–30 second,
+non-sliding reuse interval. It also requires P-256, strong biometrics, and no
+device-credential fallback, but intentionally permits new biometric enrollment
+without invalidating the key. Android requires API 30 or newer and reports `PlatformKeyStore` enforcement;
+iOS reports `ProviderProcess` enforcement, which may end reusable authorization
+earlier but never extends it past the configured interval. It has no action,
+session, or batch scope.
+
 ## Receiving credentials
 
 Start an issuance session to resolve the offer and retain the exact reviewed

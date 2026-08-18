@@ -79,12 +79,12 @@ public class SqlDelightKeyStore(
     /** Checks whether the wallet can satisfy the request using a managed key or an allowed software key. */
     public suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport =
         managedKeyProvider.preflight(requirements).let { managedSupport ->
-            if (managedSupport == KeyUseAuthorizationSupport.Supported) {
+            if (managedSupport is KeyUseAuthorizationSupport.Supported) {
                 managedSupport
-            } else if (requirements.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
+            } else if (requirements.authorizationPolicy !is KeyUseAuthorizationPolicy.None) {
                 managedSupport
             } else if (supportsSoftware(requirements)) {
-                KeyUseAuthorizationSupport.Supported
+                KeyUseAuthorizationSupport.Supported(requirements.authorizationPolicy)
             } else {
                 KeyUseAuthorizationSupport.Unsupported(
                     KeyUseAuthorizationUnsupportedReason.UnsupportedCombination,
@@ -99,11 +99,11 @@ public class SqlDelightKeyStore(
         }
         val managedSupport = managedKeyProvider.preflight(request.requirements)
         val key = when (managedSupport) {
-            KeyUseAuthorizationSupport.Supported ->
+            is KeyUseAuthorizationSupport.Supported ->
                 managedKeyProvider.generateManagedKey(request)
 
             is KeyUseAuthorizationSupport.Unsupported -> {
-                if (request.requirements.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
+                if (request.requirements.authorizationPolicy !is KeyUseAuthorizationPolicy.None) {
                     throw KeyUseAuthorizationException(
                         failure = managedSupport.reason.toAuthorizationFailure(),
                         message = "The platform cannot enforce ${request.requirements.authorizationPolicy} for ${request.requirements.spec}",
@@ -198,7 +198,7 @@ public class SqlDelightKeyStore(
             val restoration = managedKeyProvider.restoreManagedKey(stored)
             when (restoration) {
                 is PlatformManagedKeyRestoration.Missing -> {
-                    if (restoration.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
+                    if (restoration.authorizationPolicy !is KeyUseAuthorizationPolicy.None) {
                         throw KeyUseAuthorizationException(
                             KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
                             "Protected mobile key '${stored.id.value}' is unavailable",

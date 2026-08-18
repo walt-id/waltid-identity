@@ -64,22 +64,22 @@ public class WalletSdkBridge private constructor(
     public suspend fun bootstrap(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
-        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy? = null,
+        keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy? = null,
     ): WalletBridgeResult<MobileWalletBootstrapResult> =
         walletBridgeCall {
             operations.bootstrap(
                 keyType = keyType,
                 didMethod = didMethod,
-                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
+                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy?.toCorePolicy(),
             )
         }
 
     /** Checks whether an exact key-use authorization request can be enforced without creating a key. */
     public suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
-        policy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        policy: WalletBridgeKeyUseAuthorizationPolicy = WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
     ): WalletBridgeResult<WalletBridgeKeyPreflight> =
-        walletBridgeCall { operations.keyUseAuthorizationPreflight(keyType, policy).toBridgeModel() }
+        walletBridgeCall { operations.keyUseAuthorizationPreflight(keyType, policy.toCorePolicy()).toBridgeModel() }
 
     /** Resolves an offer and starts its bound OpenID4VCI issuance session. */
     public suspend fun startIssuance(

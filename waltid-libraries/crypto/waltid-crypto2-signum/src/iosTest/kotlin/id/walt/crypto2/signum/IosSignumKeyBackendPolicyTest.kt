@@ -86,6 +86,42 @@ class IosSignumKeyBackendPolicyTest {
     }
 
     @Test
+    fun `timed biometric reuse requires reusable authenticated Secure Enclave access`() {
+        val policy = SignumKeyPolicy(
+            hardware = SignumHardwarePolicy.REQUIRED,
+            authentication = SignumAuthenticationPolicy.UserPresence(
+                biometric = true,
+                allowNewBiometrics = true,
+                deviceCredential = false,
+                timeoutSeconds = 10,
+            ),
+        )
+
+        backend.validateIosNativePolicy(
+            alias = "timed-biometric",
+            policy = policy,
+            needsAuthentication = true,
+            needsAuthenticationForEveryUse = false,
+            isSecureEnclave = true,
+        )
+
+        listOf(
+            false to false,
+            true to true,
+        ).forEach { (needsAuthentication, needsAuthenticationForEveryUse) ->
+            assertFailsWith<SignumKeyPolicyMismatchException> {
+                backend.validateIosNativePolicy(
+                    alias = "timed-biometric",
+                    policy = policy,
+                    needsAuthentication = needsAuthentication,
+                    needsAuthenticationForEveryUse = needsAuthenticationForEveryUse,
+                    isSecureEnclave = true,
+                )
+            }
+        }
+    }
+
+    @Test
     fun `keychain item not found maps to a typed Signum missing-key failure`() {
         val mapped = CFCryptoOperationFailed(
             thing = "load Signum key",

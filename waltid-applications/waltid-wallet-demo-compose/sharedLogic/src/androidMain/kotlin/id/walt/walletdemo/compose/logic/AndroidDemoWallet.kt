@@ -46,7 +46,7 @@ suspend fun createAndroidDemoMobileWallet(
                     List(locales.size()) { index -> locales[index].toLanguageTag() }
                 },
                 defaultKeyUseAuthorizationPolicy = if (config.biometricEnabled) {
-                    KeyUseAuthorizationPolicy.BiometricCurrentSet
+                    KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
                 } else {
                     KeyUseAuthorizationPolicy.None
                 },

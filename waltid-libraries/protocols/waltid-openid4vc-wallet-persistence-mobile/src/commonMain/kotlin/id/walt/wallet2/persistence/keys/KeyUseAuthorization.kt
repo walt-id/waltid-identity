@@ -8,12 +8,32 @@ import kotlinx.serialization.Serializable
 
 /** Immutable authorization policy selected when a wallet key is created. */
 @Serializable
-public enum class KeyUseAuthorizationPolicy {
+public sealed interface KeyUseAuthorizationPolicy {
     /** Private-key operations retain their ordinary non-interactive behavior. */
-    None,
+    @Serializable
+    public data object None : KeyUseAuthorizationPolicy
 
     /** Every private-key operation requires a currently enrolled strong biometric. */
-    BiometricCurrentSet,
+    @Serializable
+    public data object BiometricCurrentSet : KeyUseAuthorizationPolicy
+
+    /**
+     * Strong biometric authorization may be reused for private-key operations during the fixed
+     * interval. The interval starts with successful authentication and never slides on signing.
+     *
+     * New biometric enrollment does not invalidate this key. The platform or provider may end
+     * reusable authorization earlier, but never extends it beyond [timeoutSeconds].
+     */
+    @Serializable
+    public data class BiometricTimedReuse(
+        public val timeoutSeconds: Int,
+    ) : KeyUseAuthorizationPolicy {
+        init {
+            require(timeoutSeconds in 1..30) {
+                "Biometric authorization reuse timeout must be between 1 and 30 seconds"
+            }
+        }
+    }
 }
 
 /**
@@ -86,13 +106,28 @@ public data class WalletKeyCreationRequest(
 /** Result of checking whether the wallet can satisfy the requested key and authorization requirements. */
 public sealed interface KeyUseAuthorizationSupport {
     /** The wallet can satisfy the requested key and authorization requirements. */
-    public data object Supported : KeyUseAuthorizationSupport
+    public data class Supported(
+        /** Authorization policy that will be effective for the created key. */
+        public val effectivePolicy: KeyUseAuthorizationPolicy,
+        /** How a timed-reuse interval is enforced, when one is selected. */
+        public val reuseEnforcement: KeyUseAuthorizationReuseEnforcement? = null,
+    ) : KeyUseAuthorizationSupport
 
     /** The wallet cannot satisfy the requested capability set. */
     public data class Unsupported(
         /** Reason the exact requirements cannot currently be enforced. */
         public val reason: KeyUseAuthorizationUnsupportedReason,
     ) : KeyUseAuthorizationSupport
+}
+
+/** Distinguishes platform-keystore and provider-process enforcement for timed authorization reuse. */
+@Serializable
+public enum class KeyUseAuthorizationReuseEnforcement {
+    /** The native key store enforces the authorization validity interval. */
+    PlatformKeyStore,
+
+    /** The platform crypto provider reuses authenticated process-local authorization state. */
+    ProviderProcess,
 }
 
 /** Reasons an exact key-creation requirement cannot currently be enforced. */

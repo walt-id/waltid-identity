@@ -17,9 +17,10 @@ import id.walt.crypto2.keys.ProviderId
 /**
  * Android-only Signum backend backed by Android KeyStore.
  *
- * Android [SignumAuthenticationPolicy.UserPresence] operations resolve a current resumed
+ * Per-use Android [SignumAuthenticationPolicy.UserPresence] operations resolve a current resumed
  * [FragmentActivity] at operation time so AndroidX BiometricPrompt can perform interactive
- * authorization. iOS Signum backends do not require this Android interaction host.
+ * authorization. Timed operations only use an available activity if Keystore reports that
+ * reusable authorization has expired; an already authorized signing operation remains headless.
  */
 public class AndroidSignumKeyBackend(
     private val interactionContextProvider: () -> FragmentActivity? = { null },
@@ -30,7 +31,8 @@ public class AndroidSignumKeyBackend(
         spec.isSupportedSignumSpec() &&
             usages.all { it == KeyUsage.SIGN || it == KeyUsage.VERIFY || it == KeyUsage.KEY_AGREEMENT } &&
             (KeyUsage.KEY_AGREEMENT !in usages || spec is KeySpec.Ec) &&
-            (KeyUsage.KEY_AGREEMENT in usages) == policy.keyAgreement
+            (KeyUsage.KEY_AGREEMENT in usages) == policy.keyAgreement &&
+            (!policy.authentication.isBiometricTimedReuse() || Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
 
     override suspend fun create(
         alias: String,
@@ -95,15 +97,18 @@ public class AndroidSignumKeyBackend(
             attestation = attestation,
             authentication = policy.authentication,
             signerFor = { algorithm: SignatureAlgorithm ->
-                val interactionContext = policy.authentication.takeIf {
-                    it is SignumAuthenticationPolicy.UserPresence
+                val interactionContext = when {
+                    policy.authentication.isBiometricCurrentSetEveryUse() -> requireInteractionContext(alias)
+                    policy.authentication.isBiometricTimedReuse() -> availableInteractionContext()
+                    else -> null
                 }
-                    ?.let { requireInteractionContext(alias) }
                 AndroidKeyStoreProvider.getSignerForKey(alias) {
                     configureSignumOperation(algorithm, policy.authentication)
                     if (interactionContext != null) {
                         unlockPrompt {
-                            if (policy.authentication.isBiometricCurrentSetEveryUse()) {
+                            if (policy.authentication.isBiometricCurrentSetEveryUse() ||
+                                policy.authentication.isBiometricTimedReuse()
+                            ) {
                                 allowedAuthenticators = BIOMETRIC_STRONG
                             }
                             activity = interactionContext
@@ -125,7 +130,8 @@ public class AndroidSignumKeyBackend(
         alias: String,
     ) {
         if (policy.hardware != SignumHardwarePolicy.REQUIRED &&
-            !policy.authentication.isBiometricCurrentSetEveryUse()
+            !policy.authentication.isBiometricCurrentSetEveryUse() &&
+            !policy.authentication.isBiometricTimedReuse()
         ) return
         val androidSigner = signer as? AndroidKeystoreSigner
             ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Android Keystore-backed")
@@ -145,13 +151,18 @@ public class AndroidSignumKeyBackend(
     }
 
     private fun requireInteractionContext(alias: String): FragmentActivity {
+        return availableInteractionContext()
+            ?: throw SignumInteractionContextUnavailableException(
+                "A resumed FragmentActivity is required to use protected Signum key $alias",
+            )
+    }
+
+    private fun availableInteractionContext(): FragmentActivity? {
         val activity = interactionContextProvider()
         if (activity == null || activity.isFinishing || activity.isDestroyed || activity.isChangingConfigurations ||
             !activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
         ) {
-            throw SignumInteractionContextUnavailableException(
-                "A resumed FragmentActivity is required to use protected Signum key $alias",
-            )
+            return null
         }
         return activity
     }
@@ -188,6 +199,21 @@ internal fun validateAndroidNativePolicy(
             throw SignumKeyPolicyMismatchException(
                 alias,
                 "the native key does not require biometric authentication for every use",
+            )
+        }
+        if (userAuthenticationType != null && userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG) {
+            throw SignumKeyPolicyMismatchException(alias, "the native key does not require BIOMETRIC_STRONG")
+        }
+    }
+    if (policy.authentication.isBiometricTimedReuse()) {
+        val timeoutSeconds = (policy.authentication as SignumAuthenticationPolicy.UserPresence).timeoutSeconds
+        if (!isUserAuthenticationRequired ||
+            userAuthenticationValidityDurationSeconds != timeoutSeconds ||
+            isInvalidatedByBiometricEnrollment
+        ) {
+            throw SignumKeyPolicyMismatchException(
+                alias,
+                "the native key does not enforce the requested biometric authorization reuse interval",
             )
         }
         if (userAuthenticationType != null && userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG) {

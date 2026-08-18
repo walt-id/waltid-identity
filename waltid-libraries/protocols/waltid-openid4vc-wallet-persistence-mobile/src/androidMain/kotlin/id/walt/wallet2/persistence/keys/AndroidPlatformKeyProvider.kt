@@ -11,8 +11,6 @@ import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
 import id.walt.crypto2.signum.AndroidSignumKeyBackend
-import id.walt.crypto2.signum.SignumAuthenticationPolicy
-import id.walt.crypto2.signum.SignumHardwarePolicy
 import id.walt.crypto2.signum.SignumKeyPolicy
 import id.walt.crypto2.signum.SignumKeyOptions
 import id.walt.crypto2.signum.SignumKeyNotFoundException
@@ -38,8 +36,8 @@ public class AndroidPlatformKeyProvider(
         if (!backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
-        if (requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            return KeyUseAuthorizationSupport.Supported
+        if (requirements.authorizationPolicy is KeyUseAuthorizationPolicy.None) {
+            return requirements.authorizationPolicy.supportedOnAndroid()
         }
         val failure = when {
             requirements.spec != KeySpec.Ec(EcCurve.P256) ||
@@ -52,7 +50,7 @@ public class AndroidPlatformKeyProvider(
             }
         }
         return failure?.let { KeyUseAuthorizationSupport.Unsupported(it) }
-            ?: KeyUseAuthorizationSupport.Supported
+            ?: requirements.authorizationPolicy.supportedOnAndroid()
     }
 
     override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey = try {
@@ -66,7 +64,7 @@ public class AndroidPlatformKeyProvider(
         ).withWalletAuthorizationMapping(request.requirements.authorizationPolicy)
     } catch (cause: Throwable) {
         if (
-            request.requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None &&
+            request.requirements.authorizationPolicy is KeyUseAuthorizationPolicy.None &&
             cause is SignumKeyPolicyMismatchException
         ) {
             throw cause
@@ -105,21 +103,14 @@ public class AndroidPlatformKeyProvider(
 
     private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy =
         requirements.authorizationPolicy.toSignumPolicy(prompt)
-
-    private fun KeyUseAuthorizationPolicy.toSignumPolicy(
-        prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
-    ): SignumKeyPolicy = when (this) {
-        KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
-        KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
-            hardware = SignumHardwarePolicy.REQUIRED,
-            authentication = SignumAuthenticationPolicy.UserPresence(
-                biometric = true,
-                allowNewBiometrics = false,
-                deviceCredential = false,
-                timeoutSeconds = 0,
-                prompt = prompt.reason,
-                cancelText = prompt.cancelText,
-            ),
-        )
-    }
 }
+
+private fun KeyUseAuthorizationPolicy.supportedOnAndroid(): KeyUseAuthorizationSupport.Supported =
+    KeyUseAuthorizationSupport.Supported(
+        effectivePolicy = this,
+        reuseEnforcement = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
+            KeyUseAuthorizationReuseEnforcement.PlatformKeyStore
+        } else {
+            null
+        },
+    )
