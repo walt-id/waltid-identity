@@ -3,6 +3,10 @@ package id.walt.commons.config.list
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.ConflictException
 import id.walt.commons.web.WebException
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,11 +25,21 @@ class TransactionDataProfileServiceTest {
     fun listsSeedProfilesWhenOverlayIsEmpty() {
         preloadSeed(paymentAuthorization, scaPayment)
         assertEquals(
-            setOf(paymentAuthorization.type, scaPayment.type),
-            TransactionDataProfileService.list().map { it.type }.toSet(),
+            listOf(paymentAuthorization.type, scaPayment.type),
+            TransactionDataProfileService.list().map { it.type },
         )
         TransactionDataProfileService.toTypeRegistry().requireKnown(paymentAuthorization.type)
         TransactionDataProfileService.toTypeRegistry().requireKnown(scaPayment.type)
+    }
+
+    @Test
+    fun createPreservesSeedOrderAndAppendsRuntimeProfiles() {
+        preloadSeed(scaPayment, paymentAuthorization)
+        TransactionDataProfileService.create(paymentCard)
+        assertEquals(
+            listOf(scaPayment.type, paymentAuthorization.type, paymentCard.type),
+            TransactionDataProfileService.list().map { it.type },
+        )
     }
 
     @Test
@@ -71,6 +85,48 @@ class TransactionDataProfileServiceTest {
         preloadSeed(paymentAuthorization)
         val error = assertFailsWith<WebException> { TransactionDataProfileService.get("missing") }
         assertEquals(404, error.status)
+    }
+
+    @Test
+    fun concurrentCreatesAreNotLostAndDuplicatesConflict() {
+        preloadSeed(paymentAuthorization)
+        val createdTypes = (1..40).map { "org.example.runtime-$it" }
+        val createErrors = ConcurrentLinkedQueue<Throwable>()
+        val createLatch = CountDownLatch(createdTypes.size)
+        val pool = Executors.newFixedThreadPool(8)
+        try {
+            createdTypes.forEach { type ->
+                pool.submit {
+                    runCatching {
+                        TransactionDataProfileService.create(
+                            TransactionDataProfile(type = type, displayName = type, fields = listOf("amount")),
+                        )
+                    }.onFailure(createErrors::add)
+                    createLatch.countDown()
+                }
+            }
+            assertTrue(createLatch.await(10, TimeUnit.SECONDS))
+            assertTrue(createErrors.isEmpty(), createErrors.joinToString())
+            assertEquals(
+                (listOf(paymentAuthorization.type) + createdTypes).toSet(),
+                TransactionDataProfileService.list().map { it.type }.toSet(),
+            )
+
+            val outcomes = ConcurrentLinkedQueue<Result<TransactionDataProfile>>()
+            val duplicateLatch = CountDownLatch(16)
+            repeat(16) {
+                pool.submit {
+                    outcomes.add(runCatching { TransactionDataProfileService.create(paymentCard) })
+                    duplicateLatch.countDown()
+                }
+            }
+            assertTrue(duplicateLatch.await(10, TimeUnit.SECONDS))
+            assertEquals(1, outcomes.count { it.isSuccess })
+            assertTrue(outcomes.filter { it.isFailure }.all { it.exceptionOrNull() is ConflictException })
+            assertEquals(1, TransactionDataProfileService.list().count { it.type == paymentCard.type })
+        } finally {
+            pool.shutdownNow()
+        }
     }
 
     private fun preloadSeed(vararg profiles: TransactionDataProfile) {

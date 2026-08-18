@@ -5,6 +5,8 @@ package id.walt.verifier2
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.list.TransactionDataProfile
 import id.walt.commons.config.list.TransactionDataProfilesConfig
+import id.walt.commons.featureflag.FeatureConfig
+import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.testing.E2ETest
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
@@ -33,6 +35,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TransactionDataProfilesVerifier2IntegrationTest {
@@ -119,11 +122,73 @@ class TransactionDataProfilesVerifier2IntegrationTest {
 
                     http.delete("/transaction-data-profiles/${runtime.type}")
                         .also { assertEquals(HttpStatusCode.NoContent, it.status, it.bodyAsText()) }
-                    runtime
                 }
             }
         } finally {
             ConfigManager.preclear()
+            FeatureManager.preclear()
+        }
+    }
+
+    @Test
+    fun `disabled feature uses structure-only transaction data validation`() {
+        val host = "127.0.0.1"
+        val port = 17111
+
+        try {
+            E2ETest(host, port, true).testBlock(
+                features = listOf(OSSVerifier2FeatureCatalog),
+                preload = {
+                    ConfigManager.preloadConfig(
+                        "_features",
+                        FeatureConfig(disabledFeatures = listOf("transaction-data-profiles")),
+                    )
+                    ConfigManager.preloadConfig(
+                        "verifier-service",
+                        OSSVerifier2ServiceConfig(
+                            clientId = "verifier2",
+                            clientMetadata = ClientMetadata(clientName = "Verifier2"),
+                            urlPrefix = "http://$host:$port/verification-session",
+                            urlHost = "openid4vp://authorize",
+                        ),
+                    )
+                    ConfigManager.preloadConfig(
+                        "transaction-data-profiles",
+                        TransactionDataProfilesConfig(
+                            transactionDataProfiles = listOf(
+                                TransactionDataProfile(
+                                    type = "payment_card",
+                                    displayName = "Payment Card",
+                                    fields = listOf("merchant_name", "amount"),
+                                ),
+                            ),
+                        ),
+                    )
+                },
+                init = {},
+                module = Application::verifierModule,
+            ) {
+                val http = testHttpClient()
+
+                testAndReturn("Discovery route is absent when the feature is disabled") {
+                    val response = http.get("/transaction-data-profiles")
+                    assertEquals(HttpStatusCode.NotFound, response.status, response.bodyAsText())
+                    response
+                }
+
+                testAndReturn("Session create accepts unknown types with structure-only validation") {
+                    assertNull(OSSVerifier2Manager.configuredTransactionDataTypeRegistry())
+                    val response = http.post("/verification-session/create") {
+                        contentType(ContentType.Application.Json)
+                        setBody(sessionSetup("org.example.unknown-type"))
+                    }
+                    assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+                    response.body<VerificationSessionCreationResponse>()
+                }
+            }
+        } finally {
+            ConfigManager.preclear()
+            FeatureManager.preclear()
         }
     }
 

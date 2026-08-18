@@ -2,7 +2,6 @@ package id.walt.commons.config.list
 
 import id.walt.commons.config.ConfigManager
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Process-local transaction-data profile registry: HOCON seed plus a runtime overlay.
@@ -11,50 +10,45 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object TransactionDataProfileService {
 
-    private val overrides = ConcurrentHashMap<String, TransactionDataProfile>()
-    private val tombstones = ConcurrentHashMap.newKeySet<String>()
+    private val lock = Any()
+
+    @Volatile
+    private var overlayState = TransactionDataProfileOverlay()
 
     fun reset() {
-        overrides.clear()
-        tombstones.clear()
+        synchronized(lock) {
+            overlayState = TransactionDataProfileOverlay()
+        }
     }
 
     fun seedProfiles(): List<TransactionDataProfile> =
         runCatching { ConfigManager.getConfig<TransactionDataProfilesConfig>().transactionDataProfiles }
             .getOrDefault(emptyList())
 
-    fun overlay(): TransactionDataProfileOverlay =
-        TransactionDataProfileOverlay(
-            overrides = overrides.toMap(),
-            tombstones = tombstones.toSet(),
-        )
+    fun overlay(): TransactionDataProfileOverlay = overlayState
 
     fun list(): List<TransactionDataProfile> = overlay().applyTo(seedProfiles())
 
     fun get(type: String): TransactionDataProfile = overlay().requireExisting(seedProfiles(), type)
 
-    fun create(profile: TransactionDataProfile): TransactionDataProfile {
-        val (next, created) = overlay().create(seedProfiles(), profile)
-        replaceOverlay(next)
-        return created
-    }
+    fun create(profile: TransactionDataProfile): TransactionDataProfile =
+        mutate { overlay, seed -> overlay.create(seed, profile) }
 
-    fun replace(type: String, profile: TransactionDataProfile): TransactionDataProfile {
-        val (next, updated) = overlay().replace(seedProfiles(), type, profile)
-        replaceOverlay(next)
-        return updated
-    }
+    fun replace(type: String, profile: TransactionDataProfile): TransactionDataProfile =
+        mutate { overlay, seed -> overlay.replace(seed, type, profile) }
 
     fun delete(type: String) {
-        replaceOverlay(overlay().delete(seedProfiles(), type))
+        mutate { overlay, seed -> overlay.delete(seed, type) to Unit }
     }
 
     fun toTypeRegistry(): TransactionDataTypeRegistry = overlay().toTypeRegistry(seedProfiles())
 
-    private fun replaceOverlay(next: TransactionDataProfileOverlay) {
-        overrides.clear()
-        overrides.putAll(next.overrides)
-        tombstones.clear()
-        tombstones.addAll(next.tombstones)
-    }
+    private fun <T> mutate(
+        compute: (TransactionDataProfileOverlay, List<TransactionDataProfile>) -> Pair<TransactionDataProfileOverlay, T>,
+    ): T =
+        synchronized(lock) {
+            val (next, result) = compute(overlayState, seedProfiles())
+            overlayState = next
+            result
+        }
 }

@@ -10,18 +10,28 @@ import kotlinx.serialization.Serializable
  * Runtime overlay applied on top of HOCON-seeded [TransactionDataProfile] entries.
  *
  * Overlay entries win by `type`. Tombstones hide a seeded type until it is created again.
+ * [overrides] and [tombstones] are disjoint: a type is either overridden, hidden, or neither.
  */
 @Serializable
 data class TransactionDataProfileOverlay(
     val overrides: Map<String, TransactionDataProfile> = emptyMap(),
     val tombstones: Set<String> = emptySet(),
 ) {
+    init {
+        require(overrides.keys.none { it in tombstones }) {
+            "Transaction data profile overlay overrides and tombstones must be disjoint"
+        }
+    }
+
     fun applyTo(seed: List<TransactionDataProfile>): List<TransactionDataProfile> {
-        val seedByType = seed.associateBy { it.type }
-        return (seedByType.keys + overrides.keys)
-            .filterNot { it in tombstones }
-            .map { type -> overrides[type] ?: seedByType.getValue(type) }
-            .sortedBy { it.type }
+        val seen = LinkedHashSet<String>()
+        val fromSeed = seed.mapNotNull { profile ->
+            val type = profile.type
+            if (!seen.add(type) || type in tombstones) null
+            else overrides[type] ?: profile
+        }
+        val extras = overrides.values.filter { it.type !in seen && it.type !in tombstones }
+        return fromSeed + extras
     }
 
     fun toTypeRegistry(seed: List<TransactionDataProfile>) =

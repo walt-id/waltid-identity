@@ -5,6 +5,7 @@ package id.walt.verifier2
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.list.TransactionDataProfileOverlay
 import id.walt.commons.config.list.TransactionDataProfileService
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.cose.defaultCoseSignatureAlgorithm
 import id.walt.crypto.keys.Key
@@ -87,9 +88,9 @@ object OSSVerifier2Manager {
         val enabled = runCatching {
             FeatureManager.isFeatureEnabled(OSSVerifier2FeatureCatalog.transactionDataProfilesFeature)
         }.getOrElse { false }
-        if (!enabled) return TransactionDataTypeRegistry(emptySet())
+        if (!enabled) return null // structure-only; an empty registry would reject every type
         val configLoaded = runCatching {
-            ConfigManager.getConfig<id.walt.commons.config.list.TransactionDataProfilesConfig>()
+            ConfigManager.getConfig<TransactionDataProfilesConfig>()
         }.isSuccess
         if (!configLoaded && TransactionDataProfileService.overlay() == TransactionDataProfileOverlay()) {
             return null
