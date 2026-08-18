@@ -95,7 +95,10 @@ public func assertWalletReopensSharedStateAndSigningKey(
     )
 
     // Only the host wallet bootstraps, because only the host app ever does.
-    let hostConfiguration = try namespace.walletConfiguration(walletID: walletID)
+    var hostConfiguration = try namespace.walletConfiguration(walletID: walletID)
+    // Simulators cannot create Secure Enclave keys protected by biometryCurrentSet. These
+    // assertions cover shared-storage wiring; protected extension signing remains device coverage.
+    hostConfiguration.defaultKeyUseAuthorizationPolicy = .none
     let hostWallet = try await Wallet(configuration: hostConfiguration)
     let hostBootstrap = try await hostWallet.bootstrap()
     let hostCredentials = try await hostWallet.credentials()
@@ -164,7 +167,10 @@ public func assertProviderResolvesThePublishedWalletID(
 
     // Bootstrapping is what publishes the projection: it synchronizes the platform registry afterwards,
     // and the iOS registry writes the wallet id it was built with into the App Group.
-    let hostWallet = try await Wallet(configuration: try namespace.walletConfiguration(walletID: walletID))
+    var hostConfiguration = try namespace.walletConfiguration(walletID: walletID)
+    // This assertion covers publishing the selected wallet identifier, not biometric enforcement.
+    hostConfiguration.defaultKeyUseAuthorizationPolicy = .none
+    let hostWallet = try await Wallet(configuration: hostConfiguration)
     _ = try await hostWallet.bootstrap()
 
     XCTAssertEqual(
