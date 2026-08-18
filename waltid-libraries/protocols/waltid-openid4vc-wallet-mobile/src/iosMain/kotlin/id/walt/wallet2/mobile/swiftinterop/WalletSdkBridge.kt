@@ -74,7 +74,7 @@ public class WalletSdkBridge private constructor(
             )
         }
 
-    /** Checks whether an exact key-use authorization request can be enforced without creating a key. */
+    /** Checks whether a key-use authorization request is supported without creating a key. */
     public suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
         policy: WalletBridgeKeyUseAuthorizationPolicy = WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
