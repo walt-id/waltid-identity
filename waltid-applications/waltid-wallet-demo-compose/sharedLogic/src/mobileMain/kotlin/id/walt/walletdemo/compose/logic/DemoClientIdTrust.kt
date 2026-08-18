@@ -25,8 +25,7 @@ object DemoClientIdTrust {
      * - `x509_hash:OPpTDyXlg6WRu2-Qn4rpQcA9uVqSrNExCS8kCYUe09A` (SHA-256 of this leaf)
      *
      * Demo material only, not a production CA. Valid until 2026-10-14.
-     * This leaf has no `keyUsage` extension, so client-auth usage checks may still reject it even
-     * when it is pinned. Production wallets should pin a CA and use client-auth leaves.
+     * Production wallets should pin a CA and use client-auth leaves.
      */
     val VERIFIER2_EXAMPLE_LEAF_PEM = """
         -----BEGIN CERTIFICATE-----
@@ -198,20 +197,19 @@ object DemoClientIdTrust {
 
     val AUTHOLOGIC_VERIFIER_PEM = """
         -----BEGIN CERTIFICATE-----
-        MIIClzCCAj6gAwIBAgIUN8ilrsD3z/GdAtRss8ZauIptoSUwCgYIKoZIzj0EAwIw
-        gYQxCzAJBgNVBAYTAlBMMRQwEgYDVQQIDAtNYXpvd2llY2tpZTEPMA0GA1UEBwwG
-        V2Fyc2F3MRMwEQYDVQQKDApBdXRob2xvZ2ljMREwDwYDVQQLDAhWZXJpZmllcjEm
-        MCQGA1UEAwwddmVyaWZpZXIuZGV2ZWwuYXV0aG9sb2dpYy5jb20wHhcNMjYwMjIz
-        MTIyODE4WhcNMjcwMjIzMTIyODE4WjCBhDELMAkGA1UEBhMCUEwxFDASBgNVBAgM
-        C01hem93aWVja2llMQ8wDQYDVQQHDAZXYXJzYXcxEzARBgNVBAoMCkF1dGhvbG9n
-        aWMxETAPBgNVBAsMCFZlcmlmaWVyMSYwJAYDVQQDDB12ZXJpZmllci5kZXZlbC5h
-        dXRob2xvZ2ljLmNvbTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABDndzENVECsj
-        NOcY7xZjLVw9q9WgNzOv0B7Ba9hxcin+FEa9FNCuIVOMWtYZhdeh/NVn9s9mbjbx
-        /Ak4XZfuO82jgYswgYgwDgYDVR0PAQH/BAQDAgeAMAwGA1UdEwEB/wQCMAAwHQYD
-        VR0OBBYEFB7KBw+B5xgRhuUUK7ktHEkGc7lJMB8GA1UdIwQYMBaAFB7KBw+B5xgR
-        huUUK7ktHEkGc7lJMCgGA1UdEQQhMB+CHXZlcmlmaWVyLmRldmVsLmF1dGhvbG9n
-        aWMuY29tMAoGCCqGSM49BAMCA0cAMEQCIEx7YjQP1QKik0bG90iLuP3+VG+/44EY
-        H3jrNwtSsd52AiAORJyqaFYvO5L8Wg01DFXYICumvhMZmrluzuOggqQVXg==
+        MIICWjCCAf+gAwIBAgIURMxgfdZVyDkuuDk+5EF0O6Eq56MwCgYIKoZIzj0EAwIw
+        ejELMAkGA1UEBhMCUEwxFDASBgNVBAgMC01hem93aWVja2llMQ8wDQYDVQQHDAZX
+        YXJzYXcxEzARBgNVBAoMCkF1dGhvbG9naWMxETAPBgNVBAsMCERldmVsIENBMRww
+        GgYDVQQDDBNBdXRob2xvZ2ljIERldmVsIENBMB4XDTI2MDgxNDExNDcyN1oXDTM2
+        MDgxMTExNDcyN1owejELMAkGA1UEBhMCUEwxFDASBgNVBAgMC01hem93aWVja2ll
+        MQ8wDQYDVQQHDAZXYXJzYXcxEzARBgNVBAoMCkF1dGhvbG9naWMxETAPBgNVBAsM
+        CERldmVsIENBMRwwGgYDVQQDDBNBdXRob2xvZ2ljIERldmVsIENBMFkwEwYHKoZI
+        zj0CAQYIKoZIzj0DAQcDQgAEQNrndgweAUWh9FBYRBAeSZH7MSX5XQk/HEYuei25
+        NKvLYd35wcDUXPO5OS/oxZWts86lIW3YuLMjZsq4rybGf6NjMGEwHwYDVR0jBBgw
+        FoAUokoQrmgCxZsfAKpAcK/iTd2q9pkwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8B
+        Af8EBAMCAQYwHQYDVR0OBBYEFKJKEK5oAsWbHwCqQHCv4k3dqvaZMAoGCCqGSM49
+        BAMCA0kAMEYCIQD+u+EPuNX47F9Fhu9Okj6rs6MdGAXkMPBz8dIgO0CsLgIhAIXd
+        VWuOtBE3oUD8rAOwlVMDD0Mh/viqNJ5MbS9VB2q+
         -----END CERTIFICATE-----
     """.trimIndent()
 

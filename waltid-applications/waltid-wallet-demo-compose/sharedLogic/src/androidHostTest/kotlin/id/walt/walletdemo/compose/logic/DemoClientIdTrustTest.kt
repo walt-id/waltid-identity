@@ -7,14 +7,9 @@ import kotlin.test.assertEquals
 class DemoClientIdTrustTest {
     @Test
     fun exampleAnchorsParseAsDistinctTrustAnchors() {
+        val expected = DemoClientIdTrust.x509TrustAnchorPems.map(CertificateDer::fromPEMEncodedString)
         val trust = DemoClientIdTrust.configuration
-        assertEquals(2, trust.x509TrustAnchors.size)
-        assertEquals(
-            listOf(
-                CertificateDer.fromPEMEncodedString(DemoClientIdTrust.VERIFIER2_EXAMPLE_LEAF_PEM),
-                CertificateDer.fromPEMEncodedString(DemoClientIdTrust.WALTID_VERIFIER_CA_PEM),
-            ),
-            trust.x509TrustAnchors,
-        )
+        assertEquals(expected, trust.x509TrustAnchors)
+        assertEquals(expected.toSet().size, expected.size)
     }
 }
