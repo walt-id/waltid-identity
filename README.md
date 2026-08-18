@@ -24,7 +24,7 @@ walt.id provides open-source digital ID and wallet infrastructure for issuing, h
 
 | Issuer                                                 | Wallet                                          | Verifier                                         |
 | ------------------------------------------------------ | ----------------------------------------------- | ------------------------------------------------ |
-| Issue credentials as W3C VCs, SD-JWT VCs or mdocs/mDL. | Collect, store, manage and present credentials. | Verify credentials from any compliant ID wallet. |
+| Issue credentials *(W3C VC, SD-JWT VC, mdoc/mDL)*. | Collect, store, manage and present credentials *(W3C VC, SD-JWT VC, mdoc/mDL)*. | Verify credentials *(W3C VC, SD-JWT VC, mdoc/mDL)* from any compliant ID wallet. |
 
 
 This repository — the **Community Stack** — is the free, open-source edition of the walt.id product
