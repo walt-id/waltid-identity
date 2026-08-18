@@ -83,23 +83,23 @@ class Crypto2JwtKeyResolverTest {
     }
 
     @Test
-    fun `did jwk key is selected when kid is the DID`() = runTest {
-        val resolved = resolver("$DID_JWK#0").resolveFromJwt(
-            jwtHeader = buildJsonObject { put("kid", DID_JWK) },
-            jwtPayload = buildJsonObject { put("iss", DID_JWK) },
+    fun `did jwk resolution rejects kid that is the DID without fragment`() = runTest {
+        assertNull(
+            resolver("$DID_JWK#0").resolveFromJwt(
+                jwtHeader = buildJsonObject { put("kid", DID_JWK) },
+                jwtPayload = buildJsonObject { put("iss", DID_JWK) },
+            )
         )
-
-        assertEquals(KeyId("$DID_JWK#0"), resolved?.key?.id)
     }
 
     @Test
-    fun `did jwk single key is used when kid is a kms resource path`() = runTest {
-        val resolved = resolver("$DID_JWK#0").resolveFromJwt(
-            jwtHeader = buildJsonObject { put("kid", "$DID_JWK#org.tenant.kms.key_issuer") },
-            jwtPayload = buildJsonObject { put("iss", DID_JWK) },
+    fun `did jwk resolution rejects kid that is not the method verification fragment`() = runTest {
+        assertNull(
+            resolver("$DID_JWK#0").resolveFromJwt(
+                jwtHeader = buildJsonObject { put("kid", "$DID_JWK#org.tenant.kms.key_issuer") },
+                jwtPayload = buildJsonObject { put("iss", DID_JWK) },
+            )
         )
-
-        assertEquals(KeyId("$DID_JWK#0"), resolved?.key?.id)
     }
 
     @Test

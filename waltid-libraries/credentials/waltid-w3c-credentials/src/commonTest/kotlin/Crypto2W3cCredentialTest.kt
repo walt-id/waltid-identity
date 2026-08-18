@@ -172,11 +172,12 @@ class Crypto2W3cCredentialTest {
 
         assertEquals("$didJwk#0", Issuer.getKidHeader(kmsStyleKey, didJwk))
         assertEquals("$didJwk#0", Issuer.getKidHeader(key("$didJwk#0"), didJwk))
+        assertEquals("$didJwk#0", Issuer.getKidHeader(key("$didJwk#org.tenant.kms.key_issuer"), didJwk))
         assertEquals("$didJwk#0", Issuer.getKidHeader(key("#0"), didJwk))
     }
 
     @Test
-    fun `did jwk credential signature resolves for method kid and kms-style kid`() = runTest {
+    fun `did jwk credential signature resolves for method kid and rejects non-method kid`() = runTest {
         DidService.minimalInit()
         val key = key("org.tenant.kms.key_issuer")
         val didJwk = Crypto2DidJwkRegistrar().createByKey(key, DidJwkCreateOptions()).did
@@ -199,7 +200,7 @@ class Crypto2W3cCredentialTest {
         )
         assertTrue(scheme.verifyCrypto2(issued, setOf(JwsAlgorithm.ES256)).isSuccess)
 
-        val alreadyIssued = CompactJws.sign(
+        val nonMethodKid = CompactJws.sign(
             payload = payload,
             key = key,
             algorithm = JwsAlgorithm.ES256,
@@ -208,7 +209,7 @@ class Crypto2W3cCredentialTest {
                 put("typ", "dc+sd-jwt")
             },
         )
-        assertTrue(scheme.verifyCrypto2(alreadyIssued, setOf(JwsAlgorithm.ES256)).isSuccess)
+        assertFalse(scheme.verifyCrypto2(nonMethodKid, setOf(JwsAlgorithm.ES256)).isSuccess)
     }
 
     private suspend fun publicJwkThumbprint(key: Key) =

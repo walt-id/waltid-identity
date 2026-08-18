@@ -22,7 +22,7 @@ object DidKeyResolver : BaseKeyResolver {
 
         if (!kid.isNullOrBlank()) {
             val selfIdentifyingKid = kid == selfIdentifyingVerificationMethod(issuerId) ||
-                kid == issuerId && (issuerId.startsWith("did:key:") || issuerId.startsWith("did:jwk:"))
+                kid == issuerId && issuerId.startsWith("did:key:")
             if (keys.size == 1 && selfIdentifyingKid) {
                 return keys.first()
             }
@@ -30,10 +30,6 @@ object DidKeyResolver : BaseKeyResolver {
             if (matched != null) {
                 log.debug { "Matched key by kid '$kid' in DID document for $issuerId" }
                 return matched
-            }
-            if (keys.size == 1 && issuerId.startsWith("did:jwk:")) {
-                log.debug { "Using the single did:jwk key for unmatched kid '$kid'" }
-                return keys.first()
             }
             throw NoSuchElementException("No key with kid '$kid' found in DID document for $issuerId")
         }

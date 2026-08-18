@@ -348,10 +348,10 @@ object Issuer {
 
     private fun qualifyDidKeyId(keyId: String, issuerDid: String?): String = when {
         issuerDid.isNullOrEmpty() -> keyId
+        issuerDid.startsWith("did:jwk:") -> "$issuerDid#0"
         DidUtils.isDidUrl(keyId) -> keyId
         keyId.startsWith("#") -> issuerDid + keyId
         issuerDid.startsWith("did:key:") -> "$issuerDid#${issuerDid.removePrefix("did:key:")}"
-        issuerDid.startsWith("did:jwk:") -> "$issuerDid#0"
         else -> "$issuerDid#$keyId"
     }
 }
