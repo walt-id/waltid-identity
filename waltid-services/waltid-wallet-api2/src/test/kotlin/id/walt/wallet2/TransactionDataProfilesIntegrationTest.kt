@@ -18,8 +18,10 @@ import id.walt.wallet2.server.handlers.CreateWalletRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.server.models.PresentationPreviewResponse
 import io.ktor.client.call.body
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -46,6 +48,8 @@ class TransactionDataProfilesIntegrationTest {
     private val scaType = "urn:eudi:sca:payment:1"
     private val accountType = "org.waltid.transaction-data.account-access"
 
+    private val paymentCardType = "payment_card"
+
     private val profiles = listOf(
         TransactionDataProfile(
             type = paymentType,
@@ -61,6 +65,11 @@ class TransactionDataProfilesIntegrationTest {
             type = scaType,
             displayName = "SCA Payment",
             fields = listOf("payload"),
+        ),
+        TransactionDataProfile(
+            type = paymentCardType,
+            displayName = "Payment Card",
+            fields = listOf("merchant_name", "amount"),
         ),
     )
 
@@ -100,6 +109,7 @@ class TransactionDataProfilesIntegrationTest {
                     val registry = OSSWallet2Service.configuredTransactionDataTypeRegistry()
                     registry.requireKnown(paymentType)
                     registry.requireKnown(scaType)
+                    registry.requireKnown(paymentCardType)
                     assertFailsWith<IllegalArgumentException> {
                         registry.requireKnown("org.example.unknown-type")
                     }
@@ -141,6 +151,63 @@ class TransactionDataProfilesIntegrationTest {
                         .body<PresentationPreviewResponse>()
                     assertTypeAcceptedByRegistry(preview, scaType)
                     preview
+                }
+
+                testAndReturn("Preview accepts payment_card type") {
+                    val preview = http.post("/wallet/$walletId/credentials/present/preview") {
+                        contentType(ContentType.Application.Json)
+                        setBody(PreviewPresentationRequest(requestUrl = presentationRequestUrl(paymentCardType)))
+                    }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                        .body<PresentationPreviewResponse>()
+                    assertTypeAcceptedByRegistry(preview, paymentCardType)
+                    preview
+                }
+
+                testAndReturn("CRUD can add replace and delete a runtime profile") {
+                    val runtimeType = "org.example.runtime-payment"
+                    val created = http.post("/transaction-data-profiles") {
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            TransactionDataProfile(
+                                type = runtimeType,
+                                displayName = "Runtime Payment",
+                                fields = listOf("merchant_name", "amount"),
+                            ),
+                        )
+                    }.also { assertEquals(HttpStatusCode.Created, it.status, it.bodyAsText()) }
+                        .body<TransactionDataProfile>()
+                    assertEquals(runtimeType, created.type)
+
+                    val fetched = http.get("/transaction-data-profiles/${runtimeType}")
+                        .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                        .body<TransactionDataProfile>()
+                    assertEquals("Runtime Payment", fetched.displayName)
+
+                    http.put("/transaction-data-profiles/${runtimeType}") {
+                        contentType(ContentType.Application.Json)
+                        setBody(fetched.copy(displayName = "Runtime Payment Updated"))
+                    }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+
+                    val preview = http.post("/wallet/$walletId/credentials/present/preview") {
+                        contentType(ContentType.Application.Json)
+                        setBody(PreviewPresentationRequest(requestUrl = presentationRequestUrl(runtimeType)))
+                    }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                        .body<PresentationPreviewResponse>()
+                    assertTypeAcceptedByRegistry(preview, runtimeType)
+
+                    http.delete("/transaction-data-profiles/${runtimeType}")
+                        .also { assertEquals(HttpStatusCode.NoContent, it.status, it.bodyAsText()) }
+
+                    val missing = http.get("/transaction-data-profiles/${runtimeType}")
+                    assertEquals(HttpStatusCode.NotFound, missing.status, missing.bodyAsText())
+
+                    val rejected = http.post("/wallet/$walletId/credentials/present/preview") {
+                        contentType(ContentType.Application.Json)
+                        setBody(PreviewPresentationRequest(requestUrl = presentationRequestUrl(runtimeType)))
+                    }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                        .body<PresentationPreviewResponse>()
+                    assertEquals("invalid_transaction_data", rejected.error?.code)
+                    created
                 }
 
                 testAndReturn("Preview rejects unknown transaction data type") {

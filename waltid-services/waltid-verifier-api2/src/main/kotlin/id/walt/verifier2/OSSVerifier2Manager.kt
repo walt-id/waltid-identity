@@ -3,6 +3,9 @@
 package id.walt.verifier2
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.TransactionDataProfileOverlay
+import id.walt.commons.config.list.TransactionDataProfileService
+import id.walt.commons.featureflag.FeatureManager
 import id.walt.cose.defaultCoseSignatureAlgorithm
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
@@ -21,6 +24,7 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.verifier2.data.*
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -65,6 +69,7 @@ object OSSVerifier2Manager {
                 jwsAlgorithm = it.jwsAlgorithm,
                 coseAlgorithm = it.coseAlgorithm,
                 signingKeyReference = it.reference,
+                typeRegistry = configuredTransactionDataTypeRegistry(),
             )
         } ?: VerificationSessionCreator.createVerificationSession(
             setup = setup,
@@ -74,7 +79,22 @@ object OSSVerifier2Manager {
             urlHost = urlHost,
             key = inlineLegacyKey,
             x5c = x5c,
+            typeRegistry = configuredTransactionDataTypeRegistry(),
         )
+    }
+
+    internal fun configuredTransactionDataTypeRegistry(): TransactionDataTypeRegistry? {
+        val enabled = runCatching {
+            FeatureManager.isFeatureEnabled(OSSVerifier2FeatureCatalog.transactionDataProfilesFeature)
+        }.getOrElse { false }
+        if (!enabled) return TransactionDataTypeRegistry(emptySet())
+        val configLoaded = runCatching {
+            ConfigManager.getConfig<id.walt.commons.config.list.TransactionDataProfilesConfig>()
+        }.isSuccess
+        if (!configLoaded && TransactionDataProfileService.overlay() == TransactionDataProfileOverlay()) {
+            return null
+        }
+        return TransactionDataProfileService.toTypeRegistry()
     }
 
     suspend fun resolveRequestSigningKey(session: Verification2Session): Key? =

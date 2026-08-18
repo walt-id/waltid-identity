@@ -198,7 +198,7 @@ object Wallet2RouteHandler {
         getAccountId,
         attestationAssembler,
         clientIdTrustConfiguration,
-        TransactionDataTypeRegistry(emptySet()),
+        { TransactionDataTypeRegistry(emptySet()) },
     )
 
     fun Route.registerWallet2Routes(
@@ -207,6 +207,20 @@ object Wallet2RouteHandler {
         attestationAssembler: ClientAttestationAssembler?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ) = registerWallet2Routes(
+        resolver,
+        getAccountId,
+        attestationAssembler,
+        clientIdTrustConfiguration,
+        { transactionDataTypeRegistry },
+    )
+
+    fun Route.registerWallet2Routes(
+        resolver: WalletResolver,
+        getAccountId: (suspend RoutingCall.() -> String?)?,
+        attestationAssembler: ClientAttestationAssembler?,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        transactionDataTypeRegistry: () -> TransactionDataTypeRegistry,
     ) {
         route("/wallet", { tags = listOf(WALLET_MANAGEMENT_TAG) }) {
             registerWalletManagementRoutes(
@@ -233,7 +247,7 @@ object Wallet2RouteHandler {
         getAccountId: (suspend RoutingCall.() -> String?)?,
         attestationAssembler: ClientAttestationAssembler?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        transactionDataTypeRegistry: () -> TransactionDataTypeRegistry,
     ) {
 
         post("", Wallet2OpenApiDocs.createWallet()) {
@@ -813,7 +827,7 @@ object Wallet2RouteHandler {
                                 wallet = wallet,
                                 request = req,
                                 onEvent = {},
-                                transactionDataTypeRegistry = transactionDataTypeRegistry,
+                                transactionDataTypeRegistry = transactionDataTypeRegistry(),
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
@@ -831,7 +845,7 @@ object Wallet2RouteHandler {
                                 wallet = wallet,
                                 request = req,
                                 onEvent = {},
-                                transactionDataTypeRegistry = transactionDataTypeRegistry,
+                                transactionDataTypeRegistry = transactionDataTypeRegistry(),
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
@@ -888,7 +902,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.buildVpToken(
                                 wallet = wallet,
                                 request = req,
-                                transactionDataTypeRegistry = transactionDataTypeRegistry,
+                                transactionDataTypeRegistry = transactionDataTypeRegistry(),
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
@@ -910,7 +924,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.sendAuthorizationResponse(
                                 wallet = wallet,
                                 request = req,
-                                transactionDataTypeRegistry = transactionDataTypeRegistry,
+                                transactionDataTypeRegistry = transactionDataTypeRegistry(),
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
@@ -937,7 +951,7 @@ object Wallet2RouteHandler {
                         val result = WalletPresentationHandler.previewPresentationStateless(
                             wallet = wallet,
                             request = req,
-                            transactionDataTypeRegistry = transactionDataTypeRegistry,
+                            transactionDataTypeRegistry = transactionDataTypeRegistry(),
                             clientIdTrustConfiguration = clientIdTrustConfiguration,
                         )
                         call.respond(result.toPreviewResponse())

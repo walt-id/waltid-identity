@@ -8,8 +8,8 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.commons.config.list.TransactionDataProfile
-import id.walt.commons.config.list.TransactionDataProfilesConfig
+import id.walt.commons.config.list.registerTransactionDataProfileCrudRoutes
+import id.walt.commons.featureflag.FeatureManager
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
@@ -210,15 +210,8 @@ object Verifier2Service {
                 }
             }
         }
-        get("transaction-data-profiles", {
-            tags("Transaction Data")
-            summary = "List available transaction data type profiles"
-            response {
-                HttpStatusCode.OK to { body<List<TransactionDataProfile>>() }
-            }
-        }) {
-            val config = ConfigManager.getConfig<TransactionDataProfilesConfig>()
-            call.respond(config.transactionDataProfiles)
+        if (FeatureManager.isFeatureEnabled(OSSVerifier2FeatureCatalog.transactionDataProfilesFeature)) {
+            registerTransactionDataProfileCrudRoutes()
         }
 
         route(VICAL) {
