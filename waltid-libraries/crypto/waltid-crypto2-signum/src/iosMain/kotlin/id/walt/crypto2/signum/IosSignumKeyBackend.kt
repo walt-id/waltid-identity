@@ -207,6 +207,8 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         if (policy.hardware == SignumHardwarePolicy.REQUIRED && !isSecureEnclave) {
             throw SignumKeyPolicyMismatchException(alias, "the native key is not Secure Enclave-backed")
         }
+        // Signum exposes only whether authentication is required and reusable. Its pinned public
+        // API does not expose the effective positive timeout after restoration to compare it.
         if (
             policy.authentication.isBiometricCurrentSetEveryUse() &&
             (!needsAuthentication || !needsAuthenticationForEveryUse)

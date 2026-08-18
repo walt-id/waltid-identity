@@ -21,11 +21,16 @@ public sealed interface KeyUseAuthorizationPolicy {
      * Strong biometric authorization may be reused for private-key operations during the fixed
      * interval. The interval starts with successful authentication and never slides on signing.
      *
-     * New biometric enrollment does not invalidate this key. The platform or provider may end
-     * reusable authorization earlier, but never extends it beyond [timeoutSeconds].
+     * New biometric enrollment does not invalidate this key. Android verifies this interval from
+     * native KeyStore metadata. iOS configures it in Signum, but Signum's pinned public API does
+     * not expose an effective positive timeout after restoration for independent verification.
+     *
+     * Timed reuse is recent platform or provider authentication. It is not authorization or
+     * consent for issuance, presentation, or another wallet action, and is not key-local.
      */
     @Serializable
     public data class BiometricTimedReuse(
+        /** Fixed, non-sliding strong-biometric reuse interval in seconds, from 1 through 30. */
         public val timeoutSeconds: Int,
     ) : KeyUseAuthorizationPolicy {
         init {
@@ -111,11 +116,13 @@ public sealed interface KeyUseAuthorizationSupport {
         public val effectivePolicy: KeyUseAuthorizationPolicy,
         /** How a timed-reuse interval is enforced, when one is selected. */
         public val reuseEnforcement: KeyUseAuthorizationReuseEnforcement? = null,
+        /** How the requested timed-reuse interval was validated, when one is selected. */
+        public val timeoutVerification: KeyUseAuthorizationReuseTimeoutVerification? = null,
     ) : KeyUseAuthorizationSupport
 
     /** The wallet cannot satisfy the requested capability set. */
     public data class Unsupported(
-        /** Reason the exact requirements cannot currently be enforced. */
+        /** Reason the requested requirements cannot currently be satisfied. */
         public val reason: KeyUseAuthorizationUnsupportedReason,
     ) : KeyUseAuthorizationSupport
 }
@@ -130,7 +137,17 @@ public enum class KeyUseAuthorizationReuseEnforcement {
     ProviderProcess,
 }
 
-/** Reasons an exact key-creation requirement cannot currently be enforced. */
+/** How a requested timed-reuse interval was validated before key creation. */
+@Serializable
+public enum class KeyUseAuthorizationReuseTimeoutVerification {
+    /** Android native KeyStore metadata exactly matches the requested interval. */
+    PlatformVerified,
+
+    /** The provider received the requested interval but cannot expose it for independent verification. */
+    ProviderConfigured,
+}
+
+/** Reasons a requested key-creation requirement cannot currently be satisfied. */
 public enum class KeyUseAuthorizationUnsupportedReason {
     UnsupportedCombination,
     BiometricUnavailable,

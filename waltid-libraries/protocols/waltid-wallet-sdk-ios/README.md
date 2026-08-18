@@ -117,9 +117,11 @@ Changing the configured default never changes an existing persisted key.
 Use `.biometricTimedReuse(timeoutSeconds:)` for a fixed, non-sliding 1–30 second
 reuse interval. It preserves strong-biometric-only signing and intentionally does
 not invalidate the key after new biometric enrollment. iOS preflight reports
-`.providerProcess` enforcement: the platform provider may end reusable
-authorization early, but does not extend it beyond the requested interval. The
-policy has no action, session, or batch scope.
+`.providerProcess` enforcement with `.providerConfigured` timeout verification:
+Signum receives the requested interval, but its pinned public API cannot
+independently expose the effective positive timeout after restoration. Timed
+reuse is recent provider authentication, not issuance, presentation, or other
+wallet-action consent, and is not guaranteed to be key-local.
 
 ## Local persistence
 
