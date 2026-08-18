@@ -168,7 +168,7 @@ public enum WalletKeyUseAuthorizationPreflight: Equatable, Sendable {
     case supported(
         effectivePolicy: WalletKeyUseAuthorizationPolicy,
         reuseEnforcement: WalletKeyUseAuthorizationReuseEnforcement?,
-        timeoutVerification: WalletKeyUseAuthorizationReuseTimeoutVerification?
+        timeoutValidation: WalletKeyUseAuthorizationReuseTimeoutValidation?
     )
     /// The requested policy cannot currently be supported; the reason explains why.
     case unsupported(WalletKeyUseAuthorizationUnsupportedReason)
@@ -183,13 +183,13 @@ public enum WalletKeyUseAuthorizationReuseEnforcement: Equatable, Sendable {
     case providerProcess
 }
 
-/// Timeout-validation evidence reported when timed biometric reuse is supported.
-public enum WalletKeyUseAuthorizationReuseTimeoutVerification: Equatable, Sendable {
-    /// Android native KeyStore metadata exactly matches the requested interval.
-    case platformVerified
+/// Timeout-validation capability reported when timed biometric reuse is supported.
+public enum WalletKeyUseAuthorizationReuseTimeoutValidation: Equatable, Sendable {
+    /// Native metadata can be independently read back and compared after creation or restoration.
+    case independentReadback
 
-    /// Signum received the requested interval, but its effective timeout is not independently visible.
-    case providerConfigured
+    /// The provider receives the interval, but its effective timeout cannot be independently read back.
+    case providerConfigurationOnly
 }
 
 /// Trust configuration used to authenticate verifier Request Objects.

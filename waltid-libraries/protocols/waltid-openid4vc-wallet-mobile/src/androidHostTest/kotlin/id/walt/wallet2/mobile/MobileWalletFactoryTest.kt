@@ -29,6 +29,8 @@ import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutValidation
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
@@ -202,7 +204,7 @@ class MobileWalletFactoryTest {
                         keyUseAuthorizationPolicy = case.requested,
                     )
                 }
-                assertEquals(KeyUseAuthorizationSupport.Supported(case.expected), preflight)
+                assertEquals(case.expected.toSupportedPreflight(), preflight)
                 assertEquals(listOf(case.expected), provider.preflightPolicies)
             }
 
@@ -356,7 +358,7 @@ class MobileWalletFactoryTest {
 
         override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
             preflightPolicies += requirements.authorizationPolicy
-            return preflightResult ?: KeyUseAuthorizationSupport.Supported(requirements.authorizationPolicy)
+            return preflightResult ?: requirements.authorizationPolicy.toSupportedPreflight()
         }
 
         override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey {
@@ -425,4 +427,13 @@ class MobileWalletFactoryTest {
     private companion object {
         val PRIVATE_JWK_MEMBERS = setOf("d", "p", "q", "dp", "dq", "qi", "oth", "k")
     }
+}
+
+private fun KeyUseAuthorizationPolicy.toSupportedPreflight(): KeyUseAuthorizationSupport.Supported = when (this) {
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> KeyUseAuthorizationSupport.Supported(
+        effectivePolicy = this,
+        reuseEnforcement = KeyUseAuthorizationReuseEnforcement.ProviderProcess,
+        timeoutValidation = KeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly,
+    )
+    else -> KeyUseAuthorizationSupport.Supported(this)
 }

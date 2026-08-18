@@ -138,7 +138,7 @@ final class WalletAPITests: XCTestCase {
         let preflight = WalletKeyUseAuthorizationPreflight.supported(
             effectivePolicy: policy,
             reuseEnforcement: .providerProcess,
-            timeoutVerification: .providerConfigured
+            timeoutValidation: .providerConfigurationOnly
         )
 
         acceptsSendable(policy)
@@ -148,7 +148,7 @@ final class WalletAPITests: XCTestCase {
             .supported(
                 effectivePolicy: policy,
                 reuseEnforcement: .providerProcess,
-                timeoutVerification: .providerConfigured
+                timeoutValidation: .providerConfigurationOnly
             )
         )
     }
@@ -889,10 +889,16 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         if let error {
             throw error
         }
+        let timedMetadata: (WalletKeyUseAuthorizationReuseEnforcement?, WalletKeyUseAuthorizationReuseTimeoutValidation?)
+        if case .biometricTimedReuse = policy {
+            timedMetadata = (.providerProcess, .providerConfigurationOnly)
+        } else {
+            timedMetadata = (nil, nil)
+        }
         return keyUseAuthorizationPreflightResult ?? .supported(
             effectivePolicy: policy,
-            reuseEnforcement: nil,
-            timeoutVerification: nil
+            reuseEnforcement: timedMetadata.0,
+            timeoutValidation: timedMetadata.1
         )
     }
 

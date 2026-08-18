@@ -21,12 +21,14 @@ public sealed interface KeyUseAuthorizationPolicy {
      * Strong biometric authorization may be reused for private-key operations during the fixed
      * interval. The interval starts with successful authentication and never slides on signing.
      *
-     * New biometric enrollment does not invalidate this key. Android verifies this interval from
-     * native KeyStore metadata. iOS configures it in Signum, but Signum's pinned public API does
-     * not expose an effective positive timeout after restoration for independent verification.
+     * New biometric enrollment does not invalidate this key. Android can independently read back
+     * this interval from native KeyStore metadata after creation or restoration. iOS configures it
+     * in Signum, but Signum's pinned public API does not expose an effective positive timeout after
+     * restoration for independent readback.
      *
      * Timed reuse is recent platform or provider authentication. It is not authorization or
-     * consent for issuance, presentation, or another wallet action, and is not key-local.
+     * consent for issuance, presentation, or another wallet action, and is not guaranteed to be
+     * key-local.
      */
     @Serializable
     public data class BiometricTimedReuse(
@@ -116,9 +118,16 @@ public sealed interface KeyUseAuthorizationSupport {
         public val effectivePolicy: KeyUseAuthorizationPolicy,
         /** How a timed-reuse interval is enforced, when one is selected. */
         public val reuseEnforcement: KeyUseAuthorizationReuseEnforcement? = null,
-        /** How the requested timed-reuse interval was validated, when one is selected. */
-        public val timeoutVerification: KeyUseAuthorizationReuseTimeoutVerification? = null,
-    ) : KeyUseAuthorizationSupport
+        /** How a timed-reuse interval can be validated after key creation or restoration. */
+        public val timeoutValidation: KeyUseAuthorizationReuseTimeoutValidation? = null,
+    ) : KeyUseAuthorizationSupport {
+        init {
+            val timed = effectivePolicy is KeyUseAuthorizationPolicy.BiometricTimedReuse
+            require((reuseEnforcement != null) == timed && (timeoutValidation != null) == timed) {
+                "Timed support must include enforcement and timeout validation only for timed policy"
+            }
+        }
+    }
 
     /** The wallet cannot satisfy the requested capability set. */
     public data class Unsupported(
@@ -137,14 +146,14 @@ public enum class KeyUseAuthorizationReuseEnforcement {
     ProviderProcess,
 }
 
-/** How a requested timed-reuse interval was validated before key creation. */
+/** How a timed-reuse interval can be validated after key creation or restoration. */
 @Serializable
-public enum class KeyUseAuthorizationReuseTimeoutVerification {
-    /** Android native KeyStore metadata exactly matches the requested interval. */
-    PlatformVerified,
+public enum class KeyUseAuthorizationReuseTimeoutValidation {
+    /** Native metadata can be read back independently and compared to the requested interval. */
+    IndependentReadback,
 
-    /** The provider received the requested interval but cannot expose it for independent verification. */
-    ProviderConfigured,
+    /** The requested interval can be passed to the provider but cannot be independently read back. */
+    ProviderConfigurationOnly,
 }
 
 /** Reasons a requested key-creation requirement cannot currently be satisfied. */

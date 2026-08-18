@@ -77,8 +77,8 @@ simulator cannot validate Secure Enclave or Face ID behavior.
 Use `.biometricTimedReuse(timeoutSeconds:)` for a fixed 1–30 second interval
 after successful strong-biometric authorization. The interval does not slide on
 signing and new biometric enrollment does not invalidate the key. Check the
-preflight result's `reuseEnforcement` and `timeoutVerification`: iOS reports
-provider-process enforcement with provider-configured timeout verification.
+preflight result's `reuseEnforcement` and `timeoutValidation`: iOS reports
+provider-process enforcement with provider-configuration-only validation.
 Signum receives the requested interval, but its pinned public API cannot
 independently expose the effective positive timeout after restoration. Timed
 reuse is recent provider authentication, not issuance, presentation, or other

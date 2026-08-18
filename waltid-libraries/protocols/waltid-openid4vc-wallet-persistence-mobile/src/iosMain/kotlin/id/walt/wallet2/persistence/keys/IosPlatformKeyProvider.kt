@@ -126,8 +126,8 @@ private fun KeyUseAuthorizationPolicy.supportedOnIos(): KeyUseAuthorizationSuppo
         } else {
             null
         },
-        timeoutVerification = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
-            KeyUseAuthorizationReuseTimeoutVerification.ProviderConfigured
+        timeoutValidation = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
+            KeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly
         } else {
             null
         },

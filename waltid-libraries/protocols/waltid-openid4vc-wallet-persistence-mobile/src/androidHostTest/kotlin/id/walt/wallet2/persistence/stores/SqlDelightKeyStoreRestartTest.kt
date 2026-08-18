@@ -18,6 +18,8 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutValidation
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
@@ -443,7 +445,7 @@ class SqlDelightKeyStoreRestartTest {
     private class FakePlatformManagedKeyProvider : PlatformManagedKeyProvider {
         constructor(
             authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
-            preflightResult: KeyUseAuthorizationSupport = KeyUseAuthorizationSupport.Supported(authorizationPolicy),
+            preflightResult: KeyUseAuthorizationSupport = authorizationPolicy.toSupportedPreflight(),
             restoreFailure: Throwable? = null,
             signFailure: Throwable? = null,
             metadataFailure: Throwable? = null,
@@ -532,4 +534,13 @@ class SqlDelightKeyStoreRestartTest {
             providerData = BinaryData(id.encodeToByteArray()),
         )
     }
+}
+
+private fun KeyUseAuthorizationPolicy.toSupportedPreflight(): KeyUseAuthorizationSupport.Supported = when (this) {
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> KeyUseAuthorizationSupport.Supported(
+        effectivePolicy = this,
+        reuseEnforcement = KeyUseAuthorizationReuseEnforcement.ProviderProcess,
+        timeoutValidation = KeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly,
+    )
+    else -> KeyUseAuthorizationSupport.Supported(this)
 }
