@@ -116,8 +116,8 @@ Some popular libraries you may want to look at are:
 - Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
 - Find more indepth documentation on our [docs site](https://docs.walt.id)
 
-
-
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+
+LLM? Read [llms.txt](./llms.txt).
