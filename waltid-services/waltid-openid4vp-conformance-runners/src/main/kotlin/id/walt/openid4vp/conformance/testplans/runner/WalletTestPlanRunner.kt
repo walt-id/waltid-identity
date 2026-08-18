@@ -11,20 +11,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.serialization.json.*
 
-/**
- * Executes a single wallet conformance test plan
- * 
- * Flow:
- * 1. Create test plan on conformance suite
- * 2. Get list of test modules from create response
- * 3. For each module:
- *    a. Create test instance (via /api/runner)
- *    b. Wait for WAITING state
- *    c. Trigger wallet to process authorization request
- *    d. Wait for completion
- *    e. Get result
- * 4. Collect and return results
- */
+/** Executes a single OpenID4VP wallet conformance test plan. */
 class WalletTestPlanRunner(
     val testPlan: WalletTestPlan,
     val conformanceHttp: HttpClient,
@@ -49,31 +36,26 @@ class WalletTestPlanRunner(
         println("  Signed request: ${testPlan.requiresSignedRequest}")
         println()
 
-        // Create test plan (response includes modules)
         val planResponse = createTestPlan()
         val testPlanId = planResponse.id
         println("Test plan created: $testPlanId")
         println("View plan: https://$conformanceHost:$conformancePort/plan-detail.html?plan=$testPlanId")
 
-        // Get test modules from create response
         val modules = planResponse.modules
         println("Test modules: ${modules.size}")
         modules.forEach { println("   - ${it.testModule}") }
         println()
 
-        // Run each module
-        val results = mutableListOf<TestPlanResult>()
-        modules.forEachIndexed { index, module ->
+        val results = modules.mapIndexed { index, module ->
             println("[${index + 1}/${modules.size}] Running module: ${module.testModule}")
-            
             val result = runModule(testPlanId, module)
-            results.add(result)
 
             println("   Result: ${result.walletStatus}")
             if (result.errorMessage != null) {
                 println("   Error: ${result.errorMessage}")
             }
             println()
+            result
         }
 
         val namedResults = results.mapIndexed { index, result ->
@@ -94,25 +76,12 @@ class WalletTestPlanRunner(
         return namedResults
     }
 
-    /**
-     * Create test plan on conformance suite.
-     * Returns the full response which includes the modules list.
-     */
-    private suspend fun createTestPlan(): CreateTestPlanResponse {        
+    private suspend fun createTestPlan(): CreateTestPlanResponse {
         val variantJson = Json.encodeToString(testPlan.variant)
-        
-        println("DEBUG: Creating test plan...")
-        println("DEBUG: Plan name: ${testPlan.planName}")
-        println("DEBUG: Variant JSON: $variantJson")
-        println("DEBUG: Configuration: ${testPlan.configuration}")
-        
         val createTestPlanUrl = conformance.createTestPlanUrlWithConfig {
             append("planName", testPlan.planName)
             append("variant", variantJson)
         }
-        
-        println("DEBUG: URL: $createTestPlanUrl")
-        
         val body = buildJsonObject {
             put("configuration", testPlan.configuration)
         }
@@ -122,49 +91,34 @@ class WalletTestPlanRunner(
         return response
     }
 
-    /**
-     * Run a single test module.
-     * Uses the same API pattern as verifier tests: buildCreateTestUrl + createTest.
-     */
+    /** Runs one suite module and returns its final conformance result. */
     private suspend fun runModule(testPlanId: String, module: CreateTestPlanResponse.Module): TestPlanResult {
         val moduleId = module.testModule
-        
+
         try {
-            // Create test instance for this module (same API as verifier tests)
             val createTestUrl = conformance.buildCreateTestUrl(testPlanId, module.testModule, module.variant)
             println("   Creating test: $createTestUrl")
-            
+
             val createTestResponse = conformance.createTest(createTestUrl)
             val testId = createTestResponse.id
             println("   Test ID: $testId")
             println("   View: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
 
-            // Wait for test to be ready (WAITING state)
             conformance.waitForTestStatus(testId, shouldBeWaiting = true)
 
-            // Get the test run result which contains exposed endpoints
             val testRunResult = conformance.getTestRun(testId)
             println("   Test exposed endpoints available")
 
-            // For wallet tests, trigger the wallet to process the authorization request
-            // The conformance suite exposes an authorization endpoint
             val authEndpoint = testRunResult.getExposedAuthorizationEndpoint()
             println("   Authorization endpoint: $authEndpoint")
-            
-            // Trigger wallet via adapter (adapter forwards to wallet API)
-            // Use https for the conformance suite
             val httpsEndpoint = authEndpoint.replace("http://", "https://")
             val walletResponse = conformanceHttp.get(httpsEndpoint)
             println("   Wallet response: ${walletResponse.status}")
 
-            // Wait for test to complete (no longer WAITING)
             conformance.waitForTestStatus(testId, shouldBeWaiting = false)
 
-            // Get final result from test info
             val testInfo = conformance.getTestRunInfo(testId)
             val conformanceResult = testInfo.result ?: "UNKNOWN"
-            
-            // For wallet tests, wallet status == conformance result
             val walletStatus = when {
                 testPlan.expectRejection && conformanceResult == "PASSED" -> "REJECTED"
                 conformanceResult == "PASSED" -> "PASSED"
@@ -179,7 +133,7 @@ class WalletTestPlanRunner(
                 walletStatus = walletStatus,
                 errorMessage = null
             )
-            
+
         } catch (e: Exception) {
             return TestPlanResult(
                 conformanceTestId = moduleId,
@@ -190,9 +144,6 @@ class WalletTestPlanRunner(
         }
     }
 
-    /**
-     * Print test results summary
-     */
     private fun printSummary(results: List<TestPlanResult>) {
         println()
         println("Test Results:")

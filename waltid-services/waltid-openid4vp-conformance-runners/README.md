@@ -53,7 +53,9 @@ waltid-openid4vp-conformance-runners/
 │   ├── VP-VERIFIER.md
 │   ├── VCI-WALLET.md
 │   └── VP-WALLET.md
-└── run-issuer-conformance-local.sh
+├── run-issuer-conformance-local.sh
+├── run-wallet-api2-conformance-local.sh
+└── run-wallet-conformance-local.sh
 ```
 
 ## Documentation
@@ -65,10 +67,18 @@ waltid-openid4vp-conformance-runners/
 | [docs/VCI-WALLET.md](docs/VCI-WALLET.md) | VCI wallet conformance documentation |
 | [docs/VP-WALLET.md](docs/VP-WALLET.md) | VP wallet conformance documentation |
 | [TEST-PLANS-AND-PROFILES.md](TEST-PLANS-AND-PROFILES.md) | Test-plan inventory and profile reference |
+| [Wallet API2 basic-plan matrices](../../docs/openid4vci-wallet-1.0-basic-plan-matrices.md) | Module-level VCI wallet conformance gaps |
+| [Wallet API2 compatibility report](../../docs/openid4vci-wallet-1.0-compatibility-report.md) | Consolidated VCI wallet gaps and implementation order |
+| [Wallet API2 naming notes](../../docs/wallet2-oid4vci-naming-and-extensibility.md) | API-shape and extensibility analysis |
 
 `./gradlew test` only executes the test task. It does not universally provision
 remote services or local conformance infrastructure. Follow the relevant
 role-specific guide for a runnable environment and its intended command.
+
+VCI wallet conformance uses two local processes: start Wallet API2 with
+`run-wallet-api2-conformance-local.sh`, then run
+`run-wallet-conformance-local.sh` from a second terminal. The complete setup is
+in [docs/VCI-WALLET.md](docs/VCI-WALLET.md).
 
 ## CI summaries and soft-fail
 

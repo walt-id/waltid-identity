@@ -16,12 +16,8 @@ import kotlinx.serialization.json.JsonObject
  *
  * ## Implementation
  *
- * Implementations provide:
- * - Variant parameters (credential format, grant type, etc.)
- * - Configuration JSON for conformance suite
- * - Optional overrides for plan name and other properties
- *
- * @see VciWalletSdJwtDpop for SD-JWT VC + DPoP implementation
+ * The matrix implementation provides variant parameters and configuration JSON
+ * for each suite-supported test-plan context.
  */
 interface VciWalletTestPlan {
 

@@ -15,6 +15,7 @@ services:
     ports:
      - "8443:8443"
      - "9443:9443"
+     - "9444:9444"
     extra_hosts:
      - "host.docker.internal:host-gateway"
     networks:

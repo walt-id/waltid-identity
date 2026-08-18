@@ -14,7 +14,7 @@ Test plan classes follow this pattern:
 ```
 
 Examples:
-- `VciWalletSdJwtDpop` - VCI Wallet with SD-JWT and DPoP
+- `WalletVariantMatrix` - VCI Wallet suite-plan matrix
 - `Oid4vciIssuerVariantPlan` - VCI Issuer matrix variant
 - `SdJwtVcX509SanDnsRequestUriSignedDirectPost` - VP Verifier for SD-JWT VC with X.509 client ID
 - `VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost` - VP Wallet for SD-JWT VC with X.509 client ID
@@ -25,57 +25,21 @@ Examples:
 
 ### 1. OpenID4VCI - Wallet Role
 
-#### VciWalletSdJwtDpop
-**File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vci/wallet/VciWalletSdJwtDpop.kt`  
+**Files:** `plans/vci/wallet/WalletVariantMatrix.kt`,
+`plans/vci/wallet/Oid4vciWalletVariantPlan.kt`, and
+`WalletConformanceTestRunner.kt`
 **Test Class:** `VciWalletConformanceTests.kt`
 
-**Configuration:**
-- **Protocol:** OpenID4VCI 1.0
-- **Role:** Wallet (Credential Receiver)
-- **Credential Format:** SD-JWT VC (`vc+sd-jwt`)
-- **Authentication:** DPoP + private_key_jwt
-- **Flow:** Authorization Code
-- **Key Binding:** openid4vci-proof+jwt
+The VCI wallet runner creates the suite-defined contexts instead of using fixed
+profiles:
 
-**Conformance Plan:** `oid4vci-1_0-wallet-test-plan`
+- Basic plan: `oid4vci-1_0-wallet-test-plan`, 1,728 valid contexts.
+- HAIP plan: `oid4vci-1_0-wallet-haip-test-plan`, 6 plan contexts with the
+  remaining immediate/deferred/encryption variants supplied by suite modules.
 
-**Status:** Stable SD-JWT VC reference profile
-
-**HAIP Features:**
-- ✅ DPoP (Demonstrating Proof-of-Possession)
-- ✅ private_key_jwt client authentication
-- ✅ Key binding proofs (openid4vci-proof+jwt)
-- ✅ Nonce handling (c_nonce + nonce_endpoint)
-- ✅ Authorization code flow
-
-#### VciWalletSdJwtHaip
-**File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vci/wallet/VciWalletSdJwtHaip.kt`  
-**Test Class:** `VciWalletConformanceTests.kt`
-
-**Configuration:**
-- **Protocol:** OpenID4VCI 1.0
-- **Role:** Wallet (Credential Receiver)
-- **Credential Format:** SD-JWT VC (`vc+sd-jwt`)
-- **Authentication:** DPoP + private_key_jwt
-- **Flow:** Authorization Code
-- **Profile:** HAIP full target (`fapi_profile=vci_haip`)
-- **Conformance Plan:** `oid4vci-1_0-wallet-haip-test-plan`
-
-**Purpose:** Alternative wallet-side profile aligned to the currently implemented HAIP issuance criteria in OSS. Covers the HAIP-aligned auth-code, DPoP, offer, scope, and SD-JWT validation path without requiring wallet attestation interoperability yet.
-
-#### VciWalletMdocDpop
-**File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vci/wallet/VciWalletMdocDpop.kt`  
-**Test Class:** `VciWalletConformanceTests.kt`
-
-**Configuration:**
-- **Protocol:** OpenID4VCI 1.0
-- **Role:** Wallet (Credential Receiver)
-- **Credential Format:** ISO mdoc (suite variant `mdoc`, issued format `mso_mdoc`)
-- **Authentication:** DPoP + private_key_jwt
-- **Flow:** Authorization Code
-- **Conformance Plan:** `oid4vci-1_0-wallet-test-plan`
-
-**Purpose:** Wallet-side mdoc issuance profile using the standard VCI wallet test plan with suite variant `credential_format=mdoc` for issued format `mso_mdoc`.
+It runs modules through Wallet API2 and records supported, failed, skipped, and
+blocked contexts. See [docs/VCI-WALLET.md](docs/VCI-WALLET.md) for the exact
+axes, environment filters, wrapper commands, and current implementation limits.
 
 ---
 
@@ -299,10 +263,8 @@ and emits credential `x5c` material.
 ## Summary by Status
 
 ### ⚠️ Validated Runner Profiles
-1. **VciWalletSdJwtDpop** - stable SD-JWT VC reference profile
-2. **VciWalletMdocDpop** - stable ISO mdoc reference profile
-3. **VciWalletSdJwtHaip** - HAIP-oriented baseline profile
-4. **Oid4vciIssuerVariantPlan** - generated base VCI issuer matrix
+1. **WalletVariantMatrix** - generated basic and HAIP VCI wallet contexts
+2. **Oid4vciIssuerVariantPlan** - generated base VCI issuer matrix
 
 ### ⚠️ Mostly Working (Minor Issues)
 1. **MdlX509SanDnsRequestUriSignedDirectPost** - mDL tests passing
@@ -319,8 +281,7 @@ and emits credential `x5c` material.
 
 | Interface | Role | Credential Format | Client Auth | Status |
 |-----------|------|------------------|-------------|--------|
-| OpenID4VCI | Wallet | SD-JWT VC | DPoP + private_key_jwt | ⚠️ Runner currently executes first module only |
-| OpenID4VCI | Wallet | ISO mdoc | DPoP + private_key_jwt | ⚠️ Runner currently executes first module only |
+| OpenID4VCI | Wallet | SD-JWT VC, mdoc | Suite-defined client authentication and sender constraints | ⚠️ Generated matrix; support is reported per module |
 | OpenID4VCI | Issuer | SD-JWT VC | DPoP + Client Attestation | ⚠️ 53/55 |
 | OpenID4VP | Verifier | SD-JWT VC | x509_san_dns | ⚠️ Config |
 | OpenID4VP | Verifier | mDL | x509_san_dns | ✅ Passing |
@@ -361,12 +322,24 @@ from the `waltid-identity` repository root.
 
 ### Run by Interface
 ```bash
-# VCI Wallet (profile runner)
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VciWalletConformanceTests"
+# VCI Wallet, terminal 1: start Wallet API2 with the local conformance truststore
+cd waltid-services/waltid-openid4vp-conformance-runners
+./run-wallet-api2-conformance-local.sh
+```
 
+```bash
+# VCI Wallet, terminal 2: run the selected plan from the conformance-runner module
+cd waltid-services/waltid-openid4vp-conformance-runners
+./run-wallet-conformance-local.sh
+```
+
+```bash
 # VCI Issuer: from the conformance-runner module after completing docs/VCI-ISSUER.md setup
+cd waltid-services/waltid-openid4vp-conformance-runners
 ./run-issuer-conformance-local.sh
+```
 
+```bash
 # VP Verifier (partial)
 export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests"
@@ -399,9 +372,8 @@ export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
 src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/
 ├── vci/
 │   ├── wallet/
-│   │   ├── VciWalletSdJwtDpop.kt                                      ✅
-│   │   ├── VciWalletMdocDpop.kt                                       ✅
-│   │   └── VciWalletSdJwtHaip.kt                                      ⚠️
+│   │   ├── WalletVariantMatrix.kt                                     ⚠️
+│   │   └── Oid4vciWalletVariantPlan.kt                                ⚠️
 │   └── issuer/
 │       └── Oid4vciIssuerVariantPlan.kt                                 ⚠️
 └── vp/
@@ -417,17 +389,8 @@ src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/
 ### Test Classes (4 total)
 ```
 src/test/kotlin/id/walt/openid4vp/conformance/
-├── VciWalletConformanceTests.kt       ⚠️ Profile runner
+├── VciWalletConformanceTests.kt       ⚠️ Matrix runner
 ├── IssuerConformanceTests.kt          ⚠️ 53/55
 ├── VerifierConformanceTests.kt        ⚠️ Partial
 └── VpWalletConformanceTests.kt        🚫 Ready
 ```
-# Specific VCI wallet profiles
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:vciWalletSdJwtVcDpopAuthorizationCode \
-    -PrunIntegrationTests
-
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:vciWalletIsoMdocDpopAuthorizationCode \
-    -PrunIntegrationTests
-
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:vciWalletSdJwtVcAuthorizationCodeHaipFullTarget \
-    -PrunIntegrationTests

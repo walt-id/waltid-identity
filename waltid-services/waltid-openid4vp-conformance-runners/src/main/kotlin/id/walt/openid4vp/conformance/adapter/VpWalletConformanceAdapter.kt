@@ -32,8 +32,8 @@ import kotlinx.serialization.json.*
  * Production wallets use mobile URL schemes, deep links, or Digital Credentials API.
  */
 class VpWalletConformanceAdapter(
-    private val walletApiUrl: String = "http://127.0.0.1:7005",
-    private val adapterPort: Int = 7006,
+    private val walletApiUrl: String = "http://127.0.0.1:7006",
+    private val adapterPort: Int = 7007,
     private val walletId: String = System.getenv("CONFORMANCE_WALLET_ID") ?: "conformance-test-wallet"
 ) {
     

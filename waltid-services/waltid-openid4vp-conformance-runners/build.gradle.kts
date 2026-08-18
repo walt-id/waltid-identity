@@ -160,10 +160,16 @@ fun playwrightInstallArgs(): List<String> = buildList {
 
 tasks.register<JavaExec>("installPlaywrightBrowsers") {
     group = "verification"
-    description = "Install the Playwright browser used by issuer conformance authorization-code tests."
+    description = "Install the Playwright browser used by OpenID conformance authorization-code tests."
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("com.microsoft.playwright.CLI")
     args(playwrightInstallArgs())
+}
+
+tasks.named<Test>("test") {
+    filter {
+        excludeTestsMatching("id.walt.openid4vp.conformance.VciWalletConformanceTests.*")
+    }
 }
 
 fun registerWalletProfileTestTask(taskName: String, testFilter: String, descriptionText: String) {
@@ -175,6 +181,7 @@ fun registerWalletProfileTestTask(taskName: String, testFilter: String, descript
         classpath = tasks.test.get().classpath
 
         useJUnitPlatform()
+        systemProperty("openid4vci.conformance.wallet.enabled", "true")
         filter {
             includeTestsMatching(testFilter)
         }
@@ -182,19 +189,7 @@ fun registerWalletProfileTestTask(taskName: String, testFilter: String, descript
 }
 
 registerWalletProfileTestTask(
-    taskName = "vciWalletSdJwtVcDpopAuthorizationCode",
-    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtVcDpopAuthorizationCode",
-    descriptionText = "Run the SD-JWT VC + DPoP + authorization_code VCI wallet conformance profile."
-)
-
-registerWalletProfileTestTask(
-    taskName = "vciWalletIsoMdocDpopAuthorizationCode",
-    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletIsoMdocDpopAuthorizationCode",
-    descriptionText = "Run the ISO mdoc + DPoP + authorization_code VCI wallet conformance profile."
-)
-
-registerWalletProfileTestTask(
-    taskName = "vciWalletSdJwtVcAuthorizationCodeHaipFullTarget",
-    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtVcAuthorizationCodeHaipFullTarget",
-    descriptionText = "Run the HAIP full-target VCI wallet conformance profile."
+    taskName = "runVciWalletConformanceTests",
+    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.runWalletConformanceTests",
+    descriptionText = "Run the OpenID4VCI wallet conformance matrix selected by OPENID4VCI_WALLET_CONFORMANCE_* variables."
 )
