@@ -288,7 +288,7 @@ public class MobileWallet internal constructor(
             .also { syncDigitalCredentialRegistration() }
     }
 
-    /** Checks an exact key-use authorization request without creating or persisting a key. */
+    /** Checks whether a key-use authorization request is supported without creating or persisting a key. */
     public suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType = defaultKeyType,
         keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
