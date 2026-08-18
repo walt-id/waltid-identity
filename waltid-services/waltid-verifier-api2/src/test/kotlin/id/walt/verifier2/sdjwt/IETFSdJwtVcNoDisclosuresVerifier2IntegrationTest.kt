@@ -51,6 +51,16 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
+/**
+ * Unhappy-path coverage for the pre-final community SD-JWT VC fixture.
+ *
+ * The stored token's key-binding JWT `sd_hash` is stale, so verifier2 correctly rejects
+ * the presentation at VP validation (`sd_hash-check`) and never emits
+ * `validated_credentials_available` or `credential_policy_results_available`.
+ *
+ * See [IETFSdJwtVcHappyPathVerifier2IntegrationTest] for a freshly issued credential
+ * that reaches SUCCESSFUL and the full success callback sequence.
+ */
 class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
 
     private val sdJwtVcDcqlQuery = DcqlQuery(
