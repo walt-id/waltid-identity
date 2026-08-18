@@ -1,11 +1,21 @@
-![walt.id banner](assets/walt-banner.png)
+<div align="center">
+<img src="assets/walt-banner.png" alt="walt.id banner" />
 
-Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions by [walt.id](https://walt.id)
+  <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions <span>by </span><a href="https://walt.id">walt.id</a></p>
 
-[![License](https://img.shields.io/github/license/walt-id/waltid-identity?style=flat)](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/walt-id/waltid-identity?style=flat)](https://github.com/walt-id/waltid-identity/releases)
-[![Join community!](https://img.shields.io/badge/Join-The%20Community-blue.svg?style=flat)](https://walt.id/community)
-[![Follow walt_id](https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin)](https://www.linkedin.com/company/walt-id/)
+<a href="https://github.com/walt-id/waltid-identity/blob/main/LICENSE">
+<img src="https://img.shields.io/github/license/walt-id/waltid-identity?style=flat" alt="License" />
+</a>
+<a href="https://github.com/walt-id/waltid-identity/releases">
+<img src="https://img.shields.io/github/v/release/walt-id/waltid-identity?style=flat" alt="Latest release" />
+</a>
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+</div>
 
 ## What is walt.id?
 
