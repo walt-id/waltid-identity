@@ -37,7 +37,7 @@ fun createIosDemoWallet(
                     crossProcessAccess = crossProcessAccess,
                     onDigitalCredentialRegistryChanged = onDigitalCredentialRegistryChanged,
                     defaultKeyUseAuthorizationPolicy = if (config.biometricEnabled) {
-                        KeyUseAuthorizationPolicy.BiometricCurrentSet
+                        KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
                     } else {
                         KeyUseAuthorizationPolicy.None
                     },

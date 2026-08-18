@@ -173,10 +173,12 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         alias: String,
     ) {
         if (policy.hardware != SignumHardwarePolicy.REQUIRED &&
-            !policy.authentication.isBiometricCurrentSetEveryUse()
+            !policy.authentication.isBiometricCurrentSetEveryUse() &&
+            !policy.authentication.isBiometricTimedReuse()
         ) return
-        val exactAuthentication = policy.authentication.isBiometricCurrentSetEveryUse()
-        val iosSigner = if (exactAuthentication) {
+        val requiresAuthentication = policy.authentication.isBiometricCurrentSetEveryUse() ||
+            policy.authentication.isBiometricTimedReuse()
+        val iosSigner = if (requiresAuthentication) {
             signer as? IosSigner
                 ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Keychain-backed")
         } else {
@@ -185,6 +187,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         validateIosNativePolicy(
             alias = alias,
             policy = policy,
+            needsAuthentication = iosSigner?.needsAuthentication ?: false,
             needsAuthenticationForEveryUse = iosSigner?.needsAuthenticationForEveryUse ?: false,
             isSecureEnclave = if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
                 isSecureEnclaveKey(alias)
@@ -198,6 +201,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         alias: String,
         policy: SignumKeyPolicy,
         needsAuthenticationForEveryUse: Boolean,
+        needsAuthentication: Boolean = needsAuthenticationForEveryUse,
         isSecureEnclave: Boolean,
     ) {
         if (policy.hardware == SignumHardwarePolicy.REQUIRED && !isSecureEnclave) {
@@ -205,11 +209,20 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         }
         if (
             policy.authentication.isBiometricCurrentSetEveryUse() &&
-            !needsAuthenticationForEveryUse
+            (!needsAuthentication || !needsAuthenticationForEveryUse)
         ) {
             throw SignumKeyPolicyMismatchException(
                 alias,
                 "the native key does not enforce biometric authentication for every use",
+            )
+        }
+        if (
+            policy.authentication.isBiometricTimedReuse() &&
+            (needsAuthenticationForEveryUse || !needsAuthentication)
+        ) {
+            throw SignumKeyPolicyMismatchException(
+                alias,
+                "the native key does not enforce reusable biometric authentication",
             )
         }
     }

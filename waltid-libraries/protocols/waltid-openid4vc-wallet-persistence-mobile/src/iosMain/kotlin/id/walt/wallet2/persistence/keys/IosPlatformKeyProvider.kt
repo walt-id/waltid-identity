@@ -7,8 +7,6 @@ import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
 import id.walt.crypto2.signum.IosSignumKeyBackend
-import id.walt.crypto2.signum.SignumAuthenticationPolicy
-import id.walt.crypto2.signum.SignumHardwarePolicy
 import id.walt.crypto2.signum.SignumKeyNotFoundException
 import id.walt.crypto2.signum.SignumKeyOptions
 import id.walt.crypto2.signum.SignumKeyPolicy
@@ -38,8 +36,8 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         if (!backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
-        if (requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            return KeyUseAuthorizationSupport.Supported
+        if (requirements.authorizationPolicy is KeyUseAuthorizationPolicy.None) {
+            return requirements.authorizationPolicy.supportedOnIos()
         }
         val failure = when {
             requirements.spec != KeySpec.Ec(EcCurve.P256) ||
@@ -49,7 +47,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
             else -> biometricAvailabilityFailure()
         }
         return failure?.let { KeyUseAuthorizationSupport.Unsupported(it) }
-            ?: KeyUseAuthorizationSupport.Supported
+            ?: requirements.authorizationPolicy.supportedOnIos()
     }
 
     override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey = try {
@@ -63,7 +61,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         ).withWalletAuthorizationMapping(request.requirements.authorizationPolicy)
     } catch (cause: Throwable) {
         if (
-            request.requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None &&
+            request.requirements.authorizationPolicy is KeyUseAuthorizationPolicy.None &&
             cause is SignumKeyPolicyMismatchException
         ) {
             throw cause
@@ -118,23 +116,17 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         }
     }
 
-    private fun KeyUseAuthorizationPolicy.toSignumPolicy(
-        prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
-    ): SignumKeyPolicy = when (this) {
-        KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
-        KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
-            hardware = SignumHardwarePolicy.REQUIRED,
-            authentication = SignumAuthenticationPolicy.UserPresence(
-                biometric = true,
-                allowNewBiometrics = false,
-                deviceCredential = false,
-                timeoutSeconds = 0,
-                prompt = prompt.reason,
-                cancelText = prompt.cancelText,
-            ),
-        )
-    }
 }
+
+private fun KeyUseAuthorizationPolicy.supportedOnIos(): KeyUseAuthorizationSupport.Supported =
+    KeyUseAuthorizationSupport.Supported(
+        effectivePolicy = this,
+        reuseEnforcement = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
+            KeyUseAuthorizationReuseEnforcement.ProviderProcess
+        } else {
+            null
+        },
+    )
 
 private val isSimulator: Boolean by lazy {
     NSProcessInfo.processInfo.environment.keys.any { it == "SIMULATOR_UDID" || it == "SIMULATOR_DEVICE_NAME" }

@@ -114,6 +114,13 @@ biometric authorization for every signature, and do not allow device-passcode
 fallback. The host app must declare `NSFaceIDUsageDescription` in its Info.plist.
 Changing the configured default never changes an existing persisted key.
 
+Use `.biometricTimedReuse(timeoutSeconds:)` for a fixed, non-sliding 1–30 second
+reuse interval. It preserves strong-biometric-only signing and intentionally does
+not invalidate the key after new biometric enrollment. iOS preflight reports
+`.providerProcess` enforcement: the platform provider may end reusable
+authorization early, but does not extend it beyond the requested interval. The
+policy has no action, session, or batch scope.
+
 ## Local persistence
 
 `WalletConfiguration()` uses managed persistence by default. The SDK opens an encrypted SQLDelight database through SQLCipher and manages the per-wallet database key internally in iOS Keychain. Apps using the normal Swift facade do not pass database key material.

@@ -75,9 +75,13 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             as: WalletBridgeKeyPreflight.self,
             operation: "key authorization preflight"
         )
-        switch (value.supported, value.failure) {
-        case (true, nil): return .supported
-        case (false, let failure?): return .unsupported(failure.toSwiftAuthorizationUnsupportedReason())
+        switch (value.supported, value.effectivePolicy, value.reuseEnforcement, value.failure) {
+        case (true, let policy?, let reuseEnforcement, nil):
+            return .supported(
+                effectivePolicy: policy.toSwiftAuthorizationPolicy(),
+                reuseEnforcement: reuseEnforcement?.toSwiftAuthorizationReuseEnforcement()
+            )
+        case (false, nil, nil, let failure?): return .unsupported(failure.toSwiftAuthorizationUnsupportedReason())
         default: throw WalletError.internalFailure("Invalid key authorization preflight result")
         }
     }
@@ -708,12 +712,47 @@ private extension WalletKeyType {
 }
 
 private extension WalletKeyUseAuthorizationPolicy {
-    func toKMPAuthorizationPolicy() -> Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicy {
+    func toKMPAuthorizationPolicy() -> WalletBridgeKeyUseAuthorizationPolicy {
         switch self {
         case .none:
-            return .none
+            return WalletBridgeKeyUseAuthorizationPolicy(
+                type: .none,
+                timeoutSeconds: nil
+            )
         case .biometricCurrentSet:
-            return .biometricCurrentSet
+            return WalletBridgeKeyUseAuthorizationPolicy(
+                type: .biometricCurrentSet,
+                timeoutSeconds: nil
+            )
+        case .biometricTimedReuse(let timeoutSeconds):
+            precondition((1...30).contains(timeoutSeconds), "Timed biometric reuse timeout must be between 1 and 30 seconds")
+            return WalletBridgeKeyUseAuthorizationPolicy(
+                type: .biometricTimedReuse,
+                timeoutSeconds: KotlinInt(int: Int32(timeoutSeconds))
+            )
+        }
+    }
+}
+
+private extension WalletBridgeKeyUseAuthorizationPolicy {
+    func toSwiftAuthorizationPolicy() -> WalletKeyUseAuthorizationPolicy {
+        switch type {
+        case .none: return .none
+        case .biometricCurrentSet: return .biometricCurrentSet
+        case .biometricTimedReuse:
+            guard let timeoutSeconds else {
+                preconditionFailure("Timed biometric reuse preflight omitted its timeout")
+            }
+            return .biometricTimedReuse(timeoutSeconds: Int(timeoutSeconds.intValue))
+        }
+    }
+}
+
+private extension WalletBridgeKeyUseAuthorizationReuseEnforcement {
+    func toSwiftAuthorizationReuseEnforcement() -> WalletKeyUseAuthorizationReuseEnforcement {
+        switch self {
+        case .platformKeyStore: return .platformKeyStore
+        case .providerProcess: return .providerProcess
         }
     }
 }

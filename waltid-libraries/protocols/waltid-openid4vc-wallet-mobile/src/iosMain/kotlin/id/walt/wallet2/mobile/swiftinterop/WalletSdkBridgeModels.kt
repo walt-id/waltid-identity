@@ -26,6 +26,7 @@ import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
@@ -67,9 +68,61 @@ public data class WalletBridgeConfiguration(
     public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
     public val appGroupIdentifier: String? = null,
     public val keychainAccessGroup: String? = null,
-    public val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+    public val defaultKeyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
+        WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
     public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 )
+
+/** Swift-bridge representation of the authorization policy selected for a newly created key. */
+@Serializable
+public data class WalletBridgeKeyUseAuthorizationPolicy(
+    public val type: WalletBridgeKeyUseAuthorizationPolicyType,
+    public val timeoutSeconds: Int? = null,
+) {
+    init {
+        when (type) {
+            WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse ->
+                require(timeoutSeconds != null && timeoutSeconds in 1..30) {
+                    "Timed biometric reuse timeout must be between 1 and 30 seconds"
+                }
+
+            WalletBridgeKeyUseAuthorizationPolicyType.None,
+            WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet ->
+                require(timeoutSeconds == null) { "Only timed biometric reuse accepts a timeout" }
+        }
+    }
+
+    public companion object {
+        public val None: WalletBridgeKeyUseAuthorizationPolicy =
+            WalletBridgeKeyUseAuthorizationPolicy(WalletBridgeKeyUseAuthorizationPolicyType.None)
+        public val BiometricCurrentSet: WalletBridgeKeyUseAuthorizationPolicy =
+            WalletBridgeKeyUseAuthorizationPolicy(WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet)
+    }
+}
+
+/** Variants supported by [WalletBridgeKeyUseAuthorizationPolicy]. */
+@Serializable
+public enum class WalletBridgeKeyUseAuthorizationPolicyType {
+    None,
+    BiometricCurrentSet,
+    BiometricTimedReuse,
+}
+
+internal fun WalletBridgeKeyUseAuthorizationPolicy.toCorePolicy(): KeyUseAuthorizationPolicy = when (type) {
+    WalletBridgeKeyUseAuthorizationPolicyType.None -> KeyUseAuthorizationPolicy.None
+    WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet -> KeyUseAuthorizationPolicy.BiometricCurrentSet
+    WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse ->
+        KeyUseAuthorizationPolicy.BiometricTimedReuse(requireNotNull(timeoutSeconds))
+}
+
+internal fun KeyUseAuthorizationPolicy.toBridgePolicy(): WalletBridgeKeyUseAuthorizationPolicy = when (this) {
+    KeyUseAuthorizationPolicy.None -> WalletBridgeKeyUseAuthorizationPolicy.None
+    KeyUseAuthorizationPolicy.BiometricCurrentSet -> WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> WalletBridgeKeyUseAuthorizationPolicy(
+        type = WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse,
+        timeoutSeconds = timeoutSeconds,
+    )
+}
 
 /** Swift-friendly result of a key-use authorization preflight. */
 @ConsistentCopyVisibility
@@ -77,19 +130,41 @@ public data class WalletBridgeConfiguration(
 public data class WalletBridgeKeyPreflight internal constructor(
     /** Whether the requested authorization policy can be enforced exactly. */
     public val supported: Boolean,
+    /** The authorization policy that will be effective when [supported] is true. */
+    public val effectivePolicy: WalletBridgeKeyUseAuthorizationPolicy? = null,
+    /** The enforcement boundary for timed reuse, when a timed policy is supported. */
+    public val reuseEnforcement: WalletBridgeKeyUseAuthorizationReuseEnforcement? = null,
     /** Core preflight reason when the request is unsupported. */
     public val failure: KeyUseAuthorizationUnsupportedReason? = null,
 ) {
     init {
-        require(supported == (failure == null)) {
-            "Wallet bridge preflight must include a failure exactly when unsupported"
+        require(supported == (failure == null) && supported == (effectivePolicy != null)) {
+            "Wallet bridge preflight must include an effective policy exactly when supported"
         }
     }
 }
 
 internal fun KeyUseAuthorizationSupport.toBridgeModel(): WalletBridgeKeyPreflight = when (this) {
-    KeyUseAuthorizationSupport.Supported -> WalletBridgeKeyPreflight(supported = true)
+    is KeyUseAuthorizationSupport.Supported -> WalletBridgeKeyPreflight(
+        supported = true,
+        effectivePolicy = effectivePolicy.toBridgePolicy(),
+        reuseEnforcement = reuseEnforcement?.toBridgeModel(),
+    )
     is KeyUseAuthorizationSupport.Unsupported -> WalletBridgeKeyPreflight(supported = false, failure = reason)
+}
+
+/** Enforcement boundary reported for a supported timed-reuse key. */
+@Serializable
+public enum class WalletBridgeKeyUseAuthorizationReuseEnforcement {
+    PlatformKeyStore,
+    ProviderProcess,
+}
+
+internal fun KeyUseAuthorizationReuseEnforcement.toBridgeModel(): WalletBridgeKeyUseAuthorizationReuseEnforcement = when (this) {
+    KeyUseAuthorizationReuseEnforcement.PlatformKeyStore ->
+        WalletBridgeKeyUseAuthorizationReuseEnforcement.PlatformKeyStore
+    KeyUseAuthorizationReuseEnforcement.ProviderProcess ->
+        WalletBridgeKeyUseAuthorizationReuseEnforcement.ProviderProcess
 }
 
 /**
@@ -117,7 +192,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
         preferredLocales = preferredLocales,
         transactionDataProfiles = transactionDataProfiles,
-        defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
+        defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy.toCorePolicy(),
         keyUseAuthorizationPrompt = keyUseAuthorizationPrompt,
         crossProcessAccess = appGroupIdentifier?.let { appGroup ->
             MobileWalletCrossProcessAccess(

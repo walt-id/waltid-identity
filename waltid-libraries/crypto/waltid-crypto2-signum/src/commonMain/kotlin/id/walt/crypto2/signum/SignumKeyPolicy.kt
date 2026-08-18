@@ -65,6 +65,13 @@ internal fun SignumAuthenticationPolicy.isBiometricCurrentSetEveryUse(): Boolean
         !deviceCredential &&
         timeoutSeconds == 0
 
+internal fun SignumAuthenticationPolicy.isBiometricTimedReuse(): Boolean =
+    this is SignumAuthenticationPolicy.UserPresence &&
+        biometric &&
+        allowNewBiometrics &&
+        !deviceCredential &&
+        timeoutSeconds > 0
+
 @Serializable
 enum class SignumProtectionLevel {
     HARDWARE,

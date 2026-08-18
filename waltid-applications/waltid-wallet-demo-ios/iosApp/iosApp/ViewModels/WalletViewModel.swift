@@ -215,7 +215,7 @@ class WalletViewModel: ObservableObject {
             ),
             transactionDataProfiles: transactionDataProfiles.profiles,
             crossProcessAccess: Self.crossProcessAccessConfiguration(),
-            defaultKeyUseAuthorizationPolicy: biometricEnabled ? .biometricCurrentSet : .none,
+            defaultKeyUseAuthorizationPolicy: biometricEnabled ? .biometricTimedReuse(timeoutSeconds: 10) : .none,
             keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
                 message: "Authorize wallet signing",
                 cancelText: "Cancel"

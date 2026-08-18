@@ -179,6 +179,11 @@ class MobileWalletFactoryTest {
                 requested = KeyUseAuthorizationPolicy.BiometricCurrentSet,
                 expected = KeyUseAuthorizationPolicy.BiometricCurrentSet,
             ),
+            PolicyCase(
+                configured = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                requested = KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10),
+                expected = KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10),
+            ),
         )
 
         cases.forEach { case ->
@@ -197,7 +202,7 @@ class MobileWalletFactoryTest {
                         keyUseAuthorizationPolicy = case.requested,
                     )
                 }
-                assertEquals(KeyUseAuthorizationSupport.Supported, preflight)
+                assertEquals(KeyUseAuthorizationSupport.Supported(case.expected), preflight)
                 assertEquals(listOf(case.expected), provider.preflightPolicies)
             }
 
@@ -345,13 +350,13 @@ class MobileWalletFactoryTest {
         var generateCount = 0
         var deleteCount = 0
         var generateFailure: Throwable? = null
-        var preflightResult: KeyUseAuthorizationSupport = KeyUseAuthorizationSupport.Supported
+        var preflightResult: KeyUseAuthorizationSupport? = null
         val preflightPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
         val generatedPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
 
         override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
             preflightPolicies += requirements.authorizationPolicy
-            return preflightResult
+            return preflightResult ?: KeyUseAuthorizationSupport.Supported(requirements.authorizationPolicy)
         }
 
         override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey {

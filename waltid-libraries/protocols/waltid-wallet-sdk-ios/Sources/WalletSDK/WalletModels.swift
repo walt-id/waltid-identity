@@ -104,6 +104,12 @@ public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
 
     /// Strong biometric authentication for every operation; new biometric enrollment invalidates the key.
     case biometricCurrentSet
+
+    ///
+    /// Strong biometric authentication reusable for a fixed, non-sliding interval after authorization.
+    /// New biometric enrollment does not invalidate the key. Android's KeyStore enforces the interval;
+    /// iOS reports provider-process enforcement, which may end it earlier but never extend it.
+    case biometricTimedReuse(timeoutSeconds: Int)
 }
 
 /// Prompt text supplied to the operating-system-owned authorization UI.
@@ -158,9 +164,21 @@ public enum WalletKeyUseAuthorizationUnsupportedReason: Equatable, Sendable {
 /// Result of checking whether an exact protected-key request can be enforced.
 public enum WalletKeyUseAuthorizationPreflight: Equatable, Sendable {
     /// The exact requested protected-key policy can be enforced.
-    case supported
+    case supported(
+        effectivePolicy: WalletKeyUseAuthorizationPolicy,
+        reuseEnforcement: WalletKeyUseAuthorizationReuseEnforcement?
+    )
     /// The exact requested policy cannot currently be enforced; the reason explains why.
     case unsupported(WalletKeyUseAuthorizationUnsupportedReason)
+}
+
+/// Enforcement boundary reported when timed biometric reuse is supported.
+public enum WalletKeyUseAuthorizationReuseEnforcement: Equatable, Sendable {
+    /// The native key store enforces the authorization validity interval.
+    case platformKeyStore
+
+    /// The platform crypto provider reuses process-local authorization state.
+    case providerProcess
 }
 
 /// Trust configuration used to authenticate verifier Request Objects.

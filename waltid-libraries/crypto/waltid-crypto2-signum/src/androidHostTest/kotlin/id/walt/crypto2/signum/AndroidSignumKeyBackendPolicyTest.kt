@@ -184,6 +184,50 @@ class AndroidSignumKeyBackendPolicyTest {
     }
 
     @Test
+    fun `timed biometric reuse requires the exact Keystore policy`() {
+        val policy = SignumKeyPolicy(
+            hardware = SignumHardwarePolicy.REQUIRED,
+            authentication = SignumAuthenticationPolicy.UserPresence(
+                biometric = true,
+                allowNewBiometrics = true,
+                deviceCredential = false,
+                timeoutSeconds = 10,
+            ),
+        )
+
+        validateAndroidNativePolicy(
+            alias = "timed-biometric",
+            policy = policy,
+            isInsideSecureHardware = true,
+            securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
+            isUserAuthenticationRequired = true,
+            userAuthenticationValidityDurationSeconds = 10,
+            isInvalidatedByBiometricEnrollment = false,
+            userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
+        )
+
+        listOf(
+            Triple(0, false, KeyProperties.AUTH_BIOMETRIC_STRONG),
+            Triple(11, false, KeyProperties.AUTH_BIOMETRIC_STRONG),
+            Triple(10, true, KeyProperties.AUTH_BIOMETRIC_STRONG),
+            Triple(10, false, KeyProperties.AUTH_DEVICE_CREDENTIAL),
+        ).forEach { (duration, invalidatedByEnrollment, authenticationType) ->
+            assertFailsWith<SignumKeyPolicyMismatchException> {
+                validateAndroidNativePolicy(
+                    alias = "timed-biometric",
+                    policy = policy,
+                    isInsideSecureHardware = true,
+                    securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
+                    isUserAuthenticationRequired = true,
+                    userAuthenticationValidityDurationSeconds = duration,
+                    isInvalidatedByBiometricEnrollment = invalidatedByEnrollment,
+                    userAuthenticationType = authenticationType,
+                )
+            }
+        }
+    }
+
+    @Test
     fun `verification uses the cached public key without requesting interaction`() = runTest {
         val provider = CryptographySoftwareKeyProvider()
         val spec = KeySpec.Ec(EcCurve.P256)

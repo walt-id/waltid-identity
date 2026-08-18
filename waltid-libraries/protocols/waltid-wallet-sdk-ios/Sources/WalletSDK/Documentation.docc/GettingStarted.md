@@ -74,5 +74,12 @@ not change an existing key. The host app must also declare
 `NSFaceIDUsageDescription` in `Info.plist` before using this policy; the
 simulator cannot validate Secure Enclave or Face ID behavior.
 
+Use `.biometricTimedReuse(timeoutSeconds:)` for a fixed 1–30 second interval
+after successful strong-biometric authorization. The interval does not slide on
+signing and new biometric enrollment does not invalidate the key. Check the
+preflight result's `reuseEnforcement`: iOS reports provider-process enforcement,
+which can expire earlier but never runs longer than the requested interval. This
+policy has no action, session, or batch scope.
+
 Use the returned ``WalletBootstrapResult/did`` when a verifier flow needs an
 explicit wallet DID.
