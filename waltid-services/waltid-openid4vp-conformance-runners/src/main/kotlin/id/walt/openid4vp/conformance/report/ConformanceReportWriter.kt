@@ -33,6 +33,8 @@ object ConformanceReportWriter {
         val logUrl: String? = null,
         val error: String? = null,
         val accepted: Boolean = false,
+        /** Which runner produced this entry; see [write]. */
+        val producer: String? = null,
     )
 
     fun reportDir(role: Role, reportRoot: String = DEFAULT_REPORT_ROOT): Path =
@@ -44,6 +46,7 @@ object ConformanceReportWriter {
         reportRoot: String = DEFAULT_REPORT_ROOT,
         allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
         mergeExisting: Boolean = true,
+        producer: String? = null,
     ) {
         val dir = reportDir(role, reportRoot)
         Files.createDirectories(dir)
@@ -57,12 +60,17 @@ object ConformanceReportWriter {
             } else {
                 emptyList()
             }
+            // Merging lets independent test tasks contribute to one role report (the wallet profile
+            // tasks each run a single profile). A [producer] additionally declares "these are all my
+            // entries", so re-running it drops results it no longer produces - otherwise a renamed or
+            // removed test lingers forever and is counted as a permanent failure.
+            val retained = existing.filterNot { producer != null && it.producer == producer }
             val byName = LinkedHashMap<String, Entry>()
-            existing.forEach { byName[it.name] = it }
-            entries.forEach { byName[it.name] = it }
+            retained.forEach { byName[it.name] = it }
+            entries.forEach { byName[it.name] = it.copy(producer = producer) }
             byName.values.toList()
         } else {
-            entries
+            entries.map { it.copy(producer = producer) }
         }
 
         Files.writeString(
@@ -81,12 +89,14 @@ object ConformanceReportWriter {
         reportRoot: String = DEFAULT_REPORT_ROOT,
         allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
         expectRejection: Boolean = false,
+        producer: String? = null,
     ) {
         val entries = results.map { result ->
             val accepted = result.isAccepted(expectRejection)
             Entry(
                 name = result.testName.takeIf { it != "unknown" } ?: result.conformanceTestId,
                 status = when {
+                    result.skipReason != null -> "skipped"
                     accepted -> "passed"
                     result.conformanceResult == "TIMEOUT" || result.walletStatus == "TIMEOUT" -> "timeout"
                     result.conformanceResult == "ERROR" || result.walletStatus == "ERROR" -> "error"
@@ -96,11 +106,11 @@ object ConformanceReportWriter {
                 suiteStatus = result.conformanceStatus ?: result.walletStatus ?: result.verifierStatus?.name,
                 testId = result.conformanceTestId.takeIf { it != "N/A" },
                 logUrl = logUrl(conformanceHost, conformancePort, result.conformanceTestId),
-                error = result.message,
+                error = result.skipReason ?: result.message,
                 accepted = accepted,
             )
         }
-        write(role, entries, reportRoot, allowFailure)
+        write(role, entries, reportRoot, allowFailure, producer = producer)
     }
 
     fun failIfNeeded(role: Role, entries: List<Entry>, allowFailure: Boolean = ConformanceCiFlags.allowFailure()) {
@@ -109,7 +119,7 @@ object ConformanceReportWriter {
         if (failed > 0) {
             error(
                 "$failed ${role.title} conformance test(s) failed. " +
-                    "See ${reportDir(role)}/summary.md"
+                        "See ${reportDir(role)}/summary.md"
             )
         }
     }
@@ -119,13 +129,14 @@ object ConformanceReportWriter {
         results: List<TestPlanResult>,
         allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
         expectRejection: Boolean = false,
+        producer: String? = null,
     ) {
         if (allowFailure) return
         val failed = results.count { !it.isAccepted(expectRejection) }
         if (failed > 0) {
             error(
                 "$failed ${role.title} conformance test(s) failed. " +
-                    "See ${reportDir(role)}/summary.md"
+                        "See ${reportDir(role)}/summary.md"
             )
         }
     }
@@ -134,9 +145,11 @@ object ConformanceReportWriter {
         appendLine("# ${role.title} Conformance Summary")
         appendLine()
         appendLine("- Soft-fail (`CONFORMANCE_ALLOW_FAILURE`): `${if (allowFailure) "enabled" else "disabled"}`")
+        val skipped = entries.count { it.status == "skipped" }
         appendLine("- Total: ${entries.size}")
-        appendLine("- Passed: ${entries.count { it.accepted }}")
+        appendLine("- Passed: ${entries.count { it.accepted && it.status != "skipped" }}")
         appendLine("- Failed: ${entries.count { !it.accepted }}")
+        if (skipped > 0) appendLine("- Skipped (not applicable to this variant): $skipped")
         appendLine()
         appendLine("| Test | Status | Suite | Log | Error |")
         appendLine("|------|--------|-------|-----|-------|")
@@ -144,8 +157,8 @@ object ConformanceReportWriter {
             val log = entry.logUrl?.let { "[log]($it)" } ?: ""
             appendLine(
                 "| `${entry.name.sanitizeMarkdownCell()}` | `${entry.status}` | " +
-                    "${entry.suiteResult ?: entry.suiteStatus ?: ""} | $log | " +
-                    "${entry.error?.sanitizeMarkdownCell() ?: ""} |"
+                        "${entry.suiteResult ?: entry.suiteStatus ?: ""} | $log | " +
+                        "${entry.error?.sanitizeMarkdownCell() ?: ""} |"
             )
         }
     }
@@ -159,6 +172,8 @@ object ConformanceReportWriter {
 }
 
 fun TestPlanResult.isAccepted(expectRejection: Boolean = false): Boolean {
+    // A module that was never run cannot have failed; see TestPlanResult.skipReason.
+    if (skipReason != null) return true
     if (expectRejection) {
         return walletStatus == "REJECTED" || conformanceResult == "PASSED"
     }

@@ -1,3 +1,4 @@
+import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.extensionExtendedKeyUsage
@@ -136,6 +137,106 @@ class SanDnsTests {
 
         assertIs<ClientValidationResult.Failure>(result)
         assertEquals(ClientIdError.MissingX509TrustAnchors, result.error)
+    }
+
+    /**
+     * Builds a leaf certificate for [dnsName] plus the root that signed it, and a request object
+     * signed with the leaf key - the shape an `x509_san_dns` verifier sends.
+     */
+    private suspend fun signedRequestFor(dnsName: String): Pair<String, X509Certificate> {
+        val signatureAlgorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+        val rootKey = genKey("sanDnsRoot-$dnsName")
+        val rootCertificate = X509CertificateUtil.createSelfSignedCertificate(rootKey, signatureAlgorithm) {
+            subjectDn = "cn=Test Root"
+            extensionBasicConstraints {
+                cA = true
+                pathLenConstraint = 0
+            }
+            extensionKeyUsage {
+                addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign, KeyUsageExtension.KeyUsage.cRLSign)
+            }
+        }
+        val leafKey = genKey("sanDnsLeaf-$dnsName")
+        val leafCertificate = X509CertificateUtil.createCertificate(rootKey, rootCertificate, signatureAlgorithm) {
+            subjectDn = "cn=$dnsName"
+            subjectPublicKey(leafKey)
+            extensionKeyUsage {
+                addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
+            }
+            extensionExtendedKeyUsage {
+                addKeyUsage("1.3.6.1.5.5.7.3.2")
+            }
+            extensionSan {
+                addDnsName(dnsName)
+            }
+        }
+        val requestObject = CompactJws.sign(
+            "{}".encodeToByteArray(),
+            leafKey,
+            JwsAlgorithm.ES256,
+            buildJsonObject {
+                put(
+                    "x5c", JsonArray(
+                        listOf(leafCertificate, rootCertificate).map {
+                            JsonPrimitive(Base64.Default.encode(it.encodedDer.toByteArray()))
+                        }
+                    )
+                )
+            },
+        )
+        return requestObject to rootCertificate
+    }
+
+    /**
+     * OpenID4VP 1.0 Section 14.3.1 lets the Wallet trust a `response_uri` on the strength of the
+     * authenticated Client Identifier Prefix and the signed request, so the Section 5.9.3 FQDN rule -
+     * which names `redirect_uri` - must not be applied to it. Enforcing it there rejected every
+     * conformant `direct_post` verifier that receives responses on a host other than the one its
+     * certificate names, which is both the ordinary deployment shape and what the conformance suite
+     * does.
+     */
+    @Test
+    fun `x509_san_dns accepts a response_uri on a different host than the certificate names`() = runTest {
+        val (requestObject, rootCertificate) = signedRequestFor("verifier.example.com")
+        val context = RequestContext(
+            clientId = "x509_san_dns:verifier.example.com",
+            clientMetadataString = validMetadataJson,
+            requestObjectJws = requestObject,
+            responseUri = "https://localhost.emobix.co.uk:8443/test/a/plan/response",
+        )
+        val clientId = X509SanDns("verifier.example.com", context.clientId)
+        val trust = ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore(listOf(rootCertificate)))
+
+        assertIs<ClientValidationResult.Success>(clientId.authenticateX509SanDns(clientId, context, trust))
+    }
+
+    /**
+     * The Section 5.9.3 requirement itself: with no other means of establishing trust in the Client
+     * Identifier, a `redirect_uri` on a foreign host must still be refused.
+     */
+    @Test
+    fun `x509_san_dns rejects a redirect_uri whose FQDN does not match the client id`() = runTest {
+        val (requestObject, rootCertificate) = signedRequestFor("verifier.example.com")
+        val trust = ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore(listOf(rootCertificate)))
+        val clientId = X509SanDns("verifier.example.com", "x509_san_dns:verifier.example.com")
+
+        val mismatched = RequestContext(
+            clientId = "x509_san_dns:verifier.example.com",
+            clientMetadataString = validMetadataJson,
+            requestObjectJws = requestObject,
+            redirectUri = "https://attacker.example.org/cb",
+        )
+        val failure = clientId.authenticateX509SanDns(clientId, mismatched, trust)
+        assertIs<ClientValidationResult.Failure>(failure)
+        assertIs<ClientIdError.RedirectUriHostMismatch>(failure.error)
+
+        val matching = RequestContext(
+            clientId = "x509_san_dns:verifier.example.com",
+            clientMetadataString = validMetadataJson,
+            requestObjectJws = requestObject,
+            redirectUri = "https://verifier.example.com/cb",
+        )
+        assertIs<ClientValidationResult.Success>(clientId.authenticateX509SanDns(clientId, matching, trust))
     }
 
     companion object {

@@ -3,6 +3,11 @@ package id.waltid.openid4vci.wallet.token
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
+import id.waltid.openid4vci.wallet.clientauth.CLIENT_ASSERTION_TYPE_JWT_BEARER
+import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
+import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
+import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
+import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -22,6 +27,19 @@ private val tokenResponseJson = Json { ignoreUnknownKeys = true }
 /** Creates a fresh RFC 9449 proof for the target endpoint and optional server nonce. */
 typealias DPoPProofFactory = suspend (targetEndpoint: String, nonce: String?) -> String
 
+/**
+ * Produces an RFC 7523 `client_assertion` for `private_key_jwt` client authentication.
+ *
+ * Must return a **fresh** assertion on every invocation: RFC 7523 §3 requires a unique `jti`, and
+ * authorization servers reject reuse. It is therefore called once per request attempt, including
+ * each DPoP nonce retry, rather than once per logical token request.
+ *
+ * The audience is chosen by the caller that builds the factory, because the correct value depends
+ * on the profile: FAPI 2.0 §5.3.3.1 requires the authorization server's issuer identifier, while
+ * plain RFC 7523 also permits the token endpoint.
+ */
+typealias ClientAssertionFactory = suspend () -> String
+
 /** Sanitized token endpoint failure that never retains the response body. */
 class TokenRequestException(
     val statusCode: Int,
@@ -39,7 +57,7 @@ class TokenRequestException(
 /**
  * Builds OAuth 2.0 token requests for OpenID4VCI.
  * Implements §6 of OpenID4VCI 1.0 specification (Token Endpoint).
- * 
+ *
  * @property clientConfig The OAuth 2.0 client configuration
  * @property httpClient The HTTP client for token requests
  */
@@ -63,7 +81,7 @@ class TokenRequestBuilder(
 
     /**
      * Exchanges an authorization code for an access token
-     * 
+     *
      * @param tokenEndpoint The token endpoint URL from metadata
      * @param code The authorization code received from authorization endpoint
      * @param codeVerifier The PKCE code verifier (if PKCE was used)
@@ -95,6 +113,15 @@ class TokenRequestBuilder(
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
         dpopProofFactory: DPoPProofFactory?,
+        /**
+         * `private_key_jwt` client authentication (RFC 7523) for the token endpoint.
+         *
+         * The authorization-code exchange needs this exactly as much as the pre-authorized-code
+         * exchange already does: omitting it left the request unauthenticated, which an authorization
+         * server advertising `private_key_jwt` rejects with "Could not find client assertion in
+         * request parameters".
+         */
+        clientAssertionFactory: ClientAssertionFactory? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -122,12 +149,13 @@ class TokenRequestBuilder(
             additionalHeaders,
             attestationHeaders,
             dpopProofFactory,
+            clientAssertionFactory,
         )
     }
 
     /**
      * Exchanges a pre-authorized code for an access token
-     * 
+     *
      * @param tokenEndpoint The token endpoint URL from metadata
      * @param preAuthorizedCode The pre-authorized code from credential offer
      * @param txCode Optional transaction code (PIN) if required by the issuer
@@ -167,10 +195,11 @@ class TokenRequestBuilder(
         attestationHeaders: ClientAttestationHeaders? = null,
         anonymous: Boolean = false,
         dpopProofFactory: DPoPProofFactory?,
+        clientAssertionFactory: ClientAssertionFactory? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
-        require(!anonymous || (additionalHeaders.isEmpty() && attestationHeaders == null)) {
+        require(!anonymous || (additionalHeaders.isEmpty() && attestationHeaders == null && clientAssertionFactory == null)) {
             "Anonymous pre-authorized code token requests cannot include client authentication headers"
         }
 
@@ -180,8 +209,11 @@ class TokenRequestBuilder(
         log.trace { "Additional parameters: ${additionalParameters.keys}" }
         log.trace { "Additional headers: ${additionalHeaders.keys}" }
         log.trace { "Client attestation: ${attestationHeaders != null}" }
+        log.trace { "Client assertion: ${clientAssertionFactory != null}" }
         log.trace { "Anonymous pre-authorized request: $anonymous" }
 
+        // Deliberately not added here: a client assertion must be regenerated per request attempt
+        // so each carries a fresh jti, which executeTokenRequest handles.
         val parameters = Parameters.build {
             append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
             append("pre-authorized_code", preAuthorizedCode)
@@ -201,6 +233,7 @@ class TokenRequestBuilder(
             additionalHeaders,
             attestationHeaders,
             dpopProofFactory,
+            clientAssertionFactory,
         )
     }
 
@@ -283,6 +316,7 @@ class TokenRequestBuilder(
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
         dpopProofFactory: DPoPProofFactory? = null,
+        clientAssertionFactory: ClientAssertionFactory? = null,
     ): TokenResponse {
         require(dpopProofFactory == null || additionalHeaders.keys.none { it.equals(DPOP_HEADER, ignoreCase = true) }) {
             "DPoP must be configured with either dpopProofFactory or an additional header, not both"
@@ -291,10 +325,21 @@ class TokenRequestBuilder(
         log.trace { "Request parameters count: ${parameters.names().size}" }
 
         var dpopNonce: String? = null
-        repeat(2) { attempt ->
+        repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
+            // Regenerated per attempt so every request carries a unique jti (RFC 7523 §3); a retry
+            // that replayed the previous assertion would be rejected as reuse.
+            val attemptParameters = clientAssertionFactory?.let { factory ->
+                val assertion = factory()
+                Parameters.build {
+                    appendAll(parameters)
+                    append("client_assertion_type", CLIENT_ASSERTION_TYPE_JWT_BEARER)
+                    append("client_assertion", assertion)
+                }
+            } ?: parameters
+
             val response = sendTokenRequestFollowingRedirects(
                 tokenEndpoint = tokenEndpoint,
-                parameters = parameters,
+                parameters = attemptParameters,
                 additionalHeaders = additionalHeaders,
                 attestationHeaders = attestationHeaders,
                 dpopProofFactory = dpopProofFactory,
@@ -319,9 +364,9 @@ class TokenRequestBuilder(
             return response.decodeTokenResponse().also { tokenResponse ->
                 log.info {
                     "Successfully obtained access token - " +
-                        "Type: ${tokenResponse.token_type}, " +
-                        "Expires in: ${tokenResponse.expires_in ?: "not specified"} seconds, " +
-                        "Refresh token: ${if (tokenResponse.refresh_token != null) "provided" else "none"}"
+                            "Type: ${tokenResponse.token_type}, " +
+                            "Expires in: ${tokenResponse.expires_in ?: "not specified"} seconds, " +
+                            "Refresh token: ${if (tokenResponse.refresh_token != null) "provided" else "none"}"
                 }
             }
         }
@@ -398,8 +443,8 @@ class TokenRequestBuilder(
         val sourceUrl = Url(source)
         val targetUrl = Url(target)
         return sourceUrl.protocol == targetUrl.protocol &&
-            sourceUrl.host == targetUrl.host &&
-            sourceUrl.port == targetUrl.port
+                sourceUrl.host == targetUrl.host &&
+                sourceUrl.port == targetUrl.port
     }
 
     private fun HttpRequestBuilder.appendTokenRequestHeaders(
@@ -416,9 +461,6 @@ class TokenRequestBuilder(
     }
 
     private companion object {
-        const val DPOP_HEADER = "DPoP"
-        const val DPOP_NONCE_HEADER = "DPoP-Nonce"
-        const val USE_DPOP_NONCE = "use_dpop_nonce"
         val REDIRECT_STATUS_CODES = setOf(307, 308)
     }
 }
