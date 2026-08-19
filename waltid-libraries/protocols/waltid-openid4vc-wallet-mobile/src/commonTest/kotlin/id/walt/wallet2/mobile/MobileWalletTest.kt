@@ -78,6 +78,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.http.Url
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -135,7 +136,16 @@ class MobileWalletTest {
     @Test
     fun mobileWalletConfigUsesStableDefaults() {
         val config = MobileWalletConfig()
-        val (walletId, defaultKeyType, attestationConfig, persistence, onEvent, preferredLocales, transactionDataProfiles) = config
+        val (
+            walletId,
+            defaultKeyType,
+            attestationConfig,
+            persistence,
+            onEvent,
+            preferredLocales,
+            transactionDataProfiles,
+            credentialIssuerMetadataTrustResolver,
+        ) = config
 
         assertEquals("default", walletId)
         assertEquals(MobileWalletKeyType.secp256r1, defaultKeyType)
@@ -143,6 +153,7 @@ class MobileWalletTest {
         assertEquals(MobileWalletPersistence(), persistence)
         assertEquals(emptyList(), preferredLocales)
         assertEquals(emptyList(), transactionDataProfiles)
+        assertEquals(null, credentialIssuerMetadataTrustResolver)
         assertSame(config.onEvent, onEvent)
         assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)
         assertEquals(null, config.persistence.credentialStore)
@@ -176,7 +187,14 @@ class MobileWalletTest {
             ClientIdTrustConfiguration(
                 preRegisteredClients = mapOf(
                     "verifier2" to ClientMetadata(
-                        jwks = ClientMetadata.Jwks(listOf(verifierKey.getPublicKey().exportJWKObject())),
+                        jwks = ClientMetadata.Jwks(
+                            listOf(
+                                JsonObject(
+                                    verifierKey.getPublicKey().exportJWKObject() +
+                                        ("kid" to JsonPrimitive(verifierKey.getKeyId())),
+                                ),
+                            ),
+                        ),
                     )
                 ),
             )
@@ -188,6 +206,13 @@ class MobileWalletTest {
 
         assertEquals("verifier2", preview.request.clientId)
         assertEquals(MobileWalletPresentationErrorCode.invalidRequest, preview.errorCode)
+        val authentication = assertIs<MobileWalletRequestAuthentication.Authenticated>(
+            preview.request.requestAuthentication,
+        )
+        assertEquals(Url(requestUrl).parameters["request"], authentication.compactRequestObject)
+        assertEquals("EdDSA", authentication.algorithm)
+        assertEquals(verifierKey.getKeyId(), authentication.keyId)
+        assertEquals(MobileWalletClientIdScheme.PRE_REGISTERED, authentication.clientIdScheme)
     }
 
     @Test
@@ -381,6 +406,7 @@ class MobileWalletTest {
             MobileWalletPresentationRequestContext(
                 clientId = " ",
                 verifierMetadata = null,
+                requestAuthentication = MobileWalletRequestAuthentication.Unauthenticated,
                 responseUri = null,
                 state = null,
                 nonce = null,
@@ -391,6 +417,7 @@ class MobileWalletTest {
         val context = MobileWalletPresentationRequestContext(
             clientId = "https://verifier.example",
             verifierMetadata = null,
+            requestAuthentication = MobileWalletRequestAuthentication.Unauthenticated,
             responseUri = null,
             state = null,
             nonce = null,
@@ -541,6 +568,7 @@ class MobileWalletTest {
                     policyUri = null,
                     termsOfServiceUri = null,
                 ),
+                requestAuthentication = MobileWalletRequestAuthentication.Unauthenticated,
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = "nonce-1",
@@ -1663,6 +1691,7 @@ class MobileWalletTest {
             policyUri = null,
             termsOfServiceUri = null,
         ),
+        requestAuthentication = MobileWalletRequestAuthentication.Unauthenticated,
         responseUri = "https://verifier.example/direct-post",
         state = null,
         nonce = nonce,
@@ -1713,7 +1742,10 @@ class MobileWalletTest {
                 put("response_uri", "https://verifier.example/direct-post")
                 put("dcql_query", buildJsonObject { put("credentials", buildJsonArray {}) })
             }.toString().encodeToByteArray(),
-            mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+            mapOf(
+                "typ" to JsonPrimitive("oauth-authz-req+jwt"),
+                "kid" to JsonPrimitive(verifierKey.getKeyId()),
+            ),
         )
         return URLBuilder("openid4vp://authorize").apply {
             parameters.append("client_id", "verifier2")
