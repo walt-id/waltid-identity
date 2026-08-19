@@ -12,6 +12,25 @@ jobs:
     uses: ./.github/workflows/version.yml
     with:
       preferred: ${{ inputs.release_version }}
+  enterprise-ref:
+    name: Resolve enterprise branch ref
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.ref.outputs.ref }}
+    steps:
+      - name: Determine ref to dispatch on
+        id: ref
+        env:
+          REF: ${{ github.ref_name }}
+          TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+        run: |
+          if git ls-remote --exit-code --heads "https://${TOKEN}@github.com/walt-id/waltid-identity-enterprise.git" "$REF"; then
+            echo "Branch '$REF' found in waltid-identity-enterprise, using it."
+            echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch '$REF' not found in waltid-identity-enterprise, using main."
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
   gradle:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
@@ -21,6 +40,34 @@ jobs:
       enable-android-build: true
       publish: true
       report-check-name: 'gradle / gradle (ubuntu-22.04)'
+  integration-test-aws:
+    name: Integration Tests - AWS
+    runs-on: ubuntu-latest
+    needs: enterprise-ref
+    steps:
+      - name: Dispatch integration-test-aws.yml and wait
+        uses: benc-uk/workflow-dispatch@v1.3.2
+        with:
+          workflow: integration-test-aws.yml
+          repo: walt-id/waltid-identity-enterprise
+          ref: ${{ needs.enterprise-ref.outputs.ref }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          wait-for-completion: true
+          sync-status: true
+  integration-test-azure:
+    name: Integration Tests - Azure
+    runs-on: ubuntu-latest
+    needs: enterprise-ref
+    steps:
+      - name: Dispatch integration-test-azure.yml and wait
+        uses: benc-uk/workflow-dispatch@v1.3.2
+        with:
+          workflow: integration-test-azure.yml
+          repo: walt-id/waltid-identity-enterprise
+          ref: ${{ needs.enterprise-ref.outputs.ref }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          wait-for-completion: true
+          sync-status: true
   docker:
     uses: ./.github/workflows/docker.yml
     secrets: inherit
@@ -71,69 +118,43 @@ jobs:
   enterprise-supply-chain:
     name: Enterprise supply chain
     runs-on: ubuntu-latest
-    needs: [ version, enterprise-image-digests ]
+    needs: [ enterprise-ref, enterprise-image-digests ]
     steps:
-      - name: Determine ref to dispatch on
-        id: ref
-        env:
-          REF: ${{ github.ref_name }}
-          TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
-        run: |
-          if git ls-remote --exit-code --heads "https://${TOKEN}@github.com/walt-id/waltid-identity-enterprise.git" "$REF"; then
-            echo "Branch '$REF' found in waltid-identity-enterprise, using it."
-            echo "ref=$REF" >> "$GITHUB_OUTPUT"
-          else
-            echo "Branch '$REF' not found in waltid-identity-enterprise, using main."
-            echo "ref=main" >> "$GITHUB_OUTPUT"
-          fi
       - name: Dispatch enterprise-supply-chain.yml and wait
         uses: benc-uk/workflow-dispatch@v1.3.2
         with:
           workflow: enterprise-supply-chain.yml
           repo: walt-id/waltid-identity-enterprise
-          ref: ${{ steps.ref.outputs.ref }}
+          ref: ${{ needs.enterprise-ref.outputs.ref }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
           inputs: '{"api-index-digest": "${{ needs.enterprise-image-digests.outputs.api-index-digest }}", "ui-index-digest": "${{ needs.enterprise-image-digests.outputs.ui-index-digest }}", "version": "${{ needs.version.outputs.release_version }}"}'
-  deploy:
-    uses: ./.github/workflows/deployment.yml
-    secrets: inherit
-    needs: [ version, gradle, docker, api-docker, sdk-docs ]
-    with:
-      version: ${{ needs.version.outputs.release_version }}
-      deployment: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'dev' || 'prod' }}
-      oss: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-identity-main' || 'identity-main' }}
-      enterprise: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-enterprise-main' || 'enterprise-main' }}
   deploy-license:
     name: Deploy license
     runs-on: ubuntu-latest
-    needs: [ version, api-docker ]
+    needs: [ version, enterprise-ref, gradle, docker, api-docker, sdk-docs, integration-test-aws, integration-test-azure ]
     if: ${{ !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
     steps:
-      - name: Determine ref to dispatch on
-        id: ref
-        env:
-          REF: ${{ github.ref_name }}
-          TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
-        run: |
-          if git ls-remote --exit-code --heads "https://${TOKEN}@github.com/walt-id/waltid-identity-enterprise.git" "$REF"; then
-            echo "Branch '$REF' found in waltid-identity-enterprise, using it."
-            echo "ref=$REF" >> "$GITHUB_OUTPUT"
-          else
-            echo "Branch '$REF' not found in waltid-identity-enterprise, using main."
-            echo "ref=main" >> "$GITHUB_OUTPUT"
-          fi
       - name: Dispatch deploy-k8s-license.yml and wait
         uses: benc-uk/workflow-dispatch@v1.3.2
         with:
           workflow: deploy-k8s-license.yml
           repo: walt-id/waltid-identity-enterprise
-          ref: ${{ steps.ref.outputs.ref }}
+          ref: ${{ needs.enterprise-ref.outputs.ref }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
           inputs: '{"version": "${{ needs.version.outputs.release_version }}"}'
+  deploy:
+    uses: ./.github/workflows/deployment.yml
+    secrets: inherit
+    needs: [ version, deploy-license ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      deployment: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'dev' || 'prod' }}
+      oss: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-identity-main' || 'identity-main' }}
+      enterprise: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-enterprise-main' || 'enterprise-main' }}
   branch:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
