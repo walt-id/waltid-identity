@@ -327,7 +327,11 @@ class TokenRequestBuilder(
         dpopProofFactory = null,
     )
 
-    /** Refreshes an access token while creating fresh DPoP proofs when requested. */
+    /**
+     * Advanced refresh entry point for callers that own refresh-token persistence and response challenge state.
+     * [onResponseHeaders] should persist challenge updates; [attestationHeadersFactory] is evaluated immediately
+     * before every actual token POST.
+     */
     suspend fun refreshAccessToken(
         tokenEndpoint: String,
         refreshToken: String,
@@ -416,9 +420,11 @@ class TokenRequestBuilder(
         log.trace { "Request parameters count: ${parameters.names().size}" }
 
         var dpopNonce: String? = null
+        // One bounded retry covers a single server challenge round. Response headers advance the attestation
+        // challenge before a DPoP-nonce retry, so requirements from the same response are satisfied together.
+        // Sequential challenge rounds intentionally do not receive independent retry budgets.
+        // Client assertions are regenerated per attempt so every request carries a unique jti (RFC 7523 §3).
         repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
-            // Regenerated per attempt so every request carries a unique jti (RFC 7523 §3); a retry
-            // that replayed the previous assertion would be rejected as reuse.
             val attemptParameters = clientAssertionFactory?.let { factory ->
                 val assertion = factory()
                 Parameters.build {

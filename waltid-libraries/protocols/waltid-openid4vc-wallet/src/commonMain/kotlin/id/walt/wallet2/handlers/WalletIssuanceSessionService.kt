@@ -732,18 +732,16 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestationConfigured = active.clientAttestationConfigured()
+        val attestationJwt = obtainAttestationJwt(active)
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
-            active.request.tokenRequestHeaders.isEmpty() && !attestationConfigured
+            active.request.tokenRequestHeaders.isEmpty() && attestationJwt == null
         val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthorizedCode,
             txCode = transactionCode,
             additionalHeaders = active.request.tokenRequestHeaders,
-            attestationHeadersFactory = if (attestationConfigured) {
-                { requireNotNull(attestationHeaders(active)) }
-            } else {
-                null
+            attestationHeadersFactory = attestationJwt?.let { reusableAttestationJwt ->
+                { buildAttestationHeaders(active, reusableAttestationJwt) }
             },
             anonymous = anonymous,
             dpopProofFactory = active.dpopFactory(),
@@ -764,16 +762,14 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestationConfigured = active.clientAttestationConfigured()
+        val attestationJwt = obtainAttestationJwt(active)
         val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
             tokenEndpoint = tokenEndpoint,
             code = code,
             codeVerifier = codeVerifier,
             additionalHeaders = active.request.tokenRequestHeaders,
-            attestationHeadersFactory = if (attestationConfigured) {
-                { requireNotNull(attestationHeaders(active)) }
-            } else {
-                null
+            attestationHeadersFactory = attestationJwt?.let { reusableAttestationJwt ->
+                { buildAttestationHeaders(active, reusableAttestationJwt) }
             },
             dpopProofFactory = active.dpopFactory(),
             onResponseHeaders = { headers ->
@@ -785,11 +781,6 @@ class WalletIssuanceSessionService(
         )
         return token
     }
-
-    private fun ActiveSession.clientAttestationConfigured(): Boolean =
-        attestationAssembler != null &&
-            resolved.authorizationServerMetadata.tokenEndpointAuthMethodsSupported
-                ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true
 
     /**
      * Advertised DPoP algorithms, without checking that the wallet key can sign them.
@@ -852,7 +843,9 @@ class WalletIssuanceSessionService(
                 redirectUri = request.redirectUri.toString(),
                 dpopJkt = dpopJkt,
             )
-            val attestation = attestationHeaders(active)
+            val attestation = obtainAttestationJwt(active)?.let { reusableAttestationJwt ->
+                buildAttestationHeaders(active, reusableAttestationJwt)
+            }
             val par = PushedAuthorizationRequestExecutor.execute(
                 httpClient = httpClient,
                 parEndpoint = parEndpoint,
@@ -1161,7 +1154,7 @@ class WalletIssuanceSessionService(
         error("DPoP nonce retry exhausted")
     }
 
-    private suspend fun attestationHeaders(active: ActiveSession): ClientAttestationHeaders? {
+    private suspend fun obtainAttestationJwt(active: ActiveSession): String? {
         val metadata = active.resolved.authorizationServerMetadata
         val assembler = attestationAssembler ?: return null
         if (metadata.tokenEndpointAuthMethodsSupported
@@ -1175,6 +1168,21 @@ class WalletIssuanceSessionService(
                 "Authorization server does not advertise a supported client attestation PoP signing algorithm"
             }
         }
+        val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
+        return assembler.obtainAttestationJwt(crypto2Key, active.request.clientId).also { attestationJwt ->
+            advertisedAttestationAlgorithms?.let { advertised ->
+                validateClientAttestationAlgorithm(attestationJwt, advertised)
+            }
+            emitEvent(WalletSessionEvent.issuance_attestation_obtained)
+        }
+    }
+
+    private suspend fun buildAttestationHeaders(
+        active: ActiveSession,
+        attestationJwt: String,
+    ): ClientAttestationHeaders {
+        val assembler = requireNotNull(attestationAssembler)
+        val metadata = active.resolved.authorizationServerMetadata
         val challenge = active.attestationChallenge ?: metadata.challengeEndpoint?.let { endpoint ->
             try {
                 WalletAttestationChallengeRequestBuilder(httpClient).requestChallenge(endpoint).attestationChallenge
@@ -1196,17 +1204,8 @@ class WalletIssuanceSessionService(
             persistActive(active)
         }
         val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
-        return assembler.buildAttestationHeaders(
-            crypto2Key,
-            active.request.clientId,
-            metadata.issuer,
-            challenge,
-        ).also { headers ->
-            advertisedAttestationAlgorithms?.let { advertised ->
-                validateClientAttestationAlgorithm(headers.attestationJwt, advertised)
-            }
-            emitEvent(WalletSessionEvent.issuance_attestation_obtained)
-        }
+        val popJwt = assembler.buildPopJwt(crypto2Key, active.request.clientId, metadata.issuer, challenge)
+        return ClientAttestationHeaders(attestationJwt, popJwt)
     }
 
     private fun validateClientAttestationAlgorithm(jwt: String, advertised: Set<String>) {

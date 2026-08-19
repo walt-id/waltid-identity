@@ -11,6 +11,7 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
@@ -180,6 +181,8 @@ class WalletIssuanceSessionServiceTest {
     fun tokenAttestationChallengeErrorRetriesWithFreshPop() = runTest {
         var tokenCalls = 0
         val tokenPopChallenges = mutableListOf<String?>()
+        val provider = StaticAttestationProvider()
+        val events = mutableListOf<WalletSessionEvent>()
         val service = service(
             handler = { request ->
                 when (request.url.toString()) {
@@ -212,13 +215,66 @@ class WalletIssuanceSessionServiceTest {
                     else -> respondError(HttpStatusCode.NotFound)
                 }
             },
-            attestationAssembler = ClientAttestationAssembler(StaticAttestationProvider()),
+            attestationAssembler = ClientAttestationAssembler(provider),
+            onEvent = { events += it },
         )
 
         val outcome = service.continuePreAuthorized(service.start(preAuthorizedRequest()).id)
 
         assertIs<WalletIssuanceOutcome.Deferred>(outcome)
         assertEquals(listOf<String?>("challenge-1", "challenge-2"), tokenPopChallenges)
+        assertEquals(1, provider.calls)
+        assertEquals(1, events.count { it == WalletSessionEvent.issuance_attestation_obtained })
+    }
+
+    @Test
+    fun tokenRedirectReusesAttestationAndRegeneratesOnlyPop() = runTest {
+        val provider = StaticAttestationProvider()
+        val attestationJwts = mutableListOf<String>()
+        val popJwts = mutableListOf<String>()
+        val events = mutableListOf<WalletSessionEvent>()
+        val service = service(
+            handler = { request ->
+                when (request.url.toString()) {
+                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                    AS_METADATA -> jsonResponse(attestedAuthorizationServerMetadata())
+                    CHALLENGE_ENDPOINT -> jsonResponse("""{"attestation_challenge":"challenge-1"}""")
+                    TOKEN_ENDPOINT, REDIRECTED_TOKEN_ENDPOINT -> {
+                        attestationJwts += requireNotNull(
+                            request.headers[ClientAttestationHeaders.HEADER_ATTESTATION]
+                        )
+                        popJwts += requireNotNull(
+                            request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]
+                        )
+                        if (request.url.toString() == TOKEN_ENDPOINT) {
+                            respond(
+                                content = "",
+                                status = HttpStatusCode.TemporaryRedirect,
+                                headers = headersOf(HttpHeaders.Location, REDIRECTED_TOKEN_ENDPOINT),
+                            )
+                        } else {
+                            jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                        }
+                    }
+                    CREDENTIAL_ENDPOINT -> jsonResponse(
+                        """{"transaction_id":"transaction-1","interval":5}""",
+                        HttpStatusCode.Accepted,
+                    )
+                    else -> respondError(HttpStatusCode.NotFound)
+                }
+            },
+            attestationAssembler = ClientAttestationAssembler(provider),
+            onEvent = { events += it },
+        )
+
+        val outcome = service.continuePreAuthorized(service.start(preAuthorizedRequest()).id)
+
+        assertIs<WalletIssuanceOutcome.Deferred>(outcome)
+        assertEquals(2, attestationJwts.size)
+        assertEquals(1, attestationJwts.distinct().size)
+        assertEquals(2, popJwts.distinct().size)
+        assertEquals(1, provider.calls)
+        assertEquals(1, events.count { it == WalletSessionEvent.issuance_attestation_obtained })
     }
 
     @Test
@@ -1679,12 +1735,14 @@ class WalletIssuanceSessionServiceTest {
     private suspend fun service(
         attestationAssembler: ClientAttestationAssembler? = null,
         sessionStore: WalletIssuanceSessionStore? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
         handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
     ): WalletIssuanceSessionService {
         val key = JWKKey.generate(KeyType.secp256r1)
         return WalletIssuanceSessionService(
             wallet = Wallet("test", staticKey = key),
             attestationAssembler = attestationAssembler,
+            onEvent = onEvent,
             sessionStore = sessionStore,
             httpClient = client(handler),
         )
@@ -1830,6 +1888,7 @@ class WalletIssuanceSessionServiceTest {
         const val AS_METADATA = "$ISSUER/.well-known/oauth-authorization-server"
         const val AUTHORIZATION_ENDPOINT = "$ISSUER/authorize"
         const val TOKEN_ENDPOINT = "$ISSUER/token"
+        const val REDIRECTED_TOKEN_ENDPOINT = "$TOKEN_ENDPOINT/redirected"
         const val CREDENTIAL_ENDPOINT = "$ISSUER/credential"
         const val NONCE_ENDPOINT = "$ISSUER/nonce"
         const val DEFERRED_ENDPOINT = "$ISSUER/deferred"
@@ -1843,8 +1902,13 @@ class WalletIssuanceSessionServiceTest {
         private val jwt: String =
             "eyJhbGciOiJFUzI1NiJ9.e30.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     ) : WalletAttestationProvider {
-        override suspend fun getAttestationJwt(instanceKey: Key, clientId: String): String =
-            jwt
+        var calls = 0
+            private set
+
+        override suspend fun getAttestationJwt(instanceKey: Key, clientId: String): String {
+            calls += 1
+            return jwt
+        }
     }
 
     private class RecordingCredentialStore : WalletCredentialStore {
