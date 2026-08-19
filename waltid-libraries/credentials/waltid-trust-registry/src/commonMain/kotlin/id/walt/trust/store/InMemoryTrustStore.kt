@@ -120,6 +120,13 @@ class InMemoryTrustStore : TrustStore {
             }
         }
 
+    override suspend fun findIdentitiesByJwkThumbprint(sha256Thumbprint: String): Flow<ServiceIdentity> =
+        snapshotFlow {
+            identities.values.filter {
+                it.publicKeyJwkThumbprint?.equals(sha256Thumbprint, ignoreCase = true) == true
+            }
+        }
+
     // ---------------------------------------------------------------------------
     // Entity queries
     // ---------------------------------------------------------------------------

@@ -19,7 +19,8 @@ actual object ETSITrustListInlineResolver {
         allowStaleSource: Boolean,
         requireAuthenticated: Boolean,
         validateSignatures: Boolean,
-        trustedSourceSignerCertificates: List<String>
+        trustedSourceSignerCertificates: List<String>,
+        publicKeyJwk: String?
     ): Result<JsonElement> = Result.failure(
         UnsupportedOperationException(
             "Inline trust list resolution is not supported on iOS. " +
