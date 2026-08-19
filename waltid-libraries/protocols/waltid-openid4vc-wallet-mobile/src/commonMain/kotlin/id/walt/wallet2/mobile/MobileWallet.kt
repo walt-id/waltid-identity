@@ -50,6 +50,7 @@ import id.walt.openid4vp.clientidprefix.prefixes.DecentralizedIdentifier
 import id.walt.openid4vp.clientidprefix.prefixes.OpenIdFederation
 import id.walt.openid4vp.clientidprefix.prefixes.PreRegistered
 import id.walt.openid4vp.clientidprefix.prefixes.RedirectUri
+import id.walt.openid4vp.clientidprefix.prefixes.Unsupported
 import id.walt.openid4vp.clientidprefix.prefixes.VerifierAttestation
 import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
 import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
@@ -1113,7 +1114,7 @@ private fun ClientId.toMobileClientIdScheme(): MobileWalletClientIdScheme = when
     is DecentralizedIdentifier -> MobileWalletClientIdScheme.DECENTRALIZED_IDENTIFIER
     is VerifierAttestation -> MobileWalletClientIdScheme.VERIFIER_ATTESTATION
     is OpenIdFederation -> MobileWalletClientIdScheme.OPENID_FEDERATION
-    else -> error("Unsupported authenticated client identifier type: ${this::class.simpleName}")
+    is Unsupported -> error("Unsupported client identifier cannot be authenticated: $prefix")
 }
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {

@@ -41,6 +41,8 @@ import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.openid4vci.offers.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.openid4vp.clientidprefix.prefixes.Unsupported
+import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.x509.GenericX509CertificateBuilder
 import id.walt.x509.GenericX509CertificateProfileData
@@ -66,6 +68,8 @@ import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.request.RequestObjectAuthentication
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -213,6 +217,25 @@ class MobileWalletTest {
         assertEquals("EdDSA", authentication.algorithm)
         assertEquals(verifierKey.getKeyId(), authentication.keyId)
         assertEquals(MobileWalletClientIdScheme.PRE_REGISTERED, authentication.clientIdScheme)
+    }
+
+    @Test
+    fun unsupportedAuthenticatedClientIdFailsClosed() {
+        val resolved = ResolvedAuthorizationRequest.AuthenticatedRequestObject(
+            authorizationRequest = AuthorizationRequest(clientId = "unsupported:verifier"),
+            requestObject = "header.payload.signature",
+            authentication = RequestObjectAuthentication(
+                clientId = Unsupported(prefix = "unsupported", rawValue = "unsupported:verifier"),
+                algorithm = "ES256",
+                keyId = null,
+            ),
+        )
+
+        val failure = assertFailsWith<IllegalStateException> {
+            resolved.toMobileRequestAuthentication()
+        }
+
+        assertEquals("Unsupported client identifier cannot be authenticated: unsupported", failure.message)
     }
 
     @Test
