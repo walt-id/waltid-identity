@@ -250,6 +250,38 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun doesNotValidateAttestationAlgorithmsWhenClientAttestationIsNotConfigured() = runTest {
+        var parCalls = 0
+        val service = service(
+            handler = { request ->
+                when (request.url.toString()) {
+                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                    AS_METADATA -> jsonResponse(
+                        attestedAuthorizationServerMetadata().replace(
+                            "\"client_attestation_pop_signing_alg_values_supported\":[\"ES256\"]",
+                            "\"client_attestation_pop_signing_alg_values_supported\":[\"RS256\"]",
+                        )
+                    )
+                    PAR_ENDPOINT -> {
+                        parCalls += 1
+                        assertEquals(null, request.headers[ClientAttestationHeaders.HEADER_ATTESTATION])
+                        assertEquals(null, request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP])
+                        jsonResponse(
+                            """{"request_uri":"urn:example:request","expires_in":60}""",
+                            HttpStatusCode.Created,
+                        )
+                    }
+                    else -> respondError(HttpStatusCode.NotFound)
+                }
+            },
+        )
+
+        service.beginAuthorization(service.start(authRequest()).id)
+
+        assertEquals(1, parCalls)
+    }
+
+    @Test
     fun rejectsWalletAttestationWhenItsActualAlgorithmIsNotAdvertised() = runTest {
         var parCalls = 0
         val service = service(

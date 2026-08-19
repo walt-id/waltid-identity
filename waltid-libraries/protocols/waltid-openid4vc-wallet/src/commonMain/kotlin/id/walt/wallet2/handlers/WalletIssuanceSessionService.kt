@@ -1163,6 +1163,7 @@ class WalletIssuanceSessionService(
 
     private suspend fun attestationHeaders(active: ActiveSession): ClientAttestationHeaders? {
         val metadata = active.resolved.authorizationServerMetadata
+        val assembler = attestationAssembler ?: return null
         if (metadata.tokenEndpointAuthMethodsSupported
                 ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) != true
         ) {
@@ -1174,7 +1175,6 @@ class WalletIssuanceSessionService(
                 "Authorization server does not advertise a supported client attestation PoP signing algorithm"
             }
         }
-        val assembler = attestationAssembler ?: return null
         val challenge = active.attestationChallenge ?: metadata.challengeEndpoint?.let { endpoint ->
             try {
                 WalletAttestationChallengeRequestBuilder(httpClient).requestChallenge(endpoint).attestationChallenge
