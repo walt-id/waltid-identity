@@ -22,7 +22,7 @@ data class IACADecodedCertificate internal constructor(
     val principalName: IACAPrincipalName,
     val validityPeriod: X509ValidityPeriod,
     val issuerAlternativeName: IssuerAlternativeName,
-    @Deprecated("Use crypto2PublicKey.", ReplaceWith("crypto2PublicKey"))
+    @Deprecated("Use crypto2PublicKey().", ReplaceWith("crypto2PublicKey()"))
     val publicKey: Key,
     val serialNumber: ByteString,
     val basicConstraints: X509BasicConstraints,
@@ -33,6 +33,16 @@ data class IACADecodedCertificate internal constructor(
     val crlDistributionPointUri: String? = null,
     private val certificate: X509CertificateHandle,
 ) {
+
+    /**
+     * Subject public key as a crypto2 JWK.
+     *
+     * The crypto2 replacement for [publicKey], matching
+     * [id.walt.x509.GenericX509DecodedCertificate.crypto2PublicKey]. Previously only the deprecation
+     * on [publicKey] named it, so callers following that advice did not compile.
+     */
+    @Suppress("DEPRECATION")
+    suspend fun crypto2PublicKey(): EncodedKey.Jwk = publicKey.toCrypto2PublicJwk()
 
     /**
      * Convert the decoded certificate into the specification's profile data shape.
