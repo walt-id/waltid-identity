@@ -119,13 +119,19 @@ class Crypto2JwtKeyResolver(
             require(keys.size == 1) { "JWT with multiple DID verification keys must include kid" }
             return keys.single()
         }
-        if (keys.size == 1 && kid == did && (did.startsWith("did:key:") || did.startsWith("did:jwk:"))) {
+        if (did.startsWith("did:jwk:")) {
+            require(keys.size == 1) { "did:jwk must resolve to exactly one verification key" }
+            require(kid == "$did#0") { "did:jwk kid must be '$did#0', but was '$kid'" }
+            return keys.single()
+        }
+        if (keys.size == 1 && kid == did && did.startsWith("did:key:")) {
             return keys.single()
         }
         val kidCandidates = idCandidates(kid)
         val matches = keys.filter { key -> idCandidates(key.id.value).any(kidCandidates::contains) }
         require(matches.size <= 1) { "Multiple DID verification keys match kid: $kid" }
-        return matches.singleOrNull() ?: throw NoSuchElementException("No DID verification key matches kid: $kid")
+        return matches.singleOrNull()
+            ?: throw NoSuchElementException("No DID verification key matches kid: $kid")
     }
 
     private fun idCandidates(id: String): Set<String> =
