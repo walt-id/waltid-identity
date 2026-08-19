@@ -2,41 +2,24 @@
 
 package id.waltid.openid4vp.wallet.request
 
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webdatafetching.WebDataFetcher
-import id.walt.x509.CertificateDer
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.respond
-import io.ktor.client.request.HttpRequestData
-import io.ktor.http.URLBuilder
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpMethod
-import io.ktor.http.content.OutgoingContent
-import io.ktor.http.contentType
-import io.ktor.http.headersOf
-import io.ktor.http.parseQueryString
+import io.ktor.client.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.http.content.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import java.util.Base64
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
+import kotlinx.serialization.json.*
+import java.util.*
+import kotlin.test.*
 
 class AuthorizationRequestResolverJvmTest {
 
@@ -78,7 +61,7 @@ class AuthorizationRequestResolverJvmTest {
             AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
                 vpFormatsSupported = jsonObjectOf(),
                 trustConfiguration = ClientIdTrustConfiguration(
-                    x509TrustAnchors = listOf(CertificateDer(byteArrayOf(1))),
+                    x509TrustAnchors = InMemoryTrustStore(),
                     trustedVerifierAttestationIssuers = setOf("did:example:attester"),
                 ),
             )

@@ -22,7 +22,7 @@ object DidKeyResolver : BaseKeyResolver {
 
         if (!kid.isNullOrBlank()) {
             val selfIdentifyingKid = kid == selfIdentifyingVerificationMethod(issuerId) ||
-                kid == issuerId && (issuerId.startsWith("did:key:") || issuerId.startsWith("did:jwk:"))
+                kid == issuerId && issuerId.startsWith("did:key:")
             if (keys.size == 1 && selfIdentifyingKid) {
                 return keys.first()
             }

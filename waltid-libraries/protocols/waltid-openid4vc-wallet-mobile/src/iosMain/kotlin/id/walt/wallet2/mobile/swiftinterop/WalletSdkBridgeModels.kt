@@ -1,5 +1,7 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
@@ -19,7 +21,6 @@ import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
-import id.walt.x509.CertificateDer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -68,7 +69,7 @@ public data class WalletBridgeClientIdTrustConfiguration(
 
 internal fun WalletBridgeClientIdTrustConfiguration.toClientIdTrustConfiguration(): ClientIdTrustConfiguration =
     ClientIdTrustConfiguration(
-        x509TrustAnchors = x509TrustAnchorsPem.map(CertificateDer::fromPEMEncodedString),
+        x509TrustAnchors = InMemoryTrustStore(x509TrustAnchorsPem.map(X509CertificateUtil::parseCertificatePem)),
     )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {

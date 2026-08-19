@@ -1,5 +1,7 @@
 package id.walt.wallet2
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
@@ -9,11 +11,7 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
-import id.walt.wallet2.persistence.ExposedCredentialStore
-import id.walt.wallet2.persistence.ExposedDidStore
-import id.walt.wallet2.persistence.ExposedKeyStore
-import id.walt.wallet2.persistence.ExposedStoreRegistry
-import id.walt.wallet2.persistence.ExposedWalletStore
+import id.walt.wallet2.persistence.*
 import id.walt.wallet2.server.StoreFactory
 import id.walt.wallet2.server.WalletResolver
 import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
@@ -22,15 +20,14 @@ import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
-import id.walt.x509.CertificateDer
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.asFlow
 import org.jetbrains.exposed.v1.jdbc.Database
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * OSS [WalletResolver] and route registration.
@@ -217,7 +214,9 @@ object OSSWallet2Service {
     }
 
     private fun ClientIdTrustConfig.toDomain() = ClientIdTrustConfiguration(
-        x509TrustAnchors = x509TrustAnchors.map(CertificateDer::fromPEMEncodedString),
+        x509TrustAnchors = x509TrustAnchors.map(X509CertificateUtil::parseCertificatePem)
+            .ifEmpty { null }
+            ?.let { InMemoryTrustStore(it) },
         trustedVerifierAttestationIssuers = trustedVerifierAttestationIssuers,
         preRegisteredClients = preRegisteredClients,
     )

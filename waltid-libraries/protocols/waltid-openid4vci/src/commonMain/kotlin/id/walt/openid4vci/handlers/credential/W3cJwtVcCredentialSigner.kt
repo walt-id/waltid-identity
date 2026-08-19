@@ -1,5 +1,6 @@
 package id.walt.openid4vci.handlers.credential
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
@@ -11,7 +12,6 @@ import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDMap
-import id.walt.x509.CertificateDer
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType
 import id.walt.w3c.issuance.Issuer.mergingJwtIssue
@@ -39,7 +39,7 @@ object W3cJwtVcCredentialSigner {
         issuerId: String,
         selectiveDisclosure: SDMap? = null,
         dataMapping: JsonObject? = null,
-        x5Chain: List<CertificateDer>? = null,
+        x5Chain: List<X509Certificate>? = null,
         display: List<CredentialDisplay>? = null,
         credentialStatus: JsonElement? = null,
         w3cVersion: String? = null,
@@ -66,7 +66,7 @@ object W3cJwtVcCredentialSigner {
         issuerId: String,
         selectiveDisclosure: SDMap? = null,
         dataMapping: JsonObject? = null,
-        x5Chain: List<CertificateDer>? = null,
+        x5Chain: List<X509Certificate>? = null,
         display: List<CredentialDisplay>? = null,
         credentialStatus: JsonElement? = null,
         w3cVersion: String? = null,
@@ -92,7 +92,7 @@ object W3cJwtVcCredentialSigner {
         issuerId: String,
         selectiveDisclosure: SDMap?,
         dataMapping: JsonObject?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         credentialStatus: JsonElement?,
         w3cVersion: String?,
@@ -109,7 +109,7 @@ object W3cJwtVcCredentialSigner {
         val additionalJwtHeaders = x5Chain?.let {
             mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert ->
                 JsonPrimitive(
-                    cert.bytes.toByteArray().encodeToBase64()
+                    cert.encodedDer.toByteArray().encodeToBase64()
                 )
             }))
         } ?: mapOf()
