@@ -1,4 +1,4 @@
-name: macOS eligibility
+name: SDK docs eligibility
 
 on:
   workflow_call:
@@ -33,7 +33,7 @@ on:
         default: false
     outputs:
       should-run:
-        description: "Whether macOS jobs should run"
+        description: "Whether Linux mobile SDK docs jobs should run"
         value: ${{ jobs.decide.outputs.should-run }}
       reason:
         description: "Human-readable decision reason"
@@ -54,40 +54,17 @@ jobs:
       pr-labels: ${{ inputs.pr-labels }}
       pr-draft: ${{ inputs.pr-draft }}
       additional-labels: '["ci:mobile"]'
-      platform-name: iOS
-      platform-label: ci:macos
-      # GitHub-hosted macOS concurrency is too small for path-triggered PR jobs.
-      # PRs run macOS only with ci:macos or ci:mobile; main, release, and dispatch still run.
-      pr-require-label: true
+      platform-name: SDK docs
+      platform-label: ci:sdk-docs
       path-patterns: |
         [
-          ".github/workflows/gradle-macos.yml",
           ".github/workflows/mobile-sdk-docs.yml",
-          ".github/workflows/macos-eligibility.yml",
+          ".github/workflows/sdk-docs-eligibility.yml",
           ".github/workflows/platform-eligibility.yml",
-          ".github/actions/checkout-repos/*",
-          ".github/actions/gradle-ios/*",
           ".github/actions/gradle-mobile-sdk-docs/*",
           ".github/actions/gradle-setup-action/*",
-          ".github/actions/ios-build-setup/*",
-          ".github/actions/set-properties/*",
           "scripts/check-mobile-swift-parity-decision.sh",
-          "build-logic/*",
-          "build.gradle.kts",
-          "gradle/*",
-          "gradle.properties",
-          "gradlew",
-          "settings.gradle.kts",
-          "gradle/libs.versions.toml",
-          "*/Package.swift",
-          "*/src/commonMain/*",
-          "*/src/commonTest/*",
-          "*/src/iosMain/*",
-          "*/src/iosTest/*",
-          "waltid-applications/waltid-wallet-demo-compose/*",
-          "waltid-applications/waltid-wallet-demo-ios/*",
-          "waltid-libraries/*/build.gradle.kts",
-          "waltid-libraries/*/*/build.gradle.kts",
+          "docs/mobile-sdk-api/*",
           "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
           "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
           "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"

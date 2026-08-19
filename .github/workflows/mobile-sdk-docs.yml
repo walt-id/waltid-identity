@@ -19,9 +19,65 @@ on:
         required: false
         type: string
         default: '[]'
+      generate-linux-docs:
+        description: "Run Linux ABI, Dokka, and snippet checks"
+        required: false
+        type: boolean
+        default: false
+      generate-macos-docs:
+        description: "Run macOS iOS ABI, XCFramework, and DocC generation"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
+  linux-sdk-docs:
+    if: ${{ inputs.generate-linux-docs }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+
+      - name: Check mobile SDK API contract
+        timeout-minutes: 20
+        working-directory: waltid-identity
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+        run: |
+          if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+            git fetch --prune --unshallow origin
+          fi
+          git fetch --prune origin main
+          ./gradlew \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:checkKotlinAbi \
+            -PenableAndroidBuild=true \
+            --console=plain
+          scripts/check-mobile-swift-parity-decision.sh
+
+      - name: Check mobile wallet documentation snippets
+        working-directory: waltid-identity
+        run: python3 waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/check-mobile-wallet-doc-snippets.py
+
+      - name: Generate mobile SDK API docs
+        timeout-minutes: 45
+        working-directory: waltid-identity
+        run: |
+          ./gradlew \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dokkaGeneratePublicationHtml \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:dokkaGeneratePublicationHtml \
+            -PenableAndroidBuild=true \
+            --console=plain \
+            --warning-mode=summary
+
   mobile-sdk-docs:
+    if: ${{ github.event_name == 'workflow_dispatch' || inputs.generate-macos-docs }}
     runs-on: macos-26
     env:
       XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
@@ -93,7 +149,7 @@ jobs:
           name: sdk-docs-html
           path: ${{ runner.temp }}/sdk-docs-html
           retention-days: 1
-     
+
       - name: Package Swift WalletSDK DocC archive
         working-directory: waltid-identity
         run: |

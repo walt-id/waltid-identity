@@ -120,9 +120,25 @@ val conformanceTruststorePath = providers.environmentVariable("CONFORMANCE_TRUST
 val conformanceTruststorePassword = providers.environmentVariable("CONFORMANCE_TRUSTSTORE_PASSWORD")
     .orElse("changeit")
 
+val skipLiveConformance = (
+    (findProperty("skipLiveConformance") as String?) ?: System.getenv("SKIP_LIVE_CONFORMANCE")
+).equals("true", ignoreCase = true)
+
 tasks.withType<Test>().configureEach {
     systemProperty("javax.net.ssl.trustStore", conformanceTruststorePath.get())
     systemProperty("javax.net.ssl.trustStorePassword", conformanceTruststorePassword.get())
+    if (skipLiveConformance) {
+        filter {
+            isFailOnNoMatchingTests = false
+            excludeTestsMatching("id.walt.openid4vp.conformance.ConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.IssuerConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.VerifierConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.VciWalletConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.VpWalletConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.WalletPresentConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.IsolatedWalletConformanceTest*")
+        }
+    }
 }
 
 fun selectedPlaywrightBrowser(): String = when (
