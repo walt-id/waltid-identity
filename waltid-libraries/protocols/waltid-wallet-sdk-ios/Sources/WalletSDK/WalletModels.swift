@@ -20,7 +20,8 @@ public struct WalletConfiguration: Sendable {
     /// Trust anchors used to authenticate verifier Request Objects.
     public var clientIDTrustConfiguration: WalletClientIDTrustConfiguration
 
-    /// Optional verifier for signed Credential Issuer Metadata.
+    /// Optional verifier for signed Credential Issuer Metadata. When `nil`, signed metadata is
+    /// neither requested nor accepted.
     public var issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)?
 
     /// Wallet-local persistence configuration.
@@ -46,7 +47,8 @@ public struct WalletConfiguration: Sendable {
     ///   - clientIDTrustConfiguration: Trust anchors used to authenticate verifier
     ///     Request Objects. The default trusts no X.509 verifier by configuration.
     ///   - issuerMetadataTrustResolver: Verifies signed Credential Issuer Metadata
-    ///     and establishes the signer's authority.
+    ///     and establishes the signer's authority. When `nil`, signed metadata is neither
+    ///     requested nor accepted.
     ///   - persistence: Local persistence configuration for wallet-owned state.
     ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
     ///     wallet accepts before previewing or submitting a presentation.

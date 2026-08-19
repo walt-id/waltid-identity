@@ -41,6 +41,7 @@ import kotlin.uuid.Uuid
  * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
  * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
  * @property credentialIssuerMetadataTrustResolver Optional trust boundary for signed Credential Issuer Metadata.
+ * When absent, signed metadata is neither requested nor accepted.
  * @property credentialRegistry Platform metadata registry. Platform factories install their native default when omitted.
  * @property readerTrustEvaluator Application trust policy for verified ISO 18013-7 reader chains.
  * @property crossProcessAccess Optional shared-container/keychain configuration for provider extensions.

@@ -169,7 +169,11 @@ class IssuerMetadataResolver(
             lenientJson.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
         }.getOrElse { throw IllegalArgumentException("Signed Credential Issuer Metadata payload is not a JSON object", it) }
         val subject = payload.requiredString(JwtPayloadClaims.SUBJECT, "sub")
+        // `iss` identifies the optional attesting party and may be a trusted delegate. `sub` and
+        // `credential_issuer` provide issuer binding; the trust resolver establishes signer authority.
         payload.optionalString(JwtPayloadClaims.ISSUER, "iss")
+        // The signed-metadata profile requires a numeric `iat` but defines no wallet freshness
+        // window. `exp` is enforced strictly below; `nbf` is not a profile claim.
         payload.requiredLong(JwtPayloadClaims.ISSUED_AT, "iat")
         val now = Clock.System.now().epochSeconds
         payload.optionalLong(JwtPayloadClaims.EXPIRATION, "exp")?.let { expiry ->

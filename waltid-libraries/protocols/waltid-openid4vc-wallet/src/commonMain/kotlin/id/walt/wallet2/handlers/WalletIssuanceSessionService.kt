@@ -1328,6 +1328,8 @@ class WalletIssuanceSessionService(
         }
 
         val offer = json.decodeFromString<CredentialOffer>(persisted.offer)
+        // The store is an integrity-protected persistence boundary. Restore the resolution snapshot
+        // established when the session started, then revalidate its protocol bindings below.
         val issuerMetadata = json.decodeFromString<ResolvedCredentialIssuerMetadata>(persisted.issuerMetadata)
         val authorizationServerMetadata =
             json.decodeFromString<AuthorizationServerMetadata>(persisted.authorizationServerMetadata)

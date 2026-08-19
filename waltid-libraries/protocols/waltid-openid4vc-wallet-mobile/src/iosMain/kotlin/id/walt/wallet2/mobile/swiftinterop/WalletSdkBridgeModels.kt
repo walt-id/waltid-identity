@@ -69,6 +69,7 @@ public data class WalletBridgeConfiguration(
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
+    /** Signed metadata is neither requested nor accepted when this trust resolver is absent. */
     public val issuerMetadataTrustResolver: WalletBridgeIssuerMetadataTrustResolver? = null,
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
