@@ -3,7 +3,7 @@ package id.walt.wallet2
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.list.TransactionDataProfileService
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
@@ -185,6 +185,7 @@ object OSSWallet2Service {
     fun Route.registerRoutes() {
         val attestationAssembler = createAttestationAssembler()
         val clientIdTrustConfiguration = configuredClientIdTrustConfiguration()
+        val transactionDataTypeRegistry = configuredTransactionDataTypeRegistry()
         val authEnabled = runCatching {
             FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
         }.getOrElse { false }
@@ -198,7 +199,7 @@ object OSSWallet2Service {
                     getAccountId = getAccountId,
                     attestationAssembler = attestationAssembler,
                     clientIdTrustConfiguration = clientIdTrustConfiguration,
-                    transactionDataTypeRegistry = { configuredTransactionDataTypeRegistry() },
+                    transactionDataTypeRegistry = transactionDataTypeRegistry,
                 )
             }
         } else {
@@ -207,7 +208,7 @@ object OSSWallet2Service {
                 getAccountId = null,
                 attestationAssembler = attestationAssembler,
                 clientIdTrustConfiguration = clientIdTrustConfiguration,
-                transactionDataTypeRegistry = { configuredTransactionDataTypeRegistry() },
+                transactionDataTypeRegistry = transactionDataTypeRegistry,
             )
         }
     }
@@ -228,7 +229,7 @@ object OSSWallet2Service {
             FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.transactionDataProfilesFeature)
         }.getOrElse { false }
         if (!enabled) return TransactionDataTypeRegistry(emptySet())
-        return TransactionDataProfileService.toTypeRegistry()
+        return ConfigManager.getConfig<TransactionDataProfilesConfig>().toTypeRegistry()
     }
 
     private fun createAttestationAssembler(): ClientAttestationAssembler? {

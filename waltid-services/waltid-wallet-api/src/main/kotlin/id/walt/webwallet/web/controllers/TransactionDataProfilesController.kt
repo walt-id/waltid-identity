@@ -1,7 +1,8 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.list.TransactionDataProfile
-import id.walt.commons.config.list.TransactionDataProfileService
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import io.github.smiley4.ktoropenapi.get
 import io.ktor.http.*
@@ -15,7 +16,8 @@ fun Application.transactionDataProfiles() {
             summary = "List available transaction data type profiles"
             response { HttpStatusCode.OK to { body<List<TransactionDataProfile>>() } }
         }) {
-            call.respond(TransactionDataProfileService.list())
+            val config = ConfigManager.getConfig<TransactionDataProfilesConfig>()
+            call.respond(config.transactionDataProfiles)
         }
     }
 }

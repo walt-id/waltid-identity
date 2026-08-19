@@ -1,6 +1,5 @@
 package id.walt.commons.config
 
-import id.walt.commons.config.list.TransactionDataProfileService
 import com.sksamuel.hoplite.*
 import io.klogging.noCoLogger
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -43,7 +42,6 @@ object ConfigManager {
         preloadedConfigurations.clear()
         configLoaders.clear()
         customDecoders.clear()
-        TransactionDataProfileService.reset()
     }
 
     fun preloadAndRegisterConfig(id: String, config: WaltConfig) {

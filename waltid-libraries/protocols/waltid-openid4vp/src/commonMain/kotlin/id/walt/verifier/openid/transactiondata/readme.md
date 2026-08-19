@@ -14,8 +14,8 @@ This package contains shared transaction-data primitives used by both wallet and
 
 Two entry points in `TransactionDataRequestValidator`:
 
-- `validateRequestTransactionData(transactionData, typeRegistry, credentialQueriesById)` — used by the **wallet**, and by the **verifier** when a type registry is supplied at session creation. Enforces both structural rules and that each type is in the registry.
-- `validateRequestTransactionDataStructure(transactionData, credentialQueriesById)` — structural checks only (no type registry). Used when a verifier has not configured transaction-data profiles.
+- `validateRequestTransactionData(transactionData, typeRegistry, credentialQueriesById)` — used by the **wallet**. Enforces both structural rules and that each type is in the registry.
+- `validateRequestTransactionDataStructure(transactionData, credentialQueriesById)` — used by the **verifier** when creating sessions. Runs structural checks only (no type registry).
 
 Both validate:
 - `type` is non-blank

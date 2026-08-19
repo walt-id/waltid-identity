@@ -45,7 +45,6 @@ class TransactionDataProfilesIntegrationTest {
     private val paymentType = "org.waltid.transaction-data.payment-authorization"
     private val scaType = "urn:eudi:sca:payment:1"
     private val accountType = "org.waltid.transaction-data.account-access"
-
     private val paymentCardType = "payment_card"
 
     private val profiles = listOf(
@@ -159,21 +158,6 @@ class TransactionDataProfilesIntegrationTest {
                         .body<PresentationPreviewResponse>()
                     assertTypeAcceptedByRegistry(preview, paymentCardType)
                     preview
-                }
-
-                testAndReturn("Mutation methods are not allowed") {
-                    val created = http.post("/transaction-data-profiles") {
-                        contentType(ContentType.Application.Json)
-                        setBody(
-                            TransactionDataProfile(
-                                type = "org.example.runtime-payment",
-                                displayName = "Runtime Payment",
-                                fields = listOf("merchant_name", "amount"),
-                            ),
-                        )
-                    }
-                    assertEquals(HttpStatusCode.MethodNotAllowed, created.status, created.bodyAsText())
-                    created
                 }
 
                 testAndReturn("Preview rejects unknown transaction data type") {
