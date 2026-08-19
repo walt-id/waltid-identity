@@ -67,11 +67,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
-import org.junit.Assume.assumeTrue
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.MessageDigest
@@ -87,7 +85,7 @@ import java.security.MessageDigest
  * session could not be bound to this caller either: it requires a secure-context origin, while
  * Credential Manager asserts `android:apk-key-hash:...` for a native one.
  *
- * These require Google Play services, so only the dedicated Play Store lane runs them.
+ * These require Google Play services, so only the dedicated Google APIs lane runs them.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalDigitalCredentialApi::class)
@@ -101,6 +99,40 @@ class DigitalCredentialSharingE2ETest {
         assertCredentialManagerIdle(fixture)
         activeRequests.clear()
         runBlocking { assertSharedCredentialStateUnchanged() }
+    }
+
+    /**
+     * A small platform gate before the protocol assertions: registration has to be visible to the
+     * platform and a real Digital Credentials request has to open Google's selector. The remaining
+     * tests then exercise the same selector through issuance, matching, review, and submission.
+     */
+    @Test
+    fun credentialManagerPlatformSmoke() = runBlocking {
+        val fixture = fixture()
+        val registration = wallet.refreshDigitalCredentialRegistration()
+        assertTrue(
+            "Credential Manager registration was unavailable in the platform smoke: ${registration.reason}",
+            registration.available,
+        )
+        assertTrue(
+            "Credential Manager registered no credentials in the platform smoke",
+            registration.registeredEntryCount > 0,
+        )
+
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            scenario = scenario,
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+        )
+        val request = fixture.startCredentialRequest(session.requestJson)
+        try {
+            assertNotNull(
+                "Credential Manager selector did not open for a real DC API request",
+                fixture.device.wait(Until.findObject(By.pkg(CREDENTIAL_SELECTOR_PACKAGE)), UI_ELEMENT_TIMEOUT),
+            )
+        } finally {
+            request.abandon()
+        }
     }
 
     @After
@@ -1118,7 +1150,7 @@ class DigitalCredentialSharingE2ETest {
         fun provisionCredentials() = runBlocking {
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val context = instrumentation.targetContext
-            assumeTrue(
+            assertTrue(
                 "Digital Credentials E2E requires an Android emulator with Google Play services",
                 hasGooglePlayServices(context),
             )
