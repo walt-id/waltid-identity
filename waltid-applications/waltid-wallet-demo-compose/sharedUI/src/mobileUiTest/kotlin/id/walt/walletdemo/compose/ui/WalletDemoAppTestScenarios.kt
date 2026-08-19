@@ -149,6 +149,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
         onNodeWithText("vc+sd-jwt").performScrollTo().assertIsDisplayed()
+        assertIssuerDetailsCollapsedUntilRequested()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
 
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
@@ -472,9 +473,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentationSubmitButton").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
-        onNodeWithText("https://verifier.example").performScrollTo().assertIsDisplayed().assertHasClickAction()
-        onNodeWithText("https://verifier.example/privacy").performScrollTo().assertIsDisplayed().assertHasClickAction()
-        onNodeWithText("https://verifier.example/terms").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        assertRequesterDetailsCollapsedUntilRequested()
         onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Required").performScrollTo().assertIsDisplayed()
         onNodeWithText("ECDH-ES").performScrollTo().assertIsDisplayed()
@@ -909,6 +908,39 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("https://verifier.example/response").performScrollTo().assertIsDisplayed()
         onNodeWithText("state-123").performScrollTo().assertIsDisplayed()
         onNodeWithText("nonce-456").performScrollTo().assertIsDisplayed()
+    }
+
+    private fun ComposeUiTest.assertIssuerDetailsCollapsedUntilRequested() {
+        onAllNodesWithText("Credential Issuer").assertCountEquals(0)
+        onAllNodesWithText("https://issuer.example").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.OfferIssuerDetailsToggle)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.OfferIssuerDetails).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Credential Issuer").performScrollTo().assertIsDisplayed()
+        onNodeWithText("https://issuer.example").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        onNodeWithTag(WalletUiTestTags.OfferIssuerDetailsToggle).performScrollTo().performClick()
+        onAllNodesWithText("Credential Issuer").assertCountEquals(0)
+        onAllNodesWithText("https://issuer.example").assertCountEquals(0)
+    }
+
+    private fun ComposeUiTest.assertRequesterDetailsCollapsedUntilRequested() {
+        onAllNodesWithText("https://verifier.example").assertCountEquals(0)
+        onAllNodesWithText("https://verifier.example/privacy").assertCountEquals(0)
+        onAllNodesWithText("https://verifier.example/terms").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetails).performScrollTo().assertIsDisplayed()
+        onNodeWithText("https://verifier.example").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        onNodeWithText("https://verifier.example/privacy").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        onNodeWithText("https://verifier.example/terms").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle).performScrollTo().performClick()
+        onAllNodesWithText("https://verifier.example").assertCountEquals(0)
+        onAllNodesWithText("https://verifier.example/privacy").assertCountEquals(0)
+        onAllNodesWithText("https://verifier.example/terms").assertCountEquals(0)
     }
 
     companion object {
