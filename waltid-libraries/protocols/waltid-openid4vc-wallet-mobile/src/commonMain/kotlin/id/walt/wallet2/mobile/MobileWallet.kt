@@ -349,13 +349,14 @@ public class MobileWallet internal constructor(
     public suspend fun startIssuance(
         request: MobileWalletIssuanceRequest,
     ): WalletIssuanceSession = issuanceSessions.start(
-        newIssuanceRequest(
+        request = newIssuanceRequest(
             offer = request.offer,
             keyId = request.keyId,
             did = request.did,
             clientId = request.clientId,
             redirectUri = request.redirectUri.trim(),
-        )
+        ),
+        preferredLocales = preferredLocales,
     )
 
     /**
