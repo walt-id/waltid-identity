@@ -20,15 +20,20 @@ on:
         type: string
         default: '[]'
       generate-linux-docs:
-        description: "Run Linux ABI, Dokka, and snippet checks"
+        description: "Run Linux Dokka and documentation snippet checks"
         required: false
         type: boolean
         default: false
       generate-macos-docs:
-        description: "Run macOS iOS ABI, XCFramework, and DocC generation"
+        description: "Run macOS iOS ABI checks and Swift DocC generation"
         required: false
         type: boolean
         default: true
+      restore-wallet-core-artifact:
+        description: "Download the WalletCore XCFramework produced by the consumer job"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   linux-sdk-docs:
@@ -44,24 +49,7 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
-      - name: Check mobile SDK API contract
-        timeout-minutes: 20
-        working-directory: waltid-identity
-        env:
-          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
-        run: |
-          if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-            git fetch --prune --unshallow origin
-          fi
-          git fetch --prune origin main
-          ./gradlew \
-            :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi \
-            :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:checkKotlinAbi \
-            -PenableAndroidBuild=true \
-            --console=plain
-          scripts/check-mobile-swift-parity-decision.sh
-
-      - name: Check mobile wallet documentation snippets
+      - name: Check mobile SDK documentation snippets
         working-directory: waltid-identity
         run: python3 waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/check-mobile-wallet-doc-snippets.py
 
@@ -91,6 +79,25 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
+      - name: Restore WalletCore XCFramework
+        if: ${{ inputs.restore-wallet-core-artifact }}
+        uses: actions/download-artifact@v4
+        with:
+          name: wallet-core-release-xcframework
+          path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release
+
+      - name: Detect restored WalletCore XCFramework
+        id: restore-wallet-core
+        run: |
+          xcframework="waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework"
+          if [[ -d "$xcframework" ]]; then
+            echo "skip_assemble=true" >> "$GITHUB_OUTPUT"
+            echo "Reusing WalletCore XCFramework from the consumer job artifact."
+          else
+            echo "skip_assemble=false" >> "$GITHUB_OUTPUT"
+            echo "No WalletCore artifact present; this job will assemble it."
+          fi
+
       - name: Check mobile SDK API contract
         timeout-minutes: 20
         working-directory: waltid-identity
@@ -112,10 +119,13 @@ jobs:
 
       - name: Generate mobile SDK API docs
         timeout-minutes: 45
-        uses: walt-id/waltid-identity/.github/actions/gradle-mobile-sdk-docs@88ae3106d2882f728b7c79f16295dcf665506af3
+        uses: ./waltid-identity/.github/actions/gradle-mobile-sdk-docs
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
+          generate-dokka: ${{ inputs.generate-linux-docs && 'false' || 'true' }}
+          check-snippets: ${{ inputs.generate-linux-docs && 'false' || 'true' }}
+          skip-wallet-core-assemble: ${{ steps.restore-wallet-core.outputs.skip_assemble }}
 
       - name: Collect generated HTML
         if: ${{ inputs.deploy }}

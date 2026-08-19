@@ -3,12 +3,6 @@ name: Crypto2 platform tests
 on:
   workflow_dispatch:
   workflow_call:
-    inputs:
-      run-macos:
-        description: "Run macOS Crypto2 jobs"
-        required: false
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -34,7 +28,6 @@ jobs:
           :waltid-libraries:crypto:waltid-crypto2-kms:mingwX64Test
 
   macos-x64:
-    if: ${{ github.event_name == 'workflow_dispatch' || inputs.run-macos }}
     runs-on: macos-15-intel
     steps:
       - name: Checkout all repositories
@@ -53,7 +46,6 @@ jobs:
           :waltid-libraries:crypto:waltid-crypto2-kms:macosX64Test
 
   macos-arm64-ios:
-    if: ${{ github.event_name == 'workflow_dispatch' || inputs.run-macos }}
     runs-on: macos-26
     steps:
       - name: Checkout all repositories

@@ -20,7 +20,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: write
@@ -28,6 +28,12 @@ permissions:
   pull-requests: read
 
 jobs:
+  macos-predicate-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test macOS lane predicates
+        run: .github/scripts/ci/test-macos-lane-predicates.sh
   android-eligibility:
     uses: ./.github/workflows/android-eligibility.yml
     with:
@@ -84,15 +90,6 @@ jobs:
           "waltid-libraries/crypto/waltid-jose/*",
           "waltid-libraries/crypto/waltid-cose/*"
         ]
-  sdk-docs-eligibility:
-    uses: ./.github/workflows/sdk-docs-eligibility.yml
-    with:
-      event-name: ${{ github.event_name }}
-      ref: ${{ github.ref }}
-      pr-number: ${{ github.event.pull_request.number || '' }}
-      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
-      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
-      pr-draft: ${{ github.event.pull_request.draft || false }}
   cacheless-eligibility:
     uses: ./.github/workflows/cacheless-eligibility.yml
     with:
@@ -104,19 +101,24 @@ jobs:
       pr-draft: ${{ github.event.pull_request.draft || false }}
   sdk-docs:
     uses: ./.github/workflows/mobile-sdk-docs.yml
-    needs: [macos-eligibility, sdk-docs-eligibility]
-    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' || needs.sdk-docs-eligibility.outputs.should-run == 'true' }}
+    needs: [macos-eligibility, ios-tests]
+    if: ${{ always() && !cancelled() && needs.macos-eligibility.outputs.run-sdk-docs == 'true' }}
     secrets: inherit
     with:
-      generate-linux-docs: ${{ needs.sdk-docs-eligibility.outputs.should-run == 'true' && needs.macos-eligibility.outputs.should-run != 'true' }}
-      generate-macos-docs: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
+      generate-linux-docs: true
+      generate-macos-docs: true
+      restore-wallet-core-artifact: ${{ needs.ios-tests.result == 'success' && (needs.macos-eligibility.outputs.run-native == 'true' || needs.macos-eligibility.outputs.run-compose == 'true') }}
   ios-tests:
     uses: ./.github/workflows/gradle-macos.yml
     needs: macos-eligibility
-    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
+    if: ${{ needs.macos-eligibility.outputs.run-ios-simulator == 'true' || needs.macos-eligibility.outputs.run-native == 'true' || needs.macos-eligibility.outputs.run-compose == 'true' || needs.macos-eligibility.outputs.run-enterprise == 'true' }}
     secrets: inherit
     with:
       job_name_prefix: ios-tests
+      run-ios-simulator: ${{ needs.macos-eligibility.outputs.run-ios-simulator == 'true' }}
+      run-native: ${{ needs.macos-eligibility.outputs.run-native == 'true' }}
+      run-compose: ${{ needs.macos-eligibility.outputs.run-compose == 'true' }}
+      run-enterprise: ${{ needs.macos-eligibility.outputs.run-enterprise == 'true' }}
   android-device-tests:
     uses: ./.github/workflows/android-device-tests.yml
     needs: android-eligibility
@@ -129,8 +131,6 @@ jobs:
     needs: crypto2-eligibility
     if: ${{ needs.crypto2-eligibility.outputs.should-run == 'true' }}
     secrets: inherit
-    with:
-      run-macos: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:crypto2') || contains(github.event.pull_request.labels.*.name, 'ci:macos') || contains(github.event.pull_request.labels.*.name, 'ci:mobile') }}
   gradle-build:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
@@ -142,3 +142,39 @@ jobs:
       conformance-report-check-name: 'gradle-build / conformance (ubuntu-22.04)'
       run-issuer-conformance: ${{ needs.issuer-conformance-eligibility.outputs.should-run == 'true' }}
       run-haip-conformance: ${{ needs.issuer-conformance-eligibility.outputs.should-run == 'true' }}
+  ci-gate:
+    name: ci-gate
+    if: always() && !cancelled()
+    needs:
+      - macos-predicate-tests
+      - android-eligibility
+      - macos-eligibility
+      - issuer-conformance-eligibility
+      - crypto2-eligibility
+      - cacheless-eligibility
+      - gradle-build
+      - android-device-tests
+      - ios-tests
+      - sdk-docs
+      - crypto2-platform-tests
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Evaluate merge gate
+        env:
+          NEEDS: ${{ toJson(needs) }}
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r line; do
+            job="${line%%=*}"
+            result="${line#*=}"
+            echo "$job: $result"
+            case "$result" in
+              success|skipped) ;;
+              *)
+                echo "::error::$job ended with $result"
+                fail=1
+                ;;
+            esac
+          done < <(jq -r 'to_entries[] | "\(.key)=\(.value.result)"' <<< "$NEEDS")
+          exit "$fail"
