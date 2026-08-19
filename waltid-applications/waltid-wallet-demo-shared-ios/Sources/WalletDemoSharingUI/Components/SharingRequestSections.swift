@@ -43,14 +43,21 @@ public struct SharingRequestSections: View {
 struct RequesterSection: View {
     let requester: SharingRequester
 
-    private var details: [MetadataDetailItem] {
-        (requester.detailRows.map { MetadataDetailItem(label: $0.label, value: $0.value, linkURI: $0.linkURI) })
+    private var verifiedOriginDetail: MetadataDetailItem? {
+        guard !requester.verifiedOriginIsIdentityName,
+              let origin = requester.verifiedOrigin?.presentableValue else { return nil }
+        return MetadataDetailItem(label: SharingRequester.verifiedOriginLabel, value: origin)
+    }
+
+    private var requesterDetails: [MetadataDetailItem] {
+        requester.details.map { MetadataDetailItem(label: $0.label, value: $0.value, linkURI: $0.linkURI) }
             .filter(\.isVisible)
     }
 
     var body: some View {
-        let details = details
-        if requester.identityName != nil || !details.isEmpty {
+        let verifiedOriginDetail = verifiedOriginDetail
+        let requesterDetails = requesterDetails
+        if requester.identityName != nil || verifiedOriginDetail != nil || !requesterDetails.isEmpty {
             ReviewMetadataSection(
                 title: "Requester",
                 titleAccessibilityIdentifier: WalletAccessibilityID.presentationVerifierSection
@@ -61,11 +68,26 @@ struct RequesterSection: View {
                         fallbackName: identityName,
                         supportingText: requester.identityNameCaption
                     )
-                    if !details.isEmpty {
+                    if verifiedOriginDetail != nil || !requesterDetails.isEmpty {
                         Divider()
                     }
                 }
-                MetadataDetailList(items: details)
+                if let verifiedOriginDetail {
+                    MetadataDetailList(items: [verifiedOriginDetail])
+                    if !requesterDetails.isEmpty {
+                        Divider()
+                    }
+                }
+                if !requesterDetails.isEmpty {
+                    MetadataDisclosure(
+                        title: "Requester details",
+                        initiallyExpanded: false,
+                        accessibilityIdentifier: WalletAccessibilityID.presentationRequesterDetailsToggle
+                    ) {
+                        MetadataDetailList(items: requesterDetails)
+                            .accessibilityIdentifier(WalletAccessibilityID.presentationRequesterDetails)
+                    }
+                }
             }
         }
     }
