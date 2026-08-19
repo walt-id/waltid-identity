@@ -623,6 +623,7 @@ class Issuer2ProfileEndpointTest {
         const val ISO_MDL_HAIP_PROFILE_ID = "isoMdlHaip"
         const val ISO_MDL_HAIP_CONFIGURATION_ID = "org.iso.18013.5.1.mDL.haip"
         const val ISO_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
+        const val SCA_PAYMENT_CARD_MDOC_PROFILE_ID = "scaPaymentCardMdoc"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
         const val IDENTITY_SD_JWT_CONFIGURATION_ID = "identity_credential"
         const val IDENTITY_HAIP_SD_JWT_PROFILE_ID = "identityCredentialHaipSdJwt"
@@ -645,6 +646,7 @@ class Issuer2ProfileEndpointTest {
             "isoMdlAamva",
             ISO_PHOTO_ID_PROFILE_ID,
             "eudiPidMdoc",
+            SCA_PAYMENT_CARD_MDOC_PROFILE_ID,
             "euAgeVerificationMdoc",
             "idAustriaMdoc",
             "googleIdCardMdoc",
@@ -690,6 +692,14 @@ class Issuer2ProfileEndpointTest {
                 sampleNamespace = "eu.europa.ec.eudi.pid.1",
                 sampleClaim = "family_name",
                 sampleClaimValue = JsonPrimitive("Musterfrau"),
+            ),
+            MdocProfileExpectation(
+                profileId = SCA_PAYMENT_CARD_MDOC_PROFILE_ID,
+                name = "SCA Payment Card (demo)",
+                credentialConfigurationId = "sca_payment_card_mso_mdoc",
+                sampleNamespace = "eu.europa.ec.eudi.sca.payment_card.1",
+                sampleClaim = "card_last4",
+                sampleClaimValue = JsonPrimitive("4242"),
             ),
             MdocProfileExpectation(
                 profileId = "euAgeVerificationMdoc",
