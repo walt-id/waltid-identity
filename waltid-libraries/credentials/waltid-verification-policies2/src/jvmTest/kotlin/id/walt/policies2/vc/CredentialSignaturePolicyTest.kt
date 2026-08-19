@@ -2,6 +2,7 @@
 
 package id.walt.policies2.vc
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.coseCompliantCbor
@@ -26,9 +27,6 @@ import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
-import id.walt.x509.GenericX509CertificateBuilder
-import id.walt.x509.GenericX509CertificateProfileData
-import id.walt.x509.X509DistinguishedName
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
@@ -138,17 +136,13 @@ class CredentialSignaturePolicyTest {
 
     private suspend fun createJwtCredential(sdJwt: Boolean): DigitalCredential {
         val key = generateSigningKey()
-        val certificate = GenericX509CertificateBuilder().buildDer(
-            profileData = GenericX509CertificateProfileData(
-                subjectName = X509DistinguishedName(commonName = "Credential issuer"),
-            ),
-            subjectPublicKey = key,
-            signingKey = key,
-            signatureAlgorithm = SignatureAlgorithm.Ecdsa(
-                DigestAlgorithm.SHA_256,
-                EcdsaSignatureEncoding.DER,
-            ),
+        val sigAlg = SignatureAlgorithm.Ecdsa(
+            DigestAlgorithm.SHA_256,
+            EcdsaSignatureEncoding.DER,
         )
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(key, sigAlg) {
+            subjectDn = "CN=Credential issuer"
+        }
         val payload = buildJsonObject {
             put("iss", "https://issuer.example")
             if (sdJwt) {
@@ -166,7 +160,7 @@ class CredentialSignaturePolicyTest {
             algorithm = JwsAlgorithm.ES256,
             protectedHeader = buildJsonObject {
                 put("typ", if (sdJwt) "dc+sd-jwt" else "JWT")
-                put("x5c", JsonArray(listOf(JsonPrimitive(Base64.encode(certificate.bytes.toByteArray())))))
+                put("x5c", JsonArray(listOf(JsonPrimitive(Base64.encode(certificate.encodedDer.toByteArray())))))
             },
         )
         val header = CompactJws.decodeUnverified(signed).protectedHeader
@@ -216,6 +210,11 @@ class CredentialSignaturePolicyTest {
 
     private suspend fun createMdocCredential(): MdocsCredential {
         val issuerKey = generateSigningKey()
+        val sigAlg = SignatureAlgorithm.Ecdsa(
+            DigestAlgorithm.SHA_256,
+            EcdsaSignatureEncoding.DER,
+        )
+
         val holderKey = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("holder-key"),
@@ -223,24 +222,17 @@ class CredentialSignaturePolicyTest {
                 usages = setOf(KeyUsage.KEY_AGREEMENT),
             )
         )
-        val certificate = GenericX509CertificateBuilder().buildDer(
-            profileData = GenericX509CertificateProfileData(
-                subjectName = X509DistinguishedName(commonName = "Mdoc issuer"),
-            ),
-            subjectPublicKey = issuerKey,
-            signingKey = issuerKey,
-            signatureAlgorithm = SignatureAlgorithm.Ecdsa(
-                DigestAlgorithm.SHA_256,
-                EcdsaSignatureEncoding.DER,
-            ),
-        )
+
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(issuerKey, sigAlg) {
+            subjectDn = "CN=Mdoc issuer"
+        }
         val credentialData = buildJsonObject {
             put("org.example", buildJsonObject { put("given_name", "Jane") })
         }
         val issuerSigned = MdocIssuer.issueUniversal(
             issuerKey = issuerKey,
             signatureAlgorithm = Cose.Algorithm.ES256,
-            issuerCertificate = listOf(CoseCertificate(certificate.bytes.toByteArray())),
+            issuerCertificate = listOf(CoseCertificate(certificate.encodedDer.toByteArray())),
             holderKey = (holderKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey(),
             docType = "org.example.mdoc",
             data = MdocIssuer.MdocUniversalIssuanceData(

@@ -96,7 +96,7 @@ object AuthorizationRequestResolver {
                 put("response_types_supported", responseTypesSupported.toJsonArray())
                 put("response_modes_supported", responseModesSupported.toJsonArray())
                 val unsupported = unsupportedClientIdPrefixes + buildSet {
-                    if (trustConfiguration.x509TrustAnchors.isEmpty()) {
+                    if (trustConfiguration.x509TrustAnchors == null) {
                         add(ClientIdPrefix.X509_SAN_DNS)
                         add(ClientIdPrefix.X509_HASH)
                     }

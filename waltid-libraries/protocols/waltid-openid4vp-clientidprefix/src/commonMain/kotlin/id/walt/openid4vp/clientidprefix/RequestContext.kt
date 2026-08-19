@@ -2,8 +2,9 @@
 
 package id.walt.openid4vp.clientidprefix
 
+import id.walt.certificate.x509.X509CertificateTrustStore
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.x509.CertificateDer
 import kotlinx.serialization.Serializable
 
 /**
@@ -26,10 +27,16 @@ data class RequestContext(
 }
 
 data class ClientIdTrustConfiguration(
-    val x509TrustAnchors: List<CertificateDer> = emptyList(),
+    /**
+     * List of trusted X.509 certificate DERs in base64 format.
+     */
+    val x509TrustAnchors: X509CertificateTrustStore? = null,
     val trustedVerifierAttestationIssuers: Set<String> = emptySet(),
     val preRegisteredClients: Map<String, ClientMetadata> = emptyMap(),
-)
+) {
+    val x509TrustStore: X509CertificateTrustStore
+        get() = x509TrustAnchors ?: InMemoryTrustStore()
+}
 
 /**
  * A sealed class representing all possible validation errors for clear, type-safe error handling.

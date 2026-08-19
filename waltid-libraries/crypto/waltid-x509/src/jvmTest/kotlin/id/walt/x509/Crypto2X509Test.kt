@@ -3,11 +3,7 @@ package id.walt.x509
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.SoftwareKey
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.x509.iso.IssuerAlternativeName
@@ -15,20 +11,16 @@ import id.walt.x509.iso.documentsigner.builder.Crypto2IACASignerSpecification
 import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
-import id.walt.x509.iso.documentsigner.parser.DocumentSignerCertificateParser
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
-import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
 import java.security.AlgorithmParameters
 import java.security.spec.MGF1ParameterSpec
 import java.security.spec.PSSParameterSpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -59,7 +51,6 @@ class Crypto2X509Test {
 
         certificate.verify(certificate.publicKey)
         assertEquals("1.2.840.10045.4.3.2", certificate.sigAlgOID)
-        assertFalse(certificateDer.crypto2PublicJwk().privateMaterial)
 
         val csrDer = CertificateSigningRequestBuilder().buildDer(
             profileData = CertificateSigningRequestProfileData(
@@ -72,10 +63,6 @@ class Crypto2X509Test {
         val parsed = parseCertificateSigningRequest(csrDer)
         assertEquals(subjectName.commonName, parsed.subjectName.commonName)
         assertEquals(listOf("crypto2.example"), assertNotNull(parsed.subjectAlternativeNames).dnsNames)
-        assertEquals(
-            Json.parseToJsonElement(csrDer.crypto2PublicJwk().data.toByteArray().decodeToString()),
-            Json.parseToJsonElement(parsed.crypto2PublicKey().data.toByteArray().decodeToString()),
-        )
     }
 
     @Test
@@ -169,7 +156,6 @@ class Crypto2X509Test {
         val iacaDer = IACACertificateBuilder().buildDer(iacaProfile, iacaKey, algorithm)
         val iacaCertificate = iacaDer.toJcaX509Certificate()
         iacaCertificate.verify(iacaCertificate.publicKey)
-        assertFalse(IACACertificateParser().parse(iacaDer).crypto2PublicKey.privateMaterial)
 
         val documentSignerDer = DocumentSignerCertificateBuilder().buildDer(
             profileData = DocumentSignerCertificateProfileData(
@@ -181,9 +167,6 @@ class Crypto2X509Test {
             iacaSignerSpec = Crypto2IACASignerSpecification(iacaProfile, iacaKey, algorithm),
         )
         documentSignerDer.toJcaX509Certificate().verify(iacaCertificate.publicKey)
-        assertFalse(
-            DocumentSignerCertificateParser().parse(documentSignerDer).crypto2PublicKey.privateMaterial
-        )
     }
 
     private suspend fun generate(spec: KeySpec): SoftwareKey = provider.generate(

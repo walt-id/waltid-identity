@@ -37,9 +37,6 @@ data class DocumentSignerDecodedCertificate internal constructor(
     private val certificate: X509CertificateHandle,
 ) {
 
-    val crypto2PublicKey: EncodedKey.Jwk
-        get() = certificate.getCertificateDer().crypto2PublicJwk()
-
     /**
      * Convert the decoded certificate into the specification's profile data shape.
      */

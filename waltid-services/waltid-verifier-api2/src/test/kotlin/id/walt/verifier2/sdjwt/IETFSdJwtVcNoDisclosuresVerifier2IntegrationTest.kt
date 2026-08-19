@@ -26,10 +26,13 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
+import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
+import id.walt.verifier2.events.Verifier2WebhookRecorder
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierModule
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -48,6 +51,16 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
+/**
+ * Unhappy-path coverage for the pre-final community SD-JWT VC fixture.
+ *
+ * The stored token's key-binding JWT `sd_hash` is stale, so verifier2 correctly rejects
+ * the presentation at VP validation (`sd_hash-check`) and never emits
+ * `validated_credentials_available` or `credential_policy_results_available`.
+ *
+ * See [IETFSdJwtVcHappyPathVerifier2IntegrationTest] for a freshly issued credential
+ * that reaches SUCCESSFUL and the full success callback sequence.
+ */
 class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
 
     private val sdJwtVcDcqlQuery = DcqlQuery(
@@ -75,12 +88,14 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
         )
     )
 
-    private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
-        core = GeneralFlowConfig(
-            dcqlQuery = sdJwtVcDcqlQuery,
-            policies = sdjwtvcPolicies
+    private fun verificationSessionSetup(notifications: KtorSessionNotifications): VerificationSessionSetup =
+        CrossDeviceFlowSetup(
+            core = GeneralFlowConfig(
+                dcqlQuery = sdJwtVcDcqlQuery,
+                policies = sdjwtvcPolicies,
+                notifications = notifications,
+            )
         )
-    )
 
     private val walletCredentials = listOf(
         Json.decodeFromString<DigitalCredential>(
@@ -314,7 +329,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
     fun test() {
         val host = "127.0.0.1"
         val port = 17021
-
+        Verifier2WebhookRecorder().start().use { webhook ->
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
@@ -343,7 +358,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(verificationSessionSetup)
+                    setBody(verificationSessionSetup(webhook.notifications()))
                 }.body<VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
@@ -420,6 +435,15 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
                 assertTrue { info2.attempted }
                 assertTrue { info2.status == Verification2Session.VerificationSessionStatus.FAILED }
             }
+
+            test("Emit SD-JWT verification callback events through presentation validation") {
+                webhook.assertReceivedInOrder(
+                    sessionId,
+                    Verifier2WebhookRecorder.presentationValidationFailureEvents,
+                )
+                webhook.assertDoesNotContain(sessionId, SessionEvent.wallet_error_response_received)
+            }
+        }
         }
     }
 

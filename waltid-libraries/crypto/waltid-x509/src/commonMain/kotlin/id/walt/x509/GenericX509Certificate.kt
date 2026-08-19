@@ -44,6 +44,7 @@ data class GenericX509DecodedCertificate(
     suspend fun crypto2PublicKey(): EncodedKey.Jwk = publicKey.toCrypto2PublicJwk()
 }
 
+@Deprecated("Use id.walt.certificate.x509.X509CertificateUtil")
 class GenericX509CertificateBuilder {
     @Deprecated("Use buildDer with crypto2 keys and an explicit SignatureAlgorithm.")
     suspend fun build(

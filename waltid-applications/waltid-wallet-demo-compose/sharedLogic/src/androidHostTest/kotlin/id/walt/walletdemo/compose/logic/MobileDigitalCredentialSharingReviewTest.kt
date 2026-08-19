@@ -33,16 +33,16 @@ class MobileDigitalCredentialSharingReviewTest {
             transactionData = listOf(
                 transactionDataItem(
                     displayName = "Payment Authorization",
-                    detailsJson = """{"amount":"42.00","currency":"EUR","payee":"ACME Corp"}""",
+                    detailsJson = """{"merchant_name":"ACME Corp","amount":"42.00","currency":"EUR"}""",
                 ),
             ),
         ).toSharingReview()
 
         val payment = review.request.transactionData.single()
         assertEquals("Payment Authorization", payment.title)
+        assertEquals("ACME Corp", payment.textValue("Merchant name"))
         assertEquals("42.00", payment.textValue("Amount"))
         assertEquals("EUR", payment.textValue("Currency"))
-        assertEquals("ACME Corp", payment.textValue("Payee"))
     }
 
     /** Each item must survive the mapping: showing only the first authorizes the rest unseen. */

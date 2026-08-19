@@ -13,5 +13,7 @@ import kotlinx.serialization.Serializable
 enum class AttestationFormat {
     @SerialName("jwt")
     JWT,
-    // Other attestation formats can be added here
+
+    @SerialName("registration_cert")
+    REGISTRATION_CERT,
 }

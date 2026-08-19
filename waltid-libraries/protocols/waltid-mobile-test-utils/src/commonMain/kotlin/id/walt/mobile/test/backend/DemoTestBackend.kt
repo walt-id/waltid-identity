@@ -10,7 +10,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -42,8 +41,7 @@ object DemoTestBackend {
     const val SCA_PAYMENT_CURRENCY = "EUR"
     const val SCA_PAYMENT_AMOUNT = 11.56
     const val SCA_PAYMENT_TRANSACTION_ID = "8D8AC610-566D-4EF0-9C22-186B2A5ED793"
-    // The fields the currently deployed profile declares, not the ones #2062 configures.
-    private val requiredPaymentAuthorizationFields = setOf("amount", "currency", "payee")
+    private val requiredPaymentAuthorizationFields = setOf("merchant_name", "amount", "currency")
 
     val scenarios = listOf(
         CredentialScenario(
@@ -272,22 +270,28 @@ object DemoTestBackend {
         transactionData = listOf(paymentAuthorizationTransactionData("pid")),
     )
 
-    /**
-     * One `payment-authorization` transaction data item bound to [credentialId], with the fields the
-     * deployed profile declares.
-     *
-     * The profile is fetched rather than assumed, so a deployment that stops declaring `amount`,
-     * `currency` or `payee` fails here instead of producing an item whose fields a test cannot find on
-     * screen for a reason it would misattribute to the wallet. `payee` is required only for as long as
-     * the deployed profile is the pre-#2062 one.
-     */
+    /** One generic payment-authorization item using the current public-demo profile contract. */
     suspend fun paymentAuthorizationTransactionData(credentialId: String): JsonObject {
         val fields = transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
         check(fields.containsAll(requiredPaymentAuthorizationFields)) {
             "Public demo transaction data profile '$PAYMENT_AUTHORIZATION_TYPE' is missing required fields: " +
                 (requiredPaymentAuthorizationFields - fields).joinToString()
         }
-        return paymentAuthorizationTransactionData(credentialId, fields)
+        return buildPaymentAuthorizationTransactionData(credentialId)
+    }
+
+    internal fun buildPaymentAuthorizationTransactionData(credentialId: String): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive(PAYMENT_AUTHORIZATION_TYPE))
+        putJsonArray("credential_ids") {
+            add(JsonPrimitive(credentialId))
+        }
+        put("require_cryptographic_holder_binding", JsonPrimitive(true))
+        putJsonArray("transaction_data_hashes_alg") {
+            add(JsonPrimitive("sha-256"))
+        }
+        put("merchant_name", JsonPrimitive("ACME Corp"))
+        put("amount", JsonPrimitive("42.00"))
+        put("currency", JsonPrimitive("EUR"))
     }
 
     /**
@@ -429,38 +433,12 @@ object DemoTestBackend {
         require(expectedOrigins.isNotEmpty()) { "DC API sessions require at least one expected origin" }
         require(credentialQueries.isNotEmpty()) { "DC API sessions require at least one DCQL credential query" }
 
-        val payload = buildJsonObject {
-            // Deliberately the *old* wire names. `20e20a539` renamed this flow's discriminator to
-            // "dc_api_openid4vp" and its core config to "core_flow", but verifier2.demo.walt.id -
-            // which these tests run against - is still serving a pre-rename build and answers the new
-            // names with HTTP 400 "Serializer for subclass 'dc_api_openid4vp' is not found". The two
-            // names move together: "dc_api" + "core_flow" is also a 400.
-            //
-            // Switch both to "dc_api_openid4vp" / "core_flow" once the demo verifier is redeployed
-            // from main; until then the new names would fail the whole DC API suite on the deployment
-            // rather than on anything this test exercises.
-            put("flow_type", "dc_api")
-            putJsonObject("core") {
-                putJsonObject("dcql_query") {
-                    putJsonArray("credentials") {
-                        credentialQueries.forEach { add(it) }
-                    }
-                }
-                if (encryptedResponse) put("encrypted_response", JsonPrimitive(true))
-            }
-            if (transactionData.isNotEmpty()) {
-                putJsonObject("openid") {
-                    putJsonArray("transactionData") {
-                        transactionData.forEach { add(it) }
-                    }
-                }
-            }
-            // No vp_policies override: the verifier applies its full default mdoc policy set, so a policy
-            // regression is visible here instead of silently skipped.
-            putJsonArray("expectedOrigins") {
-                expectedOrigins.forEach { add(JsonPrimitive(it)) }
-            }
-        }
+        val payload = buildDcApiVerifierSessionPayload(
+            credentialQueries = credentialQueries,
+            expectedOrigins = expectedOrigins,
+            encryptedResponse = encryptedResponse,
+            transactionData = transactionData,
+        )
 
         val response = requestJson(
             url = "$VERIFIER_BASE_URL/verification-session/create",
@@ -473,6 +451,35 @@ object DemoTestBackend {
             sessionId = sessionId,
             requestJson = dcApiRequestJson(sessionId),
         )
+    }
+
+    internal fun buildDcApiVerifierSessionPayload(
+        credentialQueries: List<JsonObject>,
+        expectedOrigins: List<String>,
+        encryptedResponse: Boolean = false,
+        transactionData: List<JsonObject> = emptyList(),
+    ): JsonObject = buildJsonObject {
+        put("flow_type", "dc_api_openid4vp")
+        putJsonObject("core_flow") {
+            putJsonObject("dcql_query") {
+                putJsonArray("credentials") {
+                    credentialQueries.forEach { add(it) }
+                }
+            }
+            if (encryptedResponse) put("encrypted_response", JsonPrimitive(true))
+        }
+        if (transactionData.isNotEmpty()) {
+            putJsonObject("openid") {
+                putJsonArray("transactionData") {
+                    transactionData.forEach { add(it) }
+                }
+            }
+        }
+        // No vp_policies override: the verifier applies its full default mdoc policy set, so a policy
+        // regression is visible here instead of silently skipped.
+        putJsonArray("expectedOrigins") {
+            expectedOrigins.forEach { add(JsonPrimitive(it)) }
+        }
     }
 
     /**
@@ -505,30 +512,6 @@ object DemoTestBackend {
             error("HTTP ${response.status.value} from verifier2 DC API response for $sessionId: $body")
         }
         return body
-    }
-
-    private fun paymentAuthorizationTransactionData(
-        credentialId: String,
-        fields: Set<String>,
-    ): JsonObject = buildJsonObject {
-        put("type", JsonPrimitive(PAYMENT_AUTHORIZATION_TYPE))
-        putJsonArray("credential_ids") {
-            add(JsonPrimitive(credentialId))
-        }
-        put("require_cryptographic_holder_binding", JsonPrimitive(true))
-        putJsonArray("transaction_data_hashes_alg") {
-            add(JsonPrimitive("sha-256"))
-        }
-        // Credential Manager consumes merchant_name/amount, so merchant_name is sent whether or not the
-        // deployed profile declares it yet.
-        put("merchant_name", JsonPrimitive("ACME Corp"))
-        putProfileField(fields, "amount", "42.00")
-        putProfileField(fields, "currency", "EUR")
-        // TODO: Remove `payee` once the transaction-data profile from #2062 is deployed to
-        //  wallet.demo.walt.id and verifier2.demo.walt.id. The repository config already declares
-        //  merchant_name/amount/currency; the deployed one still declares payee, and the fields are
-        //  resolved from it at run time.
-        putProfileField(fields, "payee", "ACME Corp")
     }
 
     suspend fun verifierSessionInfo(sessionId: String): JsonObject {
@@ -701,12 +684,6 @@ object DemoTestBackend {
 
     private fun claimSet(vararg claimIds: String) = kotlinx.serialization.json.buildJsonArray {
         claimIds.forEach { add(JsonPrimitive(it)) }
-    }
-
-    private fun JsonObjectBuilder.putProfileField(fields: Set<String>, key: String, value: String) {
-        if (key in fields) {
-            put(key, JsonPrimitive(value))
-        }
     }
 
     private val json = kotlinx.serialization.json.Json {
