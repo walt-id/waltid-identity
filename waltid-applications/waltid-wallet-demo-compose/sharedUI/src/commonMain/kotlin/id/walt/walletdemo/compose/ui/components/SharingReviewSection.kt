@@ -38,6 +38,7 @@ import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.exportTestTagsForPlatformAutomation
 
 /**
  * The wallet's single presentation-review surface, shared by every transport that can ask for a
@@ -214,6 +215,7 @@ private fun SharingClaimsDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 560.dp)
+                .exportTestTagsForPlatformAutomation()
                 .testTag(WalletUiTestTags.PresentationClaimsDialog),
         ) {
             Column(
