@@ -56,6 +56,21 @@ class LocalizedMetadataTest {
     }
 
     @Test
+    fun `malformed locales do not become the unlocalized fallback`() {
+        assertEquals(
+            "Unlocalized",
+            select(
+                listOf(
+                    Display("en_US", "Malformed locale"),
+                    Display(" ", "Blank locale"),
+                    Display(null, "Unlocalized"),
+                ),
+                listOf("de"),
+            )?.name,
+        )
+    }
+
+    @Test
     fun `normalizes preferences before constructing Accept-Language`() {
         assertEquals(
             "de-AT, en;q=0.9",

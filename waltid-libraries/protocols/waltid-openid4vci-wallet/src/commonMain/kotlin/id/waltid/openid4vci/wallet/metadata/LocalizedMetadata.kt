@@ -45,15 +45,19 @@ public object LocalizedMetadata {
         val available = entries.orEmpty()
         if (available.isEmpty()) return null
 
-        val normalizedEntries = available.map { entry ->
-            entry to localeOf(entry)?.trim()?.takeIf(::isLanguageTag)?.lowercase()
+        val normalizedEntries = available.mapNotNull { entry ->
+            localeOf(entry)
+                ?.trim()
+                ?.takeIf(::isLanguageTag)
+                ?.lowercase()
+                ?.let { locale -> entry to locale }
         }
         normalizedPreferences(preferredLocales).forEach { preference ->
             progressiveTags(preference.lowercase()).forEach { candidate ->
                 normalizedEntries.firstOrNull { (_, locale) -> locale == candidate }?.let { return it.first }
             }
         }
-        return normalizedEntries.firstOrNull { (_, locale) -> locale == null }?.first ?: available.first()
+        return available.firstOrNull { localeOf(it) == null } ?: available.first()
     }
 
     private fun progressiveTags(tag: String): Sequence<String> = sequence {
