@@ -442,10 +442,19 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             }
 
             test("Emit SD-JWT verification callback events through presentation validation") {
+                // This fixture now clears every presentation-level check - see the note above on
+                // `_sd_alg` defaulting to sha-256 - so the pipeline runs to completion and the
+                // rejection is carried in the credential policy results instead of terminating
+                // validation. The stage events are consequently the same ones a successful
+                // presentation emits, despite the session failing; the failure itself is asserted
+                // above through the session status and the `signature` policy in error_description.
                 webhook.assertReceivedInOrder(
                     sessionId,
-                    Verifier2WebhookRecorder.presentationValidationFailureEvents,
+                    Verifier2WebhookRecorder.successfulPresentationEvents,
                 )
+                // The point of the assertion above: rejection must no longer be reported as a
+                // presentation-validation failure, because this presentation is well-formed.
+                webhook.assertDoesNotContain(sessionId, SessionEvent.presentation_validation_failed)
                 webhook.assertDoesNotContain(sessionId, SessionEvent.wallet_error_response_received)
             }
         }
