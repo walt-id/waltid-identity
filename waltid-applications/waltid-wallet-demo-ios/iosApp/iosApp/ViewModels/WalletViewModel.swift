@@ -688,7 +688,7 @@ class WalletViewModel: ObservableObject {
 
         switch fetchResult {
         case .success(let profiles):
-            return TransactionDataProfilesConfiguration(profiles: profiles)
+            return TransactionDataProfilesConfiguration(profiles: withTemporaryVerificationPaymentCard(profiles))
         case .failure(let error):
             return transactionDataProfilesUnavailable("Could not fetch transaction data profiles from \(url.absoluteString): \(error)")
         case nil:
@@ -699,10 +699,30 @@ class WalletViewModel: ObservableObject {
     private static func transactionDataProfilesUnavailable(_ reason: String) -> TransactionDataProfilesConfiguration {
         NSLog("[WalletE2E] Transaction data profiles unavailable: \(reason)")
         return TransactionDataProfilesConfiguration(
-            profiles: [],
+            profiles: withTemporaryVerificationPaymentCard([]),
             warning: WalletStatusText.transactionDataProfilesUnavailable
         )
     }
+
+    /// Temporary local verification aid. The live request uses type `payment_card` from a
+    /// different issuer; do not treat this as a product seed. Remove once the loaded
+    /// profiles already include this type.
+    private static func withTemporaryVerificationPaymentCard(
+        _ profiles: [WalletTransactionDataProfile]
+    ) -> [WalletTransactionDataProfile] {
+        if profiles.contains(where: { $0.type == temporaryVerificationPaymentCardType }) {
+            return profiles
+        }
+        return profiles + [
+            WalletTransactionDataProfile(
+                type: temporaryVerificationPaymentCardType,
+                displayName: "Payment Card",
+                fields: ["merchant_name", "amount"]
+            )
+        ]
+    }
+
+    private static let temporaryVerificationPaymentCardType = "payment_card"
 
     private struct TransactionDataProfilesConfiguration {
         let profiles: [WalletTransactionDataProfile]
