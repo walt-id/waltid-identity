@@ -2,20 +2,19 @@
 
 package id.walt.openid4vp.clientidprefix.prefixes
 
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
+import id.walt.certificate.x509.model.GeneralName
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto2.jose.CompactJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
-import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
-import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
-import id.walt.x509.CertificateDer
-import id.walt.x509.validateClientAuthenticationCertificateChain
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.http.Url
+import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -54,40 +53,25 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
 
         val x5cHeader = decodedJws.protectedHeader["x5c"] as? JsonArray
             ?: return ClientValidationResult.Failure(ClientIdError.MissingX5cHeader)
-        if (trustConfiguration.x509TrustAnchors.isEmpty()) {
+        if (trustConfiguration.x509TrustAnchors == null) {
             return ClientValidationResult.Failure(ClientIdError.MissingX509TrustAnchors)
         }
 
         val certificates = try {
-            x5cHeader.map { CertificateDer(it.jsonPrimitive.content.decodeFromBase64()) }
+            x5cHeader.map { ClientIdCrypto2.parseCertificate(it.jsonPrimitive.content.decodeFromBase64()) }
         } catch (_: Exception) {
             return ClientValidationResult.Failure(ClientIdError.InvalidJws)
         }
         val leafCertificate = certificates.firstOrNull()
             ?: return ClientValidationResult.Failure(ClientIdError.EmptyX5cHeader)
-        val leafCertDer = leafCertificate.bytes.toByteArray()
 
         // 1. Validate the certificate path, trust anchor, validity, constraints, and client-auth usage.
-        try {
-            validateClientAuthenticationCertificateChain(
-                leaf = leafCertificate,
-                chain = certificates.drop(1),
-                trustAnchors = trustConfiguration.x509TrustAnchors,
-            )
-        } catch (cause: CancellationException) {
-            throw cause
-        } catch (_: Exception) {
-            return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
+        ClientIdCrypto2.validateCertificateChain(certificates, trustConfiguration.x509TrustStore)?.let { error ->
+            return error
         }
 
         // 2. Verify JWS signature using the leaf certificate's public key.
-        val key = try {
-            ClientIdCrypto2.keyFromCertificate(leafCertDer)
-        } catch (cause: CancellationException) {
-            throw cause
-        } catch (_: Exception) {
-            return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
-        }
+        val key = leafCertificate.restoreSubjectPublicKey(ClientIdCrypto2.runtime)
         log.trace { "Imported key from leaf cert der for X509SanDns: $key" }
 
         try {
@@ -98,10 +82,12 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
             return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
         }
 
-        // 3. Extract SANs using the isolated JCA utility function.
-        val sans = extractSanDnsNamesFromDer(leafCertDer).getOrElse {
-            return ClientValidationResult.Failure(ClientIdError.CannotExtractSanDnsNamesFromDer)
-        }
+        // 3. Extract SANs
+        val sans = leafCertificate.data.extensionSan
+            ?.alternativeNames
+            ?.filter { it.type == GeneralName.NameType.dNSName }
+            ?.map { it.value }
+            ?: emptyList()
 
         // 4. Check if the client_id's DNS name is in the SAN list.
         if (clientId.dnsName !in sans) {

@@ -46,7 +46,12 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
-
+/**
+ * Unhappy-path coverage for the pre-final community SD-JWT VC fixture with disclosures.
+ *
+ * Same stale `sd_hash` rejection as [IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest].
+ * See [IETFSdJwtVcHappyPathVerifier2IntegrationTest] for the successful presentation path.
+ */
 class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
     private val sdJwtVcDcqlQuery = DcqlQuery(

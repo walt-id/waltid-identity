@@ -1,5 +1,6 @@
 package id.walt.mdoc.objects.document
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
@@ -7,19 +8,14 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.elements.NamespacedIssuerSignedListSerializer
 import id.walt.mdoc.objects.mso.MobileSecurityObject
-import id.walt.x509.CertificateDer
-import id.walt.x509.crypto2PublicJwk
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -133,14 +129,11 @@ data class IssuerSigned private constructor(
         val convertedX5c = containedX5c.map { Base64.encode(it.rawBytes) }
         val signerCertificate = containedX5c.firstOrNull()
             ?: throw IllegalArgumentException("Contained x5c X509 certificate chain in Mdocs credentials is empty (no signer element)")
-        val publicJwk = CertificateDer(signerCertificate.rawBytes).crypto2PublicJwk()
-        val stored = publicJwk.toStoredSoftwareKey(
-            KeyId(Jwk.sha256Thumbprint(publicJwk)),
-            setOf(KeyUsage.VERIFY),
-        )
+
+        val cert = X509CertificateUtil.parseCertificateDerEncoded(ByteString(signerCertificate.rawBytes))
         return ParsedIssuerAuthCrypto2(
             x5c = convertedX5c,
-            signerKey = crypto2Runtime.restore(stored),
+            signerKey = cert.restoreSubjectPublicKey(crypto2Runtime)
         )
     }
 

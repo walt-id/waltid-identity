@@ -1,5 +1,7 @@
 package id.walt.wallet2
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
@@ -18,7 +20,6 @@ import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
-import id.walt.x509.CertificateDer
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
 import io.ktor.http.*
@@ -222,7 +223,9 @@ object OSSWallet2Service {
     }
 
     private fun ClientIdTrustConfig.toDomain() = ClientIdTrustConfiguration(
-        x509TrustAnchors = x509TrustAnchors.map(CertificateDer::fromPEMEncodedString),
+        x509TrustAnchors = x509TrustAnchors.map(X509CertificateUtil::parseCertificatePem)
+            .ifEmpty { null }
+            ?.let { InMemoryTrustStore(it) },
         trustedVerifierAttestationIssuers = trustedVerifierAttestationIssuers,
         preRegisteredClients = preRegisteredClients,
     )
