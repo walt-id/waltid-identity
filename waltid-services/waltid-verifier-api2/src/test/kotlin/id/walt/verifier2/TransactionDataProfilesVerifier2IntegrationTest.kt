@@ -19,7 +19,6 @@ import id.walt.verifier2.data.OpenId4VPConfig
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import io.ktor.client.call.body
-import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -41,7 +40,7 @@ import kotlin.test.assertTrue
 class TransactionDataProfilesVerifier2IntegrationTest {
 
     @Test
-    fun `discovery CRUD and session create honor the profile registry`() {
+    fun `discovery and session create honor the seeded profile registry`() {
         val host = "127.0.0.1"
         val port = 17110
         val paymentCard = TransactionDataProfile(
@@ -103,25 +102,18 @@ class TransactionDataProfilesVerifier2IntegrationTest {
                     response
                 }
 
-                testAndReturn("POST adds a runtime profile used by session create") {
+                testAndReturn("Mutation methods are not allowed") {
                     val runtime = TransactionDataProfile(
                         type = "org.example.runtime-payment",
                         displayName = "Runtime Payment",
                         fields = listOf("merchant_name"),
                     )
-                    http.post("/transaction-data-profiles") {
+                    val created = http.post("/transaction-data-profiles") {
                         contentType(ContentType.Application.Json)
                         setBody(runtime)
-                    }.also { assertEquals(HttpStatusCode.Created, it.status, it.bodyAsText()) }
-
-                    val created = http.post("/verification-session/create") {
-                        contentType(ContentType.Application.Json)
-                        setBody(sessionSetup(runtime.type))
                     }
-                    assertEquals(HttpStatusCode.OK, created.status, created.bodyAsText())
-
-                    http.delete("/transaction-data-profiles/${runtime.type}")
-                        .also { assertEquals(HttpStatusCode.NoContent, it.status, it.bodyAsText()) }
+                    assertEquals(HttpStatusCode.MethodNotAllowed, created.status, created.bodyAsText())
+                    created
                 }
             }
         } finally {

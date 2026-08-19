@@ -18,10 +18,8 @@ import id.walt.wallet2.server.handlers.CreateWalletRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.server.models.PresentationPreviewResponse
 import io.ktor.client.call.body
-import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
-import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -163,50 +161,18 @@ class TransactionDataProfilesIntegrationTest {
                     preview
                 }
 
-                testAndReturn("CRUD can add replace and delete a runtime profile") {
-                    val runtimeType = "org.example.runtime-payment"
+                testAndReturn("Mutation methods are not allowed") {
                     val created = http.post("/transaction-data-profiles") {
                         contentType(ContentType.Application.Json)
                         setBody(
                             TransactionDataProfile(
-                                type = runtimeType,
+                                type = "org.example.runtime-payment",
                                 displayName = "Runtime Payment",
                                 fields = listOf("merchant_name", "amount"),
                             ),
                         )
-                    }.also { assertEquals(HttpStatusCode.Created, it.status, it.bodyAsText()) }
-                        .body<TransactionDataProfile>()
-                    assertEquals(runtimeType, created.type)
-
-                    val fetched = http.get("/transaction-data-profiles/${runtimeType}")
-                        .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-                        .body<TransactionDataProfile>()
-                    assertEquals("Runtime Payment", fetched.displayName)
-
-                    http.put("/transaction-data-profiles/${runtimeType}") {
-                        contentType(ContentType.Application.Json)
-                        setBody(fetched.copy(displayName = "Runtime Payment Updated"))
-                    }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-
-                    val preview = http.post("/wallet/$walletId/credentials/present/preview") {
-                        contentType(ContentType.Application.Json)
-                        setBody(PreviewPresentationRequest(requestUrl = presentationRequestUrl(runtimeType)))
-                    }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-                        .body<PresentationPreviewResponse>()
-                    assertTypeAcceptedByRegistry(preview, runtimeType)
-
-                    http.delete("/transaction-data-profiles/${runtimeType}")
-                        .also { assertEquals(HttpStatusCode.NoContent, it.status, it.bodyAsText()) }
-
-                    val missing = http.get("/transaction-data-profiles/${runtimeType}")
-                    assertEquals(HttpStatusCode.NotFound, missing.status, missing.bodyAsText())
-
-                    val rejected = http.post("/wallet/$walletId/credentials/present/preview") {
-                        contentType(ContentType.Application.Json)
-                        setBody(PreviewPresentationRequest(requestUrl = presentationRequestUrl(runtimeType)))
-                    }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-                        .body<PresentationPreviewResponse>()
-                    assertEquals("invalid_transaction_data", rejected.error?.code)
+                    }
+                    assertEquals(HttpStatusCode.MethodNotAllowed, created.status, created.bodyAsText())
                     created
                 }
 

@@ -8,7 +8,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.commons.config.list.registerTransactionDataProfileCrudRoutes
+import id.walt.commons.config.list.registerTransactionDataProfileDiscoveryRoutes
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
@@ -211,7 +211,7 @@ object Verifier2Service {
             }
         }
         if (FeatureManager.isFeatureEnabled(OSSVerifier2FeatureCatalog.transactionDataProfilesFeature)) {
-            registerTransactionDataProfileCrudRoutes()
+            registerTransactionDataProfileDiscoveryRoutes()
         }
 
         route(VICAL) {

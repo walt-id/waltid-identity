@@ -6,6 +6,8 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 /**
  * Process-local transaction-data profile registry: HOCON seed plus a runtime overlay.
  *
+ * Community Wallet2/Verifier2 expose discovery only. Overlay mutations are an in-process
+ * primitive for tests and Enterprise persistence, not a public Community HTTP surface.
  * Overlay state is lost on restart; durable OSS defaults remain in `transaction-data-profiles.conf`.
  */
 object TransactionDataProfileService {
