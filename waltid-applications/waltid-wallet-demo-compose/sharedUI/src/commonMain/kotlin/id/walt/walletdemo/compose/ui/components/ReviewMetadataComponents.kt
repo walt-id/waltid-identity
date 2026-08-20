@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -142,6 +144,7 @@ private fun MetadataLogoFallback(name: String) {
 internal data class MetadataDetailItem(
     val label: String,
     val value: String?,
+    val supportingText: String? = null,
     val linkUri: String? = null,
 )
 
@@ -168,21 +171,73 @@ private fun MetadataDetailLine(item: MetadataDetailItem) {
     val value = item.value?.takeIf { it.isNotBlank() } ?: return
     val linkUri = item.linkUri?.takeIf(::isHttpsUrl)
     val uriHandler = LocalUriHandler.current
+    val supportingText = item.supportingText?.takeIf(String::isNotBlank)
+    val prefersStacked = supportingText != null || item.label.length > 28 || value.length > 38 ||
+        item.label.contains('\n') || value.contains('\n') || linkUri != null
 
-    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        Text(
-            text = item.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (linkUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            textDecoration = if (linkUri != null) TextDecoration.Underline else TextDecoration.None,
-            modifier = if (linkUri != null) Modifier.clickable { uriHandler.openUri(linkUri) } else Modifier,
-        )
+    BoxWithConstraints {
+        if (prefersStacked || maxWidth < 260.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                MetadataLabel(item.label)
+                MetadataValue(value, linkUri, uriHandler::openUri)
+                supportingText?.let { MetadataSupportingText(it) }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MetadataLabel(item.label, Modifier.weight(0.42f))
+                MetadataValue(
+                    value = value,
+                    linkUri = linkUri,
+                    onLinkClick = uriHandler::openUri,
+                    modifier = Modifier.weight(0.58f),
+                    textAlign = TextAlign.End,
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun MetadataLabel(label: String, modifier: Modifier = Modifier) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun MetadataValue(
+    value: String,
+    linkUri: String?,
+    onLinkClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    textAlign: TextAlign = TextAlign.Start,
+) {
+    Text(
+        text = value,
+        style = MaterialTheme.typography.bodySmall,
+        color = if (linkUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        textDecoration = if (linkUri != null) TextDecoration.Underline else TextDecoration.None,
+        textAlign = textAlign,
+        modifier = modifier.then(
+            if (linkUri != null) Modifier.clickable { onLinkClick(linkUri) } else Modifier,
+        ),
+    )
+}
+
+@Composable
+private fun MetadataSupportingText(value: String) {
+    Text(
+        text = value,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable

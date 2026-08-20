@@ -85,7 +85,7 @@ fun WalletDemoOfferCreateSheet(
         }
     }
 
-    MaterialTheme {
+    WalletDemoTheme {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -165,7 +165,7 @@ private fun OfferCreateReviewContent(
             title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
         )
         OfferReviewSection(
             preview = preview,
@@ -184,7 +184,7 @@ private fun OfferCreateReviewContent(
             context = WalletDemoReviewSurfaceContext.PlatformInvoked,
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 16.dp),
         )
         OfferReviewActionBar(
             preview = preview,

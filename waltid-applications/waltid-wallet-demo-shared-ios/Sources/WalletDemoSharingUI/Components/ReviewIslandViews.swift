@@ -48,7 +48,7 @@ public struct ReviewIslandNavigationView<ExpandedContent: View>: View {
     }
 
     private var summary: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             ForEach(islands) { island in
                 ReviewIslandCard(
                     island: island,
@@ -124,6 +124,7 @@ private struct ReviewIslandCard<ExpandedContent: View>: View {
     let expandedContent: ExpandedContent
 
     var body: some View {
+        let accentColor = island.kind.accentColor
         VStack(alignment: .leading, spacing: 0) {
             Color.clear
                 .frame(width: 1, height: 1)
@@ -131,11 +132,11 @@ private struct ReviewIslandCard<ExpandedContent: View>: View {
                 .accessibilityIdentifier(WalletAccessibilityID.reviewIsland(island.id))
 
             Button(action: onToggle) {
-                HStack(spacing: 12) {
-                    ReviewIslandVisualView(island: island)
+                HStack(spacing: 10) {
+                    ReviewIslandVisualView(island: island, accentColor: accentColor)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(island.title)
-                            .font(.body.weight(.semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.leading)
                         if let subtitle = island.subtitle?.presentableValue {
@@ -147,25 +148,28 @@ private struct ReviewIslandCard<ExpandedContent: View>: View {
                     }
                     Spacer(minLength: 8)
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(accentColor)
                 }
                 .contentShape(Rectangle())
-                .padding(16)
+                .padding(12)
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier(WalletAccessibilityID.reviewIslandToggle(island.id))
+            .accessibilityIdentifier(
+                island.context == .offered && island.kind == .information
+                    ? WalletAccessibilityID.offerSupportedClaims
+                    : WalletAccessibilityID.reviewIslandToggle(island.id)
+            )
             .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
 
             if !island.visibleSummaryValues.isEmpty {
                 Divider()
                 ReviewValueList(values: island.visibleSummaryValues)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(12)
             }
 
             if isExpanded {
                 Divider()
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     if let warning = island.warning?.presentableValue {
                         Text(warning)
                             .font(.caption)
@@ -195,19 +199,22 @@ private struct ReviewIslandCard<ExpandedContent: View>: View {
                         .accessibilityFocused($accessibilityFocus, equals: "technical-link-\(island.id)")
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(12)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(.separator), lineWidth: 0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isExpanded ? accentColor.opacity(0.42) : Color(.separator), lineWidth: 1)
+        )
     }
 }
 
 private struct ReviewIslandVisualView: View {
     let island: ReviewIsland
+    let accentColor: Color
 
     private var imageURL: URL? {
         guard let value = island.visual?.imageURI,
@@ -218,7 +225,7 @@ private struct ReviewIslandVisualView: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12).fill(Color(.tertiarySystemFill))
+            RoundedRectangle(cornerRadius: 10).fill(accentColor.opacity(0.12))
             if let imageData = island.visual?.imageData, let image = UIImage(data: imageData) {
                 Image(uiImage: image)
                     .resizable()
@@ -239,13 +246,26 @@ private struct ReviewIslandVisualView: View {
                 fallback
             }
         }
-        .frame(width: 52, height: 52)
+        .frame(width: 44, height: 44)
     }
 
     private var fallback: some View {
         Text(String((island.visual?.fallbackText ?? island.title).prefix(2)))
-            .font(.headline.weight(.bold))
-            .foregroundStyle(.primary)
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(accentColor)
+    }
+}
+
+private extension ReviewIslandKind {
+    var accentColor: Color {
+        switch self {
+        case .issuer, .verifier: return .blue
+        case .credential: return .purple
+        case .information: return .cyan
+        case .validityAndStatus: return .green
+        case .purposeAndTransaction: return .orange
+        case .requiredAction: return .indigo
+        }
     }
 }
 
@@ -256,20 +276,43 @@ private struct ReviewValueList: View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(values.filter(\.isVisible).enumerated()), id: \.offset) { index, value in
                 if index > 0 { Divider() }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(value.label).font(.caption2).foregroundStyle(.secondary)
-                    if let rendered = value.value?.presentableValue {
-                        if let link = safeHTTPSURL(value.linkURI) {
-                            Link(rendered, destination: link).font(.caption)
-                        } else {
-                            Text(rendered).font(.caption)
+                if let rendered = value.value?.presentableValue {
+                    let supportingText = value.supportingText?.presentableValue
+                    let link = safeHTTPSURL(value.linkURI)
+                    let stacked = supportingText != nil || value.label.count > 28 || rendered.count > 38 ||
+                        value.label.contains("\n") || rendered.contains("\n") || link != nil
+                    if stacked {
+                        VStack(alignment: .leading, spacing: 2) {
+                            valueLabel(value.label)
+                            renderedValue(rendered, link: link)
+                            if let supportingText {
+                                Text(supportingText).font(.caption2).foregroundStyle(.secondary)
+                            }
                         }
-                    }
-                    if let supportingText = value.supportingText?.presentableValue {
-                        Text(supportingText).font(.caption2).foregroundStyle(.secondary)
+                    } else {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            valueLabel(value.label)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            renderedValue(rendered, link: nil)
+                                .lineLimit(1)
+                                .multilineTextAlignment(.trailing)
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private func valueLabel(_ value: String) -> some View {
+        Text(value).font(.caption2).foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private func renderedValue(_ value: String, link: URL?) -> some View {
+        if let link {
+            Link(value, destination: link).font(.caption)
+        } else {
+            Text(value).font(.caption)
         }
     }
 
@@ -285,7 +328,7 @@ private struct ReviewTechnicalPage: View {
     let onBack: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             Color.clear
                 .frame(width: 1, height: 1)
                 .accessibilityElement()
@@ -310,15 +353,16 @@ private struct ReviewTechnicalPage: View {
             }
 
             ForEach(island.visibleTechnicalSections) { section in
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(section.title)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.tint)
                     ReviewValueList(values: section.visibleValues)
-                        .padding(16)
+                        .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator), lineWidth: 1))
                 }
             }
         }

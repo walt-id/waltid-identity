@@ -7,11 +7,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
@@ -31,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +48,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -54,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import id.walt.walletdemo.compose.logic.WalletDemoReviewIsland
 import id.walt.walletdemo.compose.logic.WalletDemoReviewIslandId
+import id.walt.walletdemo.compose.logic.WalletDemoReviewIslandKind
 import id.walt.walletdemo.compose.logic.WalletDemoReviewRoute
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
@@ -103,7 +113,7 @@ internal fun ReviewIslandNavigationHost(
                         .fillMaxWidth()
                         .then(if (scrollContent) Modifier.verticalScroll(summaryScrollState) else Modifier)
                         .padding(contentPadding),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     islands.forEach { island ->
                         ReviewIslandCard(
@@ -146,12 +156,17 @@ internal fun ReviewIslandCard(
     expandedContent: @Composable () -> Unit = {},
 ) {
     var expanded by rememberSaveable(island.id.value) { mutableStateOf(island.initiallyExpanded) }
+    val islandColors = reviewIslandColors(island.kind)
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (expanded) islandColors.accent.copy(alpha = 0.42f)
+            else MaterialTheme.colorScheme.outlineVariant,
+        ),
     ) {
         Column(modifier = Modifier.testTag(WalletUiTestTags.reviewIsland(island.id.value))) {
             Row(
@@ -160,18 +175,18 @@ internal fun ReviewIslandCard(
                     .clickable(role = Role.Button) { expanded = !expanded }
                     .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
                     .testTag(WalletUiTestTags.reviewIslandToggle(island.id.value))
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ReviewIslandVisual(island)
+                ReviewIslandVisual(island, islandColors)
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         text = island.title,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -189,6 +204,7 @@ internal fun ReviewIslandCard(
                 Icon(
                     imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = if (expanded) "Collapse ${island.title}" else "Expand ${island.title}",
+                    tint = islandColors.accent,
                 )
             }
 
@@ -196,7 +212,7 @@ internal fun ReviewIslandCard(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 ReviewValueList(
                     values = island.visibleSummaryValues,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(12.dp),
                 )
             }
 
@@ -207,8 +223,8 @@ internal fun ReviewIslandCard(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     island.warning?.let { warning ->
                         Text(
@@ -255,13 +271,13 @@ internal fun ReviewIslandCard(
 }
 
 @Composable
-private fun ReviewIslandVisual(island: WalletDemoReviewIsland) {
+private fun ReviewIslandVisual(island: WalletDemoReviewIsland, colors: ReviewIslandColors) {
     val visual = island.visual
     Box(
         modifier = Modifier
-            .size(52.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            .size(44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.container),
         contentAlignment = Alignment.Center,
     ) {
         val imageUri = visual?.imageUri?.takeIf(::isSafeReviewImage)
@@ -271,22 +287,50 @@ private fun ReviewIslandVisual(island: WalletDemoReviewIsland) {
                 contentDescription = visual.contentDescription ?: "${island.title} image",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
-                loading = { ReviewVisualFallback(visual.fallbackText) },
-                error = { ReviewVisualFallback(visual.fallbackText) },
+                loading = { ReviewVisualFallback(visual.fallbackText, colors.accent) },
+                error = { ReviewVisualFallback(visual.fallbackText, colors.accent) },
             )
         } else {
-            ReviewVisualFallback(visual?.fallbackText ?: island.title.take(1))
+            ReviewVisualFallback(visual?.fallbackText ?: island.title.take(1), colors.accent)
         }
     }
 }
 
 @Composable
-private fun ReviewVisualFallback(text: String) {
+private fun ReviewVisualFallback(text: String, color: Color) {
     Text(
         text = text.take(2),
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
+        color = color,
     )
+}
+
+private data class ReviewIslandColors(val accent: Color, val container: Color)
+
+@Composable
+private fun reviewIslandColors(kind: WalletDemoReviewIslandKind): ReviewIslandColors {
+    val accent = when (kind) {
+        WalletDemoReviewIslandKind.Issuer,
+        WalletDemoReviewIslandKind.Verifier,
+        -> if (isSystemInDarkTheme()) Color(0xFF93C5FD) else Color(0xFF2563EB)
+
+        WalletDemoReviewIslandKind.Credential ->
+            if (isSystemInDarkTheme()) Color(0xFFC4B5FD) else Color(0xFF7C3AED)
+
+        WalletDemoReviewIslandKind.Information ->
+            if (isSystemInDarkTheme()) Color(0xFF67E8F9) else Color(0xFF0E7490)
+
+        WalletDemoReviewIslandKind.ValidityAndStatus ->
+            if (isSystemInDarkTheme()) Color(0xFF6EE7B7) else Color(0xFF047857)
+
+        WalletDemoReviewIslandKind.PurposeAndTransaction ->
+            if (isSystemInDarkTheme()) Color(0xFFFCD34D) else Color(0xFFB45309)
+
+        WalletDemoReviewIslandKind.RequiredAction ->
+            if (isSystemInDarkTheme()) Color(0xFFA5B4FC) else Color(0xFF4F46E5)
+    }
+    return ReviewIslandColors(accent = accent, container = accent.copy(alpha = 0.12f))
 }
 
 @Composable
@@ -299,6 +343,7 @@ private fun ReviewValueList(
             MetadataDetailItem(
                 label = value.label,
                 value = value.value,
+                supportingText = value.supportingText,
                 linkUri = value.linkUri,
             )
         },
@@ -314,7 +359,7 @@ private fun ReviewIslandTechnicalPage(
 ) {
     Column(
         modifier = modifier.testTag(WalletUiTestTags.ReviewTechnicalDetailsPage),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -343,7 +388,7 @@ private fun ReviewIslandTechnicalPage(
         }
 
         island.visibleTechnicalSections.forEach { section ->
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     text = section.title,
                     style = MaterialTheme.typography.labelLarge,
@@ -352,12 +397,13 @@ private fun ReviewIslandTechnicalPage(
                 )
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     ReviewValueList(
                         values = section.visibleValues,
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(12.dp),
                     )
                 }
             }
@@ -369,6 +415,7 @@ private fun ReviewIslandTechnicalPage(
 @Composable
 internal fun ReviewActionBar(
     primaryLabel: String,
+    primaryCompactLabel: String = primaryLabel,
     primaryEnabled: Boolean,
     onPrimary: () -> Unit,
     primaryTestTag: String,
@@ -376,52 +423,100 @@ internal fun ReviewActionBar(
     secondaryEnabled: Boolean,
     onSecondary: () -> Unit,
     secondaryTestTag: String,
+    secondaryCompactIcon: ImageVector = Icons.Default.Close,
     modifier: Modifier = Modifier,
     tertiaryLabel: String? = null,
     tertiaryEnabled: Boolean = true,
     onTertiary: (() -> Unit)? = null,
     tertiaryTestTag: String? = null,
+    tertiaryCompactIcon: ImageVector = Icons.Default.Close,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 4.dp,
-        shadowElevation = 8.dp,
+        tonalElevation = 0.dp,
+        shadowElevation = 2.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Button(
-                onClick = onPrimary,
-                enabled = primaryEnabled,
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag(primaryTestTag),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
-                Text(primaryLabel)
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            ) {
-                OutlinedButton(
-                    onClick = onSecondary,
-                    enabled = secondaryEnabled,
-                    modifier = Modifier.testTag(secondaryTestTag),
+                val compact = maxWidth < 360.dp || LocalDensity.current.fontScale > 1.25f
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(secondaryLabel)
-                }
-                if (tertiaryLabel != null && onTertiary != null) {
-                    OutlinedButton(
-                        onClick = onTertiary,
-                        enabled = tertiaryEnabled,
-                        modifier = tertiaryTestTag?.let(Modifier::testTag) ?: Modifier,
+                    Button(
+                        onClick = onPrimary,
+                        enabled = primaryEnabled,
+                        contentPadding = PaddingValues(horizontal = if (compact) 12.dp else 20.dp, vertical = 10.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(primaryTestTag),
                     ) {
-                        Text(tertiaryLabel)
+                        Text(
+                            text = if (compact) primaryCompactLabel else primaryLabel,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
+                    ReviewCompactAction(
+                        label = secondaryLabel,
+                        icon = secondaryCompactIcon,
+                        enabled = secondaryEnabled,
+                        compact = compact && tertiaryLabel != null,
+                        onClick = onSecondary,
+                        modifier = Modifier.testTag(secondaryTestTag),
+                    )
+
+                    if (tertiaryLabel != null && onTertiary != null) {
+                        ReviewCompactAction(
+                            label = tertiaryLabel,
+                            icon = tertiaryCompactIcon,
+                            enabled = tertiaryEnabled,
+                            compact = compact,
+                            onClick = onTertiary,
+                            modifier = tertiaryTestTag?.let { Modifier.testTag(it) } ?: Modifier,
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ReviewCompactAction(
+    label: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    compact: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (compact) {
+        OutlinedIconButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = modifier.size(48.dp),
+        ) {
+            Icon(imageVector = icon, contentDescription = label)
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = enabled,
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+            modifier = modifier,
+        ) {
+            Text(label, maxLines = 1)
         }
     }
 }

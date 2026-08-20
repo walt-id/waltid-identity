@@ -84,7 +84,7 @@ fun WalletDemoSharingReviewScreen(
         }
     }
 
-    MaterialTheme {
+    WalletDemoTheme {
         Surface(
             modifier = modifier
                 .fillMaxSize()
@@ -108,7 +108,7 @@ fun WalletDemoSharingReviewScreen(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                     SharingReviewSection(
                         review = review,
@@ -132,7 +132,7 @@ fun WalletDemoSharingReviewScreen(
                         context = WalletDemoReviewSurfaceContext.PlatformInvoked,
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = 20.dp),
+                            .padding(horizontal = 16.dp),
                     )
                     SharingReviewActionBar(
                         enabled = enabled,

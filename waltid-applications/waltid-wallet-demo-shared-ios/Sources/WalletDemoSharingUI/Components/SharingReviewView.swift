@@ -66,7 +66,7 @@ public struct SharingReviewView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             ReviewIslandNavigationView(
                 islands: review.reviewIslands(context: context),
                 showsModelExpandedValues: { island in
@@ -94,10 +94,11 @@ public struct SharingReviewView: View {
         case .verifier:
             VerifierReviewFacts(request: review.request)
         case .credential:
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(review.credentialOptions) { option in
                     CredentialReviewCard(
                         option: option,
+                        showsCredentialName: review.credentialOptions.count > 1,
                         selection: selection,
                         isLoading: isLoading,
                         isReadOnly: isReadOnly,
@@ -107,7 +108,7 @@ public struct SharingReviewView: View {
                 }
             }
         case .information:
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(review.credentialOptions.filter { !$0.disclosures.isEmpty }) { option in
                     DisclosureList(
                         option: option,
@@ -135,6 +136,7 @@ public struct SharingReviewView: View {
 /// One offered credential: what it is, and what would be disclosed from it.
 struct CredentialReviewCard: View {
     let option: PresentationCredentialOption
+    let showsCredentialName: Bool
     let selection: SharingSelection
     let isLoading: Bool
     let isReadOnly: Bool
@@ -143,32 +145,52 @@ struct CredentialReviewCard: View {
 
     var body: some View {
         let details = CredentialDisplayNormalizer.details(for: option)
-        VStack(alignment: .leading, spacing: 10) {
+        HStack(alignment: .center, spacing: 10) {
             if !isReadOnly {
                 Toggle(isOn: Binding(get: {
                     selection.credentials.contains(option.selection)
                 }, set: { _ in
                     onToggleCredential(option.selection)
                 })) {
-                    Text(option.userFacingLabel)
-                        .font(.subheadline.weight(.medium))
+                    EmptyView()
                 }
+                .labelsHidden()
                 .disabled(isLoading)
+                .accessibilityLabel(showsCredentialName ? option.userFacingLabel : "Use this credential")
                 .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
             }
 
-            if let onCredentialSelected {
-                CredentialCardButton(details: details, showProtocolDetails: false) {
-                    onCredentialSelected(details.id)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(showsCredentialName ? option.userFacingLabel : "Use this credential")
+                    .font(.subheadline.weight(.medium))
+                if let issuer = option.issuer?.presentableValue {
+                    Text(issuer)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.leading, isReadOnly ? 0 : 28)
-            } else {
-                CredentialCardView(details: details, showProtocolDetails: false)
-                    .padding(.leading, isReadOnly ? 0 : 28)
+                if let subject = option.subject?.presentableValue {
+                    Text(subject)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Divider()
+            if let onCredentialSelected {
+                Button {
+                    onCredentialSelected(details.id)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+                .accessibilityLabel("View credential details")
+                .accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
+            }
         }
+        .padding(.vertical, 2)
     }
 }
 
@@ -235,10 +257,6 @@ struct DisclosureList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(CredentialDisplayVocabulary.requestedDisclosuresTitle)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
             ForEach(Array(option.disclosures.enumerated()), id: \.element.id) { index, disclosure in
                 let selection = PresentationDisclosureSelection(
                     queryID: option.queryID,
@@ -332,32 +350,72 @@ public struct SharingReviewActions: View {
         self.onCancel = onCancel
     }
 
-    public var body: some View {
-        VStack(alignment: .trailing, spacing: 8) {
+    @ViewBuilder public var body: some View {
+        if #available(iOS 16.0, *) {
+            ViewThatFits(in: .horizontal) {
+                actionRow(compact: false)
+                actionRow(compact: true)
+            }
+        } else {
+            actionRow(compact: true)
+        }
+    }
+
+    private func actionRow(compact: Bool) -> some View {
+        HStack(spacing: 8) {
             Button(action: onSubmit) {
-                Text("Share information")
+                Text("Share")
+                    .lineLimit(1)
                     .frame(maxWidth: .infinity)
             }
-                .buttonStyle(.borderedProminent)
-                .tint(.waltBlue)
-                .disabled(isLoading || !selectionComplete)
-                .accessibilityIdentifier(WalletAccessibilityID.presentationSubmitButton)
+            .buttonStyle(.borderedProminent)
+            .tint(.waltBlue)
+            .disabled(isLoading || !selectionComplete)
+            .accessibilityLabel("Share information")
+            .accessibilityIdentifier(WalletAccessibilityID.presentationSubmitButton)
 
-            HStack(spacing: 10) {
-                // Labelled "Cancel review" only where a protocol-level Reject also exists, so the two
-                // ways of declining cannot be mistaken for each other.
-                Button(onReject == nil ? "Cancel" : "Cancel review", action: onCancel)
-                    .buttonStyle(.bordered)
-                    .disabled(isLoading)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentationCancelButton)
+            reviewAction(
+                title: "Cancel",
+                systemImage: "xmark",
+                compact: compact,
+                accessibilityLabel: "Cancel",
+                identifier: WalletAccessibilityID.presentationCancelButton,
+                action: onCancel
+            )
 
-                if let onReject {
-                    Button("Reject", action: onReject)
-                        .buttonStyle(.bordered)
-                        .disabled(isLoading)
-                        .accessibilityIdentifier(WalletAccessibilityID.presentationRejectButton)
-                }
+            if let onReject {
+                reviewAction(
+                    title: "Reject",
+                    systemImage: "hand.raised",
+                    compact: compact,
+                    accessibilityLabel: "Reject request",
+                    identifier: WalletAccessibilityID.presentationRejectButton,
+                    action: onReject
+                )
             }
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func reviewAction(
+        title: String,
+        systemImage: String,
+        compact: Bool,
+        accessibilityLabel: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            if compact {
+                Image(systemName: systemImage)
+                    .frame(width: 20, height: 20)
+            } else {
+                Text(title).lineLimit(1)
+            }
+        }
+        .buttonStyle(.bordered)
+        .disabled(isLoading)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityIdentifier(identifier)
     }
 }

@@ -5,8 +5,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,7 +63,7 @@ internal fun SharingReviewSection(
         modifier = modifier
             .fillMaxWidth()
             .testTag(WalletUiTestTags.PresentationReview),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ReviewIslandNavigationHost(
             reviewKey = review,
@@ -121,19 +127,21 @@ internal fun SharingReviewActionBar(
 ) {
     ReviewActionBar(
         primaryLabel = "Share information",
+        primaryCompactLabel = "Share",
         primaryEnabled = enabled && selectionComplete,
         onPrimary = onSubmit,
         primaryTestTag = WalletUiTestTags.PresentationSubmitButton,
-        secondaryLabel = onReject?.let { "Reject" } ?: "Cancel",
+        secondaryLabel = "Cancel",
         secondaryEnabled = enabled,
-        onSecondary = onReject ?: onCancel,
-        secondaryTestTag = onReject?.let { WalletUiTestTags.PresentationRejectButton }
-            ?: WalletUiTestTags.PresentationCancelButton,
+        onSecondary = onCancel,
+        secondaryTestTag = WalletUiTestTags.PresentationCancelButton,
+        secondaryCompactIcon = Icons.AutoMirrored.Filled.ArrowBack,
         modifier = modifier.testTag(WalletUiTestTags.PresentationActions),
-        tertiaryLabel = "Cancel review".takeIf { onReject != null },
+        tertiaryLabel = "Reject".takeIf { onReject != null },
         tertiaryEnabled = enabled,
-        onTertiary = onCancel.takeIf { onReject != null },
-        tertiaryTestTag = WalletUiTestTags.PresentationCancelButton.takeIf { onReject != null },
+        onTertiary = onReject,
+        tertiaryTestTag = WalletUiTestTags.PresentationRejectButton.takeIf { onReject != null },
+        tertiaryCompactIcon = Icons.Default.Close,
     )
 }
 
@@ -174,53 +182,62 @@ private fun SharingCredentialChoices(
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onCredentialClick: (String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val hasMultipleOptions = options.size > 1
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEachIndexed { index, option ->
             val details = option.toCredentialDetails()
             val credentialDisplay = details.toCardDisplayData()
             if (index > 0) HorizontalDivider()
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag(WalletUiTestTags.presentationCredential(option.selection.id)),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
                 if (!readOnly) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Checkbox(
-                            checked = option.selection in selectedCredentialOptions,
-                            onCheckedChange = { onToggleCredential(option.selection) },
-                            enabled = enabled,
-                            modifier = Modifier.testTag(
-                                WalletUiTestTags.presentationCredentialToggle(option.selection.id)
-                            ),
+                    Checkbox(
+                        checked = option.selection in selectedCredentialOptions,
+                        onCheckedChange = { onToggleCredential(option.selection) },
+                        enabled = enabled,
+                        modifier = Modifier.testTag(
+                            WalletUiTestTags.presentationCredentialToggle(option.selection.id)
+                        ),
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = if (hasMultipleOptions) option.label else "Use this credential",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    if (hasMultipleOptions) {
+                        Text(
+                            credentialDisplay.issuer,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(option.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(
-                                credentialDisplay.issuer,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            option.subject?.let { subject ->
-                                Text(
-                                    "Subject: $subject",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                    }
+                    option.subject?.let { subject ->
+                        Text(
+                            "Subject: $subject",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
-                CredentialCard(
-                    details = details,
-                    modifier = Modifier.padding(start = if (readOnly) 0.dp else 48.dp),
-                    showProtocolDetails = false,
+                IconButton(
                     onClick = { onCredentialClick(details.summary.id) },
-                )
+                    modifier = Modifier.testTag(WalletUiTestTags.credentialCard(details.summary.id)),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "View credential details",
+                    )
+                }
             }
         }
     }

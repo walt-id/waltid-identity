@@ -47,7 +47,7 @@ internal fun OfferReviewSection(
         modifier = modifier
             .fillMaxWidth()
             .testTag(WalletUiTestTags.OfferReview),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ReviewIslandNavigationHost(
             reviewKey = preview,
@@ -88,7 +88,7 @@ internal fun OfferReviewSection(
 
 @Composable
 private fun OfferedInformationContent(credentials: List<WalletDemoOfferedCredentialMetadata>) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         credentials.filter { it.claims.isNotEmpty() }.forEachIndexed { credentialIndex, credential ->
             if (credentialIndex > 0) HorizontalDivider()
             if (credentials.size > 1) {
@@ -131,6 +131,7 @@ internal fun OfferReviewActionBar(
 ) {
     ReviewActionBar(
         primaryLabel = if (preview.requiresIssuerAuthentication) "Continue" else "Add credential",
+        primaryCompactLabel = if (preview.requiresIssuerAuthentication) "Continue" else "Add",
         primaryEnabled = acceptEnabled,
         onPrimary = onAccept,
         primaryTestTag = WalletUiTestTags.OfferAcceptButton,

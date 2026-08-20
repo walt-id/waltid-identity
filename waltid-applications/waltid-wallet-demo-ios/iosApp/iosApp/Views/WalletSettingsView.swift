@@ -46,11 +46,7 @@ struct WalletSettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier(WalletAccessibilityID.settingsScreen)
-        .confirmationDialog(
-            "Reset wallet?",
-            isPresented: $confirmsReset,
-            titleVisibility: .visible
-        ) {
+        .alert("Reset wallet?", isPresented: $confirmsReset) {
             Button("Reset", role: .destructive) {
                 Task { _ = await viewModel.resetWallet() }
             }

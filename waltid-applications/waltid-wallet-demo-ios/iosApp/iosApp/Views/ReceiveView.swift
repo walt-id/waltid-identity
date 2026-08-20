@@ -15,7 +15,7 @@ struct ReceiveView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 10) {
                     Color.clear
                         .frame(width: 1, height: 1)
                         .accessibilityElement()
@@ -94,9 +94,11 @@ struct ReceiveView: View {
                         }
                     }
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .navigationTitle("Receive")
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle(viewModel.offerPreview == nil ? "Receive" : "Add credential")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { onClose?() }
@@ -113,8 +115,8 @@ struct ReceiveView: View {
                         onAccept: viewModel.acceptOffer,
                         onDecline: viewModel.declineOffer
                     )
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                     .background(.regularMaterial)
                 }
             }

@@ -40,7 +40,7 @@ fun WalletDemoSharingReviewSheet(
 ) {
     val layout = review.platformPresentationLayout()
 
-    MaterialTheme {
+    WalletDemoTheme {
         Box(modifier = Modifier.fillMaxSize()) {
             DismissibleScrim(enabled = enabled, onDismiss = onDismiss)
             Surface(

@@ -56,8 +56,8 @@ internal fun ReceiveTab(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StatusCard(state, onDismissStatus)
 
@@ -76,6 +76,11 @@ internal fun ReceiveTab(
                     onClick = onPreviewOffer,
                 )
             } else if (state.offerPreview != null) {
+                Text(
+                    "Add credential",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
                 OfferReviewSection(
                     preview = state.offerPreview!!,
                     acceptEnabled = state.acceptOfferEnabled,

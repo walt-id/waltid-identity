@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.WalletDemoReviewIslandKind
 import id.walt.walletdemo.compose.logic.toStoredReviewIslands
 import id.walt.walletdemo.compose.logic.toSystemInfoGroup
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
@@ -25,12 +26,7 @@ internal fun CredentialDetailsContent(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         CredentialOverviewSection(details)
-        val systemInfoGroup = details.toSystemInfoGroup()
-        if (details.groups.isEmpty() && systemInfoGroup == null) {
-            Text("No credential details available")
-        }
-        details.groups.forEach { group -> ClaimGroupSection(group) }
-        systemInfoGroup?.let { ClaimGroupSection(it) }
+        CredentialInformationContent(details)
     }
 }
 
@@ -46,5 +42,20 @@ internal fun StoredCredentialDetailsContent(
             .fillMaxWidth()
             .testTag(WalletUiTestTags.credentialDetails(details.summary.id)),
         scrollContent = true,
-    )
+        showModelExpandedValues = { island -> island.kind != WalletDemoReviewIslandKind.Information },
+    ) { island ->
+        if (island.kind == WalletDemoReviewIslandKind.Information) {
+            CredentialInformationContent(details)
+        }
+    }
+}
+
+@Composable
+private fun CredentialInformationContent(details: CredentialDetails) {
+    val systemInfoGroup = details.toSystemInfoGroup()
+    if (details.groups.isEmpty() && systemInfoGroup == null) {
+        Text("No credential details available")
+    }
+    details.groups.forEach { group -> ClaimGroupSection(group) }
+    systemInfoGroup?.let { ClaimGroupSection(it) }
 }

@@ -314,24 +314,35 @@ public extension SharingReviewModel {
             summaryValues: [ReviewValue(label: "Response", value: request.responseProtection.summaryText)],
             expandedValues: actorValues,
             technicalSections: technicalSections,
-            initiallyExpanded: verifiedOrigin != nil || request.readerTrust != nil || !(verifier?.details.isEmpty ?? true)
+            initiallyExpanded: verifiedOrigin != nil || request.readerTrust != nil
         )
     }
 
     private func credentialIsland(context: ReviewSurfaceContext) -> ReviewIsland? {
         guard let first = credentialOptions.first else { return nil }
+        let firstDetails = CredentialDisplayNormalizer.details(for: first)
         let title = credentialOptions.count == 1
             ? first.userFacingLabel
-            : "\(credentialOptions.count) credentials"
+            : "Choose credentials"
         return ReviewIsland(
             id: "credential",
             kind: .credential,
             context: context,
             title: title,
-            subtitle: credentialOptions.count == 1 ? "Selected credential" : "Choose credentials",
-            visual: ReviewIslandVisual(fallbackText: title.first.map { String($0).uppercased() } ?? "C"),
-            expandedValues: credentialOptions.map {
-                ReviewValue(label: $0.userFacingLabel, value: $0.issuer ?? "Issuer unavailable", supportingText: $0.subject)
+            subtitle: credentialOptions.count == 1
+                ? first.issuer?.presentableValue
+                : "\(credentialOptions.count) credentials available",
+            visual: ReviewIslandVisual(
+                imageData: firstDetails.cardSummary.portraitData,
+                contentDescription: firstDetails.cardSummary.portraitData == nil ? nil : "Credential portrait",
+                fallbackText: title.first.map { String($0).uppercased() } ?? "C"
+            ),
+            expandedValues: credentialOptions.count == 1 ? [] : credentialOptions.map {
+                ReviewValue(
+                    label: $0.userFacingLabel,
+                    value: $0.issuer ?? "Issuer unavailable",
+                    supportingText: $0.subject
+                )
             },
             technicalSections: credentialOptions.enumerated().map { index, option in
                 ReviewTechnicalSection(
@@ -396,7 +407,7 @@ public extension SharingReviewModel {
             subtitle: "Review before sharing",
             visual: ReviewIslandVisual(fallbackText: "!"),
             expandedValues: group.items.map {
-                ReviewValue(label: $0.label, value: $0.value.reviewText, supportingText: group.title)
+                ReviewValue(label: $0.label, value: $0.value.reviewText)
             },
             technicalSections: [
                 ReviewTechnicalSection(

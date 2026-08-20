@@ -405,9 +405,8 @@ extension String {
         !trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// The trimmed value, or `nil` when there is nothing to show.
+    /// The original value, or `nil` when there is nothing but whitespace to show.
     var presentableValue: String? {
-        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        isPresentableValue ? self : nil
     }
 }

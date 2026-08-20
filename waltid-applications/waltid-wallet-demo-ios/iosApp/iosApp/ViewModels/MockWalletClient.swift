@@ -64,6 +64,15 @@ actor MockWalletClient: WalletClient {
 
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
         try await delayOperation()
+        let claims = mdocMetadata
+            ? [
+                IssuanceClaimPreview(path: ["org.iso.23220.1", "age_over_18"], mandatory: true, displayName: nil),
+                IssuanceClaimPreview(path: ["org.iso.23220.1", "age_over_65"], mandatory: false, displayName: nil),
+                IssuanceClaimPreview(path: ["org.iso.23220.dtc.1", "dtc_version"], mandatory: true, displayName: nil),
+                IssuanceClaimPreview(path: ["org.iso.23220.dtc.1", "dtc_sod"], mandatory: true, displayName: nil),
+                IssuanceClaimPreview(path: ["org.iso.23220.dtc.1", "dtc_dg1"], mandatory: nil, displayName: nil),
+            ]
+            : [IssuanceClaimPreview(path: ["given_name"], mandatory: true, displayName: "Given name")]
         return IssuanceSession(
             id: "mock-session",
             offer: .init(
@@ -76,7 +85,16 @@ actor MockWalletClient: WalletClient {
                     logoAltText: nil,
                     metadataProvenance: .unsigned
                 ),
-                credentials: [.init(configurationID: "ExampleCredential", format: "dc+sd-jwt", name: "Example", descriptionText: nil, logoURI: nil)],
+                credentials: [
+                    .init(
+                        configurationID: "ExampleCredential",
+                        format: mdocMetadata ? "mso_mdoc" : "dc+sd-jwt",
+                        name: mdocMetadata ? "Photo ID" : "Example",
+                        descriptionText: nil,
+                        logoURI: nil,
+                        claims: claims
+                    ),
+                ],
                 transactionCode: transactionCodeRequired
                     ? .init(inputMode: "numeric", length: 6, descriptionText: "Enter the six-digit code")
                     : nil

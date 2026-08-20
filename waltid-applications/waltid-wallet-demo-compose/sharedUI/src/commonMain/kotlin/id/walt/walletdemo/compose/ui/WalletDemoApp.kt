@@ -26,7 +26,7 @@ fun WalletDemoApp(controller: WalletDemoController) {
         onFailed = controller::failPresentationContinuation,
     )
 
-    MaterialTheme {
+    WalletDemoTheme {
         Surface(
             modifier = Modifier
                 .fillMaxSize()

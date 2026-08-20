@@ -282,20 +282,28 @@ private fun WalletDemoOfferPreview.credentialOfferReviewIsland(
     val title = if (offeredCredentials.size == 1 && firstCredential != null) {
         firstCredential.friendlyTitle()
     } else {
-        "${offeredCredentials.size} credentials"
+        "Credentials"
     }
     return WalletDemoReviewIsland(
         id = WalletDemoReviewIslandId("credential"),
         kind = WalletDemoReviewIslandKind.Credential,
         context = context,
         title = title,
-        subtitle = if (offeredCredentials.size == 1) "Offered credential" else "Offered credentials",
+        subtitle = if (offeredCredentials.size == 1) {
+            "Offered credential"
+        } else {
+            "${offeredCredentials.size} offered credentials"
+        },
         visual = firstCredential?.display.toReviewVisual(title),
-        expandedValues = offeredCredentials.map { credential ->
-            WalletDemoReviewValue(
-                label = credential.friendlyTitle(),
-                value = credential.display?.description ?: "Ready to add",
-            )
+        expandedValues = if (offeredCredentials.size == 1) {
+            listOf(WalletDemoReviewValue("Description", firstCredential?.display?.description))
+        } else {
+            offeredCredentials.map { credential ->
+                WalletDemoReviewValue(
+                    label = credential.friendlyTitle(),
+                    value = credential.display?.description ?: "Ready to add",
+                )
+            }
         },
         technicalSections = offeredCredentials.mapIndexed { index, credential ->
             WalletDemoReviewTechnicalSection(
@@ -458,7 +466,7 @@ private fun WalletDemoSharingReview.verifierReviewIsland(
         expandedValues = actorValues,
         technicalSections = technicalSections,
         initiallyExpanded = verifier?.verifiedOrigin.presentableOrNull() != null ||
-            request.readerTrust != null || verifier?.details?.any { it.value.presentableOrNull() != null } == true,
+            request.readerTrust != null,
     )
 }
 
@@ -475,16 +483,33 @@ private fun WalletDemoSharingReview.credentialSharingReviewIsland(
 ): WalletDemoReviewIsland? {
     if (credentialOptions.isEmpty()) return null
     val first = credentialOptions.first()
-    val title = if (credentialOptions.size == 1) first.label else "${credentialOptions.size} credentials"
+    val display = first.toCredentialDetails().toCardDisplayData()
+    val title = if (credentialOptions.size == 1) first.label else "Choose credentials"
     return WalletDemoReviewIsland(
         id = WalletDemoReviewIslandId("credential"),
         kind = WalletDemoReviewIslandKind.Credential,
         context = context,
         title = title,
-        subtitle = if (credentialOptions.size == 1) "Selected credential" else "Choose credentials",
-        visual = WalletDemoReviewVisual(fallbackText = title.firstOrNull()?.uppercase() ?: "C"),
-        expandedValues = credentialOptions.map { option ->
-            WalletDemoReviewValue(option.label, option.issuer ?: "Issuer unavailable", supportingText = option.subject)
+        subtitle = if (credentialOptions.size == 1) {
+            first.issuer?.takeIf(String::isNotBlank) ?: "Credential"
+        } else {
+            "${credentialOptions.size} credentials available"
+        },
+        visual = WalletDemoReviewVisual(
+            imageUri = display.portrait?.encoded,
+            contentDescription = display.portrait?.let { "Credential image" },
+            fallbackText = title.firstOrNull()?.uppercase() ?: "C",
+        ),
+        expandedValues = if (credentialOptions.size == 1) {
+            emptyList()
+        } else {
+            credentialOptions.map { option ->
+                WalletDemoReviewValue(
+                    option.label,
+                    option.issuer ?: "Issuer unavailable",
+                    supportingText = option.subject,
+                )
+            }
         },
         technicalSections = credentialOptions.mapIndexed { index, option ->
             WalletDemoReviewTechnicalSection(
@@ -561,7 +586,11 @@ private fun WalletDemoSharingReview.purposeAndTransactionReviewIsland(
         subtitle = "Review before sharing",
         visual = WalletDemoReviewVisual(fallbackText = "!"),
         expandedValues = items.map { (group, item) ->
-            WalletDemoReviewValue(item.label, item.value.reviewText(), supportingText = group)
+            WalletDemoReviewValue(
+                item.label,
+                item.value.reviewText(),
+                supportingText = group.takeIf { request.transactionData.size > 1 },
+            )
         },
         technicalSections = request.transactionData.mapIndexed { index, group ->
             WalletDemoReviewTechnicalSection(

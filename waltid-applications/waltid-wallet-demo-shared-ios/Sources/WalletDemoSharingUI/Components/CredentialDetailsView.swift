@@ -9,11 +9,25 @@ public struct CredentialDetailsView: View {
     }
 
     public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            CredentialOverviewView(details: details)
+            CredentialInformationView(details: details)
+        }
+    }
+}
+
+/// Credential fields without the repeated card/issuer summary, for embedding in an information island.
+public struct CredentialInformationView: View {
+    public let details: CredentialDetails
+
+    public init(details: CredentialDetails) {
+        self.details = details
+    }
+
+    public var body: some View {
         let systemInfoGroup = details.systemInfoGroup
 
         VStack(alignment: .leading, spacing: 12) {
-            CredentialOverviewView(details: details)
-
             if details.groups.isEmpty && systemInfoGroup == nil {
                 Text("No credential details available")
                     .font(.caption)

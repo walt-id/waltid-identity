@@ -36,11 +36,10 @@ internal fun CredentialsTab(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         StatusCard(state, onDismissStatus)
-        Text("Credentials", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         if (credentials.isEmpty()) {
             EmptyCredentialsState(onScan, scanEnabled)
         } else {

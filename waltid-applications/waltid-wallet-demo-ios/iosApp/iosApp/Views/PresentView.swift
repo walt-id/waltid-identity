@@ -17,7 +17,7 @@ struct PresentView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 10) {
                     Color.clear
                         .frame(width: 1, height: 1)
                         .accessibilityElement()
@@ -96,9 +96,11 @@ struct PresentView: View {
                         )
                     }
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .navigationTitle("Present")
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle(viewModel.presentationSharingReview == nil ? "Present" : "Share information")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { onClose?() }
@@ -115,8 +117,8 @@ struct PresentView: View {
                         onReject: viewModel.rejectPresentation,
                         onCancel: viewModel.cancelPresentationReview
                     )
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                     .background(.regularMaterial)
                 }
             }

@@ -12,7 +12,14 @@ struct CredentialDetailsScreen: View {
     var body: some View {
         ScrollView {
             if storedCredentialActions {
-                ReviewIslandNavigationView(islands: details.reviewIslands())
+                ReviewIslandNavigationView(
+                    islands: details.reviewIslands(),
+                    showsModelExpandedValues: { $0.kind != .information }
+                ) { island in
+                    if island.kind == .information {
+                        CredentialInformationView(details: details)
+                    }
+                }
                     .padding()
             } else {
                 CredentialDetailsView(details: details)

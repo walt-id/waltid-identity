@@ -58,8 +58,8 @@ internal fun PresentTab(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(scrollState)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StatusCard(state, onDismissStatus)
 
@@ -99,6 +99,10 @@ internal fun PresentTab(
             }
 
             state.presentationPreview?.let { preview ->
+                Text(
+                    "Share information",
+                    style = MaterialTheme.typography.titleLarge,
+                )
                 SharingReviewSection(
                     review = preview.toSharingReview(),
                     selectedCredentialOptions = state.selectedPresentationCredentialOptions,
