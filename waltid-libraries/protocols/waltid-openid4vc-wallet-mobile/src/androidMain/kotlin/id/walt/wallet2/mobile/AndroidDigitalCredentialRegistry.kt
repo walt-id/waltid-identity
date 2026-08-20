@@ -269,7 +269,9 @@ public class AndroidDigitalCredentialRegistry(
                 putJsonObject("Pass") {}
             }
             putJsonArray("preferred_protocols") {
-                add(JsonPrimitive(MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1))
+                OPENID4VCI_CREATE_PROTOCOLS.forEach { protocol ->
+                    add(JsonPrimitive(protocol))
+                }
             }
             putJsonObject("package_info") {
                 put("name", applicationName)

@@ -94,6 +94,22 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
     }
 
+    private func makeSignedMetadataWallet(walletId: String) async throws -> Wallet {
+        try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: walletId,
+                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
+                    preRegisteredClientMetadataJSON: [
+                        DemoBackend.verifierClientID: DemoBackend.verifierRequestObjectClientMetadataJSON,
+                    ]
+                ),
+                issuerMetadataTrustResolver: PublicDemoIssuerMetadataTrustResolver(),
+                transactionDataProfiles: Self.demoTransactionDataProfiles,
+                defaultKeyUseAuthorizationPolicy: .none
+            )
+        )
+    }
+
     private func makeWallet(persistence: WalletPersistence) async throws -> Wallet {
         try await Wallet(
             configuration: WalletConfiguration(
@@ -311,6 +327,56 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     func testReceiveIsoMdlCredentialFromDemoIssuer2() async throws {
         try await receiveCredentialFromDemoIssuer2(scenarioID: "iso-mdl")
+    }
+
+    func testReceiveAndPresentUsingSignedMetadataAgainstDemoIssuer2AndVerifier2() async throws {
+        let scenario = try demoPresentationScenario("eudi-pid-mdoc")
+        let walletID = "ios-demo-signed-\(UUID().uuidString)"
+        await clearTestData(walletId: walletID)
+        let wallet = try await makeSignedMetadataWallet(walletId: walletID)
+        let bootstrap = try await wallet.bootstrap()
+        let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+
+        let issuanceSession = try await startIssuance(wallet: wallet, offerURL: offerURL)
+        guard case let .signed(issuerProvenance) = issuanceSession.offer.issuer.metadataProvenance else {
+            return XCTFail("Expected signed issuer metadata provenance")
+        }
+        XCTAssertFalse(issuerProvenance.compactJWT.isEmpty)
+        XCTAssertEqual("ES256", issuerProvenance.algorithm)
+        XCTAssertNotNil(issuerProvenance.keyID)
+        XCTAssertEqual(.trustedIssuer, issuerProvenance.trustType)
+
+        let outcome = try await wallet.continuePreAuthorizedIssuance(
+            sessionID: issuanceSession.id,
+            transactionCode: offer.txCode
+        )
+        guard case let .stored(_, credentialIDs) = outcome else {
+            throw MobileWalletIntegrationError.unexpectedIssuanceOutcome
+        }
+        XCTAssertFalse(credentialIDs.isEmpty, "Should receive a credential from reviewed signed metadata")
+
+        let signedSession = try await DemoBackend.shared.createVerifierSession(scenario: scenario, signedRequest: true)
+        let presentationURL = try XCTUnwrap(URL(string: signedSession.authorizationRequestUri))
+        let preview = try requireReadyPreview(try await wallet.previewPresentation(request: presentationURL))
+        guard case let .authenticated(compactRequestObject, algorithm, keyID, clientIDScheme) = preview.request.requestAuthentication else {
+            return XCTFail("Expected authenticated signed verifier request")
+        }
+        XCTAssertFalse(compactRequestObject.isEmpty)
+        XCTAssertEqual("ES256", algorithm)
+        XCTAssertNotNil(keyID)
+        XCTAssertEqual(.preRegistered, clientIDScheme)
+
+        let result = try await wallet.submitPresentation(
+            previewHandle: preview.previewHandle,
+            selectedCredentialOptions: preview.credentialOptions.map(\.selection),
+            did: bootstrap.did
+        )
+        assertTransmittedSuccess(result, "Signed public demo presentation should succeed")
+        try await DemoBackend.shared.waitForVerifierSuccess(
+            sessionID: signedSession.sessionID,
+            timeoutSeconds: verifierPollingTimeout
+        )
     }
 
     func testReceiveAndPresentEudiEhicSdJwtAgainstEudi() async throws {
@@ -768,6 +834,20 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
 private enum MobileWalletIntegrationError: Error {
     case unexpectedIssuanceOutcome
+}
+
+private struct PublicDemoIssuerMetadataTrustResolver: IssuerMetadataTrustResolver {
+    func verify(compactJWT: String, expectedCredentialIssuer: String) async throws -> IssuerMetadataSigner {
+        let signer = try DemoBackend.verifySignedIssuerMetadata(
+            compactJWT: compactJWT,
+            expectedCredentialIssuer: expectedCredentialIssuer
+        )
+        return IssuerMetadataSigner(
+            keyID: signer.keyID,
+            algorithm: signer.algorithm,
+            trustType: .trustedIssuer
+        )
+    }
 }
 
 private actor RecordingWalletCredentialStore: WalletCredentialStore {

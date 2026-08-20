@@ -289,7 +289,14 @@ private actor TransactionCodeWalletClient: WalletClient {
             id: "transaction-code-session",
             offer: IssuanceOfferPreview(
                 grant: issuanceGrant,
-                issuer: IssuanceIssuerPreview(identifier: "https://issuer.example", name: "Example Issuer", locale: nil, logoURI: nil, logoAltText: nil),
+                issuer: IssuanceIssuerPreview(
+                    identifier: "https://issuer.example",
+                    name: "Example Issuer",
+                    locale: nil,
+                    logoURI: nil,
+                    logoAltText: nil,
+                    metadataProvenance: .unsigned
+                ),
                 credentials: [IssuanceCredentialPreview(configurationID: "ExampleCredential", format: "vc+sd-jwt", name: "Example credential", descriptionText: nil, logoURI: nil)],
                 transactionCode: transactionCode
             )
@@ -344,6 +351,7 @@ private actor TransactionCodeWalletClient: WalletClient {
                 previewHandle: PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
                 request: PresentationRequestInfo(
                     clientID: "https://verifier.example",
+                    requestAuthentication: .unauthenticated,
                     nonce: "nonce-1",
                     responseEncryption: .notRequired,
                 ),

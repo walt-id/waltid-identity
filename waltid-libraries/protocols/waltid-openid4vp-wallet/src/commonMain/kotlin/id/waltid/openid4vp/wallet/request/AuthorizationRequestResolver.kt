@@ -3,6 +3,7 @@ package id.waltid.openid4vp.wallet.request
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.crypto.utils.UuidUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.ClientIdPrefix
@@ -83,21 +84,31 @@ object AuthorizationRequestResolver {
             .map { json.encodeToJsonElement(OpenID4VPResponseMode.serializer(), it).jsonPrimitive.content }
 
         private val unsupportedClientIdPrefixes = setOf(
-            // Pre-registered clients require a verifier metadata provider; this resolver uses the authenticator default.
-            ClientIdPrefix.PRE_REGISTERED,
             // OpenID Federation parsing exists, but trust chain resolution is not implemented yet.
             ClientIdPrefix.OPENID_FEDERATION,
         )
 
+        // Ed448 is modelled by the JOSE layer but is not supported by the wallet's platform crypto providers.
+        private val requestObjectSigningAlgorithmsSupported = JwsAlgorithm.entries
+            .filterNot { it == JwsAlgorithm.ED448 }
+            .map { it.identifier }
+
         fun build(
             vpFormatsSupported: JsonObject,
             trustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+            unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         ): String = json.encodeToString(
             serializer = JsonObject.serializer(),
             value = buildJsonObject {
                 put("response_types_supported", responseTypesSupported.toJsonArray())
                 put("response_modes_supported", responseModesSupported.toJsonArray())
                 val unsupported = unsupportedClientIdPrefixes + buildSet {
+                    if (trustConfiguration.preRegisteredClients.isEmpty()) {
+                        add(ClientIdPrefix.PRE_REGISTERED)
+                    }
+                    if (unsignedRequestObjectPolicy == UnsignedRequestObjectPolicy.REQUIRE_SIGNED) {
+                        add(ClientIdPrefix.REDIRECT_URI)
+                    }
                     if (trustConfiguration.x509TrustAnchors == null) {
                         add(ClientIdPrefix.X509_SAN_DNS)
                         add(ClientIdPrefix.X509_HASH)
@@ -106,7 +117,11 @@ object AuthorizationRequestResolver {
                         add(ClientIdPrefix.VERIFIER_ATTESTATION)
                     }
                 }
-                put("client_id_prefixes_supported", (ClientIdPrefix.entries - unsupported).map { it.value }.toJsonArray())
+                val supportedClientIdPrefixes = ClientIdPrefix.entries - unsupported
+                put("client_id_prefixes_supported", supportedClientIdPrefixes.map { it.value }.toJsonArray())
+                if (supportedClientIdPrefixes.any { it != ClientIdPrefix.REDIRECT_URI }) {
+                    put("request_object_signing_alg_values_supported", requestObjectSigningAlgorithmsSupported.toJsonArray())
+                }
                 put("vp_formats_supported", vpFormatsSupported)
             },
         )
@@ -115,16 +130,18 @@ object AuthorizationRequestResolver {
             JsonArray(map(::JsonPrimitive))
     }
 
-    fun buildRequestUriPostWalletMetadata(vpFormatsSupported: JsonObject): String =
-        RequestUriPostWalletMetadata.build(vpFormatsSupported)
-
     val defaultRequestUriPostWalletMetadata: String
         get() = RequestUriPostWalletMetadata.default
 
     fun buildRequestUriPostWalletMetadata(
         vpFormatsSupported: JsonObject,
-        trustConfiguration: ClientIdTrustConfiguration,
-    ): String = RequestUriPostWalletMetadata.build(vpFormatsSupported, trustConfiguration)
+        trustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+    ): String = RequestUriPostWalletMetadata.build(
+        vpFormatsSupported,
+        trustConfiguration,
+        unsignedRequestObjectPolicy,
+    )
 
     /**
      * Shared transport mapping for retrieving Authorization Requests via `request_uri`.
@@ -336,17 +353,31 @@ object AuthorizationRequestResolver {
                 clientId = authReqJws.payload["client_id"]?.jsonPrimitive?.contentOrNull,
                 policy = unsignedRequestObjectPolicy,
             )
-        } else {
-            log.trace { "Authenticating signed AuthorizationRequest object" }
-            authenticateSignedRequestObject(requestObject, authReqJws.payload, trustConfiguration)
+            return ResolvedAuthorizationRequest.UnsignedRequestObject(
+                authorizationRequest = json.decodeFromJsonElement(
+                    deserializer = AuthorizationRequest.serializer(),
+                    element = applyRedirectUriPrefixBinding(authReqJws.payload),
+                ),
+                requestObject = requestObject,
+            )
         }
 
-        return ResolvedAuthorizationRequest.WithRequestObject(
+        log.trace { "Authenticating signed AuthorizationRequest object" }
+        val authentication = authenticateSignedRequestObject(
+            requestObject = requestObject,
+            payload = authReqJws.payload,
+            algorithm = requireNotNull(jwtAlg) { "Signed AuthorizationRequest is missing alg" },
+            keyId = authReqJws.header["kid"]?.jsonPrimitive?.contentOrNull,
+            trustConfiguration = trustConfiguration,
+        )
+
+        return ResolvedAuthorizationRequest.AuthenticatedRequestObject(
             authorizationRequest = json.decodeFromJsonElement(
                 deserializer = AuthorizationRequest.serializer(),
                 element = applyRedirectUriPrefixBinding(authReqJws.payload),
             ),
             requestObject = requestObject,
+            authentication = authentication,
         )
     }
 
@@ -354,12 +385,14 @@ object AuthorizationRequestResolver {
     private suspend fun authenticateSignedRequestObject(
         requestObject: String,
         payload: JsonObject,
+        algorithm: String,
+        keyId: String?,
         trustConfiguration: ClientIdTrustConfiguration,
-    ) {
+    ): RequestObjectAuthentication {
         val clientId = requireNotNull(payload["client_id"]?.jsonPrimitive?.contentOrNull) {
             "Missing client_id for signed AuthorizationRequest"
         }
-        val clientIdPrefix = ClientIdPrefixParser.parse(clientId)
+        val parsedClientId = ClientIdPrefixParser.parse(clientId)
             .getOrElse { error -> throw IllegalArgumentException("Could not parse client_id prefix: $clientId", error) }
         val clientMetadata = payload["client_metadata"]?.let {
             ClientMetadata.fromJson(it)
@@ -375,7 +408,7 @@ object AuthorizationRequestResolver {
         )
 
         when (val validationResult = ClientIdPrefixAuthenticator.authenticate(
-            clientIdPrefix,
+            parsedClientId,
             context,
             preRegisteredMetadataProvider = { clientId ->
                 trustConfiguration.preRegisteredClients[clientId]?.let {
@@ -385,11 +418,16 @@ object AuthorizationRequestResolver {
             trustConfiguration = trustConfiguration,
         )) {
             is ClientValidationResult.Success -> {
-                log.trace { "Signed AuthorizationRequest authentication succeeded for client_id prefix ${clientIdPrefix::class.simpleName}" }
+                log.trace { "Signed AuthorizationRequest authentication succeeded for client_id scheme ${parsedClientId::class.simpleName}" }
             }
 
             is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(validationResult.error)
         }
+        return RequestObjectAuthentication(
+            clientId = parsedClientId,
+            algorithm = algorithm,
+            keyId = keyId,
+        )
     }
 
     private fun parseRequestUriMethod(value: String): RequestUriHttpMethod = when (value) {

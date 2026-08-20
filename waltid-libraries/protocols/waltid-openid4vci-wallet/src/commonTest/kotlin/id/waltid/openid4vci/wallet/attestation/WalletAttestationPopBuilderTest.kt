@@ -37,6 +37,28 @@ class WalletAttestationPopBuilderTest {
     }
 
     @Test
+    fun includesOptionalServerChallengeOnlyWhenProvided() = runTest {
+        val key = attestationTestKey("pop-challenge")
+        val withoutChallenge = builder.buildPopJwt(key, "wallet-client", "https://issuer.example.com/token")
+        val withChallenge = builder.buildPopJwt(
+            key,
+            "wallet-client",
+            "https://issuer.example.com/token",
+            challenge = "server-challenge",
+        )
+
+        val withoutPayload = Json.parseToJsonElement(
+            CompactJws.verify(withoutChallenge, key, JwsAlgorithm.ES256).payload.decodeToString(),
+        ).jsonObject
+        val withPayload = Json.parseToJsonElement(
+            CompactJws.verify(withChallenge, key, JwsAlgorithm.ES256).payload.decodeToString(),
+        ).jsonObject
+
+        assertEquals(null, withoutPayload["challenge"])
+        assertEquals("server-challenge", withPayload["challenge"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun rejectsNonP256AndNonSigningKeys() = runTest {
         val ed25519 = attestationTestKey("pop-ed", KeySpec.Edwards(EdwardsCurve.ED25519))
         val verifyOnly = attestationTestKey("pop-verify", usages = setOf(KeyUsage.KEY_AGREEMENT))
