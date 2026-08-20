@@ -35,6 +35,7 @@ on:
 jobs:
   gradle:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
     strategy:
       matrix:
         os: [ ubuntu-22.04 ]
@@ -74,33 +75,58 @@ jobs:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
 
-      - name: Start tunnel and get URL
+      - name: Start tunnels and get URLs
         id: tunnel
         env:
           CLOUDFLARED_VERSION: "2026.7.3"
         run: |
-          # Start tunnel on port 7003
           wget -q -O cloudflared "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
           chmod +x cloudflared
-          ./cloudflared tunnel --url http://localhost:7003 > lt_output.txt 2>&1 &
-          CF_PID=$!
 
-          TUNNEL_URL=""
-          for i in $(seq 1 60); do
-            TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' lt_output.txt | head -n 1)
-            [ -n "$TUNNEL_URL" ] && break
-            kill -0 "$CF_PID" 2>/dev/null || { echo "cloudflared exited before printing a URL"; break; }
-            sleep 1
-          done
+          start_tunnel() {
+            local port="$1"
+            local log="$2"
+            ./cloudflared tunnel --url "http://localhost:${port}" > "$log" 2>&1 &
+            echo $!
+          }
 
-          if [ -z "$TUNNEL_URL" ]; then
-            echo "Failed to get tunnel URL after ${i}s"
-            cat lt_output.txt
-            exit 1
-          fi
+          wait_for_url() {
+            local pid="$1"
+            local log="$2"
+            local name="$3"
+            local url=""
+            local i
+            for i in $(seq 1 60); do
+              url=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$log" | head -n 1)
+              [ -n "$url" ] && break
+              kill -0 "$pid" 2>/dev/null || { echo "$name cloudflared exited before printing a URL"; cat "$log"; return 1; }
+              sleep 1
+            done
+            if [ -z "$url" ]; then
+              echo "Failed to get $name tunnel URL after ${i}s"
+              cat "$log"
+              return 1
+            fi
+            echo "$url"
+          }
 
-          echo "Tunnel URL: $TUNNEL_URL (ready after ${i}s)"
-          echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
+          # Sequential start+wait: concurrent trycloudflare sessions can stall before printing a URL.
+          # 7003: OpenID4VP verifier E2E server
+          # 7006: OpenID4VP wallet adapter authorization endpoint
+          # 7007: OpenID4VCI wallet adapter credential-offer endpoint
+          VERIFIER_PID=$(start_tunnel 7003 lt_verifier.txt)
+          VERIFIER_URL=$(wait_for_url "$VERIFIER_PID" lt_verifier.txt verifier) || exit 1
+          VP_WALLET_PID=$(start_tunnel 7006 lt_vp_wallet.txt)
+          VP_WALLET_URL=$(wait_for_url "$VP_WALLET_PID" lt_vp_wallet.txt vp-wallet) || exit 1
+          VCI_WALLET_PID=$(start_tunnel 7007 lt_vci_wallet.txt)
+          VCI_WALLET_URL=$(wait_for_url "$VCI_WALLET_PID" lt_vci_wallet.txt vci-wallet) || exit 1
+
+          echo "Verifier tunnel: $VERIFIER_URL"
+          echo "VP wallet adapter tunnel: $VP_WALLET_URL"
+          echo "VCI wallet adapter tunnel: $VCI_WALLET_URL"
+          echo "url=$VERIFIER_URL" >> "$GITHUB_OUTPUT"
+          echo "vp_wallet_url=$VP_WALLET_URL" >> "$GITHUB_OUTPUT"
+          echo "vci_wallet_url=$VCI_WALLET_URL" >> "$GITHUB_OUTPUT"
 
       - name: Replace URLs in Kotlin test
         if: ${{ steps.tunnel.outputs.url != '' }}
@@ -132,6 +158,10 @@ jobs:
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
           OPENID4VCI_CONFORMANCE_STRICT: ${{ vars.CONFORMANCE_ALLOW_FAILURE == 'false' }}
+          CONFORMANCE_HOST: conformance.waltid.cloud
+          CONFORMANCE_PORT: "443"
+          CONFORMANCE_VP_WALLET_ADAPTER_URL: ${{ steps.tunnel.outputs.vp_wallet_url }}/openid4vp/authorize
+          CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL: ${{ steps.tunnel.outputs.vci_wallet_url }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 

@@ -20,15 +20,21 @@ object ConformanceConfig {
      * Conformance suite hostname.
      * Local: localhost.emobix.co.uk (requires /etc/hosts entry)
      * Cloud: conformance.waltid.cloud
+     *
+     * Override with `CONFORMANCE_HOST`.
      */
-    const val CONFORMANCE_HOST = "localhost.emobix.co.uk"
+    val CONFORMANCE_HOST: String
+        get() = env("CONFORMANCE_HOST") ?: "localhost.emobix.co.uk"
 
     /**
      * Conformance suite HTTPS port.
      * Local: 8443
      * Cloud: 443
+     *
+     * Override with `CONFORMANCE_PORT`.
      */
-    const val CONFORMANCE_PORT = 8443
+    val CONFORMANCE_PORT: Int
+        get() = env("CONFORMANCE_PORT")?.toIntOrNull() ?: 8443
 
     // ================================
     // Verifier Settings
@@ -64,10 +70,15 @@ object ConformanceConfig {
     const val WALLET_API_URL = "http://127.0.0.1:7005"
 
     /**
-     * Wallet conformance adapter port.
+     * OpenID4VP wallet conformance adapter port.
      * The adapter bridges conformance suite -> wallet API.
      */
     const val WALLET_ADAPTER_PORT = 7006
+
+    /**
+     * OpenID4VCI wallet conformance adapter port.
+     */
+    const val VCI_WALLET_ADAPTER_PORT = 7007
 
     /**
      * OAuth client identifier the VCI wallet plans register with the suite as `client.client_id`.
@@ -114,9 +125,45 @@ object ConformanceConfig {
 
     /**
      * Wallet adapter authorization endpoint URL, reachable from the conformance suite.
+     *
+     * Override with `CONFORMANCE_VP_WALLET_ADAPTER_URL` when the adapter is exposed through a
+     * public HTTPS tunnel. Cloudflare quick tunnels have no custom port, so `host:port` is not
+     * enough for GitHub Actions.
      */
     val WALLET_ADAPTER_URL: String
-        get() = "http://$ADAPTER_CALLBACK_HOST:$WALLET_ADAPTER_PORT/openid4vp/authorize"
+        get() = walletAdapterAuthorizationUrl()
+
+    /**
+     * Authorization endpoint the OpenID4VP wallet plans register with the suite.
+     */
+    fun walletAdapterAuthorizationUrl(
+        publicUrl: String? = env("CONFORMANCE_VP_WALLET_ADAPTER_URL"),
+    ): String = publicUrl?.trim()?.takeIf { it.isNotEmpty() }
+        ?: "http://$ADAPTER_CALLBACK_HOST:$WALLET_ADAPTER_PORT/openid4vp/authorize"
+
+    /**
+     * Credential-offer endpoint the OpenID4VCI wallet plans register with the suite.
+     *
+     * Local runs keep `http://$adapterHost:$adapterPort/credential-offer`. CI sets
+     * `CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL` to the public HTTPS tunnel base so the cloud
+     * suite can POST offers into the adapter. The test harness still delivers offers over
+     * loopback separately.
+     */
+    fun vciSuiteCredentialOfferEndpoint(
+        adapterHost: String,
+        adapterPort: Int = VCI_WALLET_ADAPTER_PORT,
+        publicBaseUrl: String? = env("CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL"),
+    ): String {
+        val base = publicBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() }
+        return if (base != null) {
+            "$base/credential-offer"
+        } else {
+            "http://$adapterHost:$adapterPort/credential-offer"
+        }
+    }
+
+    private fun env(name: String): String? =
+        System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() }
 
     // ================================
     // Issuer Settings

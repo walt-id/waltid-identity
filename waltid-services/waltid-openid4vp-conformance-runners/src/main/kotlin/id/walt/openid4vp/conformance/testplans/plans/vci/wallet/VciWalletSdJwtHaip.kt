@@ -188,7 +188,7 @@ class VciWalletSdJwtHaip(
         }
 
         putJsonObject("vci") {
-            put("credential_offer_endpoint", "http://$adapterHost:7007/credential-offer")
+            put("credential_offer_endpoint", ConformanceConfig.vciSuiteCredentialOfferEndpoint(adapterHost))
             put("credential_configuration_id", "eu.europa.ec.eudi.pid.1")
         }
 

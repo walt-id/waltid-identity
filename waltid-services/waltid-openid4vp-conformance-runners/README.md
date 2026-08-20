@@ -82,6 +82,13 @@ OpenID4VP verifier report:
 3. OpenID4VCI Wallet
 4. OpenID4VCI Issuer
 
+GitHub-hosted CI points the wallet suites at `conformance.waltid.cloud` and
+exposes the in-process adapters through Cloudflare tunnels (OpenID4VP adapter
+on port 7006, OpenID4VCI adapter on port 7007), alongside the existing verifier
+tunnel on 7003. Those wallet suites therefore run live. The OpenID4VCI issuer
+matrix still only runs when its dedicated workflow inputs and issuer URL are
+configured.
+
 When a role produced `summary.md`, that file is appended. When it did not, the
 workflow still writes the same heading, totals, and table, with a note that no
 results were produced.
