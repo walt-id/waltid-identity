@@ -5,6 +5,20 @@ import XCTest
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
 
+    func testStoredCredentialTitlePreservesConfiguredDisplayLabel() {
+        let credential = Credential(
+            id: "cred-1",
+            format: "mso_mdoc",
+            issuer: nil,
+            subject: nil,
+            label: "PID (MSO Mdoc)",
+            addedAt: nil,
+            credentialDataJSON: #"{"docType":"eu.europa.ec.eudi.pid.1"}"#
+        )
+
+        XCTAssertEqual(CredentialDisplayNormalizer.details(for: credential).title, "PID (MSO Mdoc)")
+    }
+
     func testStoredCredentialReviewUsesCommonIslandsAndKeepsFormatTechnical() {
         let details = CredentialDisplayNormalizer.details(
             id: "credential-1",

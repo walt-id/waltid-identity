@@ -73,7 +73,7 @@ fun walletDemoViewController(
         pinStore = createIosDemoPinStore(config.walletId),
     )
     iosController = controller
-    pendingDeepLink?.let(controller::handleDeepLink)
+    pendingDeepLink?.let(controller::handleIncomingUrl)
     pendingDeepLink = null
     return ComposeUIViewController {
         WalletDemoApp(controller)
@@ -85,6 +85,6 @@ fun handleWalletDemoDeepLink(url: String) {
     if (controller == null) {
         pendingDeepLink = url
     } else {
-        controller.handleDeepLink(url)
+        controller.handleIncomingUrl(url)
     }
 }

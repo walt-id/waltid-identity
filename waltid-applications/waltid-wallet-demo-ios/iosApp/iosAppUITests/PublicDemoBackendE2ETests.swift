@@ -157,16 +157,6 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         }
 
         ui.openDeepLink(offer.offerUrl)
-        guard ui.waitForTextInputValue(
-            identifier: "wallet.offerInput",
-            fallbackLabel: "Credential offer URL",
-            value: offer.offerUrl,
-            timeout: 20
-        ) else {
-            XCTFail("Offer URL did not appear after opening the deep link")
-            return
-        }
-        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
 
         let previewStatus = ui.waitForStatus(
             prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],

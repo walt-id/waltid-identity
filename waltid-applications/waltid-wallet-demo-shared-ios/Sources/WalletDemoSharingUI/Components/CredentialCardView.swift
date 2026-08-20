@@ -6,12 +6,12 @@ public struct CredentialCardView: View {
     public let details: CredentialDetails
     public let showProtocolDetails: Bool
 
-    public init(details: CredentialDetails, showProtocolDetails: Bool = true) {
+    public init(details: CredentialDetails, showProtocolDetails: Bool = false) {
         self.details = details
         self.showProtocolDetails = showProtocolDetails
     }
 
-    public init(credential: Credential, showProtocolDetails: Bool = true) {
+    public init(credential: Credential, showProtocolDetails: Bool = false) {
         self.details = CredentialDisplayNormalizer.details(for: credential)
         self.showProtocolDetails = showProtocolDetails
     }
@@ -65,7 +65,7 @@ public struct CredentialCardButton: View {
 
     public init(
         details: CredentialDetails,
-        showProtocolDetails: Bool = true,
+        showProtocolDetails: Bool = false,
         action: @escaping () -> Void
     ) {
         self.details = details

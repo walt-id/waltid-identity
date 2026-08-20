@@ -7,6 +7,8 @@ struct PresentView: View {
     @Environment(\.openURL) private var openURL
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
+    var showsInput = true
+    var onClose: (() -> Void)? = nil
 
     private var presentationDetails: [CredentialDetails] {
         viewModel.presentationPreview?.credentialOptions.map(CredentialDisplayNormalizer.details(for:)) ?? []
@@ -21,23 +23,25 @@ struct PresentView: View {
                         .accessibilityElement()
                         .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
 
-                    ScannableUrlEditor(
-                        title: "Present",
-                        label: "OpenID4VP request URL",
-                        text: $viewModel.presentationRequestUrl,
-                        inputIdentifier: WalletAccessibilityID.presentationInput,
-                        scanButtonIdentifier: WalletAccessibilityID.presentationScanButton,
-                        isEnabled: viewModel.presentationUrlEntryEnabled,
-                        focusResetKey: viewModel.inputFocusResetKey
-                    )
+                    if showsInput {
+                        ScannableUrlEditor(
+                            title: "Share information",
+                            label: "Request URL",
+                            text: $viewModel.presentationRequestUrl,
+                            inputIdentifier: WalletAccessibilityID.presentationInput,
+                            scanButtonIdentifier: WalletAccessibilityID.presentationScanButton,
+                            isEnabled: viewModel.presentationUrlEntryEnabled,
+                            focusResetKey: viewModel.inputFocusResetKey
+                        )
 
-                    Button("Preview") {
-                        viewModel.previewPresentation()
+                        Button("Preview") {
+                            viewModel.previewPresentation()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.waltBlue)
+                        .disabled(!viewModel.presentationPreviewActionEnabled)
+                        .accessibilityIdentifier(WalletAccessibilityID.presentButton)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
-                    .disabled(!viewModel.presentationPreviewActionEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentButton)
 
                     if viewModel.credentials.isEmpty {
                         Text("No credentials available")
@@ -92,6 +96,13 @@ struct PresentView: View {
                 .padding()
             }
             .navigationTitle("Present")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { onClose?() }
+                        .disabled(onClose == nil)
+                        .opacity(onClose == nil ? 0 : 1)
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 if viewModel.presentationSharingReview != nil, !viewModel.presentationCompleted {
                     SharingReviewActions(

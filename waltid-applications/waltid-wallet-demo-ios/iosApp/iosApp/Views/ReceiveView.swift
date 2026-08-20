@@ -4,6 +4,8 @@ import WalletDemoSharingUI
 struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
+    var showsInput = true
+    var onClose: (() -> Void)? = nil
     @Environment(\.openURL) private var openURL
 
     private var receivedDetails: [CredentialDetails] {
@@ -19,7 +21,7 @@ struct ReceiveView: View {
                         .accessibilityElement()
                         .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
 
-                    if viewModel.offerPreview == nil {
+                    if viewModel.offerPreview == nil && showsInput {
                         ScannableUrlEditor(
                             title: "Receive",
                             label: "Credential offer URL",
@@ -92,6 +94,13 @@ struct ReceiveView: View {
                 .padding()
             }
             .navigationTitle("Receive")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { onClose?() }
+                        .disabled(onClose == nil)
+                        .opacity(onClose == nil ? 0 : 1)
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 if let preview = viewModel.offerPreview, !viewModel.receiveCompleted {
                     OfferReviewActions(

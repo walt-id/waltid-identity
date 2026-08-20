@@ -81,7 +81,7 @@ class MainActivity : FragmentActivity() {
             drainOrphanCreateAuthorization()
             return
         }
-        controller.handleDeepLink(uri.toString())
+        controller.handleIncomingUrl(uri.toString())
     }
 
     /**

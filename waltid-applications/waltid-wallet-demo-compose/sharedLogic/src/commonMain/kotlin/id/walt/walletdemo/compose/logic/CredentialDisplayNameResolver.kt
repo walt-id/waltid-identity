@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
-/** Keeps protocol identifiers out of user-facing credential titles. */
+/** Preserves configured display labels and derives a readable fallback only when they are absent. */
 object CredentialDisplayNameResolver {
     private val json = Json { ignoreUnknownKeys = true }
     private val typeKeys = setOf("doctype", "docType", "vct")
@@ -18,7 +18,10 @@ object CredentialDisplayNameResolver {
         credentialDataJson: String? = null,
         credentialType: String? = null,
     ): String {
-        label.presentableLabel(format)?.let { return it }
+        label
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
 
         val resolvedType = credentialType
             ?.takeIf { it.isNotBlank() }
@@ -31,18 +34,6 @@ object CredentialDisplayNameResolver {
             else -> "Credential"
         }
     }
-
-    private fun String?.presentableLabel(format: String): String? = this
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() && !it.equals(format, ignoreCase = true) }
-        ?.takeUnless { it.looksLikeProtocolIdentifier() }
-
-    private fun String.looksLikeProtocolIdentifier(): Boolean =
-        equals("mso_mdoc", ignoreCase = true) ||
-            contains("sd-jwt", ignoreCase = true) ||
-            contains("jwt_vc", ignoreCase = true) ||
-            startsWith("urn:", ignoreCase = true) ||
-            contains("://")
 
     private fun String?.findCredentialType(): String? {
         val root = this?.takeIf { it.isNotBlank() }

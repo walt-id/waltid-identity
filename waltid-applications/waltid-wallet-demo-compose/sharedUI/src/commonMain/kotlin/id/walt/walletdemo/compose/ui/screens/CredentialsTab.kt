@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,7 +22,12 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialCard
 
 @Composable
-internal fun CredentialsTab(credentials: List<WalletDemoCredential>, onCredentialClick: (String) -> Unit) {
+internal fun CredentialsTab(
+    credentials: List<WalletDemoCredential>,
+    onCredentialClick: (String) -> Unit,
+    onScan: () -> Unit,
+    scanEnabled: Boolean,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -31,7 +37,7 @@ internal fun CredentialsTab(credentials: List<WalletDemoCredential>, onCredentia
     ) {
         Text("Credentials", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         if (credentials.isEmpty()) {
-            EmptyCredentialsState()
+            EmptyCredentialsState(onScan, scanEnabled)
         } else {
             credentials.forEach { credential ->
                 CredentialCard(
@@ -44,7 +50,7 @@ internal fun CredentialsTab(credentials: List<WalletDemoCredential>, onCredentia
 }
 
 @Composable
-private fun EmptyCredentialsState() {
+private fun EmptyCredentialsState(onScan: () -> Unit, scanEnabled: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -55,9 +61,16 @@ private fun EmptyCredentialsState() {
     ) {
         Text("No credentials yet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
         Text(
-            "Receive a credential to see it here.",
+            "Scan a credential offer to add your first one.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Button(
+            onClick = onScan,
+            enabled = scanEnabled,
+            modifier = Modifier.testTag(WalletUiTestTags.ScanEmptyAction),
+        ) {
+            Text("Scan a code")
+        }
     }
 }

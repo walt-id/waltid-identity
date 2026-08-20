@@ -5,6 +5,7 @@ import WalletSDK
 struct CredentialsTabView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
+    let onScan: () -> Void
 
     private var details: [CredentialDetails] {
         viewModel.credentials.map(CredentialDisplayNormalizer.details(for:))
@@ -25,7 +26,7 @@ struct CredentialsTabView: View {
                     }
 
                     if details.isEmpty {
-                        EmptyCredentialsView()
+                        EmptyCredentialsView(onScan: onScan, scanEnabled: viewModel.isReady)
                     } else {
                         ForEach(details) { item in
                             CredentialCardButton(details: item) {
@@ -37,6 +38,15 @@ struct CredentialsTabView: View {
                 .padding()
             }
             .navigationTitle("Credentials")
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button(action: onScan) {
+                        Label("Scan QR", systemImage: "qrcode.viewfinder")
+                    }
+                    .disabled(!viewModel.isReady)
+                    .accessibilityIdentifier(WalletAccessibilityID.scanAction)
+                }
+            }
             .background(detailsNavigationLink)
             .accessibilityIdentifier(WalletAccessibilityID.credentialsTabContent)
         }

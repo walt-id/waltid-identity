@@ -101,6 +101,31 @@ class WalletDemoController(
         _state.update { it.copy(selectedTab = tab) }
     }
 
+    fun submitInteractionInput(rawInput: String): WalletInteractionClassification {
+        val classification = classifyWalletInteraction(rawInput)
+        if (classification is WalletInteractionClassification.Supported) {
+            handleDeepLink(classification.normalizedInput)
+        }
+        return classification
+    }
+
+    fun resolveCurrentInteraction() {
+        when (_state.value.selectedTab) {
+            WalletDemoTab.Receive -> previewOffer()
+            WalletDemoTab.Present -> previewPresentation()
+            WalletDemoTab.Credentials -> Unit
+        }
+    }
+
+    fun dismissInteraction() {
+        when (_state.value.selectedTab) {
+            WalletDemoTab.Receive -> startNewReceiveFlow()
+            WalletDemoTab.Present -> startNewPresentationFlow()
+            WalletDemoTab.Credentials -> Unit
+        }
+        _state.update { it.copy(selectedTab = WalletDemoTab.Credentials) }
+    }
+
     /**
      * Reloads credentials from the store into the ready session.
      *
@@ -278,6 +303,14 @@ class WalletDemoController(
             }
             WalletDeepLinkScheme.AuthorizationCallback -> continueAuthorization(url)
             null -> Unit
+        }
+    }
+
+    fun handleIncomingUrl(url: String) {
+        val classification = classifyWalletInteraction(url)
+        handleDeepLink(url)
+        if (classification is WalletInteractionClassification.Supported) {
+            resolveCurrentInteraction()
         }
     }
 

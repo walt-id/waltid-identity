@@ -99,6 +99,7 @@ class WalletViewModel: ObservableObject {
     private var issuanceSession: IssuanceSession?
     private var pendingPresentationSuccessMessage: String?
     private var presentationTask: Task<Void, Never>?
+    private let updatesIdentityDocumentRegistration: Bool
 
     var presentationPreview: PresentationPreview? {
         if case .ready(let preview)? = presentationReview { return preview }
@@ -199,6 +200,39 @@ class WalletViewModel: ObservableObject {
         isError && statusApplies(to: tab)
     }
 
+    @discardableResult
+    func submitInteractionInput(_ rawInput: String) -> WalletInteractionClassification {
+        let classification = classifyWalletInteraction(rawInput)
+        if case .supported(_, let normalizedInput) = classification,
+           let url = URL(string: normalizedInput) {
+            handleDeepLink(url)
+        }
+        return classification
+    }
+
+    func resolveCurrentInteraction() {
+        switch selectedTab {
+        case .credentials:
+            break
+        case .receive:
+            previewOffer()
+        case .present:
+            previewPresentation()
+        }
+    }
+
+    func dismissInteraction() {
+        switch selectedTab {
+        case .credentials:
+            break
+        case .receive:
+            startNewReceiveFlow()
+        case .present:
+            startNewPresentationFlow()
+        }
+        selectedTab = .credentials
+    }
+
     private let walletClient: any WalletClient
 
     init(
@@ -234,6 +268,7 @@ class WalletViewModel: ObservableObject {
             )
         )
         self.walletClient = walletClient ?? SDKWalletClient(configuration: configuration)
+        updatesIdentityDocumentRegistration = walletClient == nil
         transactionDataProfilesWarning = transactionDataProfiles.warning
         bootstrap()
     }
@@ -332,7 +367,7 @@ class WalletViewModel: ObservableObject {
         case missingResponse
     }
 
-    func handleDeepLink(_ url: URL) {
+    func handleDeepLink(_ url: URL, resolveInteraction: Bool = false) {
         resetInputFocus()
         logE2E("Deep link received: \(url.scheme ?? "unknown")")
         switch url.scheme.flatMap(WalletDeepLinkScheme.init(rawValue:)) {
@@ -354,6 +389,9 @@ class WalletViewModel: ObservableObject {
             clearPendingPresentationContinuation()
             presentationNavigationResetKey += 1
             resetFlowStatusForIncomingURL()
+            if resolveInteraction {
+                previewOffer()
+            }
         case .presentationRequest:
             receiveTask?.cancel()
             presentationTask?.cancel()
@@ -373,11 +411,25 @@ class WalletViewModel: ObservableObject {
             clearPendingPresentationContinuation()
             presentationNavigationResetKey += 1
             resetFlowStatusForIncomingURL()
+            if resolveInteraction {
+                previewPresentation()
+            }
         case .authorizationCallback:
             continueAuthorization(callbackURI: url)
         case nil:
             break
         }
+    }
+
+    func handleIncomingURL(_ url: URL) {
+        let classification = classifyWalletInteraction(url.absoluteString)
+        let resolveInteraction: Bool
+        if case .supported = classification {
+            resolveInteraction = true
+        } else {
+            resolveInteraction = false
+        }
+        handleDeepLink(url, resolveInteraction: resolveInteraction)
     }
 
     func startNewReceiveFlow() {
@@ -610,7 +662,7 @@ class WalletViewModel: ObservableObject {
         }
 
         credentials = refreshedCredentials
-        if #available(iOS 26.0, *) {
+        if updatesIdentityDocumentRegistration, #available(iOS 26.0, *) {
             try await DemoIdentityDocumentRegistration.update()
         }
         issuanceSession = nil
@@ -636,7 +688,7 @@ class WalletViewModel: ObservableObject {
                 case let .stored(_, credentialIDs):
                     let refreshedCredentials = try await walletClient.credentials()
                     credentials = refreshedCredentials
-                    if #available(iOS 26.0, *) {
+                    if updatesIdentityDocumentRegistration, #available(iOS 26.0, *) {
                         try await DemoIdentityDocumentRegistration.update()
                     }
                     deferredCredentials.removeAll { $0.id == credential.id }
@@ -961,7 +1013,7 @@ class WalletViewModel: ObservableObject {
 
                 did = result.did
                 credentials = list
-                if #available(iOS 26.0, *) {
+                if updatesIdentityDocumentRegistration, #available(iOS 26.0, *) {
                     try await DemoIdentityDocumentRegistration.update()
                 }
                 isReady = true

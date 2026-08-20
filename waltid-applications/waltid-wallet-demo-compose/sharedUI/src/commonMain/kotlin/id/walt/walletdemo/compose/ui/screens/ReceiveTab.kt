@@ -27,6 +27,7 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialCard
 import id.walt.walletdemo.compose.ui.components.OfferReviewActionBar
 import id.walt.walletdemo.compose.ui.components.OfferReviewSection
+import id.walt.walletdemo.compose.ui.components.StatusCard
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
 @Composable
@@ -41,6 +42,7 @@ internal fun ReceiveTab(
     onStartNew: () -> Unit,
     onResumeDeferred: (String) -> Unit,
     onCredentialClick: (String) -> Unit,
+    showsInput: Boolean = true,
 ) {
     val receivedCredentials = state.receivedCredentials()
 
@@ -56,7 +58,9 @@ internal fun ReceiveTab(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            if (state.offerPreview == null) {
+            StatusCard(state)
+
+            if (state.offerPreview == null && showsInput) {
                 UrlActionSection(
                     title = "Receive",
                     value = requestDrafts.offerUrl,
@@ -70,7 +74,7 @@ internal fun ReceiveTab(
                     scanButtonTestTag = WalletUiTestTags.OfferScanButton,
                     onClick = onPreviewOffer,
                 )
-            } else {
+            } else if (state.offerPreview != null) {
                 OfferReviewSection(
                     preview = state.offerPreview!!,
                     acceptEnabled = state.acceptOfferEnabled,
@@ -81,6 +85,8 @@ internal fun ReceiveTab(
                     onDecline = onDeclineOffer,
                     showActions = false,
                 )
+            } else {
+                Text("Credential offer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
 
             if (state.deferredCredentials.isNotEmpty()) {

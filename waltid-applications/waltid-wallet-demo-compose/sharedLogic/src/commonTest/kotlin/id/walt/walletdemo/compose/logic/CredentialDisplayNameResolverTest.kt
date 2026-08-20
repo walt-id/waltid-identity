@@ -9,7 +9,7 @@ class CredentialDisplayNameResolverTest {
         assertEquals(
             "Mobile driving licence",
             CredentialDisplayNameResolver.resolve(
-                label = "mso_mdoc",
+                label = null,
                 format = "mso_mdoc",
                 credentialDataJson = """{"docType":"org.iso.18013.5.1.mDL"}""",
             ),
@@ -17,9 +17,9 @@ class CredentialDisplayNameResolverTest {
     }
 
     @Test
-    fun replacesProtocolLabelWithNeutralFallback() {
+    fun preservesConfiguredProtocolLabel() {
         assertEquals(
-            "Mobile document",
+            "mso_mdoc",
             CredentialDisplayNameResolver.resolve(label = "mso_mdoc", format = "mso_mdoc"),
         )
     }
@@ -29,7 +29,7 @@ class CredentialDisplayNameResolverTest {
         assertEquals(
             "Personal ID",
             CredentialDisplayNameResolver.resolve(
-                label = "urn:eu.europa.ec.eudi:pid:1",
+                label = null,
                 format = "dc+sd-jwt",
                 credentialType = "urn:eu.europa.ec.eudi:pid:1",
             ),

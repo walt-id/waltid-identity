@@ -42,8 +42,8 @@ class WalletDemoAppIosTest {
         scenarios.offerClaimsUseSemanticGroupsAndInclusionLabels()
 
     @Test
-    fun receiveAndPresentTabsExposeQrScanActions() =
-        scenarios.receiveAndPresentTabsExposeQrScanActions()
+    fun credentialsHomeExposesOneScanAction() =
+        scenarios.credentialsHomeExposesOneScanAction()
 
     @Test
     fun presentTabAllowsPreviewAndDeclineWithoutCredentials() =

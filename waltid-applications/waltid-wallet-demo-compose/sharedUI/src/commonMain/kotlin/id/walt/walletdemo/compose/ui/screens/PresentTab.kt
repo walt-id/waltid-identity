@@ -27,6 +27,7 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.SharingReviewActionBar
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
+import id.walt.walletdemo.compose.ui.components.StatusCard
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
 @Composable
@@ -42,6 +43,7 @@ internal fun PresentTab(
     onSubmit: () -> Unit,
     onReject: () -> Unit,
     onCancel: () -> Unit,
+    showsInput: Boolean = true,
 ) {
     val scrollState = rememberScrollState()
     val credentials = (state.session as? WalletSessionState.Ready)?.credentials.orEmpty()
@@ -58,19 +60,25 @@ internal fun PresentTab(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            UrlActionSection(
-                title = "Present",
-                value = requestDrafts.presentationRequestUrl,
-                onValueChange = onPresentationRequestUrlChange,
-                label = "OpenID4VP request URL",
-                buttonText = "Preview",
-                enabled = state.presentationPreviewActionEnabled,
-                inputEnabled = state.presentationUrlEntryEnabled,
-                inputTestTag = WalletUiTestTags.PresentationInput,
-                buttonTestTag = WalletUiTestTags.PresentButton,
-                scanButtonTestTag = WalletUiTestTags.PresentationScanButton,
-                onClick = onPreview,
-            )
+            StatusCard(state)
+
+            if (showsInput) {
+                UrlActionSection(
+                    title = "Share information",
+                    value = requestDrafts.presentationRequestUrl,
+                    onValueChange = onPresentationRequestUrlChange,
+                    label = "Request URL",
+                    buttonText = "Preview",
+                    enabled = state.presentationPreviewActionEnabled,
+                    inputEnabled = state.presentationUrlEntryEnabled,
+                    inputTestTag = WalletUiTestTags.PresentationInput,
+                    buttonTestTag = WalletUiTestTags.PresentButton,
+                    scanButtonTestTag = WalletUiTestTags.PresentationScanButton,
+                    onClick = onPreview,
+                )
+            } else if (state.presentationReview == null) {
+                Text("Share information", style = MaterialTheme.typography.titleLarge)
+            }
 
             if (credentials.isEmpty()) {
                 Text(

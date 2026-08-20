@@ -422,9 +422,7 @@ private enum CredentialReviewDisplayNameResolver {
     private static let typeKeys = Set(["doctype", "docType", "vct"])
 
     static func resolve(label: String?, format: String, credentialDataJSON: String) -> String {
-        if let label = label?.presentableValue,
-           label.caseInsensitiveCompare(format) != .orderedSame,
-           !looksLikeProtocolIdentifier(label) {
+        if let label = label?.presentableValue {
             return label
         }
         if let type = credentialType(in: credentialDataJSON), let name = standardName(for: type) {
@@ -435,15 +433,6 @@ private enum CredentialReviewDisplayNameResolver {
         case "dc+sd-jwt", "vc+sd-jwt", "jwt_vc_json", "jwt_vc_json-ld": return "Digital credential"
         default: return "Credential"
         }
-    }
-
-    private static func looksLikeProtocolIdentifier(_ value: String) -> Bool {
-        let normalized = value.lowercased()
-        return normalized == "mso_mdoc"
-            || normalized.contains("sd-jwt")
-            || normalized.contains("jwt_vc")
-            || normalized.hasPrefix("urn:")
-            || normalized.contains("://")
     }
 
     private static func credentialType(in credentialDataJSON: String) -> String? {

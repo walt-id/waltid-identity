@@ -21,7 +21,13 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.StatusCard
 
 @Composable
-internal fun WalletHeader(did: String?, state: WalletDemoUiState, onLock: () -> Unit) {
+internal fun WalletHeader(
+    did: String?,
+    state: WalletDemoUiState,
+    scanEnabled: Boolean,
+    onScan: () -> Unit,
+    onLock: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -45,8 +51,17 @@ internal fun WalletHeader(did: String?, state: WalletDemoUiState, onLock: () -> 
                     )
                 }
             }
-            OutlinedButton(onClick = onLock) {
-                Text("Lock")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onScan,
+                    enabled = scanEnabled,
+                    modifier = Modifier.testTag(WalletUiTestTags.ScanAction),
+                ) {
+                    Text("Scan QR")
+                }
+                OutlinedButton(onClick = onLock) {
+                    Text("Lock")
+                }
             }
         }
         StatusCard(state)

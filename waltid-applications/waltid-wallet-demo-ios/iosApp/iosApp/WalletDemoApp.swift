@@ -58,7 +58,7 @@ struct WalletDemoApp: App {
             ContentView(viewModel: viewModel)
             .tint(.waltBlue)
             .onOpenURL { url in
-                viewModel.handleDeepLink(url)
+                viewModel.handleIncomingURL(url)
             }
             .onChange(of: scenePhase) { phase in
                 // Reconciling requests authorization on a first run, and afterwards picks up a status

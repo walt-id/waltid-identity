@@ -113,6 +113,32 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertFalse(viewModel.isError)
     }
 
+    func testIncomingCredentialOfferOpensItsReview() async throws {
+        let client = TransactionCodeWalletClient()
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.handleIncomingURL(URL(string: "openid-credential-offer://issuer.example")!)
+        try await waitUntil { viewModel.offerPreview != nil }
+
+        XCTAssertEqual(viewModel.selectedTab, .receive)
+        XCTAssertEqual(viewModel.offerUrl, "openid-credential-offer://issuer.example")
+        XCTAssertEqual(viewModel.statusMessage, "Review credential offer")
+    }
+
+    func testIncomingPresentationRequestOpensItsReview() async throws {
+        let client = TransactionCodeWalletClient(startsWithCredential: true)
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.handleIncomingURL(URL(string: "openid4vp://verifier.example")!)
+        try await waitUntil { viewModel.presentationReview != nil }
+
+        XCTAssertEqual(viewModel.selectedTab, .present)
+        XCTAssertEqual(viewModel.presentationRequestUrl, "openid4vp://verifier.example")
+        XCTAssertEqual(viewModel.statusMessage, "Review presentation request")
+    }
+
     func testPresentationDeepLinkCancelsActiveIssuanceSession() async throws {
         let client = TransactionCodeWalletClient(startsWithCredential: true)
         let viewModel = WalletViewModel(walletClient: client)

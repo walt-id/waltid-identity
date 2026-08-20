@@ -57,7 +57,6 @@ final class WalletE2EUI {
         }
 
         app.open(url)
-        app.activate()
     }
 
     func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
@@ -73,21 +72,29 @@ final class WalletE2EUI {
     }
 
     func textInput(identifier: String, fallbackLabel: String) -> XCUIElement {
-        firstExisting([
+        var candidates = [
             app.textFields[identifier],
             app.secureTextFields[identifier],
             app.textViews[identifier],
             app.textFields[fallbackLabel],
             app.secureTextFields[fallbackLabel],
             app.textViews[fallbackLabel],
-        ])
+        ]
+        if identifier == "wallet.offerInput" || identifier == "wallet.presentationInput" {
+            candidates.append(app.textFields["wallet.scanInput"])
+        }
+        return firstExisting(candidates)
     }
 
     func tapButton(identifier: String, fallbackLabel: String) {
-        let button = firstExisting([
+        var candidates = [
             app.buttons[identifier],
             app.buttons[fallbackLabel],
-        ])
+        ]
+        if identifier == "wallet.receiveButton" || identifier == "wallet.presentButton" {
+            candidates.append(app.buttons["wallet.scanSubmit"])
+        }
+        let button = firstExisting(candidates)
         XCTAssertTrue(button.waitForExistence(timeout: 20), "Button not found: \(identifier)")
         makeHittable(button)
         XCTAssertTrue(button.isHittable, "Button is not hittable: \(identifier)")
@@ -138,13 +145,23 @@ final class WalletE2EUI {
     }
 
     func tapTab(label: String) {
-        let tab = app.tabBars.buttons[label]
         dismissKeyboardIfPresent()
-        makeHittable(tab)
-        if tab.exists && tab.isHittable {
-            tab.tap()
+        if label == "Credentials" {
+            let close = app.buttons["Close"].firstMatch
+            if close.exists {
+                makeHittable(close)
+                close.tap()
+            }
         } else {
-            tapTabCoordinate(label: label)
+            let close = app.buttons["Close"].firstMatch
+            if close.exists && !app.buttons["wallet.scanSubmit"].exists {
+                makeHittable(close)
+                close.tap()
+            }
+            let scan = app.buttons["wallet.scanAction"]
+            XCTAssertTrue(scan.waitForExistence(timeout: 10), "Scan action did not become visible")
+            makeHittable(scan)
+            scan.tap()
         }
         XCTAssertTrue(waitForTabContent(label: label, timeout: 5), "Tab content did not become visible: \(label)")
     }
@@ -205,27 +222,6 @@ final class WalletE2EUI {
         RunLoop.current.run(until: Date().addingTimeInterval(0.3))
     }
 
-    private func tapTabCoordinate(label: String) {
-        let xOffset: CGFloat
-        switch label {
-        case "Credentials":
-            xOffset = 1.0 / 6.0
-        case "Receive":
-            xOffset = 3.0 / 6.0
-        case "Present":
-            xOffset = 5.0 / 6.0
-        default:
-            XCTFail("Unknown tab: \(label)")
-            return
-        }
-        let tabBar = app.tabBars.firstMatch
-        if tabBar.exists {
-            tabBar.coordinate(withNormalizedOffset: CGVector(dx: xOffset, dy: 0.5)).tap()
-        } else {
-            app.coordinate(withNormalizedOffset: CGVector(dx: xOffset, dy: 0.95)).tap()
-        }
-    }
-
     private func waitForTabContent(label: String, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
@@ -244,14 +240,9 @@ final class WalletE2EUI {
                 || app.staticTexts["Credential details"].exists
                 || firstHittableElement(identifierPrefix: "wallet.credentialCard.") != nil
         case "Receive":
-            return textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL").isHittable
-                || app.staticTexts["Received credentials"].exists
-                || app.staticTexts["Credential details"].exists
+            return app.textFields["wallet.scanInput"].exists
         case "Present":
-            return textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").isHittable
-                || app.staticTexts["Review presentation request"].exists
-                || app.staticTexts["Credential details"].exists
-                || app.buttons["wallet.presentationNewButton"].exists
+            return app.textFields["wallet.scanInput"].exists
         default:
             return false
         }

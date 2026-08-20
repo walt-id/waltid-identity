@@ -64,7 +64,6 @@ private struct CredentialOverviewView: View {
                     }
 
                     HStack(spacing: 8) {
-                        Text(details.format)
                         if let validityText = summary.validityText {
                             Text(validityText)
                         }

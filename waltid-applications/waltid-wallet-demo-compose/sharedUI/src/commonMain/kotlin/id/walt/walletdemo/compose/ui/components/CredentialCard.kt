@@ -25,7 +25,7 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 internal fun CredentialCard(
     details: CredentialDetails,
     modifier: Modifier = Modifier,
-    showProtocolDetails: Boolean = true,
+    showProtocolDetails: Boolean = false,
     onClick: () -> Unit,
 ) {
     val display = details.toCardDisplayData()
@@ -55,7 +55,7 @@ internal fun CredentialCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                display.credentialType?.takeIf { showProtocolDetails }?.let {
+                display.credentialType?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
                 display.holderName?.let {
