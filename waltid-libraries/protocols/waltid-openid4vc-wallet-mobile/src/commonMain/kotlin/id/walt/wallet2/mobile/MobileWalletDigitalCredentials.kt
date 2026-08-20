@@ -10,8 +10,23 @@ public object MobileWalletDigitalCredentialProtocols {
     public const val OPENID4VP_MULTISIGNED: String = "openid4vp-v1-multisigned"
     /** ISO 18013-7 Annex C mobile-document protocol identifier. */
     public const val ISO_MDOC_ANNEX_C: String = "org-iso-mdoc"
-    /** OpenID4VCI Digital Credentials issuance protocol identifier. */
+    /** Canonical OpenID4VCI Digital Credentials issuance protocol identifier. */
     public const val OPENID4VCI_V1: String = "openid4vci-v1"
+
+    /**
+     * Ordered OpenID4VCI create-protocol identifiers advertised to Credential Manager.
+     *
+     * [OPENID4VCI_V1] is canonical and first. The remaining entries are historical aliases still
+     * sent by some issuer pages; they are accepted and echoed, not advertised as separate
+     * capabilities.
+     */
+    public val OPENID4VCI_CREATE_PROTOCOLS: List<String> = listOf(
+        OPENID4VCI_V1,
+        "openid4vci1.0",
+        "openid4vci-1.0",
+        "openid4vci1.1",
+        "openid4vci-1.1",
+    )
 }
 
 /**

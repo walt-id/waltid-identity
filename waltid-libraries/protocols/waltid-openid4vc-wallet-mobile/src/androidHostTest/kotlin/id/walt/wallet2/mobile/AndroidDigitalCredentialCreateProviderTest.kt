@@ -49,23 +49,42 @@ class AndroidDigitalCredentialCreateProviderTest {
     }
 
     @Test
-    fun rejectsHistoricalOpenId4VciProtocolAlias() {
-        assertFailsWith<IllegalArgumentException> {
-            AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
-                requestJson = """{"requests":[{"protocol":"openid4vci1.0","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
+    fun acceptsHistoricalOpenId4VciProtocolAliasesAndEchoesThem() {
+        val aliases = MobileWalletDigitalCredentialProtocols.OPENID4VCI_CREATE_PROTOCOLS
+            .filter { it != MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1 }
+        for (protocol in aliases) {
+            val request = AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
+                requestJson = """{"requests":[{"protocol":"$protocol","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
                 verifiedOrigin = "android:apk-key-hash:abc",
             )
+            assertEquals(protocol, request.protocol)
         }
     }
 
     @Test
-    fun rejectsUnsupportedOpenId4VciProtocolAlias() {
+    fun rejectsUnversionedOpenId4VciProtocolAlias() {
         assertFailsWith<IllegalArgumentException> {
             AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
                 requestJson = """{"requests":[{"protocol":"openid4vci","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
                 verifiedOrigin = "android:apk-key-hash:abc",
             )
         }
+    }
+
+    @Test
+    fun prefersCanonicalOpenId4VciV1OverHistoricalAlias() {
+        val request = AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
+            requestJson = """
+                {"requests":[
+                  {"protocol":"openid4vci1.0","data":{"credential_issuer":"https://alias.example","credential_configuration_ids":["alias"]}},
+                  {"protocol":"openid4vci-v1","data":{"credential_issuer":"https://v1.example","credential_configuration_ids":["v1"]}}
+                ]}
+            """.trimIndent(),
+            verifiedOrigin = "https://issuer.example",
+        )
+        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1, request.protocol)
+        val offer = Json.parseToJsonElement(request.offerJson).jsonObject
+        assertEquals("https://v1.example", offer["credential_issuer"]?.jsonPrimitive?.content)
     }
 
     @Test

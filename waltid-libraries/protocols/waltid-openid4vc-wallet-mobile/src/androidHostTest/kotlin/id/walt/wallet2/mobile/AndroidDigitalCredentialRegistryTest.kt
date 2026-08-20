@@ -144,7 +144,7 @@ class AndroidDigitalCredentialRegistryTest {
         )
         assertEquals(Json.parseToJsonElement("{\"Pass\":{}}"), json["filter"])
         assertEquals(
-            listOf("openid4vci-v1"),
+            MobileWalletDigitalCredentialProtocols.OPENID4VCI_CREATE_PROTOCOLS,
             json["preferred_protocols"]!!.jsonArray.map { it.jsonPrimitive.content },
         )
         assertEquals("walt.id Wallet", json["package_info"]!!.jsonObject["name"]?.jsonPrimitive?.content)
