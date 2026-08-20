@@ -87,7 +87,7 @@ class IssuerMetadataResolverTest {
             preferredLocales = listOf(" de-AT ", "DE-at", "invalid tag", "en"),
         )
 
-        assertEquals(1, metadata.credentialConfigurationsSupported?.size)
+        assertEquals(1, metadata.metadata.credentialConfigurationsSupported.size)
     }
 
     @Test
