@@ -38,7 +38,10 @@ import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
+import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
 import id.waltid.openid4vci.wallet.nonce.NonceRequestError
 import id.waltid.openid4vci.wallet.nonce.NonceRequestException
@@ -96,7 +99,30 @@ data class WalletIssuanceIssuerPreview(
     val locale: String?,
     val logoUri: String?,
     val logoAltText: String?,
+    /** Whether the issuer metadata was unsigned or verified signed metadata. */
+    val metadataProvenance: WalletIssuanceMetadataProvenance,
 )
+
+/** Verification provenance of issuer metadata retained by an issuance session. */
+@Serializable
+sealed interface WalletIssuanceMetadataProvenance {
+    /** Metadata was received as an unsigned JSON document. */
+    @Serializable
+    data object Unsigned : WalletIssuanceMetadataProvenance
+
+    /** Metadata was received in a JWS verified by the configured trust resolver. */
+    @Serializable
+    data class Signed(
+        /** Exact compact JWS returned by the issuer. */
+        val compactJwt: String,
+        /** JWS algorithm verified by the configured trust resolver. */
+        val algorithm: String,
+        /** Identifier of the trusted verification key, as reported by the trust resolver. */
+        val keyId: String?,
+        /** Authority relationship established by the trust resolver. */
+        val trustType: MetadataSignerTrustType,
+    ) : WalletIssuanceMetadataProvenance
+}
 
 /** Offered credential information safe for an app review screen. */
 @Serializable
@@ -240,6 +266,7 @@ sealed interface WalletIssuanceOutcome {
 class WalletIssuanceSessionService(
     private val wallet: Wallet,
     private val attestationAssembler: ClientAttestationAssembler? = null,
+    private val metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
     private val sessionStore: WalletIssuanceSessionStore? = null,
     httpClient: HttpClient? = null,
@@ -604,7 +631,7 @@ class WalletIssuanceSessionService(
             } catch (error: Exception) {
                 throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO, error)
             }
-            val proofNonce = if (proof.required) fetchNonce(active.resolved.issuerMetadata) else null
+            val proofNonce = if (proof.required) fetchNonce(active.resolved.issuerMetadata.metadata) else null
             val proofJwt = if (proof.required) {
                 try {
                     buildCredentialProof(
@@ -632,7 +659,7 @@ class WalletIssuanceSessionService(
                 }
             }.toString()
             val protected = postProtected(
-                endpoint = active.resolved.issuerMetadata.credentialEndpoint,
+                endpoint = active.resolved.issuerMetadata.metadata.credentialEndpoint,
                 accessToken = token.access_token,
                 tokenType = token.token_type,
                 dpop = dpopAlgorithms,
@@ -683,7 +710,7 @@ class WalletIssuanceSessionService(
                     }
                     val transactionId = response.transactionId
                         ?: throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
-                    val deferredEndpoint = active.resolved.issuerMetadata.deferredCredentialEndpoint
+                    val deferredEndpoint = active.resolved.issuerMetadata.metadata.deferredCredentialEndpoint
                         ?: throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
                     val public = WalletDeferredCredential(
                         id = Uuid.random().toString(),
@@ -925,12 +952,12 @@ class WalletIssuanceSessionService(
             val parsed = CredentialOfferParser.parseCredentialOfferUrl(request.getEffectiveOfferString())
             CredentialOfferResolver(httpClient).resolveCredentialOffer(parsed.credentialOffer, parsed.credentialOfferUri)
         }
-        val resolver = IssuerMetadataResolver(httpClient)
+        val resolver = IssuerMetadataResolver(httpClient, metadataTrustResolver)
         // Operational metadata is always resolved from issuer-derived well-known endpoints.
         // Unrecognized offer parameters are caller-controlled and must not select network
         // endpoints for issuance.
         val issuerMetadata = resolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
-        require(issuerMetadata.credentialIssuer == offer.credentialIssuer) {
+        require(issuerMetadata.metadata.credentialIssuer == offer.credentialIssuer) {
             "Credential issuer metadata identifier does not match the offer"
         }
         val grantAuthorizationServer = when (offer.getGrantType()) {
@@ -938,12 +965,12 @@ class WalletIssuanceSessionService(
             is GrantType.PreAuthorizedCode -> offer.grants?.preAuthorizedCode?.authorizationServer
             else -> null
         }
-        val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata, grantAuthorizationServer)
+        val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata.metadata, grantAuthorizationServer)
         val authorizationServerMetadata = resolver.resolveAuthorizationServerMetadata(selectedAuthorizationServer)
         require(authorizationServerMetadata.issuer == selectedAuthorizationServer) {
             "Authorization server metadata issuer does not match the selected server"
         }
-        val offered = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
+        val offered = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
         require(offered.isNotEmpty()) { "Credential offer resolved no supported credentials" }
         return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered)
     }
@@ -964,7 +991,7 @@ class WalletIssuanceSessionService(
     }
 
     private fun ResolvedOffer.toPreview(grant: GrantType): WalletIssuanceOfferPreview {
-        val issuerDisplay = issuerMetadata.display?.firstOrNull()
+        val issuerDisplay = issuerMetadata.metadata.display?.firstOrNull()
         val txCode = offer.grants?.preAuthorizedCode?.txCode
         return WalletIssuanceOfferPreview(
             grant = when (grant) {
@@ -973,11 +1000,12 @@ class WalletIssuanceSessionService(
                 else -> error("Unsupported credential offer grant")
             },
             issuer = WalletIssuanceIssuerPreview(
-                identifier = offer.credentialIssuer,
+                identifier = issuerMetadata.metadata.credentialIssuer,
                 name = issuerDisplay?.name,
                 locale = issuerDisplay?.locale,
                 logoUri = issuerDisplay?.logo?.uri,
                 logoAltText = issuerDisplay?.logo?.altText,
+                metadataProvenance = issuerMetadata.toPreviewProvenance(),
             ),
             credentials = offeredCredentials.map { offered ->
                 val display = offered.configuration.credentialMetadata?.display?.firstOrNull()
@@ -992,6 +1020,16 @@ class WalletIssuanceSessionService(
             transactionCode = txCode?.let {
                 WalletIssuanceTransactionCode(it.inputMode, it.length, it.description)
             },
+        )
+    }
+
+    private fun ResolvedCredentialIssuerMetadata.toPreviewProvenance(): WalletIssuanceMetadataProvenance = when (this) {
+        is ResolvedCredentialIssuerMetadata.Unsigned -> WalletIssuanceMetadataProvenance.Unsigned
+        is ResolvedCredentialIssuerMetadata.Signed -> WalletIssuanceMetadataProvenance.Signed(
+            compactJwt = compactJwt,
+            algorithm = signer.algorithm,
+            keyId = signer.keyId,
+            trustType = signer.trustType,
         )
     }
 
@@ -1290,10 +1328,12 @@ class WalletIssuanceSessionService(
         }
 
         val offer = json.decodeFromString<CredentialOffer>(persisted.offer)
-        val issuerMetadata = json.decodeFromString<CredentialIssuerMetadata>(persisted.issuerMetadata)
+        // The store is an integrity-protected persistence boundary. Restore the resolution snapshot
+        // established when the session started, then revalidate its protocol bindings below.
+        val issuerMetadata = json.decodeFromString<ResolvedCredentialIssuerMetadata>(persisted.issuerMetadata)
         val authorizationServerMetadata =
             json.decodeFromString<AuthorizationServerMetadata>(persisted.authorizationServerMetadata)
-        val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
+        val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
         val resolved = ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offeredCredentials)
         validatePersistedResolution(persisted.public, resolved)
 
@@ -1361,10 +1401,10 @@ class WalletIssuanceSessionService(
         require(resolved.offer.credentialIssuer == public.offer.issuer.identifier) {
             "Stored issuance session issuer binding is invalid"
         }
-        require(resolved.issuerMetadata.credentialIssuer == resolved.offer.credentialIssuer) {
+        require(resolved.issuerMetadata.metadata.credentialIssuer == resolved.offer.credentialIssuer) {
             "Stored credential issuer metadata binding is invalid"
         }
-        require(resolved.authorizationServerMetadata.issuer in resolved.issuerMetadata.authorizationServerIssuers()) {
+        require(resolved.authorizationServerMetadata.issuer in resolved.issuerMetadata.metadata.authorizationServerIssuers()) {
             "Stored authorization server binding is invalid"
         }
         require(
@@ -1648,7 +1688,7 @@ class WalletIssuanceSessionService(
 
     private data class ResolvedOffer(
         val offer: CredentialOffer,
-        val issuerMetadata: CredentialIssuerMetadata,
+        val issuerMetadata: ResolvedCredentialIssuerMetadata,
         val authorizationServerMetadata: AuthorizationServerMetadata,
         val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
     )

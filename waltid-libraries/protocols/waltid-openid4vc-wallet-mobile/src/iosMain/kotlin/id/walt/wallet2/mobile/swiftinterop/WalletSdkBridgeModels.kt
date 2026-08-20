@@ -8,6 +8,7 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -20,6 +21,9 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vci.wallet.metadata.MetadataSigner
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
@@ -50,6 +54,7 @@ import kotlin.time.Instant
  * @property databaseKeyProvider Swift-owned database key provider used when [persistence] uses
  * [WalletBridgeDatabaseKeyConfiguration.Provided].
  * @property attestation Optional client-attestation configuration for issuers that require it.
+ * @property issuerMetadataTrustResolver Optional Swift-owned verifier for signed Credential Issuer Metadata.
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
  * @property clientIdTrustConfiguration Trust anchors used to authenticate verifier Request Objects.
@@ -64,6 +69,8 @@ public data class WalletBridgeConfiguration(
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
+    /** Signed metadata is neither requested nor accepted when this trust resolver is absent. */
+    public val issuerMetadataTrustResolver: WalletBridgeIssuerMetadataTrustResolver? = null,
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
@@ -202,14 +209,21 @@ internal fun KeyUseAuthorizationReuseTimeoutValidation.toBridgeModel():
  * Verifier Request Object trust configuration exposed to the Swift wallet bridge.
  *
  * @property x509TrustAnchorsPem PEM-encoded trust anchors pinned by the hosting application.
+ * @property preRegisteredClientMetadataJson Explicit pre-registered client metadata, keyed by client ID.
  */
 public data class WalletBridgeClientIdTrustConfiguration(
     public val x509TrustAnchorsPem: List<String> = emptyList(),
+    public val preRegisteredClientMetadataJson: Map<String, String> = emptyMap(),
 )
 
 internal fun WalletBridgeClientIdTrustConfiguration.toClientIdTrustConfiguration(): ClientIdTrustConfiguration =
     ClientIdTrustConfiguration(
         x509TrustAnchors = InMemoryTrustStore(x509TrustAnchorsPem.map(X509CertificateUtil::parseCertificatePem)),
+        preRegisteredClients = preRegisteredClientMetadataJson.mapValues { (clientId, metadataJson) ->
+            ClientMetadata.fromJson(metadataJson).getOrElse { cause ->
+                throw IllegalArgumentException("Malformed pre-registered client metadata for '$clientId'", cause)
+            }
+        },
     )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {
@@ -220,6 +234,11 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         walletId = walletId,
         defaultKeyType = defaultKeyType,
         attestationConfig = attestation,
+        credentialIssuerMetadataTrustResolver = issuerMetadataTrustResolver?.let { bridgeResolver ->
+            CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->
+                bridgeResolver.verify(compactJwt, expectedCredentialIssuer).toMetadataSigner()
+            }
+        },
         persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
         preferredLocales = preferredLocales,
         transactionDataProfiles = transactionDataProfiles,
@@ -233,6 +252,51 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         },
     )
 }
+
+/** Trusted signer details returned after Swift verifies signed Credential Issuer Metadata. */
+public data class WalletBridgeIssuerMetadataSigner(
+    /** Identifier of the trusted verification key, as reported by the trust resolver. */
+    public val keyId: String?,
+    /** JWS algorithm verified by the trust resolver. */
+    public val algorithm: String,
+    /** Authority category established by the trust resolver. */
+    public val trustType: WalletBridgeIssuerMetadataSignerTrustType,
+)
+
+/** Authority category assigned by Swift after it verifies the signed metadata JWS. */
+public enum class WalletBridgeIssuerMetadataSignerTrustType {
+    /** The signer is the trusted credential issuer. */
+    TrustedIssuer,
+    /** The signer is a trusted delegate of the credential issuer. */
+    TrustedDelegate,
+}
+
+/**
+ * Swift-facing trust boundary for signed Credential Issuer Metadata.
+ *
+ * Implementations must verify the JWS and establish that its signer is authorized for the requested issuer.
+ * Returning normally authorizes the metadata for wallet use.
+ */
+public interface WalletBridgeIssuerMetadataTrustResolver {
+    /**
+     * @param compactJwt Compact JWS returned by the Credential Issuer Metadata endpoint.
+     * @param expectedCredentialIssuer Credential issuer for which signer authority must be established.
+     * @return Trusted signer details used to retain metadata provenance.
+     */
+    public suspend fun verify(
+        compactJwt: String,
+        expectedCredentialIssuer: String,
+    ): WalletBridgeIssuerMetadataSigner
+}
+
+private fun WalletBridgeIssuerMetadataSigner.toMetadataSigner(): MetadataSigner = MetadataSigner(
+    keyId = keyId,
+    algorithm = algorithm,
+    trustType = when (trustType) {
+        WalletBridgeIssuerMetadataSignerTrustType.TrustedIssuer -> MetadataSignerTrustType.TRUSTED_ISSUER
+        WalletBridgeIssuerMetadataSignerTrustType.TrustedDelegate -> MetadataSignerTrustType.TRUSTED_DELEGATE
+    },
+)
 
 /**
  * Persistence configuration exposed to the Swift wallet bridge.

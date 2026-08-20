@@ -52,7 +52,13 @@ class OpenId4VpPresentationService(
         request: String,
         walletId: Uuid? = null,
     ): Result<ResolvedAuthorizationRequest> = runCatching {
-        val runtimeRequestUriPostWalletMetadata = walletId?.let { buildRuntimeRequestUriPostWalletMetadata(it) }
+        val runtimeRequestUriPostWalletMetadata = walletId
+            ?.let { buildRuntimeRequestUriPostWalletMetadata(it) }
+            ?: AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                WalletPresentationFormatRegistry.buildVpFormatsSupported(),
+                clientIdTrustConfiguration,
+                unsignedRequestObjectPolicy,
+            )
 
         AuthorizationRequestResolver.resolve(
             requestUrl = Url(request),
@@ -86,7 +92,8 @@ class OpenId4VpPresentationService(
         resolvedRequest: ResolvedAuthorizationRequest,
     ): Url = when (resolvedRequest) {
         is ResolvedAuthorizationRequest.Plain -> buildWalletPresentationRequest(request, resolvedRequest.authorizationRequest)
-        is ResolvedAuthorizationRequest.WithRequestObject -> buildWalletPresentationRequest(request, resolvedRequest.requestObject)
+        is ResolvedAuthorizationRequest.UnsignedRequestObject -> buildWalletPresentationRequest(request, resolvedRequest.requestObject)
+        is ResolvedAuthorizationRequest.AuthenticatedRequestObject -> buildWalletPresentationRequest(request, resolvedRequest.requestObject)
     }
 
     suspend fun matchCredentialsForPresentationRequest(
@@ -195,7 +202,11 @@ class OpenId4VpPresentationService(
 
         val runtimeCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(runtimeKeyTypes)
         val runtimeVpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(runtimeCapabilities)
-        return AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(runtimeVpFormatsSupported)
+        return AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+            runtimeVpFormatsSupported,
+            clientIdTrustConfiguration,
+            unsignedRequestObjectPolicy,
+        )
     }
 
     companion object {

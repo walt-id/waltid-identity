@@ -6,6 +6,7 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -62,6 +63,10 @@ class AuthorizationRequestResolverJvmTest {
             metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
         )
         assertEquals(
+            JwsAlgorithm.entries.filterNot { it == JwsAlgorithm.ED448 }.map { it.identifier },
+            metadata.getValue("request_object_signing_alg_values_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
+        assertEquals(
             jsonObjectOf("dc+sd-jwt" to jsonObjectOf()),
             metadata.getValue("vp_formats_supported").jsonObject,
         )
@@ -82,6 +87,28 @@ class AuthorizationRequestResolverJvmTest {
         assertEquals(
             listOf("redirect_uri", "x509_san_dns", "x509_hash", "decentralized_identifier", "verifier_attestation"),
             metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    @Test
+    fun `signed-only wallet metadata advertises configured pre-registered clients but not redirect uri`() {
+        val metadata = Json.parseToJsonElement(
+            AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                vpFormatsSupported = jsonObjectOf(),
+                trustConfiguration = ClientIdTrustConfiguration(
+                    preRegisteredClients = mapOf("verifier2" to ClientMetadata()),
+                ),
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            )
+        ).jsonObject
+
+        assertEquals(
+            listOf("pre-registered", "decentralized_identifier"),
+            metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
+        assertEquals(
+            JwsAlgorithm.entries.filterNot { it == JwsAlgorithm.ED448 }.map { it.identifier },
+            metadata.getValue("request_object_signing_alg_values_supported").jsonArray.map { it.jsonPrimitive.content },
         )
     }
 
@@ -172,7 +199,7 @@ class AuthorizationRequestResolverJvmTest {
             }
         }
 
-        assertIs<ResolvedAuthorizationRequest.WithRequestObject>(resolved)
+        assertIs<ResolvedAuthorizationRequest.UnsignedRequestObject>(resolved)
         assertEquals("verifier2", resolved.authorizationRequest.clientId)
         assertEquals(requestObject, resolved.requestObject)
     }
@@ -238,7 +265,11 @@ class AuthorizationRequestResolverJvmTest {
             ),
         )
 
-        assertIs<ResolvedAuthorizationRequest.WithRequestObject>(resolved)
+        val authenticated = assertIs<ResolvedAuthorizationRequest.AuthenticatedRequestObject>(resolved)
+        assertEquals(requestObject, authenticated.requestObject)
+        assertEquals("EdDSA", authenticated.authentication.algorithm)
+        assertEquals(trustedKey.getKeyId(), authenticated.authentication.keyId)
+        assertIs<id.walt.openid4vp.clientidprefix.prefixes.PreRegistered>(authenticated.authentication.clientId)
     }
 
     @Test
@@ -295,7 +326,10 @@ class AuthorizationRequestResolverJvmTest {
             put("client_id", "verifier2")
             put("nonce", "nonce-123")
         }.toString().encodeToByteArray(),
-        mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+        mapOf(
+            "typ" to JsonPrimitive("oauth-authz-req+jwt"),
+            "kid" to JsonPrimitive(key.getKeyId()),
+        ),
     )
 
     private fun jsonObjectOf(vararg pairs: Pair<String, kotlinx.serialization.json.JsonElement>) =

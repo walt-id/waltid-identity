@@ -58,7 +58,14 @@ actor MockWalletClient: WalletClient {
             id: "mock-session",
             offer: .init(
                 grant: issuanceGrant,
-                issuer: .init(identifier: "https://issuer.example", name: "Example Issuer", locale: nil, logoURI: nil, logoAltText: nil),
+                issuer: .init(
+                    identifier: "https://issuer.example",
+                    name: "Example Issuer",
+                    locale: nil,
+                    logoURI: nil,
+                    logoAltText: nil,
+                    metadataProvenance: .unsigned
+                ),
                 credentials: [.init(configurationID: "ExampleCredential", format: "dc+sd-jwt", name: "Example", descriptionText: nil, logoURI: nil)],
                 transactionCode: transactionCodeRequired
                     ? .init(inputMode: "numeric", length: 6, descriptionText: "Enter the six-digit code")
@@ -163,6 +170,7 @@ actor MockWalletClient: WalletClient {
                     termsOfServiceURI: "https://verifier.example/terms"
                 )
             },
+            requestAuthentication: .unauthenticated,
             responseURI: URL(string: "https://verifier.example/response"),
             state: "state-123",
             nonce: "nonce-456",

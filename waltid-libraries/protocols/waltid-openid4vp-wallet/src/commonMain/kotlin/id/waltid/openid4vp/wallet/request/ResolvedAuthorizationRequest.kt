@@ -9,8 +9,15 @@ sealed class ResolvedAuthorizationRequest {
         override val authorizationRequest: AuthorizationRequest,
     ) : ResolvedAuthorizationRequest()
 
-    data class WithRequestObject(
+    data class UnsignedRequestObject(
         override val authorizationRequest: AuthorizationRequest,
         val requestObject: String,
+    ) : ResolvedAuthorizationRequest()
+
+    data class AuthenticatedRequestObject(
+        override val authorizationRequest: AuthorizationRequest,
+        val requestObject: String,
+        /** Authentication facts established by [AuthorizationRequestResolver]. */
+        val authentication: RequestObjectAuthentication,
     ) : ResolvedAuthorizationRequest()
 }
