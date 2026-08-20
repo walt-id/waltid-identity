@@ -61,11 +61,10 @@ class SdJwtBindingValidationTest {
     @Test
     fun `SD-JWT disclosure algorithm must be SHA-256`() = runTest {
         requireSupportedSdAlgorithm(jwt(JsonObject(mapOf("_sd_alg" to JsonPrimitive("sha-256"))), "JWT"))
+        // RFC 9901 §4.1.1: omitted _sd_alg defaults to sha-256
+        requireSupportedSdAlgorithm(jwt(JsonObject(emptyMap()), "JWT"))
         assertFailsWith<IllegalArgumentException> {
             requireSupportedSdAlgorithm(jwt(JsonObject(mapOf("_sd_alg" to JsonPrimitive("sha-512"))), "JWT"))
-        }
-        assertFailsWith<IllegalArgumentException> {
-            requireSupportedSdAlgorithm(jwt(JsonObject(emptyMap()), "JWT"))
         }
     }
 

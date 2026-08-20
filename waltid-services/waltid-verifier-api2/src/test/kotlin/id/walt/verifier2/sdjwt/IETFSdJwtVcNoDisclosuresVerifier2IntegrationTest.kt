@@ -417,9 +417,14 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
                 val resp = presentationResult.getOrThrow()
                 println("Response: $resp")
                 assertTrue("Pre-final SD-JWT fixture must be rejected") { resp.transmissionSuccess == false }
+                // The fixture is intentionally invalid. Historically it tripped the SD-JWT `sd_hash-check`
+                // policy (missing `_sd_alg` claim). Since `_sd_alg` now defaults to sha-256 per
+                // RFC 9901 §4.1.1, the presentation gets past that gate and is instead rejected by
+                // the credential `signature` policy on the stale x5c chain. Either rejection is
+                // acceptable for this fixture.
                 assertTrue {
-                    resp.verifierResponse!!.jsonObject["error_description"]!!.jsonPrimitive.content
-                        .contains("sd_hash-check")
+                    val description = resp.verifierResponse!!.jsonObject["error_description"]!!.jsonPrimitive.content
+                    description.contains("sd_hash-check") || description.contains("signature")
                 }
             }
 
@@ -437,10 +442,19 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             }
 
             test("Emit SD-JWT verification callback events through presentation validation") {
+                // This fixture now clears every presentation-level check - see the note above on
+                // `_sd_alg` defaulting to sha-256 - so the pipeline runs to completion and the
+                // rejection is carried in the credential policy results instead of terminating
+                // validation. The stage events are consequently the same ones a successful
+                // presentation emits, despite the session failing; the failure itself is asserted
+                // above through the session status and the `signature` policy in error_description.
                 webhook.assertReceivedInOrder(
                     sessionId,
-                    Verifier2WebhookRecorder.presentationValidationFailureEvents,
+                    Verifier2WebhookRecorder.successfulPresentationEvents,
                 )
+                // The point of the assertion above: rejection must no longer be reported as a
+                // presentation-validation failure, because this presentation is well-formed.
+                webhook.assertDoesNotContain(sessionId, SessionEvent.presentation_validation_failed)
                 webhook.assertDoesNotContain(sessionId, SessionEvent.wallet_error_response_received)
             }
         }
