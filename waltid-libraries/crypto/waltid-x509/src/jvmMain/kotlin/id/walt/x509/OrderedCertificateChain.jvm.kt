@@ -5,8 +5,6 @@ import java.util.Date
 import java.security.cert.X509Certificate
 import kotlin.time.Instant
 
-actual val platformSupportsPkixCertificatePathValidation: Boolean = true
-
 internal actual class PlatformX509Certificate private constructor(
     private val certificate: X509Certificate,
 ) {
