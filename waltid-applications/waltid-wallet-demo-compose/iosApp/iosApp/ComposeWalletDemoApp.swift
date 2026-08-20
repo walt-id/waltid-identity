@@ -12,6 +12,7 @@ struct ComposeWalletDemoApp: App {
     private let attestationBearerToken: String
     private let attestationHostHeader: String
     private let transactionDataProfilesUrl: String
+    private let biometricEnabled: Bool
 
     init() {
         let env = ProcessInfo.processInfo.environment
@@ -22,6 +23,7 @@ struct ComposeWalletDemoApp: App {
         attestationBearerToken = env["ATTESTATION_BEARER_TOKEN"] ?? defaults.string(forKey: "ATTESTATION_BEARER_TOKEN") ?? DemoBackendDefaults.attestationBearerToken
         attestationHostHeader = env["ATTESTATION_HOST_HEADER"] ?? defaults.string(forKey: "ATTESTATION_HOST_HEADER") ?? DemoBackendDefaults.attestationHostHeader
         transactionDataProfilesUrl = env["TRANSACTION_DATA_PROFILES_URL"] ?? defaults.string(forKey: "TRANSACTION_DATA_PROFILES_URL") ?? DemoBackendDefaults.transactionDataProfilesURL
+        biometricEnabled = walletBiometricEnabled(environment: env, defaults: defaults)
     }
 
     var body: some Scene {
@@ -39,7 +41,8 @@ struct ComposeWalletDemoApp: App {
                 // process may write that.
                 onDigitalCredentialRegistryChanged: {
                     Task { await Self.reconcileRegistrations() }
-                }
+                },
+                biometricEnabled: biometricEnabled
             )
             .ignoresSafeArea()
             .onOpenURL { url in
@@ -79,6 +82,16 @@ struct ComposeWalletDemoApp: App {
         guard #available(iOS 26.0, *) else { return }
         await IdentityDocumentRegistrationCoordinator(namespace: namespace)
             .reconcileFromPlatformCallback()
+    }
+}
+
+private func walletBiometricEnabled(environment: [String: String], defaults: UserDefaults) -> Bool {
+    let rawValue = environment["WALLET_BIOMETRIC_ENABLED"] ?? defaults.string(forKey: "WALLET_BIOMETRIC_ENABLED")
+    guard let rawValue else { return true }
+    switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "0", "false", "no", "off": return false
+    case "1", "true", "yes", "on": return true
+    default: return true
     }
 }
 

@@ -1,5 +1,12 @@
 package id.walt.crypto2.signum
 
+import android.os.Build
+import android.security.keystore.KeyProperties
+import android.security.keystore.UserNotAuthenticatedException
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import at.asitplus.signum.supreme.os.AndroidKeystoreSigner
 import at.asitplus.signum.supreme.os.AndroidKeyStoreProvider
 import at.asitplus.signum.supreme.os.PlatformSigningProviderSigner
 import id.walt.crypto2.algorithms.SignatureAlgorithm
@@ -8,7 +15,17 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ProviderId
 
-class AndroidSignumKeyBackend : SignumPlatformBackend {
+/**
+ * Android-only Signum backend backed by Android KeyStore.
+ *
+ * Per-use Android [SignumAuthenticationPolicy.UserPresence] operations resolve a current resumed
+ * [FragmentActivity] at operation time so AndroidX BiometricPrompt can perform interactive
+ * authorization. Timed operations only use an available activity if Keystore reports that
+ * reusable authorization has expired; an already authorized signing operation remains headless.
+ */
+public class AndroidSignumKeyBackend(
+    private val interactionContextProvider: () -> FragmentActivity? = { null },
+) : SignumPlatformBackend {
     override val id = ProviderId("android-keystore-signum")
 
     override fun supports(spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): Boolean =
@@ -27,6 +44,16 @@ class AndroidSignumKeyBackend : SignumPlatformBackend {
         val signer = AndroidKeyStoreProvider.createSigningKey(alias) {
             configureSignumKey(spec, usages, policy)
         }.getOrThrow()
+        try {
+            validateNativePolicy(signer, policy, alias)
+        } catch (cause: Throwable) {
+            try {
+                delete(alias)
+            } catch (cleanupFailure: Throwable) {
+                cause.addSuppressed(cleanupFailure)
+            }
+            throw cause
+        }
         return handle(alias, spec, usages, policy, signer)
     }
 
@@ -36,12 +63,19 @@ class AndroidSignumKeyBackend : SignumPlatformBackend {
         usages: Set<KeyUsage>,
         policy: SignumKeyPolicy,
     ): SignumPlatformKey? {
-        val signer = AndroidKeyStoreProvider.getSignerForKey(alias).getOrNull() ?: return null
+        val signer = AndroidKeyStoreProvider.getSignerForKey(alias).getOrElse { failure ->
+            throw failure.mapSignumFailure(alias)
+        }
+        validateNativePolicy(signer, policy, alias)
         return handle(alias, spec, usages, policy, signer)
     }
 
     override suspend fun delete(alias: String) {
-        AndroidKeyStoreProvider.deleteSigningKey(alias).getOrThrow()
+        AndroidKeyStoreProvider.deleteSigningKey(alias).getOrElse { failure ->
+            val mapped = failure.mapSignumFailure(alias)
+            if (mapped is SignumKeyNotFoundException) return
+            throw mapped
+        }
     }
 
     private fun handle(
@@ -55,17 +89,168 @@ class AndroidSignumKeyBackend : SignumPlatformBackend {
         return SignumPlatformKeyHandle(
             alias = alias,
             spec = spec,
-            protectionLevel = policy.effectiveProtection(attestation),
+            // REQUIRED has already been independently checked against KeyInfo above; only then may the
+            // backend report the observed hardware level. Other policies remain attestation-derived.
+            protectionLevel = if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
+                SignumProtectionLevel.HARDWARE
+            } else policy.effectiveProtection(attestation),
             attestation = attestation,
             authentication = policy.authentication,
             signerFor = { algorithm: SignatureAlgorithm ->
+                val interactionContext = when {
+                    policy.authentication.isBiometricCurrentSetEveryUse() -> requireInteractionContext(alias)
+                    policy.authentication.isBiometricTimedReuse() -> availableInteractionContext()
+                    else -> null
+                }
                 AndroidKeyStoreProvider.getSignerForKey(alias) {
                     configureSignumOperation(algorithm, policy.authentication)
-                }.getOrThrow()
+                    if (interactionContext != null) {
+                        unlockPrompt {
+                            if (policy.authentication.isBiometricCurrentSetEveryUse() ||
+                                policy.authentication.isBiometricTimedReuse()
+                            ) {
+                                allowedAuthenticators = BIOMETRIC_STRONG
+                            }
+                            activity = interactionContext
+                        }
+                    }
+                }.getOrElse { failure ->
+                    throw failure.mapSignumFailure(alias)
+                }
             },
-            defaultSigner = signer,
+            operationFailureMapper = { failure ->
+                if (policy.authentication.isBiometricTimedReuse()) {
+                    failure.mapTimedReuseInteractionContextFailure(alias, availableInteractionContext() != null)
+                } else {
+                    failure
+                }
+            },
+            nativePublicKey = signer.publicKey,
             keyAgreementEnabled = KeyUsage.KEY_AGREEMENT in usages && policy.keyAgreement,
         )
+    }
+
+    @Suppress("DEPRECATION") // Required as the pre-S fallback when KeyInfo.securityLevel is unavailable.
+    private fun validateNativePolicy(
+        signer: PlatformSigningProviderSigner<*, *>,
+        policy: SignumKeyPolicy,
+        alias: String,
+    ) {
+        if (policy.hardware != SignumHardwarePolicy.REQUIRED &&
+            !policy.authentication.isBiometricCurrentSetEveryUse() &&
+            !policy.authentication.isBiometricTimedReuse()
+        ) return
+        val androidSigner = signer as? AndroidKeystoreSigner
+            ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Android Keystore-backed")
+        val info = androidSigner.keyInfo
+        validateAndroidNativePolicy(
+            alias = alias,
+            policy = policy,
+            isInsideSecureHardware = info.isInsideSecureHardware,
+            securityLevel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) info.securityLevel else null,
+            isUserAuthenticationRequired = info.isUserAuthenticationRequired,
+            userAuthenticationValidityDurationSeconds = info.userAuthenticationValidityDurationSeconds,
+            isInvalidatedByBiometricEnrollment = info.isInvalidatedByBiometricEnrollment,
+            userAuthenticationType = info.userAuthenticationType,
+        )
+    }
+
+    private fun requireInteractionContext(alias: String): FragmentActivity {
+        return availableInteractionContext()
+            ?: throw SignumInteractionContextUnavailableException(
+                "A resumed FragmentActivity is required to use protected Signum key $alias",
+            )
+    }
+
+    private fun availableInteractionContext(): FragmentActivity? {
+        val activity = interactionContextProvider()
+        if (activity == null || activity.isFinishing || activity.isDestroyed || activity.isChangingConfigurations ||
+            !activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        ) {
+            return null
+        }
+        return activity
+    }
+}
+
+internal fun validateAndroidNativePolicy(
+    alias: String,
+    policy: SignumKeyPolicy,
+    isInsideSecureHardware: Boolean,
+    securityLevel: Int?,
+    isUserAuthenticationRequired: Boolean,
+    userAuthenticationValidityDurationSeconds: Int,
+    isInvalidatedByBiometricEnrollment: Boolean,
+    userAuthenticationType: Int,
+) {
+    if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
+        if (!isInsideSecureHardware) {
+            throw SignumKeyPolicyMismatchException(alias, "the native key is not backed by secure hardware")
+        }
+        if (securityLevel != null && securityLevel !in setOf(
+                KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
+                KeyProperties.SECURITY_LEVEL_STRONGBOX,
+                KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE,
+            )
+        ) {
+            throw SignumKeyPolicyMismatchException(alias, "the native key is not backed by a hardware security level")
+        }
+    }
+    if (policy.authentication.isBiometricCurrentSetEveryUse()) {
+        if (!isUserAuthenticationRequired ||
+            userAuthenticationValidityDurationSeconds !in setOf(-1, 0) ||
+            !isInvalidatedByBiometricEnrollment
+        ) {
+            throw SignumKeyPolicyMismatchException(
+                alias,
+                "the native key does not require biometric authentication for every use",
+            )
+        }
+        if (userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG) {
+            throw SignumKeyPolicyMismatchException(alias, "the native key does not require BIOMETRIC_STRONG")
+        }
+    }
+    if (policy.authentication.isBiometricTimedReuse()) {
+        val timeoutSeconds = (policy.authentication as SignumAuthenticationPolicy.UserPresence).timeoutSeconds
+        if (!isUserAuthenticationRequired ||
+            userAuthenticationValidityDurationSeconds != timeoutSeconds ||
+            isInvalidatedByBiometricEnrollment
+        ) {
+            throw SignumKeyPolicyMismatchException(
+                alias,
+                "the native key does not enforce the requested biometric authorization reuse interval",
+            )
+        }
+        if (userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG) {
+            throw SignumKeyPolicyMismatchException(alias, "the native key does not require BIOMETRIC_STRONG")
+        }
+    }
+}
+
+/**
+ * Converts an expired timed-reuse operation with no viable AndroidX prompt host into the stable
+ * wallet boundary failure before a provider-specific exception can escape.
+ */
+internal fun Throwable.mapTimedReuseInteractionContextFailure(alias: String, hasInteractionContext: Boolean): Throwable {
+    if (hasInteractionContext) return this
+    val causes = generateSequence(this) { it.cause }.toList()
+    return if (causes.any { it is UserNotAuthenticatedException || it is UnsupportedOperationException }) {
+        SignumInteractionContextUnavailableException(
+            "A resumed FragmentActivity is required to reauthorize timed Signum key $alias",
+            this,
+        )
+    } else {
+        this
+    }
+}
+
+private fun Throwable.mapSignumFailure(alias: String): Throwable {
+    val causes = generateSequence(this) { it.cause }.toList()
+    return when {
+        causes.any { it is android.security.keystore.KeyPermanentlyInvalidatedException } ->
+            SignumKeyInvalidatedException(alias, this)
+        causes.any { it is NoSuchElementException } -> SignumKeyNotFoundException(alias, this)
+        else -> this
     }
 }
 
