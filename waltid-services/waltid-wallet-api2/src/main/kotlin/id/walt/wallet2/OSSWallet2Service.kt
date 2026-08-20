@@ -93,6 +93,7 @@ object OSSWallet2Service {
             return if (registry != null) registry.resolveKeyStore(storeId)
             else namedKeyStores.computeIfAbsent(storeId) { keyStoreFactory(storeId) }
         }
+
         override suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) {
             if (persistentStoreRegistry != null) {
                 require(store is ExposedKeyStore && store.storeId == storeId) {
@@ -100,9 +101,11 @@ object OSSWallet2Service {
                 }
             } else namedKeyStores[storeId] = store
         }
+
         override suspend fun createKeyStore(storeId: String): WalletKeyStore =
             persistentStoreRegistry?.createKeyStore(storeId)
                 ?: keyStoreFactory(storeId).also { namedKeyStores[storeId] = it }
+
         override fun listKeyStoreIds() =
             persistentStoreRegistry?.listKeyStoreIds() ?: namedKeyStores.keys.asFlow()
 
@@ -111,6 +114,7 @@ object OSSWallet2Service {
             return if (registry != null) registry.resolveCredentialStore(storeId)
             else namedCredentialStores.computeIfAbsent(storeId) { credentialStoreFactory(storeId) }
         }
+
         override suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) {
             if (persistentStoreRegistry != null) {
                 require(store is ExposedCredentialStore && store.storeId == storeId) {
@@ -118,9 +122,11 @@ object OSSWallet2Service {
                 }
             } else namedCredentialStores[storeId] = store
         }
+
         override suspend fun createCredentialStore(storeId: String): WalletCredentialStore =
             persistentStoreRegistry?.createCredentialStore(storeId)
                 ?: credentialStoreFactory(storeId).also { namedCredentialStores[storeId] = it }
+
         override fun listCredentialStoreIds() =
             persistentStoreRegistry?.listCredentialStoreIds() ?: namedCredentialStores.keys.asFlow()
 
@@ -129,6 +135,7 @@ object OSSWallet2Service {
             return if (registry != null) registry.resolveDidStore(storeId)
             else namedDidStores.computeIfAbsent(storeId) { didStoreFactory(storeId) }
         }
+
         override suspend fun storeDidStore(storeId: String, store: WalletDidStore) {
             if (persistentStoreRegistry != null) {
                 require(store is ExposedDidStore && store.storeId == storeId) {
@@ -136,9 +143,11 @@ object OSSWallet2Service {
                 }
             } else namedDidStores[storeId] = store
         }
+
         override suspend fun createDidStore(storeId: String): WalletDidStore =
             persistentStoreRegistry?.createDidStore(storeId)
                 ?: didStoreFactory(storeId).also { namedDidStores[storeId] = it }
+
         override fun listDidStoreIds() =
             persistentStoreRegistry?.listDidStoreIds() ?: namedDidStores.keys.asFlow()
 

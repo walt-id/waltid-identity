@@ -9,6 +9,8 @@ import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
@@ -62,13 +64,22 @@ public class WalletSdkBridge private constructor(
     public suspend fun bootstrap(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
+        keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy? = null,
     ): WalletBridgeResult<MobileWalletBootstrapResult> =
         walletBridgeCall {
             operations.bootstrap(
                 keyType = keyType,
                 didMethod = didMethod,
+                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy?.toCorePolicy(),
             )
         }
+
+    /** Checks whether a key-use authorization request is supported without creating a key. */
+    public suspend fun keyUseAuthorizationPreflight(
+        keyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
+        policy: WalletBridgeKeyUseAuthorizationPolicy = WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
+    ): WalletBridgeResult<WalletBridgeKeyPreflight> =
+        walletBridgeCall { operations.keyUseAuthorizationPreflight(keyType, policy.toCorePolicy()).toBridgeModel() }
 
     /** Resolves an offer and starts its bound OpenID4VCI issuance session. */
     public suspend fun startIssuance(
@@ -230,7 +241,13 @@ internal interface WalletSdkBridgeOperations {
     suspend fun bootstrap(
         keyType: MobileWalletKeyType?,
         didMethod: String,
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
     ): MobileWalletBootstrapResult
+
+    suspend fun keyUseAuthorizationPreflight(
+        keyType: MobileWalletKeyType,
+        policy: KeyUseAuthorizationPolicy,
+    ): KeyUseAuthorizationSupport
 
     suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession
 
@@ -297,11 +314,18 @@ internal class MobileWalletSdkBridgeOperations(
     override suspend fun bootstrap(
         keyType: MobileWalletKeyType?,
         didMethod: String,
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
     ): MobileWalletBootstrapResult =
         wallet.bootstrap(
             keyType = keyType,
             didMethod = didMethod,
+            keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
         )
+
+    override suspend fun keyUseAuthorizationPreflight(
+        keyType: MobileWalletKeyType,
+        policy: KeyUseAuthorizationPolicy,
+    ): KeyUseAuthorizationSupport = wallet.keyUseAuthorizationPreflight(keyType, policy)
 
     override suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession =
         wallet.startIssuance(request)

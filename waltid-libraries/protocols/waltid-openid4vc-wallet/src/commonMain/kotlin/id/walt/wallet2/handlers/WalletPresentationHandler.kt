@@ -396,7 +396,9 @@ object WalletPresentationHandler {
     suspend fun presentCredential(
         wallet: Wallet,
         request: PresentCredentialRequest,
-        onEvent: suspend (WalletSessionEvent) -> Unit,
+        // Defaulted so a caller that only cares about transaction data need not opt into session
+        // notifications, matching every other overload here.
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult = presentCredentialWithTrust(
         wallet,
@@ -481,7 +483,9 @@ object WalletPresentationHandler {
     suspend fun presentCredentialIsolated(
         wallet: Wallet,
         request: PresentCredentialIsolatedRequest,
-        onEvent: suspend (WalletSessionEvent) -> Unit,
+        // Defaulted so a caller that only cares about transaction data need not opt into session
+        // notifications, matching every other overload here.
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult = presentCredentialIsolatedWithTrust(
         wallet,

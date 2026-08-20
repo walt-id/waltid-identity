@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.wallet
 
+import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.testplans.keys.ClientAttestationTestAuthority
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -33,14 +35,22 @@ class VciWalletSdJwtHaip(
     val redirectUri: String,
     val conformanceHost: String,
     val conformancePort: Int,
-    val adapterHost: String = "127.0.0.1"
+    val adapterHost: String = "127.0.0.1",
+    /**
+     * Attester whose certificate chain the suite validates the wallet's client attestation against.
+     *
+     * Passed in whole rather than as an issuer plus a PEM so the advertised trust anchor is
+     * necessarily the one that signed the attestation; two loose strings can drift apart, and the
+     * resulting failure surfaces as an opaque signature error.
+     */
+    val attestationAuthority: ClientAttestationTestAuthority,
 ) : VciWalletTestPlan {
 
     companion object {
-        private const val clientAttestationIssuer = "https://wallet.test.attester.example"
-
-        // Test attester key used to satisfy HAIP client-attestation configuration requirements.
-        private val clientAttesterJwks = Json.decodeFromString<JsonObject>(
+        // Key attestation is a separate HAIP feature from client attestation: it attests the
+        // *proof* key inside a credential request, and the suite verifies it against this JWKS
+        // (VerifyKeyAttestationSignatureUsingConfigJwks) rather than against a certificate chain.
+        private val keyAttestationJwks = Json.decodeFromString<JsonObject>(
             """
             {
               "keys": [
@@ -83,7 +93,11 @@ class VciWalletSdJwtHaip(
     override val variant = mapOf(
         "credential_format" to "sd_jwt_vc",
         "vci_authorization_code_flow_variant" to "issuer_initiated",
+        // The HAIP plan fixes authorization_request_type itself and rejects it being restated
+        // ("Variant 'authorization_request_type' has been set by user, but test plan already sets
+        // this variant"), so unlike the non-HAIP plans it must not appear here.
         "vci_credential_offer_variant" to "by_value"
+
     )
 
     override val configuration: JsonObject = buildJsonObject {
@@ -113,7 +127,7 @@ class VciWalletSdJwtHaip(
         }
 
         putJsonObject("client") {
-            put("client_id", "wallet-conformance-test")
+            put("client_id", ConformanceConfig.VCI_WALLET_CLIENT_ID)
             put("redirect_uri", redirectUri)
             putJsonObject("jwks") {
                 put("keys", Json.decodeFromString<JsonObject>(
@@ -162,10 +176,14 @@ class VciWalletSdJwtHaip(
         }
 
         putJsonObject("client_attestation") {
-            put("issuer", clientAttestationIssuer)
-            put("trust_anchor", trustAnchorPem)
-            put("attester_jwks", clientAttesterJwks)
-            put("key_attestation_jwks", clientAttesterJwks)
+            // issuer and trust_anchor are both mandatory for HAIP; AbstractVCIWalletTest refuses
+            // to configure the test without them.
+            put("issuer", attestationAuthority.issuer)
+            put("trust_anchor", attestationAuthority.trustAnchorPem)
+            // attester_jwks is deliberately absent: only the *issuer* test suite signs attestations
+            // from it. For wallet tests the suite verifies our attestation against the x5c chain, so
+            // publishing a JWKS here - previously including its private key - attested to nothing.
+            put("key_attestation_jwks", keyAttestationJwks)
             put("key_attestation_trust_anchor_pem", trustAnchorPem)
         }
 
@@ -174,7 +192,7 @@ class VciWalletSdJwtHaip(
             put("credential_configuration_id", "eu.europa.ec.eudi.pid.1")
         }
 
-        put("waitTimeoutSeconds", 120)
+        put("waitTimeoutSeconds", 30)
         put("publish", "no")
     }
 }

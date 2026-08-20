@@ -1,198 +1,203 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.testing.E2ETest
+import id.walt.did.dids.DidService
 import id.walt.openid4vp.conformance.adapter.VpWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
-import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.VpWalletMdlX509SanDnsRequestUriSignedDirectPost
-import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.VpWalletNegativeTests
-import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost
-import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletTestPlan
+import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
+import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.Oid4vpWalletVariantPlan
+import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletCredentialFixture
 import id.walt.openid4vp.conformance.testplans.runner.WalletTestPlanRunner
+import id.walt.openid4vp.conformance.wallet.WalletCredentialIssuer
+import id.walt.wallet2.OSSWallet2FeatureCatalog
+import id.walt.wallet2.ClientIdTrustConfig
+import id.walt.wallet2.OSSWallet2ServiceConfig
+import id.walt.wallet2.handlers.ImportCredentialRequest
+import id.walt.wallet2.server.handlers.CreateWalletRequest
+import id.walt.wallet2.server.handlers.ImportKeyRequest
+import id.walt.wallet2.server.handlers.WalletCreatedResponse
+import id.walt.wallet2.wallet2Module
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.time.Duration.Companion.minutes
 
 /**
- * VP Wallet Conformance Tests
- * 
- * Tests wallet-side OpenID4VP compliance against the OpenID Foundation conformance suite.
- * 
- * ## Prerequisites
- * 
- * 1. OpenID conformance suite running:
- *    ```bash
- *    cd ~/dev/openid/conformance-suite
- *    docker compose -f docker-compose-walt.yml up -d
- *    ```
- * 
- * 2. /etc/hosts entry: `127.0.0.1 localhost.emobix.co.uk`
- * 
- * 3. JVM truststore configured (handled by build.gradle.kts)
- * 
- * ## Running Tests
- * 
- * Run the isolated test (currently working):
- * ```bash
- * ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
- *     --tests "IsolatedWalletConformanceTest"
- * ```
- * 
- * ## Known Issues
- * 
- * - Test plan creation works (verified)
- * - `getTestModules()` returns 404 - API path needs fixing
- * - Full test suite in this class has timeout issues (see IsolatedWalletConformanceTest for working pattern)
- * 
- * @see IsolatedWalletConformanceTest for the working isolated test pattern
+ * OpenID4VP 1.0 wallet conformance tests.
+ *
+ * Wallet2 runs **in-process** through [E2ETest], exactly as Verifier2 does for the verifier tests -
+ * no separately launched service and no fixed external port to coordinate. [VpWalletConformanceAdapter]
+ * bridges the conformance suite's authorization endpoint to that in-process wallet.
+ *
+ * The wallet is provisioned with a credential issued by [WalletCredentialIssuer], so the run owns the
+ * whole trust chain and the suite's `dcql_query` is guaranteed to match something in the store.
  */
 class VpWalletConformanceTests {
 
     companion object {
-        val walletApiUrl: String = ConformanceConfig.WALLET_API_URL
-        val adapterPort: Int = ConformanceConfig.WALLET_ADAPTER_PORT
-        val adapterUrl: String = "http://host.docker.internal:$adapterPort/openid4vp/authorize"
+        private const val WALLET_HOST = "127.0.0.1"
+        private const val WALLET_PORT = 7015
+
         val conformanceHost: String = ConformanceConfig.CONFORMANCE_HOST
         val conformancePort: Int = ConformanceConfig.CONFORMANCE_PORT
 
         val conformanceServerVersionResult = runBlocking {
             runCatching {
                 ConformanceInterface(conformanceHost, conformancePort).getServerVersion()
-            }.onFailure {
-                println("INFO: Conformance suite not available")
-                println("To run these tests:")
-                println("  1. cd ~/dev/openid/conformance-suite")
-                println("  2. docker compose -f docker-compose-walt.yml up -d")
-                println("  3. Wait ~30s for startup")
-                println("  4. Verify: curl -k https://localhost.emobix.co.uk:8443/")
-            }
+            }.onFailure { println("Conformance suite not available at $conformanceHost:$conformancePort: $it") }
         }
 
         @JvmStatic
         val isConformanceAvailable = conformanceServerVersionResult.isSuccess
 
+        /**
+         * Optional comma-separated substrings selecting which matrix points to run, e.g.
+         * `-Dconformance.wallet.variants=x509sandns,x509hash`.
+         *
+         * The full matrix is 18 plans and a few hundred modules, which is far too slow a loop when
+         * investigating one variant. Unset - the default, and what CI uses - runs everything.
+         */
+        private val selectedVariants: List<String> =
+            System.getProperty("conformance.wallet.variants")
+                ?.split(",")
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                .orEmpty()
+
+        private fun isSelected(plan: Oid4vpWalletVariantPlan): Boolean =
+            selectedVariants.isEmpty() || selectedVariants.any { it in plan.name }
+
         fun createHttpClient(): HttpClient = HttpClient(Java) {
             install(ContentNegotiation) {
-                json(Json {
-                    ignoreUnknownKeys = true
-                    isLenient = true
-                    prettyPrint = true
-                })
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
             }
             install(HttpTimeout) {
-                requestTimeoutMillis = 60_000
-                connectTimeoutMillis = 30_000
+                requestTimeoutMillis = ConformanceConfig.HTTP_REQUEST_TIMEOUT_MS
+                connectTimeoutMillis = ConformanceConfig.HTTP_CONNECT_TIMEOUT_MS
             }
             expectSuccess = false
         }
     }
 
-    /**
-     * SD-JWT VC + x509_san_dns + request_uri_signed + direct_post.jwt
-     * 
-     * NOTE: This test currently has timeout issues when run from this class.
-     * Use IsolatedWalletConformanceTest.testWalletTestPlanRunner() instead.
-     */
     @Test
     @EnabledIf("isConformanceAvailable")
-    fun `VP Wallet - SD-JWT VC`() = runBlocking {
-        val httpClient = createHttpClient()
-        val adapter = VpWalletConformanceAdapter(
-            walletApiUrl = walletApiUrl,
-            adapterPort = adapterPort
-        )
-        
-        try {
-            adapter.start(httpClient)
-            val plan = VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort)
-            WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
-        } finally {
-            adapter.stop()
-            httpClient.close()
-        }
-    }
+    fun runWallet2ConformanceTests() {
+        E2ETest(WALLET_HOST, WALLET_PORT, failEarly = true).testBlock(
+            // 18 matrix points, and any module the suite cannot complete costs a 60 s poll budget
+            // before it is recorded. A full run measured ~43 min, so 30 min truncated it and reported
+            // an UncompletedCoroutinesError instead of the results that had already been collected.
+            timeout = 90.minutes,
 
-    /**
-     * mDL + x509_san_dns + request_uri_signed + direct_post.jwt
-     */
-    @Test
-    @EnabledIf("isConformanceAvailable")
-    fun `VP Wallet - mDL`() = runBlocking {
-        val httpClient = createHttpClient()
-        val adapter = VpWalletConformanceAdapter(
-            walletApiUrl = walletApiUrl,
-            adapterPort = adapterPort
-        )
-        
-        try {
-            adapter.start(httpClient)
-            val plan = VpWalletMdlX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort)
-            WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
-        } finally {
-            adapter.stop()
-            httpClient.close()
-        }
-    }
+            features = listOf(OSSWallet2FeatureCatalog),
+            preload = {
+                ConfigManager.preloadConfig(
+                    "wallet-service",
+                    OSSWallet2ServiceConfig(
+                        publicBaseUrl = Url("http://$WALLET_HOST:$WALLET_PORT"),
+                        // The suite signs its request objects with the certificate in `client.jwks`.
+                        // Authenticating an x509_san_dns / x509_hash client identifier means chaining
+                        // that certificate to a trust anchor, so the wallet has to be told about the CA
+                        // or every signed request is rejected as unverifiable.
+                        clientIdTrust = ClientIdTrustConfig(
+                            x509TrustAnchors = listOf(TestKeyMaterial.CREDENTIAL_ISSUER_CA_PEM),
+                        ),
+                    )
+                )
+            },
+            init = { DidService.minimalInit() },
+            module = { wallet2Module(withPlugins = false) },
+        ) {
+            val wallet = testHttpClient()
+            val walletId = provisionWallet(wallet)
 
-    /**
-     * Negative Tests - Security Validation
-     */
-    @Test
-    @EnabledIf("isConformanceAvailable")
-    fun `VP Wallet - Negative Tests`() = runBlocking {
-        val httpClient = createHttpClient()
-        val adapter = VpWalletConformanceAdapter(
-            walletApiUrl = walletApiUrl,
-            adapterPort = adapterPort
-        )
-        
-        try {
-            adapter.start(httpClient)
-            val plan = VpWalletNegativeTests(adapterUrl, conformanceHost, conformancePort)
-            WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
-        } finally {
-            adapter.stop()
-            httpClient.close()
-        }
-    }
+            // The adapter is a separate server the suite calls; it forwards to the in-process wallet.
+            val adapterHttp = createHttpClient()
+            val adapter = VpWalletConformanceAdapter(
+                walletApiUrl = "http://$WALLET_HOST:$WALLET_PORT",
+                adapterPort = ConformanceConfig.WALLET_ADAPTER_PORT,
+                walletId = walletId,
+            )
 
-    /**
-     * Run all VP Wallet test plans
-     */
-    @Test
-    @EnabledIf("isConformanceAvailable")
-    fun `Run all VP Wallet conformance tests`() = runBlocking {
-        val httpClient = createHttpClient()
-        val adapter = VpWalletConformanceAdapter(
-            walletApiUrl = walletApiUrl,
-            adapterPort = adapterPort
-        )
-        
-        val testPlans: List<WalletTestPlan> = listOf(
-            VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort),
-            VpWalletMdlX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort),
-            VpWalletNegativeTests(adapterUrl, conformanceHost, conformancePort)
-        )
-        
-        try {
-            adapter.start(httpClient)
-            
-            testPlans.forEach { plan ->
-                println()
-                println("=" .repeat(80))
-                println("Running: ${plan.description}")
-                println("=" .repeat(80))
-                
-                WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+            try {
+                adapter.start(adapterHttp)
+                Oid4vpWalletVariantPlan.supportedByWallet2(
+                    walletApiUrl = ConformanceConfig.WALLET_ADAPTER_URL,
+                    conformanceHost = conformanceHost,
+                    conformancePort = conformancePort,
+                ).filter(::isSelected).forEach { plan ->
+                    println("\n" + "=".repeat(80))
+                    println("Running wallet plan: ${plan.name}")
+                    println("=".repeat(80))
+                    WalletTestPlanRunner(plan, adapterHttp, conformanceHost, conformancePort).test()
+                }
+            } finally {
+                adapter.stop()
+                adapterHttp.close()
             }
-        } finally {
-            adapter.stop()
-            httpClient.close()
         }
+    }
+
+    /**
+     * Create a wallet, give it the holder key the credential is bound to, and import the credential.
+     *
+     * Returns the wallet id the adapter should present from.
+     */
+    private suspend fun E2ETest.provisionWallet(wallet: HttpClient): String {
+        val issuer = WalletCredentialIssuer()
+
+        val walletId = testAndReturn("Create wallet") {
+            wallet.post("/wallet") {
+                contentType(ContentType.Application.Json)
+                setBody(CreateWalletRequest())
+            }.also { assertEquals(HttpStatusCode.Created, it.status) }
+                .body<WalletCreatedResponse>().walletId
+        }
+
+        test("Import holder key") {
+            wallet.post("/wallet/$walletId/keys/import") {
+                contentType(ContentType.Application.Json)
+                setBody(ImportKeyRequest(key = issuer.holderSerializedKey()))
+            }.also { assertEquals(HttpStatusCode.Created, it.status) }
+        }
+
+        test("Import SD-JWT VC bound to the holder key") {
+            val credential = issuer.issueSdJwtVc()
+            println("Provisioned credential (vct=${WalletCredentialFixture.SD_JWT_VC_VCT}): ${credential.take(80)}...")
+            wallet.post("/wallet/$walletId/credentials/import") {
+                contentType(ContentType.Application.Json)
+                setBody(ImportCredentialRequest(rawCredential = credential, label = "conformance"))
+            }.also { assertEquals(HttpStatusCode.Created, it.status) }
+        }
+
+        test("Import mDL bound to the same holder key as device key") {
+            val mdl = issuer.issueMdl()
+            println("Provisioned mDL (docType=${WalletCredentialFixture.MDOC_DOCTYPE}): ${mdl.take(60)}...")
+            wallet.post("/wallet/$walletId/credentials/import") {
+                contentType(ContentType.Application.Json)
+                setBody(ImportCredentialRequest(rawCredential = mdl, label = "conformance-mdl"))
+            }.also { assertEquals(HttpStatusCode.Created, it.status) }
+        }
+
+        test("Wallet holds both provisioned credentials") {
+            val credentials = wallet.get("/wallet/$walletId/credentials").body<List<JsonObject>>()
+            assertNotNull(credentials)
+            assertEquals(2, credentials.size, "expected the SD-JWT VC and the mDL to be stored")
+        }
+
+        return walletId
     }
 }

@@ -105,6 +105,24 @@ Issuance uses DPoP consistently for authorization binding, token exchange, and
 protected credential requests whenever the authorization server advertises
 supported DPoP signing algorithms.
 
+## Protected keys
+
+New signing keys default to `.biometricCurrentSet`. Select `.none` explicitly
+when an unprotected key is required, such as simulator-only development. Protected
+keys are P-256, Secure Enclave-backed on a qualifying physical device, require
+biometric authorization for every signature, and do not allow device-passcode
+fallback. The host app must declare `NSFaceIDUsageDescription` in its Info.plist.
+Changing the configured default never changes an existing persisted key.
+
+Use `.biometricTimedReuse(timeoutSeconds:)` for a fixed, non-sliding 1–30 second
+reuse interval. It preserves strong-biometric-only signing and intentionally does
+not invalidate the key after new biometric enrollment. iOS preflight reports
+`.providerProcess` enforcement with `.providerConfigurationOnly` timeout validation:
+Signum receives the requested interval, but its pinned public API cannot
+independently expose the effective positive timeout after restoration. Timed
+reuse is recent provider authentication, not issuance, presentation, or other
+wallet-action consent, and is not guaranteed to be key-local.
+
 ## Local persistence
 
 `WalletConfiguration()` uses managed persistence by default. The SDK opens an encrypted SQLDelight database through SQLCipher and manages the per-wallet database key internally in iOS Keychain. Apps using the normal Swift facade do not pass database key material.

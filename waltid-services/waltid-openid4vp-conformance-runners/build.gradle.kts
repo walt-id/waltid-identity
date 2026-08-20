@@ -1,9 +1,9 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import io.ktor.plugin.features.*
-import org.gradle.api.tasks.JavaExec
-import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import java.security.KeyStore
+import java.security.cert.CertificateFactory
 
 object Versions {
     const val HOPLITE_VERSION = "2.9.0"
@@ -91,12 +91,24 @@ dependencies {
 
     implementation(project(":waltid-services:waltid-service-commons-test"))
     implementation(project(":waltid-services:waltid-verifier-api2"))
+    // Wallet2 is started in-process for the wallet conformance runs, like Verifier2 is
+    implementation(project(":waltid-services:waltid-wallet-api2"))
+    // Used directly to mint the credential provisioned into the wallet under test
+    api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+    // Used directly to issue the mdoc provisioned into the wallet under test
+    api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
 
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies2"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
+    // Used directly to derive x509_hash client identifiers, so declared rather than relied on transitively
+    api(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
+    // Used directly to mint the test attester's certificate chain for HAIP client attestation
+    api(project(":waltid-libraries:crypto:waltid-x509"))
+    // Used directly for client attestation JWT claim and type constants
+    api(project(":waltid-libraries:protocols:waltid-openid4vci"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier-openapi"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
 }
@@ -124,9 +136,78 @@ val skipLiveConformance = (
     (findProperty("skipLiveConformance") as String?) ?: System.getenv("SKIP_LIVE_CONFORMANCE")
 ).equals("true", ignoreCase = true)
 
+// The committed truststore matches the docker-compose flow, where
+// run-issuer-conformance-local.sh generates its own nginx certificate and imports it.
+// A devenv-based suite instead terminates TLS with an mkcert certificate, whose root CA lives at
+// <conformance-suite>/.devenv/state/mkcert/rootCA.pem. Point CONFORMANCE_EXTRA_CA_PEM at that file
+// (or any other PEM) to have it trusted in addition to the committed anchors.
+val conformanceExtraCaPem = providers.environmentVariable("CONFORMANCE_EXTRA_CA_PEM")
+    // A devenv-run suite keeps its mkcert root CA inside its own checkout, so look there when the
+    // variable is not set. Saves passing CONFORMANCE_EXTRA_CA_PEM on every single run.
+    .orElse(
+        providers.provider {
+            sequenceOf("conformance-suite", "../conformance-suite")
+                .map { rootDir.resolve("$it/.devenv/state/mkcert/rootCA.pem") }
+                .firstOrNull { it.isFile }
+                ?.absolutePath
+        }
+    )
+val derivedConformanceTruststore = layout.buildDirectory.file("conformance/conformance-truststore.jks")
+
+val prepareConformanceTruststore = tasks.register("prepareConformanceTruststore") {
+    group = "verification"
+    description = "Derive a test truststore that additionally trusts CONFORMANCE_EXTRA_CA_PEM."
+
+    // Captured as locals so the task actions stay configuration-cache compatible
+    // (referencing build-script members such as file(..) or logger would capture the script).
+    val basePath = conformanceTruststorePath
+    val extraCaPath = conformanceExtraCaPem
+    val password = conformanceTruststorePassword
+    val output = derivedConformanceTruststore
+
+    onlyIf { extraCaPath.isPresent }
+
+    inputs.files(basePath, extraCaPath).withPropertyName("trustSources")
+    inputs.property("truststorePassword", password)
+    outputs.file(output)
+
+    doLast {
+        val extraCa = File(extraCaPath.get())
+        require(extraCa.isFile) { "CONFORMANCE_EXTRA_CA_PEM does not point at a file: $extraCa" }
+
+        val secret = password.get().toCharArray()
+        val store = KeyStore.getInstance("JKS").apply {
+            File(basePath.get()).inputStream().use { load(it, secret) }
+        }
+        // A PEM may carry a whole chain, so import every certificate it contains.
+        extraCa.inputStream().buffered().use { pem ->
+            CertificateFactory.getInstance("X.509").generateCertificates(pem)
+        }.forEachIndexed { index, certificate ->
+            store.setCertificateEntry("conformance-extra-ca-$index", certificate)
+        }
+
+        val target = output.get().asFile
+        target.parentFile.mkdirs()
+        target.outputStream().use { store.store(it, secret) }
+        println("Conformance truststore (base + $extraCa) written to $target")
+    }
+}
+
 tasks.withType<Test>().configureEach {
-    systemProperty("javax.net.ssl.trustStore", conformanceTruststorePath.get())
+    dependsOn(prepareConformanceTruststore)
+    systemProperty(
+        "javax.net.ssl.trustStore",
+        conformanceExtraCaPem
+            .map { derivedConformanceTruststore.get().asFile.absolutePath }
+            .orElse(conformanceTruststorePath)
+            .get()
+    )
     systemProperty("javax.net.ssl.trustStorePassword", conformanceTruststorePassword.get())
+    // Gradle's test JVM is a separate process, so the selector has to be forwarded explicitly.
+    // See VpWalletConformanceTests.selectedVariants.
+    ((findProperty("conformance.wallet.variants") as String?)
+        ?: System.getProperty("conformance.wallet.variants"))
+        ?.let { systemProperty("conformance.wallet.variants", it) }
     if (skipLiveConformance) {
         filter {
             isFailOnNoMatchingTests = false

@@ -32,6 +32,8 @@ import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.mobile.WalletAttestationConfig
@@ -605,6 +607,7 @@ class WalletSdkBridgeTest {
         override suspend fun bootstrap(
             keyType: MobileWalletKeyType?,
             didMethod: String,
+            keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
         ): MobileWalletBootstrapResult {
             bootstrapKeyType = keyType
             bootstrapDidMethod = didMethod
@@ -613,6 +616,11 @@ class WalletSdkBridgeTest {
                 did = "did:jwk:issuer",
             )
         }
+
+        override suspend fun keyUseAuthorizationPreflight(
+            keyType: MobileWalletKeyType,
+            policy: KeyUseAuthorizationPolicy,
+        ): KeyUseAuthorizationSupport = error("Not used by this test fake")
 
         override suspend fun startIssuance(request: MobileWalletIssuanceRequest) =
             error("Not used by this test fake")

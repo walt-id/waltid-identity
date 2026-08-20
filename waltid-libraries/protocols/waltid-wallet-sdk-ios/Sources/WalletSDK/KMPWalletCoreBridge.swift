@@ -43,10 +43,15 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
     }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult {
+    func bootstrap(
+        keyType: WalletKeyType,
+        didMethod: String,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
+    ) async throws -> WalletBootstrapResult {
         let result = try await bridge.bootstrap(
             keyType: keyType.toKMPKeyType(),
-            didMethod: didMethod
+            didMethod: didMethod,
+            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy?.toKMPAuthorizationPolicy()
         )
         let value = try Self.successValue(
             result,
@@ -55,6 +60,43 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
 
         return .init(keyID: value.keyId, did: value.did)
+    }
+
+    func keyUseAuthorizationPreflight(
+        keyType: WalletKeyType,
+        policy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyUseAuthorizationPreflight {
+        let result = try await bridge.keyUseAuthorizationPreflight(
+            keyType: keyType.toKMPKeyType(),
+            policy: policy.toKMPAuthorizationPolicy()
+        )
+        let value = try Self.successValue(
+            result,
+            as: WalletBridgeKeyPreflight.self,
+            operation: "key authorization preflight"
+        )
+        switch (value.supported, value.effectivePolicy, value.reuseEnforcement, value.timeoutValidation, value.failure) {
+        case (true, let policy?, let reuseEnforcement?, let timeoutValidation?, nil):
+            guard policy.type == .biometricTimedReuse else {
+                throw WalletError.internalFailure("Invalid timed key authorization preflight result")
+            }
+            return .supported(
+                effectivePolicy: policy.toSwiftAuthorizationPolicy(),
+                reuseEnforcement: reuseEnforcement.toSwiftAuthorizationReuseEnforcement(),
+                timeoutValidation: timeoutValidation.toSwiftAuthorizationTimeoutValidation()
+            )
+        case (true, let policy?, nil, nil, nil):
+            guard policy.type != .biometricTimedReuse else {
+                throw WalletError.internalFailure("Timed key authorization preflight lacks timeout metadata")
+            }
+            return .supported(
+                effectivePolicy: policy.toSwiftAuthorizationPolicy(),
+                reuseEnforcement: nil,
+                timeoutValidation: nil
+            )
+        case (false, nil, nil, nil, let failure?): return .unsupported(failure.toSwiftAuthorizationUnsupportedReason())
+        default: throw WalletError.internalFailure("Invalid key authorization preflight result")
+        }
     }
 
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
@@ -463,7 +505,12 @@ private extension WalletConfiguration {
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
             clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration(),
             appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
-            keychainAccessGroup: crossProcessAccess?.keychainAccessGroup
+            keychainAccessGroup: crossProcessAccess?.keychainAccessGroup,
+            defaultKeyUseAuthorizationPolicy: defaultKeyUseAuthorizationPolicy.toKMPAuthorizationPolicy(),
+            keyUseAuthorizationPrompt: Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPrompt(
+                reason: keyUseAuthorizationPrompt.message,
+                cancelText: keyUseAuthorizationPrompt.cancelText
+            )
         )
     }
 }
@@ -673,6 +720,85 @@ private extension WalletKeyType {
             return .rsa3072
         case .rsa4096:
             return .rsa4096
+        }
+    }
+}
+
+private extension WalletKeyUseAuthorizationPolicy {
+    func toKMPAuthorizationPolicy() -> WalletBridgeKeyUseAuthorizationPolicy {
+        switch self {
+        case .none:
+            return WalletBridgeKeyUseAuthorizationPolicy(
+                type: .none,
+                timeoutSeconds: nil
+            )
+        case .biometricCurrentSet:
+            return WalletBridgeKeyUseAuthorizationPolicy(
+                type: .biometricCurrentSet,
+                timeoutSeconds: nil
+            )
+        case .biometricTimedReuse(let timeoutSeconds):
+            precondition((1...30).contains(timeoutSeconds), "Timed biometric reuse timeout must be between 1 and 30 seconds")
+            return WalletBridgeKeyUseAuthorizationPolicy(
+                type: .biometricTimedReuse,
+                timeoutSeconds: KotlinInt(int: Int32(timeoutSeconds))
+            )
+        }
+    }
+}
+
+private extension WalletBridgeKeyUseAuthorizationPolicy {
+    func toSwiftAuthorizationPolicy() -> WalletKeyUseAuthorizationPolicy {
+        switch type {
+        case .none: return .none
+        case .biometricCurrentSet: return .biometricCurrentSet
+        case .biometricTimedReuse:
+            guard let timeoutSeconds else {
+                preconditionFailure("Timed biometric reuse preflight omitted its timeout")
+            }
+            return .biometricTimedReuse(timeoutSeconds: Int(timeoutSeconds.intValue))
+        }
+    }
+}
+
+private extension WalletBridgeKeyUseAuthorizationReuseEnforcement {
+    func toSwiftAuthorizationReuseEnforcement() -> WalletKeyUseAuthorizationReuseEnforcement {
+        switch self {
+        case .platformKeyStore: return .platformKeyStore
+        case .providerProcess: return .providerProcess
+        }
+    }
+}
+
+private extension WalletBridgeKeyUseAuthorizationReuseTimeoutValidation {
+    func toSwiftAuthorizationTimeoutValidation() -> WalletKeyUseAuthorizationReuseTimeoutValidation {
+        switch self {
+        case .independentReadback: return .independentReadback
+        case .providerConfigurationOnly: return .providerConfigurationOnly
+        }
+    }
+}
+
+private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationUnsupportedReason {
+    func toSwiftAuthorizationUnsupportedReason() -> WalletKeyUseAuthorizationUnsupportedReason {
+        switch self {
+        case .unsupportedCombination: return .unsupportedCombination
+        case .biometricUnavailable: return .biometricUnavailable
+        case .biometricNotEnrolled: return .biometricNotEnrolled
+        }
+    }
+}
+
+private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationFailure {
+    func toSwiftAuthorizationFailure() -> WalletKeyUseAuthorizationFailure {
+        switch self {
+        case .unsupportedCombination: return .unsupportedCombination
+        case .biometricUnavailable: return .biometricUnavailable
+        case .biometricNotEnrolled: return .biometricNotEnrolled
+        case .interactionContextUnavailable: return .interactionContextUnavailable
+        case .authorizationNotCompleted: return .authorizationNotCompleted
+        case .protectedKeyUnavailable: return .protectedKeyUnavailable
+        case .invalidStoredKeyMetadata: return .invalidStoredKeyMetadata
         }
     }
 }
@@ -1073,6 +1199,11 @@ private extension WalletBridgeError {
             return .crypto(message)
         case .credentialNotFound:
             return .credentialNotFound(message)
+        case .authorization:
+            guard let authorizationFailure else {
+                return .internalFailure("Authorization error did not include a failure reason")
+            }
+            return .keyUseAuthorization(authorizationFailure.toSwiftAuthorizationFailure())
         case .cancelled:
             return .cancelled
         case .internalFailure:

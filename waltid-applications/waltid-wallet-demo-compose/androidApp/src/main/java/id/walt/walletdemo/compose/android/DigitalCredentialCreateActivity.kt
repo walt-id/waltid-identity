@@ -3,12 +3,12 @@ package id.walt.walletdemo.compose.android
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.credentials.ExperimentalDigitalCredentialApi
+import androidx.fragment.app.FragmentActivity
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.AndroidDigitalCredentialCreateProvider
 import id.walt.wallet2.mobile.MobileWallet
@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
  * returns the `openid://` callback to this Activity so the CREATE_CREDENTIAL result can finish.
  */
 @OptIn(ExperimentalDigitalCredentialApi::class)
-class DigitalCredentialCreateActivity : ComponentActivity() {
+class DigitalCredentialCreateActivity : FragmentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val resultIntent = Intent()
     private var wallet: MobileWallet? = null
@@ -87,6 +87,7 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                 val created = createAndroidDemoMobileWallet(
                     context = applicationContext,
                     config = demoWalletConfig(),
+                    interactionContextProvider = { this@DigitalCredentialCreateActivity },
                 )
                 val mobileWallet = created.wallet
                 wallet = mobileWallet

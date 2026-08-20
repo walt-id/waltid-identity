@@ -44,7 +44,7 @@ class IssuerMetadataResolver(
         val urlsToTry = if (credentialIssuerUrl.contains(CREDENTIAL_ISSUER_WELL_KNOWN_PATH)) {
             listOf(credentialIssuerUrl)
         } else {
-            listOf(buildMetadataUrl(credentialIssuerUrl, CREDENTIAL_ISSUER_WELL_KNOWN_PATH))
+            listOf(buildMetadataUrl(credentialIssuerUrl, CREDENTIAL_ISSUER_WELL_KNOWN_PATH, preserveTrailingSlash = true))
         }.distinct()
 
         log.debug { "Attempting to fetch metadata from ${urlsToTry.size} well-known endpoints" }
@@ -118,7 +118,16 @@ class IssuerMetadataResolver(
         val urlsToTry = if (authorizationServerUrl.contains(OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH)) {
             listOf(authorizationServerUrl)
         } else {
-            listOf(buildMetadataUrl(authorizationServerUrl, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH))
+            // RFC 8414 §3 defines oauth-authorization-server, but many authorization servers - in
+            // particular OpenID Providers reused as OpenID4VCI authorization servers - publish only
+            // the OpenID Connect Discovery document. Both are read as AuthorizationServerMetadata:
+            // its deserializer takes the fields it knows and keeps the rest as custom parameters, and
+            // a discovery document is a superset. Previously only the first was attempted, so those
+            // servers failed metadata resolution outright.
+            listOf(
+                buildMetadataUrl(authorizationServerUrl, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH),
+                buildMetadataUrl(authorizationServerUrl, OPENID_CONFIGURATION_WELL_KNOWN_PATH),
+            )
         }.distinct()
 
         val failures = mutableListOf<ResolveFailure>()
@@ -211,7 +220,16 @@ class IssuerMetadataResolver(
     }
 
     /**
-     * Resolves authorization server metadata :
+     * Resolves authorization server metadata for a credential issuer.
+     *
+     * Uses the first entry of the issuer's `authorization_servers`, falling back to the Credential
+     * Issuer Identifier itself when the issuer advertises none - OpenID4VCI 1.0 §11.2.3 makes
+     * `authorization_servers` optional and treats the issuer as its own authorization server when it
+     * is absent.
+     *
+     * The "fallback" in the name refers to that issuer fallback. Each candidate URL is additionally
+     * tried against both well-known endpoints; see [resolveAuthorizationServerMetadata].
+     *
      * @param credentialIssuerMetadata The credential issuer metadata
      * @return AuthorizationServerMetadata
      */
@@ -220,19 +238,35 @@ class IssuerMetadataResolver(
     ): AuthorizationServerMetadata {
         log.info { "Resolving authorization server metadata" }
 
-        val authorizationServers = credentialIssuerMetadata.authorizationServers
-        val authServerUrl = authorizationServers?.first() ?: credentialIssuerMetadata.credentialIssuer
+        // firstOrNull, not first: defence in depth only - the metadata model refuses to deserialize
+        // an empty authorization_servers array, so this cannot currently be reached.
+        val authServerUrl = credentialIssuerMetadata.authorizationServers?.firstOrNull()
+            ?: credentialIssuerMetadata.credentialIssuer
         log.info { "Attempting to use authorization server from issuer metadata: $authServerUrl" }
 
         return resolveAuthorizationServerMetadata(authServerUrl)
-
     }
 
     /**
+     * Builds a well-known metadata URL by inserting [wellKnownSuffix] between the host and the
+     * issuer identifier's path component.
+     *
+     * [preserveTrailingSlash] selects between the two incompatible rules the specifications give:
+     * - OpenID4VCI 1.0 §12.2.2 (`openid-credential-issuer`) appends the path verbatim, so an issuer
+     *   identifier ending in `/` yields a metadata URL ending in `/`.
+     * - RFC 8414 §3.1 (`oauth-authorization-server`) and OpenID Connect Discovery require the
+     *   terminating `/` to be removed first; a request that retains it is non-compliant.
      */
-    internal fun buildMetadataUrl(baseUrl: String, wellKnownSuffix: String): String {
+    internal fun buildMetadataUrl(
+        baseUrl: String,
+        wellKnownSuffix: String,
+        preserveTrailingSlash: Boolean = false,
+    ): String {
         val url = Url(baseUrl)
-        val pathSuffix = url.encodedPath.trimEnd('/').takeIf { it.isNotEmpty() && it != "/" } ?: ""
+        // The issuer's path component is inserted after the well-known segment. Whether its
+        // terminating "/" survives is spec-dependent - see [preserveTrailingSlash].
+        val rawPath = if (preserveTrailingSlash) url.encodedPath else url.encodedPath.trimEnd('/')
+        val pathSuffix = rawPath.takeIf { it.isNotEmpty() && it != "/" } ?: ""
         val hostAndPort = if (url.specifiedPort != DEFAULT_PORT && url.specifiedPort != url.protocol.defaultPort) {
             "${url.host}:${url.specifiedPort}"
         } else {
