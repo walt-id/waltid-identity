@@ -127,6 +127,14 @@ sealed interface WalletIssuanceMetadataProvenance {
 
 /** Offered credential information safe for an app review screen. */
 @Serializable
+data class WalletIssuanceClaimPreview(
+    val path: List<String>,
+    val mandatory: Boolean?,
+    val displayName: String?,
+)
+
+/** Offered credential information safe for an app review screen. */
+@Serializable
 data class WalletIssuanceCredentialPreview(
     val configurationId: String,
     val format: String,
@@ -134,6 +142,7 @@ data class WalletIssuanceCredentialPreview(
     val descriptionText: String?,
     val logoUri: String?,
     val logoAltText: String? = null,
+    val claims: List<WalletIssuanceClaimPreview> = emptyList(),
 )
 
 /** Typed offer preview retained by the issuance session. */
@@ -1041,6 +1050,13 @@ class WalletIssuanceSessionService(
                     descriptionText = display?.description,
                     logoUri = display?.logo?.uri,
                     logoAltText = display?.logo?.altText,
+                    claims = offered.configuration.credentialMetadata?.claims.orEmpty().map { claim ->
+                        WalletIssuanceClaimPreview(
+                            path = claim.path,
+                            mandatory = claim.mandatory,
+                            displayName = claim.display?.firstOrNull()?.name,
+                        )
+                    },
                 )
             },
             transactionCode = txCode?.let {

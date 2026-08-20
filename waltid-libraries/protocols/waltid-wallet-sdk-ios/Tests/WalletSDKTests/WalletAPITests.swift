@@ -146,6 +146,28 @@ final class WalletAPITests: XCTestCase {
 
     }
 
+    func testIssuanceClaimPreviewPreservesAdvertisedDisplayText() {
+        let credential = IssuanceCredentialPreview(
+            configurationID: "example-id",
+            format: "vc+sd-jwt",
+            name: "Example credential",
+            descriptionText: nil,
+            logoURI: nil,
+            claims: [
+                IssuanceClaimPreview(
+                    path: ["given_name"],
+                    mandatory: true,
+                    displayName: "  Preferred given name  "
+                ),
+            ]
+        )
+
+        acceptsSendable(credential)
+        XCTAssertEqual(credential.claims.single?.displayName, "  Preferred given name  ")
+        XCTAssertEqual(credential.claims.single?.path, ["given_name"])
+        XCTAssertEqual(credential.claims.single?.mandatory, true)
+    }
+
     func testTimedKeyUseAuthorizationPolicyAndPreflightArePublicValueTypes() {
         let policy = WalletKeyUseAuthorizationPolicy.biometricTimedReuse(timeoutSeconds: 10)
         let preflight = WalletKeyUseAuthorizationPreflight.supported(

@@ -433,7 +433,19 @@ private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
             name: name,
             descriptionText: descriptionText,
             logoURI: logoUri.flatMap(URL.init(string:)),
-            logoAltText: logoAltText
+            logoAltText: logoAltText,
+            claims: swiftArray(claims, of: Waltid_openid4vc_walletWalletIssuanceClaimPreview.self)
+                .map { $0.toSwiftIssuanceClaimPreview() }
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceClaimPreview {
+    func toSwiftIssuanceClaimPreview() -> IssuanceClaimPreview {
+        IssuanceClaimPreview(
+            path: swiftArray(path, of: String.self),
+            mandatory: mandatory?.boolValue,
+            displayName: displayName
         )
     }
 }

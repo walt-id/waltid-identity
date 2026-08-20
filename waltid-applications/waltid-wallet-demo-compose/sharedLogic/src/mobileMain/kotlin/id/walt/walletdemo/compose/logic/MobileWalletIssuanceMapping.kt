@@ -35,7 +35,13 @@ fun WalletIssuanceSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
                         logoAltText = credential.logoAltText,
                         description = credential.descriptionText,
                     ),
-                    claims = emptyList(),
+                    claims = credential.claims.map { claim ->
+                        WalletDemoCredentialClaimMetadata(
+                            path = claim.path,
+                            mandatory = claim.mandatory,
+                            displayName = claim.displayName,
+                        )
+                    },
                 )
             },
             transactionCode = offer.transactionCode?.toDemoRequirement(),

@@ -877,6 +877,25 @@ public struct SignedMetadataProvenance: Equatable, Sendable {
     }
 }
 
+/// Display-safe claim metadata advertised for an offered credential.
+public struct IssuanceClaimPreview: Equatable, Sendable {
+    /// Claim path exactly as advertised by the issuer.
+    public let path: [String]
+
+    /// Whether the issuer marks the claim as mandatory.
+    public let mandatory: Bool?
+
+    /// Human-facing claim name exactly as advertised by the issuer, when available.
+    public let displayName: String?
+
+    /// Creates an advertised claim preview.
+    public init(path: [String], mandatory: Bool?, displayName: String?) {
+        self.path = path
+        self.mandatory = mandatory
+        self.displayName = displayName
+    }
+}
+
 /// Display-safe credential configuration offered by an issuer.
 public struct IssuanceCredentialPreview: Equatable, Sendable {
     /// Issuer-defined credential configuration identifier.
@@ -897,6 +916,9 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     /// Accessibility text for the credential logo when advertised.
     public let logoAltText: String?
 
+    /// Claim metadata advertised for this credential configuration.
+    public let claims: [IssuanceClaimPreview]
+
     /// Creates a credential preview.
     ///
     /// - Parameters:
@@ -906,13 +928,15 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     ///   - descriptionText: Localized credential description.
     ///   - logoURI: Credential logo URL.
     ///   - logoAltText: Accessibility text for the credential logo.
+    ///   - claims: Claim metadata advertised by the issuer.
     public init(
         configurationID: String,
         format: String,
         name: String?,
         descriptionText: String?,
         logoURI: URL?,
-        logoAltText: String? = nil
+        logoAltText: String? = nil,
+        claims: [IssuanceClaimPreview] = []
     ) {
         self.configurationID = configurationID
         self.format = format
@@ -920,6 +944,7 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
         self.descriptionText = descriptionText
         self.logoURI = logoURI
         self.logoAltText = logoAltText
+        self.claims = claims
     }
 }
 
