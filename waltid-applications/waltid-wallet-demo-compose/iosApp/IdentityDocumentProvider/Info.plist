@@ -25,6 +25,8 @@
 		<key>EXExtensionPointIdentifier</key>
 		<string>com.apple.identity-document-services.document-provider-ui</string>
 	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to authorize wallet signing.</string>
 	<!--
 	  Read at runtime by IdentityDocumentNamespace: only the build can expand AppIdentifierPrefix into
 	  the Team ID, and a hand-written Team ID would silently produce a group this process is not

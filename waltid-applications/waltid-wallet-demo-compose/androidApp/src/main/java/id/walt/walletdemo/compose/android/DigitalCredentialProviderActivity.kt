@@ -3,13 +3,13 @@ package id.walt.walletdemo.compose.android
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.credentials.provider.ProviderGetCredentialRequest
+import androidx.fragment.app.FragmentActivity
 import id.walt.wallet2.mobile.AndroidDigitalCredentialProvider
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
  * Separate from [MainActivity]: Credential Manager owns this task's lifecycle and expects exactly one
  * result from it, which the wallet's own navigation must not be able to influence.
  */
-class DigitalCredentialProviderActivity : ComponentActivity() {
+class DigitalCredentialProviderActivity : FragmentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val resultIntent = Intent()
 
@@ -54,6 +54,7 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                 val wallet = createAndroidDemoMobileWallet(
                     context = applicationContext,
                     config = demoWalletConfig(),
+                    interactionContextProvider = { this@DigitalCredentialProviderActivity },
                 ).wallet
                 wallet.bootstrap()
                 if (input.request.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {

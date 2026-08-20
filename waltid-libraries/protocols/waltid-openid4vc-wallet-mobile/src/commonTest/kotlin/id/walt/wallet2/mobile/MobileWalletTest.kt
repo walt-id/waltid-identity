@@ -60,6 +60,7 @@ import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
@@ -604,7 +605,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
             credentialRegistry = registry,
         )
 
@@ -643,7 +644,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
             credentialRegistry = registry,
         )
 
@@ -676,7 +677,7 @@ class MobileWalletTest {
             credentialStore = RecordingCredentialStore(
                 StoredCredential(id = "pid-1", credential = credential, label = "PID"),
             ),
-            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
             credentialRegistry = registry,
         )
 
@@ -730,7 +731,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
             credentialRegistry = registry,
         )
 
@@ -773,7 +774,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
             credentialRegistry = registry,
         )
 
@@ -805,7 +806,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { error("Registry failure must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Registry failure must not generate keys") },
             credentialRegistry = registry,
         )
 
@@ -845,7 +846,7 @@ class MobileWalletTest {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },
             credentialStore = credentialStore,
-            generateAndPersistKey = { error("Issuance must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Issuance must not generate keys") },
             credentialRegistry = registry,
             issuanceHttpClient = mockIssuer(),
         )
@@ -883,7 +884,7 @@ class MobileWalletTest {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },
             credentialStore = InMemoryCredentialStore(),
-            generateAndPersistKey = { error("Issuance must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Issuance must not generate keys") },
             issuanceHttpClient = mockIssuer(),
         )
 
@@ -929,7 +930,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { error("Registry notification must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Registry notification must not generate keys") },
             credentialRegistry = registry,
             // How many projections had been published when the host was notified, which proves the
             // notification follows the publish rather than racing it.
@@ -966,7 +967,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { error("Registry notification must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Registry notification must not generate keys") },
             credentialRegistry = registry,
             onDigitalCredentialRegistryChanged = {
                 reconciliationRequests++
@@ -988,7 +989,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
-            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
             credentialRegistry = registry,
         )
 
@@ -1006,7 +1007,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
-            generateAndPersistKey = { error("Parsing must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Parsing must not generate keys") },
         )
         val raw = DeviceRequest(
             docType = "org.iso.18013.5.1.mDL",
@@ -1038,7 +1039,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
-            generateAndPersistKey = { error("Reading a request must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Reading a request must not generate keys") },
         )
         val deviceRequest = DeviceRequest(
             docType = "org.iso.18013.5.1.mDL",
@@ -1134,7 +1135,7 @@ class MobileWalletTest {
                     label = "mDL",
                 )
             ),
-            generateAndPersistKey = { error("Reader-authentication preview must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Reader-authentication preview must not generate keys") },
             readerTrustEvaluator = MobileWalletReaderTrustEvaluator { chain ->
                 assertEquals(1, chain.size)
                 assertContentEquals(readerCertificate, chain.single())
@@ -1235,7 +1236,7 @@ class MobileWalletTest {
                     label = "mDL",
                 )
             ),
-            generateAndPersistKey = { error("Reader-trust previews must not generate keys") },
+            generateAndPersistKey = { _, _ -> error("Reader-trust previews must not generate keys") },
         )
         val parsedRequest = wallet.parseAnnexCDeviceRequest(signedRequest.encodeToBase64Url())
 
@@ -1720,8 +1721,8 @@ class MobileWalletTest {
         }.buildString()
     }
 
-    private fun unusedKeyGenerator(): suspend (MobileWalletKeyType) -> ManagedKeyMaterial =
-        { error("This test must not bootstrap a new key") }
+    private fun unusedKeyGenerator(): suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> ManagedKeyMaterial =
+        { _, _ -> error("This test must not bootstrap a new key") }
 
     /** A pre-authorized offer carried inline, so resolving it needs no offer fetch of its own. */
     private fun preAuthorizedOfferUrl(): String = URLBuilder(CROSS_DEVICE_CREDENTIAL_OFFER_URL).apply {

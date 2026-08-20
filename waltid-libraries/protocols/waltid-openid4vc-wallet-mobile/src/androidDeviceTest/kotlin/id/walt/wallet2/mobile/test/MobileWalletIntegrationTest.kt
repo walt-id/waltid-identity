@@ -28,6 +28,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -95,7 +96,9 @@ class MobileWalletIntegrationTest {
 
     @Test
     fun bootstrapCreatesKeyAndDid() = runBlocking {
-        val client = MobileWalletFactory(context).create()
+        val client = MobileWalletFactory(context).create(
+            MobileWalletConfig(defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+        )
         val result = client.bootstrap()
         assertNotNull(result.keyId, "bootstrap should create a key")
         assertNotNull(result.did, "bootstrap should create a DID")
@@ -104,7 +107,9 @@ class MobileWalletIntegrationTest {
 
     @Test
     fun receiveEudiPidSdJwtFromEudi() = runBlocking {
-        val client = MobileWalletFactory(context).create()
+        val client = MobileWalletFactory(context).create(
+            MobileWalletConfig(defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+        )
         client.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
@@ -416,6 +421,7 @@ class MobileWalletIntegrationTest {
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
         onEvent = { event -> println("WALLET EVENT: $event") },
         transactionDataProfiles = transactionDataProfiles,
+        defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
     )
 
     private suspend fun MobileWallet.receiveCredential(

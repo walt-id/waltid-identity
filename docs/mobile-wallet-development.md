@@ -42,6 +42,12 @@ enableIosBuild=true
 
 `local.properties` is ignored by Git and overrides the tracked defaults in `gradle.properties`. Command-line `-P` flags still take highest precedence for CI and one-off overrides.
 
+Protected mobile keys require platform setup in addition to the Gradle flags.
+Android callers must provide a current resumed `FragmentActivity` for each
+biometric prompt. iOS callers must run on a physical Secure Enclave device and
+declare `NSFaceIDUsageDescription` in the host app's `Info.plist`; simulator
+preflight is expected to report `BiometricUnavailable`.
+
 Enable only the platform builds your machine can support. Android requires an Android SDK; native iOS requires macOS and Xcode. The Web/Wasm flag only enables the mock Compose preview module.
 
 ## iOS physical-device and Digital Credentials setup

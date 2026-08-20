@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.certificate.x509.X509CertificateUtil
@@ -20,10 +22,19 @@ import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutValidation
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -44,6 +55,8 @@ import kotlin.time.Instant
  * @property clientIdTrustConfiguration Trust anchors used to authenticate verifier Request Objects.
  * @property appGroupIdentifier Shared container used by the app and document-provider extension.
  * @property keychainAccessGroup Shared Keychain access group used for database and signing keys.
+ * @property defaultKeyUseAuthorizationPolicy Default authorization policy for newly created wallet keys.
+ * @property keyUseAuthorizationPrompt Prompt text used for protected signing operations.
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
@@ -56,7 +69,134 @@ public data class WalletBridgeConfiguration(
     public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
     public val appGroupIdentifier: String? = null,
     public val keychainAccessGroup: String? = null,
+    public val defaultKeyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
+        WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
+    public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 )
+
+/**
+ * Swift-bridge representation of the authorization policy selected for a newly created key.
+ *
+ * @property type Selected authorization-policy variant.
+ * @property timeoutSeconds Fixed timed-reuse interval in seconds, only for [WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse].
+ */
+@Serializable
+public data class WalletBridgeKeyUseAuthorizationPolicy(
+    public val type: WalletBridgeKeyUseAuthorizationPolicyType,
+    public val timeoutSeconds: Int? = null,
+) {
+    init {
+        when (type) {
+            WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse ->
+                require(timeoutSeconds != null && timeoutSeconds in 1..30) {
+                    "Timed biometric reuse timeout must be between 1 and 30 seconds"
+                }
+
+            WalletBridgeKeyUseAuthorizationPolicyType.None,
+            WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet ->
+                require(timeoutSeconds == null) { "Only timed biometric reuse accepts a timeout" }
+        }
+    }
+
+    /** Predefined bridge policies that do not require a timeout. */
+    public companion object {
+        /** Ordinary non-interactive private-key operations. */
+        public val None: WalletBridgeKeyUseAuthorizationPolicy =
+            WalletBridgeKeyUseAuthorizationPolicy(WalletBridgeKeyUseAuthorizationPolicyType.None)
+        /** Strong biometric authentication for every private-key operation. */
+        public val BiometricCurrentSet: WalletBridgeKeyUseAuthorizationPolicy =
+            WalletBridgeKeyUseAuthorizationPolicy(WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet)
+    }
+}
+
+/** Variants supported by [WalletBridgeKeyUseAuthorizationPolicy]. */
+@Serializable
+public enum class WalletBridgeKeyUseAuthorizationPolicyType {
+    None,
+    BiometricCurrentSet,
+    BiometricTimedReuse,
+}
+
+internal fun WalletBridgeKeyUseAuthorizationPolicy.toCorePolicy(): KeyUseAuthorizationPolicy = when (type) {
+    WalletBridgeKeyUseAuthorizationPolicyType.None -> KeyUseAuthorizationPolicy.None
+    WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet -> KeyUseAuthorizationPolicy.BiometricCurrentSet
+    WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse ->
+        KeyUseAuthorizationPolicy.BiometricTimedReuse(requireNotNull(timeoutSeconds))
+}
+
+internal fun KeyUseAuthorizationPolicy.toBridgePolicy(): WalletBridgeKeyUseAuthorizationPolicy = when (this) {
+    KeyUseAuthorizationPolicy.None -> WalletBridgeKeyUseAuthorizationPolicy.None
+    KeyUseAuthorizationPolicy.BiometricCurrentSet -> WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> WalletBridgeKeyUseAuthorizationPolicy(
+        type = WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse,
+        timeoutSeconds = timeoutSeconds,
+    )
+}
+
+/** Swift-friendly result of a key-use authorization preflight. */
+@ConsistentCopyVisibility
+@Serializable
+public data class WalletBridgeKeyPreflight internal constructor(
+    /** Whether the requested authorization policy is supported with the reported metadata. */
+    public val supported: Boolean,
+    /** The authorization policy that will be effective when [supported] is true. */
+    public val effectivePolicy: WalletBridgeKeyUseAuthorizationPolicy? = null,
+    /** The enforcement boundary for timed reuse, when a timed policy is supported. */
+    public val reuseEnforcement: WalletBridgeKeyUseAuthorizationReuseEnforcement? = null,
+    /** How a timed-reuse interval can be validated after key creation or restoration. */
+    public val timeoutValidation: WalletBridgeKeyUseAuthorizationReuseTimeoutValidation? = null,
+    /** Core preflight reason when the request is unsupported. */
+    public val failure: KeyUseAuthorizationUnsupportedReason? = null,
+) {
+    init {
+        require(supported == (failure == null) && supported == (effectivePolicy != null)) {
+            "Wallet bridge preflight must include an effective policy exactly when supported"
+        }
+        val timed = effectivePolicy?.type == WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse
+        require((reuseEnforcement != null) == timed && (timeoutValidation != null) == timed) {
+            "Timed bridge preflight must include enforcement and timeout validation only for timed policy"
+        }
+    }
+}
+
+internal fun KeyUseAuthorizationSupport.toBridgeModel(): WalletBridgeKeyPreflight = when (this) {
+    is KeyUseAuthorizationSupport.Supported -> WalletBridgeKeyPreflight(
+        supported = true,
+        effectivePolicy = effectivePolicy.toBridgePolicy(),
+        reuseEnforcement = reuseEnforcement?.toBridgeModel(),
+        timeoutValidation = timeoutValidation?.toBridgeModel(),
+    )
+    is KeyUseAuthorizationSupport.Unsupported -> WalletBridgeKeyPreflight(supported = false, failure = reason)
+}
+
+/** Enforcement boundary reported for a supported timed-reuse key. */
+@Serializable
+public enum class WalletBridgeKeyUseAuthorizationReuseEnforcement {
+    PlatformKeyStore,
+    ProviderProcess,
+}
+
+/** Timeout-validation capability reported for a supported timed-reuse key. */
+@Serializable
+public enum class WalletBridgeKeyUseAuthorizationReuseTimeoutValidation {
+    IndependentReadback,
+    ProviderConfigurationOnly,
+}
+
+internal fun KeyUseAuthorizationReuseEnforcement.toBridgeModel(): WalletBridgeKeyUseAuthorizationReuseEnforcement = when (this) {
+    KeyUseAuthorizationReuseEnforcement.PlatformKeyStore ->
+        WalletBridgeKeyUseAuthorizationReuseEnforcement.PlatformKeyStore
+    KeyUseAuthorizationReuseEnforcement.ProviderProcess ->
+        WalletBridgeKeyUseAuthorizationReuseEnforcement.ProviderProcess
+}
+
+internal fun KeyUseAuthorizationReuseTimeoutValidation.toBridgeModel():
+    WalletBridgeKeyUseAuthorizationReuseTimeoutValidation = when (this) {
+    KeyUseAuthorizationReuseTimeoutValidation.IndependentReadback ->
+        WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.IndependentReadback
+    KeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly ->
+        WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly
+}
 
 /**
  * Verifier Request Object trust configuration exposed to the Swift wallet bridge.
@@ -83,6 +223,8 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
         preferredLocales = preferredLocales,
         transactionDataProfiles = transactionDataProfiles,
+        defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy.toCorePolicy(),
+        keyUseAuthorizationPrompt = keyUseAuthorizationPrompt,
         crossProcessAccess = appGroupIdentifier?.let { appGroup ->
             MobileWalletCrossProcessAccess(
                 appGroupIdentifier = appGroup,
@@ -363,6 +505,9 @@ public enum class WalletBridgeErrorCategory {
     /** The operation was cancelled. */
     cancelled,
 
+    /** Key-use authorization was unavailable or was not completed. */
+    authorization,
+
     /** Unexpected wallet failure that does not fit a narrower category. */
     internalFailure,
 }
@@ -373,20 +518,29 @@ public enum class WalletBridgeErrorCategory {
  * @property category Coarse failure category.
  * @property message Human-readable failure message.
  * @property causeClass Kotlin exception class name when available.
+ * @property authorizationFailure Stable key-use authorization failure when authorization is the category.
  */
 @Serializable
-public data class WalletBridgeError(
-    val category: WalletBridgeErrorCategory,
-    val message: String,
-    val causeClass: String? = null,
+public class WalletBridgeError internal constructor(
+    public val category: WalletBridgeErrorCategory,
+    public val message: String,
+    public val causeClass: String? = null,
+    public val authorizationFailure: KeyUseAuthorizationFailure? = null,
 ) {
+    init {
+        require((category == WalletBridgeErrorCategory.authorization) == (authorizationFailure != null)) {
+            "Authorization bridge errors must include exactly one authorization failure"
+        }
+    }
     internal companion object {
         fun fromThrowable(throwable: Throwable): WalletBridgeError {
-            val category = when (throwable) {
-                is CancellationException -> WalletBridgeErrorCategory.cancelled
-                is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
-                is PreviewSessionException -> WalletBridgeErrorCategory.invalidInput
-                is WalletPersistenceException -> WalletBridgeErrorCategory.storage
+            val authorizationFailure = (throwable as? KeyUseAuthorizationException)?.failure
+            val category = when {
+                authorizationFailure != null -> WalletBridgeErrorCategory.authorization
+                throwable is CancellationException -> WalletBridgeErrorCategory.cancelled
+                throwable is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
+                throwable is PreviewSessionException -> WalletBridgeErrorCategory.invalidInput
+                throwable is WalletPersistenceException -> WalletBridgeErrorCategory.storage
                 else -> WalletBridgeErrorCategory.internalFailure
             }
 
@@ -394,6 +548,7 @@ public data class WalletBridgeError(
                 category = category,
                 message = throwable.message ?: throwable::class.simpleName ?: "Unknown wallet error",
                 causeClass = throwable::class.simpleName,
+                authorizationFailure = authorizationFailure,
             )
         }
     }
