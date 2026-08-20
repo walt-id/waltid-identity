@@ -285,7 +285,7 @@ private struct ReviewValueList: View {
                     let supportingText = value.supportingText?.presentableValue
                     let link = safeHTTPSURL(value.linkURI)
                     let stacked = dynamicTypeSize.isAccessibilitySize || supportingText != nil ||
-                        value.label.count > 28 || rendered.count > 38 ||
+                        value.label.count > 28 || rendered.count > 30 ||
                         value.label.contains("\n") || rendered.contains("\n") || link != nil
                     if stacked {
                         VStack(alignment: .leading, spacing: 2) {
@@ -316,9 +316,15 @@ private struct ReviewValueList: View {
     @ViewBuilder
     private func renderedValue(_ value: String, link: URL?) -> some View {
         if let link {
-            Link(value, destination: link).font(.caption)
+            Link(destination: link) {
+                Text(value)
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         } else {
-            Text(value).font(.caption)
+            Text(value)
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
