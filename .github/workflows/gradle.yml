@@ -162,17 +162,47 @@ jobs:
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
+          append_role_summary() {
+            local role_dir="$1"
+            local title="$2"
+            local summary=""
+            local candidate
+            while IFS= read -r candidate; do
+              summary="$candidate"
+              break
+            done < <(find . -path "*/build/reports/openid-conformance/${role_dir}/summary.md" 2>/dev/null)
+
+            echo >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "$summary" ] && [ -f "$summary" ]; then
+              cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+              found=$((found + 1))
+            else
+              {
+                echo "# ${title} Conformance Summary"
+                echo
+                if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
+                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`enabled\`"
+                else
+                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`disabled\`"
+                fi
+                echo "- Total: 0"
+                echo "- Passed: 0"
+                echo "- Failed: 0"
+                echo
+                echo "| Test | Status | Suite | Log | Error |"
+                echo "|------|--------|-------|-----|-------|"
+                echo
+                echo "_No ${title} conformance results were produced (suite skipped, unavailable, or failed before writing a report)._"
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo >> "$GITHUB_STEP_SUMMARY"
+          }
+
           found=0
-          while IFS= read -r -d '' summary; do
-            found=$((found + 1))
-            {
-              echo
-              cat "$summary"
-              echo
-            } >> "$GITHUB_STEP_SUMMARY"
-          done < <(find . \
-            -path '*/build/reports/openid-conformance/*/summary.md' \
-            -print0 2>/dev/null)
+          append_role_summary vp-verifier "OpenID4VP Verifier"
+          append_role_summary vp-wallet "OpenID4VP Wallet"
+          append_role_summary vci-wallet "OpenID4VCI Wallet"
+          append_role_summary vci-issuer "OpenID4VCI Issuer"
 
           while IFS= read -r -d '' summary; do
             found=$((found + 1))
@@ -185,11 +215,7 @@ jobs:
             -path '*/build/reports/openid4vci-issuer-matrix/summary.md' \
             -print0 2>/dev/null)
 
-          if [ "$found" -eq 0 ]; then
-            echo "_No OpenID conformance suite summaries were produced (suites skipped or unavailable)._" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Appended $found OpenID conformance summary file(s) to the job summary."
-          fi
+          echo "Published OpenID conformance summaries for verifier, OpenID4VP wallet, OpenID4VCI wallet, and issuer (${found} file(s) found)."
 
       - name: Set version
         if: ${{ inputs.version != '' && runner.os == 'linux' }}

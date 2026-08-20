@@ -48,6 +48,90 @@ class ConformanceReportWriterTest {
         assertTrue(summary.contains("audience mismatch"))
         assertTrue(summary.contains("Soft-fail"))
         assertTrue(summary.contains("[log](https://conformance.example:443/log-detail.html?log=def-456)"))
+        assertTrue(summary.contains("# OpenID4VP Verifier Conformance Summary"))
+    }
+
+    @Test
+    fun writesTheSameSummaryShapeForWalletRoles() {
+        val reportRoot = Files.createTempDirectory("openid-conformance-wallet-report").toString()
+        val results = listOf(
+            TestPlanResult(
+                testName = "wallet-module",
+                conformanceTestId = "wal-123",
+                conformanceStatus = "FINISHED",
+                conformanceResult = "PASSED",
+                walletStatus = "PASSED",
+            ),
+        )
+
+        listOf(ConformanceReportWriter.Role.VP_WALLET, ConformanceReportWriter.Role.VCI_WALLET)
+            .forEach { role ->
+                ConformanceReportWriter.writeTestPlanResults(
+                    role = role,
+                    results = results,
+                    conformanceHost = "conformance.example",
+                    conformancePort = 443,
+                    reportRoot = reportRoot,
+                    allowFailure = true,
+                    producer = role.directoryName,
+                )
+                val summary = Files.readString(
+                    ConformanceReportWriter.reportDir(role, reportRoot).resolve("summary.md")
+                )
+                assertTrue(summary.contains("# ${role.title} Conformance Summary"))
+                assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
+                assertTrue(summary.contains("wallet-module"))
+                assertTrue(summary.contains("Soft-fail"))
+            }
+    }
+
+    @Test
+    fun writeSkippedIfEmptyDoesNotOverwriteAnExistingReport() {
+        val reportRoot = Files.createTempDirectory("openid-conformance-skipped").toString()
+        ConformanceReportWriter.writeTestPlanResults(
+            role = ConformanceReportWriter.Role.VP_WALLET,
+            results = listOf(
+                TestPlanResult(
+                    testName = "real-module",
+                    conformanceTestId = "abc",
+                    conformanceResult = "PASSED",
+                    walletStatus = "PASSED",
+                )
+            ),
+            reportRoot = reportRoot,
+            allowFailure = true,
+            producer = "vp-wallet",
+        )
+        ConformanceReportWriter.writeSkippedIfEmpty(
+            role = ConformanceReportWriter.Role.VP_WALLET,
+            reason = "suite down",
+            reportRoot = reportRoot,
+        )
+        val summary = Files.readString(
+            ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VP_WALLET, reportRoot)
+                .resolve("summary.md")
+        )
+        assertTrue(summary.contains("real-module"))
+        assertFalse(summary.contains("suite down"))
+    }
+
+    @Test
+    fun writeSkippedIfEmptyPublishesPlaceholderWhenMissing() {
+        val reportRoot = Files.createTempDirectory("openid-conformance-placeholder").toString()
+        ConformanceReportWriter.writeSkippedIfEmpty(
+            role = ConformanceReportWriter.Role.VCI_WALLET,
+            reason = "Conformance suite not available at localhost.emobix.co.uk:8443",
+            reportRoot = reportRoot,
+            allowFailure = true,
+        )
+        val summary = Files.readString(
+            ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VCI_WALLET, reportRoot)
+                .resolve("summary.md")
+        )
+        assertTrue(summary.contains("# OpenID4VCI Wallet Conformance Summary"))
+        assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
+        assertTrue(summary.contains("conformance-suite"))
+        assertTrue(summary.contains("not available"))
     }
 
     @Test

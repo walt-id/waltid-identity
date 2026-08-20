@@ -73,8 +73,18 @@ role-specific guide for a runnable environment and its intended command.
 ## CI summaries and soft-fail
 
 The reusable OSS Gradle workflow
-(`.github/workflows/gradle.yml`) appends per-role Markdown summaries to the
-GitHub Actions job summary after `allTests`.
+(`.github/workflows/gradle.yml`) always publishes these role sections to the
+GitHub Actions job summary, using the same heading and table shape as the
+OpenID4VP verifier report:
+
+1. OpenID4VP Verifier
+2. OpenID4VP Wallet
+3. OpenID4VCI Wallet
+4. OpenID4VCI Issuer
+
+When a role produced `summary.md`, that file is appended. When it did not, the
+workflow still writes the same heading, totals, and table, with a note that no
+results were produced.
 
 Artifacts (when a role actually runs):
 

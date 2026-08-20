@@ -52,28 +52,41 @@ class VciWalletTestPlanRunner(
     suspend fun test(): List<TestPlanResult> {
         printHeader()
 
-        // Create test plan
-        val createResponse = createTestPlan()
-        val testPlanId = createResponse.id
-        println("Test plan created: $testPlanId")
-
-        // Get modules
-        val modules = createResponse.modules
-        println("Test modules: ${modules.size}")
-        modules.forEach { println("   - ${it.testModule}") }
-        println()
-
         val results = mutableListOf<TestPlanResult>()
+        var failure: Throwable? = null
+        try {
+            // Create test plan
+            val createResponse = createTestPlan()
+            val testPlanId = createResponse.id
+            println("Test plan created: $testPlanId")
 
-        modules.forEachIndexed { index, module ->
-            println("[${index + 1}/${modules.size}] Running: ${module.testModule}")
-            val result = runModule(testPlanId, module)
-            results.add(result)
-            println("   Status: ${result.conformanceResult}")
-            if (result.errorMessage != null) {
-                println("   Error: ${result.errorMessage}")
-            }
+            // Get modules
+            val modules = createResponse.modules
+            println("Test modules: ${modules.size}")
+            modules.forEach { println("   - ${it.testModule}") }
             println()
+
+            modules.forEachIndexed { index, module ->
+                println("[${index + 1}/${modules.size}] Running: ${module.testModule}")
+                val result = runModule(testPlanId, module)
+                results.add(result)
+                println("   Status: ${result.conformanceResult}")
+                if (result.errorMessage != null) {
+                    println("   Error: ${result.errorMessage}")
+                }
+                println()
+            }
+        } catch (e: Throwable) {
+            failure = e
+            if (results.isEmpty()) {
+                results += TestPlanResult(
+                    testName = testPlan.producerId,
+                    conformanceTestId = "N/A",
+                    conformanceResult = "ERROR",
+                    walletStatus = "ERROR",
+                    errorMessage = e.message ?: e.toString(),
+                )
+            }
         }
 
         val namedResults = results.mapIndexed { index, result ->
@@ -89,6 +102,7 @@ class VciWalletTestPlanRunner(
             conformancePort = conformancePort,
             producer = testPlan.producerId,
         )
+        failure?.let { throw it }
         printSummary(namedResults)
         ConformanceReportWriter.failIfNeededFromTestPlanResults(
             role = ConformanceReportWriter.Role.VCI_WALLET,
@@ -121,12 +135,32 @@ class VciWalletTestPlanRunner(
         testPlanId: String,
         module: id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse.Module
     ): TestPlanResult {
+        var testId: String? = null
+        try {
+            return runModuleAttempt(testPlanId, module) { testId = it }
+        } catch (e: Exception) {
+            return TestPlanResult(
+                testName = "${testPlan.producerId}/${module.testModule}",
+                conformanceTestId = testId ?: module.testModule,
+                conformanceResult = "ERROR",
+                walletStatus = "ERROR",
+                errorMessage = e.message ?: e.toString(),
+            )
+        }
+    }
+
+    private suspend fun runModuleAttempt(
+        testPlanId: String,
+        module: id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse.Module,
+        rememberTestId: (String) -> Unit,
+    ): TestPlanResult {
         // Start test with variant
         val variantJson = module.variant.takeIf { it.isNotEmpty() } ?: JsonObject(emptyMap())
 
         val createTestUrl = conformance.buildCreateTestUrl(testPlanId, module.testModule, variantJson)
         val createTestResponse = conformance.createTest(createTestUrl)
         val testId = createTestResponse.id
+        rememberTestId(testId)
 
         println("   Test ID: $testId")
         println("   View: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")

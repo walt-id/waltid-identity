@@ -81,6 +81,36 @@ object ConformanceReportWriter {
         println("Wrote ${role.title} conformance report to $dir (${merged.size} entries)")
     }
 
+    /**
+     * Writes a skipped-suite placeholder when this role has no `summary.md` yet.
+     *
+     * Used by conformance test classes after a skipped run so GitHub Actions can still
+     * publish the same per-role heading and table shape as a completed verifier report.
+     */
+    fun writeSkippedIfEmpty(
+        role: Role,
+        reason: String,
+        reportRoot: String = DEFAULT_REPORT_ROOT,
+        allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
+    ) {
+        if (Files.exists(reportDir(role, reportRoot).resolve("summary.md"))) return
+        write(
+            role = role,
+            entries = listOf(
+                Entry(
+                    name = "conformance-suite",
+                    status = "skipped",
+                    error = reason,
+                    accepted = true,
+                )
+            ),
+            reportRoot = reportRoot,
+            allowFailure = allowFailure,
+            mergeExisting = false,
+            producer = "suite-availability",
+        )
+    }
+
     fun writeTestPlanResults(
         role: Role,
         results: List<TestPlanResult>,
