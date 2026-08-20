@@ -246,7 +246,7 @@ final class MockCredentialDisplayUITests: XCTestCase {
         XCTAssertTrue(credentialCard.waitForExistence(timeout: 10), "Mock credential card was not shown")
         credentialCard.tap()
 
-        XCTAssertTrue(app.descendants(matching: .any)["wallet.credentialOverview.cred-1"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.reviewIsland.credential"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["wallet.claimGroup.Personal_details"].waitForExistence(timeout: 10))
         ui.assertExists(identifier: ui.claimImageIdentifier(path: "portrait.elementValue"), timeout: 10)
         XCTAssertTrue(app.staticTexts["wallet.claimGroup.About_this_credential"].waitForExistence(timeout: 10))

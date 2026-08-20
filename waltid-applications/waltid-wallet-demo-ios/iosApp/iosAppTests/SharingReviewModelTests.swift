@@ -139,6 +139,25 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
+    func testNamedVerifierStartsCompactWhileVerifiedOriginDetailsStayVisible() throws {
+        let named = SharingReviewModel(
+            request: SharingRequest(verifier: SharingVerifier(fallbackName: "Example Verifier")),
+            credentialOptions: []
+        )
+        let verified = SharingReviewModel(
+            request: SharingRequest(
+                verifier: SharingVerifier(
+                    fallbackName: "Example Verifier",
+                    verifiedOrigin: "https://verifier.example"
+                )
+            ),
+            credentialOptions: []
+        )
+
+        XCTAssertFalse(try XCTUnwrap(named.reviewIslands().first).initiallyExpanded)
+        XCTAssertTrue(try XCTUnwrap(verified.reviewIslands().first).initiallyExpanded)
+    }
+
     // MARK: - Reader trust
 
     func testAProtocolWithoutReaderAuthenticationGetsNoReaderTrustState() {
@@ -328,9 +347,8 @@ final class SharingReviewModelTests: XCTestCase {
 
         let island = try XCTUnwrap(review.reviewIslands().first { $0.kind == .credential })
         XCTAssertEqual(island.title, "mso_mdoc")
-        XCTAssertTrue(
-            island.expandedValues.contains { $0.label == "mso_mdoc" && $0.value == "Example Issuer" }
-        )
+        XCTAssertEqual(island.subtitle, "Example Issuer")
+        XCTAssertTrue(island.expandedValues.isEmpty)
         XCTAssertTrue(
             island.technicalSections.flatMap(\.values).contains { $0.label == "Format" && $0.value == "mso_mdoc" }
         )
@@ -356,6 +374,31 @@ final class SharingReviewModelTests: XCTestCase {
         let island = try XCTUnwrap(review.reviewIslands().first { $0.kind == .credential })
 
         XCTAssertEqual(island.title, configuredLabel)
+    }
+
+    func testSeveralCredentialOptionsUseOneNeutralIslandHeading() throws {
+        let credentials = ["Personal ID", "Travel ID"].enumerated().map { index, label in
+            PresentationCredentialOption(
+                queryID: "pid",
+                credentialID: "credential-\(index)",
+                format: "vc+sd-jwt",
+                issuer: "Example Issuer",
+                subject: nil,
+                label: label,
+                credentialDataJSON: "{}",
+                disclosures: []
+            )
+        }
+        let review = SharingReviewModel(
+            request: SharingRequest(verifier: nil),
+            credentialOptions: credentials
+        )
+
+        let island = try XCTUnwrap(review.reviewIslands().first { $0.kind == .credential })
+
+        XCTAssertEqual(island.title, "Choose credentials")
+        XCTAssertEqual(island.subtitle, "2 credentials available")
+        XCTAssertEqual(island.expandedValues.map(\.label), ["Personal ID", "Travel ID"])
     }
 
     // MARK: - Transaction data and technical details

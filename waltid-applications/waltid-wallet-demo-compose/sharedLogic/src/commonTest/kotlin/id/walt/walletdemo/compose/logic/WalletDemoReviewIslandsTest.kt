@@ -68,6 +68,7 @@ class WalletDemoReviewIslandsTest {
             islands.map(WalletDemoReviewIsland::kind),
         )
         assertEquals("Photo ID", islands[1].title)
+        assertTrue(islands[1].visibleExpandedValues.none { it.label == "Photo ID" })
         assertEquals("Transaction code", islands.last().title)
         assertTrue(islands.all { it.context == WalletDemoReviewSurfaceContext.PlatformInvoked })
 
@@ -138,6 +139,61 @@ class WalletDemoReviewIslandsTest {
     }
 
     @Test
+    fun severalCredentialOptionsUseOneNeutralIslandHeading() {
+        val review = WalletDemoSharingReview(
+            request = WalletDemoSharingRequest(verifier = null),
+            credentialOptions = listOf(
+                WalletDemoPresentationCredentialOption(
+                    queryId = "pid",
+                    credentialId = "credential-1",
+                    label = "Personal ID",
+                    issuer = "Example Issuer",
+                    format = "vc+sd-jwt",
+                    credentialDataJson = "{}",
+                    disclosures = emptyList(),
+                ),
+                WalletDemoPresentationCredentialOption(
+                    queryId = "pid",
+                    credentialId = "credential-2",
+                    label = "Travel ID",
+                    issuer = "Example Issuer",
+                    format = "vc+sd-jwt",
+                    credentialDataJson = "{}",
+                    disclosures = emptyList(),
+                ),
+            ),
+        )
+
+        val island = review.toReviewIslands().single { it.kind == WalletDemoReviewIslandKind.Credential }
+
+        assertEquals("Choose credentials", island.title)
+        assertEquals("2 credentials available", island.subtitle)
+        assertEquals(listOf("Personal ID", "Travel ID"), island.visibleExpandedValues.map { it.label })
+    }
+
+    @Test
+    fun namedVerifierStartsCompactWhileVerifiedOrReaderTrustDetailsStayVisible() {
+        val namedVerifier = WalletDemoSharingReview(
+            request = WalletDemoSharingRequest(
+                verifier = WalletDemoSharingVerifier(fallbackName = "Example Verifier"),
+            ),
+            credentialOptions = emptyList(),
+        ).toReviewIslands().single()
+        val verifiedVerifier = WalletDemoSharingReview(
+            request = WalletDemoSharingRequest(
+                verifier = WalletDemoSharingVerifier(
+                    fallbackName = "Example Verifier",
+                    verifiedOrigin = "https://verifier.example",
+                ),
+            ),
+            credentialOptions = emptyList(),
+        ).toReviewIslands().single()
+
+        assertFalse(namedVerifier.initiallyExpanded)
+        assertTrue(verifiedVerifier.initiallyExpanded)
+    }
+
+    @Test
     fun sharingUsesVerifierCredentialInformationAndTransactionOrder() {
         val review = WalletDemoSharingReview(
             request = WalletDemoSharingRequest(
@@ -198,6 +254,9 @@ class WalletDemoReviewIslandsTest {
         assertTrue(islands.first().initiallyExpanded)
         assertTrue(islands[1].initiallyExpanded)
         assertTrue(islands[2].initiallyExpanded)
+        assertEquals("Photo ID", islands[1].title)
+        assertEquals("Example Issuer", islands[1].subtitle)
+        assertTrue(islands[1].visibleExpandedValues.isEmpty())
         assertEquals("Payment authorization", islands.last().title)
 
         val normalText = islands.flatMap { it.visibleSummaryValues + it.visibleExpandedValues }

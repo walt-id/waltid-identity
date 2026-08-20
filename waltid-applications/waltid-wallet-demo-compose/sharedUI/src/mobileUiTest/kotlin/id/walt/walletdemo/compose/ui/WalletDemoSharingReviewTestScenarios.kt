@@ -81,6 +81,8 @@ class WalletDemoSharingReviewTestScenarios {
         }
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("Driving licence").assertCountEquals(1)
+        onAllNodesWithText("Requested disclosures").assertCountEquals(0)
     }
 
     /**
@@ -137,6 +139,11 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.PresentationRejectButton).assertCountEquals(0)
         onAllNodesWithText("Reject").assertCountEquals(0)
+        val shareCenter = onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton)
+            .fetchSemanticsNode().boundsInRoot.center.y
+        val cancelCenter = onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton)
+            .fetchSemanticsNode().boundsInRoot.center.y
+        assertEquals(shareCenter, cancelCenter, absoluteTolerance = 1f)
 
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(

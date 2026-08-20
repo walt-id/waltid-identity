@@ -145,9 +145,15 @@ final class WalletE2EUI {
     }
 
     func tapNavigationBack() {
-        let button = app.navigationBars.buttons.firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 20), "Navigation back button not found")
-        button.tap()
+        let swiftUIBackButton = app.buttons["BackButton"].firstMatch
+        if swiftUIBackButton.waitForExistence(timeout: 2), swiftUIBackButton.isHittable {
+            swiftUIBackButton.tap()
+            return
+        }
+
+        let button = app.navigationBars.buttons.allElementsBoundByIndex.first { $0.isHittable }
+        XCTAssertNotNil(button, "Navigation back button not found")
+        button?.tap()
     }
 
     func tapTab(label: String) {

@@ -399,6 +399,9 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         onNodeWithTag(WalletUiTestTags.ScanAction).assertIsDisplayed().assertIsEnabled()
+        onNodeWithContentDescription("Scan credential offer or presentation request").assertIsDisplayed()
+        onNodeWithContentDescription("Settings").assertIsDisplayed()
+        onAllNodesWithText("Credentials").assertCountEquals(1)
         onAllNodesWithTag(WalletUiTestTags.OfferScanButton).assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.PresentationScanButton).assertCountEquals(0)
     }
@@ -421,6 +424,15 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
         onNodeWithText("No credentials available").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsNotEnabled()
+        val actionCenters = listOf(
+            WalletUiTestTags.PresentationSubmitButton,
+            WalletUiTestTags.PresentationCancelButton,
+            WalletUiTestTags.PresentationRejectButton,
+        ).map { tag -> onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.center.y }
+        assertTrue(
+            actionCenters.maxOrNull()!! - actionCenters.minOrNull()!! < 1f,
+            "Presentation actions must remain on one row: $actionCenters",
+        )
         onNodeWithTag(WalletUiTestTags.PresentationRejectButton).assertIsEnabled().performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationCompleted }
         assertEquals("openid4vp://example", wallet.rejectedRequestUrl)
@@ -496,6 +508,9 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentationSubmitButton").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.reviewIslandToggle("verifier"))
+            .performScrollTo()
+            .performClick()
         assertVerifierPublishedDetailsVisible()
         onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Protected response").performScrollTo().assertIsDisplayed()
@@ -568,6 +583,9 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
+        onNodeWithTag(WalletUiTestTags.reviewIslandToggle("verifier"))
+            .performScrollTo()
+            .performClick()
         onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("No message-level encryption requested").performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Key management algorithm").assertCountEquals(0)

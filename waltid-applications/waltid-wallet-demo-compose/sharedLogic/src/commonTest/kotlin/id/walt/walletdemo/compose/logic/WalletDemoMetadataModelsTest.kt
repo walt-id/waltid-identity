@@ -6,6 +6,26 @@ import kotlin.test.assertEquals
 class WalletDemoMetadataModelsTest {
 
     @Test
+    fun preservesAdvertisedHumanFacingClaimTextVerbatim() {
+        val claim = WalletDemoOfferedCredentialMetadata(
+            configurationId = "example-id",
+            format = "vc+sd-jwt",
+            vct = null,
+            doctype = null,
+            display = null,
+            claims = listOf(
+                WalletDemoCredentialClaimMetadata(
+                    path = listOf("given_name"),
+                    mandatory = true,
+                    displayName = "  Preferred given name  ",
+                )
+            ),
+        ).claimDisplayGroups().single().claims.single()
+
+        assertEquals("  Preferred given name  ", claim.label)
+    }
+
+    @Test
     fun groupsMdocOfferClaimsByUserFacingSemantics() {
         val credential = WalletDemoOfferedCredentialMetadata(
             configurationId = "org.iso.23220.photoid.1",
