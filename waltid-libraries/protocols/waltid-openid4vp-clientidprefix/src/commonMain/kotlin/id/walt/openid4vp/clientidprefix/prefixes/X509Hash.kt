@@ -26,6 +26,21 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
         require(b64UrlRegex.matches(hash)) { "Hash must be a valid Base64URL string." }
     }
 
+    companion object {
+        /**
+         * Derive the `x509_hash` client identifier value from the DER encoding of a leaf
+         * certificate: the base64url-encoded SHA-256 hash, per OpenID4VP 1.0, Section 5.9.3.
+         *
+         * Shared so that producing a `client_id` and verifying one cannot drift apart.
+         */
+        fun hashOfCertificate(leafCertificateDer: ByteArray): String =
+            SHA256().digest(leafCertificateDer).encodeToBase64Url()
+
+        /** Full `x509_hash:<hash>` client identifier for the given DER-encoded leaf certificate. */
+        fun clientIdForCertificate(leafCertificateDer: ByteArray): String =
+            "x509_hash:${hashOfCertificate(leafCertificateDer)}"
+    }
+
     suspend fun authenticateX509Hash(clientId: X509Hash, context: RequestContext): ClientValidationResult {
         return authenticateX509Hash(clientId, context, ClientIdTrustConfiguration())
     }
@@ -72,7 +87,9 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
         } catch (_: Exception) {
             return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
         }
-        val calculatedHash = SHA256().digest(leafCertificate.encodedDer.toByteArray()).encodeToBase64Url()
+        // Via the shared helper rather than hashing inline: deriving an x509_hash client
+        // identifier and verifying one must not be able to drift apart.
+        val calculatedHash = hashOfCertificate(leafCertificate.encodedDer.toByteArray())
         if (clientId.hash != calculatedHash) {
             return ClientValidationResult.Failure(ClientIdError.X509HashMismatch)
         }

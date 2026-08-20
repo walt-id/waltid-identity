@@ -112,11 +112,24 @@ jobs:
             -e "s#8443#443#g" \
             "$FILE"
 
+      # `playwright install --with-deps` shells out to apt-get, and three modules register an
+      # installPlaywrightBrowsers task that the build runs in parallel. They then race for
+      # /var/lib/dpkg/lock-frontend and whichever loses fails with "Failed to install browsers".
+      # Installing once, serially, keeps the same dep-install mechanism while taking apt out of the
+      # parallel phase; the browsers land in ~/.cache/ms-playwright, so the tasks in the build below
+      # find them already present and become no-ops with --with-deps switched off.
+      - name: Install Playwright browsers and system dependencies once
+        run: ./gradlew :waltid-services:waltid-issuer-api2:installPlaywrightBrowsers --no-daemon --console=plain
+        env:
+          CI: "true"
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+
       - name: Clean and build with all tests
         run: ./gradlew clean cleanAllTests build allTests --rerun-tasks --no-daemon --continue --console=plain --warning-mode=summary
         env:
           CI: "true"
-          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+          # Already installed serially above; leaving this on would reintroduce the dpkg race.
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
           OPENID4VCI_CONFORMANCE_STRICT: ${{ vars.CONFORMANCE_ALLOW_FAILURE == 'false' }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}

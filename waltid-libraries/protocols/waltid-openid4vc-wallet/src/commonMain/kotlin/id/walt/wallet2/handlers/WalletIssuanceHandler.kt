@@ -2,18 +2,10 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.selectJwsAlgorithm
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
@@ -32,8 +24,15 @@ import id.walt.wallet2.handlers.WalletIssuanceHandler.pollDeferredFlow
 import id.walt.wallet2.handlers.WalletIssuanceHandler.resolveOffer
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
+import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
+import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
+import id.waltid.openid4vci.wallet.clientauth.ClientAssertionBuilder
+import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
+import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
+import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
+import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
@@ -42,6 +41,7 @@ import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
 import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
+import id.waltid.openid4vci.wallet.token.ClientAssertionFactory
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -49,6 +49,7 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.serialization.Serializable
@@ -306,10 +307,18 @@ data class RequestTokenRequest(
 @Serializable
 data class RequestTokenResult(
     val accessToken: String,
-    val expiresIn: Long? = null
+    val expiresIn: Long? = null,
+    /**
+     * OAuth `token_type`, e.g. `DPoP` or `Bearer`.
+     *
+     * RFC 9449 Section 7.1: a DPoP-typed access token must be presented with a per-request proof, and
+     * a Bearer token must not be. Dropping this made the authorization-code flow request credentials
+     * without a proof even after the token endpoint had issued it a DPoP token.
+     */
+    val tokenType: String? = null,
 ) {
     override fun toString(): String =
-        "RequestTokenResult(accessToken=<redacted>, expiresIn=$expiresIn)"
+        "RequestTokenResult(accessToken=<redacted>, expiresIn=$expiresIn, tokenType=$tokenType)"
 }
 
 @Serializable
@@ -383,6 +392,59 @@ data class FetchCredentialResult(
 )
 
 /**
+ * Completes the authorization-code grant in one call: exchanges [code] for an access token, builds a
+ * proof of possession, fetches the credential(s) and stores them in the wallet.
+ *
+ * The caller still drives the browser redirect and therefore holds [code], [codeVerifier] and the
+ * endpoints that `POST /credentials/receive/authorization-url` returned - those isolated steps remain
+ * the caller's responsibility. Everything after the redirect is handled here, mirroring what
+ * `credentials/receive` does for the pre-authorized code grant.
+ */
+@Serializable
+data class ReceiveAuthorizedCredentialRequest(
+    /** Authorization code from the redirect callback. */
+    val code: String,
+    /** PKCE verifier returned by `authorization-url`; required whenever PKCE was used. */
+    val codeVerifier: String? = null,
+    /** Credential Issuer Identifier, used to re-resolve issuer and authorization server metadata. */
+    val credentialIssuer: String,
+    val credentialEndpoint: Url,
+    val credentialConfigurationId: String,
+    /** Issuer nonce endpoint, when it advertises one; validated against issuer metadata. */
+    val nonceEndpoint: Url? = null,
+    val clientId: String = DEFAULT_CLIENT_ID,
+    val redirectUri: Url = Url("openid://"),
+    /**
+     * Sender constrain the token and credential requests with DPoP (RFC 9449).
+     *
+     * Opt-in, because there is no metadata that says whether the *credential endpoint* accepts
+     * DPoP-bound tokens - `dpop_signing_alg_values_supported` describes the authorization server only.
+     * Enabling it on that signal alone broke working issuance: an authorization server advertising DPoP
+     * duly issued a DPoP-bound token, and the Credential Issuer then rejected it as `invalid_token`
+     * because its credential endpoint expects a Bearer token.
+     *
+     * Turn it on for issuers known to accept DPoP end to end, such as FAPI 2.0 / HAIP deployments.
+     */
+    val useDpop: Boolean = false,
+
+    /** Inline holder key for proof of possession; takes precedence over [keyId]. */
+    val key: DirectSerializedKey? = null,
+    val keyId: String? = null,
+    /** Holder DID; when absent the proof is bound to the raw JWK. */
+    val did: String? = null,
+    /** Optional metadata stored alongside the received credential(s). */
+    val metadata: JsonObject? = null,
+    /** Optional label override; otherwise derived from the credential configuration display. */
+    val label: String? = null,
+) {
+    init {
+        require(code.isNotBlank()) { "Authorization code must not be blank" }
+        require(credentialIssuer.isNotBlank()) { "credentialIssuer must not be blank" }
+        require(credentialConfigurationId.isNotBlank()) { "credentialConfigurationId must not be blank" }
+    }
+}
+
+/**
  * A sanitized failure returned by an OpenID4VCI Credential Endpoint.
  *
  * The response body is parsed into [credentialError] when it follows the OID4VCI error shape;
@@ -432,7 +494,15 @@ data class GenerateAuthorizationUrlRequest(
     override val offerJson: JsonObject? = null,
     val clientId: String = DEFAULT_CLIENT_ID,
     val redirectUri: Url = Url("openid://"),
-    val usePkce: Boolean = true
+    val usePkce: Boolean = true,
+    /**
+     * Request the credential by OAuth `scope` instead of `authorization_details`.
+     *
+     * OID4VCI 1.0 Section 5.1.2 defines both, as alternatives. `authorization_details` is the default
+     * because it names the credential configuration directly; scope-based authorization needs the
+     * issuer to publish a `scope` on the configuration, and some profiles (HAIP among them) require it.
+     */
+    val useScope: Boolean = false,
 ) : CredentialOfferSource {
     init {
         checkOfferSource()
@@ -591,7 +661,15 @@ object WalletIssuanceHandler {
     ): Flow<StoredCredential> = channelFlow {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
-            ?: error("No key available: wallet has no keyStores, no staticKey, no inline key, and no keyId was specified")
+            // The previous wording claimed the wallet had no key stores, which misreports the common
+            // case of a store that exists but is empty - resolveKeyMaterial also returns null when a
+            // named key is absent, or when the keys present do not permit signing.
+            ?: error(
+                request.keyId?.let { "Wallet '${wallet.id}' has no key '$it' usable for signing" }
+                    ?: "Wallet '${wallet.id}' holds no key usable for signing: none of its " +
+                    "${wallet.keyStores.size} key store(s) contained a key permitting KeyUsage.SIGN, " +
+                    "there is no static key, and neither an inline key nor a keyId was supplied"
+            )
         val did = request.did ?: wallet.defaultDid()
         val requestMetadata = request.metadata
 
@@ -632,7 +710,7 @@ object WalletIssuanceHandler {
             ?: error("Authorization server metadata contains no token_endpoint")
         log.trace { "Requesting token from $tokenEndpoint" }
 
-        val attestationHeaders = buildTokenEndpointAttestationHeaders(
+        val attestationHeaders = buildClientAttestationHeaders(
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
@@ -640,10 +718,26 @@ object WalletIssuanceHandler {
             onAttestationObtained = { onEvent(WalletSessionEvent.issuance_attestation_obtained) },
         )
 
+        // private_key_jwt (RFC 7523). Engaged from authorization server metadata for the same reason
+        // attestation is: the wallet cannot know out of band which method a given issuer requires.
+        // Attestation wins when both are advertised, because it additionally attests the wallet
+        // instance rather than only proving key control.
+        val clientAssertionFactory = clientAssertionFactory(
+            asMetadata = asMetadata,
+            clientId = request.clientId,
+            keyMaterial = keyMaterial,
+        ).takeIf { attestationHeaders == null }
+
         val anonymousPreAuthorizedCode =
             asMetadata.preAuthorizedGrantAnonymousAccessSupported == true &&
                     request.tokenRequestHeaders.isEmpty() &&
-                    attestationHeaders == null
+                    attestationHeaders == null &&
+                    clientAssertionFactory == null
+
+        // Sender constraining (RFC 9449): used when the authorization server advertises DPoP *and*
+        // the wallet key can sign one of the advertised algorithms. Otherwise a plain Bearer token
+        // is requested - DPoP is optional for the wallet, so an unusable key must not fail issuance.
+        val dpopAlgorithms = usableDpopAlgorithms(asMetadata, keyMaterial)
 
         val tokenResponse = tokenBuilder.exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
@@ -652,9 +746,19 @@ object WalletIssuanceHandler {
             additionalHeaders = request.tokenRequestHeaders,
             attestationHeaders = attestationHeaders,
             anonymous = anonymousPreAuthorizedCode,
+            dpopProofFactory = dpopAlgorithms?.let { algorithms ->
+                { endpoint: String, nonce: String? ->
+                    buildDpopProof(keyMaterial, algorithms, endpoint, nonce = nonce)
+                }
+            },
+            clientAssertionFactory = clientAssertionFactory,
         )
         log.trace { "Token obtained" }
         onEvent(WalletSessionEvent.issuance_token_obtained)
+
+        // A DPoP-typed access token must carry a per-request proof; a Bearer token must not.
+        val credentialDpop = dpopAlgorithmsForToken(tokenResponse.token_type, dpopAlgorithms)
+            ?.let { DpopRequestContext(it, keyMaterial) }
 
         val credentialEndpoint = issuerMetadata.credentialEndpoint
         log.trace { "Credential endpoint: $credentialEndpoint" }
@@ -691,6 +795,7 @@ object WalletIssuanceHandler {
                 httpClient = httpClient,
                 buildProof = buildProof,
                 onProofGenerated = { onEvent(WalletSessionEvent.issuance_proof_signed) },
+                dpop = credentialDpop,
             )
             onEvent(WalletSessionEvent.issuance_credential_received)
 
@@ -888,7 +993,7 @@ object WalletIssuanceHandler {
      */
     suspend fun resolveOfferDetailed(
         request: ResolveOfferRequest,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): WalletOfferResolution {
         val resolved = resolveIssuanceOffer(request, httpClient)
         return WalletOfferResolution(
@@ -920,7 +1025,7 @@ object WalletIssuanceHandler {
             metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         }
         val attestationHeaders = asMetadata?.let {
-            buildTokenEndpointAttestationHeaders(
+            buildClientAttestationHeaders(
                 asMetadata = it,
                 clientId = request.clientId,
                 attestationAssembler = attestationAssembler,
@@ -964,7 +1069,8 @@ object WalletIssuanceHandler {
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,
-            expiresIn = tokenResponse.expires_in
+            expiresIn = tokenResponse.expires_in,
+            tokenType = tokenResponse.token_type,
         )
     }
 
@@ -995,12 +1101,12 @@ object WalletIssuanceHandler {
         val configuration = issuerMetadata.credentialConfigurationsSupported[request.credentialConfigurationId]
             ?: error(
                 "Unknown credential configuration '${request.credentialConfigurationId}' " +
-                    "for issuer '${issuerMetadata.credentialIssuer}'"
+                        "for issuer '${issuerMetadata.credentialIssuer}'"
             )
         val acceptedAlgorithms = supportedJwtProofAlgorithms(configuration.proofTypesSupported)
             ?: error(
                 "Credential configuration '${request.credentialConfigurationId}' " +
-                    "does not advertise JWT proof types"
+                        "does not advertise JWT proof types"
             )
         val preferJwkBinding = shouldPreferJwkBinding(configuration.cryptographicBindingMethodsSupported)
         val proofs = buildJwtProof(
@@ -1031,6 +1137,7 @@ object WalletIssuanceHandler {
     private suspend fun requestCredential(
         request: FetchCredentialRequest,
         httpClient: HttpClient,
+        dpop: DpopRequestContext? = null,
     ): CredentialResponse {
         // Build JSON manually to avoid Proofs serialization issue
         val credentialRequestJson = buildJsonObject {
@@ -1041,21 +1148,57 @@ object WalletIssuanceHandler {
                 }
             }
         }
-        val response = postFollowingRedirects(httpClient, request.credentialEndpoint.toString()) {
-            header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
-            contentType(ContentType.Application.Json)
-            setBody(credentialRequestJson.toString())
-        }
-        if (!response.status.isSuccess()) {
-            val credentialError = runCatching {
+        val endpoint = request.credentialEndpoint.toString()
+        val scheme = if (dpop != null) "DPoP" else "Bearer"
+        var dpopNonce: String? = null
+
+        repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
+            val proof = dpop?.let {
+                buildDpopProof(
+                    keyMaterial = it.keyMaterial,
+                    algorithms = it.algorithms,
+                    endpoint = endpoint,
+                    accessToken = request.accessToken,
+                    nonce = dpopNonce,
+                )
+            }
+            val response = postFollowingRedirects(httpClient, endpoint) {
+                header(HttpHeaders.Authorization, "$scheme ${request.accessToken}")
+                proof?.let { header(DPOP_HEADER, it) }
+                contentType(ContentType.Application.Json)
+                setBody(credentialRequestJson.toString())
+            }
+            if (response.status.isSuccess()) return response.body()
+
+            // Read the DPoP signals before the body: oauthErrorCode() consumes it.
+            val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
+            val oauthError = response.oauthErrorCode()
+            if (
+                attempt == 0 &&
+                proof != null &&
+                oauthError == USE_DPOP_NONCE &&
+                !suppliedNonce.isNullOrBlank()
+            ) {
+                log.debug { "Credential endpoint demanded a DPoP nonce; retrying once with it" }
+                dpopNonce = suppliedNonce
+                return@repeat
+            }
+
+            // try-catch rather than runCatching: the body read suspends, and runCatching would
+            // swallow CancellationException.
+            val credentialError = try {
                 lenientJson.decodeFromString<CredentialError>(response.bodyAsText())
-            }.getOrNull()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                null
+            }
             throw CredentialEndpointException(
                 statusCode = response.status.value,
                 credentialError = credentialError,
             )
         }
-        return response.body()
+        error("DPoP nonce retry exhausted for the credential endpoint")
     }
 
     /**
@@ -1072,11 +1215,12 @@ object WalletIssuanceHandler {
         httpClient: HttpClient,
         buildProof: (suspend (String?) -> String?)?,
         onProofGenerated: suspend () -> Unit = {},
+        dpop: DpopRequestContext? = null,
     ): CredentialResponse {
         suspend fun fetchWithFreshProof(): CredentialResponse {
             val proofJwt = buildProof?.invoke(requestProofNonce(httpClient, nonceEndpoint))
             onProofGenerated()
-            return requestCredential(request.copy(proofJwt = proofJwt), httpClient)
+            return requestCredential(request.copy(proofJwt = proofJwt), httpClient, dpop)
         }
 
         return try {
@@ -1111,7 +1255,7 @@ object WalletIssuanceHandler {
                 if (request.credentialIssuerBaseUrl.isNullOrBlank() && request.metadata == null && request.label == null) {
                     log.warn {
                         "storeInWallet=true without credentialIssuerBaseUrl/metadata/label; " +
-                            "issuer display metadata and labels will not be persisted"
+                                "issuer display metadata and labels will not be persisted"
                     }
                 }
                 val storage = resolveCredentialStorageContext(
@@ -1141,6 +1285,120 @@ object WalletIssuanceHandler {
      * Builds a [ClientConfiguration] from the common clientId/redirectUri pair.
      * Extracted to eliminate four identical constructions across issuance functions.
      */
+    /**
+     * Perform a pushed authorization request (RFC 9126) and return the browser URL for it.
+     *
+     * The resulting authorization request carries **only** `client_id` and `request_uri`. Anything
+     * else is a finding: RFC 9126 Section 4 and FAPI 2.0 Security Profile Section 5.3.3.2 both
+     * require it, on the grounds that duplicated parameters can leak into browser history and logs.
+     *
+     * [keyMaterial] is what makes this possible at all - the endpoint is client authenticated. When it
+     * is absent the request is still pushed, but unauthenticated, which an authorization server
+     * demanding `private_key_jwt` will reject; callers that have a wallet should use the
+     * [generateAuthorizationUrl] overload that takes one.
+     */
+    private suspend fun pushAuthorizationRequest(
+        request: GenerateAuthorizationUrlRequest,
+        offer: CredentialOffer,
+        issuerMetadata: CredentialIssuerMetadata,
+        asMetadata: AuthorizationServerMetadata,
+        authorizationEndpoint: String,
+        authBuilder: AuthorizationRequestBuilder,
+        credentialConfigurationId: String,
+        parEndpoint: String,
+        keyMaterial: WalletKeyStoreEntry?,
+        attestationAssembler: ClientAttestationAssembler?,
+    ): GenerateAuthorizationUrlResult {
+        // Binds the eventual access token to this wallet's key at authorization time (RFC 9449
+        // Section 10). Only offered when the key can actually sign an advertised algorithm.
+        val dpopJkt = keyMaterial
+            ?.takeIf { usableDpopAlgorithms(asMetadata, it) != null }
+            ?.jwkThumbprint()
+
+        val pushed = authBuilder.buildPushedAuthorizationRequestStateForCredentialConfigurations(
+            credentialConfigurationIds = listOf(credentialConfigurationId),
+            issuerState = offer.grants?.authorizationCode?.issuerState,
+            usePKCE = request.usePkce,
+            metadata = asMetadata,
+            redirectUri = request.redirectUri.toString(),
+            dpopJkt = dpopJkt,
+            credentialIssuerLocations = issuerMetadata.authorizationDetailLocations(),
+            scope = if (request.useScope) {
+                issuerMetadata.requireCredentialScope(credentialConfigurationId)
+            } else {
+                null
+            },
+        )
+
+        // A pushed authorization request authenticates the client exactly as the token request does
+        // (RFC 9126 Section 2), so it needs the same credential. Under HAIP that is the only one on
+        // offer: the authorization server advertises attest_jwt_client_auth alone and requires PAR, so
+        // without this the flow cannot authenticate at all and the suite answers 401.
+        val attestationHeaders = buildClientAttestationHeaders(
+            asMetadata = asMetadata,
+            clientId = request.clientId,
+            attestationAssembler = attestationAssembler,
+            resolveInstanceKey = { keyMaterial?.crypto2AttestationKey() },
+        )
+
+        val response = PushedAuthorizationRequestExecutor.execute(
+            httpClient = httpClient,
+            parEndpoint = parEndpoint,
+            parameters = pushed.parameters,
+            // Mutually exclusive with the attestation headers: presenting two client credentials is
+            // what "token_endpoint_auth_methods_supported: [attest_jwt_client_auth]" excludes.
+            clientAssertionFactory = keyMaterial
+                ?.takeIf { attestationHeaders == null }
+                ?.let { material ->
+                    clientAssertionFactory(
+                        asMetadata = asMetadata,
+                        clientId = request.clientId,
+                        keyMaterial = material,
+                    )
+                },
+            attestationHeaders = attestationHeaders,
+        )
+
+        return GenerateAuthorizationUrlResult(
+            authorizationUrl = Url(
+                URLBuilder(authorizationEndpoint).apply {
+                    parameters.append("client_id", request.clientId)
+                    parameters.append("request_uri", response.requestUri)
+                }.buildString()
+            ),
+            state = pushed.state,
+            codeVerifier = pushed.pkceData?.codeVerifier,
+            credentialConfigurationId = credentialConfigurationId,
+            credentialIssuerBaseUrl = offer.credentialIssuer,
+            nonceEndpoint = issuerMetadata.nonceEndpoint?.let { Url(it) },
+        )
+    }
+
+    /**
+     * `locations` to put in each `openid_credential` authorization detail, or `null` when it may be
+     * omitted.
+     *
+     * OID4VCI 1.0 Section 5.1.1 makes it mandatory once the Credential Issuer advertises
+     * `authorization_servers`, because a single authorization server can serve several issuers and the
+     * grant would otherwise be ambiguous. The value is the Credential Issuer Identifier itself.
+     */
+    /**
+     * The `scope` the issuer publishes for [credentialConfigurationId].
+     *
+     * Fails loudly rather than silently falling back to `authorization_details`: a caller that asked
+     * for scope-based authorization against an issuer that publishes no scope has a configuration
+     * problem, and quietly sending something else would surface later as an opaque authorization
+     * error.
+     */
+    private fun CredentialIssuerMetadata.requireCredentialScope(credentialConfigurationId: String): String =
+        requireNotNull(credentialConfigurationsSupported[credentialConfigurationId]?.scope) {
+            "Credential configuration '$credentialConfigurationId' publishes no scope, so this " +
+                    "credential cannot be requested by scope (OID4VCI 1.0 Section 5.1.2)"
+        }
+
+    private fun CredentialIssuerMetadata.authorizationDetailLocations(): List<String>? =
+        authorizationServers?.takeIf { it.isNotEmpty() }?.let { listOf(credentialIssuer) }
+
     private fun clientConfig(clientId: String, redirectUri: Url) =
         ClientConfiguration(clientId = clientId, redirectUris = listOf(redirectUri.toString()))
 
@@ -1231,7 +1489,7 @@ object WalletIssuanceHandler {
         credentialConfigurationId: String?,
         requestMetadata: JsonObject? = null,
         labelOverride: String? = null,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         issuerMetadata: CredentialIssuerMetadata? = null,
     ): CredentialStorageContext {
         val resolvedIssuerMetadata = issuerMetadata
@@ -1247,7 +1505,44 @@ object WalletIssuanceHandler {
         )
     }
 
-    private suspend fun buildTokenEndpointAttestationHeaders(
+    /**
+     * Builds a `private_key_jwt` client-assertion factory when the authorization server advertises
+     * that method, or null otherwise.
+     *
+     * The wallet's own signing key is used as the client credential: a wallet acting as its own
+     * OAuth client has no separate registered secret, and the authorization server holds the public
+     * half of exactly this key from registration.
+     *
+     * `aud` is the authorization server's issuer identifier, which FAPI 2.0 §5.3.3.1 requires;
+     * plain RFC 7523 §3 would also allow the token endpoint, but the issuer satisfies both.
+     *
+     * The returned factory signs a new assertion on every call so each carries a fresh `jti`.
+     */
+    private fun clientAssertionFactory(
+        asMetadata: AuthorizationServerMetadata,
+        clientId: String,
+        keyMaterial: WalletKeyStoreEntry,
+    ): ClientAssertionFactory? {
+        val supported = asMetadata.tokenEndpointAuthMethodsSupported
+            ?.contains(ClientAuthenticationMethods.PRIVATE_KEY_JWT) == true
+        if (!supported) return null
+        return {
+            ClientAssertionBuilder().buildAssertion(
+                key = keyMaterial.requireCrypto2SigningKey(),
+                clientId = clientId,
+                audience = asMetadata.issuer,
+                supportedAlgorithms = asMetadata.tokenEndpointAuthSigningAlgValuesSupported,
+            )
+        }
+    }
+
+    /**
+     * Client attestation headers for any request that authenticates this client to the authorization
+     * server - the token request and the pushed authorization request alike. Both take the
+     * authorization server's issuer as the PoP audience (OAuth 2.0 Attestation-Based Client
+     * Authentication Section 5.2), so one builder serves both.
+     */
+    private suspend fun buildClientAttestationHeaders(
         asMetadata: AuthorizationServerMetadata,
         clientId: String,
         attestationAssembler: ClientAttestationAssembler?,
@@ -1343,8 +1638,33 @@ object WalletIssuanceHandler {
      * The caller (mobile app / browser) must then redirect to [GenerateAuthorizationUrlResult.authorizationUrl]
      * and capture the `code` from the redirect callback before calling [exchangeCode].
      */
-    suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult {
-        val httpClient = defaultHttpClient()
+    /**
+     * Step 1 of the auth-code grant, with the wallet available so the request can be client
+     * authenticated.
+     *
+     * Prefer this over the [wallet]-less overload: only this one can perform a pushed authorization
+     * request (RFC 9126), because PAR needs a key to authenticate the client and to bind the DPoP
+     * proof (`dpop_jkt`). An authorization server that advertises
+     * `require_pushed_authorization_requests` rejects a plain authorization request outright.
+     */
+    suspend fun generateAuthorizationUrl(
+        wallet: Wallet,
+        request: GenerateAuthorizationUrlRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+    ): GenerateAuthorizationUrlResult = generateAuthorizationUrl(
+        request = request,
+        keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)),
+        attestationAssembler = attestationAssembler,
+    )
+
+    suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult =
+        generateAuthorizationUrl(request = request, keyMaterial = null)
+
+    private suspend fun generateAuthorizationUrl(
+        request: GenerateAuthorizationUrlRequest,
+        keyMaterial: WalletKeyStoreEntry?,
+        attestationAssembler: ClientAttestationAssembler? = null,
+    ): GenerateAuthorizationUrlResult {
         val offer = resolveOffer(request, httpClient)
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val asMetadata =
@@ -1354,15 +1674,46 @@ object WalletIssuanceHandler {
             ?: error("Authorization server has no authorization_endpoint")
 
         val clientConfig = clientConfig(request.clientId, request.redirectUri)
-        val authBuilder = id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder(clientConfig)
+        val authBuilder = AuthorizationRequestBuilder(clientConfig)
         val credentialConfigurationId = offer.credentialConfigurationIds.first()
+
+        // Engaged only when the authorization server *requires* PAR, not merely advertises an
+        // endpoint. RFC 9126 makes PAR optional for the client, and pushing to an endpoint that does
+        // not expect this client's authentication fails the whole flow - an issuer that advertises the
+        // endpoint but does not require it answered our pushed request with HTTP 401 and broke
+        // authorization-code issuance that previously worked. Same failure mode as engaging DPoP on
+        // advertisement alone.
+        val parEndpoint = asMetadata.pushedAuthorizationRequestEndpoint
+            ?.takeIf { asMetadata.requirePushedAuthorizationRequests == true }
+        require(asMetadata.requirePushedAuthorizationRequests != true || parEndpoint != null) {
+            "Authorization server requires PAR but advertises no pushed_authorization_request_endpoint"
+        }
+        if (parEndpoint != null) {
+            return pushAuthorizationRequest(
+                request = request,
+                offer = offer,
+                issuerMetadata = issuerMetadata,
+                asMetadata = asMetadata,
+                authorizationEndpoint = authorizationEndpoint,
+                authBuilder = authBuilder,
+                credentialConfigurationId = credentialConfigurationId,
+                parEndpoint = parEndpoint,
+                keyMaterial = keyMaterial,
+                attestationAssembler = attestationAssembler,
+            )
+        }
 
         val authRequest = authBuilder.buildAuthorizationRequest(
             authorizationEndpoint = authorizationEndpoint,
             credentialConfigurationId = credentialConfigurationId,
             issuerState = offer.grants?.authorizationCode?.issuerState,
             usePKCE = request.usePkce,
-            metadata = asMetadata
+            metadata = asMetadata,
+            scope = if (request.useScope) {
+                issuerMetadata.requireCredentialScope(credentialConfigurationId)
+            } else {
+                null
+            },
         )
         return GenerateAuthorizationUrlResult(
             authorizationUrl = Url(authRequest.url),
@@ -1398,13 +1749,26 @@ object WalletIssuanceHandler {
         attestationAssembler: ClientAttestationAssembler? = null,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         onAttestationObtained: suspend () -> Unit = {},
+        /**
+         * Key to client authenticate and sender constrain this exchange with, when the caller already
+         * resolved one.
+         *
+         * Must be the same key the subsequent credential request proves possession of: a DPoP access
+         * token is bound to the `jkt` of the key that requested it (RFC 9449 Section 6), so resolving
+         * the wallet default here while the flow proceeds with a `keyReference`-selected key binds the
+         * token to one key and proves possession of another - which the credential endpoint correctly
+         * rejects as `invalid_token`.
+         */
+        keyMaterial: WalletKeyStoreEntry? = null,
+        /** See [ReceiveAuthorizedCredentialRequest.useDpop]. Client authentication is unaffected. */
+        useDpop: Boolean = false,
     ): RequestTokenResult {
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
             ?: error("credentialIssuerBaseUrl must be provided")
         val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
-        val attestationHeaders = buildTokenEndpointAttestationHeaders(
+        val attestationHeaders = buildClientAttestationHeaders(
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
@@ -1418,6 +1782,9 @@ object WalletIssuanceHandler {
             tokenEndpoint = tokenEndpoint,
             attestationHeaders = attestationHeaders,
             httpClient = httpClient,
+            asMetadata = asMetadata,
+            keyMaterial = keyMaterial ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)),
+            useDpop = useDpop,
         )
     }
 
@@ -1426,21 +1793,54 @@ object WalletIssuanceHandler {
         tokenEndpoint: String,
         attestationHeaders: ClientAttestationHeaders?,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        /**
+         * Authorization server metadata and wallet key, needed to client authenticate and sender
+         * constrain the token request. Both optional so the key-less overload still works, but a
+         * caller with a wallet should always supply them - see [exchangeCode].
+         */
+        asMetadata: AuthorizationServerMetadata? = null,
+        keyMaterial: WalletKeyStoreEntry? = null,
+        useDpop: Boolean = false,
     ): RequestTokenResult {
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
             redirectUris = listOf(request.redirectUri.toString())
         )
+
+        // Mirrors the pre-authorized-code exchange. Attestation wins over private_key_jwt when both
+        // are advertised, because it additionally attests the wallet instance rather than only proving
+        // key control.
+        val clientAssertionFactory = if (attestationHeaders == null && asMetadata != null && keyMaterial != null) {
+            clientAssertionFactory(asMetadata = asMetadata, clientId = request.clientId, keyMaterial = keyMaterial)
+        } else {
+            null
+        }
+
+        // Sender constraining (RFC 9449), engaged only when the key can sign an advertised algorithm;
+        // DPoP is optional for the wallet, so an unusable key must fall back to Bearer, not fail.
+        val senderConstraining = if (useDpop && asMetadata != null && keyMaterial != null) {
+            usableDpopAlgorithms(asMetadata, keyMaterial)?.let { algorithms -> keyMaterial to algorithms }
+        } else {
+            null
+        }
+
         val tokenResponse = TokenRequestBuilder(clientConfig, httpClient).exchangeAuthorizationCode(
             tokenEndpoint = tokenEndpoint,
             code = request.code,
             codeVerifier = request.codeVerifier,
             additionalHeaders = request.tokenRequestHeaders,
             attestationHeaders = attestationHeaders,
+            dpopProofFactory = senderConstraining?.let { (key, algorithms) ->
+                { endpoint: String, nonce: String? ->
+                    buildDpopProof(key, algorithms, endpoint, nonce = nonce)
+                }
+            },
+            clientAssertionFactory = clientAssertionFactory,
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,
-            expiresIn = tokenResponse.expires_in
+            expiresIn = tokenResponse.expires_in,
+            tokenType = tokenResponse.token_type,
         )
     }
 
@@ -1553,6 +1953,12 @@ object WalletIssuanceHandler {
         did: String? = null,
         /** Optional sidecar metadata merged with resolved issuer display when storing. */
         metadata: JsonObject? = null,
+        /**
+         * Sender constrain the token and credential requests with DPoP (RFC 9449); see
+         * [ReceiveAuthorizedCredentialRequest.useDpop] for why this is opt-in rather than derived from
+         * the authorization server's advertised algorithms.
+         */
+        useDpop: Boolean = false,
         /** Optional credential label override; otherwise derived from credential configuration display. */
         label: String? = null,
         attestationAssembler: ClientAttestationAssembler? = null,
@@ -1581,6 +1987,8 @@ object WalletIssuanceHandler {
             attestationAssembler = attestationAssembler,
             httpClient = httpClient,
             onAttestationObtained = { onEvent(WalletSessionEvent.issuance_attestation_obtained) },
+            keyMaterial = keyMaterial,
+            useDpop = useDpop,
         )
         onEvent(WalletSessionEvent.issuance_token_obtained)
 
@@ -1619,6 +2027,17 @@ object WalletIssuanceHandler {
                 ).jwt?.firstOrNull()
             },
             onProofGenerated = { onEvent(WalletSessionEvent.issuance_proof_signed) },
+            // RFC 9449 Section 7.1: a DPoP-typed access token has to be presented with a fresh
+            // per-request proof at the credential endpoint too, not only at the token endpoint. The
+            // pre-authorized-code flow already did this; omitting it here meant the issuer answered a
+            // successfully DPoP-bound token exchange with "Couldn't find DPoP Proof header".
+            dpop = if (!useDpop) null else dpopAlgorithmsForToken(
+                tokenType = tokenResult.tokenType ?: "Bearer",
+                advertisedAlgorithms = usableDpopAlgorithms(
+                    resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient),
+                    keyMaterial,
+                ),
+            )?.let { algorithms -> DpopRequestContext(algorithms, keyMaterial) },
         )
         onEvent(WalletSessionEvent.issuance_credential_received)
 
@@ -1648,6 +2067,45 @@ object WalletIssuanceHandler {
             send(entry)
         }
         onEvent(WalletSessionEvent.issuance_completed)
+    }
+
+    /**
+     * Collects [receiveCredentialAuthCodeFlow] into a result, so the authorization-code grant has the
+     * same single-call shape over HTTP that [receiveCredential] gives the pre-authorized code grant.
+     *
+     * Deferred issuance is not reported here: [receiveCredentialAuthCodeFlow] does not handle a `202`
+     * response, so a deferring issuer surfaces through the credential endpoint error instead. Poll
+     * such credentials with [pollDeferredFlow].
+     */
+    suspend fun receiveCredentialAuthCode(
+        wallet: Wallet,
+        request: ReceiveAuthorizedCredentialRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+    ): ReceiveCredentialResult {
+        val ids = mutableListOf<String>()
+        receiveCredentialAuthCodeFlow(
+            wallet = wallet,
+            code = request.code,
+            codeVerifier = request.codeVerifier,
+            credentialIssuerBaseUrl = request.credentialIssuer,
+            credentialEndpoint = request.credentialEndpoint,
+            credentialConfigurationId = request.credentialConfigurationId,
+            useDpop = request.useDpop,
+            nonceEndpoint = request.nonceEndpoint?.toString(),
+            clientId = request.clientId,
+            redirectUri = request.redirectUri,
+            key = request.key,
+            keyReference = request.keyId,
+            did = request.did,
+            metadata = request.metadata,
+            label = request.label,
+            attestationAssembler = attestationAssembler,
+            onEvent = onEvent,
+            httpClient = httpClient,
+        ).collect { ids += it.id }
+        return ReceiveCredentialResult(credentialIds = ids)
     }
 
     /**
@@ -1695,15 +2153,6 @@ object WalletIssuanceHandler {
             )
         }
     }
-
-    private suspend fun migrateLocalJwk(key: Key) =
-        (key as? JWKKey)?.takeUnless { it.keyType == KeyType.secp256k1 }?.let {
-            val jwk = it.exportJWKObject()
-            EncodedKey.Jwk(
-                BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
-                privateMaterial = Jwk.containsPrivateMaterial(jwk),
-            ).toStoredSoftwareKey(KeyId(it.getKeyId()), setOf(KeyUsage.SIGN))
-        }
 }
 
 internal fun supportedJwtProofAlgorithms(proofTypes: Map<String, ProofType>?): Set<String>? {
