@@ -52,6 +52,16 @@ import kotlin.uuid.Uuid
 import id.walt.crypto2.keys.Key as Crypto2Key
 
 @OptIn(ExperimentalSerializationApi::class)
+/**
+ * The OpenID4VP `redirect_uri` Client Identifier Prefix.
+ *
+ * Deliberately restated rather than shared with `ClientIdPrefix.REDIRECT_URI`: that enum lives in
+ * `waltid-openid4vp-clientidprefix`, a wallet-side client-authentication module the verifier neither
+ * depends on nor should. Adding a module dependency to share one string literal would be a worse
+ * trade than repeating it here.
+ */
+private const val REDIRECT_URI_CLIENT_ID_PREFIX = "redirect_uri"
+
 object VerificationSessionCreator {
 
     private val log = KotlinLogging.logger { }
@@ -676,9 +686,14 @@ object VerificationSessionCreator {
         responseUri: String?,
     ): String? {
         if ((isDcApi && !isSignedRequest) || isAnnexC) return null
-        val provided = clientId?.takeIf { it.isNotBlank() }
+        // The bare prefix counts as "not provided": OID4VP 1.0 Section 5.9.3-3.1.1 makes a
+        // redirect_uri client identifier the Response URI itself, which only exists once the session
+        // id has been generated, so callers that want it pass the prefix alone and it is completed
+        // here. A bare prefix carries no URI and is not a usable client identifier on its own, so
+        // this is unambiguous.
+        val provided = clientId?.takeIf { it.isNotBlank() && it != REDIRECT_URI_CLIENT_ID_PREFIX }
         if (provided != null) {
-            require(!isSignedRequest || !provided.startsWith("redirect_uri:")) {
+            require(!isSignedRequest || !provided.startsWith("$REDIRECT_URI_CLIENT_ID_PREFIX:")) {
                 "Signed requests cannot use the redirect_uri client_id prefix"
             }
             return provided
@@ -687,9 +702,10 @@ object VerificationSessionCreator {
             "Signed requests require a client_id; omitting client_id only auto-generates the unsigned redirect_uri scheme"
         }
         val destination = requireNotNull(responseUri) {
-            "Cannot auto-generate redirect_uri client_id without a response_uri"
+            "A redirect_uri client identifier is the Response URI, so it is only available for " +
+                "cross-device flows"
         }
-        return "redirect_uri:$destination"
+        return "$REDIRECT_URI_CLIENT_ID_PREFIX:$destination"
     }
 
     private sealed interface VerifierSigningKey {

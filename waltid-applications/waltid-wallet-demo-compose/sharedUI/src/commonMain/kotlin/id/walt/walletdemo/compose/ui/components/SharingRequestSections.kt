@@ -72,12 +72,12 @@ private fun RequesterSection(requester: WalletDemoSharingRequester) {
     // what a request carrying no verifier metadata looks like, the label captions that heading instead
     // of repeating the origin as a second row: one string, one statement about it.
     val originIsIdentity = verifiedOrigin != null && verifiedOrigin == identityName
-    val details = buildList {
-        add(WalletDemoSharingDetail(VERIFIED_ORIGIN_LABEL, verifiedOrigin?.takeIf { !originIsIdentity }))
-        addAll(requester.details)
-    }.filter { !it.value.isNullOrBlank() }
+    val verifiedOriginDetail = verifiedOrigin
+        ?.takeIf { !originIsIdentity }
+        ?.let { WalletDemoSharingDetail(VERIFIED_ORIGIN_LABEL, it) }
+    val requesterDetails = requester.details.filter { !it.value.isNullOrBlank() }
 
-    if (identityName == null && details.isEmpty()) return
+    if (identityName == null && verifiedOriginDetail == null && requesterDetails.isEmpty()) return
 
     ReviewMetadataSection(
         title = "Requester",
@@ -89,9 +89,24 @@ private fun RequesterSection(requester: WalletDemoSharingRequester) {
                 fallbackName = identityName,
                 supportingText = VERIFIED_ORIGIN_LABEL.takeIf { originIsIdentity },
             )
-            if (details.isNotEmpty()) MetadataRowDivider()
+            if (verifiedOriginDetail != null || requesterDetails.isNotEmpty()) MetadataRowDivider()
         }
-        MetadataDetailList(details.map { MetadataDetailItem(it.label, it.value, it.linkUri) })
+        verifiedOriginDetail?.let {
+            MetadataDetailList(listOf(MetadataDetailItem(it.label, it.value, it.linkUri)))
+            if (requesterDetails.isNotEmpty()) MetadataRowDivider()
+        }
+        if (requesterDetails.isNotEmpty()) {
+            MetadataDisclosure(
+                title = "Requester details",
+                initiallyExpanded = false,
+                modifier = Modifier.testTag(WalletUiTestTags.PresentationRequesterDetailsToggle),
+            ) {
+                MetadataDetailList(
+                    requesterDetails.map { MetadataDetailItem(it.label, it.value, it.linkUri) },
+                    modifier = Modifier.testTag(WalletUiTestTags.PresentationRequesterDetails),
+                )
+            }
+        }
     }
 }
 

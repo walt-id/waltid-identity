@@ -41,7 +41,8 @@ class Wallet2ClientIdTrustStartupTest {
             signingKey = DirectSerializedKey(runBlocking { JWKKey.generate(KeyType.Ed25519) }),
         )
         try {
-            E2ETest("127.0.0.1", 17066, failEarly = true).testBlock(
+            val port = freePort()
+            E2ETest("127.0.0.1", port, failEarly = true).testBlock(
                 features = listOf(OSSWallet2FeatureCatalog),
                 featureAmendments = mapOf(
                     CommonsFeatureCatalog.authenticationServiceFeature to suspend {
@@ -55,7 +56,7 @@ class Wallet2ClientIdTrustStartupTest {
                     ConfigManager.preloadConfig(
                         "wallet-service",
                         OSSWallet2ServiceConfig(
-                            publicBaseUrl = Url("http://127.0.0.1:17066"),
+                            publicBaseUrl = Url("http://127.0.0.1:$port"),
                             clientIdTrust = ClientIdTrustConfig(
                                 preRegisteredClients = mapOf("registered-verifier" to metadata),
                             ),

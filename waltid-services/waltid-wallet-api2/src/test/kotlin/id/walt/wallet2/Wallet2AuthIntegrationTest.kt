@@ -47,7 +47,7 @@ import kotlin.test.assertTrue
 class Wallet2AuthIntegrationTest {
 
     private val host = "127.0.0.1"
-    private val port = 17050
+    private val port = freePort()
 
     @Test
     fun testAuthFlow() {

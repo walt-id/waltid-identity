@@ -100,7 +100,6 @@ import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
 class Wallet2AdditionalUseCasesTest {
 
     private val host = "127.0.0.1"
-    private val basePort = 17200
 
     // -----------------------------------------------------------------------
     // Test 1: Static-key wallet - wallet configured with an embedded key,
@@ -109,7 +108,7 @@ class Wallet2AdditionalUseCasesTest {
 
     @Test
     fun testStaticKeyWallet() {
-        val port = basePort
+        val port = freePort()
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
@@ -164,7 +163,7 @@ class Wallet2AdditionalUseCasesTest {
 
     @Test
     fun testKeyImport() {
-        val port = basePort + 1
+        val port = freePort()
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
@@ -231,7 +230,7 @@ class Wallet2AdditionalUseCasesTest {
 
     @Test
     fun testSharedCredentialStore() {
-        val port = basePort + 2
+        val port = freePort()
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
@@ -301,8 +300,8 @@ class Wallet2AdditionalUseCasesTest {
 
     @Test
     fun testPresentationIsolatedStepsAndMatching() {
-        val issuerPort = basePort + 3
-        val walletPort = basePort + 4
+        val issuerPort = freePort()
+        val walletPort = freePort()
         val issuerBase = "http://$host:$issuerPort"
         val walletBase = "http://$host:$walletPort"
 
@@ -629,8 +628,8 @@ class Wallet2AdditionalUseCasesTest {
 
     @Test
     fun testAuthCodeGrantIsolatedSteps() {
-        val issuerPort = basePort + 5
-        val walletPort = basePort + 6
+        val issuerPort = freePort()
+        val walletPort = freePort()
         val issuerBase = "http://$host:$issuerPort"
         val walletBase = "http://$host:$walletPort"
 

@@ -40,7 +40,7 @@ import kotlin.test.assertTrue
 class TransactionDataProfilesIntegrationTest {
 
     private val host = "127.0.0.1"
-    private val port = 17080
+    private val port = freePort()
 
     private val paymentType = "org.waltid.transaction-data.payment-authorization"
     private val scaType = "urn:eudi:sca:payment:1"

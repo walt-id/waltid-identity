@@ -86,7 +86,6 @@ import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
 class Wallet2ExtendedIntegrationTest {
 
     private val host = "127.0.0.1"
-    private val basePort = 17100
 
     // -----------------------------------------------------------------------
     // Test 1: Wallet creation with all three store types attached
@@ -94,7 +93,7 @@ class Wallet2ExtendedIntegrationTest {
 
     @Test
     fun testWalletCreationWithStoresAndListEndpoints() {
-        val port = basePort
+        val port = freePort()
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
@@ -174,7 +173,7 @@ class Wallet2ExtendedIntegrationTest {
 
     @Test
     fun testKeyAndDidManagement() {
-        val port = basePort + 1
+        val port = freePort()
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
@@ -306,8 +305,8 @@ class Wallet2ExtendedIntegrationTest {
 
     @Test
     fun testIsolatedReceiveSteps() {
-        val issuerPort = basePort + 2
-        val walletPort = basePort + 3
+        val issuerPort = freePort()
+        val walletPort = freePort()
         val issuerBase = "http://$host:$issuerPort"
         val walletBase = "http://$host:$walletPort"
 
@@ -739,7 +738,7 @@ class Wallet2ExtendedIntegrationTest {
 
     @Test
     fun testCredentialDeletion() {
-        val port = basePort + 4
+        val port = freePort()
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {

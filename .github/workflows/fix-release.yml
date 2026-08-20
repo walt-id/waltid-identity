@@ -12,6 +12,25 @@ jobs:
     uses: ./.github/workflows/version.yml
     with:
       preferred: ${{ inputs.release_version }}
+  enterprise-ref:
+    name: Resolve enterprise branch ref
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.ref.outputs.ref }}
+    steps:
+      - name: Determine ref to dispatch on
+        id: ref
+        env:
+          REF: ${{ github.ref_name }}
+          TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+        run: |
+          if git ls-remote --exit-code --heads "https://${TOKEN}@github.com/walt-id/waltid-identity-enterprise.git" "$REF"; then
+            echo "Branch '$REF' found in waltid-identity-enterprise, using it."
+            echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch '$REF' not found in waltid-identity-enterprise, using main."
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
   gradle:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
@@ -21,6 +40,34 @@ jobs:
       enable-android-build: true
       publish: true
       report-check-name: 'gradle / gradle (ubuntu-22.04)'
+  integration-test-aws:
+    name: Integration Tests - AWS
+    runs-on: ubuntu-latest
+    needs: enterprise-ref
+    steps:
+      - name: Dispatch integration-test-aws.yml and wait
+        uses: benc-uk/workflow-dispatch@v1.3.2
+        with:
+          workflow: integration-test-aws.yml
+          repo: walt-id/waltid-identity-enterprise
+          ref: ${{ needs.enterprise-ref.outputs.ref }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          wait-for-completion: true
+          sync-status: true
+  integration-test-azure:
+    name: Integration Tests - Azure
+    runs-on: ubuntu-latest
+    needs: enterprise-ref
+    steps:
+      - name: Dispatch integration-test-azure.yml and wait
+        uses: benc-uk/workflow-dispatch@v1.3.2
+        with:
+          workflow: integration-test-azure.yml
+          repo: walt-id/waltid-identity-enterprise
+          ref: ${{ needs.enterprise-ref.outputs.ref }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          wait-for-completion: true
+          sync-status: true
   docker:
     uses: ./.github/workflows/docker.yml
     secrets: inherit
@@ -38,14 +85,14 @@ jobs:
   tag:
     uses: ./.github/workflows/tag.yml
     secrets: inherit
-    needs: [ version, gradle, docker, api-docker ]
+    needs: [ version, gradle, docker, api-docker, integration-test-aws, integration-test-azure ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       ref: ${{ github.ref_name }}
   enterprise-tag:
     uses: ./.github/workflows/tag.yml
     secrets: inherit
-    needs: [ version, gradle, docker, api-docker ]
+    needs: [ version, gradle, docker, api-docker, integration-test-aws, integration-test-azure ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-identity-enterprise
@@ -53,7 +100,7 @@ jobs:
   docs-tag:
     uses: ./.github/workflows/tag.yml
     secrets: inherit
-    needs: [ version, gradle, docker, api-docker ]
+    needs: [ version, gradle, docker, api-docker, integration-test-aws, integration-test-azure ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-docs
@@ -61,7 +108,7 @@ jobs:
   quickstart-tag:
     uses: ./.github/workflows/tag.yml
     secrets: inherit
-    needs: [ version, gradle, docker, api-docker ]
+    needs: [ version, gradle, docker, api-docker, integration-test-aws, integration-test-azure ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-enterprise-quickstart
@@ -69,7 +116,7 @@ jobs:
   unified-build-tag:
     uses: ./.github/workflows/tag.yml
     secrets: inherit
-    needs: [ version, gradle, docker, api-docker ]
+    needs: [ version, gradle, docker, api-docker, integration-test-aws, integration-test-azure ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-unified-build
