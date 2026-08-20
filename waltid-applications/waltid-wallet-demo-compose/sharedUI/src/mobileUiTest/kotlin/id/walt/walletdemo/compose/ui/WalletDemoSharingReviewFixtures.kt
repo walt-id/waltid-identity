@@ -9,7 +9,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoReaderTrust
 import id.walt.walletdemo.compose.logic.WalletDemoSharingDetail
 import id.walt.walletdemo.compose.logic.WalletDemoSharingEncryptionMechanism
 import id.walt.walletdemo.compose.logic.WalletDemoSharingRequest
-import id.walt.walletdemo.compose.logic.WalletDemoSharingRequester
+import id.walt.walletdemo.compose.logic.WalletDemoSharingVerifier
 import id.walt.walletdemo.compose.logic.WalletDemoSharingResponseProtection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionDataItem
@@ -29,7 +29,7 @@ internal object WalletDemoSharingReviewFixtures {
         credentialOptions: List<WalletDemoPresentationCredentialOption> = listOf(credentialOption()),
     ): WalletDemoSharingReview = WalletDemoSharingReview(
         request = WalletDemoSharingRequest(
-            requester = WalletDemoSharingRequester(
+            verifier = WalletDemoSharingVerifier(
                 fallbackName = "https://verifier.example",
                 verifiedOrigin = "https://verifier.example",
             ),
@@ -69,7 +69,7 @@ internal object WalletDemoSharingReviewFixtures {
         ),
     ): WalletDemoSharingReview = WalletDemoSharingReview(
         request = WalletDemoSharingRequest(
-            requester = WalletDemoSharingRequester(
+            verifier = WalletDemoSharingVerifier(
                 fallbackName = "https://verifier.example",
                 verifiedOrigin = "https://verifier.example",
             ),

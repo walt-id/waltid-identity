@@ -2,16 +2,13 @@ package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
@@ -22,10 +19,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
 import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
+import id.walt.walletdemo.compose.logic.WalletDemoReviewIsland
+import id.walt.walletdemo.compose.logic.WalletDemoReviewIslandKind
+import id.walt.walletdemo.compose.logic.WalletDemoReviewSurfaceContext
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
 import id.walt.walletdemo.compose.logic.claimDisplayGroups
+import id.walt.walletdemo.compose.logic.toReviewIslands
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
+/** Issuance review rendered through the shared island and technical-navigation grammar. */
 @Composable
 internal fun OfferReviewSection(
     preview: WalletDemoOfferPreview,
@@ -36,185 +38,160 @@ internal fun OfferReviewSection(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     modifier: Modifier = Modifier,
+    showActions: Boolean = true,
+    scrollContent: Boolean = false,
+    context: WalletDemoReviewSurfaceContext = WalletDemoReviewSurfaceContext.Offered,
 ) {
-    val focusManager = LocalFocusManager.current
-
+    val islands = preview.toReviewIslands(context)
     Column(
         modifier = modifier
             .fillMaxWidth()
             .testTag(WalletUiTestTags.OfferReview),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Credential offer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-
-        ReviewMetadataSection(
-            title = "Issuer",
-            modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerSection),
-        ) {
-            val issuerName = preview.issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
-            val issuerIdentifier = preview.issuer.credentialIssuer.trim()
-            val issuerDetails = listOf(
-                MetadataDetailItem(
-                    label = "Credential Issuer",
-                    value = issuerIdentifier.takeIf { issuerName != null && it != issuerName },
-                    linkUri = issuerIdentifier,
-                ),
-            ).filter { !it.value.isNullOrBlank() }
-            MetadataIdentityRow(
-                display = preview.issuer.display,
-                fallbackName = issuerIdentifier,
-            )
-            if (issuerDetails.isNotEmpty()) {
-                MetadataRowDivider()
-                MetadataDisclosure(
-                    title = "Issuer details",
-                    initiallyExpanded = false,
-                    modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerDetailsToggle),
-                ) {
-                    MetadataDetailList(
-                        issuerDetails,
-                        modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerDetails),
+        ReviewIslandNavigationHost(
+            reviewKey = preview,
+            islands = islands,
+            modifier = if (scrollContent) Modifier.weight(1f) else Modifier,
+            scrollContent = scrollContent,
+            islandModifier = { island -> offerIslandTestModifier(island) },
+            showModelExpandedValues = { island -> island.kind != WalletDemoReviewIslandKind.Information },
+        ) { island ->
+            when (island.kind) {
+                WalletDemoReviewIslandKind.Information -> OfferedInformationContent(preview.offeredCredentials)
+                WalletDemoReviewIslandKind.RequiredAction -> TransactionCodeField(
+                        preview = preview,
+                        txCode = txCode,
+                        reviewEnabled = reviewEnabled,
+                        onTxCodeChange = onTxCodeChange,
                     )
-                }
+                WalletDemoReviewIslandKind.Issuer,
+                WalletDemoReviewIslandKind.Verifier,
+                WalletDemoReviewIslandKind.Credential,
+                WalletDemoReviewIslandKind.PurposeAndTransaction,
+                -> Unit
             }
         }
 
-        if (preview.offeredCredentials.isNotEmpty()) {
-            ReviewMetadataSection(
-                title = "Offered credentials",
-                modifier = Modifier.testTag(WalletUiTestTags.OfferCredentialsSection),
-            ) {
-                preview.offeredCredentials.forEachIndexed { index, credential ->
-                    if (index > 0) HorizontalDivider()
-                    OfferedCredentialContent(credential)
-                }
-            }
+        if (showActions) {
+            OfferReviewActionBar(
+                preview = preview,
+                acceptEnabled = acceptEnabled,
+                reviewEnabled = reviewEnabled,
+                onAccept = onAccept,
+                onDecline = onDecline,
+            )
         }
+    }
+}
 
-        if (preview.requiresIssuerAuthentication) {
-            ReviewMetadataSection(
-                title = "Issuer sign-in",
-                modifier = Modifier.testTag(WalletUiTestTags.OfferAuthorizationSection),
-            ) {
+@Composable
+private fun OfferedInformationContent(credentials: List<WalletDemoOfferedCredentialMetadata>) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        credentials.filter { it.claims.isNotEmpty() }.forEachIndexed { credentialIndex, credential ->
+            if (credentialIndex > 0) HorizontalDivider()
+            if (credentials.size > 1) {
                 Text(
-                    text = "Continuing opens your browser to sign in with the issuer before the credential is issued.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
+                    text = credential.display?.name ?: credential.configurationId,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
-        }
-
-        preview.transactionCode?.let { requirement ->
-            ReviewMetadataSection(
-                title = "Transaction code",
-                modifier = Modifier.testTag(WalletUiTestTags.OfferTransactionCodeSection),
-            ) {
+            credential.claimDisplayGroups().forEachIndexed { groupIndex, group ->
+                if (groupIndex > 0) HorizontalDivider()
                 Text(
-                    text = requirement.description ?: "Enter the transaction code provided by the issuer.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
+                    text = group.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
                 )
-                OutlinedTextField(
-                    value = txCode,
-                    onValueChange = { value ->
-                        onTxCodeChange(value)
-                        val requiredLength = requirement.length
-                        if (requiredLength != null && requirement.normalizeInput(value).length == requiredLength) {
-                            focusManager.clearFocus()
-                        }
-                    },
-                    label = { Text("Code") },
-                    supportingText = requirement.length?.let { length ->
-                        { Text("$length characters") }
-                    },
-                    singleLine = true,
-                    enabled = reviewEnabled,
-                    keyboardOptions = KeyboardOptions(
-                        autoCorrectEnabled = false,
-                        keyboardType = when (requirement.inputMode) {
-                            WalletDemoTransactionCodeInputMode.Numeric -> KeyboardType.NumberPassword
-                            WalletDemoTransactionCodeInputMode.Text -> KeyboardType.Password
-                        },
-                    ),
-                    visualTransformation = PasswordVisualTransformation(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(WalletUiTestTags.TxCodeInput),
-                )
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = onAccept,
-                enabled = acceptEnabled,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferAcceptButton),
-            ) {
-                Text(if (preview.requiresIssuerAuthentication) "Continue to sign in" else "Accept")
-            }
-            TextButton(
-                onClick = onDecline,
-                enabled = reviewEnabled,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferDeclineButton),
-            ) {
-                Text("Decline")
+                group.claims.forEach { claim ->
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(claim.label, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            text = claim.inclusion,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun OfferedCredentialContent(credential: WalletDemoOfferedCredentialMetadata) {
-    val title = credential.display?.name
-        ?: credential.vct
-        ?: credential.doctype
-        ?: credential.configurationId
+internal fun OfferReviewActionBar(
+    preview: WalletDemoOfferPreview,
+    acceptEnabled: Boolean,
+    reviewEnabled: Boolean,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ReviewActionBar(
+        primaryLabel = if (preview.requiresIssuerAuthentication) "Continue" else "Add credential",
+        primaryEnabled = acceptEnabled,
+        onPrimary = onAccept,
+        primaryTestTag = WalletUiTestTags.OfferAcceptButton,
+        secondaryLabel = "Decline",
+        secondaryEnabled = reviewEnabled,
+        onSecondary = onDecline,
+        secondaryTestTag = WalletUiTestTags.OfferDeclineButton,
+        modifier = modifier,
+    )
+}
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        MetadataIdentityRow(
-            display = credential.display,
-            fallbackName = title,
-            supportingText = credential.display?.description,
-        )
-        val details = listOf(
-            MetadataDetailItem("Format", credential.format),
-            MetadataDetailItem("Type", credential.vct ?: credential.doctype),
-        ).filter { !it.value.isNullOrBlank() }
-        if (details.isNotEmpty()) {
-            MetadataRowDivider()
-            MetadataDetailList(details)
-        }
-        if (credential.claims.isNotEmpty()) {
-            MetadataRowDivider()
-            MetadataDisclosure(
-                title = "Supported claims (${credential.claims.size})",
-                initiallyExpanded = false,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferSupportedClaims),
-            ) {
-                credential.claimDisplayGroups().forEachIndexed { groupIndex, group ->
-                    if (groupIndex > 0) MetadataRowDivider()
-                    Text(
-                        text = group.title,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    group.claims.forEachIndexed { index, claim ->
-                        if (index > 0) MetadataRowDivider()
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(claim.label, style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                text = claim.inclusion,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
+@Composable
+private fun TransactionCodeField(
+    preview: WalletDemoOfferPreview,
+    txCode: String,
+    reviewEnabled: Boolean,
+    onTxCodeChange: (String) -> Unit,
+) {
+    val requirement = preview.transactionCode ?: return
+    val focusManager = LocalFocusManager.current
+    OutlinedTextField(
+        value = txCode,
+        onValueChange = { value ->
+            onTxCodeChange(value)
+            val requiredLength = requirement.length
+            if (requiredLength != null && requirement.normalizeInput(value).length == requiredLength) {
+                focusManager.clearFocus()
             }
+        },
+        label = { Text("Code") },
+        supportingText = requirement.length?.let { length ->
+            { Text("$length characters") }
+        },
+        singleLine = true,
+        enabled = reviewEnabled,
+        keyboardOptions = KeyboardOptions(
+            autoCorrectEnabled = false,
+            keyboardType = when (requirement.inputMode) {
+                WalletDemoTransactionCodeInputMode.Numeric -> KeyboardType.NumberPassword
+                WalletDemoTransactionCodeInputMode.Text -> KeyboardType.Password
+            },
+        ),
+        visualTransformation = PasswordVisualTransformation(),
+        colors = OutlinedTextFieldDefaults.colors(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(WalletUiTestTags.TxCodeInput),
+    )
+}
+
+private fun offerIslandTestModifier(island: WalletDemoReviewIsland): Modifier = when (island.kind) {
+    WalletDemoReviewIslandKind.Issuer -> Modifier.testTag(WalletUiTestTags.OfferIssuerSection)
+    WalletDemoReviewIslandKind.Credential -> Modifier.testTag(WalletUiTestTags.OfferCredentialsSection)
+    WalletDemoReviewIslandKind.Information -> Modifier.testTag(WalletUiTestTags.OfferSupportedClaims)
+    WalletDemoReviewIslandKind.RequiredAction -> Modifier.testTag(
+        if (island.title.contains("code", ignoreCase = true)) {
+            WalletUiTestTags.OfferTransactionCodeSection
+        } else {
+            WalletUiTestTags.OfferAuthorizationSection
         }
-    }
+    )
+    WalletDemoReviewIslandKind.Verifier,
+    WalletDemoReviewIslandKind.PurposeAndTransaction,
+    -> Modifier
 }

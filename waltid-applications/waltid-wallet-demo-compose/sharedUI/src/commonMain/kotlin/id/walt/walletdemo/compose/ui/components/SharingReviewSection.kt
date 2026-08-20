@@ -5,12 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -20,21 +18,21 @@ import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
+import id.walt.walletdemo.compose.logic.WalletDemoReaderTrust
+import id.walt.walletdemo.compose.logic.WalletDemoReviewIsland
+import id.walt.walletdemo.compose.logic.WalletDemoReviewIslandKind
+import id.walt.walletdemo.compose.logic.WalletDemoReviewSurfaceContext
+import id.walt.walletdemo.compose.logic.WalletDemoSharingEncryptionMechanism
+import id.walt.walletdemo.compose.logic.WalletDemoSharingRequest
+import id.walt.walletdemo.compose.logic.WalletDemoSharingResponseProtection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
+import id.walt.walletdemo.compose.logic.toReviewIslands
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
-/**
- * The wallet's single presentation-review surface, shared by every transport that can ask for a
- * credential.
- *
- * @param review What the user is being asked to share, already mapped off the transport's preview.
- * @param onReject Sends a protocol-level refusal to the requester. Pass null for transports with no
- * such message - the platform Digital Credentials APIs return a cancellation instead, and offering
- * both a Reject and a Cancel button there would promise the requester gets told two different things.
- */
+/** The presentation review shared by wallet-initiated and platform-invoked hosts. */
 @Composable
 internal fun SharingReviewSection(
     review: WalletDemoSharingReview,
@@ -50,25 +48,136 @@ internal fun SharingReviewSection(
     onReject: (() -> Unit)? = null,
     readOnly: Boolean = false,
     modifier: Modifier = Modifier,
+    showActions: Boolean = true,
+    scrollContent: Boolean = false,
+    context: WalletDemoReviewSurfaceContext = WalletDemoReviewSurfaceContext.SelectedForSharing,
 ) {
+    val islands = review.toReviewIslands(context)
     Column(
         modifier = modifier
             .fillMaxWidth()
             .testTag(WalletUiTestTags.PresentationReview),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SharingRequestSections(review.request)
+        ReviewIslandNavigationHost(
+            reviewKey = review,
+            islands = islands,
+            modifier = if (scrollContent) Modifier.weight(1f) else Modifier,
+            scrollContent = scrollContent,
+            islandModifier = { island -> sharingIslandTestModifier(island) },
+            showModelExpandedValues = { island ->
+                island.kind !in setOf(
+                    WalletDemoReviewIslandKind.Credential,
+                    WalletDemoReviewIslandKind.Information,
+                )
+            },
+        ) { island ->
+            when (island.kind) {
+                WalletDemoReviewIslandKind.Verifier -> VerifierReviewFacts(review.request)
+                WalletDemoReviewIslandKind.Credential -> SharingCredentialChoices(
+                    options = review.credentialOptions,
+                    selectedCredentialOptions = selectedCredentialOptions,
+                    enabled = enabled,
+                    readOnly = readOnly,
+                    onToggleCredential = onToggleCredential,
+                    onCredentialClick = onCredentialClick,
+                )
+                WalletDemoReviewIslandKind.Information -> SharingInformationChoices(
+                    options = review.credentialOptions,
+                    selectedCredentialOptions = selectedCredentialOptions,
+                    selectedDisclosureOptions = selectedDisclosureOptions,
+                    enabled = enabled,
+                    readOnly = readOnly,
+                    onToggleDisclosure = onToggleDisclosure,
+                )
+                WalletDemoReviewIslandKind.Issuer,
+                WalletDemoReviewIslandKind.PurposeAndTransaction,
+                WalletDemoReviewIslandKind.RequiredAction,
+                -> Unit
+            }
+        }
 
+        if (showActions && !readOnly) {
+            SharingReviewActionBar(
+                enabled = enabled,
+                selectionComplete = selectionComplete,
+                onSubmit = onSubmit,
+                onCancel = onCancel,
+                onReject = onReject,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun SharingReviewActionBar(
+    enabled: Boolean,
+    selectionComplete: Boolean,
+    onSubmit: () -> Unit,
+    onCancel: () -> Unit,
+    onReject: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    ReviewActionBar(
+        primaryLabel = "Share information",
+        primaryEnabled = enabled && selectionComplete,
+        onPrimary = onSubmit,
+        primaryTestTag = WalletUiTestTags.PresentationSubmitButton,
+        secondaryLabel = onReject?.let { "Reject" } ?: "Cancel",
+        secondaryEnabled = enabled,
+        onSecondary = onReject ?: onCancel,
+        secondaryTestTag = onReject?.let { WalletUiTestTags.PresentationRejectButton }
+            ?: WalletUiTestTags.PresentationCancelButton,
+        modifier = modifier.testTag(WalletUiTestTags.PresentationActions),
+        tertiaryLabel = "Cancel review".takeIf { onReject != null },
+        tertiaryEnabled = enabled,
+        onTertiary = onCancel.takeIf { onReject != null },
+        tertiaryTestTag = WalletUiTestTags.PresentationCancelButton.takeIf { onReject != null },
+    )
+}
+
+@Composable
+private fun VerifierReviewFacts(request: WalletDemoSharingRequest) {
+    request.readerTrust?.let { trust ->
+        val (headline, explanation) = trust.userFacingText()
+        Column(
+            modifier = Modifier.testTag(WalletUiTestTags.PresentationReaderTrustSection),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(headline, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(
+                text = explanation,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    Column(
+        modifier = Modifier.testTag(WalletUiTestTags.PresentationResponseProtectionSection),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         Text(
-            "Select credentials to share",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            text = request.responseProtection.userFacingExplanation(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
 
-        review.credentialOptions.forEach { option ->
+@Composable
+private fun SharingCredentialChoices(
+    options: List<WalletDemoPresentationCredentialOption>,
+    selectedCredentialOptions: Set<WalletDemoPresentationCredentialSelection>,
+    enabled: Boolean,
+    readOnly: Boolean,
+    onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
+    onCredentialClick: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        options.forEachIndexed { index, option ->
             val details = option.toCredentialDetails()
             val credentialDisplay = details.toCardDisplayData()
-            val requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty()
+            if (index > 0) HorizontalDivider()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -84,46 +193,61 @@ internal fun SharingReviewSection(
                             checked = option.selection in selectedCredentialOptions,
                             onCheckedChange = { onToggleCredential(option.selection) },
                             enabled = enabled,
-                            modifier = Modifier.testTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id)),
+                            modifier = Modifier.testTag(
+                                WalletUiTestTags.presentationCredentialToggle(option.selection.id)
+                            ),
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(option.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(credentialDisplay.issuer, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            option.subject?.let {
-                                Text("Subject: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                credentialDisplay.issuer,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            option.subject?.let { subject ->
+                                Text(
+                                    "Subject: $subject",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
-                            Text(option.format, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
-
                 CredentialCard(
                     details = details,
                     modifier = Modifier.padding(start = if (readOnly) 0.dp else 48.dp),
+                    showProtocolDetails = false,
                     onClick = { onCredentialClick(details.summary.id) },
                 )
-                if (option.disclosures.isNotEmpty()) {
-                    SharingDisclosureList(
-                        option = option,
-                        credentialSelected = option.selection in selectedCredentialOptions,
-                        selectedDisclosureOptions = selectedDisclosureOptions,
-                        requestedDisclosureItems = requestedDisclosureItems,
-                        enabled = enabled,
-                        readOnly = readOnly,
-                        onToggleDisclosure = onToggleDisclosure,
-                    )
-                }
-                HorizontalDivider()
             }
         }
+    }
+}
 
-        if (!readOnly) {
-            SharingActionsRow(
+@Composable
+private fun SharingInformationChoices(
+    options: List<WalletDemoPresentationCredentialOption>,
+    selectedCredentialOptions: Set<WalletDemoPresentationCredentialSelection>,
+    selectedDisclosureOptions: Set<WalletDemoPresentationDisclosureSelection>,
+    enabled: Boolean,
+    readOnly: Boolean,
+    onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        options.filter { it.disclosures.isNotEmpty() }.forEachIndexed { optionIndex, option ->
+            if (optionIndex > 0) HorizontalDivider()
+            if (options.size > 1) {
+                Text(option.label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            }
+            SharingDisclosureList(
+                option = option,
+                credentialSelected = option.selection in selectedCredentialOptions,
+                selectedDisclosureOptions = selectedDisclosureOptions,
+                requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty(),
                 enabled = enabled,
-                selectionComplete = selectionComplete,
-                onSubmit = onSubmit,
-                onCancel = onCancel,
-                onReject = onReject,
+                readOnly = readOnly,
+                onToggleDisclosure = onToggleDisclosure,
             )
         }
     }
@@ -139,15 +263,7 @@ private fun SharingDisclosureList(
     readOnly: Boolean,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
 ) {
-    Column(
-        modifier = Modifier.padding(start = if (readOnly) 0.dp else 48.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            "Requested disclosures",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         option.disclosures.forEachIndexed { index, disclosure ->
             val selection = WalletDemoPresentationDisclosureSelection(
                 queryId = option.queryId,
@@ -196,40 +312,34 @@ private fun SharingDisclosureList(
     }
 }
 
-@Composable
-private fun SharingActionsRow(
-    enabled: Boolean,
-    selectionComplete: Boolean,
-    onSubmit: () -> Unit,
-    onCancel: () -> Unit,
-    onReject: (() -> Unit)?,
-) {
-    Row(
-        modifier = Modifier.testTag(WalletUiTestTags.PresentationActions),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Button(
-            onClick = onSubmit,
-            enabled = enabled && selectionComplete,
-            modifier = Modifier.testTag(WalletUiTestTags.PresentationSubmitButton),
-        ) {
-            Text("Share")
-        }
-        onReject?.let { reject ->
-            TextButton(
-                onClick = reject,
-                enabled = enabled,
-                modifier = Modifier.testTag(WalletUiTestTags.PresentationRejectButton),
-            ) {
-                Text("Reject")
-            }
-        }
-        TextButton(
-            onClick = onCancel,
-            enabled = enabled,
-            modifier = Modifier.testTag(WalletUiTestTags.PresentationCancelButton),
-        ) {
-            Text(if (onReject == null) "Cancel" else "Cancel review")
-        }
+private fun sharingIslandTestModifier(island: WalletDemoReviewIsland): Modifier = when (island.kind) {
+    WalletDemoReviewIslandKind.Verifier -> Modifier.testTag(WalletUiTestTags.PresentationVerifierSection)
+    WalletDemoReviewIslandKind.PurposeAndTransaction -> Modifier.testTag(
+        WalletUiTestTags.claimGroup(island.title)
+    )
+    WalletDemoReviewIslandKind.Issuer,
+    WalletDemoReviewIslandKind.Credential,
+    WalletDemoReviewIslandKind.Information,
+    WalletDemoReviewIslandKind.RequiredAction,
+    -> Modifier
+}
+
+private fun WalletDemoReaderTrust.userFacingText(): Pair<String, String> = when (this) {
+    WalletDemoReaderTrust.NotAuthenticated ->
+        "Reader not authenticated" to "The request carried no reader signature."
+    WalletDemoReaderTrust.PendingVerification ->
+        "Reader authentication checked before sharing" to "Nothing is sent if verification fails."
+    is WalletDemoReaderTrust.Untrusted ->
+        "Reader identity not trusted by this wallet" to reason
+    is WalletDemoReaderTrust.Trusted ->
+        "Trusted reader" to readerIdentity
+}
+
+private fun WalletDemoSharingResponseProtection.userFacingExplanation(): String = when (this) {
+    WalletDemoSharingResponseProtection.None -> "The request does not require an encrypted response."
+    is WalletDemoSharingResponseProtection.Encrypted -> when (mechanism) {
+        WalletDemoSharingEncryptionMechanism.Jwe -> "The response is encrypted for the Verifier."
+        WalletDemoSharingEncryptionMechanism.DcApiJwt -> "The response is encrypted for platform delivery."
+        WalletDemoSharingEncryptionMechanism.AnnexCHpke -> "The response is protected for this reader session."
     }
 }

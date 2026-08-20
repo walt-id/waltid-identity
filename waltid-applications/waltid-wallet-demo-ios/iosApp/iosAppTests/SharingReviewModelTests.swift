@@ -10,7 +10,7 @@ import XCTest
 /// something it is not.
 final class SharingReviewModelTests: XCTestCase {
 
-    // MARK: - Requester identity
+    // MARK: - Verifier identity
 
     func testNormalOpenIDReviewIsHeadedByVerifierMetadataAndNotByAVerifiedOrigin() {
         let review = openIDPreview(
@@ -22,26 +22,26 @@ final class SharingReviewModelTests: XCTestCase {
             )
         ).sharingReview()
 
-        let requester = try? XCTUnwrap(review.request.requester)
-        XCTAssertEqual(requester?.display?.name, "Example Verifier")
+        let verifier = try? XCTUnwrap(review.request.verifier)
+        XCTAssertEqual(verifier?.display?.name, "Example Verifier")
         XCTAssertEqual(
-            requester?.verifiedOrigin,
+            verifier?.verifiedOrigin,
             nil,
             "A plain OpenID4VP request has no platform-verified origin, and claiming one would present a self-asserted client ID as authenticated"
         )
         XCTAssertEqual(
-            requester?.details.map(\.label),
+            verifier?.details.map(\.label),
             ["Client URI", "Privacy policy", "Terms of service"]
         )
-        XCTAssertEqual(requester?.details.first { $0.label == "Privacy policy" }?.linkURI, "https://verifier.example/privacy")
+        XCTAssertEqual(verifier?.details.first { $0.label == "Privacy policy" }?.linkURI, "https://verifier.example/privacy")
     }
 
-    func testARequestWithoutVerifierMetadataGetsNoRequesterSection() {
+    func testARequestWithoutVerifierMetadataGetsNoVerifierIsland() {
         let review = openIDPreview(verifierMetadata: nil).sharingReview()
 
         XCTAssertNil(
-            review.request.requester,
-            "An empty requester section would read as a named requester whose name happens to be missing"
+            review.request.verifier,
+            "An empty Verifier island would read as a named Verifier whose name happens to be missing"
         )
     }
 
@@ -55,21 +55,21 @@ final class SharingReviewModelTests: XCTestCase {
             )
         ).sharingReview()
 
-        XCTAssertNil(review.request.requester)
+        XCTAssertNil(review.request.verifier)
     }
 
     func testAnnexCReviewIsHeadedByTheVerifiedOriginTheWalletWillBindTheResponseTo() {
         let review = annexCPreview(verifiedOrigin: "https://reader.example").sharingReview()
-        let requester = try? XCTUnwrap(review.request.requester)
+        let verifier = try? XCTUnwrap(review.request.verifier)
 
-        XCTAssertEqual(requester?.fallbackName, "https://reader.example")
+        XCTAssertEqual(verifier?.fallbackName, "https://reader.example")
         XCTAssertEqual(
-            requester?.verifiedOrigin,
+            verifier?.verifiedOrigin,
             "https://reader.example",
             "The origin is the only authenticated fact about an Annex C caller, so it must stay marked as verified"
         )
         XCTAssertNil(
-            requester?.display,
+            verifier?.display,
             "Annex C carries no verifier display metadata, and inventing one would name a caller the request never named"
         )
     }
@@ -78,45 +78,45 @@ final class SharingReviewModelTests: XCTestCase {
         let review = annexCPreview(verifiedOrigin: "https://Reader.Example:443/").sharingReview()
 
         XCTAssertEqual(
-            review.request.requester?.verifiedOrigin,
+            review.request.verifier?.verifiedOrigin,
             "https://Reader.Example:443/",
             "Canonicalization belongs to the shared KMP layer; normalizing again here could disagree with what the verifier bound its request to"
         )
     }
 
-    func testAnOriginThatHeadsTheRequesterSectionIsCaptionedAsVerifiedAndNotRepeated() {
-        let requester = annexCPreview(verifiedOrigin: "https://reader.example").sharingReview().request.requester
+    func testAnOriginThatHeadsTheVerifierIslandIsCaptionedAsVerifiedAndNotRepeated() {
+        let verifier = annexCPreview(verifiedOrigin: "https://reader.example").sharingReview().request.verifier
 
-        XCTAssertEqual(requester?.identityName, "https://reader.example")
+        XCTAssertEqual(verifier?.identityName, "https://reader.example")
         XCTAssertEqual(
-            requester?.identityNameCaption,
-            SharingRequester.verifiedOriginLabel,
-            "An uncaptioned heading reads as one more self-asserted requester claim, and the origin is the only authenticated one"
+            verifier?.identityNameCaption,
+            SharingVerifier.verifiedOriginLabel,
+            "An uncaptioned heading reads as one more self-asserted Verifier claim, and the origin is the only authenticated one"
         )
         XCTAssertEqual(
-            requester?.detailRows.filter { $0.value?.isEmpty == false }.map(\.label),
+            verifier?.detailRows.filter { $0.value?.isEmpty == false }.map(\.label),
             [],
-            "The origin already heads the section, so a labelled row repeating it would read as a second, independent requester fact"
+            "The origin already heads the island, so a labelled row repeating it would read as a second, independent Verifier fact"
         )
     }
 
     func testAnOriginBesideSelfAssertedMetadataIsALabelledRowRatherThanACaption() {
-        let requester = SharingRequester(
+        let verifier = SharingVerifier(
             display: MetadataDisplay(name: "Example Verifier", locale: "en", logoURI: nil, logoAltText: nil),
             fallbackName: "https://verifier.example",
             verifiedOrigin: "https://verifier.example",
             details: [SharingDetail(label: "Privacy policy", value: "https://verifier.example/privacy")]
         )
 
-        XCTAssertEqual(requester.identityName, "Example Verifier")
+        XCTAssertEqual(verifier.identityName, "Example Verifier")
         XCTAssertNil(
-            requester.identityNameCaption,
+            verifier.identityNameCaption,
             "The heading here is self-asserted metadata, and captioning it as verified would present it as authenticated"
         )
         XCTAssertEqual(
-            requester.detailRows.map { [$0.label, $0.value ?? ""] },
+            verifier.detailRows.map { [$0.label, $0.value ?? ""] },
             [
-                [SharingRequester.verifiedOriginLabel, "https://verifier.example"],
+                [SharingVerifier.verifiedOriginLabel, "https://verifier.example"],
                 ["Privacy policy", "https://verifier.example/privacy"],
             ],
             "The origin stays visible under its own label: a review showing only the name a request asked to be called would hide the one verified fact"
@@ -235,6 +235,89 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertNotEqual(review.request.responseProtection, SharingResponseProtection.none)
     }
 
+    func testReviewIslandsPutHumanDecisionsBeforeProtocolDetails() {
+        let review = openIDPreview(
+            responseEncryption: .required(
+                ResponseEncryptionDetails(
+                    keyManagementAlgorithm: "ECDH-ES",
+                    contentEncryptionAlgorithm: "A256GCM",
+                    verifierKeyID: "verifier-key-1",
+                    verifierKeyThumbprint: "thumbprint-1"
+                )
+            ),
+            transactionData: [
+                PresentationTransactionData(
+                    type: "urn:test:payment",
+                    displayName: "Payment authorization",
+                    credentialQueryIDs: ["pid"],
+                    supportedFields: ["amount"],
+                    rawJSON: #"{"type":"urn:test:payment","amount":"42.00 EUR"}"#,
+                    detailsJSON: #"{"amount":"42.00 EUR"}"#
+                ),
+            ]
+        ).sharingReview()
+
+        let islands = review.reviewIslands(context: .selectedForSharing)
+        XCTAssertEqual(
+            islands.map(\.kind),
+            [.verifier, .credential, .information, .purposeAndTransaction]
+        )
+        XCTAssertEqual(islands.first?.title, "Example Verifier")
+        XCTAssertEqual(islands.first?.summaryValues.first?.value, "Protected response")
+
+        let normalCopy = islands.flatMap { island in
+            [island.title, island.subtitle].compactMap { $0 }
+                + island.summaryValues.compactMap(\.value)
+                + island.expandedValues.compactMap(\.value)
+        }
+        XCTAssertFalse(normalCopy.contains("ECDH-ES"))
+        XCTAssertFalse(normalCopy.contains("A256GCM"))
+        XCTAssertFalse(normalCopy.contains("mso_mdoc"))
+
+        let technicalCopy = islands.flatMap(\.technicalSections).flatMap(\.values).compactMap(\.value)
+        XCTAssertTrue(technicalCopy.contains("ECDH-ES"))
+        XCTAssertTrue(technicalCopy.contains("A256GCM"))
+        XCTAssertTrue(technicalCopy.contains("mso_mdoc"))
+    }
+
+    func testDigitalCredentialsEncryptionUsesUserFacingOpenID4VPWording() {
+        let review = SharingReviewModel(
+            request: SharingRequest(
+                verifier: SharingVerifier(fallbackName: "Example Verifier"),
+                responseProtection: .encrypted(mechanism: .dcAPIJWT)
+            ),
+            credentialOptions: []
+        )
+
+        let values = review.reviewIslands().flatMap(\.technicalSections).flatMap(\.values)
+        XCTAssertTrue(values.contains { $0.value == "OpenID4VP encrypted response" })
+        XCTAssertFalse(values.contains { $0.value == "dc_api.jwt" })
+    }
+
+    func testProtocolCredentialLabelsAreResolvedForTheIslandSummary() throws {
+        let credential = PresentationCredentialOption(
+            queryID: "mdl",
+            credentialID: "credential-1",
+            format: "mso_mdoc",
+            issuer: "Example Issuer",
+            subject: nil,
+            label: "mso_mdoc",
+            credentialDataJSON: #"{"docType":"org.iso.18013.5.1.mDL"}"#,
+            disclosures: []
+        )
+        let review = SharingReviewModel(
+            request: SharingRequest(verifier: nil),
+            credentialOptions: [credential]
+        )
+
+        let island = try XCTUnwrap(review.reviewIslands().first { $0.kind == .credential })
+        XCTAssertEqual(island.title, "Mobile driving licence")
+        XCTAssertFalse(island.expandedValues.contains { $0.label == "mso_mdoc" })
+        XCTAssertTrue(
+            island.technicalSections.flatMap(\.values).contains { $0.label == "Format" && $0.value == "mso_mdoc" }
+        )
+    }
+
     // MARK: - Transaction data and technical details
 
     func testTransactionDataIsGroupedForReviewOnTheNormalOpenIDPath() {
@@ -305,7 +388,7 @@ final class SharingReviewModelTests: XCTestCase {
             responseEncryption: .notRequired
         ).sharingRequest()
 
-        XCTAssertEqual(request.requester?.display?.name, "Example Verifier")
+        XCTAssertEqual(request.verifier?.display?.name, "Example Verifier")
         XCTAssertEqual(request.technicalDetails.first { $0.label == "Client ID" }?.value, "https://verifier.example")
         XCTAssertTrue(request.transactionData.isEmpty)
         XCTAssertNil(request.readerTrust)

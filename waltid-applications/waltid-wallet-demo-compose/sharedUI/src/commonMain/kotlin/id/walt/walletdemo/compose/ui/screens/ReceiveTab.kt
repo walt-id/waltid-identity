@@ -25,6 +25,7 @@ import id.walt.walletdemo.compose.logic.receivedCredentials
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialCard
+import id.walt.walletdemo.compose.ui.components.OfferReviewActionBar
 import id.walt.walletdemo.compose.ui.components.OfferReviewSection
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
@@ -46,63 +47,79 @@ internal fun ReceiveTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .testTag(WalletUiTestTags.ReceiveTabContent)
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .testTag(WalletUiTestTags.ReceiveTabContent),
     ) {
-        if (state.offerPreview == null) {
-            UrlActionSection(
-                title = "Receive",
-                value = requestDrafts.offerUrl,
-                onValueChange = onOfferUrlChange,
-                label = "Credential offer URL",
-                buttonText = "Receive",
-                enabled = state.receiveActionEnabled,
-                inputEnabled = state.receiveUrlEntryEnabled,
-                inputTestTag = WalletUiTestTags.OfferInput,
-                buttonTestTag = WalletUiTestTags.ReceiveButton,
-                scanButtonTestTag = WalletUiTestTags.OfferScanButton,
-                onClick = onPreviewOffer,
-            )
-        } else {
-            OfferReviewSection(
-                preview = state.offerPreview!!,
-                acceptEnabled = state.acceptOfferEnabled,
-                reviewEnabled = state.offerReviewEnabled,
-                txCode = requestDrafts.txCode,
-                onTxCodeChange = onTxCodeChange,
-                onAccept = onAcceptOffer,
-                onDecline = onDeclineOffer,
-            )
-        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            if (state.offerPreview == null) {
+                UrlActionSection(
+                    title = "Receive",
+                    value = requestDrafts.offerUrl,
+                    onValueChange = onOfferUrlChange,
+                    label = "Credential offer URL",
+                    buttonText = "Receive",
+                    enabled = state.receiveActionEnabled,
+                    inputEnabled = state.receiveUrlEntryEnabled,
+                    inputTestTag = WalletUiTestTags.OfferInput,
+                    buttonTestTag = WalletUiTestTags.ReceiveButton,
+                    scanButtonTestTag = WalletUiTestTags.OfferScanButton,
+                    onClick = onPreviewOffer,
+                )
+            } else {
+                OfferReviewSection(
+                    preview = state.offerPreview!!,
+                    acceptEnabled = state.acceptOfferEnabled,
+                    reviewEnabled = state.offerReviewEnabled,
+                    txCode = requestDrafts.txCode,
+                    onTxCodeChange = onTxCodeChange,
+                    onAccept = onAcceptOffer,
+                    onDecline = onDeclineOffer,
+                    showActions = false,
+                )
+            }
 
-        if (state.deferredCredentials.isNotEmpty()) {
-            Text("Pending credentials", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            state.deferredCredentials.forEach { pending ->
+            if (state.deferredCredentials.isNotEmpty()) {
+                Text("Pending credentials", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                state.deferredCredentials.forEach { pending ->
+                    OutlinedButton(
+                        onClick = { onResumeDeferred(pending.id) },
+                        enabled = !state.isAuthenticating,
+                    ) {
+                        Text("Check ${pending.credentialConfigurationId}")
+                    }
+                }
+            }
+
+            if (state.receiveCompleted) {
                 OutlinedButton(
-                    onClick = { onResumeDeferred(pending.id) },
-                    enabled = !state.isAuthenticating,
+                    onClick = onStartNew,
+                    modifier = Modifier.testTag(WalletUiTestTags.ReceiveNewButton),
                 ) {
-                    Text("Check ${pending.credentialConfigurationId}")
+                    Text("New receive")
+                }
+                Text("Received credentials", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                receivedCredentials.forEach { credential ->
+                    CredentialCard(
+                        details = credential.toCredentialDetails(),
+                        onClick = { onCredentialClick(credential.id) },
+                    )
                 }
             }
         }
 
-        if (state.receiveCompleted) {
-            OutlinedButton(
-                onClick = onStartNew,
-                modifier = Modifier.testTag(WalletUiTestTags.ReceiveNewButton),
-            ) {
-                Text("New receive")
-            }
-            Text("Received credentials", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            receivedCredentials.forEach { credential ->
-                CredentialCard(
-                    details = credential.toCredentialDetails(),
-                    onClick = { onCredentialClick(credential.id) },
-                )
-            }
+        state.offerPreview?.takeUnless { state.receiveCompleted }?.let { preview ->
+            OfferReviewActionBar(
+                preview = preview,
+                acceptEnabled = state.acceptOfferEnabled,
+                reviewEnabled = state.offerReviewEnabled,
+                onAccept = onAcceptOffer,
+                onDecline = onDeclineOffer,
+            )
         }
     }
 }

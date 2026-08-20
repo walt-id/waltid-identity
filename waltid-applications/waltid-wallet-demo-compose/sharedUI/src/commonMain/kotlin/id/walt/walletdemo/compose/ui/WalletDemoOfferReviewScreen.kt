@@ -4,11 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +26,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
+import id.walt.walletdemo.compose.logic.WalletDemoReviewSurfaceContext
+import id.walt.walletdemo.compose.ui.components.OfferReviewActionBar
 import id.walt.walletdemo.compose.ui.components.OfferReviewSection
 
 /**
@@ -40,7 +41,7 @@ sealed interface WalletDemoOfferCreateUiState {
 
     data class Review(
         val preview: WalletDemoOfferPreview,
-        val title: String = "Accept digital credential?",
+        val title: String = "Add credential",
         val submitting: Boolean = false,
     ) : WalletDemoOfferCreateUiState
 
@@ -152,22 +153,19 @@ private fun OfferCreateReviewContent(
     onDecline: () -> Unit,
 ) {
     var txCode by remember(preview) { mutableStateOf("") }
-    val scrollState = rememberScrollState()
     val txRequirement = preview.transactionCode
     val acceptEnabled = enabled && (txRequirement == null || txRequirement.accepts(txCode))
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .fillMaxHeight(0.92f),
     ) {
         Text(
             title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
         )
         OfferReviewSection(
             preview = preview,
@@ -180,6 +178,19 @@ private fun OfferCreateReviewContent(
             onAccept = {
                 onAccept(txCode.trim().ifBlank { null })
             },
+            onDecline = onDecline,
+            showActions = false,
+            scrollContent = true,
+            context = WalletDemoReviewSurfaceContext.PlatformInvoked,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 20.dp),
+        )
+        OfferReviewActionBar(
+            preview = preview,
+            acceptEnabled = acceptEnabled,
+            reviewEnabled = enabled,
+            onAccept = { onAccept(txCode.trim().ifBlank { null }) },
             onDecline = onDecline,
         )
     }

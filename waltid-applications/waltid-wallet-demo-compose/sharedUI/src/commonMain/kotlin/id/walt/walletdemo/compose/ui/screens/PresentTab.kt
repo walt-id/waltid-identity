@@ -24,6 +24,7 @@ import id.walt.walletdemo.compose.logic.presentationReviewEnabled
 import id.walt.walletdemo.compose.logic.presentationUrlEntryEnabled
 import id.walt.walletdemo.compose.logic.toSharingReview
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.components.SharingReviewActionBar
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
@@ -48,65 +49,81 @@ internal fun PresentTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .testTag(WalletUiTestTags.PresentTabContent)
-            .verticalScroll(scrollState)
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .testTag(WalletUiTestTags.PresentTabContent),
     ) {
-        UrlActionSection(
-            title = "Present",
-            value = requestDrafts.presentationRequestUrl,
-            onValueChange = onPresentationRequestUrlChange,
-            label = "OpenID4VP request URL",
-            buttonText = "Preview",
-            enabled = state.presentationPreviewActionEnabled,
-            inputEnabled = state.presentationUrlEntryEnabled,
-            inputTestTag = WalletUiTestTags.PresentationInput,
-            buttonTestTag = WalletUiTestTags.PresentButton,
-            scanButtonTestTag = WalletUiTestTags.PresentationScanButton,
-            onClick = onPreview,
-        )
-
-        if (credentials.isEmpty()) {
-            Text(
-                "No credentials available",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(scrollState)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            UrlActionSection(
+                title = "Present",
+                value = requestDrafts.presentationRequestUrl,
+                onValueChange = onPresentationRequestUrlChange,
+                label = "OpenID4VP request URL",
+                buttonText = "Preview",
+                enabled = state.presentationPreviewActionEnabled,
+                inputEnabled = state.presentationUrlEntryEnabled,
+                inputTestTag = WalletUiTestTags.PresentationInput,
+                buttonTestTag = WalletUiTestTags.PresentButton,
+                scanButtonTestTag = WalletUiTestTags.PresentationScanButton,
+                onClick = onPreview,
             )
-        }
 
-        if (state.presentationCompleted) {
-            OutlinedButton(
-                onClick = onStartNew,
-                modifier = Modifier.testTag(WalletUiTestTags.PresentationNewButton),
-            ) {
-                Text("New presentation")
+            if (credentials.isEmpty()) {
+                Text(
+                    "No credentials available",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            if (state.presentationCompleted) {
+                OutlinedButton(
+                    onClick = onStartNew,
+                    modifier = Modifier.testTag(WalletUiTestTags.PresentationNewButton),
+                ) {
+                    Text("New presentation")
+                }
+            }
+
+            state.presentationPreview?.let { preview ->
+                SharingReviewSection(
+                    review = preview.toSharingReview(),
+                    selectedCredentialOptions = state.selectedPresentationCredentialOptions,
+                    selectedDisclosureOptions = state.selectedPresentationDisclosureOptions,
+                    selectionComplete = state.presentationCredentialSelectionComplete(),
+                    enabled = state.presentationReviewEnabled,
+                    readOnly = state.presentationCompleted,
+                    onToggleCredential = onToggleCredential,
+                    onToggleDisclosure = onToggleDisclosure,
+                    onCredentialClick = onCredentialClick,
+                    onSubmit = onSubmit,
+                    onReject = onReject,
+                    onCancel = onCancel,
+                    showActions = false,
+                )
+            }
+
+            state.presentationError?.let { error ->
+                PresentationErrorSection(
+                    error = error,
+                    enabled = state.presentationReviewEnabled,
+                    onNotifyVerifier = onReject,
+                    onDismiss = onCancel,
+                )
             }
         }
 
-        state.presentationPreview?.let { preview ->
-            SharingReviewSection(
-                review = preview.toSharingReview(),
-                selectedCredentialOptions = state.selectedPresentationCredentialOptions,
-                selectedDisclosureOptions = state.selectedPresentationDisclosureOptions,
+        if (state.presentationPreview != null && !state.presentationCompleted) {
+            SharingReviewActionBar(
+                enabled = state.presentationReviewEnabled,
                 selectionComplete = state.presentationCredentialSelectionComplete(),
-                enabled = state.presentationReviewEnabled,
-                readOnly = state.presentationCompleted,
-                onToggleCredential = onToggleCredential,
-                onToggleDisclosure = onToggleDisclosure,
-                onCredentialClick = onCredentialClick,
                 onSubmit = onSubmit,
-                onReject = onReject,
                 onCancel = onCancel,
-            )
-        }
-
-        state.presentationError?.let { error ->
-            PresentationErrorSection(
-                error = error,
-                enabled = state.presentationReviewEnabled,
-                onNotifyVerifier = onReject,
-                onDismiss = onCancel,
+                onReject = onReject,
             )
         }
     }

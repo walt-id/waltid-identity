@@ -14,6 +14,11 @@ struct ReceiveView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    Color.clear
+                        .frame(width: 1, height: 1)
+                        .accessibilityElement()
+                        .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
+
                     if viewModel.offerPreview == nil {
                         ScannableUrlEditor(
                             title: "Receive",
@@ -46,6 +51,7 @@ struct ReceiveView: View {
                             isAcceptEnabled: viewModel.acceptOfferEnabled,
                             isReviewEnabled: viewModel.offerReviewEnabled,
                             txCode: viewModel.txCode,
+                            showsActions: false,
                             onTxCodeChange: viewModel.updateTxCode,
                             onAccept: viewModel.acceptOffer,
                             onDecline: viewModel.declineOffer
@@ -86,8 +92,21 @@ struct ReceiveView: View {
                 .padding()
             }
             .navigationTitle("Receive")
+            .safeAreaInset(edge: .bottom) {
+                if let preview = viewModel.offerPreview, !viewModel.receiveCompleted {
+                    OfferReviewActions(
+                        preview: preview,
+                        isAcceptEnabled: viewModel.acceptOfferEnabled,
+                        isReviewEnabled: viewModel.offerReviewEnabled,
+                        onAccept: viewModel.acceptOffer,
+                        onDecline: viewModel.declineOffer
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial)
+                }
+            }
             .background(detailsNavigationLink)
-            .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
         .navigationViewStyle(.stack)
         .onChange(of: viewModel.authorizationRequestURL) { authorizationURL in

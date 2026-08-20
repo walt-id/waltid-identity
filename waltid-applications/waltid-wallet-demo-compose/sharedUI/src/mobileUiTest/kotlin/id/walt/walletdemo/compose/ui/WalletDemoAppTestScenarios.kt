@@ -148,8 +148,17 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("vc+sd-jwt").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.reviewIslandToggle("credential"))
+            .performScrollTo()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.reviewIslandTechnicalDetails("credential"))
+            .performScrollTo()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.ReviewTechnicalDetailsPage).assertIsDisplayed()
         onNodeWithText("vc+sd-jwt").performScrollTo().assertIsDisplayed()
-        assertIssuerDetailsCollapsedUntilRequested()
+        returnFromReviewTechnicalDetails()
+        assertIssuerTechnicalDetailsAvailable()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
 
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
@@ -288,12 +297,12 @@ class WalletDemoAppTestScenarios {
 
         onNodeWithTag(WalletUiTestTags.OfferAuthorizationSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Issuer sign-in").assertIsDisplayed()
-        onNodeWithText("Continuing opens your browser to sign in with the issuer before the credential is issued.")
-            .assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.OfferAcceptButton)
+        onNodeWithText("Continuing opens your browser to sign in with the Issuer before the credential is added.")
             .performScrollTo()
             .assertIsDisplayed()
-        onNodeWithText("Continue to sign in").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton)
+            .assertIsDisplayed()
+        onNodeWithText("Continue").assertIsDisplayed()
         onAllNodesWithText("Accept").assertCountEquals(0)
     }
 
@@ -396,8 +405,8 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentButton).assertIsEnabled().performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
         onNodeWithText("No credentials available").performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performScrollTo().assertIsNotEnabled()
-        onNodeWithTag(WalletUiTestTags.PresentationRejectButton).performScrollTo().assertIsEnabled().performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentationRejectButton).assertIsEnabled().performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationCompleted }
         assertEquals("openid4vp://example", wallet.rejectedRequestUrl)
     }
@@ -467,19 +476,15 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
 
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
-        assertPresentationActionsFollowReviewContent()
-        onNodeWithTag("wallet.presentationInput").assertIsDisplayed()
-        onNodeWithTag("wallet.presentationInput").assertIsNotEnabled()
-        onNodeWithTag("wallet.presentationSubmitButton").performScrollTo().assertIsDisplayed()
+        assertPresentationReviewLandmarksAndStickyActions()
+        onNodeWithTag("wallet.presentationInput").performScrollTo().assertIsDisplayed().assertIsNotEnabled()
+        onNodeWithTag("wallet.presentationSubmitButton").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
-        assertRequesterDetailsCollapsedUntilRequested()
+        assertVerifierPublishedDetailsVisible()
         onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
-        onNodeWithText("Required").performScrollTo().assertIsDisplayed()
-        onNodeWithText("ECDH-ES").performScrollTo().assertIsDisplayed()
-        onNodeWithText("A256GCM").performScrollTo().assertIsDisplayed()
-        onNodeWithText("thumbprint-1").performScrollTo().assertIsDisplayed()
-        assertVerifierTechnicalDetailsCollapsedUntilRequested()
+        onNodeWithText("Protected response").performScrollTo().assertIsDisplayed()
+        assertVerifierTechnicalDetailsAvailable()
         onNodeWithTag(WalletUiTestTags.credentialCard(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.credentialCard(samplePresentationCredentialOption.selection.id)).performClick()
@@ -487,7 +492,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("Disclosure 7").performScrollTo().assertIsDisplayed()
         onNodeWithTag("wallet.detailsBack").performClick()
 
-        onNodeWithTag("wallet.presentationSubmitButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        onNodeWithTag("wallet.presentationSubmitButton").performSemanticsAction(SemanticsActions.OnClick)
 
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText == "Presentation sent" }
         onNodeWithTag("wallet.status").assertTextContains("Presentation sent")
@@ -523,13 +528,13 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentButton).performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
-        onNodeWithTag(WalletUiTestTags.PresentationRejectButton).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationRejectButton).performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText == "Presentation declined" }
 
         assertEquals("openid4vp://example", wallet.rejectedRequestUrl)
         onNodeWithTag(WalletUiTestTags.Status).assertTextContains("Presentation declined")
         onAllNodesWithTag(WalletUiTestTags.PresentationReview).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.PresentationNewButton).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationNewButton).performScrollTo().assertIsDisplayed()
     }
 
     fun presentTabShowsUnencryptedResponseState() = runComposeUiTest {
@@ -550,7 +555,13 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
         onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
-        onNodeWithText("Not requested").assertIsDisplayed()
+        onNodeWithText("No message-level encryption requested").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("Key management algorithm").assertCountEquals(0)
+        onAllNodesWithText("Verifier key thumbprint").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.reviewIslandTechnicalDetails("verifier"))
+            .performScrollTo()
+            .performClick()
+        onNodeWithText("Not requested").performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Key management algorithm").assertCountEquals(0)
         onAllNodesWithText("Verifier key thumbprint").assertCountEquals(0)
     }
@@ -575,14 +586,14 @@ class WalletDemoAppTestScenarios {
 
         val portraitDisclosurePath = "disclosures[0].portrait"
         onNodeWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.credentialCard(pathOnlyPortraitDisclosureCredentialOption.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
         onAllNodesWithText("$.portrait").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Portrait").assertCountEquals(2)
-        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
     }
 
     fun presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails() = runComposeUiTest {
@@ -604,9 +615,15 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
-        onAllNodesWithTag(WalletUiTestTags.PresentationVerifierSection).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Verifier").performScrollTo().assertIsDisplayed()
         onAllNodesWithText(sampleDidClientId).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.VerifierTechnicalDetailsToggle).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.reviewIslandToggle("verifier"))
+            .performScrollTo()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.reviewIslandTechnicalDetails("verifier"))
+            .performScrollTo()
+            .performClick()
         onNodeWithText(sampleDidClientId).performScrollTo().assertIsDisplayed()
     }
 
@@ -663,11 +680,11 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(identityDisclosure.id)).performScrollTo().assertIsOn()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(ageDisclosure.id)).performScrollTo().assertIsOff()
 
-        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performScrollTo().assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsEnabled()
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(identityOption.selection.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performScrollTo().assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsNotEnabled()
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(identityOption.selection.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performScrollTo().assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsEnabled()
 
         onNodeWithTag(WalletUiTestTags.credentialCard(ageOption.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
@@ -728,7 +745,7 @@ class WalletDemoAppTestScenarios {
 
         previewGate.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
-        onNodeWithTag("wallet.presentationSubmitButton").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("wallet.presentationSubmitButton").assertIsDisplayed()
     }
 
     fun deepLinksRouteToReceiveAndPresentTabs() = runComposeUiTest {
@@ -857,90 +874,84 @@ class WalletDemoAppTestScenarios {
         waitForIdle()
     }
 
-    private fun ComposeUiTest.assertPresentationActionsFollowReviewContent() {
-        val expectedCredentialTag = WalletUiTestTags.presentationCredential(
-            WalletDemoPresentationCredentialSelection(queryId = "pid", credentialId = "cred-1").id
-        )
+    private fun ComposeUiTest.assertPresentationReviewLandmarksAndStickyActions() {
+        val verifierTag = WalletUiTestTags.reviewIsland("verifier")
+        val credentialTag = WalletUiTestTags.reviewIsland("credential")
+        val informationTag = WalletUiTestTags.reviewIsland("information")
         val reviewLandmarkTags = onAllNodes(
             matcher = hasAnyAncestor(hasTestTag("wallet.presentationReview")) and (
-                hasTestTag(WalletUiTestTags.PresentationVerifierSection) or
-                    hasTestTag(WalletUiTestTags.PresentationResponseProtectionSection) or
-                    hasTestTag(WalletUiTestTags.PresentationTechnicalDetailsSection) or
-                    hasTestTag(expectedCredentialTag) or
-                    hasTestTag("wallet.presentationActions")
+                hasTestTag(verifierTag) or
+                    hasTestTag(credentialTag) or
+                    hasTestTag(informationTag)
                 ),
             useUnmergedTree = true,
         )
             .fetchSemanticsNodes()
             .mapNotNull { it.config.getOrElseNullable(SemanticsProperties.TestTag) { null } }
 
-        val verifierIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationVerifierSection)
-        val responseProtectionIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationResponseProtectionSection)
-        val technicalDetailsIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationTechnicalDetailsSection)
-        val credentialIndex = reviewLandmarkTags.indexOf(expectedCredentialTag)
-        val actionsIndex = reviewLandmarkTags.indexOf("wallet.presentationActions")
+        val verifierIndex = reviewLandmarkTags.indexOf(verifierTag)
+        val credentialIndex = reviewLandmarkTags.indexOf(credentialTag)
+        val informationIndex = reviewLandmarkTags.indexOf(informationTag)
 
-        assertTrue(verifierIndex >= 0, "Verifier details are missing from presentation review: $reviewLandmarkTags")
-        assertTrue(responseProtectionIndex >= 0, "Response protection is missing from presentation review: $reviewLandmarkTags")
-        assertTrue(technicalDetailsIndex >= 0, "Technical request details are missing from presentation review: $reviewLandmarkTags")
-        assertTrue(credentialIndex >= 0, "Shared credential is missing from presentation review: $reviewLandmarkTags")
-        assertTrue(actionsIndex >= 0, "Share actions are missing from presentation review: $reviewLandmarkTags")
+        assertTrue(verifierIndex >= 0, "Verifier island is missing from presentation review: $reviewLandmarkTags")
+        assertTrue(credentialIndex >= 0, "Credential island is missing from presentation review: $reviewLandmarkTags")
+        assertTrue(informationIndex >= 0, "Information island is missing from presentation review: $reviewLandmarkTags")
         assertTrue(
-            verifierIndex < responseProtectionIndex &&
-                responseProtectionIndex < technicalDetailsIndex,
-            "Verifier metadata, response-protection, and technical sections are out of order: $reviewLandmarkTags",
+            verifierIndex < credentialIndex && credentialIndex < informationIndex,
+            "Verifier, credential, and information islands are out of order: $reviewLandmarkTags",
         )
-        assertTrue(
-            technicalDetailsIndex < credentialIndex,
-            "Credential selection should follow request metadata: $reviewLandmarkTags",
-        )
-        assertTrue(
-            credentialIndex < actionsIndex,
-            "Share action should follow shared credential details so the credential is reviewed before consent: $reviewLandmarkTags",
-        )
+        onNodeWithTag(WalletUiTestTags.PresentationActions).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed()
     }
 
-    private fun ComposeUiTest.assertVerifierTechnicalDetailsCollapsedUntilRequested() {
+    private fun ComposeUiTest.assertVerifierTechnicalDetailsAvailable() {
         onAllNodesWithText("Client ID").assertCountEquals(0)
-        onNodeWithTag("wallet.verifierTechnicalDetailsToggle").performScrollTo().assertIsDisplayed()
-        onNodeWithTag("wallet.verifierTechnicalDetailsToggle").performClick()
+        onAllNodesWithText("ECDH-ES").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.reviewIslandTechnicalDetails("verifier"))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.ReviewTechnicalDetailsPage).assertIsDisplayed()
         onNodeWithText("Client ID").performScrollTo().assertIsDisplayed()
         onNodeWithText("https://verifier.example/response").performScrollTo().assertIsDisplayed()
         onNodeWithText("state-123").performScrollTo().assertIsDisplayed()
         onNodeWithText("nonce-456").performScrollTo().assertIsDisplayed()
+        onNodeWithText("ECDH-ES").performScrollTo().assertIsDisplayed()
+        onNodeWithText("A256GCM").performScrollTo().assertIsDisplayed()
+        onNodeWithText("thumbprint-1").performScrollTo().assertIsDisplayed()
+        returnFromReviewTechnicalDetails()
     }
 
-    private fun ComposeUiTest.assertIssuerDetailsCollapsedUntilRequested() {
-        onAllNodesWithText("Credential Issuer").assertCountEquals(0)
+    private fun ComposeUiTest.assertIssuerTechnicalDetailsAvailable() {
         onAllNodesWithText("https://issuer.example").assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.OfferIssuerDetailsToggle)
+        onNodeWithTag(WalletUiTestTags.reviewIslandToggle("issuer"))
+            .performScrollTo()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.reviewIslandTechnicalDetails("issuer"))
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
-        onNodeWithTag(WalletUiTestTags.OfferIssuerDetails).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.ReviewTechnicalDetailsPage).assertIsDisplayed()
         onNodeWithText("Credential Issuer").performScrollTo().assertIsDisplayed()
         onNodeWithText("https://issuer.example").performScrollTo().assertIsDisplayed().assertHasClickAction()
-        onNodeWithTag(WalletUiTestTags.OfferIssuerDetailsToggle).performScrollTo().performClick()
-        onAllNodesWithText("Credential Issuer").assertCountEquals(0)
+        returnFromReviewTechnicalDetails()
         onAllNodesWithText("https://issuer.example").assertCountEquals(0)
     }
 
-    private fun ComposeUiTest.assertRequesterDetailsCollapsedUntilRequested() {
-        onAllNodesWithText("https://verifier.example").assertCountEquals(0)
-        onAllNodesWithText("https://verifier.example/privacy").assertCountEquals(0)
-        onAllNodesWithText("https://verifier.example/terms").assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle)
-            .performScrollTo()
-            .assertIsDisplayed()
-            .performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetails).performScrollTo().assertIsDisplayed()
+    private fun ComposeUiTest.assertVerifierPublishedDetailsVisible() {
         onNodeWithText("https://verifier.example").performScrollTo().assertIsDisplayed().assertHasClickAction()
         onNodeWithText("https://verifier.example/privacy").performScrollTo().assertIsDisplayed().assertHasClickAction()
         onNodeWithText("https://verifier.example/terms").performScrollTo().assertIsDisplayed().assertHasClickAction()
-        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle).performScrollTo().performClick()
-        onAllNodesWithText("https://verifier.example").assertCountEquals(0)
-        onAllNodesWithText("https://verifier.example/privacy").assertCountEquals(0)
-        onAllNodesWithText("https://verifier.example/terms").assertCountEquals(0)
+    }
+
+    private fun ComposeUiTest.returnFromReviewTechnicalDetails() {
+        onNodeWithTag(WalletUiTestTags.ReviewTechnicalDetailsBack)
+            .performScrollTo()
+            .performClick()
+        mainClock.advanceTimeBy(500)
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(WalletUiTestTags.ReviewTechnicalDetailsPage).fetchSemanticsNodes().isEmpty()
+        }
     }
 
     companion object {

@@ -28,19 +28,24 @@ data class WalletDemoSharingReview(
  * said something it never said - a fabricated `client_id` for an unsigned Digital Credentials
  * request, or an OpenID4VP `state` for an Annex C DeviceRequest.
  *
- * @property requester Who is asking, or null when the transport proves nothing about the caller.
+ * @property verifier The Verifier identity, or null when the transport proves nothing about it.
  * @property readerTrust Reader-authentication state, or null when the protocol has no reader auth.
  * @property responseProtection Protection applied to the response the wallet is about to produce.
  * @property transactionData Transactions this presentation will authorize, already display-grouped.
  * @property technicalDetails Protocol-level values shown behind a disclosure for inspection.
  */
 data class WalletDemoSharingRequest(
-    val requester: WalletDemoSharingRequester?,
+    val verifier: WalletDemoSharingVerifier?,
     val readerTrust: WalletDemoReaderTrust? = null,
     val responseProtection: WalletDemoSharingResponseProtection = WalletDemoSharingResponseProtection.None,
     val transactionData: List<ClaimGroup> = emptyList(),
     val technicalDetails: List<WalletDemoSharingDetail> = emptyList(),
-)
+) {
+    /** Temporary property alias for source compatibility with pre-island callers. */
+    @Deprecated("Use verifier")
+    val requester: WalletDemoSharingVerifier?
+        get() = verifier
+}
 
 /**
  * The identity shown to the user for the party requesting the presentation.
@@ -49,12 +54,12 @@ data class WalletDemoSharingRequest(
  * self-asserted by the request, while a verified origin was authenticated by the platform or by
  * request signing. A wallet that renders them identically invites the user to trust the wrong one.
  *
- * @property display Self-asserted requester display metadata, when the request carried any.
+ * @property display Self-asserted Verifier display metadata, when the request carried any.
  * @property fallbackName Name to show when [display] has none.
  * @property verifiedOrigin Origin authenticated outside the request itself, when there is one.
- * @property details Additional requester-published links, such as privacy policy or terms.
+ * @property details Additional Verifier-published links, such as privacy policy or terms.
  */
-data class WalletDemoSharingRequester(
+data class WalletDemoSharingVerifier(
     val display: WalletDemoMetadataDisplay? = null,
     val fallbackName: String? = null,
     val verifiedOrigin: String? = null,
@@ -67,7 +72,11 @@ data class WalletDemoSharingRequester(
             details.any { !it.value.isNullOrBlank() }
 }
 
-/** One labelled value in a requester or technical-details list. */
+/** Temporary source-compatibility alias while downstream fixtures adopt Verifier terminology. */
+@Deprecated("Use WalletDemoSharingVerifier")
+typealias WalletDemoSharingRequester = WalletDemoSharingVerifier
+
+/** One labelled value in a Verifier or technical-details list. */
 data class WalletDemoSharingDetail(
     val label: String,
     val value: String?,
@@ -220,8 +229,8 @@ fun WalletDemoPresentationPreview.toSharingReview(): WalletDemoSharingReview = W
 
 /** Maps the request metadata of a normal OpenID4VP preview or protocol error onto review concepts. */
 fun WalletDemoPresentationRequestInfo.toSharingRequest(): WalletDemoSharingRequest = WalletDemoSharingRequest(
-    requester = verifierMetadata?.let { metadata ->
-        WalletDemoSharingRequester(
+    verifier = verifierMetadata?.let { metadata ->
+        WalletDemoSharingVerifier(
             display = metadata.display,
             details = listOf(
                 WalletDemoSharingDetail("Client URI", metadata.clientUri, metadata.clientUri),

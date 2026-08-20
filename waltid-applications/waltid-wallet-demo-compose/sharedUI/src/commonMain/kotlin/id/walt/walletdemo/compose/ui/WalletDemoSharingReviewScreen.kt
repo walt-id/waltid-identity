@@ -3,10 +3,9 @@ package id.walt.walletdemo.compose.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -20,12 +19,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
+import id.walt.walletdemo.compose.logic.WalletDemoReviewSurfaceContext
 import id.walt.walletdemo.compose.logic.defaultCredentialSelection
 import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toggleCredential
 import id.walt.walletdemo.compose.logic.toggleDisclosure
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import id.walt.walletdemo.compose.ui.components.SharingReviewActionBar
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.screens.CredentialDetailsScreen
 
@@ -63,7 +64,6 @@ fun WalletDemoSharingReviewScreen(
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
     var openCredentialDetailsId by remember(review) { mutableStateOf<String?>(null) }
-    val scrollState = rememberScrollState()
     val openDetails = openCredentialDetailsId?.let { detailsId ->
         review.credentialOptions
             .map { it.toCredentialDetails() }
@@ -99,15 +99,15 @@ fun WalletDemoSharingReviewScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .safeDrawingPadding()
-                        .verticalScroll(scrollState)
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                        .safeDrawingPadding(),
                 ) {
                     Text(
                         title,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
                     )
                     SharingReviewSection(
                         review = review,
@@ -123,6 +123,19 @@ fun WalletDemoSharingReviewScreen(
                         },
                         onToggleDisclosure = { disclosure -> selection = selection.toggleDisclosure(disclosure) },
                         onCredentialClick = { detailsId -> openCredentialDetailsId = detailsId },
+                        onSubmit = { onSubmit(selection) },
+                        onCancel = onCancel,
+                        onReject = onReject,
+                        showActions = false,
+                        scrollContent = true,
+                        context = WalletDemoReviewSurfaceContext.PlatformInvoked,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 20.dp),
+                    )
+                    SharingReviewActionBar(
+                        enabled = enabled,
+                        selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
                         onSubmit = { onSubmit(selection) },
                         onCancel = onCancel,
                         onReject = onReject,
@@ -144,8 +157,11 @@ object WalletDemoSharingReviewTestTags {
     /** Cancel button. */
     val CancelButton: String get() = WalletUiTestTags.PresentationCancelButton
 
-    /** Requester section. */
-    val RequesterSection: String get() = WalletUiTestTags.PresentationVerifierSection
+    /** Verifier section. */
+    val VerifierSection: String get() = WalletUiTestTags.PresentationVerifierSection
+
+    /** Legacy automation alias retained while downstream tests migrate. */
+    @Deprecated("Use VerifierSection")
 
     /** Reader-authentication section, rendered only for protocols that have reader auth. */
     val ReaderTrustSection: String get() = WalletUiTestTags.PresentationReaderTrustSection

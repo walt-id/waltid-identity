@@ -71,6 +71,20 @@ public struct SharingReviewScreen: View {
             }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                if failure == nil, review != nil {
+                    SharingReviewActions(
+                        selectionComplete: selectionComplete,
+                        isLoading: isSubmitting,
+                        onSubmit: onSubmit,
+                        onReject: onReject,
+                        onCancel: onCancel
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial)
+                }
+            }
             .sheet(item: $openCredentialDetails) { details in
                 NavigationStack {
                     ScrollView {
@@ -99,6 +113,8 @@ public struct SharingReviewScreen: View {
                 selection: selection,
                 selectionComplete: selectionComplete,
                 isLoading: isSubmitting,
+                showsActions: false,
+                context: .platformInvoked,
                 onToggleCredential: onToggleCredential,
                 onToggleDisclosure: onToggleDisclosure,
                 onCredentialSelected: { detailsID in

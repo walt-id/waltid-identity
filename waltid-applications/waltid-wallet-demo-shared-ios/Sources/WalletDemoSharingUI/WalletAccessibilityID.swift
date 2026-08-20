@@ -34,13 +34,13 @@ public enum WalletAccessibilityID {
     public static let presentationCancelButton = identifier("presentationCancelButton")
     public static let presentationVerifier = identifier("presentationVerifier")
     public static let presentationVerifierSection = identifier("presentationVerifierSection")
-    public static let presentationRequesterDetailsToggle = identifier("presentationRequesterDetailsToggle")
-    public static let presentationRequesterDetails = identifier("presentationRequesterDetails")
     public static let presentationReaderTrustSection = identifier("presentationReaderTrustSection")
     public static let presentationResponseProtectionSection = identifier("presentationResponseProtectionSection")
     public static let presentationTechnicalDetailsSection = identifier("presentationTechnicalDetailsSection")
     public static let verifierTechnicalDetailsToggle = identifier("verifierTechnicalDetailsToggle")
     public static let verifierTechnicalDetails = identifier("verifierTechnicalDetails")
+    public static let reviewTechnicalDetailsPage = identifier("reviewTechnicalDetailsPage")
+    public static let reviewTechnicalDetailsBack = identifier("reviewTechnicalDetailsBack")
 
     public static func claim(_ path: String) -> String {
         dynamicIdentifier("claim", path)
@@ -76,6 +76,18 @@ public enum WalletAccessibilityID {
 
     public static func presentationDisclosureToggle(_ id: String) -> String {
         identifier("presentationDisclosureToggle", id)
+    }
+
+    public static func reviewIsland(_ id: String) -> String {
+        identifier("reviewIsland", id)
+    }
+
+    public static func reviewIslandToggle(_ id: String) -> String {
+        identifier("reviewIslandToggle", id)
+    }
+
+    public static func reviewIslandTechnicalDetails(_ id: String) -> String {
+        identifier("reviewIslandTechnicalDetails", id)
     }
 
     private static func identifier(_ segments: String...) -> String {

@@ -21,7 +21,7 @@ public extension PresentationRequestInfo {
     /// The request concepts of a normal OpenID4VP presentation request.
     func sharingRequest() -> SharingRequest {
         SharingRequest(
-            requester: verifierMetadata?.sharingRequester(verifiedOrigin: nil),
+            verifier: verifierMetadata?.sharingVerifier(verifiedOrigin: nil),
             // Plain OpenID4VP has no reader authentication concept, so no reader-trust section is
             // offered rather than one reporting an absent reader.
             readerTrust: nil,
@@ -44,7 +44,7 @@ public extension PresentationRequestContext {
     /// deciding whether to notify them.
     func sharingRequest() -> SharingRequest {
         SharingRequest(
-            requester: verifierMetadata?.sharingRequester(verifiedOrigin: nil),
+            verifier: verifierMetadata?.sharingVerifier(verifiedOrigin: nil),
             readerTrust: nil,
             responseProtection: responseEncryption.sharingResponseProtection(mechanism: .jwe),
             transactionData: [],
@@ -70,7 +70,7 @@ public extension AnnexCPresentationPreview {
             request: SharingRequest(
                 // Annex C proves an origin and nothing else about the caller, so the origin both
                 // heads the section and stays labelled as the verified fact it is.
-                requester: SharingRequester(
+                verifier: SharingVerifier(
                     fallbackName: verifiedOrigin,
                     verifiedOrigin: verifiedOrigin
                 ),
@@ -126,9 +126,9 @@ public extension ReaderTrust {
 }
 
 private extension VerifierMetadata {
-    /// The requester identity a verifier's self-asserted metadata supports.
-    func sharingRequester(verifiedOrigin: String?) -> SharingRequester? {
-        let requester = SharingRequester(
+    /// The Verifier identity its self-asserted metadata supports.
+    func sharingVerifier(verifiedOrigin: String?) -> SharingVerifier? {
+        let verifier = SharingVerifier(
             display: display,
             fallbackName: verifiedOrigin,
             verifiedOrigin: verifiedOrigin,
@@ -138,7 +138,7 @@ private extension VerifierMetadata {
                 SharingDetail(label: "Terms of service", value: termsOfServiceURI, linkURI: termsOfServiceURI),
             ]
         )
-        return requester.hasContent ? requester : nil
+        return verifier.hasContent ? verifier : nil
     }
 }
 

@@ -15,9 +15,9 @@ import id.walt.wallet2.mobile.MobileWalletReaderTrust
 fun MobileWalletDigitalCredentialPreview.toSharingReview(): WalletDemoSharingReview =
     WalletDemoSharingReview(
         request = WalletDemoSharingRequest(
-            requester = WalletDemoSharingRequester(
+            verifier = WalletDemoSharingVerifier(
                 display = request.verifierMetadata?.display?.toDemoMetadataDisplay(),
-                // Falling back to the origin keeps the requester named by something authenticated.
+                // Falling back to the origin keeps the Verifier named by something authenticated.
                 // An unsigned DC API request has no trusted `client_id`, so there is nothing else
                 // truthful to head this section with.
                 fallbackName = verifiedOrigin,
@@ -60,7 +60,7 @@ fun MobileWalletDigitalCredentialPreview.toSharingReview(): WalletDemoSharingRev
 fun MobileWalletAnnexCPreview.toSharingReview(): WalletDemoSharingReview =
     WalletDemoSharingReview(
         request = WalletDemoSharingRequest(
-            requester = WalletDemoSharingRequester(
+            verifier = WalletDemoSharingVerifier(
                 fallbackName = verifiedOrigin,
                 verifiedOrigin = verifiedOrigin,
             ),
@@ -107,7 +107,11 @@ private fun MobileWalletPresentationCredentialOption.toDemoCredentialOption(): W
         queryId = queryId,
         credentialId = credentialId,
         multiple = multiple,
-        label = label ?: format,
+        label = CredentialDisplayNameResolver.resolve(
+            label = label,
+            format = format,
+            credentialDataJson = credentialDataJson,
+        ),
         issuer = issuer,
         subject = subject,
         format = format,

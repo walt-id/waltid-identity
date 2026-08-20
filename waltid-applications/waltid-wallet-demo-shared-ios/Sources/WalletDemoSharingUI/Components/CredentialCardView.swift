@@ -4,13 +4,16 @@ import WalletSDK
 
 public struct CredentialCardView: View {
     public let details: CredentialDetails
+    public let showProtocolDetails: Bool
 
-    public init(details: CredentialDetails) {
+    public init(details: CredentialDetails, showProtocolDetails: Bool = true) {
         self.details = details
+        self.showProtocolDetails = showProtocolDetails
     }
 
-    public init(credential: Credential) {
+    public init(credential: Credential, showProtocolDetails: Bool = true) {
         self.details = CredentialDisplayNormalizer.details(for: credential)
+        self.showProtocolDetails = showProtocolDetails
     }
 
     public var body: some View {
@@ -36,7 +39,9 @@ public struct CredentialCardView: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                 HStack(spacing: 8) {
-                    Text(details.format)
+                    if showProtocolDetails {
+                        Text(details.format)
+                    }
                     if let validityText = details.cardSummary.validityText {
                         Text(validityText)
                     }
@@ -55,16 +60,22 @@ public struct CredentialCardView: View {
 
 public struct CredentialCardButton: View {
     public let details: CredentialDetails
+    public let showProtocolDetails: Bool
     public let action: () -> Void
 
-    public init(details: CredentialDetails, action: @escaping () -> Void) {
+    public init(
+        details: CredentialDetails,
+        showProtocolDetails: Bool = true,
+        action: @escaping () -> Void
+    ) {
         self.details = details
+        self.showProtocolDetails = showProtocolDetails
         self.action = action
     }
 
     public var body: some View {
         Button(action: action) {
-            CredentialCardView(details: details)
+            CredentialCardView(details: details, showProtocolDetails: showProtocolDetails)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)

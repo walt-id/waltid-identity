@@ -22,7 +22,7 @@ final class AnnexCPresentationModelTests: XCTestCase {
         XCTAssertNil(model.failure)
         let review = model.review
         XCTAssertNotNil(review, "A prepared request must produce a review rather than an empty screen")
-        XCTAssertEqual(review?.request.requester?.verifiedOrigin, "https://reader.example")
+        XCTAssertEqual(review?.request.verifier?.verifiedOrigin, "https://reader.example")
         XCTAssertEqual(model.selection.credentials.map(\.credentialID), ["cred-mdl"])
         XCTAssertTrue(model.hasCompleteSelection, "Share is available once every requested document is answered")
     }

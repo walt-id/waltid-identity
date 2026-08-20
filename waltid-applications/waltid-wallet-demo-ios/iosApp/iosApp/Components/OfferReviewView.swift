@@ -7,160 +7,235 @@ struct OfferReviewView: View {
     let isAcceptEnabled: Bool
     let isReviewEnabled: Bool
     let txCode: String
+    let showsActions: Bool
     let onTxCodeChange: (String) -> Void
     let onAccept: () -> Void
     let onDecline: () -> Void
 
+    init(
+        preview: IssuanceOfferPreview,
+        isAcceptEnabled: Bool,
+        isReviewEnabled: Bool,
+        txCode: String,
+        showsActions: Bool = true,
+        onTxCodeChange: @escaping (String) -> Void,
+        onAccept: @escaping () -> Void,
+        onDecline: @escaping () -> Void
+    ) {
+        self.preview = preview
+        self.isAcceptEnabled = isAcceptEnabled
+        self.isReviewEnabled = isReviewEnabled
+        self.txCode = txCode
+        self.showsActions = showsActions
+        self.onTxCodeChange = onTxCodeChange
+        self.onAccept = onAccept
+        self.onDecline = onDecline
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Credential offer")
+            Text("Add credential")
                 .font(.headline)
 
-            ReviewMetadataSection(
-                title: "Issuer",
-                titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection
-            ) {
-                MetadataIdentityView(
-                    display: issuerDisplay,
-                    fallbackName: preview.issuer.identifier,
-                    supportingText: nil
+            ReviewIslandNavigationView(islands: preview.reviewIslands, expandedContent: { island in
+                if island.kind == .requiredAction, let requirement = preview.transactionCode {
+                    transactionCodeInput(requirement)
+                }
+            })
+
+            if showsActions {
+                OfferReviewActions(
+                    preview: preview,
+                    isAcceptEnabled: isAcceptEnabled,
+                    isReviewEnabled: isReviewEnabled,
+                    onAccept: onAccept,
+                    onDecline: onDecline
                 )
-                if issuerHasFriendlyName {
-                    Divider()
-                    MetadataDisclosure(
-                        title: "Issuer details",
-                        initiallyExpanded: false,
-                        accessibilityIdentifier: WalletAccessibilityID.offerIssuerDetailsToggle
-                    ) {
-                        MetadataDetailList(items: [
-                            MetadataDetailItem(
-                                label: "Credential Issuer",
-                                value: preview.issuer.identifier,
-                                linkURI: preview.issuer.identifier
-                            ),
-                        ])
-                        .accessibilityIdentifier(WalletAccessibilityID.offerIssuerDetails)
-                    }
-                }
-            }
-
-            if !preview.credentials.isEmpty {
-                ReviewMetadataSection(
-                    title: "Offered credentials",
-                    titleAccessibilityIdentifier: WalletAccessibilityID.offerCredentialsSection
-                ) {
-                    ForEach(Array(preview.credentials.enumerated()), id: \.offset) { index, credential in
-                        if index > 0 {
-                            Divider()
-                        }
-                        OfferedCredentialView(credential: credential)
-                    }
-                }
-            }
-
-            if preview.grant == .authorizationCode {
-                ReviewMetadataSection(
-                    title: "Issuer sign-in",
-                    titleAccessibilityIdentifier: WalletAccessibilityID.offerAuthorizationSection
-                ) {
-                    Text("Continuing opens your browser to sign in with the issuer before the credential is issued.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let requirement = preview.transactionCode {
-                ReviewMetadataSection(
-                    title: "Transaction code",
-                    titleAccessibilityIdentifier: WalletAccessibilityID.offerTransactionCodeSection
-                ) {
-                    Text(requirement.descriptionText ?? "Enter the transaction code provided by the issuer.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    SecureField(
-                        "Code",
-                        text: Binding(get: { txCode }, set: onTxCodeChange)
-                    )
-                    .textContentType(.oneTimeCode)
-                    .keyboardType(requirement.inputMode?.lowercased() == "numeric" ? .numberPad : .asciiCapable)
-                    .textInputAutocapitalization(.never)
-                    .disableAutocorrection(true)
-                    .padding(8)
-                    .frame(minHeight: 52)
-                    .background(
-                        isReviewEnabled ? Color(.systemBackground) : Color(.secondarySystemFill),
-                        in: RoundedRectangle(cornerRadius: 8)
-                    )
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.separator), lineWidth: 1))
-                    .disabled(!isReviewEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.txCodeInput)
-
-                    if let length = requirement.length {
-                        Text("\(length) characters")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            HStack(spacing: 8) {
-                Button(preview.grant == .authorizationCode ? "Continue to sign in" : "Accept", action: onAccept)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
-                    .disabled(!isAcceptEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
-
-                Button("Decline", action: onDecline)
-                    .buttonStyle(.bordered)
-                    .disabled(!isReviewEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
             }
         }
     }
 
-    private var issuerDisplay: MetadataDisplay? {
-        MetadataDisplay(
-            name: preview.issuer.name,
-            locale: preview.issuer.locale,
-            logoURI: preview.issuer.logoURI?.absoluteString,
-            logoAltText: preview.issuer.logoAltText
-        )
-    }
+    private func transactionCodeInput(_ requirement: IssuanceTransactionCode) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SecureField(
+                "Code",
+                text: Binding(get: { txCode }, set: onTxCodeChange)
+            )
+            .textContentType(.oneTimeCode)
+            .keyboardType(requirement.inputMode?.lowercased() == "numeric" ? .numberPad : .asciiCapable)
+            .textInputAutocapitalization(.never)
+            .disableAutocorrection(true)
+            .padding(8)
+            .frame(minHeight: 52)
+            .background(
+                isReviewEnabled ? Color(.systemBackground) : Color(.secondarySystemFill),
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.separator), lineWidth: 1))
+            .disabled(!isReviewEnabled)
+            .accessibilityIdentifier(WalletAccessibilityID.txCodeInput)
 
-    private var issuerHasFriendlyName: Bool {
-        guard let name = preview.issuer.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
-            return false
+            if let length = requirement.length {
+                Text("\(length) characters")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
-        return name != preview.issuer.identifier
     }
 }
 
-private struct OfferedCredentialView: View {
-    let credential: IssuanceCredentialPreview
-
-    private var title: String {
-        credential.name ?? credential.configurationID
-    }
+struct OfferReviewActions: View {
+    let preview: IssuanceOfferPreview
+    let isAcceptEnabled: Bool
+    let isReviewEnabled: Bool
+    let onAccept: () -> Void
+    let onDecline: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            MetadataIdentityView(
-                display: MetadataDisplay(
-                    name: credential.name,
-                    locale: nil,
-                    logoURI: credential.logoURI?.absoluteString,
-                    logoAltText: credential.logoAltText
-                ),
-                fallbackName: title,
-                supportingText: credential.descriptionText
-            )
-            let details = [
-                MetadataDetailItem(label: "Format", value: credential.format),
-            ].filter(\.isVisible)
-            if !details.isEmpty {
-                Divider()
-                MetadataDetailList(items: details)
+        VStack(spacing: 8) {
+            Button(action: onAccept) {
+                Text(preview.grant == .authorizationCode ? "Continue" : "Add credential")
+                    .frame(maxWidth: .infinity)
             }
+                .buttonStyle(.borderedProminent)
+                .tint(.waltBlue)
+                .disabled(!isAcceptEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
+
+            Button("Decline", action: onDecline)
+                .buttonStyle(.bordered)
+                .disabled(!isReviewEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
         }
+    }
+}
+
+private extension IssuanceOfferPreview {
+    var reviewIslands: [ReviewIsland] {
+        var islands = [issuerReviewIsland]
+        if let credentialReviewIsland {
+            islands.append(credentialReviewIsland)
+        }
+        if let requiredActionReviewIsland {
+            islands.append(requiredActionReviewIsland)
+        }
+        return islands
+    }
+
+    var issuerReviewIsland: ReviewIsland {
+        let title = issuer.name?.presentableValue ?? issuer.identifier
+        return ReviewIsland(
+            id: "issuer",
+            kind: .issuer,
+            context: .offered,
+            title: title,
+            subtitle: "Issuer",
+            visual: ReviewIslandVisual(
+                imageURI: issuer.logoURI?.absoluteString,
+                contentDescription: issuer.logoAltText,
+                fallbackText: title.first.map { String($0).uppercased() } ?? "I"
+            ),
+            technicalSections: [
+                ReviewTechnicalSection(
+                    id: "issuer-identity",
+                    title: "Issuer identity",
+                    values: [
+                        ReviewValue(
+                            label: "Credential Issuer",
+                            value: issuer.identifier,
+                            linkURI: issuer.identifier
+                        ),
+                        ReviewValue(label: "Selected display name", value: issuer.name),
+                        ReviewValue(label: "Selected locale", value: issuer.locale),
+                        ReviewValue(label: "Logo source", value: issuer.logoURI?.absoluteString),
+                    ]
+                ),
+            ]
+        )
+    }
+
+    var credentialReviewIsland: ReviewIsland? {
+        guard let first = credentials.first else { return nil }
+        let title: String
+        if credentials.count == 1 {
+            title = first.name?.presentableValue ?? "Credential"
+        } else {
+            title = "\(credentials.count) credentials"
+        }
+        return ReviewIsland(
+            id: "credential",
+            kind: .credential,
+            context: .offered,
+            title: title,
+            subtitle: credentials.count == 1 ? "Offered credential" : "Offered credentials",
+            visual: ReviewIslandVisual(
+                imageURI: first.logoURI?.absoluteString,
+                contentDescription: first.logoAltText,
+                fallbackText: title.first.map { String($0).uppercased() } ?? "C"
+            ),
+            expandedValues: credentials.map {
+                ReviewValue(
+                    label: $0.name?.presentableValue ?? "Credential",
+                    value: $0.descriptionText?.presentableValue ?? "Ready to add"
+                )
+            },
+            technicalSections: credentials.enumerated().map { index, credential in
+                ReviewTechnicalSection(
+                    id: "credential-\(index)",
+                    title: credential.name?.presentableValue ?? "Credential",
+                    values: [
+                        ReviewValue(label: "Configuration identifier", value: credential.configurationID),
+                        ReviewValue(label: "Format", value: credential.format),
+                        ReviewValue(label: "Logo source", value: credential.logoURI?.absoluteString),
+                    ]
+                )
+            },
+            initiallyExpanded: credentials.count > 1
+        )
+    }
+
+    var requiredActionReviewIsland: ReviewIsland? {
+        guard grant == .authorizationCode || transactionCode != nil else { return nil }
+        let title = transactionCode == nil ? "Issuer sign-in" : "Transaction code"
+        let subtitle = transactionCode?.descriptionText?.presentableValue
+            ?? (grant == .authorizationCode
+                ? "Continue securely in your browser"
+                : "Enter the code provided by the Issuer")
+        return ReviewIsland(
+            id: "required-action",
+            kind: .requiredAction,
+            context: .offered,
+            title: title,
+            subtitle: subtitle,
+            visual: ReviewIslandVisual(fallbackText: "→"),
+            expandedValues: grant == .authorizationCode
+                ? [ReviewValue(
+                    label: "Next step",
+                    value: "Continuing opens your browser to sign in with the Issuer before the credential is added."
+                )]
+                : [],
+            technicalSections: [
+                ReviewTechnicalSection(
+                    id: "authorization-method",
+                    title: "Authorization method",
+                    values: [
+                        ReviewValue(
+                            label: "Grant",
+                            value: grant == .authorizationCode ? "Authorization code" : "Pre-authorized code"
+                        ),
+                        ReviewValue(label: "Transaction code input", value: transactionCode?.inputMode),
+                        ReviewValue(label: "Expected length", value: transactionCode?.length.map { String($0) }),
+                    ]
+                ),
+            ],
+            initiallyExpanded: true
+        )
+    }
+}
+
+private extension String {
+    var presentableValue: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

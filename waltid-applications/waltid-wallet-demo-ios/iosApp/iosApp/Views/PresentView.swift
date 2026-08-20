@@ -16,6 +16,11 @@ struct PresentView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    Color.clear
+                        .frame(width: 1, height: 1)
+                        .accessibilityElement()
+                        .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
+
                     ScannableUrlEditor(
                         title: "Present",
                         label: "OpenID4VP request URL",
@@ -63,6 +68,7 @@ struct PresentView: View {
                             selectionComplete: viewModel.presentationCredentialSelectionComplete,
                             isLoading: !viewModel.presentationReviewEnabled,
                             isReadOnly: viewModel.presentationCompleted,
+                            showsActions: false,
                             onToggleCredential: viewModel.togglePresentationCredential,
                             onToggleDisclosure: viewModel.togglePresentationDisclosure,
                             onCredentialSelected: { detailsID in selectedDetailsID = detailsID },
@@ -86,8 +92,21 @@ struct PresentView: View {
                 .padding()
             }
             .navigationTitle("Present")
+            .safeAreaInset(edge: .bottom) {
+                if viewModel.presentationSharingReview != nil, !viewModel.presentationCompleted {
+                    SharingReviewActions(
+                        selectionComplete: viewModel.presentationCredentialSelectionComplete,
+                        isLoading: !viewModel.presentationReviewEnabled,
+                        onSubmit: viewModel.submitPresentation,
+                        onReject: viewModel.rejectPresentation,
+                        onCancel: viewModel.cancelPresentationReview
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial)
+                }
+            }
             .background(detailsNavigationLink)
-            .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }
         .navigationViewStyle(.stack)
         .onChange(of: viewModel.pendingPresentationContinuationURL) { url in

@@ -12,6 +12,8 @@ public struct SharingReviewView: View {
     private let selectionComplete: Bool
     private let isLoading: Bool
     private let isReadOnly: Bool
+    private let showsActions: Bool
+    private let context: ReviewSurfaceContext
     private let onToggleCredential: (PresentationCredentialSelection) -> Void
     private let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
     private let onCredentialSelected: ((String) -> Void)?
@@ -29,9 +31,9 @@ public struct SharingReviewView: View {
     ///   - isReadOnly: Whether the review is a record of a finished presentation rather than a prompt.
     ///   - onCredentialSelected: Opens a credential's full details, when the host has somewhere to
     ///     open them.
-    ///   - onReject: Sends a protocol-level refusal to the requester. Pass `nil` for transports with
+    ///   - onReject: Sends a protocol-level refusal to the Verifier. Pass `nil` for transports with
     ///     no such message - the platform Digital Credentials APIs return a cancellation instead, and
-    ///     offering both Reject and Cancel there would promise the requester gets told two different
+    ///     offering both Reject and Cancel there would promise the Verifier gets told two different
     ///     things.
     public init(
         review: SharingReviewModel,
@@ -39,6 +41,8 @@ public struct SharingReviewView: View {
         selectionComplete: Bool,
         isLoading: Bool = false,
         isReadOnly: Bool = false,
+        showsActions: Bool = true,
+        context: ReviewSurfaceContext = .selectedForSharing,
         onToggleCredential: @escaping (PresentationCredentialSelection) -> Void,
         onToggleDisclosure: @escaping (PresentationDisclosureSelection) -> Void,
         onCredentialSelected: ((String) -> Void)? = nil,
@@ -51,6 +55,8 @@ public struct SharingReviewView: View {
         self.selectionComplete = selectionComplete
         self.isLoading = isLoading
         self.isReadOnly = isReadOnly
+        self.showsActions = showsActions
+        self.context = context
         self.onToggleCredential = onToggleCredential
         self.onToggleDisclosure = onToggleDisclosure
         self.onCredentialSelected = onCredentialSelected
@@ -61,25 +67,17 @@ public struct SharingReviewView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SharingRequestSections(request: review.request)
-
-            Text("Select credentials to share")
-                .font(.subheadline.weight(.semibold))
-
-            ForEach(review.credentialOptions) { option in
-                CredentialReviewCard(
-                    option: option,
-                    selection: selection,
-                    isLoading: isLoading,
-                    isReadOnly: isReadOnly,
-                    onToggleCredential: onToggleCredential,
-                    onToggleDisclosure: onToggleDisclosure,
-                    onCredentialSelected: onCredentialSelected
-                )
+            ReviewIslandNavigationView(
+                islands: review.reviewIslands(context: context),
+                showsModelExpandedValues: { island in
+                    island.kind != .credential && island.kind != .information
+                }
+            ) { island in
+                expandedContent(for: island)
             }
 
-            if !isReadOnly {
-                ReviewActions(
+            if showsActions && !isReadOnly {
+                SharingReviewActions(
                     selectionComplete: selectionComplete,
                     isLoading: isLoading,
                     onSubmit: onSubmit,
@@ -88,6 +86,49 @@ public struct SharingReviewView: View {
                 )
             }
         }
+    }
+
+    @ViewBuilder
+    private func expandedContent(for island: ReviewIsland) -> some View {
+        switch island.kind {
+        case .verifier:
+            VerifierReviewFacts(request: review.request)
+        case .credential:
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(review.credentialOptions) { option in
+                    CredentialReviewCard(
+                        option: option,
+                        selection: selection,
+                        isLoading: isLoading,
+                        isReadOnly: isReadOnly,
+                        onToggleCredential: onToggleCredential,
+                        onCredentialSelected: onCredentialSelected
+                    )
+                }
+            }
+        case .information:
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(review.credentialOptions.filter { !$0.disclosures.isEmpty }) { option in
+                    DisclosureList(
+                        option: option,
+                        credentialSelected: selection.credentials.contains(option.selection),
+                        selectedDisclosureOptions: selection.disclosures,
+                        requestedDisclosureItems: requestedDisclosureItems(for: option),
+                        isLoading: isLoading,
+                        isReadOnly: isReadOnly,
+                        onToggleDisclosure: onToggleDisclosure
+                    )
+                }
+            }
+        case .issuer, .purposeAndTransaction, .requiredAction:
+            EmptyView()
+        }
+    }
+
+    private func requestedDisclosureItems(for option: PresentationCredentialOption) -> [ClaimItem] {
+        CredentialDisplayNormalizer.details(for: option).groups
+            .first { $0.title == CredentialDisplayVocabulary.requestedDisclosuresTitle }?
+            .items ?? []
     }
 }
 
@@ -98,15 +139,10 @@ struct CredentialReviewCard: View {
     let isLoading: Bool
     let isReadOnly: Bool
     let onToggleCredential: (PresentationCredentialSelection) -> Void
-    let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
     let onCredentialSelected: ((String) -> Void)?
 
     var body: some View {
         let details = CredentialDisplayNormalizer.details(for: option)
-        let requestedDisclosureItems = details.groups
-            .first { $0.title == CredentialDisplayVocabulary.requestedDisclosuresTitle }?
-            .items ?? []
-
         VStack(alignment: .leading, spacing: 10) {
             if !isReadOnly {
                 Toggle(isOn: Binding(get: {
@@ -114,7 +150,7 @@ struct CredentialReviewCard: View {
                 }, set: { _ in
                     onToggleCredential(option.selection)
                 })) {
-                    Text(option.label ?? option.format)
+                    Text(option.userFacingLabel)
                         .font(.subheadline.weight(.medium))
                 }
                 .disabled(isLoading)
@@ -122,29 +158,67 @@ struct CredentialReviewCard: View {
             }
 
             if let onCredentialSelected {
-                CredentialCardButton(details: details) {
+                CredentialCardButton(details: details, showProtocolDetails: false) {
                     onCredentialSelected(details.id)
                 }
                 .padding(.leading, isReadOnly ? 0 : 28)
             } else {
-                CredentialCardView(details: details)
+                CredentialCardView(details: details, showProtocolDetails: false)
                     .padding(.leading, isReadOnly ? 0 : 28)
             }
 
-            if !option.disclosures.isEmpty {
-                DisclosureList(
-                    option: option,
-                    credentialSelected: selection.credentials.contains(option.selection),
-                    selectedDisclosureOptions: selection.disclosures,
-                    requestedDisclosureItems: requestedDisclosureItems,
-                    isLoading: isLoading,
-                    isReadOnly: isReadOnly,
-                    onToggleDisclosure: onToggleDisclosure
-                )
-                .padding(.leading, isReadOnly ? 0 : 28)
-            }
-
             Divider()
+        }
+    }
+}
+
+private struct VerifierReviewFacts: View {
+    let request: SharingRequest
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let readerTrust = request.readerTrust {
+                let fact = readerTrust.userFacingFact
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(fact.0).font(.subheadline.weight(.medium))
+                    Text(fact.1).font(.caption).foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier(WalletAccessibilityID.presentationReaderTrustSection)
+            }
+            Text(request.responseProtection.userFacingExplanation)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier(WalletAccessibilityID.presentationResponseProtectionSection)
+        }
+    }
+}
+
+private extension SharingReaderTrust {
+    var userFacingFact: (String, String) {
+        switch self {
+        case .notAuthenticated:
+            return ("Reader not authenticated", "The request carried no reader signature.")
+        case .pendingVerification:
+            return ("Reader authentication checked before sharing", "Nothing is sent if verification fails.")
+        case .untrusted(let reason):
+            return ("Reader identity not trusted by this wallet", reason)
+        case .trusted(let identity):
+            return ("Trusted reader", identity)
+        }
+    }
+}
+
+private extension SharingResponseProtection {
+    var userFacingExplanation: String {
+        switch self {
+        case .none:
+            return "The request does not require an encrypted response."
+        case .encrypted(let mechanism, _, _, _, _):
+            switch mechanism {
+            case .jwe: return "The response is encrypted for the Verifier."
+            case .dcAPIJWT: return "The response is encrypted for platform delivery."
+            case .annexCHPKE: return "The response is protected for this reader session."
+            }
         }
     }
 }
@@ -237,33 +311,52 @@ private struct DisclosureTextView: View {
 }
 
 /// Share, and the ways of declining the transport actually supports.
-struct ReviewActions: View {
+public struct SharingReviewActions: View {
     let selectionComplete: Bool
     let isLoading: Bool
     let onSubmit: () -> Void
     let onReject: (() -> Void)?
     let onCancel: () -> Void
 
-    var body: some View {
-        HStack(spacing: 10) {
-            Button("Share", action: onSubmit)
+    public init(
+        selectionComplete: Bool,
+        isLoading: Bool,
+        onSubmit: @escaping () -> Void,
+        onReject: (() -> Void)?,
+        onCancel: @escaping () -> Void
+    ) {
+        self.selectionComplete = selectionComplete
+        self.isLoading = isLoading
+        self.onSubmit = onSubmit
+        self.onReject = onReject
+        self.onCancel = onCancel
+    }
+
+    public var body: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            Button(action: onSubmit) {
+                Text("Share information")
+                    .frame(maxWidth: .infinity)
+            }
                 .buttonStyle(.borderedProminent)
                 .tint(.waltBlue)
                 .disabled(isLoading || !selectionComplete)
                 .accessibilityIdentifier(WalletAccessibilityID.presentationSubmitButton)
 
-            // Labelled "Cancel review" only where a protocol-level Reject also exists, so the two
-            // ways of declining cannot be mistaken for each other.
-            Button(onReject == nil ? "Cancel" : "Cancel review", action: onCancel)
-                .buttonStyle(.bordered)
-                .disabled(isLoading)
-                .accessibilityIdentifier(WalletAccessibilityID.presentationCancelButton)
-
-            if let onReject {
-                Button("Reject", action: onReject)
+            HStack(spacing: 10) {
+                // Labelled "Cancel review" only where a protocol-level Reject also exists, so the two
+                // ways of declining cannot be mistaken for each other.
+                Button(onReject == nil ? "Cancel" : "Cancel review", action: onCancel)
                     .buttonStyle(.bordered)
                     .disabled(isLoading)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentationRejectButton)
+                    .accessibilityIdentifier(WalletAccessibilityID.presentationCancelButton)
+
+                if let onReject {
+                    Button("Reject", action: onReject)
+                        .buttonStyle(.bordered)
+                        .disabled(isLoading)
+                        .accessibilityIdentifier(WalletAccessibilityID.presentationRejectButton)
+                }
             }
         }
     }

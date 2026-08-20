@@ -36,8 +36,8 @@ public struct SharingReviewModel: Equatable {
 /// said something it never said - a fabricated `client_id` for an unsigned Digital Credentials
 /// request, or an OpenID4VP `state` for an Annex C `DeviceRequest`.
 public struct SharingRequest: Equatable {
-    /// Who is asking, or `nil` when the transport proves nothing about the caller.
-    public let requester: SharingRequester?
+    /// Who is asking, or `nil` when the transport proves nothing about the Verifier.
+    public let verifier: SharingVerifier?
     /// Reader-authentication state, or `nil` when the protocol has no reader authentication.
     public let readerTrust: SharingReaderTrust?
     /// Protection applied to the response the wallet is about to produce.
@@ -49,17 +49,39 @@ public struct SharingRequest: Equatable {
 
     /// Creates a sharing request description.
     public init(
-        requester: SharingRequester?,
+        verifier: SharingVerifier?,
         readerTrust: SharingReaderTrust? = nil,
         responseProtection: SharingResponseProtection = .none,
         transactionData: [ClaimGroup] = [],
         technicalDetails: [SharingDetail] = []
     ) {
-        self.requester = requester
+        self.verifier = verifier
         self.readerTrust = readerTrust
         self.responseProtection = responseProtection
         self.transactionData = transactionData
         self.technicalDetails = technicalDetails
+    }
+
+    /// Source-compatibility alias for callers that have not adopted Verifier terminology yet.
+    @available(*, deprecated, renamed: "verifier")
+    public var requester: SharingVerifier? { verifier }
+
+    /// Source-compatible initializer retained while downstream fixtures adopt Verifier terminology.
+    @available(*, deprecated, message: "Use init(verifier:readerTrust:responseProtection:transactionData:technicalDetails:)")
+    public init(
+        requester: SharingVerifier?,
+        readerTrust: SharingReaderTrust? = nil,
+        responseProtection: SharingResponseProtection = .none,
+        transactionData: [ClaimGroup] = [],
+        technicalDetails: [SharingDetail] = []
+    ) {
+        self.init(
+            verifier: requester,
+            readerTrust: readerTrust,
+            responseProtection: responseProtection,
+            transactionData: transactionData,
+            technicalDetails: technicalDetails
+        )
     }
 }
 
@@ -69,17 +91,17 @@ public struct SharingRequest: Equatable {
 /// metadata is self-asserted by the request, while a verified origin was authenticated by the
 /// platform or by request signing. A wallet that renders them identically invites the user to trust
 /// the wrong one.
-public struct SharingRequester: Equatable {
-    /// Self-asserted requester display metadata, when the request carried any.
+public struct SharingVerifier: Equatable {
+    /// Self-asserted Verifier display metadata, when the request carried any.
     public let display: MetadataDisplay?
     /// Name to show when ``display`` has none.
     public let fallbackName: String?
     /// Origin authenticated outside the request itself, when there is one.
     public let verifiedOrigin: String?
-    /// Additional requester-published links, such as privacy policy or terms.
+    /// Additional Verifier-published links, such as privacy policy or terms.
     public let details: [SharingDetail]
 
-    /// Creates a requester identity.
+    /// Creates a Verifier identity.
     public init(
         display: MetadataDisplay? = nil,
         fallbackName: String? = nil,
@@ -92,7 +114,7 @@ public struct SharingRequester: Equatable {
         self.details = details
     }
 
-    /// Whether anything about the requester is worth rendering.
+    /// Whether anything about the Verifier is worth rendering.
     public var hasContent: Bool {
         display?.name?.isPresentableValue == true ||
             fallbackName?.isPresentableValue == true ||
@@ -100,10 +122,10 @@ public struct SharingRequester: Equatable {
             details.contains { $0.value?.isPresentableValue == true }
     }
 
-    /// Names the one requester claim the transport authenticated, wherever it is shown.
+    /// Names the one Verifier claim the transport authenticated, wherever it is shown.
     public static let verifiedOriginLabel = "Verified website"
 
-    /// The name the review heads the requester section with, or `nil` when the request named nobody.
+    /// The name the review heads the Verifier island with, or `nil` when the request named nobody.
     public var identityName: String? {
         display?.name?.presentableValue ?? fallbackName?.presentableValue
     }
@@ -119,9 +141,9 @@ public struct SharingRequester: Equatable {
 
     /// Caption for ``identityName``, or `nil` when the heading needs none.
     ///
-    /// The origin is the only requester claim that was authenticated rather than self-asserted, so it
+    /// The origin is the only Verifier claim that was authenticated rather than self-asserted, so it
     /// is always marked as one. When it is itself the heading it is captioned there, because an
-    /// unlabelled origin reads as one more self-asserted requester claim.
+    /// unlabelled origin reads as one more self-asserted Verifier claim.
     public var identityNameCaption: String? {
         verifiedOriginIsIdentityName ? Self.verifiedOriginLabel : nil
     }
@@ -129,14 +151,18 @@ public struct SharingRequester: Equatable {
     /// The labelled rows shown under ``identityName``.
     ///
     /// The origin leads them, but only when it is not already the heading: one string, one statement
-    /// about it. Repeating it would read as two independent facts about the requester.
+    /// about it. Repeating it would read as two independent facts about the Verifier.
     public var detailRows: [SharingDetail] {
         let leadingOrigin = verifiedOriginIsIdentityName ? nil : verifiedOrigin?.presentableValue
         return [SharingDetail(label: Self.verifiedOriginLabel, value: leadingOrigin)] + details
     }
 }
 
-/// One labelled value in a requester or technical-details list.
+/// Temporary source-compatibility alias while downstream fixtures adopt Verifier terminology.
+@available(*, deprecated, renamed: "SharingVerifier")
+public typealias SharingRequester = SharingVerifier
+
+/// One labelled value in a Verifier or technical-details list.
 public struct SharingDetail: Equatable {
     /// Row label.
     public let label: String
@@ -206,7 +232,7 @@ public enum SharingEncryptionMechanism: Equatable {
     public var displayName: String {
         switch self {
         case .jwe: return "JWE encrypted response"
-        case .dcAPIJWT: return "OpenID4VP dc_api.jwt"
+        case .dcAPIJWT: return "OpenID4VP encrypted response"
         case .annexCHPKE: return "ISO 18013-7 Annex C HPKE"
         }
     }

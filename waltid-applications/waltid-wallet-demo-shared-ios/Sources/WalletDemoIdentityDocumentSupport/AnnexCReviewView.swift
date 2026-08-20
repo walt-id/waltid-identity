@@ -7,7 +7,7 @@ import WalletSDK
 ///
 /// This view is the whole provider UI: it owns the Apple request context and the two-stage
 /// submission through ``AnnexCPresentationModel``, and renders the same review the in-app OpenID4VP
-/// flow renders. Nothing here formats claims, names the requester or describes reader trust - all of
+/// flow renders. Nothing here formats claims, names the Verifier or describes reader trust - all of
 /// that is the shared review's job, so the two demos and the two transports cannot diverge on what a
 /// request is saying.
 @available(iOS 26.0, *)
@@ -33,7 +33,7 @@ public struct AnnexCReviewView: View {
 
     public var body: some View {
         SharingReviewScreen(
-            title: "Share documents",
+            title: "Share information",
             review: model.review,
             selection: model.selection,
             selectionComplete: model.hasCompleteSelection,
@@ -44,7 +44,7 @@ public struct AnnexCReviewView: View {
             onSubmit: { Task { await model.submit() } },
             // No Reject action: IdentityDocumentServices has no way to tell the reader it was
             // refused, so cancelling is the only truthful decline. Offering both would promise the
-            // requester learns something it never learns.
+            // Verifier learns something it never learns.
             onReject: nil,
             onCancel: model.cancel
         )

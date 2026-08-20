@@ -17,7 +17,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoReaderTrust
-import id.walt.walletdemo.compose.logic.WalletDemoSharingRequester
+import id.walt.walletdemo.compose.logic.WalletDemoSharingVerifier
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.OPTIONAL_DISCLOSURE_PATH
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.REQUIRED_DISCLOSURE_PATH
@@ -56,10 +56,10 @@ class WalletDemoSharingReviewTestScenarios {
         }
 
         onNodeWithTag(WalletDemoSharingReviewTestTags.Review).assertIsDisplayed()
-        onNodeWithTag(WalletDemoSharingReviewTestTags.RequesterSection).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.VerifierSection).performScrollTo().assertIsDisplayed()
         // An unsigned Digital Credentials request has no verifier metadata, so the authenticated origin
-        // is the requester identity: shown once, and captioned as verified, because an uncaptioned origin
-        // reads as one more self-asserted requester claim.
+        // is the Verifier identity: shown once, and captioned as verified, because an uncaptioned origin
+        // reads as one more self-asserted Verifier claim.
         onNodeWithText("https://verifier.example").performScrollTo().assertIsDisplayed()
         onAllNodesWithText("https://verifier.example").assertCountEquals(1)
         onNodeWithText("Verified website").performScrollTo().assertIsDisplayed()
@@ -69,7 +69,16 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithText("EUR").performScrollTo().assertIsDisplayed()
         onNodeWithText("ACME Corp").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ResponseProtectionSection).performScrollTo().assertIsDisplayed()
-        onNodeWithText("OpenID4VP dc_api.jwt").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.reviewIslandTechnicalDetails("verifier"))
+            .performScrollTo()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.ReviewTechnicalDetailsPage).assertIsDisplayed()
+        onNodeWithText("OpenID4VP encrypted response").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.ReviewTechnicalDetailsBack).performScrollTo().performClick()
+        mainClock.advanceTimeBy(500)
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(WalletUiTestTags.ReviewTechnicalDetailsPage).fetchSemanticsNodes().isEmpty()
+        }
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
     }
@@ -77,7 +86,7 @@ class WalletDemoSharingReviewTestScenarios {
     /**
      * Self-asserted verifier metadata heads the section, and the authenticated origin stays visible beside
      * it under its own label. Showing only the name a request asked to be called would hide the one
-     * requester fact that was actually verified.
+     * Verifier fact that was actually verified.
      */
     fun verifiedOriginStaysVisibleBesideSelfAssertedVerifierMetadata() = runComposeUiTest {
         setContent {
@@ -85,7 +94,7 @@ class WalletDemoSharingReviewTestScenarios {
                 review = digitalCredentialReview().let { review ->
                     review.copy(
                         request = review.request.copy(
-                            requester = WalletDemoSharingRequester(
+                            verifier = WalletDemoSharingVerifier(
                                 display = WalletDemoMetadataDisplay(
                                     name = "Example Verifier",
                                     logoUri = null,
@@ -111,7 +120,7 @@ class WalletDemoSharingReviewTestScenarios {
 
     /**
      * A transport with no protocol-level refusal offers Share and Cancel only. A Reject button here
-     * would promise the requester is told something the platform has no channel to tell it.
+     * would promise the Verifier is told something the platform has no channel to tell it.
      */
     fun credentialManagerReviewOffersShareAndCancelWithoutReject() = runComposeUiTest {
         var submitted: WalletDemoSharingSelection? = null
@@ -125,18 +134,18 @@ class WalletDemoSharingReviewTestScenarios {
             )
         }
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.PresentationRejectButton).assertCountEquals(0)
         onAllNodesWithText("Reject").assertCountEquals(0)
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(
             setOf(WalletDemoPresentationCredentialSelection("pid", "credential-1")),
             submitted?.credentials,
         )
         assertEquals(false, cancelled)
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).performClick()
         assertEquals(true, cancelled)
     }
 
@@ -152,8 +161,8 @@ class WalletDemoSharingReviewTestScenarios {
             )
         }
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().assertIsNotEnabled()
-        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).performScrollTo().assertIsNotEnabled()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).assertIsNotEnabled()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).assertIsNotEnabled()
     }
 
     /**
@@ -170,7 +179,7 @@ class WalletDemoSharingReviewTestScenarios {
             )
         }
 
-        onAllNodesWithTag(WalletDemoSharingReviewTestTags.ReaderTrustSection).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.PresentationReaderTrustSection).assertCountEquals(0)
     }
 
     /**
@@ -187,11 +196,15 @@ class WalletDemoSharingReviewTestScenarios {
             )
         }
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ReaderTrustSection).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationReaderTrustSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Reader identity not trusted by this wallet").performScrollTo().assertIsDisplayed()
         onNodeWithText("No reader trust policy is configured").performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Trusted reader").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.reviewIslandTechnicalDetails("verifier"))
+            .performScrollTo()
+            .performClick()
         onNodeWithText("ISO 18013-7 Annex C HPKE").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.ReviewTechnicalDetailsBack).performScrollTo().performClick()
     }
 
     /** A trusted reader is named, which is the only state in which the wallet can identify the reader. */
@@ -232,13 +245,13 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(photoId.selection.id))
             .performScrollTo()
             .performClick()
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().assertIsNotEnabled()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).assertIsNotEnabled()
         assertNull(submitted)
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(photoId.selection.id))
             .performScrollTo()
             .performClick()
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(mdl.selection, photoId.selection), submitted?.credentials)
     }
 
@@ -296,7 +309,7 @@ class WalletDemoSharingReviewTestScenarios {
             .performScrollTo()
             .assertIsOff()
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(second.selection), submitted?.credentials)
         assertEquals(emptySet<WalletDemoPresentationDisclosureSelection>(), submitted?.disclosures)
     }
@@ -328,11 +341,11 @@ class WalletDemoSharingReviewTestScenarios {
 
         // A required disclosure is not carried as a selection, so an empty disclosure set is what
         // "the user approved nothing optional" looks like.
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(emptySet<WalletDemoPresentationDisclosureSelection>(), submitted?.disclosures)
 
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(optional), submitted?.disclosures)
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id))

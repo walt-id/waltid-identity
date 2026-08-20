@@ -79,17 +79,17 @@ class MobileDigitalCredentialSharingReviewTest {
     }
 
     /**
-     * An unsigned Digital Credentials request has no authenticated `client_id`, so the requester is
+     * An unsigned Digital Credentials request has no authenticated `client_id`, so the Verifier is
      * headed by the origin the platform authenticated and nothing is invented to fill the gap.
      */
     @Test
     fun unsignedRequestNamesTheVerifiedOriginAndInventsNoRequestFields() {
         val review = digitalCredentialPreview().toSharingReview()
 
-        val requester = requireNotNull(review.request.requester) { "review has no requester" }
-        assertEquals("https://verifier.example", requester.fallbackName)
-        assertEquals("https://verifier.example", requester.verifiedOrigin)
-        assertNull(requester.display)
+        val verifier = requireNotNull(review.request.verifier) { "review has no Verifier" }
+        assertEquals("https://verifier.example", verifier.fallbackName)
+        assertEquals("https://verifier.example", verifier.verifiedOrigin)
+        assertNull(verifier.display)
         assertEquals("openid4vp-v1-unsigned", review.request.technicalDetails.textValue("Protocol"))
         assertNull(review.request.technicalDetails.textValue("Client ID"))
         assertTrue(
@@ -100,9 +100,9 @@ class MobileDigitalCredentialSharingReviewTest {
         assertTrue(review.request.transactionData.isEmpty())
     }
 
-    /** Verifier metadata heads the requester when the request published any, over the bare origin. */
+    /** Verifier metadata heads the actor island when the request published any, over the bare origin. */
     @Test
-    fun verifierMetadataOutranksTheOriginAsRequesterIdentity() {
+    fun verifierMetadataOutranksTheOriginAsVerifierIdentity() {
         val review = digitalCredentialPreview(
             verifierMetadata = MobileWalletVerifierMetadata(
                 display = MobileWalletMetadataDisplay(
@@ -118,11 +118,11 @@ class MobileDigitalCredentialSharingReviewTest {
             ),
         ).toSharingReview()
 
-        val requester = requireNotNull(review.request.requester) { "review has no requester" }
-        assertEquals("Example Verifier", requester.display?.name)
-        assertEquals("https://verifier.example/about", requester.details.textValue("Client URI"))
-        assertEquals("https://verifier.example/privacy", requester.details.textValue("Privacy policy"))
-        assertEquals("https://verifier.example/terms", requester.details.textValue("Terms of service"))
+        val verifier = requireNotNull(review.request.verifier) { "review has no Verifier" }
+        assertEquals("Example Verifier", verifier.display?.name)
+        assertEquals("https://verifier.example/about", verifier.details.textValue("Client URI"))
+        assertEquals("https://verifier.example/privacy", verifier.details.textValue("Privacy policy"))
+        assertEquals("https://verifier.example/terms", verifier.details.textValue("Terms of service"))
     }
 
     /** The claims the request asks for are reviewed through the ordinary disclosure model. */
@@ -195,7 +195,7 @@ class MobileDigitalCredentialSharingReviewTest {
         assertEquals("DHKEM(P-256, HKDF-SHA256)", encryption.keyManagementAlgorithm)
         assertEquals("AES-128-GCM", encryption.contentEncryptionAlgorithm)
         assertEquals(MDL_DOC_TYPE, review.request.technicalDetails.textValue("Requested documents"))
-        assertEquals("https://verifier.example", review.request.requester?.verifiedOrigin)
+        assertEquals("https://verifier.example", review.request.verifier?.verifiedOrigin)
     }
 
     /**

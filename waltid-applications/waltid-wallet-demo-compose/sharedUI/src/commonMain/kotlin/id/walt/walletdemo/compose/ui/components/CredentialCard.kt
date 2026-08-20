@@ -25,6 +25,7 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 internal fun CredentialCard(
     details: CredentialDetails,
     modifier: Modifier = Modifier,
+    showProtocolDetails: Boolean = true,
     onClick: () -> Unit,
 ) {
     val display = details.toCardDisplayData()
@@ -54,7 +55,7 @@ internal fun CredentialCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                display.credentialType?.let {
+                display.credentialType?.takeIf { showProtocolDetails }?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
                 display.holderName?.let {
@@ -62,7 +63,9 @@ internal fun CredentialCard(
                 }
                 Text("Issuer: ${display.issuer}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(display.format, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (showProtocolDetails) {
+                        Text(display.format, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     display.validity?.let {
                         Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
