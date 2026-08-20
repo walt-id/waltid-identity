@@ -87,7 +87,7 @@ val credentialIds = (outcome as? WalletIssuanceOutcome.Stored)?.credentialIds
 `MobileWalletCredentialOffer.Uri` is used for deep-link / QR offers.
 `MobileWalletCredentialOffer.InlineJson` is the Credential Offer object from an
 OpenID4VCI Digital Credentials create request (`openid4vci-v1`, plus historical
-aliases in `OPENID4VCI_CREATE_PROTOCOLS`). On Android, use
+aliases). On Android, use
 `AndroidDigitalCredentialCreateProvider` to extract that request from Credential
 Manager and `AndroidDigitalCredentialRegistry.registerCreationOptions` to
 advertise issuance capability separately from presentation registry replacement.

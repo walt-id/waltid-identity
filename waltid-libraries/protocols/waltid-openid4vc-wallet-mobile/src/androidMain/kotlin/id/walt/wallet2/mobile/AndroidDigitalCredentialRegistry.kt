@@ -269,7 +269,7 @@ public class AndroidDigitalCredentialRegistry(
                 putJsonObject("Pass") {}
             }
             putJsonArray("preferred_protocols") {
-                MobileWalletDigitalCredentialProtocols.OPENID4VCI_CREATE_PROTOCOLS.forEach { protocol ->
+                OPENID4VCI_CREATE_PROTOCOLS.forEach { protocol ->
                     add(JsonPrimitive(protocol))
                 }
             }

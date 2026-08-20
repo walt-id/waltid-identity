@@ -143,8 +143,16 @@ class AndroidDigitalCredentialRegistryTest {
             entry["explainer"]?.jsonObject?.get("default")?.jsonPrimitive?.content,
         )
         assertEquals(Json.parseToJsonElement("{\"Pass\":{}}"), json["filter"])
+        val expectedCreateProtocols = listOf(
+            MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+            "openid4vci1.0",
+            "openid4vci-1.0",
+            "openid4vci1.1",
+            "openid4vci-1.1",
+        )
+        assertEquals(expectedCreateProtocols, OPENID4VCI_CREATE_PROTOCOLS)
         assertEquals(
-            MobileWalletDigitalCredentialProtocols.OPENID4VCI_CREATE_PROTOCOLS,
+            expectedCreateProtocols,
             json["preferred_protocols"]!!.jsonArray.map { it.jsonPrimitive.content },
         )
         assertEquals("walt.id Wallet", json["package_info"]!!.jsonObject["name"]?.jsonPrimitive?.content)

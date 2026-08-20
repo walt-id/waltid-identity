@@ -1792,9 +1792,6 @@ final object id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols { // 
         final fun <get-OPENID4VP_SIGNED>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED.<get-OPENID4VP_SIGNED>|<get-OPENID4VP_SIGNED>(){}[0]
     final const val OPENID4VP_UNSIGNED // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED|{}OPENID4VP_UNSIGNED[0]
         final fun <get-OPENID4VP_UNSIGNED>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED.<get-OPENID4VP_UNSIGNED>|<get-OPENID4VP_UNSIGNED>(){}[0]
-
-    final val OPENID4VCI_CREATE_PROTOCOLS // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VCI_CREATE_PROTOCOLS|{}OPENID4VCI_CREATE_PROTOCOLS[0]
-        final fun <get-OPENID4VCI_CREATE_PROTOCOLS>(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VCI_CREATE_PROTOCOLS.<get-OPENID4VCI_CREATE_PROTOCOLS>|<get-OPENID4VCI_CREATE_PROTOCOLS>(){}[0]
 }
 
 final object id.walt.wallet2.mobile/UnavailableMobileWalletCredentialRegistry : id.walt.wallet2.mobile/MobileWalletCredentialRegistry { // id.walt.wallet2.mobile/UnavailableMobileWalletCredentialRegistry|null[0]

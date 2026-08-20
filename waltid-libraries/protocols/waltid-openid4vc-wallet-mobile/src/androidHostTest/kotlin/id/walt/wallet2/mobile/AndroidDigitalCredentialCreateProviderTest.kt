@@ -50,8 +50,17 @@ class AndroidDigitalCredentialCreateProviderTest {
 
     @Test
     fun acceptsHistoricalOpenId4VciProtocolAliasesAndEchoesThem() {
-        val aliases = MobileWalletDigitalCredentialProtocols.OPENID4VCI_CREATE_PROTOCOLS
-            .filter { it != MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1 }
+        val expectedCreateProtocols = listOf(
+            MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+            "openid4vci1.0",
+            "openid4vci-1.0",
+            "openid4vci1.1",
+            "openid4vci-1.1",
+        )
+        assertEquals(expectedCreateProtocols, OPENID4VCI_CREATE_PROTOCOLS)
+        val aliases = expectedCreateProtocols.filter {
+            it != MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1
+        }
         for (protocol in aliases) {
             val request = AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
                 requestJson = """{"requests":[{"protocol":"$protocol","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",

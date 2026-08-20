@@ -33,8 +33,8 @@ public data class AndroidDigitalCredentialCreateProviderInput(
  *
  * Kept on the Android adapter boundary rather than the common mobile SDK surface.
  *
- * @property protocol Digital Credentials protocol identifier selected from
- * [MobileWalletDigitalCredentialProtocols.OPENID4VCI_CREATE_PROTOCOLS].
+ * @property protocol Digital Credentials protocol identifier selected from the advertised
+ * OpenID4VCI create protocols (`openid4vci-v1` first, then historical aliases).
  * @property offerJson Credential Offer JSON object extracted from the selected protocol
  * alternative's `data` field.
  * @property verifiedOrigin Canonical caller origin derived from Credential Manager caller
@@ -119,8 +119,8 @@ public object AndroidDigitalCredentialCreateProvider {
      * Resolves the first preferred OpenID4VCI protocol alternative from a standard create-request envelope.
      *
      * Only the Digital Credentials `requests` array shape is accepted. Selection follows
-     * [MobileWalletDigitalCredentialProtocols.OPENID4VCI_CREATE_PROTOCOLS] order so a dual-protocol
-     * request prefers `openid4vci-v1`. Unsupported alternatives are skipped.
+     * [OPENID4VCI_CREATE_PROTOCOLS] order so a dual-protocol request prefers `openid4vci-v1`.
+     * Unsupported alternatives are skipped.
      */
     internal fun resolveCreateRequest(
         requestJson: String,
@@ -131,7 +131,7 @@ public object AndroidDigitalCredentialCreateProvider {
             ?: throw IllegalArgumentException("Digital credential create request must contain a requests array")
         require(requests.isNotEmpty()) { "At least one protocol request is required" }
         val protocolRequests = requests.map { it.jsonObject }
-        val selected = MobileWalletDigitalCredentialProtocols.OPENID4VCI_CREATE_PROTOCOLS.firstNotNullOfOrNull { protocol ->
+        val selected = OPENID4VCI_CREATE_PROTOCOLS.firstNotNullOfOrNull { protocol ->
             protocolRequests.firstOrNull { protocolRequest ->
                 protocolRequest["protocol"]?.jsonPrimitive?.content == protocol
             }
