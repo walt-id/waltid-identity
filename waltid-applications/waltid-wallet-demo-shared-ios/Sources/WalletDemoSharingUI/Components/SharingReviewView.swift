@@ -163,7 +163,7 @@ struct CredentialReviewCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(showsCredentialName ? option.userFacingLabel : "Use this credential")
                     .font(.subheadline.weight(.medium))
-                if let issuer = option.issuer?.presentableValue {
+                if showsCredentialName, let issuer = option.issuer?.presentableValue {
                     Text(issuer)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -172,7 +172,7 @@ struct CredentialReviewCard: View {
                     Text(subject)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

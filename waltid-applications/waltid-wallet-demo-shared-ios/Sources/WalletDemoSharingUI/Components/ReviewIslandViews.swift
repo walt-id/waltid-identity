@@ -139,13 +139,17 @@ private struct ReviewIslandCard<ExpandedContent: View>: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                         if let subtitle = island.subtitle?.presentableValue {
                             Text(subtitle)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(1)
                     Spacer(minLength: 8)
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .foregroundStyle(accentColor)
@@ -271,6 +275,7 @@ private extension ReviewIslandKind {
 
 private struct ReviewValueList: View {
     let values: [ReviewValue]
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -279,7 +284,8 @@ private struct ReviewValueList: View {
                 if let rendered = value.value?.presentableValue {
                     let supportingText = value.supportingText?.presentableValue
                     let link = safeHTTPSURL(value.linkURI)
-                    let stacked = supportingText != nil || value.label.count > 28 || rendered.count > 38 ||
+                    let stacked = dynamicTypeSize.isAccessibilitySize || supportingText != nil ||
+                        value.label.count > 28 || rendered.count > 38 ||
                         value.label.contains("\n") || rendered.contains("\n") || link != nil
                     if stacked {
                         VStack(alignment: .leading, spacing: 2) {

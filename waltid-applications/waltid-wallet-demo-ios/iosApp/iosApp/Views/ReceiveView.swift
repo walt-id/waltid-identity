@@ -2,6 +2,7 @@ import SwiftUI
 import WalletDemoSharingUI
 
 struct ReceiveView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
     var showsInput = true
@@ -12,6 +13,14 @@ struct ReceiveView: View {
         viewModel.receivedCredentials.map(CredentialDisplayNormalizer.details(for:))
     }
 
+    private var screenTitle: String {
+        viewModel.offerPreview == nil ? "Receive" : "Add credential"
+    }
+
+    private var usesAccessibilityContentTitle: Bool {
+        dynamicTypeSize.isAccessibilitySize && viewModel.offerPreview != nil
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -20,6 +29,13 @@ struct ReceiveView: View {
                         .frame(width: 1, height: 1)
                         .accessibilityElement()
                         .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
+
+                    if usesAccessibilityContentTitle {
+                        Text(screenTitle)
+                            .font(.title.bold())
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                    }
 
                     if viewModel.offerPreview == nil && showsInput {
                         ScannableUrlEditor(
@@ -98,7 +114,7 @@ struct ReceiveView: View {
                 .padding(.vertical, 12)
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle(viewModel.offerPreview == nil ? "Receive" : "Add credential")
+            .navigationTitle(usesAccessibilityContentTitle ? "" : screenTitle)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { onClose?() }

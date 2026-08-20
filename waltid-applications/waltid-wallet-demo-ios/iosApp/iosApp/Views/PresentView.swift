@@ -5,6 +5,7 @@ import WalletSDK
 
 struct PresentView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
     var showsInput = true
@@ -12,6 +13,14 @@ struct PresentView: View {
 
     private var presentationDetails: [CredentialDetails] {
         viewModel.presentationPreview?.credentialOptions.map(CredentialDisplayNormalizer.details(for:)) ?? []
+    }
+
+    private var screenTitle: String {
+        viewModel.presentationSharingReview == nil ? "Present" : "Share information"
+    }
+
+    private var usesAccessibilityContentTitle: Bool {
+        dynamicTypeSize.isAccessibilitySize && viewModel.presentationSharingReview != nil
     }
 
     var body: some View {
@@ -22,6 +31,13 @@ struct PresentView: View {
                         .frame(width: 1, height: 1)
                         .accessibilityElement()
                         .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
+
+                    if usesAccessibilityContentTitle {
+                        Text(screenTitle)
+                            .font(.title.bold())
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                    }
 
                     if showsInput {
                         ScannableUrlEditor(
@@ -100,7 +116,7 @@ struct PresentView: View {
                 .padding(.vertical, 12)
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle(viewModel.presentationSharingReview == nil ? "Present" : "Share information")
+            .navigationTitle(usesAccessibilityContentTitle ? "" : screenTitle)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { onClose?() }
