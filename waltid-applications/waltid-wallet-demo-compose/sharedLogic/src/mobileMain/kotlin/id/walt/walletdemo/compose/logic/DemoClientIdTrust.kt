@@ -2,8 +2,9 @@
 
 package id.walt.walletdemo.compose.logic
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.x509.CertificateDer
 
 /**
  * Example verifier trust anchors for the Compose demo.
@@ -255,6 +256,8 @@ object DemoClientIdTrust {
     )
 
     val configuration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(
-        x509TrustAnchors = x509TrustAnchorPems.map(CertificateDer::fromPEMEncodedString),
+        x509TrustAnchors = InMemoryTrustStore(
+            x509TrustAnchorPems.map(X509CertificateUtil::parseCertificatePem),
+        ),
     )
 }
