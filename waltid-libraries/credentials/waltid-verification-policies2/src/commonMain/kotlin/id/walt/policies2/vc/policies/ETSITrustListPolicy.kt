@@ -288,6 +288,16 @@ data class ETSITrustListPolicy(
      * (DID resolution, or HTTPS well-known JWT VC issuer metadata) and matched against the trust
      * list by JWK thumbprint instead. An inline `jwk` header is intentionally not trusted here
      * (`allowInlineJwk = false`): it is self-asserted and establishes no issuer identity on its own.
+     *
+     * Signer binding: this trust check is only sound if it resolves the *same* key that the base
+     * `signature` policy verified the credential against — otherwise an attacker could sign with a
+     * self-asserted key while trust is matched against a different, trust-listed key. That binding
+     * holds structurally rather than by convention: for both W3C JWT VCs and SD-JWT VCs, the base
+     * signature policy resolves its verification key via
+     * `JwsSignatureScheme.getIssuerCrypto2KeyInfo(compact)`, whose default `resolver` parameter is
+     * `Crypto2JwtKeyResolver()` — the same class, with the same `allowInlineJwk = false` default, run
+     * over the same JWT header/payload as [keyResolver] here. Given identical (deterministic) inputs
+     * and an identical resolver configuration, both policies always resolve to the same key.
      */
     private suspend fun extractJwtTrustMaterial(
         signature: JwtBasedSignature,
