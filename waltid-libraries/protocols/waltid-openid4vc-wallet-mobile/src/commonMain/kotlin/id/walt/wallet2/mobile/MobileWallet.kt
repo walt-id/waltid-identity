@@ -19,6 +19,8 @@ import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialOption
 import id.walt.wallet2.handlers.PresentationCredentialRequirement
@@ -188,9 +190,12 @@ public class MobileWallet internal constructor(
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
-    private val generateAndPersistKey: suspend (MobileWalletKeyType) -> Key,
+    private val generateAndPersistKey: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> Key,
+    private val runKeyUseAuthorizationPreflight: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> KeyUseAuthorizationSupport =
+        { _, _ -> error("This MobileWallet does not support key-use authorization preflight") },
     private val didService: Crypto2DidService = Crypto2DidService,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
+    private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
     attestationConfig: WalletAttestationConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
@@ -243,7 +248,7 @@ public class MobileWallet internal constructor(
     )
 
     /**
-     * Initializes the wallet by creating or reusing platform-backed key material and a DID.
+     * Initializes the wallet by creating or reusing wallet signing key material and a DID.
      *
      * If the wallet already contains persisted DIDs, the first persisted DID and key are reused.
      *
@@ -255,6 +260,7 @@ public class MobileWallet internal constructor(
     public suspend fun bootstrap(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy? = null,
     ): MobileWalletBootstrapResult {
         MobileDidSupport.ensureInitialized()
         val existingDids = didStore.listDids().toList()
@@ -277,13 +283,21 @@ public class MobileWallet internal constructor(
         }
 
         val effectiveKeyType = keyType ?: defaultKeyType
-        return createKeyAndDid(effectiveKeyType, didMethod)
+        val effectivePolicy = keyUseAuthorizationPolicy ?: defaultKeyUseAuthorizationPolicy
+        return createKeyAndDid(effectiveKeyType, didMethod, effectivePolicy)
             .also { syncDigitalCredentialRegistration() }
     }
+
+    /** Checks whether a key-use authorization request is supported without creating or persisting a key. */
+    public suspend fun keyUseAuthorizationPreflight(
+        keyType: MobileWalletKeyType = defaultKeyType,
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
+    ): KeyUseAuthorizationSupport = runKeyUseAuthorizationPreflight(keyType, keyUseAuthorizationPolicy)
 
     private suspend fun createKeyAndDid(
         keyType: MobileWalletKeyType,
         didMethod: String,
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
     ): MobileWalletBootstrapResult {
         val normalizedMethod = didMethod.lowercase()
         val options = when (normalizedMethod) {
@@ -291,7 +305,7 @@ public class MobileWallet internal constructor(
             "jwk" -> DidJwkCreateOptions()
             else -> throw IllegalArgumentException("Mobile bootstrap supports only did:key and did:jwk")
         }
-        val key = generateAndPersistKey(keyType)
+        val key = generateAndPersistKey(keyType, keyUseAuthorizationPolicy)
         try {
             val didResult = didService.registerByKey(normalizedMethod, key, options)
             didStore.addDid(

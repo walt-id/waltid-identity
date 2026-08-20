@@ -75,7 +75,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await Wallet(
             configuration: WalletConfiguration(
                 walletID: walletId ?? testWalletId,
-                transactionDataProfiles: Self.demoTransactionDataProfiles
+                transactionDataProfiles: Self.demoTransactionDataProfiles,
+                defaultKeyUseAuthorizationPolicy: .none
             )
         )
     }
@@ -87,7 +88,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
                 clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
                     x509TrustAnchorsPEM: [EudiTestBackend.verifierTrustAnchorPEM]
                 ),
-                transactionDataProfiles: Self.demoTransactionDataProfiles
+                transactionDataProfiles: Self.demoTransactionDataProfiles,
+                defaultKeyUseAuthorizationPolicy: .none
             )
         )
     }
@@ -97,7 +99,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
             configuration: WalletConfiguration(
                 walletID: testWalletId,
                 persistence: persistence,
-                transactionDataProfiles: Self.demoTransactionDataProfiles
+                transactionDataProfiles: Self.demoTransactionDataProfiles,
+                defaultKeyUseAuthorizationPolicy: .none
             )
         )
     }

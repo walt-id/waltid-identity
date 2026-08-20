@@ -10,6 +10,7 @@ import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPersistence
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
@@ -152,7 +153,10 @@ class MobileWalletEncryptionTest {
 
         val firstKey = provider.getOrCreateKey(walletId, databaseName)
         val wallet = MobileWalletFactory(context).create(
-            MobileWalletConfig(walletId = walletId)
+            MobileWalletConfig(
+                walletId = walletId,
+                defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+            )
         )
         assertTrue(databaseFiles(databaseFileName).any { it.exists() }, "Encrypted wallet DB should exist before deletion")
 
@@ -185,6 +189,7 @@ class MobileWalletEncryptionTest {
             persistence = MobileWalletPersistence(
                 databaseKey = MobileWalletDatabaseKey.Provided(provider),
             ),
+            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
         )
         val wallet = factory.create(config)
 
@@ -211,6 +216,7 @@ class MobileWalletEncryptionTest {
             persistence = MobileWalletPersistence(
                 credentialStore = credentialStore,
             ),
+            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
         )
         val factory = MobileWalletFactory(context)
         deleteDatabaseFiles(databaseFileName)
