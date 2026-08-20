@@ -303,7 +303,9 @@ public extension SharingReviewModel {
             kind: .verifier,
             context: context,
             title: name,
-            subtitle: verifiedOrigin == name ? SharingVerifier.verifiedOriginLabel : "Verifier",
+            subtitle: verifiedOrigin == name
+                ? SharingVerifier.verifiedOriginCaption(for: verifiedOrigin)
+                : "Verifier",
             visual: ReviewIslandVisual(
                 imageURI: verifier?.display?.logoURI,
                 contentDescription: verifier?.display?.logoAltText,

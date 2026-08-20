@@ -211,6 +211,28 @@ class WalletDemoReviewIslandsTest {
         assertTrue("OpenID4VP encrypted response" in verifierTechnicalText)
     }
 
+    @Test
+    fun platformVerifiedAppOriginIsNotDescribedAsAWebsite() {
+        val review = WalletDemoSharingReview(
+            request = WalletDemoSharingRequest(
+                verifier = WalletDemoSharingVerifier(
+                    fallbackName = "android:apk-key-hash:example",
+                    verifiedOrigin = "android:apk-key-hash:example",
+                ),
+            ),
+            credentialOptions = emptyList(),
+        )
+
+        val verifier = review.toReviewIslands(WalletDemoReviewSurfaceContext.PlatformInvoked).first()
+
+        assertEquals("Verified app", verifier.subtitle)
+    }
+
+    @Test
+    fun unknownVerifiedOriginSchemeUsesNeutralCopy() {
+        assertEquals("Verified origin", "custom:origin".verifiedOriginLabel())
+    }
+
     private fun offerPreview(
         transactionCode: WalletDemoTransactionCodeRequirement? = null,
         requiresIssuerAuthentication: Boolean = false,

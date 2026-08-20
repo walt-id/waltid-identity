@@ -123,6 +123,22 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
+    func testVerifiedNativeAppOriginUsesAppCopy() {
+        let verifier = SharingVerifier(
+            fallbackName: "android:apk-key-hash:example",
+            verifiedOrigin: "android:apk-key-hash:example"
+        )
+
+        XCTAssertEqual(verifier.identityNameCaption, "Verified app")
+    }
+
+    func testUnknownVerifiedOriginSchemeUsesNeutralCopy() {
+        XCTAssertEqual(
+            SharingVerifier.verifiedOriginCaption(for: "custom:origin"),
+            "Verified origin"
+        )
+    }
+
     // MARK: - Reader trust
 
     func testAProtocolWithoutReaderAuthenticationGetsNoReaderTrustState() {

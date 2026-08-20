@@ -407,9 +407,10 @@ private fun WalletDemoSharingReview.verifierReviewIsland(
         ?: verifier?.verifiedOrigin.presentableOrNull()
         ?: "Verifier"
     val verifiedOrigin = verifier?.verifiedOrigin.presentableOrNull()
+    val verifiedOriginLabel = verifiedOrigin.verifiedOriginLabel()
     val actorValues = buildList {
         if (verifiedOrigin != null && verifiedOrigin != name) {
-            add(WalletDemoReviewValue("Verified website", verifiedOrigin))
+            add(WalletDemoReviewValue(verifiedOriginLabel, verifiedOrigin))
         }
         verifier?.details.orEmpty().forEach { detail ->
             add(WalletDemoReviewValue(detail.label, detail.value, linkUri = detail.linkUri))
@@ -449,7 +450,7 @@ private fun WalletDemoSharingReview.verifierReviewIsland(
         kind = WalletDemoReviewIslandKind.Verifier,
         context = context,
         title = name,
-        subtitle = if (verifiedOrigin == name) "Verified website" else "Verifier",
+        subtitle = if (verifiedOrigin == name) verifiedOriginLabel else "Verifier",
         visual = verifier?.display.toReviewVisual(name),
         summaryValues = listOf(
             WalletDemoReviewValue("Response", request.responseProtection.summaryText()),
@@ -459,6 +460,14 @@ private fun WalletDemoSharingReview.verifierReviewIsland(
         initiallyExpanded = verifier?.verifiedOrigin.presentableOrNull() != null ||
             request.readerTrust != null || verifier?.details?.any { it.value.presentableOrNull() != null } == true,
     )
+}
+
+internal fun String?.verifiedOriginLabel(): String = when {
+    this == null -> "Verified origin"
+    startsWith("https://", ignoreCase = true) || startsWith("http://", ignoreCase = true) ->
+        "Verified website"
+    startsWith("android:apk-key-hash:", ignoreCase = true) -> "Verified app"
+    else -> "Verified origin"
 }
 
 private fun WalletDemoSharingReview.credentialSharingReviewIsland(

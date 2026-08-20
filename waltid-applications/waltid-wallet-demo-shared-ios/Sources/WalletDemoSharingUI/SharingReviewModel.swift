@@ -125,6 +125,18 @@ public struct SharingVerifier: Equatable {
     /// Names the one Verifier claim the transport authenticated, wherever it is shown.
     public static let verifiedOriginLabel = "Verified website"
 
+    /// Describes the authenticated origin without treating a native app as a website.
+    public static func verifiedOriginCaption(for origin: String?) -> String {
+        guard let origin = origin?.presentableValue else { return "Verified origin" }
+        if origin.hasPrefixIgnoringCase("https://") || origin.hasPrefixIgnoringCase("http://") {
+            return verifiedOriginLabel
+        }
+        if origin.hasPrefixIgnoringCase("android:apk-key-hash:") {
+            return "Verified app"
+        }
+        return "Verified origin"
+    }
+
     /// The name the review heads the Verifier island with, or `nil` when the request named nobody.
     public var identityName: String? {
         display?.name?.presentableValue ?? fallbackName?.presentableValue
@@ -145,7 +157,7 @@ public struct SharingVerifier: Equatable {
     /// is always marked as one. When it is itself the heading it is captioned there, because an
     /// unlabelled origin reads as one more self-asserted Verifier claim.
     public var identityNameCaption: String? {
-        verifiedOriginIsIdentityName ? Self.verifiedOriginLabel : nil
+        verifiedOriginIsIdentityName ? Self.verifiedOriginCaption(for: verifiedOrigin) : nil
     }
 
     /// The labelled rows shown under ``identityName``.
@@ -154,7 +166,13 @@ public struct SharingVerifier: Equatable {
     /// about it. Repeating it would read as two independent facts about the Verifier.
     public var detailRows: [SharingDetail] {
         let leadingOrigin = verifiedOriginIsIdentityName ? nil : verifiedOrigin?.presentableValue
-        return [SharingDetail(label: Self.verifiedOriginLabel, value: leadingOrigin)] + details
+        return [SharingDetail(label: Self.verifiedOriginCaption(for: leadingOrigin), value: leadingOrigin)] + details
+    }
+}
+
+private extension String {
+    func hasPrefixIgnoringCase(_ prefix: String) -> Bool {
+        range(of: prefix, options: [.anchored, .caseInsensitive]) != nil
     }
 }
 
