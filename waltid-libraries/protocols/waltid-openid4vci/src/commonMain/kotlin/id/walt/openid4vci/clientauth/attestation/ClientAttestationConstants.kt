@@ -3,6 +3,7 @@ package id.walt.openid4vci.clientauth.attestation
 object ClientAttestationHeaders {
     const val CLIENT_ATTESTATION = "OAuth-Client-Attestation"
     const val CLIENT_ATTESTATION_POP = "OAuth-Client-Attestation-PoP"
+    const val CLIENT_ATTESTATION_CHALLENGE = "OAuth-Client-Attestation-Challenge"
 }
 
 object ClientAttestationJwtTypes {

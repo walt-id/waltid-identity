@@ -49,14 +49,22 @@ class AndroidDigitalCredentialCreateProviderTest {
     }
 
     @Test
-    fun rejectsHistoricalOpenId4VciProtocolAliases() {
-        for (protocol in listOf("openid4vci1.0", "openid4vci")) {
-            assertFailsWith<IllegalArgumentException> {
-                AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
-                    requestJson = """{"requests":[{"protocol":"$protocol","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
-                    verifiedOrigin = "android:apk-key-hash:abc",
-                )
-            }
+    fun rejectsHistoricalOpenId4VciProtocolAlias() {
+        assertFailsWith<IllegalArgumentException> {
+            AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
+                requestJson = """{"requests":[{"protocol":"openid4vci1.0","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
+                verifiedOrigin = "android:apk-key-hash:abc",
+            )
+        }
+    }
+
+    @Test
+    fun rejectsUnsupportedOpenId4VciProtocolAlias() {
+        assertFailsWith<IllegalArgumentException> {
+            AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
+                requestJson = """{"requests":[{"protocol":"openid4vci","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
+                verifiedOrigin = "android:apk-key-hash:abc",
+            )
         }
     }
 
