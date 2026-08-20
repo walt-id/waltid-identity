@@ -17,6 +17,9 @@ internal class LazyDemoWallet(
     override suspend fun bootstrap(): WalletDemoBootstrapResult =
         wallet().bootstrap()
 
+    override suspend fun deleteCredential(credentialId: String): Boolean =
+        wallet().deleteCredential(credentialId)
+
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()
 

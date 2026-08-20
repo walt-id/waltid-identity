@@ -101,7 +101,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithContentDescription("Receive tab").assertIsDisplayed()
         onNodeWithContentDescription("Present tab").assertIsDisplayed()
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
-        onNodeWithContentDescription("Credential portrait").assertIsDisplayed()
+        onNodeWithContentDescription("Credential portrait").performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Credential").assertIsDisplayed()
         onNodeWithText("Mobile driving licence").assertIsDisplayed()
         onNodeWithText("Ada Lovelace").assertIsDisplayed()
@@ -112,21 +112,23 @@ class WalletDemoAppTestScenarios {
         onNodeWithContentDescription("Back").assertIsDisplayed()
         onNodeWithText("Credential details").assertIsDisplayed()
         onAllNodesWithText("Example Credential").assertCountEquals(1)
-        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential"))
-            .performScrollTo()
-            .assertIsDisplayed()
-        onAllNodesWithTag(WalletUiTestTags.claim("system.format")).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential")).performClick()
-        onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claim("system.format")).performScrollTo().assertIsDisplayed()
-        onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Street address").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Main Street 1").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Portrait").performScrollTo().assertIsDisplayed()
-        onNodeWithContentDescription("Credential image").performScrollTo().assertIsDisplayed()
-        onNodeWithText("image/png").performScrollTo().assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.reviewIslandToggle("credential")).assertCountEquals(1)
+        onAllNodesWithTag(WalletUiTestTags.reviewIslandToggle("issuer")).assertCountEquals(1)
+        onAllNodesWithTag(WalletUiTestTags.reviewIslandToggle("information")).assertCountEquals(1)
+        onNodeWithTag(WalletUiTestTags.CredentialCopyRawData).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.CredentialDelete).assertIsDisplayed()
+        onAllNodesWithText("Given name").assertCountEquals(1)
+        onAllNodesWithText("Ada").assertCountEquals(1)
+        onAllNodesWithText("Street address").assertCountEquals(1)
+        onAllNodesWithText("Main Street 1").assertCountEquals(1)
         onAllNodesWithText("Raw credential data").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.reviewIslandTechnicalDetails("credential"))
+            .performScrollTo()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        mainClock.advanceTimeBy(500)
+        onAllNodesWithTag(WalletUiTestTags.ReviewTechnicalDetailsPage).assertCountEquals(1)
+        onAllNodesWithText("jwt_vc_json").assertCountEquals(1)
+        onNodeWithTag(WalletUiTestTags.ReviewTechnicalDetailsBack).performClick()
         onNodeWithTag("wallet.detailsBack").performClick()
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
         assertEquals(1, wallet.bootstrapCalls)
@@ -1108,6 +1110,12 @@ private class FakeDemoWallet(
     }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
+
+    override suspend fun deleteCredential(credentialId: String): Boolean {
+        val previousCount = credentials.size
+        credentials = credentials.filterNot { it.id == credentialId }
+        return credentials.size != previousCount
+    }
 
     override suspend fun startIssuance(
         offerUrl: String,

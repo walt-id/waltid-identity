@@ -264,7 +264,7 @@ private fun ReviewIslandVisual(island: WalletDemoReviewIsland) {
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         contentAlignment = Alignment.Center,
     ) {
-        val imageUri = visual?.imageUri?.takeIf(::isHttpsReviewImage)
+        val imageUri = visual?.imageUri?.takeIf(::isSafeReviewImage)
         if (imageUri != null) {
             SubcomposeAsyncImage(
                 model = imageUri,
@@ -442,5 +442,8 @@ private fun reviewRouteTransition(
     )
 }
 
-private fun isHttpsReviewImage(value: String): Boolean =
-    value.trim().startsWith("https://", ignoreCase = true)
+private fun isSafeReviewImage(value: String): Boolean {
+    val normalized = value.trim()
+    return normalized.startsWith("https://", ignoreCase = true) ||
+        normalized.startsWith("data:image/", ignoreCase = true)
+}

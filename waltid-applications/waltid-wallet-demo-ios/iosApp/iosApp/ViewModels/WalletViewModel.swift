@@ -175,6 +175,18 @@ class WalletViewModel: ObservableObject {
         presentationSharingReview?.hasCompleteCredentialSelection(selectedPresentationCredentialOptions) == true
     }
 
+    func deleteCredential(id: String) async -> Bool {
+        do {
+            guard try await walletClient.deleteCredential(id: id) else { return false }
+            credentials.removeAll { $0.id == id }
+            setSuccess("Credential deleted", tab: .credentials)
+            return true
+        } catch {
+            setError(WalletStatusText.failure("Delete failed", error), tab: .credentials)
+            return false
+        }
+    }
+
     func statusMessage(for tab: WalletTab) -> String {
         statusApplies(to: tab) ? statusMessage : fallbackStatusMessage(for: tab)
     }

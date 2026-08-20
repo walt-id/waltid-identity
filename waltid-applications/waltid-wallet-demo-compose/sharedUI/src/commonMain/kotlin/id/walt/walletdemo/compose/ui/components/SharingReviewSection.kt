@@ -91,6 +91,7 @@ internal fun SharingReviewSection(
                     onToggleDisclosure = onToggleDisclosure,
                 )
                 WalletDemoReviewIslandKind.Issuer,
+                WalletDemoReviewIslandKind.ValidityAndStatus,
                 WalletDemoReviewIslandKind.PurposeAndTransaction,
                 WalletDemoReviewIslandKind.RequiredAction,
                 -> Unit
@@ -320,6 +321,7 @@ private fun sharingIslandTestModifier(island: WalletDemoReviewIsland): Modifier 
     WalletDemoReviewIslandKind.Issuer,
     WalletDemoReviewIslandKind.Credential,
     WalletDemoReviewIslandKind.Information,
+    WalletDemoReviewIslandKind.ValidityAndStatus,
     WalletDemoReviewIslandKind.RequiredAction,
     -> Modifier
 }

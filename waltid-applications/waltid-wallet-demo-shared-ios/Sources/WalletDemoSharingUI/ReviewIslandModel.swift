@@ -7,8 +7,129 @@ public enum ReviewIslandKind: String, Equatable {
     case verifier
     case credential
     case information
+    case validityAndStatus
     case purposeAndTransaction
     case requiredAction
+}
+
+public extension CredentialDetails {
+    /// Builds stored-credential details with the same information hierarchy as review surfaces.
+    func reviewIslands(context: ReviewSurfaceContext = .stored) -> [ReviewIsland] {
+        let summary = cardSummary
+        let issuerName = issuerDisplay?.name?.presentableValue
+            ?? issuer?.presentableValue
+            ?? "Issuer unavailable"
+        var islands = [
+            ReviewIsland(
+                id: "credential",
+                kind: .credential,
+                context: context,
+                title: summary.title,
+                subtitle: summary.credentialType ?? "Stored credential",
+                visual: ReviewIslandVisual(
+                    imageData: summary.portraitData,
+                    contentDescription: summary.portraitData == nil ? nil : "Credential portrait",
+                    fallbackText: summary.title.first.map { String($0).uppercased() } ?? "C"
+                ),
+                expandedValues: [ReviewValue(label: "Holder", value: summary.holderName)],
+                technicalSections: [
+                    ReviewTechnicalSection(
+                        id: "credential-identity",
+                        title: "Credential identity",
+                        values: [
+                            ReviewValue(label: "Credential identifier", value: id),
+                            ReviewValue(label: "Format", value: format),
+                            ReviewValue(label: "Subject", value: subject),
+                        ]
+                    )
+                ],
+                initiallyExpanded: true
+            ),
+            ReviewIsland(
+                id: "issuer",
+                kind: .issuer,
+                context: context,
+                title: issuerName,
+                subtitle: "Credential Issuer",
+                visual: ReviewIslandVisual(
+                    imageURI: issuerDisplay?.logoURI,
+                    contentDescription: issuerDisplay?.logoAltText,
+                    fallbackText: issuerName.first.map { String($0).uppercased() } ?? "I"
+                ),
+                expandedValues: [ReviewValue(label: "About", value: issuerDisplay?.description)],
+                technicalSections: [
+                    ReviewTechnicalSection(
+                        id: "issuer-identity",
+                        title: "Issuer identity",
+                        values: [
+                            ReviewValue(label: "Issuer identifier", value: issuer, linkURI: issuer),
+                            ReviewValue(label: "Selected display name", value: issuerDisplay?.name),
+                            ReviewValue(label: "Logo source", value: issuerDisplay?.logoURI, linkURI: issuerDisplay?.logoURI),
+                        ]
+                    )
+                ]
+            ),
+        ]
+
+        if !groups.isEmpty {
+            let fieldCount = groups.flatMap(\.items).count
+            islands.append(
+                ReviewIsland(
+                    id: "information",
+                    kind: .information,
+                    context: context,
+                    title: "Information",
+                    subtitle: "\(fieldCount) \(fieldCount == 1 ? "field" : "fields")",
+                    visual: ReviewIslandVisual(fallbackText: "i"),
+                    expandedValues: groups.flatMap { group in
+                        group.items.map {
+                            ReviewValue(label: $0.label, value: $0.value.reviewText, supportingText: group.title)
+                        }
+                    },
+                    technicalSections: groups.enumerated().map { index, group in
+                        ReviewTechnicalSection(
+                            id: "stored-information-\(index)",
+                            title: group.title,
+                            values: group.items.map {
+                                ReviewValue(label: $0.path.id, value: $0.rawValue ?? $0.value.reviewText)
+                            }
+                        )
+                    },
+                    initiallyExpanded: true
+                )
+            )
+        }
+
+        if let validity = summary.validityText {
+            islands.append(
+                ReviewIsland(
+                    id: "validity-and-status",
+                    kind: .validityAndStatus,
+                    context: context,
+                    title: "Dates and status",
+                    subtitle: validity,
+                    visual: ReviewIslandVisual(fallbackText: "✓"),
+                    expandedValues: [ReviewValue(label: "Available information", value: validity)],
+                    technicalSections: [
+                        ReviewTechnicalSection(
+                            id: "stored-dates",
+                            title: "Stored dates",
+                            values: [ReviewValue(label: "Added to wallet", value: addedAt.map(Self.reviewDateFormatter.string(from:)))]
+                        )
+                    ]
+                )
+            )
+        }
+
+        return islands
+    }
+
+    private static let reviewDateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 }
 
 /// Why an island is being rendered. Context changes copy and controls, not source data.
@@ -22,11 +143,13 @@ public enum ReviewSurfaceContext: Equatable {
 /// A stable visual which never becomes the source of an identity claim.
 public struct ReviewIslandVisual: Equatable {
     public let imageURI: String?
+    public let imageData: Data?
     public let contentDescription: String?
     public let fallbackText: String
 
-    public init(imageURI: String? = nil, contentDescription: String? = nil, fallbackText: String) {
+    public init(imageURI: String? = nil, imageData: Data? = nil, contentDescription: String? = nil, fallbackText: String) {
         self.imageURI = imageURI
+        self.imageData = imageData
         self.contentDescription = contentDescription
         self.fallbackText = fallbackText
     }
@@ -400,7 +523,7 @@ private extension SharingResponseProtection {
     }
 }
 
-private extension DisplayValue {
+extension DisplayValue {
     var reviewText: String {
         switch self {
         case .text(let value), .number(let value), .decodedText(let value), .raw(let value): return value

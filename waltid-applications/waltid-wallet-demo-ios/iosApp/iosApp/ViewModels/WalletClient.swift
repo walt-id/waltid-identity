@@ -4,6 +4,7 @@ import WalletSDK
 protocol WalletClient {
     func bootstrap() async throws -> WalletBootstrapResult
     func credentials() async throws -> [Credential]
+    func deleteCredential(id: String) async throws -> Bool
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession
     func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome
@@ -36,6 +37,10 @@ final class SDKWalletClient: WalletClient {
 
     func credentials() async throws -> [Credential] {
         try await wallet().credentials()
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
+        try await wallet().deleteCredential(id: id)
     }
 
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession { try await wallet().startIssuance(request) }
@@ -84,4 +89,8 @@ final class SDKWalletClient: WalletClient {
         cachedWallet = wallet
         return wallet
     }
+}
+
+extension WalletClient {
+    func deleteCredential(id: String) async throws -> Bool { false }
 }

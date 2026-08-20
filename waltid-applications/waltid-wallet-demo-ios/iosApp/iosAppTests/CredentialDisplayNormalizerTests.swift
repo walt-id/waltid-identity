@@ -5,6 +5,32 @@ import XCTest
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
 
+    func testStoredCredentialReviewUsesCommonIslandsAndKeepsFormatTechnical() {
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "Personal ID",
+            issuer: "https://issuer.example",
+            subject: "did:key:holder",
+            format: "vc+sd-jwt",
+            addedAt: Self.isoDateFormatter.date(from: "2026-08-20T08:00:00Z"),
+            credentialDataJSON: #"{"given_name":"Ada","vct":"urn:eudi:pid:1"}"#
+        )
+
+        let islands = details.reviewIslands()
+
+        XCTAssertEqual(islands.map(\.kind), [.credential, .issuer, .information, .validityAndStatus])
+        XCTAssertTrue(islands.allSatisfy { $0.context == .stored })
+        XCTAssertTrue(
+            islands.first?.visibleTechnicalSections
+                .flatMap(\.visibleValues)
+                .contains { $0.value == "vc+sd-jwt" } == true
+        )
+        let normalText = islands.flatMap { $0.visibleSummaryValues + $0.visibleExpandedValues }
+            .compactMap(\.value)
+        XCTAssertFalse(normalText.contains("vc+sd-jwt"))
+        XCTAssertFalse(normalText.contains("urn:eudi:pid:1"))
+    }
+
     func testFlattensNamespacedMdocObjectClaimsIntoDisplayRows() {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",

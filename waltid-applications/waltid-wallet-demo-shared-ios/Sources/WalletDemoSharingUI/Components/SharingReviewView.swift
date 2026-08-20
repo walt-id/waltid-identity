@@ -120,7 +120,7 @@ public struct SharingReviewView: View {
                     )
                 }
             }
-        case .issuer, .purposeAndTransaction, .requiredAction:
+        case .issuer, .validityAndStatus, .purposeAndTransaction, .requiredAction:
             EmptyView()
         }
     }

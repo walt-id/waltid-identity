@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.toStoredReviewIslands
 import id.walt.walletdemo.compose.logic.toSystemInfoGroup
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
@@ -26,13 +27,24 @@ internal fun CredentialDetailsContent(
         CredentialOverviewSection(details)
         val systemInfoGroup = details.toSystemInfoGroup()
         if (details.groups.isEmpty() && systemInfoGroup == null) {
-            Text(
-                "No credential details available",
-            )
+            Text("No credential details available")
         }
-        details.groups.forEach { group ->
-            ClaimGroupSection(group)
-        }
+        details.groups.forEach { group -> ClaimGroupSection(group) }
         systemInfoGroup?.let { ClaimGroupSection(it) }
     }
+}
+
+@Composable
+internal fun StoredCredentialDetailsContent(
+    details: CredentialDetails,
+    modifier: Modifier = Modifier,
+) {
+    ReviewIslandNavigationHost(
+        reviewKey = details.summary.id,
+        islands = details.toStoredReviewIslands(),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(WalletUiTestTags.credentialDetails(details.summary.id)),
+        scrollContent = true,
+    )
 }

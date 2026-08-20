@@ -120,6 +120,31 @@ class WalletDemoController(
         }
     }
 
+    fun deleteCredential(credentialId: String) {
+        scope.launch(dispatcher) {
+            if (_state.value.session !is WalletSessionState.Ready) return@launch
+            runCatching { wallet.deleteCredential(credentialId) }
+                .onSuccess { removed ->
+                    if (removed) {
+                        _state.update { state ->
+                            val currentReady = state.session as? WalletSessionState.Ready ?: return@update state
+                            state.copy(session = currentReady.copy(credentials = currentReady.credentials.filterNot { it.id == credentialId }))
+                        }
+                    }
+                }
+                .onFailure { error ->
+                    _state.update { state ->
+                        state.copy(
+                            operation = WalletOperationState.Failed(
+                                message = WalletDisplayText.failure("Delete failed", error.message ?: "unknown error"),
+                                tab = WalletDemoTab.Credentials,
+                            )
+                        )
+                    }
+                }
+        }
+    }
+
     fun completePresentationContinuation() {
         _state.update { state ->
             val pending = state.pendingPresentationContinuation ?: return@update state

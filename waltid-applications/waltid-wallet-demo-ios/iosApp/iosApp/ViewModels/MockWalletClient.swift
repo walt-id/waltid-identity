@@ -52,6 +52,12 @@ actor MockWalletClient: WalletClient {
         storedCredentials
     }
 
+    func deleteCredential(id: String) async throws -> Bool {
+        let previousCount = storedCredentials.count
+        storedCredentials.removeAll { $0.id == id }
+        return storedCredentials.count != previousCount
+    }
+
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
         try await delayOperation()
         return IssuanceSession(
@@ -280,7 +286,7 @@ actor MockWalletClient: WalletClient {
         ])
     ]
 
-    private static let sampleCredential = Credential(
+    static let sampleCredential = Credential(
         id: "cred-1",
         format: "jwt_vc_json",
         issuer: "Example Issuer",

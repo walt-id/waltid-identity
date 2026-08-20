@@ -9,8 +9,126 @@ enum class WalletDemoReviewIslandKind {
     Verifier,
     Credential,
     Information,
+    ValidityAndStatus,
     PurposeAndTransaction,
     RequiredAction,
+}
+
+/** Builds stored-credential details with the same information hierarchy as review surfaces. */
+fun CredentialDetails.toStoredReviewIslands(): List<WalletDemoReviewIsland> {
+    val summary = toCardDisplayData()
+    val issuerName = issuerDisplay?.name.presentableOrNull()
+        ?: this.summary.issuer.presentableOrNull()
+        ?: "Issuer unavailable"
+
+    return buildList {
+        add(
+            WalletDemoReviewIsland(
+                id = WalletDemoReviewIslandId("credential"),
+                kind = WalletDemoReviewIslandKind.Credential,
+                context = WalletDemoReviewSurfaceContext.Stored,
+                title = summary.title,
+                subtitle = summary.credentialType ?: "Stored credential",
+                visual = WalletDemoReviewVisual(
+                    imageUri = summary.portrait?.encoded,
+                    contentDescription = summary.portrait?.let { "Credential portrait" },
+                    fallbackText = summary.title.firstOrNull()?.uppercase() ?: "C",
+                ),
+                expandedValues = listOf(
+                    WalletDemoReviewValue("Holder", summary.holderName),
+                ),
+                technicalSections = listOf(
+                    WalletDemoReviewTechnicalSection(
+                        id = "credential-identity",
+                        title = "Credential identity",
+                        values = listOf(
+                            WalletDemoReviewValue("Credential identifier", this@toStoredReviewIslands.summary.id),
+                            WalletDemoReviewValue("Format", this@toStoredReviewIslands.summary.format),
+                            WalletDemoReviewValue("Subject", this@toStoredReviewIslands.summary.subject),
+                        ),
+                    )
+                ),
+                initiallyExpanded = true,
+            )
+        )
+        add(
+            WalletDemoReviewIsland(
+                id = WalletDemoReviewIslandId("issuer"),
+                kind = WalletDemoReviewIslandKind.Issuer,
+                context = WalletDemoReviewSurfaceContext.Stored,
+                title = issuerName,
+                subtitle = "Credential Issuer",
+                visual = issuerDisplay.toReviewVisual(issuerName),
+                expandedValues = listOf(
+                    WalletDemoReviewValue("About", issuerDisplay?.description),
+                ),
+                technicalSections = listOf(
+                    WalletDemoReviewTechnicalSection(
+                        id = "issuer-identity",
+                        title = "Issuer identity",
+                        values = listOf(
+                            WalletDemoReviewValue(
+                                "Issuer identifier",
+                                this@toStoredReviewIslands.summary.issuer,
+                                linkUri = this@toStoredReviewIslands.summary.issuer,
+                            ),
+                            WalletDemoReviewValue("Selected display name", issuerDisplay?.name),
+                            WalletDemoReviewValue("Logo source", issuerDisplay?.logoUri, linkUri = issuerDisplay?.logoUri),
+                        ),
+                    )
+                ),
+            )
+        )
+        if (groups.isNotEmpty()) {
+            add(
+                WalletDemoReviewIsland(
+                    id = WalletDemoReviewIslandId("information"),
+                    kind = WalletDemoReviewIslandKind.Information,
+                    context = WalletDemoReviewSurfaceContext.Stored,
+                    title = "Information",
+                    subtitle = groups.flatMap(ClaimGroup::items).size.let { count ->
+                        "$count ${if (count == 1) "field" else "fields"}"
+                    },
+                    visual = WalletDemoReviewVisual(fallbackText = "i"),
+                    expandedValues = groups.flatMap { group ->
+                        group.items.map { item ->
+                            WalletDemoReviewValue(item.label, item.value.reviewText(), supportingText = group.title)
+                        }
+                    },
+                    technicalSections = groups.mapIndexed { index, group ->
+                        WalletDemoReviewTechnicalSection(
+                            id = "stored-information-$index",
+                            title = group.title,
+                            values = group.items.map { item ->
+                                WalletDemoReviewValue(item.path.id, item.rawValue ?: item.value.reviewText())
+                            },
+                        )
+                    },
+                    initiallyExpanded = true,
+                )
+            )
+        }
+        summary.validity?.let { validity ->
+            add(
+                WalletDemoReviewIsland(
+                    id = WalletDemoReviewIslandId("validity-and-status"),
+                    kind = WalletDemoReviewIslandKind.ValidityAndStatus,
+                    context = WalletDemoReviewSurfaceContext.Stored,
+                    title = "Dates and status",
+                    subtitle = validity,
+                    visual = WalletDemoReviewVisual(fallbackText = "✓"),
+                    expandedValues = listOf(WalletDemoReviewValue("Available information", validity)),
+                    technicalSections = listOf(
+                        WalletDemoReviewTechnicalSection(
+                            id = "stored-dates",
+                            title = "Stored dates",
+                            values = listOf(WalletDemoReviewValue("Added to wallet", this@toStoredReviewIslands.summary.addedAt)),
+                        )
+                    ),
+                )
+            )
+        }
+    }
 }
 
 /** The context that decides which details and controls an island may expose. */

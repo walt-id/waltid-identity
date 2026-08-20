@@ -64,6 +64,8 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                 backStack = credentialsBackStack,
                 details = credentials.map { it.toCredentialDetails() },
                 modifier = modifier,
+                storedCredentialActions = true,
+                onDeleteCredential = controller::deleteCredential,
                 root = {
                     CredentialsTab(
                         credentials = credentials,

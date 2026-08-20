@@ -8,6 +8,45 @@ import kotlin.test.assertTrue
 class WalletDemoReviewIslandsTest {
 
     @Test
+    fun storedCredentialReusesIslandsWithoutPromotingProtocolData() {
+        val details = CredentialSummary(
+            id = "credential-1",
+            format = "vc+sd-jwt",
+            issuer = "https://issuer.example",
+            subject = "did:key:holder",
+            label = "Personal ID",
+            addedAt = "2026-08-20T08:00:00Z",
+            credentialDataJson = """{"given_name":"Ada","vct":"urn:eudi:pid:1"}""",
+            metadataJson = """{"issuerDisplay":[{"name":"Example Issuer"}]}""",
+        ).toCredentialDetails()
+
+        val islands = details.toStoredReviewIslands()
+
+        assertEquals(
+            listOf(
+                WalletDemoReviewIslandKind.Credential,
+                WalletDemoReviewIslandKind.Issuer,
+                WalletDemoReviewIslandKind.Information,
+                WalletDemoReviewIslandKind.ValidityAndStatus,
+            ),
+            islands.map(WalletDemoReviewIsland::kind),
+        )
+        assertTrue(islands.all { it.context == WalletDemoReviewSurfaceContext.Stored })
+        assertEquals("Example Issuer", islands[1].title)
+        assertTrue(islands[2].visibleExpandedValues.any { it.label == "Given name" && it.value == "Ada" })
+
+        val normalText = islands.flatMap { it.visibleSummaryValues + it.visibleExpandedValues }
+            .flatMap { listOfNotNull(it.label, it.value, it.supportingText) }
+        assertFalse("vc+sd-jwt" in normalText)
+        assertFalse("urn:eudi:pid:1" in normalText)
+        assertTrue(
+            islands.first().visibleTechnicalSections
+                .flatMap { it.visibleValues }
+                .any { it.value == "vc+sd-jwt" }
+        )
+    }
+
+    @Test
     fun issuanceUsesSemanticOrderAndKeepsProtocolIdentifiersInTechnicalDetails() {
         val preview = offerPreview(
             transactionCode = WalletDemoTransactionCodeRequirement(

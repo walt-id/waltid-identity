@@ -65,7 +65,14 @@ struct CredentialsTabView: View {
             if let detailsID = selectedDetailsID {
                 CredentialDetailsDestination(
                     detailsID: detailsID,
-                    details: details
+                    details: details,
+                    onDelete: { credentialID in
+                        Task {
+                            if await viewModel.deleteCredential(id: credentialID) {
+                                selectedDetailsID = nil
+                            }
+                        }
+                    }
                 )
             } else {
                 EmptyView()

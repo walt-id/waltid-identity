@@ -159,6 +159,11 @@ public actor Wallet {
         try await bridge.credentials()
     }
 
+    /// Removes one credential from wallet-local storage and refreshes native registration.
+    public func deleteCredential(id: String) async throws -> Bool {
+        try await bridge.deleteCredential(id: id)
+    }
+
     /// Deletes wallet-local state and managed persistence material.
     ///
     /// - Throws: ``WalletError`` when local wallet material cannot be deleted.

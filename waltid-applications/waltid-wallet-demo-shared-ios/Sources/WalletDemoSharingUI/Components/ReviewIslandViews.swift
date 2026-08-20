@@ -219,7 +219,13 @@ private struct ReviewIslandVisualView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12).fill(Color(.tertiarySystemFill))
-            if let imageURL {
+            if let imageData = island.visual?.imageData, let image = UIImage(data: imageData) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+                    .accessibilityLabel(island.visual?.contentDescription ?? "Credential image")
+            } else if let imageURL {
                 AsyncImage(url: imageURL) { phase in
                     switch phase {
                     case .success(let image): image.resizable().scaledToFit()

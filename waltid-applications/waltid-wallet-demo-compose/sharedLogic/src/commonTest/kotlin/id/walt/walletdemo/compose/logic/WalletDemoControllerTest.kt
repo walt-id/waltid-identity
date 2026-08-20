@@ -1624,6 +1624,12 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
+    override suspend fun deleteCredential(credentialId: String): Boolean {
+        val previousCount = credentials.size
+        credentials = credentials.filterNot { it.id == credentialId }
+        return credentials.size != previousCount
+    }
+
     override suspend fun startIssuance(
         offerUrl: String,
         redirectUri: String,

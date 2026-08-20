@@ -68,6 +68,7 @@ internal fun OfferReviewSection(
                 WalletDemoReviewIslandKind.Issuer,
                 WalletDemoReviewIslandKind.Verifier,
                 WalletDemoReviewIslandKind.Credential,
+                WalletDemoReviewIslandKind.ValidityAndStatus,
                 WalletDemoReviewIslandKind.PurposeAndTransaction,
                 -> Unit
             }
@@ -192,6 +193,7 @@ private fun offerIslandTestModifier(island: WalletDemoReviewIsland): Modifier = 
         }
     )
     WalletDemoReviewIslandKind.Verifier,
+    WalletDemoReviewIslandKind.ValidityAndStatus,
     WalletDemoReviewIslandKind.PurposeAndTransaction,
     -> Modifier
 }

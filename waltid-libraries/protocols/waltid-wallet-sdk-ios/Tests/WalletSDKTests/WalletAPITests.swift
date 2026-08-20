@@ -362,6 +362,16 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.credentialsCallCount, 1)
     }
 
+    func testDeleteCredentialForwardsIdentifierAndReturnsResult() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+
+        let deleted = try await wallet.deleteCredential(id: "credential-1")
+
+        XCTAssertTrue(deleted)
+        XCTAssertEqual(bridge.deletedCredentialIDs, ["credential-1"])
+    }
+
     func testDeleteLocalDataForwardsToBridge() async throws {
         let bridge = FakeWalletCoreBridge()
         let wallet = Wallet(bridge: bridge)
@@ -908,6 +918,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var cancelledIssuanceSessionIDs: [String] = []
     private(set) var resumedDeferredCredentialIDs: [String] = []
     private(set) var credentialsCallCount = 0
+    private(set) var deletedCredentialIDs: [String] = []
     private(set) var deleteLocalDataCallCount = 0
     private(set) var presentCalls: [PresentCall] = []
     private(set) var previewCalls: [URL] = []
@@ -1015,6 +1026,12 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
         credentialsCallCount += 1
         return credentialsResult
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
+        if let error { throw error }
+        deletedCredentialIDs.append(id)
+        return true
     }
 
     func deleteLocalData() async throws {

@@ -19,6 +19,9 @@ struct WalletDemoApp: App {
                 walletID: walletID,
                 biometricEnabled: biometricEnabled,
                 walletClient: MockWalletClient(
+                    storedCredentials: env["E2E_MOCK_STORED_CREDENTIAL"] == "1"
+                        ? [MockWalletClient.sampleCredential]
+                        : [],
                     operationDelayMilliseconds: delayMilliseconds,
                     verifierStyle: Self.mockVerifierStyle(environment: env),
                     duplicatePresentationOptions: env["E2E_MOCK_DUPLICATE_PRESENTATION_OPTIONS"] == "1",
