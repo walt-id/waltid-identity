@@ -334,7 +334,8 @@ object AuthorizationRequestResolver {
         }
         parameters[deliveryParameter]?.let { explicitUri ->
             require(explicitUri == embeddedUri) {
-                "$deliveryParameter must exactly match the URI encoded in client_id"
+                "Authorization Request $deliveryParameter '$explicitUri' does not match the " +
+                    "redirect_uri client_id '$embeddedUri'"
             }
         }
         return parseParameters(Parameters.build {
