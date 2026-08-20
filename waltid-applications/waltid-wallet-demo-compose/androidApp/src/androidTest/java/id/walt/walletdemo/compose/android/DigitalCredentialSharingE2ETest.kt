@@ -1125,7 +1125,9 @@ class DigitalCredentialSharingE2ETest {
 
             wallet = createAndroidDemoMobileWallet(
                 context = context,
-                config = demoWalletConfig(),
+                // This Play Store emulator cannot enforce protected signing keys; production
+                // defaults remain covered by the app, while this fixture needs ordinary keys.
+                config = demoWalletConfig().copy(biometricEnabled = false),
             ).wallet
             wallet.bootstrap()
 
