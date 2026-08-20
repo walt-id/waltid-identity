@@ -15,11 +15,14 @@ struct CredentialsTabView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    StatusBannerView(
-                        message: viewModel.statusMessage(for: .credentials),
-                        isLoading: viewModel.statusIsLoading(for: .credentials),
-                        isError: viewModel.statusIsError(for: .credentials)
-                    )
+                    if viewModel.statusShouldPersist(for: .credentials) {
+                        StatusBannerView(
+                            message: viewModel.statusMessage(for: .credentials),
+                            isLoading: viewModel.statusIsLoading(for: .credentials),
+                            isError: viewModel.statusIsError(for: .credentials),
+                            onDismiss: viewModel.dismissStatus
+                        )
+                    }
 
                     if let warning = viewModel.transactionDataProfilesWarning {
                         WarningBannerView(message: warning)
@@ -45,6 +48,11 @@ struct CredentialsTabView: View {
                     }
                     .disabled(!viewModel.isReady)
                     .accessibilityIdentifier(WalletAccessibilityID.scanAction)
+
+                    NavigationLink(destination: WalletSettingsView(viewModel: viewModel)) {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                    .accessibilityIdentifier(WalletAccessibilityID.settingsAction)
                 }
             }
             .background(detailsNavigationLink)

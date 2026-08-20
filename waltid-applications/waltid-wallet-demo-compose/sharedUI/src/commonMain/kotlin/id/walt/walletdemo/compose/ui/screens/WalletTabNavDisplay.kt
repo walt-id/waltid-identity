@@ -15,6 +15,7 @@ internal fun WalletTabNavDisplay(
     modifier: Modifier,
     storedCredentialActions: Boolean = false,
     onDeleteCredential: (String) -> Unit = {},
+    settings: (@Composable () -> Unit)? = null,
     root: @Composable () -> Unit,
 ) {
     NavDisplay(
@@ -23,6 +24,9 @@ internal fun WalletTabNavDisplay(
         entryProvider = entryProvider {
             entry<WalletRoute.Root> {
                 root()
+            }
+            entry<WalletRoute.Settings> {
+                settings?.invoke() ?: root()
             }
             entry<WalletRoute.CredentialDetails> { route ->
                 val selectedDetails = details.firstOrNull { it.summary.id == route.detailsId }
@@ -44,6 +48,11 @@ internal fun WalletTabNavDisplay(
 internal fun SnapshotStateList<WalletRoute>.pushDetails(detailsId: String) {
     removeAll { it is WalletRoute.CredentialDetails }
     add(WalletRoute.CredentialDetails(detailsId))
+}
+
+internal fun SnapshotStateList<WalletRoute>.pushSettings() {
+    removeAll { it is WalletRoute.Settings }
+    add(WalletRoute.Settings)
 }
 
 internal fun SnapshotStateList<WalletRoute>.resetToRoot() {

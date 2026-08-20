@@ -25,6 +25,14 @@ class CredentialDisplayNameResolverTest {
     }
 
     @Test
+    fun preservesConfiguredLabelVerbatim() {
+        assertEquals(
+            "  mso_mdoc  ",
+            CredentialDisplayNameResolver.resolve(label = "  mso_mdoc  ", format = "mso_mdoc"),
+        )
+    }
+
+    @Test
     fun replacesIdentifierLabelWithKnownCredentialName() {
         assertEquals(
             "Personal ID",

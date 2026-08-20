@@ -250,7 +250,7 @@ fun WalletDemoSharingReview.toReviewIslands(
 private fun WalletDemoOfferPreview.issuerReviewIsland(
     context: WalletDemoReviewSurfaceContext,
 ): WalletDemoReviewIsland {
-    val issuerName = issuer.display?.name.presentableOrNull() ?: issuer.credentialIssuer
+    val issuerName = issuer.display?.name?.takeIf { it.isNotBlank() } ?: issuer.credentialIssuer
     return WalletDemoReviewIsland(
         id = WalletDemoReviewIslandId("issuer"),
         kind = WalletDemoReviewIslandKind.Issuer,
@@ -402,7 +402,7 @@ private fun WalletDemoSharingReview.verifierReviewIsland(
     context: WalletDemoReviewSurfaceContext,
 ): WalletDemoReviewIsland? {
     val verifier = request.verifier
-    val name = verifier?.display?.name.presentableOrNull()
+    val name = verifier?.display?.name?.takeIf { it.isNotBlank() }
         ?: verifier?.fallbackName.presentableOrNull()
         ?: verifier?.verifiedOrigin.presentableOrNull()
         ?: "Verifier"

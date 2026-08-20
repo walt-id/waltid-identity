@@ -5,6 +5,7 @@ protocol WalletClient {
     func bootstrap() async throws -> WalletBootstrapResult
     func credentials() async throws -> [Credential]
     func deleteCredential(id: String) async throws -> Bool
+    func deleteLocalData() async throws
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession
     func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome
@@ -41,6 +42,12 @@ final class SDKWalletClient: WalletClient {
 
     func deleteCredential(id: String) async throws -> Bool {
         try await wallet().deleteCredential(id: id)
+    }
+
+    func deleteLocalData() async throws {
+        let wallet = try await wallet()
+        try await wallet.deleteLocalData()
+        cachedWallet = nil
     }
 
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession { try await wallet().startIssuance(request) }

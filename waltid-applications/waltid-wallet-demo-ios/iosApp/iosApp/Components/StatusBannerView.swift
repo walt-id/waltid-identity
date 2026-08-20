@@ -5,17 +5,31 @@ struct StatusBannerView: View {
     let message: String
     let isLoading: Bool
     let isError: Bool
+    var onDismiss: () -> Void = {}
+    @State private var expanded = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            if isLoading {
-                ProgressView()
-                    .controlSize(.small)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(message)
+                    .font(.subheadline)
+                    .lineLimit(expanded ? nil : 2)
+                    .accessibilityIdentifier(WalletAccessibilityID.status)
             }
-            Text(message)
-                .font(.subheadline)
-                .lineLimit(2)
-                .accessibilityIdentifier(WalletAccessibilityID.status)
+            if isError {
+                HStack {
+                    Button(expanded ? "Show less" : "Show details") {
+                        expanded.toggle()
+                    }
+                    Spacer()
+                    Button("Dismiss", action: onDismiss)
+                }
+                .font(.caption.weight(.semibold))
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)

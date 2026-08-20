@@ -41,11 +41,14 @@ struct ReceiveView: View {
                         .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
                     }
 
-                    StatusBannerView(
-                        message: viewModel.statusMessage(for: .receive),
-                        isLoading: viewModel.statusIsLoading(for: .receive),
-                        isError: viewModel.statusIsError(for: .receive)
-                    )
+                    if viewModel.statusShouldPersist(for: .receive) {
+                        StatusBannerView(
+                            message: viewModel.statusMessage(for: .receive),
+                            isLoading: viewModel.statusIsLoading(for: .receive),
+                            isError: viewModel.statusIsError(for: .receive),
+                            onDismiss: viewModel.dismissStatus
+                        )
+                    }
 
                     if let preview = viewModel.offerPreview {
                         OfferReviewView(

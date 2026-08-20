@@ -23,6 +23,34 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertFalse(app.buttons["wallet.presentationScanButton"].exists)
     }
 
+    func testSettingsOwnsWalletIdentityAndConfirmsReset() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            "Wallet ready"
+        )
+        XCTAssertFalse(app.staticTexts["did:key:mock"].exists)
+
+        let settings = app.buttons["wallet.settingsAction"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 10))
+        settings.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.settingsScreen"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.did"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.keyId"].waitForExistence(timeout: 10))
+
+        let reset = app.buttons["wallet.resetAction"]
+        XCTAssertTrue(reset.waitForExistence(timeout: 10))
+        reset.tap()
+        XCTAssertTrue(app.staticTexts["Reset wallet?"].waitForExistence(timeout: 10))
+        app.buttons["wallet.resetConfirm"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.settingsScreen"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.did"].waitForExistence(timeout: 10))
+    }
+
     func testDeepLinksRouteToCredentialAndInformationReviewSheets() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -103,11 +131,7 @@ final class MockWalletUITests: XCTestCase {
         let interactionSheet = app.descendants(matching: .any)["wallet.interactionSheet"]
         let transactionCodeSection = interactionSheet.descendants(matching: .any)["wallet.reviewIsland.required-action"]
         XCTAssertTrue(transactionCodeSection.waitForExistence(timeout: 10))
-        XCTAssertLessThan(
-            interactionSheet.staticTexts["wallet.status"].frame.minY,
-            transactionCodeSection.frame.minY,
-            "Receive status should precede the offer review"
-        )
+        XCTAssertFalse(interactionSheet.staticTexts["wallet.status"].exists)
 
         let accept = app.buttons["Add credential"]
         let decline = app.buttons["Decline"]

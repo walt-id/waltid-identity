@@ -19,8 +19,7 @@ object CredentialDisplayNameResolver {
         credentialType: String? = null,
     ): String {
         label
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+            ?.takeIf { it.isNotBlank() }
             ?.let { return it }
 
         val resolvedType = credentialType

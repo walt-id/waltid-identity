@@ -964,6 +964,25 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun transactionDataGroupsPreserveConfiguredDisplayNameWhenItMatchesTheType() {
+        val configuredName = "org.waltid.transaction-data.payment_authorization"
+        val group = CredentialDisplayNormalizer.transactionDataGroups(
+            listOf(
+                WalletDemoTransactionDataItem(
+                    type = configuredName,
+                    displayName = configuredName,
+                    credentialQueryIds = emptyList(),
+                    supportedFields = emptyList(),
+                    detailsJson = "{}",
+                    rawJson = "{}",
+                )
+            )
+        ).single()
+
+        assertEquals(configuredName, group.title)
+    }
+
+    @Test
     fun transactionDataGroupsQualifyNestedScaPayloadLabelsWithTheirParent() {
         val groups = CredentialDisplayNormalizer.transactionDataGroups(
             listOf(

@@ -15,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
@@ -22,7 +24,9 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletOperationState
 import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.logic.receiveUrlEntryEnabled
 import id.walt.walletdemo.compose.logic.presentationUrlEntryEnabled
 import id.walt.walletdemo.compose.logic.receivedCredentials
@@ -42,6 +46,15 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
     var scanVisible by remember { mutableStateOf(false) }
     val scanSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val interactionSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val showingSettings = credentialsBackStack.lastOrNull() is WalletRoute.Settings
+    val successMessage = (state.operation as? WalletOperationState.Succeeded)?.message
+
+    LaunchedEffect(successMessage) {
+        successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+        }
+    }
 
     LaunchedEffect(state.authorizationRequestUrl) {
         state.authorizationRequestUrl?.let { authorizationUrl ->
@@ -65,13 +78,15 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
         },
         topBar = {
             WalletHeader(
-                did = ready?.did,
                 state = state,
                 scanEnabled = ready != null,
+                showingSettings = showingSettings,
+                onBack = { credentialsBackStack.removeLastOrNull() },
                 onScan = { scanVisible = true },
-                onLock = controller::lock,
+                onSettings = { credentialsBackStack.pushSettings() },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { contentPadding ->
         val modifier = Modifier
             .fillMaxSize()
@@ -83,12 +98,26 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             modifier = modifier,
             storedCredentialActions = true,
             onDeleteCredential = controller::deleteCredential,
+            settings = {
+                ready?.let { session ->
+                    WalletSettingsScreen(
+                        state = state,
+                        session = session,
+                        resetEnabled = !state.isBusy,
+                        onLock = controller::lock,
+                        onReset = controller::resetWallet,
+                        onDismissStatus = controller::dismissOperationStatus,
+                    )
+                }
+            },
             root = {
                 CredentialsTab(
+                    state = state,
                     credentials = credentials,
                     onCredentialClick = { detailsId -> credentialsBackStack.pushDetails(detailsId) },
                     onScan = { scanVisible = true },
                     scanEnabled = ready != null,
+                    onDismissStatus = controller::dismissOperationStatus,
                 )
             },
         )
@@ -137,6 +166,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                             onStartNew = controller::startNewReceiveFlow,
                             onResumeDeferred = controller::resumeDeferredCredential,
                             onCredentialClick = { detailsId -> receiveBackStack.pushDetails(detailsId) },
+                            onDismissStatus = controller::dismissOperationStatus,
                             showsInput = state.receiveUrlEntryEnabled,
                         )
                     },
@@ -172,6 +202,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                             onSubmit = controller::submitPresentation,
                             onReject = controller::rejectPresentation,
                             onCancel = controller::cancelPresentationReview,
+                            onDismissStatus = controller::dismissOperationStatus,
                             showsInput = state.presentationUrlEntryEnabled,
                         )
                     },

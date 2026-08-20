@@ -11,7 +11,7 @@ import kotlin.io.encoding.Base64
 @OptIn(CryptographyProviderApi::class)
 internal class PersistentDemoPinStore(
     private val readRecord: () -> String?,
-    private val writeRecord: (String) -> Unit,
+    private val writeRecord: (String?) -> Unit,
     private val provider: CryptographyProvider = CryptographyProvider.Default,
 ) : DemoPinStore {
     private val pbkdf2 by lazy { provider.get(PBKDF2) }
@@ -45,6 +45,10 @@ internal class PersistentDemoPinStore(
         }
 
         return derive(pin, salt, iterations).constantTimeEquals(expected)
+    }
+
+    override suspend fun clearPin() {
+        writeRecord(null)
     }
 
     private suspend fun derive(pin: String, salt: ByteArray, iterations: Int): ByteArray =

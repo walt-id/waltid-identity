@@ -30,5 +30,8 @@ class AndroidDemoPinStoreTest {
             .getString("pin.$walletId", null)
         assertTrue(storedRecord?.startsWith("1:210000:") == true)
         assertNotEquals("1234", storedRecord)
+
+        recreatedStore.clearPin()
+        assertFalse(createAndroidDemoPinStore(context, walletId).hasPin())
     }
 }

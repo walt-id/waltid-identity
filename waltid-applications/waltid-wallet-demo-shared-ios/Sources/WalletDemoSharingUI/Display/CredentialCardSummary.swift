@@ -23,7 +23,7 @@ extension CredentialDetails {
         let portrait = firstImage(in: items)
         let expiryDate = firstExpiryDate(in: items)
         let addedDate = addedAt.map(Self.cardDateFormatter.string(from:))
-        let issuerName = issuerDisplay?.name?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+        let issuerName = issuerDisplay?.name.flatMap { $0.isPresentableValue ? $0 : nil }
             ?? issuer?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
             ?? CredentialDisplayText.unknown
 

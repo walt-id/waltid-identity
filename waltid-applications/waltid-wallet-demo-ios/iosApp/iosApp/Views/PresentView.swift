@@ -49,11 +49,14 @@ struct PresentView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    StatusBannerView(
-                        message: viewModel.statusMessage(for: .present),
-                        isLoading: viewModel.statusIsLoading(for: .present),
-                        isError: viewModel.statusIsError(for: .present)
-                    )
+                    if viewModel.statusShouldPersist(for: .present) {
+                        StatusBannerView(
+                            message: viewModel.statusMessage(for: .present),
+                            isLoading: viewModel.statusIsLoading(for: .present),
+                            isError: viewModel.statusIsError(for: .present),
+                            onDismiss: viewModel.dismissStatus
+                        )
+                    }
 
                     if let warning = viewModel.transactionDataProfilesWarning {
                         WarningBannerView(message: warning)

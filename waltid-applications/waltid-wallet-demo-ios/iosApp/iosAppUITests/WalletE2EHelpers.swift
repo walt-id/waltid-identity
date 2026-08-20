@@ -35,6 +35,12 @@ final class WalletE2EUI {
     }
 
     func latestStatus(prefixes: [String]) -> String? {
+        if prefixes.contains("Wallet ready") {
+            let scanAction = app.buttons["wallet.scanAction"]
+            if scanAction.exists, scanAction.isEnabled {
+                return "Wallet ready"
+            }
+        }
         for prefix in prefixes {
             let predicate = NSPredicate(format: "label BEGINSWITH %@", prefix)
             let match = app.staticTexts.matching(predicate).firstMatch

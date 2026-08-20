@@ -58,6 +58,10 @@ actor MockWalletClient: WalletClient {
         return storedCredentials.count != previousCount
     }
 
+    func deleteLocalData() async throws {
+        storedCredentials.removeAll()
+    }
+
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
         try await delayOperation()
         return IssuanceSession(

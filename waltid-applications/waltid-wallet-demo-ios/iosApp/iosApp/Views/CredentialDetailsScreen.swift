@@ -62,5 +62,14 @@ struct CredentialDetailsScreen: View {
         }
         .navigationTitle("Credential details")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: copiedRawData) {
+            guard copiedRawData else { return }
+            do {
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+            } catch {
+                return
+            }
+            copiedRawData = false
+        }
     }
 }

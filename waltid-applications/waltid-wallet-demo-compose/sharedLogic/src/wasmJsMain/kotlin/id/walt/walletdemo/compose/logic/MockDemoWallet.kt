@@ -19,6 +19,10 @@ private class MockDemoWallet : DemoWallet {
         return credentials.size != previousCount
     }
 
+    override suspend fun deleteWallet() {
+        credentials = emptyList()
+    }
+
     override suspend fun startIssuance(
         offerUrl: String,
         redirectUri: String,

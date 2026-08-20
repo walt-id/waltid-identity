@@ -38,6 +38,20 @@ struct HomeView: View {
         .onChange(of: viewModel.presentationNavigationResetKey) { _ in
             selectedPresentationDetailsID = nil
         }
+        .overlay(alignment: .top) {
+            if let message = viewModel.transientMessage {
+                Text(message)
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial, in: Capsule())
+                    .shadow(radius: 4, y: 2)
+                    .padding(.top, 8)
+                    .padding(.horizontal)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut, value: viewModel.transientMessage)
     }
 
     private var interactionPresented: Binding<Bool> {

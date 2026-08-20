@@ -6,7 +6,11 @@ public enum CredentialDisplayNormalizer {
     public static func details(for credential: Credential) -> CredentialDetails {
         var result = details(
             id: credential.id,
-            title: credential.label ?? credential.format,
+            title: CredentialReviewDisplayNameResolver.resolve(
+                label: credential.label,
+                format: credential.format,
+                credentialDataJSON: credential.credentialDataJSON
+            ),
             issuer: credential.issuer,
             subject: credential.subject,
             format: credential.format,
@@ -29,7 +33,11 @@ public enum CredentialDisplayNormalizer {
     public static func details(for option: PresentationCredentialOption) -> CredentialDetails {
         let parsed = details(
             id: option.selection.id,
-            title: option.label ?? option.format,
+            title: CredentialReviewDisplayNameResolver.resolve(
+                label: option.label,
+                format: option.format,
+                credentialDataJSON: option.credentialDataJSON
+            ),
             issuer: option.issuer,
             subject: option.subject,
             format: option.format,
@@ -72,8 +80,9 @@ public enum CredentialDisplayNormalizer {
 
     public static func transactionDataGroups(for transactionData: [PresentationTransactionData]) -> [ClaimGroup] {
         let baseTitles = transactionData.map { item in
-            item.displayName.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
-                ?? CredentialDisplayVocabulary.transactionDataTitle
+            item.displayName.isPresentableValue
+                ? item.displayName
+                : CredentialDisplayVocabulary.transactionDataTitle
         }
         let titleCounts = baseTitles.reduce(into: [String: Int]()) { counts, title in
             counts[title, default: 0] += 1

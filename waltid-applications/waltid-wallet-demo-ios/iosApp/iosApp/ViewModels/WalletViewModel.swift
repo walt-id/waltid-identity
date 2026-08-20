@@ -25,6 +25,8 @@ private enum WalletStatusText {
     static let resolvingPresentation = "Resolving presentation..."
     static let presentingCredential = "Presenting credential..."
     static let decliningPresentation = "Declining presentation..."
+    static let resettingWallet = "Resetting wallet..."
+    static let resetFailed = "Reset failed"
     static let bootstrappingWallet = "Bootstrapping wallet..."
     static let reviewPresentationRequest = "Review presentation request"
     static let reviewPresentationError = "Review presentation error"
@@ -63,8 +65,10 @@ private enum WalletStatusText {
 class WalletViewModel: ObservableObject {
     @Published var isReady = false
     @Published var did = ""
+    @Published var keyID = ""
     @Published var credentials: [Credential] = []
     @Published var statusMessage = WalletStatusText.startingWallet
+    @Published var transientMessage: String?
     @Published var isLoading = false
     @Published var isError = false
     @Published var offerUrl = "" {
@@ -99,6 +103,7 @@ class WalletViewModel: ObservableObject {
     private var issuanceSession: IssuanceSession?
     private var pendingPresentationSuccessMessage: String?
     private var presentationTask: Task<Void, Never>?
+    private var transientMessageTask: Task<Void, Never>?
     private let updatesIdentityDocumentRegistration: Bool
 
     var presentationPreview: PresentationPreview? {
@@ -188,6 +193,34 @@ class WalletViewModel: ObservableObject {
         }
     }
 
+    func resetWallet() async -> Bool {
+        guard isReady, !isLoading else { return false }
+        receiveTask?.cancel()
+        presentationTask?.cancel()
+        issuanceSession = nil
+        authorizationRequestURL = nil
+        presentationReview = nil
+        clearPendingPresentationContinuation()
+        setLoading(WalletStatusText.resettingWallet, tab: .credentials)
+        do {
+            try await walletClient.deleteLocalData()
+            did = ""
+            keyID = ""
+            credentials = []
+            lastReceivedCredentialIDs = []
+            deferredCredentials = []
+            receiveCompleted = false
+            presentationCompleted = false
+            isReady = false
+            selectedTab = .credentials
+            bootstrap()
+            return true
+        } catch {
+            setError(WalletStatusText.failure(WalletStatusText.resetFailed, error), tab: .credentials)
+            return false
+        }
+    }
+
     func statusMessage(for tab: WalletTab) -> String {
         statusApplies(to: tab) ? statusMessage : fallbackStatusMessage(for: tab)
     }
@@ -198,6 +231,17 @@ class WalletViewModel: ObservableObject {
 
     func statusIsError(for tab: WalletTab) -> Bool {
         isError && statusApplies(to: tab)
+    }
+
+    func statusShouldPersist(for tab: WalletTab) -> Bool {
+        statusApplies(to: tab) && (isLoading || isError)
+    }
+
+    func dismissStatus() {
+        guard isError else { return }
+        isError = false
+        statusTab = nil
+        statusMessage = isReady ? WalletStatusText.walletReady : WalletStatusText.startingWallet
     }
 
     @discardableResult
@@ -672,6 +716,7 @@ class WalletViewModel: ObservableObject {
         self.txCode = ""
         receiveCompleted = true
         setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .receive)
+        selectedTab = .credentials
     }
 
     func updateTxCode(_ value: String) {
@@ -1012,6 +1057,7 @@ class WalletViewModel: ObservableObject {
                 logE2E("Bootstrap: listCredentials returned \(list.count) credentials")
 
                 did = result.did
+                keyID = result.keyID
                 credentials = list
                 if updatesIdentityDocumentRegistration, #available(iOS 26.0, *) {
                     try await DemoIdentityDocumentRegistration.update()
@@ -1067,6 +1113,8 @@ class WalletViewModel: ObservableObject {
     }
 
     private func setLoading(_ message: String, tab: WalletTab? = nil) {
+        transientMessageTask?.cancel()
+        transientMessage = nil
         isLoading = true
         isError = false
         statusTab = tab
@@ -1079,6 +1127,9 @@ class WalletViewModel: ObservableObject {
         isError = false
         statusTab = tab
         statusMessage = message
+        if message != WalletStatusText.walletReady {
+            showTransient(message)
+        }
         logE2E("STATUS \(message)")
     }
 
@@ -1101,11 +1152,27 @@ class WalletViewModel: ObservableObject {
     }
 
     private func setError(_ message: String, tab: WalletTab? = nil) {
+        transientMessageTask?.cancel()
+        transientMessage = nil
         isLoading = false
         isError = true
         statusTab = tab
         statusMessage = message
         logE2E("STATUS \(message)")
+    }
+
+    private func showTransient(_ message: String) {
+        transientMessageTask?.cancel()
+        transientMessage = message
+        transientMessageTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+            } catch {
+                return
+            }
+            guard self?.transientMessage == message else { return }
+            self?.transientMessage = nil
+        }
     }
 
     private func resetFlowStatusForIncomingURL() {

@@ -41,6 +41,26 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(viewModel.receivedCredentials.map(\.id), ["credential-1"])
         XCTAssertEqual(viewModel.txCode, "")
         XCTAssertNil(viewModel.offerPreview?.transactionCode)
+        XCTAssertEqual(viewModel.selectedTab, .credentials)
+    }
+
+    func testSettingsExposeBootstrapIdentityAndResetRecreatesTheWallet() async throws {
+        let client = TransactionCodeWalletClient(startsWithCredential: true)
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        XCTAssertEqual(viewModel.did, "did:key:test")
+        XCTAssertEqual(viewModel.keyID, "key-1")
+
+        let reset = await viewModel.resetWallet()
+        XCTAssertTrue(reset)
+        try await waitUntil { viewModel.isReady }
+
+        let deleteCalls = await client.deleteLocalDataCalls
+        XCTAssertEqual(deleteCalls, 1)
+        XCTAssertEqual(viewModel.did, "did:key:test")
+        XCTAssertEqual(viewModel.keyID, "key-1")
+        XCTAssertTrue(viewModel.credentials.isEmpty)
     }
 
     func testChangingOfferClearsTransactionCodeState() async throws {
@@ -270,11 +290,12 @@ private actor TransactionCodeWalletClient: WalletClient {
     private(set) var receivedTxCodes: [String] = []
     private(set) var cancelledIssuanceSessionIDs: [String] = []
     private(set) var discardedPresentationPreviewHandles: [PresentationPreviewHandle] = []
+    private(set) var deleteLocalDataCalls = 0
     private var credentialIssued = false
     private let issuanceStartDelayNanoseconds: UInt64
     private let transactionCode: IssuanceTransactionCode?
     private let issuanceGrant: IssuanceGrant
-    private let startsWithCredential: Bool
+    private var startsWithCredential: Bool
     private let presentationPreviewDelayNanoseconds: UInt64
     private let presentationActionDelayNanoseconds: UInt64
 
@@ -304,6 +325,12 @@ private actor TransactionCodeWalletClient: WalletClient {
 
     func credentials() async throws -> [Credential] {
         startsWithCredential || credentialIssued ? [Self.credential] : []
+    }
+
+    func deleteLocalData() async throws {
+        deleteLocalDataCalls += 1
+        startsWithCredential = false
+        credentialIssued = false
     }
 
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {

@@ -4,6 +4,7 @@ interface DemoPinStore {
     fun hasPin(): Boolean
     suspend fun setPin(pin: String)
     suspend fun verifyPin(pin: String): Boolean
+    suspend fun clearPin()
 }
 
 class InMemoryDemoPinStore : DemoPinStore {
@@ -16,4 +17,8 @@ class InMemoryDemoPinStore : DemoPinStore {
     }
 
     override suspend fun verifyPin(pin: String): Boolean = configuredPin == pin
+
+    override suspend fun clearPin() {
+        configuredPin = null
+    }
 }

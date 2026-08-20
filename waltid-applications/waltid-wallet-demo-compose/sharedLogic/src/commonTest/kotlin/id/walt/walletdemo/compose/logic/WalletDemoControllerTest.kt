@@ -124,10 +124,50 @@ class WalletDemoControllerTest {
         assertTrue(state.auth is WalletAuthState.Unlocked)
         val session = state.session as WalletSessionState.Ready
         assertEquals("Wallet ready", state.statusText)
+        assertEquals("key-1", session.keyId)
         assertEquals("did:key:test", session.did)
         assertEquals(listOf(sampleCredential), session.credentials)
         assertEquals(1, wallet.bootstrapCalls)
         assertTrue(pinStore.hasPin())
+    }
+
+    @Test
+    fun resetDeletesWalletAndPinBeforeReturningToSetup() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val pinStore = InMemoryDemoPinStore()
+        val controller = controllerWith(wallet, this, pinStore)
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+
+        controller.resetWallet()
+        runCurrent()
+
+        assertEquals(1, wallet.deleteWalletCalls)
+        assertFalse(pinStore.hasPin())
+        assertTrue(controller.state.value.auth is WalletAuthState.Setup)
+        assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
+    }
+
+    @Test
+    fun resetFailureKeepsTheUnlockedWalletAndPinAvailableForRetry() = runTest {
+        val wallet = FakeDemoWallet(deleteWalletError = IllegalStateException("storage unavailable"))
+        val pinStore = InMemoryDemoPinStore()
+        val controller = controllerWith(wallet, this, pinStore)
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+
+        controller.resetWallet()
+        runCurrent()
+
+        assertEquals(1, wallet.deleteWalletCalls)
+        assertTrue(pinStore.hasPin())
+        assertTrue(controller.state.value.session is WalletSessionState.Ready)
+        assertTrue(controller.state.value.operation is WalletOperationState.Failed)
+        assertTrue(controller.state.value.statusText.startsWith("Reset failed"))
     }
 
     @Test
@@ -213,7 +253,7 @@ class WalletDemoControllerTest {
         assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
         assertEquals(1, wallet.receiveCalls)
         assertEquals(
-            WalletOperationState.Succeeded("Received 1 credential(s)", WalletDemoTab.Receive),
+            WalletOperationState.Succeeded("Received 1 credential(s)", WalletDemoTab.Credentials),
             controller.state.value.operation,
         )
         assertEquals("Received 1 credential(s)", controller.state.value.statusText)
@@ -1280,7 +1320,7 @@ class WalletDemoControllerTest {
         assertFalse(controller.state.value.receiveUrlEntryEnabled)
         assertFalse(controller.state.value.receiveActionEnabled)
         assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
-        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
 
         val resetKeyBeforeNewFlow = controller.state.value.receiveNavigationResetKey
         controller.startNewReceiveFlow()
@@ -1524,6 +1564,8 @@ private class RecoverableDemoPinStore : DemoPinStore {
     }
 
     override suspend fun verifyPin(pin: String): Boolean = true
+
+    override suspend fun clearPin() = Unit
 }
 
 private fun offerPreview(
@@ -1598,8 +1640,10 @@ private class FakeDemoWallet(
         credentialOptions = emptyList(),
     ),
     private val presentationError: WalletDemoPresentationError? = null,
+    private val deleteWalletError: Throwable? = null,
 ) : DemoWallet {
     var bootstrapCalls = 0
+    var deleteWalletCalls = 0
     var startIssuanceCalls = 0
     var resolvedOfferUrl: String? = null
     var receivedTxCode: String? = null
@@ -1628,6 +1672,12 @@ private class FakeDemoWallet(
         val previousCount = credentials.size
         credentials = credentials.filterNot { it.id == credentialId }
         return credentials.size != previousCount
+    }
+
+    override suspend fun deleteWallet() {
+        deleteWalletCalls += 1
+        deleteWalletError?.let { throw it }
+        credentials = emptyList()
     }
 
     override suspend fun startIssuance(

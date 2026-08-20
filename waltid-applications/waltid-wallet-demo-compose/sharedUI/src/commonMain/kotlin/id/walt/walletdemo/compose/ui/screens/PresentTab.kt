@@ -43,6 +43,7 @@ internal fun PresentTab(
     onSubmit: () -> Unit,
     onReject: () -> Unit,
     onCancel: () -> Unit,
+    onDismissStatus: () -> Unit,
     showsInput: Boolean = true,
 ) {
     val scrollState = rememberScrollState()
@@ -60,7 +61,7 @@ internal fun PresentTab(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            StatusCard(state)
+            StatusCard(state, onDismissStatus)
 
             if (showsInput) {
                 UrlActionSection(

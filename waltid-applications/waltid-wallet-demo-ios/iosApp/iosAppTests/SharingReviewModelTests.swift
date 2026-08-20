@@ -310,7 +310,7 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertFalse(values.contains { $0.value == "dc_api.jwt" })
     }
 
-    func testProtocolCredentialLabelsAreResolvedForTheIslandSummary() throws {
+    func testConfiguredCredentialLabelIsPreservedForTheIslandSummary() throws {
         let credential = PresentationCredentialOption(
             queryID: "mdl",
             credentialID: "credential-1",
@@ -327,11 +327,35 @@ final class SharingReviewModelTests: XCTestCase {
         )
 
         let island = try XCTUnwrap(review.reviewIslands().first { $0.kind == .credential })
-        XCTAssertEqual(island.title, "Mobile driving licence")
-        XCTAssertFalse(island.expandedValues.contains { $0.label == "mso_mdoc" })
+        XCTAssertEqual(island.title, "mso_mdoc")
+        XCTAssertTrue(
+            island.expandedValues.contains { $0.label == "mso_mdoc" && $0.value == "Example Issuer" }
+        )
         XCTAssertTrue(
             island.technicalSections.flatMap(\.values).contains { $0.label == "Format" && $0.value == "mso_mdoc" }
         )
+    }
+
+    func testConfiguredCredentialLabelIsPreservedVerbatim() throws {
+        let configuredLabel = "  mso_mdoc  "
+        let credential = PresentationCredentialOption(
+            queryID: "mdl",
+            credentialID: "credential-1",
+            format: "mso_mdoc",
+            issuer: "Example Issuer",
+            subject: nil,
+            label: configuredLabel,
+            credentialDataJSON: #"{"docType":"org.iso.18013.5.1.mDL"}"#,
+            disclosures: []
+        )
+
+        let review = SharingReviewModel(
+            request: SharingRequest(verifier: nil),
+            credentialOptions: [credential]
+        )
+        let island = try XCTUnwrap(review.reviewIslands().first { $0.kind == .credential })
+
+        XCTAssertEqual(island.title, configuredLabel)
     }
 
     // MARK: - Transaction data and technical details
@@ -362,6 +386,24 @@ final class SharingReviewModelTests: XCTestCase {
             items.contains { $0.value == .text("urn:test:payment") },
             "The transaction type stays visible, since the label is chosen by the wallet profile rather than by the request"
         )
+    }
+
+    func testTransactionDisplayNameIsNotRewrittenWhenItMatchesTheType() throws {
+        let configuredName = "org.waltid.transaction-data.payment_authorization"
+        let groups = CredentialDisplayNormalizer.transactionDataGroups(for: [
+            PresentationTransactionData(
+                type: configuredName,
+                displayName: configuredName,
+                credentialQueryIDs: ["pid"],
+                supportedFields: [],
+                rawJSON: "{}",
+                detailsJSON: "{}"
+            ),
+        ])
+        let group = try XCTUnwrap(groups.first)
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(group.title, configuredName)
     }
 
     func testAnnexCHasNoTransactionDataAndNoOpenIDRequestParametersToShow() {

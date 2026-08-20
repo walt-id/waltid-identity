@@ -97,6 +97,56 @@ class WalletDemoController(
         discardPresentationPreview(previous.activePresentationPreviewHandle())
     }
 
+    fun resetWallet() {
+        val current = _state.value
+        if (current.session !is WalletSessionState.Ready || current.isBusy) return
+        receiveJob?.cancel()
+        presentationJob?.cancel()
+        issuanceSession = null
+        if (!_state.compareAndSet(
+                current,
+                current.copy(
+                    selectedTab = WalletDemoTab.Credentials,
+                    operation = WalletOperationState.ResettingWallet,
+                    offerPreview = null,
+                    presentationReview = null,
+                    selectedPresentationCredentialOptions = emptySet(),
+                    selectedPresentationDisclosureOptions = emptySet(),
+                    pendingPresentationContinuation = null,
+                ),
+            )
+        ) return
+
+        scope.launch(dispatcher) {
+            runCatching {
+                wallet.deleteWallet()
+                pinStore.clearPin()
+            }.onSuccess {
+                _state.value = WalletDemoUiState(auth = WalletAuthState.Setup())
+            }.onFailure { error ->
+                _state.update { state ->
+                    state.copy(
+                        operation = WalletOperationState.Failed(
+                            WalletDisplayText.failure(WalletDisplayText.ResetFailed, error),
+                            WalletDemoTab.Credentials,
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissOperationStatus() {
+        _state.update { state ->
+            when (state.operation) {
+                is WalletOperationState.Succeeded,
+                is WalletOperationState.Failed,
+                -> state.copy(operation = WalletOperationState.Idle)
+                else -> state
+            }
+        }
+    }
+
     fun selectTab(tab: WalletDemoTab) {
         _state.update { it.copy(selectedTab = tab) }
     }
@@ -153,7 +203,15 @@ class WalletDemoController(
                     if (removed) {
                         _state.update { state ->
                             val currentReady = state.session as? WalletSessionState.Ready ?: return@update state
-                            state.copy(session = currentReady.copy(credentials = currentReady.credentials.filterNot { it.id == credentialId }))
+                            state.copy(
+                                session = currentReady.copy(
+                                    credentials = currentReady.credentials.filterNot { it.id == credentialId },
+                                ),
+                                operation = WalletOperationState.Succeeded(
+                                    WalletDisplayText.CredentialDeleted,
+                                    WalletDemoTab.Credentials,
+                                ),
+                            )
                         }
                     }
                 }
@@ -527,10 +585,11 @@ class WalletDemoController(
                 requestDrafts = it.requestDrafts.copy(txCode = ""),
                 operation = WalletOperationState.Succeeded(
                     WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
-                    WalletDemoTab.Receive,
+                    WalletDemoTab.Credentials,
                 ),
                 lastReceivedCredentialIds = displayableReceivedCredentialIds,
                 receiveCompleted = true,
+                selectedTab = WalletDemoTab.Credentials,
             )
         }
     }
@@ -554,8 +613,9 @@ class WalletDemoController(
                                 receiveCompleted = true,
                                 operation = WalletOperationState.Succeeded(
                                     WalletDisplayText.receivedCredentials(outcome.credentialIds.size),
-                                    WalletDemoTab.Receive,
+                                    WalletDemoTab.Credentials,
                                 ),
+                                selectedTab = WalletDemoTab.Credentials,
                             )
                         }
                     }
@@ -1096,6 +1156,7 @@ class WalletDemoController(
                 _state.update {
                     it.copy(
                         session = WalletSessionState.Ready(
+                            keyId = result.keyId,
                             did = result.did,
                             credentials = credentials,
                         ),

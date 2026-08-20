@@ -16,7 +16,7 @@ public extension CredentialDetails {
     /// Builds stored-credential details with the same information hierarchy as review surfaces.
     func reviewIslands(context: ReviewSurfaceContext = .stored) -> [ReviewIsland] {
         let summary = cardSummary
-        let issuerName = issuerDisplay?.name?.presentableValue
+        let issuerName = issuerDisplay?.name.flatMap { $0.isPresentableValue ? $0 : nil }
             ?? issuer?.presentableValue
             ?? "Issuer unavailable"
         var islands = [
@@ -420,11 +420,11 @@ extension PresentationCredentialOption {
     }
 }
 
-private enum CredentialReviewDisplayNameResolver {
+enum CredentialReviewDisplayNameResolver {
     private static let typeKeys = Set(["doctype", "docType", "vct"])
 
     static func resolve(label: String?, format: String, credentialDataJSON: String) -> String {
-        if let label = label?.presentableValue {
+        if let label, label.isPresentableValue {
             return label
         }
         if let type = credentialType(in: credentialDataJSON), let name = standardName(for: type) {

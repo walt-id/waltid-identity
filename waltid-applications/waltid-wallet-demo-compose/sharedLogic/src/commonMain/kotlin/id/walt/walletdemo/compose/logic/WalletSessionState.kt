@@ -5,6 +5,7 @@ sealed interface WalletSessionState {
     data object Bootstrapping : WalletSessionState
 
     data class Ready(
+        val keyId: String,
         val did: String,
         val credentials: List<WalletDemoCredential>,
     ) : WalletSessionState

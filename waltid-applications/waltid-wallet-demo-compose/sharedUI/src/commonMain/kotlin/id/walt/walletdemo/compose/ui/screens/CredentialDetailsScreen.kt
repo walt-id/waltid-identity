@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +34,7 @@ import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 import id.walt.walletdemo.compose.ui.components.StoredCredentialDetailsContent
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun CredentialDetailsScreen(
@@ -43,6 +45,13 @@ internal fun CredentialDetailsScreen(
 ) {
     val clipboard = LocalClipboardManager.current
     var confirmDelete by remember(details.summary.id) { mutableStateOf(false) }
+    var copiedRawData by remember(details.summary.id) { mutableStateOf(false) }
+    LaunchedEffect(copiedRawData) {
+        if (copiedRawData) {
+            delay(2_000)
+            copiedRawData = false
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -97,14 +106,17 @@ internal fun CredentialDetailsScreen(
             ) {
                 OutlinedButton(
                     onClick = {
-                        details.summary.credentialDataJson?.let { clipboard.setText(AnnotatedString(it)) }
+                        details.summary.credentialDataJson?.let {
+                            clipboard.setText(AnnotatedString(it))
+                            copiedRawData = true
+                        }
                     },
                     enabled = !details.summary.credentialDataJson.isNullOrBlank(),
                     modifier = Modifier
                         .weight(1f)
                         .testTag(WalletUiTestTags.CredentialCopyRawData),
                 ) {
-                    Text("Copy raw data")
+                    Text(if (copiedRawData) "Copied" else "Copy raw data")
                 }
                 TextButton(
                     onClick = { confirmDelete = true },

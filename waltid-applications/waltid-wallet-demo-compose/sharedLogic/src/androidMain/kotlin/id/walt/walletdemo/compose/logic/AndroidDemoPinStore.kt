@@ -11,7 +11,9 @@ fun createAndroidDemoPinStore(
     return PersistentDemoPinStore(
         readRecord = { preferences.getString(recordKey, null) },
         writeRecord = { record ->
-            check(preferences.edit().putString(recordKey, record).commit()) {
+            val editor = preferences.edit()
+            if (record == null) editor.remove(recordKey) else editor.putString(recordKey, record)
+            check(editor.commit()) {
                 "PIN verifier could not be persisted"
             }
         },

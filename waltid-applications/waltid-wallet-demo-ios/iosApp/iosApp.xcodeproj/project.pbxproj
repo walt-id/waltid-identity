@@ -38,6 +38,7 @@
 		A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */; };
 		A1000601AAAA000100000061 /* WalletInteractionClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000601AAAA000000000061 /* WalletInteractionClassifier.swift */; };
 		A1000602AAAA000100000062 /* UnifiedScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000602AAAA000000000062 /* UnifiedScanView.swift */; };
+		A1000603AAAA000100000063 /* WalletSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000603AAAA000000000063 /* WalletSettingsView.swift */; };
 		B33B17EA2C2C394F001A32F7 /* WalletDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */; };
 		B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17EB2C2C394F001A32F7 /* ContentView.swift */; };
 		B33B17EE2C2C3957001A32F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B33B17ED2C2C3957001A32F7 /* Assets.xcassets */; };
@@ -121,6 +122,7 @@
 		A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDetailsScreen.swift; sourceTree = "<group>"; };
 		A1000601AAAA000000000061 /* WalletInteractionClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletInteractionClassifier.swift; sourceTree = "<group>"; };
 		A1000602AAAA000000000062 /* UnifiedScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedScanView.swift; sourceTree = "<group>"; };
+		A1000603AAAA000000000063 /* WalletSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletSettingsView.swift; sourceTree = "<group>"; };
 		B30E22802C2D8AD700D4781C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B33B17E62C2C394F001A32F7 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletDemoApp.swift; sourceTree = "<group>"; };
@@ -261,6 +263,7 @@
 			children = (
 				A1000002AAAA000000000002 /* HomeView.swift */,
 				A1000602AAAA000000000062 /* UnifiedScanView.swift */,
+				A1000603AAAA000000000063 /* WalletSettingsView.swift */,
 				A1000422AAAA000000000022 /* CredentialsTabView.swift */,
 				A1000003AAAA000000000003 /* ReceiveView.swift */,
 				A1000004AAAA000000000004 /* PresentView.swift */,
@@ -625,6 +628,7 @@
 				A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */,
 				A1000601AAAA000100000061 /* WalletInteractionClassifier.swift in Sources */,
 				A1000602AAAA000100000062 /* UnifiedScanView.swift in Sources */,
+				A1000603AAAA000100000063 /* WalletSettingsView.swift in Sources */,
 				A75200000000000000000011 /* IdentityDocumentRegistrationCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

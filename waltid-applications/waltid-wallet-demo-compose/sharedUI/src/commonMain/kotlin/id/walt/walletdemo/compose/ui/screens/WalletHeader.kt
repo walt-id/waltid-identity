@@ -5,6 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -14,19 +18,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
-import id.walt.walletdemo.compose.ui.components.StatusCard
 
 @Composable
 internal fun WalletHeader(
-    did: String?,
     state: WalletDemoUiState,
     scanEnabled: Boolean,
+    showingSettings: Boolean,
+    onBack: () -> Unit,
     onScan: () -> Unit,
-    onLock: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -38,33 +41,45 @@ internal fun WalletHeader(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("walt.id Wallet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                if (!did.isNullOrBlank()) {
+            if (showingSettings) {
+                Row(modifier = Modifier.weight(1f)) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.testTag(WalletUiTestTags.SettingsBack),
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
                     Text(
-                        did,
-                        modifier = Modifier.testTag(WalletUiTestTags.Did),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        "Settings",
+                        modifier = Modifier.padding(top = 10.dp),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
                     )
                 }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = onScan,
-                    enabled = scanEnabled,
-                    modifier = Modifier.testTag(WalletUiTestTags.ScanAction),
-                ) {
-                    Text("Scan QR")
-                }
-                OutlinedButton(onClick = onLock) {
-                    Text("Lock")
+            } else {
+                Text(
+                    "walt.id Wallet",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onScan,
+                        enabled = scanEnabled,
+                        modifier = Modifier.testTag(WalletUiTestTags.ScanAction),
+                    ) {
+                        Text("Scan")
+                    }
+                    OutlinedButton(
+                        onClick = onSettings,
+                        modifier = Modifier.testTag(WalletUiTestTags.SettingsAction),
+                    ) {
+                        Text("Settings")
+                    }
                 }
             }
         }
-        StatusCard(state)
         state.warning?.let { warning ->
             WarningCard(warning)
         }

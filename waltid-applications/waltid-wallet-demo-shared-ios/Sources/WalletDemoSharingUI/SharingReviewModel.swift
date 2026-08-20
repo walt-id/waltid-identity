@@ -139,7 +139,10 @@ public struct SharingVerifier: Equatable {
 
     /// The name the review heads the Verifier island with, or `nil` when the request named nobody.
     public var identityName: String? {
-        display?.name?.presentableValue ?? fallbackName?.presentableValue
+        if let displayName = display?.name, displayName.isPresentableValue {
+            return displayName
+        }
+        return fallbackName?.presentableValue
     }
 
     /// Whether ``verifiedOrigin`` is itself the name heading the section.

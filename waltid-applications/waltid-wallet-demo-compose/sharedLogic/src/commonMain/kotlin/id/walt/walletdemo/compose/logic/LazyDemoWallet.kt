@@ -20,6 +20,14 @@ internal class LazyDemoWallet(
     override suspend fun deleteCredential(credentialId: String): Boolean =
         wallet().deleteCredential(credentialId)
 
+    override suspend fun deleteWallet() {
+        val current = wallet()
+        current.deleteWallet()
+        mutex.withLock {
+            if (wallet === current) wallet = null
+        }
+    }
+
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()
 

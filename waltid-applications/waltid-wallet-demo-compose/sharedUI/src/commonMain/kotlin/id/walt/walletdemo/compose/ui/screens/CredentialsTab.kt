@@ -17,16 +17,20 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
+import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialCard
+import id.walt.walletdemo.compose.ui.components.StatusCard
 
 @Composable
 internal fun CredentialsTab(
+    state: WalletDemoUiState,
     credentials: List<WalletDemoCredential>,
     onCredentialClick: (String) -> Unit,
     onScan: () -> Unit,
     scanEnabled: Boolean,
+    onDismissStatus: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -35,6 +39,7 @@ internal fun CredentialsTab(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        StatusCard(state, onDismissStatus)
         Text("Credentials", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         if (credentials.isEmpty()) {
             EmptyCredentialsState(onScan, scanEnabled)

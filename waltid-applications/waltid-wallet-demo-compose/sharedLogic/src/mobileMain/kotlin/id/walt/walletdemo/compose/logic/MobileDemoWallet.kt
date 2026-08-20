@@ -50,6 +50,8 @@ internal class MobileDemoWallet(
     override suspend fun deleteCredential(credentialId: String): Boolean =
         mobileWallet.deleteCredential(credentialId)
 
+    override suspend fun deleteWallet() = mobileWallet.deleteWallet()
+
     override suspend fun startIssuance(
         offerUrl: String,
         redirectUri: String,

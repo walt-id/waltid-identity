@@ -14,6 +14,10 @@ class WalletDemoAppIosTest {
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
 
     @Test
+    fun settingsShowsWalletIdentityAndKeepsDestructiveResetConfirmed() =
+        scenarios.settingsShowsWalletIdentityAndKeepsDestructiveResetConfirmed()
+
+    @Test
     fun credentialsTabShowsEmptyStateAndUpdatesAfterReceive() =
         scenarios.credentialsTabShowsEmptyStateAndUpdatesAfterReceive()
 

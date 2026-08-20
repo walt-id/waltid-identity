@@ -7,7 +7,10 @@ fun createIosDemoPinStore(walletId: String): DemoPinStore {
     val recordKey = "$RECORD_KEY_PREFIX$walletId"
     return PersistentDemoPinStore(
         readRecord = { defaults.stringForKey(recordKey) },
-        writeRecord = { record -> defaults.setObject(record, forKey = recordKey) },
+        writeRecord = { record ->
+            if (record == null) defaults.removeObjectForKey(recordKey)
+            else defaults.setObject(record, forKey = recordKey)
+        },
     )
 }
 

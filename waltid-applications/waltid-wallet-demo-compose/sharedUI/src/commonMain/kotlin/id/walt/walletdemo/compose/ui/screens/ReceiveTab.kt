@@ -42,6 +42,7 @@ internal fun ReceiveTab(
     onStartNew: () -> Unit,
     onResumeDeferred: (String) -> Unit,
     onCredentialClick: (String) -> Unit,
+    onDismissStatus: () -> Unit,
     showsInput: Boolean = true,
 ) {
     val receivedCredentials = state.receivedCredentials()
@@ -58,7 +59,7 @@ internal fun ReceiveTab(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            StatusCard(state)
+            StatusCard(state, onDismissStatus)
 
             if (state.offerPreview == null && showsInput) {
                 UrlActionSection(

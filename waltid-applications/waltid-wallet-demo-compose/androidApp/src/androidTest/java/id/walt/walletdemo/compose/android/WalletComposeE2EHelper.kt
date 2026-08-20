@@ -89,13 +89,19 @@ internal object WalletComposeE2EHelper {
 
         assertTrue(
             "Wallet did not become ready after unlock. Latest status: ${latestStatus(device)}",
-            waitForStatus(
-                device = device,
-                timeoutMs = WALLET_READY_TIMEOUT,
-                matcher = { it == "Wallet ready" },
-                failurePrefixes = listOf("Bootstrap failed")
-            )
+            waitForWalletReady(device, WALLET_READY_TIMEOUT),
         )
+    }
+
+    private fun waitForWalletReady(device: UiDevice, timeoutMs: Long): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            val scanAction = device.findObject(By.res("wallet.scanAction"))
+            if (scanAction?.isEnabled == true) return true
+            if (latestStatus(device).startsWith("Bootstrap failed")) return false
+            Thread.sleep(500)
+        }
+        return false
     }
 
     fun sendDeepLink(context: Context, url: String) {

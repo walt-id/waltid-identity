@@ -131,12 +131,8 @@ object CredentialDisplayNormalizer {
     }
 
     private fun WalletDemoTransactionDataItem.transactionDataTitle(): String {
-        val title = displayName.trim()
-        return when {
-            title.isBlank() -> CredentialDisplayVocabulary.TransactionDataTitle
-            title == type -> CredentialDisplayVocabulary.humanizedClaimLabel(title)
-            else -> title
-        }
+        return displayName.takeIf { it.isNotBlank() }
+            ?: CredentialDisplayVocabulary.TransactionDataTitle
     }
 
     private fun claimItemsFromJson(rawJson: String, path: ClaimPath, fallbackLabel: String): List<ClaimItem> {
