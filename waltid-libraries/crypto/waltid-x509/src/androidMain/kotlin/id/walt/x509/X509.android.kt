@@ -5,6 +5,8 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import kotlinx.coroutines.runBlocking
 
+actual val platformSupportsPkixCertificatePathValidation: Boolean = true
+
 @Throws(exceptionClasses = [X509ValidationException::class])
 actual fun validateCertificateChain(
     leaf: CertificateDer,
