@@ -32,6 +32,64 @@ import org.robolectric.annotation.Config
 class WalletDemoSharingReviewBackHandlingAndroidTest {
 
     /**
+     * The operating-system container is dismissible without turning that dismissal into a rejected
+     * credential request. This preserves the provider contract: dismissal lets the platform continue,
+     * while the explicit Cancel action answers the request.
+     */
+    @Test
+    fun backAtTheSheetRootDismissesWithoutCancelling() =
+        runAndroidComposeUiTest<ComponentActivity> {
+            var dismissed = 0
+            var cancelled = 0
+            setContent {
+                WalletDemoSharingReviewSheet(
+                    review = digitalCredentialReview().withoutTransactionData(),
+                    title = "Share digital credential?",
+                    onSubmit = {},
+                    onCancel = { cancelled++ },
+                    onDismiss = { dismissed++ },
+                )
+            }
+
+            onNodeWithTag(WalletDemoSharingReviewTestTags.Sheet).assertIsDisplayed()
+
+            pressBack()
+
+            waitUntil { dismissed == 1 }
+            assertEquals(0, cancelled)
+        }
+
+    /** Technical details remain an internal horizontal destination even inside the platform tray. */
+    @Test
+    fun backFromCredentialDetailsStaysInsideTheSheet() =
+        runAndroidComposeUiTest<ComponentActivity> {
+            var dismissed = 0
+            var cancelled = 0
+            val option = credentialOption()
+            setContent {
+                WalletDemoSharingReviewSheet(
+                    review = digitalCredentialReview(credentialOptions = listOf(option)),
+                    title = "Share digital credential?",
+                    onSubmit = {},
+                    onCancel = { cancelled++ },
+                    onDismiss = { dismissed++ },
+                )
+            }
+
+            onNodeWithTag(WalletUiTestTags.credentialCard(option.selection.id))
+                .performScrollTo()
+                .performClick()
+            onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
+
+            pressBack()
+
+            onNodeWithTag(WalletDemoSharingReviewTestTags.Sheet).assertIsDisplayed()
+            onNodeWithTag(WalletDemoSharingReviewTestTags.Review).assertIsDisplayed()
+            assertEquals(0, dismissed)
+            assertEquals(0, cancelled)
+        }
+
+    /**
      * With credential details open the gesture is the screen's own navigation: it closes them and the host
      * is told nothing, rather than ending an OS-invoked surface because the user looked at what they were
      * about to share.
@@ -136,4 +194,8 @@ class WalletDemoSharingReviewBackHandlingAndroidTest {
         runOnUiThread { requireNotNull(activity) { "No host activity" }.onBackPressedDispatcher.onBackPressed() }
         waitForIdle()
     }
+
+    private fun id.walt.walletdemo.compose.logic.WalletDemoSharingReview.withoutTransactionData() = copy(
+        request = request.copy(transactionData = emptyList()),
+    )
 }

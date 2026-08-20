@@ -2,7 +2,7 @@
 <resources>
     <style name="Theme.WalletDemoCompose" parent="android:style/Theme.Material.Light.NoActionBar" />
 
-    <!-- CREATE_CREDENTIAL fulfillment: transparent host so ModalBottomSheet feels in-tray. -->
+    <!-- Provider fulfillment: transparent host for the wallet-owned review tray and scrim. -->
     <style name="Theme.WalletDemoCompose.Translucent" parent="android:style/Theme.Translucent.NoTitleBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>

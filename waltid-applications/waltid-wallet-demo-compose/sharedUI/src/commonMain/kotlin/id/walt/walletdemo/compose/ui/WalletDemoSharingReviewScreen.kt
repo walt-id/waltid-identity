@@ -59,6 +59,7 @@ fun WalletDemoSharingReviewScreen(
     onReject: (() -> Unit)? = null,
     enabled: Boolean = true,
     onBackAtRoot: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     var selection by remember(review) {
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
@@ -85,7 +86,7 @@ fun WalletDemoSharingReviewScreen(
 
     MaterialTheme {
         Surface(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .exportTestTagsForPlatformAutomation(),
             color = MaterialTheme.colorScheme.background,
@@ -148,6 +149,9 @@ fun WalletDemoSharingReviewScreen(
 
 /** Compose test tags the sharing review exposes to platform UI automation. */
 object WalletDemoSharingReviewTestTags {
+    /** Platform-invoked bottom tray. */
+    const val Sheet: String = "wallet.platformSharingSheet"
+
     /** Root of the review surface. */
     val Review: String get() = WalletUiTestTags.PresentationReview
 

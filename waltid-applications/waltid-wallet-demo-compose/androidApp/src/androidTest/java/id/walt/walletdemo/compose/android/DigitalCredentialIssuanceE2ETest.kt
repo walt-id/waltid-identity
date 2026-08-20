@@ -11,8 +11,9 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import id.walt.mobile.test.backend.DemoTestBackend
+import id.walt.walletdemo.compose.logic.CredentialDisplayNameResolver
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
@@ -216,11 +217,15 @@ class DigitalCredentialIssuanceE2ETest {
      * The create flow runs in `DigitalCredentialCreateActivity`, which builds its own wallet instance
      * and never reports into the main UI's status line, so the only wallet-side proof is the stored
      * credential itself. Its card test tag is keyed by a wallet-local id, hence the tag pattern plus
-     * an assertion on the rendered doctype, which is the scenario's credential configuration id.
+     * assertions on the resolved display name and the exact format in technical details.
      */
     private fun Fixture.assertStoredCredentialIs(scenario: DemoTestBackend.CredentialScenario) {
+        val expectedDisplayName = CredentialDisplayNameResolver.resolve(
+            label = null,
+            format = scenario.format,
+            credentialType = scenario.credentialConfigurationId,
+        )
         relaunchAndUnlock(context, device)
-        clickByTag(device, "wallet.tab.credentials")
 
         // Multiple tests in this class issue the same doctype, so the card must be new to
         // distinguish this run from credentials already stored in the wallet.
@@ -242,12 +247,22 @@ class DigitalCredentialIssuanceE2ETest {
             "Credential details did not open for $cardTag",
             waitForResource(device, detailsTag, UI_ELEMENT_TIMEOUT),
         )
-        assertClaimValueVisibleAfterScrolling(
+        // Format identifiers are intentionally kept off the human-facing overview. Follow the same
+        // horizontal technical-details navigation a person can use when they need the exact value.
+        clickByTag(device, "wallet.reviewIslandTechnicalDetails.credential")
+        assertNotNull(
+            "Credential technical details did not open for $cardTag",
+            waitForResource(device, "wallet.reviewTechnicalDetailsPage", UI_ELEMENT_TIMEOUT),
+        )
+        assertTextContainingVisibleAfterScrolling(
             device = device,
-            path = "docType",
-            label = "Doc type",
-            expectedValues = listOf(scenario.credentialConfigurationId),
-            message = "Stored credential is not the ${scenario.displayName} this test issued",
+            substring = expectedDisplayName,
+            message = "Stored credential does not show its resolved $expectedDisplayName label",
+        )
+        assertTextContainingVisibleAfterScrolling(
+            device = device,
+            substring = scenario.format,
+            message = "Stored ${scenario.displayName} has no mobile-document format detail",
         )
     }
 
@@ -307,9 +322,8 @@ class DigitalCredentialIssuanceE2ETest {
         )
         val device = UiDevice.getInstance(instrumentation)
         launchAndUnlock(context, device)
-        // Recorded before issuance so the post-flow assertion can tell this run's credential apart
-        // from one an earlier test method in the same class already stored.
-        clickByTag(device, "wallet.tab.credentials")
+        // Credentials are the wallet home. Record cards before issuance so the post-flow assertion
+        // can tell this run's credential apart from one an earlier test method already stored.
         return Fixture(context, device, device.credentialCardTags())
     }
 
