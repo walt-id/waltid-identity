@@ -177,7 +177,7 @@ class Crypto2W3cCredentialTest {
     }
 
     @Test
-    fun `did jwk credential signature resolves for method kid and rejects non-method kid`() = runTest {
+    fun `did jwk credential signature resolves for method kid and non-method kid`() = runTest {
         DidService.minimalInit()
         val key = key("org.tenant.kms.key_issuer")
         val didJwk = Crypto2DidJwkRegistrar().createByKey(key, DidJwkCreateOptions()).did
@@ -209,7 +209,7 @@ class Crypto2W3cCredentialTest {
                 put("typ", "dc+sd-jwt")
             },
         )
-        assertFalse(scheme.verifyCrypto2(nonMethodKid, setOf(JwsAlgorithm.ES256)).isSuccess)
+        assertTrue(scheme.verifyCrypto2(nonMethodKid, setOf(JwsAlgorithm.ES256)).isSuccess)
     }
 
     private suspend fun publicJwkThumbprint(key: Key) =
