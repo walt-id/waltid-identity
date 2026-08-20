@@ -97,6 +97,7 @@ fun Application.wallet2Api(authConfig: OSSWallet2AuthConfig? = null) {
             registerWallet2AuthRoutes(
                 tokenExpiry = authConfig.tokenExpiry,
                 walletResolver = OSSWallet2Service.resolver,
+                oidcConfig = authConfig.oidc,
             )
         }
         registerTransactionDataProfilesRoute()

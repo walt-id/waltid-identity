@@ -28,6 +28,8 @@ import id.walt.ktorauthnz.auth.getEffectiveRequestAuthToken
 import id.walt.ktorauthnz.auth.ktorAuthnz
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.EmailPass
+import id.walt.ktorauthnz.methods.OIDC
+import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import id.walt.ktorauthnz.methods.registerAuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
@@ -49,6 +51,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.ktorauthnz.flows.AuthFlow
 
 private val authLog = KotlinLogging.logger {}
 
@@ -159,13 +162,14 @@ data class AccountInfoResponse(
  *   session tokens. Sufficient on its own, and the only way to configure a managed key.
  * - [OSSWallet2AuthConfig.signingKey]: legacy sidecar and in-memory migration source.
  * - [OSSWallet2AuthConfig.tokenExpiry]: JWT `exp` lifetime as a [Duration].
+ * - [OSSWallet2AuthConfig.oidc]: optional OIDC authentication configuration.
  *
  * [cryptoRuntime] resolves the configured StoredKey. The default carries software providers only;
  * pass a runtime holding the matching [id.walt.crypto2.providers.ManagedKeyProvider] to run auth off
  * a KMS/HSM key.
  *
- * Returns the loaded [OSSWallet2AuthConfig] so the caller can pass
- * [OSSWallet2AuthConfig.tokenExpiry] to [registerWallet2AuthRoutes].
+ * Returns the loaded [OSSWallet2AuthConfig] so the caller can pass the route-specific
+ * authentication configuration to [registerWallet2AuthRoutes].
  *
  * Called from Main.kt when the auth optional feature is enabled.
  */
@@ -262,8 +266,13 @@ private val walletAuthKeyUsages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
  *   Defaults to 24 hours. Pass the value from [configureWallet2Auth] to keep it in sync.
  * @param walletResolver The resolver used for wallet ownership lookups (account/wallets routes).
  *   Must be the same resolver that the wallet routes use so both read from the same store.
+ * @param oidcConfig Optional OIDC configuration. When present, OIDC authentication routes are registered.
  */
-fun Route.registerWallet2AuthRoutes(tokenExpiry: Duration = 24.hours, walletResolver: WalletResolver) {
+fun Route.registerWallet2AuthRoutes(
+    tokenExpiry: Duration = 24.hours,
+    walletResolver: WalletResolver,
+    oidcConfig: OidcAuthConfiguration? = null,
+) {
     route("/auth") {
 
         post("/register") {
@@ -295,6 +304,24 @@ fun Route.registerWallet2AuthRoutes(tokenExpiry: Duration = 24.hours, walletReso
                 initialFlow = emailPassFlow
             )
         })
+        oidcConfig?.let { config ->
+            val oidcFlow = AuthFlow(
+                method = OIDC.id,
+                config = Json.encodeToJsonElement(
+                    OidcAuthConfiguration.serializer(),
+                    config
+                ).jsonObject,
+                success = true,
+                expiration = tokenExpiry.toIsoString()
+            )
+
+            registerAuthenticationMethod(OIDC, authContext = {
+                AuthContext(
+                    implicitSessionGeneration = true,
+                    initialFlow = oidcFlow
+                )
+            })
+        }
 
         post("/logout") {
             val token = call.getEffectiveRequestAuthToken()
