@@ -104,7 +104,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
                     ]
                 ),
                 issuerMetadataTrustResolver: PublicDemoIssuerMetadataTrustResolver(),
-                transactionDataProfiles: Self.demoTransactionDataProfiles
+                transactionDataProfiles: Self.demoTransactionDataProfiles,
+                defaultKeyUseAuthorizationPolicy: .none
             )
         )
     }
