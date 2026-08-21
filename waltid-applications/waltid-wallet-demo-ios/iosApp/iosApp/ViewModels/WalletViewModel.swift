@@ -365,6 +365,11 @@ class WalletViewModel: ObservableObject {
         submitPin()
     }
 
+    func promptBiometricUnlockIfNeeded() {
+        guard auth == .login else { return }
+        unlockWithBiometrics()
+    }
+
     var isBiometricUnlockAvailable: Bool { biometricAuthenticator.isAvailable }
     var isBiometricUnlockEnabled: Bool { pinStore.isBiometricUnlockEnabled }
 
