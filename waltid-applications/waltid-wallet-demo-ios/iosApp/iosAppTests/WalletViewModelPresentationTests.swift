@@ -180,6 +180,8 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertEqual(viewModel.credentials.map(\.id), ["cred-1"])
 
         viewModel.resetWallet()
+        try await waitUntil { viewModel.auth == .setup && !viewModel.isReady }
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady && viewModel.credentials.isEmpty }
         XCTAssertEqual(viewModel.did, "did:key:mock")
         XCTAssertEqual(viewModel.keyID, "mock-key-1")
