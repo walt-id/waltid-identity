@@ -1,0 +1,77 @@
+{
+  "shared": [
+    ".github/workflows/build.yml",
+    ".github/workflows/gradle-macos.yml",
+    ".github/workflows/macos-eligibility.yml",
+    ".github/workflows/platform-eligibility.yml",
+    ".github/ci/*",
+    ".github/scripts/ci/*",
+    ".github/actions/checkout-repos/*",
+    ".github/actions/gradle-ios/*",
+    ".github/actions/gradle-setup-action/*",
+    ".github/actions/ios-build-setup/*",
+    ".github/actions/set-properties/*",
+    "build-logic/*",
+    "build.gradle.kts",
+    "gradle/*",
+    "gradle.properties",
+    "gradlew",
+    "settings.gradle.kts",
+    "gradle/libs.versions.toml"
+  ],
+  "lanes": {
+    "ios-simulator": {
+      "description": "Kotlin iOS compilation and iosSimulatorArm64 tests",
+      "patterns": [
+        "*/src/commonMain/*",
+        "*/src/commonTest/*",
+        "*/src/iosMain/*",
+        "*/src/iosTest/*",
+        "waltid-libraries/*/build.gradle.kts",
+        "waltid-libraries/*/*/build.gradle.kts",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*"
+      ]
+    },
+    "native": {
+      "description": "WalletCore XCFramework, Swift package, and native Xcode demo",
+      "patterns": [
+        "*/Package.swift",
+        "scripts/check-mobile-swift-parity-decision.sh",
+        "waltid-applications/waltid-wallet-demo-ios/*",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+      ]
+    },
+    "compose": {
+      "description": "Compose iOS demo and its WalletCore/Swift integration",
+      "patterns": [
+        "waltid-applications/waltid-wallet-demo-compose/*",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+      ]
+    },
+    "enterprise": {
+      "description": "Enterprise iOS mobile integration against Identity wallet-mobile",
+      "patterns": [
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+      ]
+    },
+    "sdk-docs": {
+      "description": "Mobile SDK ABI, Dokka, snippets, and Swift DocC",
+      "patterns": [
+        ".github/workflows/mobile-sdk-docs.yml",
+        ".github/actions/gradle-mobile-sdk-docs/*",
+        "scripts/check-mobile-swift-parity-decision.sh",
+        "docs/mobile-sdk-api/*",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+      ]
+    }
+  }
+}

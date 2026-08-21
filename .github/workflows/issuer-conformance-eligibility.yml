@@ -72,6 +72,7 @@ jobs:
           "gradle/*",
           "gradlew",
           "waltid-services/waltid-issuer-api2/*",
+          "waltid-services/waltid-verifier-api2/*",
           "waltid-services/waltid-openid4vp-conformance-runners/*",
           "waltid-services/waltid-service-commons/*",
           "waltid-libraries/protocols/waltid-openid4vci*/*",
