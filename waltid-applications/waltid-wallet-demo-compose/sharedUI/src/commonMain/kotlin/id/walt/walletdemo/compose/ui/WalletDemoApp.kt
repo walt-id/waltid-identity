@@ -1,8 +1,13 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -18,7 +23,10 @@ import id.walt.walletdemo.compose.ui.screens.PinStorageUnavailableScreen
 import id.walt.walletdemo.compose.ui.screens.WalletScreen
 
 @Composable
-fun WalletDemoApp(controller: WalletDemoController) {
+fun WalletDemoApp(
+    controller: WalletDemoController,
+    branding: WalletDemoBranding = WalletDemoBranding(),
+) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
         continuation = state.pendingPresentationContinuation?.continuation,
@@ -26,7 +34,7 @@ fun WalletDemoApp(controller: WalletDemoController) {
         onFailed = controller::failPresentationContinuation,
     )
 
-    MaterialTheme {
+    WalletDemoTheme(branding) {
         Surface(
             modifier = Modifier
                 .fillMaxSize()
@@ -36,18 +44,32 @@ fun WalletDemoApp(controller: WalletDemoController) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .safeDrawingPadding(),
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                    ),
             ) {
                 when (val auth = state.auth) {
-                    is WalletAuthState.PinEntry -> PinScreen(
-                        controller = controller,
-                        auth = auth,
-                        isBusy = state.isBusy,
-                    )
-                    is WalletAuthState.StorageUnavailable -> PinStorageUnavailableScreen(
-                        controller = controller,
-                        message = auth.message,
-                    )
+                    is WalletAuthState.PinEntry -> Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .safeDrawingPadding(),
+                    ) {
+                        PinScreen(
+                            controller = controller,
+                            auth = auth,
+                            isBusy = state.isBusy,
+                        )
+                    }
+                    is WalletAuthState.StorageUnavailable -> Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .safeDrawingPadding(),
+                    ) {
+                        PinStorageUnavailableScreen(
+                            controller = controller,
+                            message = auth.message,
+                        )
+                    }
                     WalletAuthState.Unlocked -> WalletScreen(controller, state)
                 }
             }

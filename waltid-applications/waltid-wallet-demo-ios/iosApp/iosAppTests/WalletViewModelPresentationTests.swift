@@ -94,8 +94,8 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertFalse(viewModel.presentationCompleted)
         XCTAssertTrue(viewModel.statusIsLoading(for: .present))
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Declining presentation...")
-        XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Wallet ready")
-        XCTAssertEqual(viewModel.statusMessage(for: .receive), "Wallet ready")
+        XCTAssertEqual(viewModel.statusMessage(for: .credentials), "")
+        XCTAssertEqual(viewModel.statusMessage(for: .receive), "")
         XCTAssertEqual(viewModel.pendingPresentationContinuationURL, continuationURL)
 
         viewModel.completePresentationContinuation()
@@ -134,6 +134,73 @@ final class WalletViewModelPresentationTests: XCTestCase {
             viewModel.statusMessage(for: .present),
             "Could not deliver the verifier response: network unavailable"
         )
+    }
+
+    @MainActor
+    func testDidAndKeyAreCapturedAndStatusCanBeDismissed() async throws {
+        let viewModel = WalletViewModel(
+            walletID: "settings-\(UUID().uuidString)",
+            walletClient: MockWalletClient()
+        )
+        try await waitUntil { viewModel.isReady }
+
+        XCTAssertEqual(viewModel.did, "did:key:mock")
+        XCTAssertEqual(viewModel.keyID, "mock-key-1")
+        XCTAssertTrue(viewModel.isStatusVisible(for: .credentials))
+        XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Wallet ready")
+
+        viewModel.dismissStatus()
+        XCTAssertFalse(viewModel.isStatusVisible(for: .credentials))
+    }
+
+    @MainActor
+    func testResetWalletRebootstrapsAFreshSession() async throws {
+        let viewModel = WalletViewModel(
+            walletID: "reset-\(UUID().uuidString)",
+            walletClient: MockWalletClient(
+                storedCredentials: [
+                    Credential(
+                        id: "cred-1",
+                        format: "jwt_vc_json",
+                        issuer: "Example Issuer",
+                        subject: nil,
+                        label: "Example Credential",
+                        addedAt: nil,
+                        credentialDataJSON: "{}"
+                    )
+                ]
+            )
+        )
+        try await waitUntil { viewModel.isReady }
+        XCTAssertEqual(viewModel.credentials.map(\.id), ["cred-1"])
+
+        viewModel.resetWallet()
+        try await waitUntil { viewModel.isReady && viewModel.credentials.isEmpty }
+        XCTAssertEqual(viewModel.did, "did:key:mock")
+        XCTAssertEqual(viewModel.keyID, "mock-key-1")
+    }
+
+    @MainActor
+    func testDeleteCredentialRemovesItFromTheWallet() async throws {
+        let viewModel = WalletViewModel(
+            walletID: "delete-\(UUID().uuidString)",
+            walletClient: MockWalletClient(
+                storedCredentials: [
+                    Credential(
+                        id: "cred-1",
+                        format: "jwt_vc_json",
+                        issuer: "Example Issuer",
+                        subject: nil,
+                        label: "Example Credential",
+                        addedAt: nil,
+                        credentialDataJSON: "{}"
+                    )
+                ]
+            )
+        )
+        try await waitUntil { viewModel.isReady }
+        viewModel.deleteCredential(id: "cred-1")
+        try await waitUntil { viewModel.credentials.isEmpty }
     }
 
     /// Waits for `predicate`, bounded by elapsed time rather than by a yield count.

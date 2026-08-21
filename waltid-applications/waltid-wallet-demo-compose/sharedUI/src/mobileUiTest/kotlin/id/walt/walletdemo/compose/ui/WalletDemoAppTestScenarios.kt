@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -843,6 +844,70 @@ class WalletDemoAppTestScenarios {
         assertEquals(2, wallet.bootstrapCalls)
     }
 
+    fun customBrandingTitleAppearsInTheHeader() = runComposeUiTest {
+        val wallet = FakeDemoWallet()
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+        val branding = WalletDemoBranding(appTitle = "Acme Wallet")
+
+        setContent { WalletDemoApp(controller, branding) }
+        onNodeWithText("Acme Wallet").assertIsDisplayed()
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+        onNodeWithTag(WalletUiTestTags.AppTitle).assertTextEquals("Acme Wallet")
+    }
+
+    fun settingsReplacesHeaderLockAndShowsDidAndKey() = runComposeUiTest {
+        val wallet = FakeDemoWallet()
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onAllNodesWithText("Lock").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.SettingsButton).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsDid).assertTextContains("did:key:test")
+        onNodeWithTag(WalletUiTestTags.SettingsKeyId).assertTextContains("key-1")
+        onNodeWithTag(WalletUiTestTags.SettingsLock).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsReset).assertIsDisplayed()
+
+        onNodeWithTag(WalletUiTestTags.SettingsLock).performClick()
+        onNodeWithText("Enter your PIN").assertIsDisplayed()
+    }
+
+    fun credentialDetailsCanCopyAndDelete() = runComposeUiTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag("wallet.credentialCard.cred-1").performClick()
+        onNodeWithTag(WalletUiTestTags.CopyRawCredential).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.DeleteCredential).performClick()
+        onNodeWithTag(WalletUiTestTags.DeleteCredentialConfirm).performClick()
+        waitUntil(timeoutMillis = 5_000) {
+            (controller.state.value.session as? WalletSessionState.Ready)?.credentials.orEmpty().isEmpty()
+        }
+        assertEquals(listOf("cred-1"), wallet.deletedCredentialIds)
+        onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
+    }
+
+    fun successStatusCanBeDismissedFromTheHeader() = runComposeUiTest {
+        val wallet = FakeDemoWallet()
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+        onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
+        onNodeWithTag(WalletUiTestTags.StatusDismiss).performClick()
+        onAllNodesWithTag("wallet.status").assertCountEquals(0)
+    }
+
     private fun ComposeUiTest.unlockWithPin() {
         onNodeWithTag("wallet.pinInput").performClick().performTextInput("1234")
         onNodeWithTag("wallet.pinConfirmationInput").performClick().performTextInput("1234")
@@ -1056,6 +1121,8 @@ private class RecoverableDemoPinStore : DemoPinStore {
     override suspend fun setPin(pin: String) = Unit
 
     override suspend fun verifyPin(pin: String): Boolean = true
+
+    override fun clear() = Unit
 }
 
 private class FakeDemoWallet(
@@ -1088,6 +1155,8 @@ private class FakeDemoWallet(
     var previewedRequestUrl: String? = null
     var submittedRequestUrl: String? = null
     var rejectedRequestUrl: String? = null
+    val deletedCredentialIds = mutableListOf<String>()
+    var deleteWalletCalls = 0
     private val issuanceSources = mutableMapOf<String, String>()
     private val presentationSources = mutableMapOf<WalletDemoPresentationPreviewHandle, String>()
 
@@ -1187,5 +1256,18 @@ private class FakeDemoWallet(
 
     override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) {
         presentationSources.remove(previewHandle)
+    }
+
+    override suspend fun deleteCredential(credentialId: String): Boolean {
+        deletedCredentialIds += credentialId
+        val remaining = credentials.filterNot { it.id == credentialId }
+        val removed = remaining.size != credentials.size
+        credentials = remaining
+        return removed
+    }
+
+    override suspend fun deleteWallet() {
+        deleteWalletCalls += 1
+        credentials = emptyList()
     }
 }

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.ui.LocalWalletDemoBranding
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -46,7 +47,11 @@ internal fun PinScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Spacer(Modifier.height(12.dp))
-        Text("walt.id Wallet", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(
+            LocalWalletDemoBranding.current.appTitle,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
         Text(
             if (setup != null) "Create a PIN" else "Enter your PIN",
             style = MaterialTheme.typography.titleMedium,
@@ -117,7 +122,11 @@ internal fun PinStorageUnavailableScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Spacer(Modifier.height(12.dp))
-        Text("walt.id Wallet", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(
+            LocalWalletDemoBranding.current.appTitle,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
         Text("PIN storage unavailable", style = MaterialTheme.typography.titleMedium)
         Text(
             "$message. The wallet remains locked.",

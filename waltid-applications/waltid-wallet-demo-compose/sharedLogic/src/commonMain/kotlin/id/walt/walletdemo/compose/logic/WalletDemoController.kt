@@ -8,13 +8,18 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.seconds
 
 class WalletDemoController(
     private val wallet: DemoWallet,
@@ -31,6 +36,27 @@ class WalletDemoController(
         ),
     )
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
+    private var statusHideJob: Job? = null
+
+    init {
+        scope.launch(dispatcher) {
+            state
+                .map { ui ->
+                    ui.statusBanner()
+                        ?.takeIf { banner -> banner.kind == WalletStatusKind.Success && ui.isStatusVisible }
+                        ?.key
+                }
+                .distinctUntilChanged()
+                .collect { key ->
+                    statusHideJob?.cancel()
+                    if (key == null) return@collect
+                    statusHideJob = launch {
+                        delay(SuccessBannerAutoHide)
+                        dismissStatus(key)
+                    }
+                }
+        }
+    }
 
     fun updatePin(value: String) {
         _state.update { state ->
@@ -95,6 +121,66 @@ class WalletDemoController(
         }
         cancelIssuance()
         discardPresentationPreview(previous.activePresentationPreviewHandle())
+    }
+
+    fun dismissStatus(key: String? = _state.value.statusBanner()?.key) {
+        val dismissedKey = key ?: return
+        _state.update { state ->
+            if (state.statusBanner()?.key != dismissedKey) {
+                state
+            } else {
+                state.copy(statusDismissedKey = dismissedKey, statusExpanded = false)
+            }
+        }
+    }
+
+    fun toggleStatusExpanded() {
+        _state.update { state ->
+            if (state.statusBanner()?.kind != WalletStatusKind.Error || !state.isStatusVisible) {
+                state
+            } else {
+                state.copy(statusExpanded = !state.statusExpanded)
+            }
+        }
+    }
+
+    fun deleteCredential(credentialId: String) {
+        if (_state.value.session !is WalletSessionState.Ready) return
+        scope.launch(dispatcher) {
+            runCatching { wallet.deleteCredential(credentialId) }
+                .onSuccess { removed ->
+                    if (!removed) return@onSuccess
+                    runCatching { wallet.listCredentials() }
+                        .onSuccess { credentials ->
+                            _state.update { state ->
+                                val currentReady = state.session as? WalletSessionState.Ready ?: return@update state
+                                state.copy(session = currentReady.copy(credentials = credentials))
+                            }
+                        }
+                }
+                .onFailure { error ->
+                    setOperationError(WalletDisplayText.DeleteCredentialFailed, error, _state.value.selectedTab)
+                }
+        }
+    }
+
+    fun resetWallet() {
+        receiveJob?.cancel()
+        presentationJob?.cancel()
+        val previous = getAndUpdateState { it }
+        cancelIssuance()
+        discardPresentationPreview(previous.activePresentationPreviewHandle())
+        scope.launch(dispatcher) {
+            runCatching {
+                wallet.deleteWallet()
+                pinStore.clear()
+            }.onSuccess {
+                statusHideJob?.cancel()
+                _state.value = WalletDemoUiState(auth = WalletAuthState.Setup())
+            }.onFailure { error ->
+                setOperationError(WalletDisplayText.ResetWalletFailed, error, _state.value.selectedTab)
+            }
+        }
     }
 
     fun selectTab(tab: WalletDemoTab) {
@@ -1039,6 +1125,7 @@ class WalletDemoController(
                     it.copy(
                         session = WalletSessionState.Ready(
                             did = result.did,
+                            keyId = result.keyId,
                             credentials = credentials,
                         ),
                         operation = WalletOperationState.Idle,
@@ -1096,6 +1183,7 @@ class WalletDemoController(
 
     private companion object {
         val pinPattern = Regex("\\d{4,8}")
+        val SuccessBannerAutoHide = 4.seconds
 
         fun isValidPin(pin: String): Boolean = pin.matches(pinPattern)
     }

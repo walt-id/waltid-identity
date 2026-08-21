@@ -96,4 +96,19 @@ class WalletDemoAppIosTest {
     @Test
     fun credentialsPersistAcrossControllerRecreation() =
         scenarios.credentialsPersistAcrossControllerRecreation()
+
+    @Test
+    fun customBrandingTitleAppearsInTheHeader() =
+        scenarios.customBrandingTitleAppearsInTheHeader()
+
+    fun settingsReplacesHeaderLockAndShowsDidAndKey() =
+        scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
+
+    @Test
+    fun credentialDetailsCanCopyAndDelete() =
+        scenarios.credentialDetailsCanCopyAndDelete()
+
+    @Test
+    fun successStatusCanBeDismissedFromTheHeader() =
+        scenarios.successStatusCanBeDismissedFromTheHeader()
 }

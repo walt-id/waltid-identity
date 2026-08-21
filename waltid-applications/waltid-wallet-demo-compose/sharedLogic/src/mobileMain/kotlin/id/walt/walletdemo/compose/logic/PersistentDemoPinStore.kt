@@ -12,6 +12,7 @@ import kotlin.io.encoding.Base64
 internal class PersistentDemoPinStore(
     private val readRecord: () -> String?,
     private val writeRecord: (String) -> Unit,
+    private val clearRecord: () -> Unit,
     private val provider: CryptographyProvider = CryptographyProvider.Default,
 ) : DemoPinStore {
     private val pbkdf2 by lazy { provider.get(PBKDF2) }
@@ -29,6 +30,10 @@ internal class PersistentDemoPinStore(
                 Base64.encode(verifier),
             ).joinToString(RECORD_SEPARATOR),
         )
+    }
+
+    override fun clear() {
+        clearRecord()
     }
 
     override suspend fun verifyPin(pin: String): Boolean {

@@ -84,7 +84,7 @@ fun WalletDemoOfferCreateSheet(
         }
     }
 
-    MaterialTheme {
+    WalletDemoTheme {
         Box(
             modifier = Modifier
                 .fillMaxSize()

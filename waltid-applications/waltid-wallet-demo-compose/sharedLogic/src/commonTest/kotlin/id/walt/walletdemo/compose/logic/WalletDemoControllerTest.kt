@@ -6,6 +6,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -124,10 +125,62 @@ class WalletDemoControllerTest {
         assertTrue(state.auth is WalletAuthState.Unlocked)
         val session = state.session as WalletSessionState.Ready
         assertEquals("Wallet ready", state.statusText)
+        assertTrue(state.isStatusVisible)
         assertEquals("did:key:test", session.did)
+        assertEquals("key-1", session.keyId)
         assertEquals(listOf(sampleCredential), session.credentials)
         assertEquals(1, wallet.bootstrapCalls)
         assertTrue(pinStore.hasPin())
+    }
+
+    @Test
+    fun successStatusCanBeDismissedAndAutoHides() = runTest {
+        val controller = unlockedControllerWith(FakeDemoWallet(), this)
+        assertTrue(controller.state.value.isStatusVisible)
+        assertEquals("Wallet ready", controller.state.value.statusText)
+
+        controller.dismissStatus()
+        assertFalse(controller.state.value.isStatusVisible)
+
+        val autoHideController = unlockedControllerWith(FakeDemoWallet(), this)
+        assertTrue(autoHideController.state.value.isStatusVisible)
+        advanceTimeBy(4_000)
+        runCurrent()
+        assertFalse(autoHideController.state.value.isStatusVisible)
+        assertEquals("Wallet ready", autoHideController.state.value.statusText)
+    }
+
+    @Test
+    fun deleteCredentialRemovesItFromTheReadySession() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.deleteCredential("cred-1")
+        runCurrent()
+
+        assertEquals(listOf("cred-1"), wallet.deletedCredentialIds)
+        val session = controller.state.value.session as WalletSessionState.Ready
+        assertEquals(emptyList(), session.credentials)
+    }
+
+    @Test
+    fun resetWalletDeletesDataClearsPinAndReturnsToSetup() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val pinStore = InMemoryDemoPinStore()
+        val controller = controllerWith(wallet, this, pinStore)
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+        assertTrue(pinStore.hasPin())
+
+        controller.resetWallet()
+        runCurrent()
+
+        assertEquals(1, wallet.deleteWalletCalls)
+        assertFalse(pinStore.hasPin())
+        assertTrue(controller.state.value.auth is WalletAuthState.Setup)
+        assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
     }
 
     @Test
@@ -1524,6 +1577,8 @@ private class RecoverableDemoPinStore : DemoPinStore {
     }
 
     override suspend fun verifyPin(pin: String): Boolean = true
+
+    override fun clear() = Unit
 }
 
 private fun offerPreview(
@@ -1616,6 +1671,8 @@ private class FakeDemoWallet(
     val resumedDeferredCredentialIds = mutableListOf<String>()
     val discardedPresentationPreviewHandles = mutableListOf<WalletDemoPresentationPreviewHandle>()
     val rejectedPresentationPreviewHandles = mutableListOf<WalletDemoPresentationPreviewHandle>()
+    val deletedCredentialIds = mutableListOf<String>()
+    var deleteWalletCalls = 0
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult {
         bootstrapCalls += 1
@@ -1723,5 +1780,18 @@ private class FakeDemoWallet(
     ): WalletDemoOperationResult {
         rejectedPresentationPreviewHandles += previewHandle
         return rejectionResult
+    }
+
+    override suspend fun deleteCredential(credentialId: String): Boolean {
+        deletedCredentialIds += credentialId
+        val remaining = credentials.filterNot { it.id == credentialId }
+        val removed = remaining.size != credentials.size
+        credentials = remaining
+        return removed
+    }
+
+    override suspend fun deleteWallet() {
+        deleteWalletCalls += 1
+        credentials = emptyList()
     }
 }
