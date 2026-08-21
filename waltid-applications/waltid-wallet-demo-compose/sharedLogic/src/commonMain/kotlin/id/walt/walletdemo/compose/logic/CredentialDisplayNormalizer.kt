@@ -24,9 +24,15 @@ object CredentialDisplayNormalizer {
 
     fun toDetails(summary: CredentialSummary): CredentialDetails {
         val issuerDisplay = StoredCredentialMetadataParser.issuerDisplay(summary.metadataJson)
+        val credentialDisplay = StoredCredentialMetadataParser.credentialDisplay(summary.metadataJson)
         val rawJson = summary.credentialDataJson?.trim().orEmpty()
         if (rawJson.isBlank()) {
-            return CredentialDetails(summary = summary, groups = emptyList(), issuerDisplay = issuerDisplay)
+            return CredentialDetails(
+                summary = summary,
+                groups = emptyList(),
+                issuerDisplay = issuerDisplay,
+                credentialDisplay = credentialDisplay,
+            )
         }
 
         val parsed = runCatching { json.parseToJsonElement(rawJson).jsonObject }.getOrNull()
@@ -34,6 +40,7 @@ object CredentialDisplayNormalizer {
                 summary = summary,
                 groups = emptyList(),
                 issuerDisplay = issuerDisplay,
+                credentialDisplay = credentialDisplay,
             )
         val displayData = if (summary.format == MdocFormat) parsed.withoutNullObjectMembers() else parsed
 
@@ -63,6 +70,7 @@ object CredentialDisplayNormalizer {
             summary = summary,
             groups = groupedItems,
             issuerDisplay = issuerDisplay,
+            credentialDisplay = credentialDisplay,
         )
     }
 

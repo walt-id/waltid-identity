@@ -76,4 +76,64 @@ class StoredCredentialMetadataParserTest {
         assertEquals("https://issuer.example/logo.png", details.issuerDisplay?.logoUri)
         assertEquals("Demo Issuer", details.toCardDisplayData().issuer)
     }
+
+    @Test
+    fun parsesCredentialDisplayCardArt() {
+        val display = StoredCredentialMetadataParser.credentialDisplay(
+            """
+            {
+              "credentialDisplay": [
+                {
+                  "name": "Personal ID",
+                  "locale": "en-US",
+                  "logo": { "uri": "https://issuer.example/pid.png", "alt_text": "PID logo" },
+                  "background_color": "#12107c",
+                  "background_image": { "uri": "https://issuer.example/pid-bg.png" },
+                  "text_color": "#FFFFFF"
+                }
+              ]
+            }
+            """.trimIndent()
+        )
+
+        assertNotNull(display)
+        assertEquals("Personal ID", display.name)
+        assertEquals("https://issuer.example/pid.png", display.logoUri)
+        assertEquals("#12107c", display.backgroundColor)
+        assertEquals("https://issuer.example/pid-bg.png", display.backgroundImageUri)
+        assertEquals("#FFFFFF", display.textColor)
+    }
+
+    @Test
+    fun toDetailsSurfacesCredentialDisplayOnCardData() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "vc+sd-jwt",
+                issuer = "https://issuer.example",
+                label = "PID",
+                credentialDataJson = """{"given_name":"Ada"}""",
+                metadataJson = """
+                    {
+                      "issuerDisplay": [
+                        { "name": "Demo Issuer", "logo": { "uri": "https://issuer.example/logo.png" } }
+                      ],
+                      "credentialDisplay": [
+                        {
+                          "name": "Personal ID",
+                          "logo": { "uri": "https://issuer.example/pid.png" },
+                          "background_color": "#12107c",
+                          "text_color": "#FFFFFF"
+                        }
+                      ]
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        assertEquals("Personal ID", details.credentialDisplay?.name)
+        assertEquals("#12107c", details.toCardDisplayData().backgroundColor)
+        assertEquals("https://issuer.example/pid.png", details.toCardDisplayData().logoUri)
+        assertEquals("Personal ID", details.toCardDisplayData().title)
+    }
 }

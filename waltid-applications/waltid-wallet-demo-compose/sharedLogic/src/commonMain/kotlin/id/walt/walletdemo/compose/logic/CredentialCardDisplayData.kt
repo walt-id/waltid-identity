@@ -9,6 +9,11 @@ data class CredentialCardDisplayData(
     val holderName: String?,
     val validity: String?,
     val portrait: DisplayValue.Image?,
+    val backgroundColor: String? = null,
+    val backgroundImageUri: String? = null,
+    val textColor: String? = null,
+    val logoUri: String? = null,
+    val logoAltText: String? = null,
 )
 
 fun CredentialDetails.toCardDisplayData(): CredentialCardDisplayData {
@@ -21,10 +26,11 @@ fun CredentialDetails.toCardDisplayData(): CredentialCardDisplayData {
         .ifBlank { null }
     val expiryDate = allItems.firstExpiryDateText()
     val fallbackAddedDate = summary.addedAt
+    val cardDisplay = credentialDisplay
 
     return CredentialCardDisplayData(
         id = summary.id,
-        title = summary.label,
+        title = cardDisplay?.name?.takeIf { it.isNotBlank() } ?: summary.label,
         credentialType = allItems.firstCredentialTypeText(),
         format = summary.format,
         issuer = issuerDisplay?.name?.takeIf { it.isNotBlank() }
@@ -34,6 +40,11 @@ fun CredentialDetails.toCardDisplayData(): CredentialCardDisplayData {
         validity = expiryDate?.let { CredentialDisplayText.expires(it) }
             ?: fallbackAddedDate?.let { CredentialDisplayText.added(it) },
         portrait = allItems.firstImageForRole(ClaimRole.Image),
+        backgroundColor = cardDisplay?.backgroundColor,
+        backgroundImageUri = cardDisplay?.backgroundImageUri,
+        textColor = cardDisplay?.textColor,
+        logoUri = cardDisplay?.logoUri,
+        logoAltText = cardDisplay?.logoAltText,
     )
 }
 

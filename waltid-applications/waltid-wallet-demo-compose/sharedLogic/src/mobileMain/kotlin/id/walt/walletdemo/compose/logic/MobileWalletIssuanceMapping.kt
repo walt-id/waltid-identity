@@ -34,6 +34,9 @@ fun WalletIssuanceSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
                         logoUri = credential.logoUri,
                         logoAltText = credential.logoAltText,
                         description = credential.descriptionText,
+                        backgroundColor = credential.backgroundColor,
+                        backgroundImageUri = credential.backgroundImageUri,
+                        textColor = credential.textColor,
                     ),
                     claims = emptyList(),
                 )

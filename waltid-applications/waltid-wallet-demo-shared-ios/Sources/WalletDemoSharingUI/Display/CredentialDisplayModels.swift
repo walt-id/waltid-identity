@@ -11,6 +11,7 @@ public struct CredentialDetails: Equatable, Identifiable {
     public let groups: [ClaimGroup]
     public let metadataJSON: String?
     public let issuerDisplay: MetadataDisplay?
+    public let credentialDisplay: MetadataDisplay?
 
     public init(
         id: String,
@@ -21,7 +22,8 @@ public struct CredentialDetails: Equatable, Identifiable {
         addedAt: Date?,
         groups: [ClaimGroup],
         metadataJSON: String? = nil,
-        issuerDisplay: MetadataDisplay? = nil
+        issuerDisplay: MetadataDisplay? = nil,
+        credentialDisplay: MetadataDisplay? = nil
     ) {
         self.id = id
         self.title = title
@@ -33,6 +35,8 @@ public struct CredentialDetails: Equatable, Identifiable {
         self.metadataJSON = metadataJSON
         self.issuerDisplay = issuerDisplay
             ?? StoredCredentialMetadataParser.issuerDisplay(from: metadataJSON)
+        self.credentialDisplay = credentialDisplay
+            ?? StoredCredentialMetadataParser.credentialDisplay(from: metadataJSON)
     }
 }
 

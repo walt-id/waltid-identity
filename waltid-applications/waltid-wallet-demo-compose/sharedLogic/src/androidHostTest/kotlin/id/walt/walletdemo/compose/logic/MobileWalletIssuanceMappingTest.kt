@@ -32,15 +32,18 @@ class MobileWalletIssuanceMappingTest {
                         descriptionText = null,
                         logoUri = "https://issuer.example/mdl.png",
                         logoAltText = "Driving licence logo",
+                        backgroundColor = "#12107c",
+                        backgroundImageUri = "https://issuer.example/mdl-bg.png",
+                        textColor = "#FFFFFF",
                     ),
                 ),
                 transactionCode = null,
             ),
         )
 
-        assertEquals(
-            "Driving licence logo",
-            session.toDemoIssuanceSession().preview.offeredCredentials.single().display?.logoAltText,
-        )
+        assertEquals("Driving licence logo", session.toDemoIssuanceSession().preview.offeredCredentials.single().display?.logoAltText)
+        assertEquals("#12107c", session.toDemoIssuanceSession().preview.offeredCredentials.single().display?.backgroundColor)
+        assertEquals("https://issuer.example/mdl-bg.png", session.toDemoIssuanceSession().preview.offeredCredentials.single().display?.backgroundImageUri)
+        assertEquals("#FFFFFF", session.toDemoIssuanceSession().preview.offeredCredentials.single().display?.textColor)
     }
 }
