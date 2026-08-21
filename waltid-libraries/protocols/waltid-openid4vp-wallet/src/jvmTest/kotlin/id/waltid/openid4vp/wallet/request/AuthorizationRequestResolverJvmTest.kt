@@ -158,7 +158,7 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
-    fun `strict plain request binds redirect uri client id`() = runBlocking {
+    fun `unsigned redirect uri query is accepted only when unsigned requests are allowed`() = runBlocking {
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
             parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
             parameters.append("response_type", "vp_token")
@@ -167,9 +167,16 @@ class AuthorizationRequestResolverJvmTest {
             parameters.append("nonce", "nonce")
         }.build()
 
+        assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            ) { _, _ -> error("request_uri fetch should not be called") }
+        }
+
         val resolved = AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         ) { _, _ -> error("request_uri fetch should not be called") }
         assertEquals("https://verifier.example/callback", resolved.authorizationRequest.redirectUri)
     }
@@ -187,7 +194,7 @@ class AuthorizationRequestResolverJvmTest {
         assertFailsWith<IllegalArgumentException> {
             AuthorizationRequestResolver.resolve(
                 requestUrl = requestUrl,
-                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
             ) { _, _ -> error("request_uri fetch should not be called") }
         }
     }
@@ -223,8 +230,8 @@ class AuthorizationRequestResolverJvmTest {
         )
         cases.forEach { (_, payload) ->
             val requestUrl = URLBuilder("openid4vp://authorize").apply {
-                parameters.append("client_id", "verifier2")
-                parameters.append("request", unsignedJwt(payload))
+                parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
+                parameters.append("request", unsignedJwt(payload.replace("\"client_id\":\"verifier2\"", "\"client_id\":\"redirect_uri:https://verifier.example/callback\"")))
             }.build()
             assertFailsWith<IllegalArgumentException> {
                 AuthorizationRequestResolver.resolve(
@@ -238,10 +245,10 @@ class AuthorizationRequestResolverJvmTest {
     @Test
     fun `request object accepts a configured audience`() = runBlocking {
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
-            parameters.append("client_id", "verifier2")
+            parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
             parameters.append(
                 "request",
-                unsignedJwt("{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://audience.example\"}"),
+                unsignedJwt("{\"client_id\":\"redirect_uri:https://verifier.example/callback\",\"nonce\":\"n\",\"aud\":\"https://audience.example\"}"),
             )
         }.build()
 
@@ -252,7 +259,7 @@ class AuthorizationRequestResolverJvmTest {
             fetchRequestUri = { _, _ -> error("request_uri fetch should not be called") },
             trustConfiguration = ClientIdTrustConfiguration(),
         )
-        assertEquals("verifier2", resolved.authorizationRequest.clientId)
+        assertEquals("redirect_uri:https://verifier.example/callback", resolved.authorizationRequest.clientId)
     }
 
     @Test
@@ -263,7 +270,7 @@ class AuthorizationRequestResolverJvmTest {
             parameters.append("request_uri_method", "post")
         }.build()
 
-        val unsignedJsonError = assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
             AuthorizationRequestResolver.resolve(
                 requestUrl = requestUrl,
                 unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
@@ -276,21 +283,22 @@ class AuthorizationRequestResolverJvmTest {
                 )
             }
         }
-        assertEquals(
-            "Unsigned authorization request not allowed: received application/json from request_uri " +
-                "but wallet policy requires signed requests (application/oauth-authz-req+jwt)",
-            unsignedJsonError.message,
-        )
+
+        val nonceRequestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
+            parameters.append("request_uri", "https://verifier.example/request")
+            parameters.append("request_uri_method", "post")
+        }.build()
 
         val nonceError = assertFailsWith<IllegalArgumentException> {
             AuthorizationRequestResolver.resolve(
-                requestUrl = requestUrl,
+                requestUrl = nonceRequestUrl,
                 unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
             ) { _, _ ->
                 AuthorizationRequestResolver.RequestUriFetchResponse(
                     status = io.ktor.http.HttpStatusCode.OK,
                     contentType = ContentType.parse("application/oauth-authz-req+jwt"),
-                    body = unsignedJwt("{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://self-issued.me/v2\",\"wallet_nonce\":\"other\"}"),
+                    body = unsignedJwt("{\"client_id\":\"redirect_uri:https://verifier.example/callback\",\"nonce\":\"n\",\"aud\":\"https://self-issued.me/v2\",\"wallet_nonce\":\"other\"}"),
                     walletNonce = "wallet-nonce",
                 )
             }
@@ -353,7 +361,7 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
-    fun `signed-only wallet metadata advertises configured pre-registered clients but not redirect uri`() {
+    fun `signed-only wallet metadata does not advertise redirect uri`() {
         val metadata = Json.parseToJsonElement(
             AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
                 vpFormatsSupported = jsonObjectOf(),
@@ -443,14 +451,14 @@ class AuthorizationRequestResolverJvmTest {
         val requestObject = unsignedJwt(
             """
             {
-              "client_id":"verifier2",
+              "client_id":"redirect_uri:https://verifier.example/callback",
               "nonce":"nonce-123",
               "aud":"https://self-issued.me/v2"
             }
             """.trimIndent(),
         )
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
-            parameters.append("client_id", "verifier2")
+            parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
             parameters.append("request", requestObject)
         }.build()
 
@@ -464,18 +472,18 @@ class AuthorizationRequestResolverJvmTest {
         }
 
         assertIs<ResolvedAuthorizationRequest.UnsignedRequestObject>(resolved)
-        assertEquals("verifier2", resolved.authorizationRequest.clientId)
+        assertEquals("redirect_uri:https://verifier.example/callback", resolved.authorizationRequest.clientId)
         assertEquals(requestObject, resolved.requestObject)
     }
 
     @Test
     fun `request object with wrong typ is rejected`() {
         val requestObject = unsignedJwt(
-            payloadJson = """{"client_id":"verifier2","nonce":"nonce-123"}""",
+            payloadJson = """{"client_id":"redirect_uri:https://verifier.example/callback","nonce":"nonce-123"}""",
             type = "JWT",
         )
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
-            parameters.append("client_id", "verifier2")
+            parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
             parameters.append("request", requestObject)
         }.build()
 
@@ -491,9 +499,9 @@ class AuthorizationRequestResolverJvmTest {
 
     @Test
     fun `outer and request object client ids must match`() {
-        val requestObject = unsignedJwt("""{"client_id":"inner","nonce":"nonce-123"}""")
+        val requestObject = unsignedJwt("""{"client_id":"redirect_uri:https://inner.example/callback","nonce":"nonce-123"}""")
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
-            parameters.append("client_id", "outer")
+            parameters.append("client_id", "redirect_uri:https://outer.example/callback")
             parameters.append("request", requestObject)
         }.build()
 
@@ -676,17 +684,104 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     /**
-     * `redirect_uri` has no key to sign with - OpenID4VP 1.0 Section 5.9.3 forbids pairing it with a
-     * signed request - so an unsigned Request Object under that prefix must be accepted even when the
-     * policy is REQUIRE_SIGNED. Refusing it made every `request_uri_unsigned` flow impossible, as that
-     * is the only prefix the conformance suite pairs with the request method.
-     *
-     * The second half is the part that must never regress: every other prefix authenticates the
-     * Verifier *through* the signature, so `alg: none` there would let anyone claim the identifier.
+     * Unsigned JSON from `request_uri` is the Verifier2 bootstrap. HAIP (REQUIRE_SIGNED) rejects it,
+     * including `redirect_uri`. ALLOW_UNSIGNED accepts JSON only for that prefix.
      */
     @Test
-    fun `unsigned request object is allowed only for prefixes that cannot sign`() = runBlocking {
-        suspend fun resolveUnsigned(clientId: String) = AuthorizationRequestResolver.resolve(
+    fun `unsigned JSON request uri is accepted for redirect uri only when unsigned requests are allowed`() = runBlocking {
+        val destination = "https://verifier.example/callback"
+        val clientId = "redirect_uri:$destination"
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", clientId)
+            parameters.append("request_uri", "https://verifier.example/request")
+        }.build()
+
+        val fetchJson = { _: String, _: RequestUriHttpMethod? ->
+            AuthorizationRequestResolver.RequestUriFetchResponse(
+                status = io.ktor.http.HttpStatusCode.OK,
+                contentType = ContentType.Application.Json,
+                body = """{"client_id":"$clientId","response_type":"vp_token","response_mode":"direct_post","nonce":"nonce-123"}""",
+            )
+        }
+
+        assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                fetchRequestUri = fetchJson,
+            )
+        }
+
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            fetchRequestUri = fetchJson,
+        )
+
+        assertIs<ResolvedAuthorizationRequest.Plain>(resolved)
+        assertEquals(clientId, resolved.authorizationRequest.clientId)
+        assertEquals(destination, resolved.authorizationRequest.responseUri)
+    }
+
+    @Test
+    fun `strict resolver rejects unsigned JSON request uri for prefixes that can sign`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "x509_san_dns:bank.example.com")
+            parameters.append("request_uri", "https://verifier.example/request")
+        }.build()
+
+        assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            ) { _, _ ->
+                AuthorizationRequestResolver.RequestUriFetchResponse(
+                    status = io.ktor.http.HttpStatusCode.OK,
+                    contentType = ContentType.Application.Json,
+                    body = """{"client_id":"x509_san_dns:bank.example.com","nonce":"nonce-123"}""",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `strict unsigned JSON request uri binds redirect uri destination`() = runBlocking {
+        val destination = "https://verifier.example/callback"
+        val clientId = "redirect_uri:$destination"
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", clientId)
+            parameters.append("request_uri", "https://verifier.example/request")
+        }.build()
+
+        val mismatch = assertFails {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            ) { _, _ ->
+                AuthorizationRequestResolver.RequestUriFetchResponse(
+                    status = io.ktor.http.HttpStatusCode.OK,
+                    contentType = ContentType.Application.Json,
+                    body = """{"client_id":"$clientId","response_type":"vp_token","response_mode":"direct_post","response_uri":"https://attacker.example/collect","nonce":"nonce-123"}""",
+                )
+            }
+        }
+        assertTrue(
+            "does not match the redirect_uri client_id" in (mismatch.message ?: ""),
+            "expected a binding failure, was: ${mismatch.message}",
+        )
+    }
+
+    /**
+     * Unsigned Request Objects (`alg: none`) are accepted only with ALLOW_UNSIGNED and only for
+     * `redirect_uri`. HAIP (REQUIRE_SIGNED) rejects them, including `redirect_uri`. Signable
+     * prefixes stay rejected even when unsigned requests are allowed.
+     */
+    @Test
+    fun `unsigned request object is allowed only for redirect uri when unsigned requests are allowed`() = runBlocking {
+        suspend fun resolveUnsigned(
+            clientId: String,
+            policy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy,
+        ) = AuthorizationRequestResolver.resolve(
             requestUrl = URLBuilder("openid4vp://authorize").apply {
                 parameters.append("client_id", clientId)
                 parameters.append(
@@ -694,24 +789,38 @@ class AuthorizationRequestResolverJvmTest {
                     unsignedJwt("""{"client_id":"$clientId","nonce":"nonce-123","aud":"https://self-issued.me/v2"}"""),
                 )
             }.build(),
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            unsignedRequestObjectPolicy = policy,
         ) { _, _ -> error("request_uri fetch should not be called for inline request objects") }
 
         val redirectUriClientId = "redirect_uri:https://verifier.example.com/response"
+        assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+            resolveUnsigned(redirectUriClientId, AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED)
+        }
         assertEquals(
             redirectUriClientId,
-            resolveUnsigned(redirectUriClientId).authorizationRequest.clientId,
+            resolveUnsigned(
+                redirectUriClientId,
+                AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            ).authorizationRequest.clientId,
         )
 
-        // An unsigned request must not be able to impersonate a certificate-authenticated verifier.
         assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
-            resolveUnsigned("x509_san_dns:bank.example.com")
+            resolveUnsigned(
+                "x509_san_dns:bank.example.com",
+                AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            )
         }
         assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
-            resolveUnsigned("x509_hash:Uvo3HtuIxuhC92rShpgqcT3YXwrqRxWEviRiA0OZszk")
+            resolveUnsigned(
+                "x509_hash:Uvo3HtuIxuhC92rShpgqcT3YXwrqRxWEviRiA0OZszk",
+                AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            )
         }
         assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
-            resolveUnsigned("decentralized_identifier:did:web:verifier.example.com")
+            resolveUnsigned(
+                "decentralized_identifier:did:web:verifier.example.com",
+                AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            )
         }
         Unit
     }
@@ -735,7 +844,7 @@ class AuthorizationRequestResolverJvmTest {
                 parameters.append("nonce", "nonce-123")
                 extra.forEach { (k, value) -> parameters.append(k, value) }
             }.build(),
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         ) { _, _ -> error("request_uri fetch should not be called") }
 
         // Omitted: derived from the client_id.

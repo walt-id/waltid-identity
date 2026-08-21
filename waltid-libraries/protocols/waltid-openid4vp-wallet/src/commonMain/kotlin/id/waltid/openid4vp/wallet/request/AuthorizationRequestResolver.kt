@@ -63,6 +63,14 @@ object AuthorizationRequestResolver {
         val walletNonce: String? = null,
     )
 
+    /**
+     * Policy for unsigned OpenID4VP Authorization Requests (JSON from `request_uri`, query
+     * parameters, or `alg: none` JWTs).
+     *
+     * [REQUIRE_SIGNED] is HAIP: only signed Request Objects are accepted, and `redirect_uri` is
+     * rejected. [ALLOW_UNSIGNED] also accepts unsigned JSON / `redirect_uri` requests. Signed
+     * Request Objects are accepted under both values.
+     */
     enum class UnsignedRequestObjectPolicy {
         ALLOW_UNSIGNED,
         REQUIRE_SIGNED,
@@ -259,8 +267,13 @@ object AuthorizationRequestResolver {
         )
 
         return ResolvedAuthorizationRequest.Plain(
-            if (enforceFinalRequestObject) parsePlainRequest(parameters)
-            else parseParametersLegacy(parameters),
+            if (enforceFinalRequestObject) {
+                requireUnsignedRequestObjectAllowed(
+                    clientId = parameters["client_id"],
+                    policy = unsignedRequestObjectPolicy,
+                )
+                parsePlainRequest(parameters)
+            } else parseParametersLegacy(parameters),
         )
     }
 
@@ -382,35 +395,24 @@ object AuthorizationRequestResolver {
 
         val contentType = requireNotNull(response.contentType) { "AuthorizationRequest response does not define a content type" }
         log.trace { "Resolved AuthorizationRequest response with content type $contentType" }
-        val requestObjectPolicy = if (enforceFinalRequestObject && requestUriMethod == RequestUriHttpMethod.POST) {
-            UnsignedRequestObjectPolicy.REQUIRE_SIGNED
-        } else {
-            unsignedRequestObjectPolicy
-        }
 
         return when {
             contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(
                 requestObject = response.body,
                 outerClientId = outerClientId,
                 enforceFinalRequestObject = enforceFinalRequestObject,
-                unsignedRequestObjectPolicy = requestObjectPolicy,
+                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 expectedWalletNonce = response.walletNonce,
                 trustConfiguration = trustConfiguration,
                 expectedRequestObjectAudience = expectedRequestObjectAudience,
                 requireOuterClientId = true,
             )
-            contentType.match(ContentType.Application.Json) -> {
-                if (requestObjectPolicy == UnsignedRequestObjectPolicy.REQUIRE_SIGNED) {
-                    throw IllegalArgumentException(
-                        "Unsigned authorization request not allowed: received application/json from request_uri " +
-                            "but wallet policy requires signed requests (application/oauth-authz-req+jwt)"
-                    )
-                }
-                val authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body)
-                    .also { if (enforceFinalRequestObject) it.dcqlQuery?.precheck() }
-                if (enforceFinalRequestObject) requireMatchingClientId(outerClientId, authorizationRequest.clientId)
-                ResolvedAuthorizationRequest.Plain(authorizationRequest)
-            }
+            contentType.match(ContentType.Application.Json) -> resolveFromUnsignedJson(
+                body = response.body,
+                outerClientId = outerClientId,
+                enforceFinalRequestObject = enforceFinalRequestObject,
+                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+            )
             else -> throw IllegalArgumentException("Unsupported AuthorizationRequest content type: $contentType")
         }
     }
@@ -598,29 +600,54 @@ object AuthorizationRequestResolver {
     }
 
     /**
-     * Decide whether an unsigned (`alg: none`) Request Object may be processed.
+     * Unsigned JSON from `request_uri` is the Verifier2 bootstrap path. It is accepted only when
+     * [UnsignedRequestObjectPolicy.ALLOW_UNSIGNED] is set and the Client Identifier is `redirect_uri`.
+     * Signed-only (HAIP) wallets reject it.
+     */
+    private fun resolveFromUnsignedJson(
+        body: String,
+        outerClientId: String?,
+        enforceFinalRequestObject: Boolean,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
+    ): ResolvedAuthorizationRequest {
+        if (!enforceFinalRequestObject) {
+            return ResolvedAuthorizationRequest.Plain(json.decodeFromString(body))
+        }
+        requireUnsignedRequestObjectAllowed(outerClientId, unsignedRequestObjectPolicy)
+        val payload = json.parseToJsonElement(body)
+        require(payload is JsonObject) {
+            "Unsigned authorization request from request_uri must be a JSON object"
+        }
+        val authorizationRequest = json.decodeFromJsonElement(
+            deserializer = AuthorizationRequest.serializer(),
+            element = applyRedirectUriPrefixBinding(payload),
+        ).also { it.dcqlQuery?.precheck() }
+        requireMatchingClientId(outerClientId, authorizationRequest.clientId)
+        return ResolvedAuthorizationRequest.Plain(authorizationRequest)
+    }
+
+    /**
+     * Unsigned Authorization Requests are JSON from `request_uri`, query parameters, or `alg: none`
+     * JWTs. They are accepted only when [UnsignedRequestObjectPolicy.ALLOW_UNSIGNED] is set **and**
+     * the Client Identifier Prefix is `redirect_uri`.
      *
-     * [UnsignedRequestObjectPolicy.ALLOW_UNSIGNED] accepts any of them. Under
-     * [UnsignedRequestObjectPolicy.REQUIRE_SIGNED] one is still accepted when the Client Identifier
-     * Prefix has no key to sign with in the first place, which is the case OpenID4VP 1.0 §5.9.3
-     * describes for `redirect_uri`: that prefix is authenticated by the Verifier receiving the
-     * response at the very URI that names it, not by a signature, and the same section forbids
-     * combining it with a signed request at all. Rejecting those made every
-     * `request_method=request_uri_unsigned` flow impossible, since `redirect_uri` is the only prefix
-     * the suite pairs with it.
+     * That is the unsigned Verifier2 bootstrap: JSON at `request_uri` named by `redirect_uri:<response
+     * destination>`. Signed Request Objects remain accepted under either policy, which is the HAIP
+     * profile. [UnsignedRequestObjectPolicy.REQUIRE_SIGNED] rejects `redirect_uri` entirely because
+     * that prefix cannot carry a signature.
      *
-     * Every other prefix authenticates the Verifier *through* the request object's signature and its
-     * `x5c` chain, DID, attestation or federation trust chain. Accepting `alg: none` there would let
-     * anyone at all claim, say, `x509_san_dns:bank.example.com` simply by omitting the signature, so
-     * those stay refused regardless of how the request arrived.
+     * Unsigned JSON or `alg: none` for a signable prefix (`x509_san_dns`, DID, attestation, …) is
+     * always refused. Accepting it would let anyone claim, say, `x509_san_dns:bank.example.com`.
      */
     private fun requireUnsignedRequestObjectAllowed(clientId: String?, policy: UnsignedRequestObjectPolicy) {
-        if (policy == UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) return
-        val prefixCannotSign = clientId
+        if (policy != UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) {
+            throw UnsignedAuthorizationRequestNotAllowedException()
+        }
+        val isRedirectUri = clientId
             ?.let { ClientIdPrefixParser.parse(it).getOrNull() }
             ?.let { it is RedirectUri }
             ?: false
-        if (!prefixCannotSign) throw UnsignedAuthorizationRequestNotAllowedException()
+        if (!isRedirectUri) throw UnsignedAuthorizationRequestNotAllowedException()
     }
 
     /**

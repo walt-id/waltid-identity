@@ -219,8 +219,8 @@ class WalletPresentFunctionality2Test {
             Result.success(JsonPrimitive("legacy"))
         }
         val algNone = requestUrl(
-            outerClientId = "verifier",
-            requestObject = unsignedRequestObject("verifier", "oauth-authz-req+jwt"),
+            outerClientId = "redirect_uri:https://verifier.example/callback",
+            requestObject = unsignedRequestObject("redirect_uri:https://verifier.example/callback", "oauth-authz-req+jwt"),
         )
         assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
             WalletPresentFunctionality2.resolveAuthorizationRequest(
@@ -229,7 +229,10 @@ class WalletPresentFunctionality2Test {
                 fallback,
             )
         }
-        val clientMismatch = requestUrl("outer", unsignedRequestObject("inner", "oauth-authz-req+jwt"))
+        val clientMismatch = requestUrl(
+            "redirect_uri:https://outer.example/callback",
+            unsignedRequestObject("redirect_uri:https://inner.example/callback", "oauth-authz-req+jwt"),
+        )
         assertFailsWith<IllegalArgumentException> {
             WalletPresentFunctionality2.resolveAuthorizationRequest(
                 clientMismatch,
@@ -237,7 +240,10 @@ class WalletPresentFunctionality2Test {
                 fallback,
             )
         }
-        val wrongType = requestUrl("verifier", unsignedRequestObject("verifier", "JWT"))
+        val wrongType = requestUrl(
+            "redirect_uri:https://verifier.example/callback",
+            unsignedRequestObject("redirect_uri:https://verifier.example/callback", "JWT"),
+        )
         assertFailsWith<IllegalArgumentException> {
             WalletPresentFunctionality2.resolveAuthorizationRequest(
                 wrongType,
