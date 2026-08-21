@@ -49,11 +49,16 @@ class IssuerMetadataResolver(
     /**
      * Resolves credential issuer metadata and retains its signed/unsigned provenance.
      *
+     * Language preferences are sent as `Accept-Language`. Callers must still select a display
+     * locally because issuers can return multiple localized alternatives.
+     *
      * @param credentialIssuerUrl Credential issuer identifier URL.
+     * @param preferredLocales Ordered BCP 47 locale preferences for the metadata request.
      * @return Parsed metadata with explicit unsigned or verified signed provenance.
      */
     suspend fun resolveCredentialIssuerMetadata(
         credentialIssuerUrl: String,
+        preferredLocales: List<String> = emptyList(),
     ): ResolvedCredentialIssuerMetadata {
         require(credentialIssuerUrl.isNotBlank()) { "Credential issuer URL cannot be blank" }
 
@@ -69,6 +74,7 @@ class IssuerMetadataResolver(
         log.debug { "Attempting to fetch metadata from ${urlsToTry.size} well-known endpoints" }
         log.trace { "Metadata URLs to try: ${urlsToTry.joinToString()}" }
 
+        val acceptLanguage = LocalizedMetadata.acceptLanguageValue(preferredLocales)
         val failures = mutableListOf<ResolveFailure>()
         for ((index, metadataUrl) in urlsToTry.withIndex()) {
             log.debug { "Attempt ${index + 1}/${urlsToTry.size}: Fetching from $metadataUrl" }
@@ -81,6 +87,7 @@ class IssuerMetadataResolver(
                             "${CredentialIssuerMetadataJwt.MEDIA_TYPE}, ${ContentType.Application.Json}"
                         } ?: ContentType.Application.Json.toString(),
                     )
+                    acceptLanguage?.let { header(HttpHeaders.AcceptLanguage, it) }
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e

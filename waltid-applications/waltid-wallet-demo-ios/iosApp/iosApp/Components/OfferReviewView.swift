@@ -149,7 +149,7 @@ private struct OfferedCredentialView: View {
                     name: credential.name,
                     locale: nil,
                     logoURI: credential.logoURI?.absoluteString,
-                    logoAltText: nil
+                    logoAltText: credential.logoAltText
                 ),
                 fallbackName: title,
                 supportingText: credential.descriptionText
