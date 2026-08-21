@@ -51,6 +51,7 @@ kotlin {
                 androidMain.dependencies {
                     implementation(identityLibs.ktor.client.android)
                     implementation(identityLibs.androidx.fragment)
+                    implementation(identityLibs.androidx.biometric)
                 }
 
                 getByName("androidDeviceTest").dependencies {
