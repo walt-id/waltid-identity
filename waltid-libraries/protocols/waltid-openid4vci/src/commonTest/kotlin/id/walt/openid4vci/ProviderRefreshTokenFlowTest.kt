@@ -9,7 +9,6 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
-import id.walt.openid4vci.responses.token.TokenFailureStage
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -80,9 +79,7 @@ class ProviderRefreshTokenFlowTest {
         val reuse = refresh(provider, initial.refreshToken)
         assertTrue(reuse is AccessTokenResponseResult.Failure)
         assertEquals("invalid_grant", reuse.error.error)
-        val reuseContext = assertNotNull(reuse.context)
-        assertEquals("demo-subject", reuseContext.sessionSubject)
-        assertEquals(TokenFailureStage.GRANT_VALIDATION, reuseContext.stage)
+        assertEquals("demo-subject", assertNotNull(reuse.request.session).subject)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -95,7 +92,7 @@ class ProviderRefreshTokenFlowTest {
 
         assertTrue(result is AccessTokenResponseResult.Failure)
         assertEquals("invalid_grant", result.error.error)
-        assertNull(result.context)
+        assertNull(result.request.session)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -211,7 +208,7 @@ class ProviderRefreshTokenFlowTest {
 
         assertTrue(result is AccessTokenResponseResult.Failure)
         assertEquals("invalid_grant", result.error.error)
-        assertNull(result.context)
+        assertNull(result.request.session)
     }
 
     private fun buildTestProvider(
