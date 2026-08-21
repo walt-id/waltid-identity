@@ -21,7 +21,7 @@ public struct SharingRequestSections: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let requester = request.requester {
-                RequesterSection(requester: requester)
+                RequesterSection(requester: requester, compact: compact)
             }
 
             ForEach(request.transactionData) { group in
@@ -46,6 +46,7 @@ public struct SharingRequestSections: View {
 /// Who is asking, headed by whatever the request lets the wallet name truthfully.
 struct RequesterSection: View {
     let requester: SharingRequester
+    var compact: Bool = false
 
     private var verifiedOriginDetail: MetadataDetailItem? {
         guard !requester.verifiedOriginIsIdentityName,
@@ -61,7 +62,13 @@ struct RequesterSection: View {
     var body: some View {
         let verifiedOriginDetail = verifiedOriginDetail
         let requesterDetails = requesterDetails
-        if requester.identityName != nil || verifiedOriginDetail != nil || !requesterDetails.isEmpty {
+        if compact {
+            if let name = requester.identityName ?? requester.verifiedOrigin?.presentableValue {
+                Text(name)
+                    .font(.headline)
+                    .accessibilityIdentifier(WalletAccessibilityID.presentationVerifierSection)
+            }
+        } else if requester.identityName != nil || verifiedOriginDetail != nil || !requesterDetails.isEmpty {
             ReviewMetadataSection(
                 title: "Requester",
                 titleAccessibilityIdentifier: WalletAccessibilityID.presentationVerifierSection

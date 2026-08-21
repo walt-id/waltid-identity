@@ -48,6 +48,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun digitalCredentialReviewShowsOriginTransactionDataAndEncryption() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
                 onSubmit = {},
@@ -82,6 +83,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun verifiedOriginStaysVisibleBesideSelfAssertedVerifierMetadata() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview().let { review ->
                     review.copy(
                         request = review.request.copy(
@@ -118,6 +120,7 @@ class WalletDemoSharingReviewTestScenarios {
         var cancelled = false
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
                 onSubmit = { submitted = it },
@@ -144,6 +147,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun disabledReviewCannotBeSubmittedTwice() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
                 onSubmit = {},
@@ -163,6 +167,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun reviewWithoutReaderAuthenticationShowsNoReaderSection() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
                 onSubmit = {},
@@ -180,6 +185,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun untrustedReaderIsDescribedAsATrustDecisionNotASignatureFailure() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = annexCReview(WalletDemoReaderTrust.Untrusted("No reader trust policy is configured")),
                 title = "Share mobile document?",
                 onSubmit = {},
@@ -198,6 +204,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun trustedReaderIsNamedOnTheReview() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = annexCReview(WalletDemoReaderTrust.Trusted("CN=Example Reader")),
                 title = "Share mobile document?",
                 onSubmit = {},
@@ -219,6 +226,7 @@ class WalletDemoSharingReviewTestScenarios {
         val photoId = credentialOption(queryId = "org.iso.23220.photoid.1", credentialId = "credential-2")
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = annexCReview(
                     readerTrust = WalletDemoReaderTrust.NotAuthenticated,
                     credentialOptions = listOf(mdl, photoId),
@@ -262,6 +270,7 @@ class WalletDemoSharingReviewTestScenarios {
         )
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = annexCReview(
                     readerTrust = WalletDemoReaderTrust.NotAuthenticated,
                     credentialOptions = listOf(first, second),
@@ -311,6 +320,7 @@ class WalletDemoSharingReviewTestScenarios {
         val option = credentialOption(disclosures = listOf(requiredDisclosure(), optionalDisclosure()))
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview(credentialOptions = listOf(option)),
                 title = "Share digital credential?",
                 onSubmit = { submitted = it },

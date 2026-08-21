@@ -37,6 +37,7 @@ internal fun OfferReviewSection(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     modifier: Modifier = Modifier,
+    cardFirst: Boolean = false,
 ) {
     val focusManager = LocalFocusManager.current
 
@@ -46,6 +47,7 @@ internal fun OfferReviewSection(
             .testTag(WalletUiTestTags.OfferReview),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        if (!cardFirst) {
         Text("Credential offer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 
         ReviewMetadataSection(
@@ -80,7 +82,19 @@ internal fun OfferReviewSection(
             }
         }
 
+        }
+
         if (preview.offeredCredentials.isNotEmpty()) {
+            if (cardFirst) {
+                preview.offeredCredentials.forEach { credential ->
+                    FlippableOfferCard(
+                        credential = credential,
+                        issuerDisplay = preview.issuer.display,
+                        issuerFallback = preview.issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: preview.issuer.credentialIssuer,
+                    )
+                }
+            } else {
             ReviewMetadataSection(
                 title = "Offered credentials",
                 modifier = Modifier.testTag(WalletUiTestTags.OfferCredentialsSection),
@@ -100,6 +114,7 @@ internal fun OfferReviewSection(
                     HorizontalDivider()
                     OfferedCredentialContent(credential)
                 }
+            }
             }
         }
 

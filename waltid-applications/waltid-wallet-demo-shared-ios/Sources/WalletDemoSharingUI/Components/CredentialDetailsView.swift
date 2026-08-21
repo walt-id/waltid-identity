@@ -3,16 +3,18 @@ import WalletSDK
 
 public struct CredentialDetailsView: View {
     public let details: CredentialDetails
+    public var onCardTap: (() -> Void)?
 
-    public init(details: CredentialDetails) {
+    public init(details: CredentialDetails, onCardTap: (() -> Void)? = nil) {
         self.details = details
+        self.onCardTap = onCardTap
     }
 
     public var body: some View {
         let systemInfoGroup = details.systemInfoGroup
 
         VStack(alignment: .leading, spacing: 12) {
-            CredentialOverviewView(details: details)
+            CredentialOverviewView(details: details, onCardTap: onCardTap)
 
             if details.groups.isEmpty && systemInfoGroup == nil {
                 Text("No credential details available")
@@ -33,6 +35,7 @@ public struct CredentialDetailsView: View {
 
 private struct CredentialOverviewView: View {
     let details: CredentialDetails
+    var onCardTap: (() -> Void)?
 
     private var summary: CredentialCardSummary {
         details.cardSummary
@@ -45,6 +48,8 @@ private struct CredentialOverviewView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             CredentialCardView(details: details, compact: true)
+                .contentShape(Rectangle())
+                .onTapGesture { onCardTap?() }
 
             if let issuerDisplay = details.issuerDisplay {
                 let supporting = details.issuer?
