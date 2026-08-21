@@ -23,7 +23,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.toSharingReview
-import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewScreen
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewSheet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -97,7 +97,7 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
     ) {
         setContent {
             var submitting by remember { mutableStateOf(false) }
-            WalletDemoSharingReviewScreen(
+            WalletDemoSharingReviewSheet(
                 review = review,
                 title = title,
                 enabled = !submitting,

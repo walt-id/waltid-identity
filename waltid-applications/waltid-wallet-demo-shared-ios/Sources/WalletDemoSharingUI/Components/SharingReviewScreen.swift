@@ -108,7 +108,8 @@ public struct SharingReviewScreen: View {
                 },
                 onSubmit: onSubmit,
                 onReject: onReject,
-                onCancel: onCancel
+                onCancel: onCancel,
+                compact: true
             )
         } else {
             // No request content is shown while preparing: what a request asks for is only known once
