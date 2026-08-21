@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.logic
 import id.walt.wallet2.handlers.WalletIssuanceCredentialPreview
 import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceIssuerPreview
+import id.walt.wallet2.handlers.WalletIssuanceMetadataProvenance
 import id.walt.wallet2.handlers.WalletIssuanceOfferPreview
 import id.walt.wallet2.handlers.WalletIssuanceSession
 import kotlin.test.Test
@@ -21,6 +22,7 @@ class MobileWalletIssuanceMappingTest {
                     locale = "en",
                     logoUri = null,
                     logoAltText = null,
+                    metadataProvenance = WalletIssuanceMetadataProvenance.Unsigned,
                 ),
                 credentials = listOf(
                     WalletIssuanceCredentialPreview(
