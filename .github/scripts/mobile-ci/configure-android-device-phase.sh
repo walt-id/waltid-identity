@@ -19,6 +19,8 @@ case "$phase" in
     # instrumentation discovery; their class-level assumption would otherwise
     # collapse the reported test count and make Gradle fail the phase.
     compose_demo_excluded_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest,id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest"
+    compose_demo_excluded_classes+=",id.walt.walletdemo.compose.android.DigitalCredentialPortalPresentationE2ETest"
+    compose_demo_excluded_classes+=",id.walt.walletdemo.compose.android.DigitalCredentialPortalIssuanceE2ETest"
     script="ANDROID_TEST_NOT_CLASS=$compose_demo_excluded_classes ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
@@ -39,6 +41,19 @@ case "$phase" in
     emulator_api_level="37.0"
     emulator_profile="pixel_7"
     emulator_target="google_apis"
+    ;;
+  dc-api-browser)
+    # Browser-origin coverage has its own Play Store/Chrome userdata baseline.
+    # It must never restore or mutate the native google_apis DC API cache.
+    dc_api_browser_test_classes="id.walt.walletdemo.compose.android.DigitalCredentialPortalPresentationE2ETest,id.walt.walletdemo.compose.android.DigitalCredentialPortalIssuanceE2ETest"
+    script="DC_API_BROWSER_TESTS=true ANDROID_TEST_CLASS=$dc_api_browser_test_classes EXPECTED_ANDROID_TEST_CASE_COUNT=3 ./waltid-identity/.github/scripts/mobile-ci/run-android-dc-api-compose-tests.sh"
+    emulator_options="-no-snapshot -no-snapshot-save -no-window -gpu auto -noaudio -no-boot-anim -camera-back none -memory 4096 -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator"
+    emulator_avd_name="dc-api-browser-api37-pixel7-playstore"
+    report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
+    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**'
+    emulator_api_level="37.0"
+    emulator_profile="pixel_7"
+    emulator_target="google_apis_playstore_ps16k"
     ;;
   enterprise-mobile)
     script="./waltid-identity/.github/scripts/mobile-ci/run-enterprise-android-mobile-tests.sh"
