@@ -750,10 +750,14 @@ object WalletIssuanceHandler {
         // is requested - DPoP is optional for the wallet, so an unusable key must not fail issuance.
         val dpopAlgorithms = usableDpopAlgorithms(asMetadata, keyMaterial)
 
+        // OpenID4VCI 1.0 §6.3: only forward a tx_code when the offer's grant requested one;
+        // issuers now reject an unsolicited tx_code instead of ignoring it.
+        val effectiveTxCode = request.txCode?.takeIf { preAuthGrant.txCode != null }
+
         val tokenResponse = tokenBuilder.exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthGrant.preAuthorizedCode,
-            txCode = request.txCode,
+            txCode = effectiveTxCode,
             additionalHeaders = request.tokenRequestHeaders,
             attestationHeaders = attestationHeaders,
             anonymous = anonymousPreAuthorizedCode,
