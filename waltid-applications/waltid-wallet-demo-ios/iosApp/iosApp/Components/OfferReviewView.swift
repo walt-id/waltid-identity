@@ -10,6 +10,7 @@ struct OfferReviewView: View {
     let onTxCodeChange: (String) -> Void
     let onAccept: () -> Void
     let onDecline: () -> Void
+    @State private var openOfferedID: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -49,10 +50,13 @@ struct OfferReviewView: View {
                     title: "Offered credentials",
                     titleAccessibilityIdentifier: WalletAccessibilityID.offerCredentialsSection
                 ) {
-                    ForEach(Array(preview.credentials.enumerated()), id: \.offset) { index, credential in
-                        if index > 0 {
-                            Divider()
-                        }
+                    ForEach(preview.credentials, id: \.configurationID) { credential in
+                        CredentialCardArtView(summary: credential.cardSummary)
+                            .onTapGesture { openOfferedID = credential.configurationID }
+                    }
+                    if let openOfferedID,
+                       let credential = preview.credentials.first(where: { $0.configurationID == openOfferedID }) {
+                        Divider()
                         OfferedCredentialView(credential: credential)
                     }
                 }
@@ -132,6 +136,26 @@ struct OfferReviewView: View {
             return false
         }
         return name != preview.issuer.identifier
+    }
+}
+
+private extension IssuanceCredentialPreview {
+    var cardSummary: CredentialCardSummary {
+        CredentialCardSummary(
+            title: name ?? configurationID,
+            credentialType: nil,
+            holderName: nil,
+            issuer: "",
+            dateText: nil,
+            validityText: nil,
+            portraitData: nil,
+            portraitMimeType: nil,
+            backgroundColor: backgroundColor,
+            backgroundImageURI: backgroundImageURI?.absoluteString,
+            textColor: textColor,
+            logoURI: logoURI?.absoluteString,
+            logoAltText: logoAltText
+        )
     }
 }
 

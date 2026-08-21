@@ -18,6 +18,7 @@ public struct SharingReviewView: View {
     private let onSubmit: () -> Void
     private let onReject: (() -> Void)?
     private let onCancel: () -> Void
+    private let compact: Bool
 
     /// Renders one sharing review.
     ///
@@ -44,7 +45,8 @@ public struct SharingReviewView: View {
         onCredentialSelected: ((String) -> Void)? = nil,
         onSubmit: @escaping () -> Void,
         onReject: (() -> Void)? = nil,
-        onCancel: @escaping () -> Void
+        onCancel: @escaping () -> Void,
+        compact: Bool = false
     ) {
         self.review = review
         self.selection = selection
@@ -57,25 +59,34 @@ public struct SharingReviewView: View {
         self.onSubmit = onSubmit
         self.onReject = onReject
         self.onCancel = onCancel
+        self.compact = compact
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SharingRequestSections(request: review.request)
+            SharingRequestSections(request: review.request, compact: compact)
 
-            Text("Select credentials to share")
-                .font(.subheadline.weight(.semibold))
+            if compact {
+                CredentialCardStackView(
+                    details: review.credentialOptions.map(CredentialDisplayNormalizer.details(for:))
+                ) { id in
+                    onCredentialSelected?(id)
+                }
+            } else {
+                Text("Select credentials to share")
+                    .font(.subheadline.weight(.semibold))
 
-            ForEach(review.credentialOptions) { option in
-                CredentialReviewCard(
-                    option: option,
-                    selection: selection,
-                    isLoading: isLoading,
-                    isReadOnly: isReadOnly,
-                    onToggleCredential: onToggleCredential,
-                    onToggleDisclosure: onToggleDisclosure,
-                    onCredentialSelected: onCredentialSelected
-                )
+                ForEach(review.credentialOptions) { option in
+                    CredentialReviewCard(
+                        option: option,
+                        selection: selection,
+                        isLoading: isLoading,
+                        isReadOnly: isReadOnly,
+                        onToggleCredential: onToggleCredential,
+                        onToggleDisclosure: onToggleDisclosure,
+                        onCredentialSelected: onCredentialSelected
+                    )
+                }
             }
 
             if !isReadOnly {
