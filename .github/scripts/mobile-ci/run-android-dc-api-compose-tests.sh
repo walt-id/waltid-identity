@@ -5,9 +5,23 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 identity_dir="$(cd "$script_dir/../../.." && pwd -P)"
 source "$script_dir/prepare-android-dc-api-device.sh"
 
+dc_api_browser_tests="${DC_API_BROWSER_TESTS:-false}"
+if [[ "$dc_api_browser_tests" == "true" ]]; then
+  source "$script_dir/prepare-android-dc-api-browser-device.sh"
+fi
+
 # The preparation job caches an unmodified factory-image AVD. Test jobs validate
 # that exact baseline and fail before Gradle if the restored device has drifted.
 validate_android_dc_api_device
+if [[ "$dc_api_browser_tests" == "true" ]]; then
+  assert_android_dc_api_browser_baseline_manifest
+  validate_android_dc_api_chrome
+  assert_android_dc_api_browser_baseline_manifest
+  # Chrome validation returns HOME after exercising the prepared profile. Recheck
+  # the launcher immediately before instrumentation so no browser/system overlay
+  # can obscure the wallet's first UI interaction.
+  assert_android_dc_api_launcher_health
+fi
 
 instrumentation_args=()
 if [[ -n "${ANDROID_TEST_CLASS:-}" ]]; then
@@ -56,6 +70,9 @@ fi
 
 postflight_status=0
 assert_android_dc_api_device_unchanged || postflight_status=$?
+if [[ "$dc_api_browser_tests" == "true" ]]; then
+  assert_android_dc_api_browser_baseline_manifest || postflight_status=$?
+fi
 log_android_dc_api_launcher_diagnostic
 
 if (( test_status != 0 )); then

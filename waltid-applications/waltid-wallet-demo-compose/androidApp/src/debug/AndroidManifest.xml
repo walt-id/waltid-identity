@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+      Debug only, for the portal2 DC API E2Es: Android 11+ package visibility otherwise hides Chrome
+      from their explicit capability diagnostics. The wallet itself never queries browsers.
+    -->
+    <queries>
+        <package android:name="com.android.chrome" />
+    </queries>
+
     <application>
         <activity
             android:name=".DigitalCredentialTestVerifierActivity"
