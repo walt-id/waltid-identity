@@ -32,7 +32,11 @@ class DigitalCredentialPortalPresentationE2ETest {
         val device = UiDevice.getInstance(instrumentation)
         val capabilities = Portal2DigitalCredentialE2EHelper.requirePresentationCapabilities(context)
 
-        val wallet = createAndroidDemoMobileWallet(context, demoWalletConfig()).wallet
+        val wallet = createAndroidDemoMobileWallet(
+            context = context,
+            // Match the native DC fixture: this emulator cannot enforce protected signing keys.
+            config = demoWalletConfig().copy(biometricEnabled = false),
+        ).wallet
         wallet.bootstrap()
         wallet.credentials().forEach { credential ->
             check(wallet.deleteCredential(credential.id)) {
