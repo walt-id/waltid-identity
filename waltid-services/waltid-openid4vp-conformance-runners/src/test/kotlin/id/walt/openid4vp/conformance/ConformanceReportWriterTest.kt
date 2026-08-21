@@ -236,6 +236,8 @@ class ConformanceReportWriterTest {
             walletStatus = "PASSED",
         )
         assertTrue(warning.isAccepted())
+        assertTrue(warning.passed)
+        assertEquals(null, warning.message)
 
         val reportRoot = Files.createTempDirectory("openid-conformance-vci-warning").toString()
         ConformanceReportWriter.writeTestPlanResults(
@@ -253,6 +255,65 @@ class ConformanceReportWriterTest {
         assertTrue(summary.contains("`passed`"))
         assertTrue(summary.contains("WARNING"))
         assertFalse(summary.contains("`failed`"))
+        assertFalse(summary.contains("Conformance: WARNING"))
+    }
+
+    @Test
+    fun vpWalletReviewIsAcceptedWithoutAnErrorCell() {
+        val review = TestPlanResult(
+            testName = "oid4vp-1final-wallet-happy-flow",
+            conformanceTestId = "review-1",
+            conformanceResult = "REVIEW",
+            walletStatus = "PASSED",
+        )
+        assertTrue(review.isAccepted())
+        assertTrue(review.passed)
+
+        val reportRoot = Files.createTempDirectory("openid-conformance-vp-review").toString()
+        ConformanceReportWriter.writeTestPlanResults(
+            role = ConformanceReportWriter.Role.VP_WALLET,
+            results = listOf(review),
+            conformanceHost = "conformance.example",
+            conformancePort = 443,
+            reportRoot = reportRoot,
+            allowFailure = true,
+        )
+        val summary = Files.readString(
+            ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VP_WALLET, reportRoot)
+                .resolve("summary.md")
+        )
+        assertTrue(summary.contains("`passed`"))
+        assertTrue(summary.contains("REVIEW"))
+        assertFalse(summary.contains("`failed`"))
+        assertFalse(summary.contains("Conformance: REVIEW"))
+    }
+
+    @Test
+    fun interruptedWarningIsNotAcceptedAsAPass() {
+        val interrupted = TestPlanResult(
+            testName = "oid4vci-1_0-wallet-test-client-attestation-challenge",
+            conformanceTestId = "int-1",
+            conformanceStatus = "INTERRUPTED",
+            conformanceResult = "WARNING",
+            walletStatus = "WARNING",
+            errorMessage = "Suite interrupted this module",
+        )
+        assertFalse(interrupted.isAccepted())
+        assertFalse(interrupted.passed)
+
+        val reportRoot = Files.createTempDirectory("openid-conformance-vci-interrupted").toString()
+        ConformanceReportWriter.writeTestPlanResults(
+            role = ConformanceReportWriter.Role.VCI_WALLET,
+            results = listOf(interrupted),
+            reportRoot = reportRoot,
+            allowFailure = true,
+        )
+        val summary = Files.readString(
+            ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VCI_WALLET, reportRoot)
+                .resolve("summary.md")
+        )
+        assertTrue(summary.contains("`failed`"))
+        assertTrue(summary.contains("Suite interrupted this module"))
     }
 
     @Test

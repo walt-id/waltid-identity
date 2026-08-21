@@ -136,7 +136,7 @@ object ConformanceReportWriter {
                 suiteStatus = result.conformanceStatus ?: result.walletStatus ?: result.verifierStatus?.name,
                 testId = result.conformanceTestId.takeIf { it != "N/A" },
                 logUrl = logUrl(conformanceHost, conformancePort, result.conformanceTestId),
-                error = result.skipReason ?: result.message,
+                error = result.skipReason ?: result.message.takeIf { !accepted },
                 accepted = accepted,
             )
         }

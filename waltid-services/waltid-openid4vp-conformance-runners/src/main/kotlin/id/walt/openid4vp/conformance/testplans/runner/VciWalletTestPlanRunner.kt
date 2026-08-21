@@ -4,6 +4,7 @@ import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
+import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletModuleApplicability
 import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletTestPlan
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -165,22 +166,16 @@ class VciWalletTestPlanRunner(
         println("   Test ID: $testId")
         println("   View: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
 
-        if (module.testModule.startsWith(FAPI2_CLIENT_MODULE_PREFIX)) {
-            // The HAIP plan bundles the FAPI 2.0 client tests, which exercise the wallet as an OAuth
-            // client rather than as a credential recipient: the suite is only an authorization server,
-            // publishes no credential offer, and waits for the client to start an authorization
-            // request by itself. Driving them needs wallet-initiated issuance, which this harness has
-            // no entry point for, so they are recorded as skipped rather than reported as wallet
-            // failures. Cancelled explicitly because a module left WAITING holds the plan alias and
-            // would take the next module down with it.
-            println("   Not a credential-issuance module - skipping")
+        VciWalletModuleApplicability.skipReason(module.testModule, variantJson)?.let { reason ->
+            // Cancelled explicitly because a module left WAITING holds the plan alias and would
+            // take the next module down with it.
+            println("   Skipping: $reason")
             conformance.cancelTest(testId)
             return TestPlanResult(
                 conformanceTestId = testId,
                 conformanceResult = "SKIPPED",
                 walletStatus = "SKIPPED",
-                skipReason = "FAPI 2.0 client test: needs wallet-initiated issuance, which the " +
-                    "harness cannot yet trigger",
+                skipReason = reason,
             )
         }
 
@@ -198,13 +193,27 @@ class VciWalletTestPlanRunner(
 
             val testInfo = conformance.getTestRunInfo(testId)
 
-            if (testInfo.status in setOf("FINISHED", "INTERRUPTED")) {
+            if (testInfo.status == "INTERRUPTED") {
+                // An interrupted module did not finish its checks. WARNING here is usually TLS plus
+                // a cancelled wait, not a completed pass - do not map it the way FINISHED WARNING is.
+                val result = testInfo.result ?: "UNKNOWN"
+                return TestPlanResult(
+                    conformanceTestId = testId,
+                    conformanceStatus = testInfo.status,
+                    conformanceResult = result,
+                    walletStatus = result,
+                    errorMessage = "Suite interrupted this module",
+                )
+            }
+
+            if (testInfo.status == "FINISHED") {
                 val result = testInfo.result ?: "UNKNOWN"
                 // The suite reports SKIPPED for a module it decided not to exercise - typically an
                 // optional feature this wallet does not advertise. That is not a wallet failure, and
                 // counting it as one made a clean run read as "6 passed, 6 failed".
-                // WARNING/REVIEW are mapped the same way as OpenID4VP: Cloudflare Quick Tunnels
-                // cannot satisfy EnsureIncomingTls12/13, so TLS-only WARNING must not fail the row.
+                // WARNING/REVIEW are mapped the same way as OpenID4VP verifier REVIEW: Cloudflare
+                // Quick Tunnels cannot satisfy EnsureIncomingTls12/13, so TLS-only WARNING must not
+                // fail the row or fill the GitHub Error column.
                 val skipped = result == "SKIPPED"
                 val walletStatus = when {
                     skipped -> "SKIPPED"
@@ -213,6 +222,7 @@ class VciWalletTestPlanRunner(
                 }
                 return TestPlanResult(
                     conformanceTestId = testId,
+                    conformanceStatus = testInfo.status,
                     conformanceResult = result,
                     walletStatus = walletStatus,
                     skipReason = "Suite skipped this module".takeIf { skipped },
@@ -334,9 +344,6 @@ class VciWalletTestPlanRunner(
     }
 
     private companion object {
-        /** Module-name prefix of the FAPI 2.0 client tests the HAIP plan bundles. */
-        const val FAPI2_CLIENT_MODULE_PREFIX = "fapi2-security-profile-final-client-test-"
-
         /** Offer delivery is either by value or by reference, per OpenID4VCI 1.0. */
         val OFFER_PARAMETER_NAMES = listOf("credential_offer", "credential_offer_uri")
 
