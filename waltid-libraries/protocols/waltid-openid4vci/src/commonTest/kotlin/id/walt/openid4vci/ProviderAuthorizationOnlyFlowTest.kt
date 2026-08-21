@@ -1,7 +1,6 @@
 package id.walt.openid4vci
 
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
-import id.walt.openid4vci.responses.token.TokenFailureStage
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
@@ -191,9 +190,7 @@ class ProviderAuthorizationOnlyFlowTest {
 
         assertTrue(accessResponse is AccessTokenResponseResult.Failure)
         assertEquals("invalid_scope", accessResponse.error.error)
-        val context = assertNotNull(accessResponse.context)
-        assertEquals("demo-subject", context.sessionSubject)
-        assertEquals(TokenFailureStage.SCOPE_VALIDATION, context.stage)
+        assertEquals("demo-subject", assertNotNull(accessResponse.request.session).subject)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -232,9 +229,7 @@ class ProviderAuthorizationOnlyFlowTest {
 
         assertTrue(accessResponse is AccessTokenResponseResult.Failure)
         assertEquals("invalid_grant", accessResponse.error.error)
-        val context = assertNotNull(accessResponse.context)
-        assertEquals("demo-subject", context.sessionSubject)
-        assertEquals(TokenFailureStage.REDIRECT_URI_VALIDATION, context.stage)
+        assertEquals("demo-subject", assertNotNull(accessResponse.request.session).subject)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -370,7 +365,8 @@ class ProviderAuthorizationOnlyFlowTest {
         val response = provider.createAccessTokenResponse(request)
         assertTrue(response is AccessTokenResponseResult.Failure)
         assertEquals("unsupported_grant_type", response.error.error)
-        assertNull(response.context)
+        assertEquals(request, response.request)
+        assertNull(response.request.session)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
