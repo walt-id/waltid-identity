@@ -72,19 +72,25 @@ public struct SharingReviewScreen: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .sheet(item: $openCredentialDetails) { details in
-                NavigationStack {
+                ZStack(alignment: .topTrailing) {
                     ScrollView {
-                        CredentialDetailsView(details: details)
+                        CredentialDetailsView(details: details, onCardTap: { openCredentialDetails = nil })
                             .padding()
+                            .padding(.top, 28)
                     }
-                    .navigationTitle("Credential details")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { openCredentialDetails = nil }
-                        }
+                    Button {
+                        openCredentialDetails = nil
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
                     }
+                    .padding(12)
+                    .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
                 }
+                .accessibilityIdentifier(WalletAccessibilityID.credentialDetailsScreen)
             }
         }
     }

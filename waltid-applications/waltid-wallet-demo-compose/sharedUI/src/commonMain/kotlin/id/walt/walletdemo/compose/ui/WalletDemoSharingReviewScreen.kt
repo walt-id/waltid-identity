@@ -62,6 +62,7 @@ fun WalletDemoSharingReviewScreen(
     onReject: (() -> Unit)? = null,
     enabled: Boolean = true,
     onBackAtRoot: (() -> Unit)? = null,
+    compact: Boolean = true,
 ) {
     var selection by remember(review) {
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
@@ -119,6 +120,7 @@ fun WalletDemoSharingReviewScreen(
                         selectedDisclosureOptions = selection.disclosures,
                         selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
                         enabled = enabled,
+                        compact = compact,
                         onToggleCredential = { credential ->
                             selection = selection.toggleCredential(
                                 selection = credential,

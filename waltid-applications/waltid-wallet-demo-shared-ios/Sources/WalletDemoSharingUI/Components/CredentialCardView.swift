@@ -29,6 +29,7 @@ public struct CredentialCardView: View {
 public struct CredentialCardArtView: View {
     public let summary: CredentialCardSummary
     public var compact: Bool = false
+    @State private var loadedMetadataArt: UIImage?
 
     public init(summary: CredentialCardSummary, compact: Bool = false) {
         self.summary = summary
@@ -41,60 +42,35 @@ public struct CredentialCardArtView: View {
         let nameSize: CGFloat = compact ? 13 : 18
         let background = Color(css: summary.backgroundColor) ?? defaultWaltCardBlue
         let label = Color(css: summary.textColor) ?? .white
+        let logoSize: CGFloat = compact ? 22 : 36
 
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
                 background
-                backgroundImage(in: proxy.size)
-                HStack(alignment: .top) {
+                if let loadedMetadataArt {
+                    Image(uiImage: loadedMetadataArt)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                } else {
                     Text(summary.title)
                         .font(.system(size: nameSize, weight: .semibold))
                         .foregroundStyle(label)
                         .lineLimit(2)
-                    Spacer(minLength: 8)
-                    logo(labelColor: label)
+                        .padding(padding)
+                    DefaultWaltLogo()
+                        .frame(width: logoSize, height: logoSize)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                        .padding(padding)
                 }
-                .padding(padding)
             }
             .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
-            .shadow(color: .black.opacity(compact ? 0.12 : 0.22), radius: compact ? 2 : 6, y: 2)
+            .shadow(color: .black.opacity(compact ? 0.22 : 0.34), radius: compact ? 10 : 16, y: 6)
         }
         .aspectRatio(id1AspectRatio, contentMode: .fit)
-    }
-
-    @ViewBuilder
-    private func backgroundImage(in size: CGSize) -> some View {
-        if let url = httpsURL(summary.backgroundImageURI) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case let .success(image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: size.width, height: size.height)
-                        .clipped()
-                default:
-                    EmptyView()
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func logo(labelColor: Color) -> some View {
-        let logoSize: CGFloat = compact ? 22 : 36
-        if let url = httpsURL(summary.logoURI) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case let .success(image):
-                    image.resizable().scaledToFit()
-                default:
-                    DefaultWaltLogo(color: labelColor)
-                }
-            }
-            .frame(width: logoSize, height: logoSize)
-        } else {
-            DefaultWaltLogo(color: labelColor)
+        .task(id: summary.backgroundImageURI) {
+            loadedMetadataArt = await loadMetadataArt(from: summary.backgroundImageURI)
         }
     }
 }
@@ -103,17 +79,14 @@ public struct CredentialCardButton: View {
     public let details: CredentialDetails
     public var compact: Bool = false
     public let action: () -> Void
-    public var onLongPress: (() -> Void)?
 
     public init(
         details: CredentialDetails,
         compact: Bool = false,
-        onLongPress: (() -> Void)? = nil,
         action: @escaping () -> Void
     ) {
         self.details = details
         self.compact = compact
-        self.onLongPress = onLongPress
         self.action = action
     }
 
@@ -121,9 +94,6 @@ public struct CredentialCardButton: View {
         CredentialCardView(details: details, compact: compact)
             .contentShape(Rectangle())
             .onTapGesture(perform: action)
-            .onLongPressGesture {
-                onLongPress?()
-            }
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
             .accessibilityAddTraits(.isButton)
@@ -133,8 +103,6 @@ public struct CredentialCardButton: View {
 public struct CredentialCardStackView: View {
     public let details: [CredentialDetails]
     public let onOpenDetails: (String) -> Void
-
-    @State private var expandedID: String?
 
     public init(details: [CredentialDetails], onOpenDetails: @escaping (String) -> Void) {
         self.details = details
@@ -147,29 +115,19 @@ public struct CredentialCardStackView: View {
             let cardHeight = width / id1AspectRatio
             let offsets = cardOffsets(
                 count: details.count,
-                expandedIndex: details.firstIndex(where: { $0.id == expandedID }),
                 peek: credentialCardPeek,
                 cardHeight: cardHeight
             )
             let stackHeight = (offsets.last ?? 0) + cardHeight
-            let frontID = expandedID ?? details.last?.id
 
             ZStack(alignment: .topLeading) {
                 ForEach(Array(details.enumerated()), id: \.element.id) { index, item in
-                    let isFront = item.id == frontID
-                    CredentialCardButton(
-                        details: item,
-                        onLongPress: { onOpenDetails(item.id) }
-                    ) {
-                        if isFront {
-                            onOpenDetails(item.id)
-                        } else {
-                            expandedID = item.id
-                        }
+                    CredentialCardButton(details: item) {
+                        onOpenDetails(item.id)
                     }
                     .frame(width: width)
                     .offset(y: offsets[index])
-                    .zIndex(isFront ? Double(details.count) : Double(index))
+                    .zIndex(Double(index))
                 }
             }
             .frame(width: width, height: stackHeight, alignment: .top)
@@ -182,7 +140,6 @@ public struct CredentialCardStackView: View {
         let cardHeight = width / id1AspectRatio
         let offsets = cardOffsets(
             count: details.count,
-            expandedIndex: details.firstIndex(where: { $0.id == expandedID }),
             peek: credentialCardPeek,
             cardHeight: cardHeight
         )
@@ -192,60 +149,45 @@ public struct CredentialCardStackView: View {
 
 public func cardOffsets(
     count: Int,
-    expandedIndex: Int?,
     peek: CGFloat,
     cardHeight: CGFloat
 ) -> [CGFloat] {
     var y: CGFloat = 0
     return (0..<count).map { index in
         let offset = y
-        let isExpanded = expandedIndex == index
         let isLast = index == count - 1
-        y += (isExpanded || (expandedIndex == nil && isLast)) ? cardHeight : peek
+        y += isLast ? cardHeight : peek
         return offset
     }
 }
 
-public struct CredentialPortraitView: View {
-    public let summary: CredentialCardSummary
-    public let size: CGFloat
-
-    public init(summary: CredentialCardSummary, size: CGFloat) {
-        self.summary = summary
-        self.size = size
-    }
-
-    public var body: some View {
-        Group {
-            if let data = summary.portraitData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-            } else {
-                Image(systemName: "person.text.rectangle")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
+private struct DefaultWaltLogo: View {
+    var body: some View {
+        if let image = bundledWaltLogo() {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .accessibilityLabel("walt.id")
         }
-        .frame(width: size, height: size)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(.separator), lineWidth: 1)
-        )
-        .accessibilityLabel("Credential portrait")
     }
 }
 
-private struct DefaultWaltLogo: View {
-    let color: Color
+private func bundledWaltLogo() -> UIImage? {
+    guard let url = Bundle.module.url(forResource: "waltid_logo", withExtension: "png") else {
+        return nil
+    }
+    return UIImage(contentsOfFile: url.path)
+}
 
-    var body: some View {
-        Text("walt.id")
-            .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(color)
-            .lineLimit(1)
+private func loadMetadataArt(from value: String?) async -> UIImage? {
+    guard let url = httpsURL(value) else { return nil }
+    do {
+        let (data, _) = try await URLSession.shared.data(from: url)
+        guard let image = UIImage(data: data), image.size.height > 0 else { return nil }
+        let aspect = image.size.width / image.size.height
+        return (1.2...2.0).contains(aspect) ? image : nil
+    } catch {
+        return nil
     }
 }
 

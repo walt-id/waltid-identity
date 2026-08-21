@@ -98,6 +98,7 @@ internal fun PresentTab(
                 onSubmit = onSubmit,
                 onReject = onReject,
                 onCancel = onCancel,
+                compact = true,
             )
         }
 

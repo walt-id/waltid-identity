@@ -67,7 +67,8 @@ struct PresentView: View {
                             // Normal OpenID4VP can tell the verifier it was refused, so Reject is
                             // offered alongside dismissing the review locally.
                             onReject: viewModel.rejectPresentation,
-                            onCancel: viewModel.cancelPresentationReview
+                            onCancel: viewModel.cancelPresentationReview,
+                            compact: true
                         )
                     }
 

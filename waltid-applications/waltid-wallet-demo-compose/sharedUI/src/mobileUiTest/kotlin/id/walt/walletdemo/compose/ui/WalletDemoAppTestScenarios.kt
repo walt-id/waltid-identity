@@ -180,8 +180,8 @@ class WalletDemoAppTestScenarios {
 
         onNodeWithTag("wallet.credentialCard.cred-1").performClick()
         onNodeWithTag("wallet.credentialDetailsScreen").assertIsDisplayed()
-        onNodeWithContentDescription("Back").assertIsDisplayed()
-        onNodeWithText("Credential details").assertIsDisplayed()
+        onNodeWithContentDescription("Close").assertIsDisplayed()
+        onNodeWithTag("wallet.detailsBack").assertIsDisplayed()
         onAllNodesWithText("Example Credential").assertCountEquals(1)
         onNodeWithTag(WalletUiTestTags.claimGroup("About this credential"))
             .performScrollTo()
@@ -544,13 +544,9 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentationSubmitButton").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
-        assertRequesterDetailsCollapsedUntilRequested()
-        onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
-        onNodeWithText("Required").performScrollTo().assertIsDisplayed()
-        onNodeWithText("ECDH-ES").performScrollTo().assertIsDisplayed()
-        onNodeWithText("A256GCM").performScrollTo().assertIsDisplayed()
-        onNodeWithText("thumbprint-1").performScrollTo().assertIsDisplayed()
-        assertVerifierTechnicalDetailsCollapsedUntilRequested()
+        onAllNodesWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.PresentationResponseProtectionSection).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.PresentationTechnicalDetailsSection).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.credentialCard(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.credentialCard(samplePresentationCredentialOption.selection.id)).performClick()
@@ -620,8 +616,8 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
-        onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
-        onNodeWithText("Not requested").assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.PresentationResponseProtectionSection).assertCountEquals(0)
+        onAllNodesWithText("Not requested").assertCountEquals(0)
         onAllNodesWithText("Key management algorithm").assertCountEquals(0)
         onAllNodesWithText("Verifier key thumbprint").assertCountEquals(0)
     }
@@ -645,8 +641,7 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
         val portraitDisclosurePath = "disclosures[0].portrait"
-        onNodeWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).assertCountEquals(0)
 
         onNodeWithTag(WalletUiTestTags.credentialCard(pathOnlyPortraitDisclosureCredentialOption.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
@@ -677,8 +672,7 @@ class WalletDemoAppTestScenarios {
 
         onAllNodesWithTag(WalletUiTestTags.PresentationVerifierSection).assertCountEquals(0)
         onAllNodesWithText(sampleDidClientId).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.VerifierTechnicalDetailsToggle).performScrollTo().performClick()
-        onNodeWithText(sampleDidClientId).performScrollTo().assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.VerifierTechnicalDetailsToggle).assertCountEquals(0)
     }
 
     fun presentationDetailsResolveDuplicateCredentialOptionsIndependently() = runComposeUiTest {
@@ -728,16 +722,9 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
-        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(identityDisclosure.id)).performScrollTo().assertIsOff()
-        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(ageDisclosure.id)).performScrollTo().assertIsOff()
-        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(identityDisclosure.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(identityDisclosure.id)).performScrollTo().assertIsOn()
-        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(ageDisclosure.id)).performScrollTo().assertIsOff()
-
-        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performScrollTo().assertIsEnabled()
-        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(identityOption.selection.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performScrollTo().assertIsNotEnabled()
-        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(identityOption.selection.id)).performScrollTo().performClick()
+        onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(identityDisclosure.id)).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(ageDisclosure.id)).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.presentationCredentialToggle(identityOption.selection.id)).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performScrollTo().assertIsEnabled()
 
         onNodeWithTag(WalletUiTestTags.credentialCard(ageOption.selection.id)).performScrollTo().performClick()
@@ -1102,14 +1089,10 @@ class WalletDemoAppTestScenarios {
     }
 
     private fun ComposeUiTest.assertPresentationActionsFollowReviewContent() {
-        val expectedCredentialTag = WalletUiTestTags.presentationCredential(
-            WalletDemoPresentationCredentialSelection(queryId = "pid", credentialId = "cred-1").id
-        )
+        val expectedCredentialTag = WalletUiTestTags.credentialCard(samplePresentationCredentialOption.selection.id)
         val reviewLandmarkTags = onAllNodes(
             matcher = hasAnyAncestor(hasTestTag("wallet.presentationReview")) and (
                 hasTestTag(WalletUiTestTags.PresentationVerifierSection) or
-                    hasTestTag(WalletUiTestTags.PresentationResponseProtectionSection) or
-                    hasTestTag(WalletUiTestTags.PresentationTechnicalDetailsSection) or
                     hasTestTag(expectedCredentialTag) or
                     hasTestTag("wallet.presentationActions")
                 ),
@@ -1119,29 +1102,19 @@ class WalletDemoAppTestScenarios {
             .mapNotNull { it.config.getOrElseNullable(SemanticsProperties.TestTag) { null } }
 
         val verifierIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationVerifierSection)
-        val responseProtectionIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationResponseProtectionSection)
-        val technicalDetailsIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationTechnicalDetailsSection)
         val credentialIndex = reviewLandmarkTags.indexOf(expectedCredentialTag)
         val actionsIndex = reviewLandmarkTags.indexOf("wallet.presentationActions")
 
-        assertTrue(verifierIndex >= 0, "Verifier details are missing from presentation review: $reviewLandmarkTags")
-        assertTrue(responseProtectionIndex >= 0, "Response protection is missing from presentation review: $reviewLandmarkTags")
-        assertTrue(technicalDetailsIndex >= 0, "Technical request details are missing from presentation review: $reviewLandmarkTags")
+        assertTrue(verifierIndex >= 0, "Verifier name is missing from the simple presentation review: $reviewLandmarkTags")
         assertTrue(credentialIndex >= 0, "Shared credential is missing from presentation review: $reviewLandmarkTags")
         assertTrue(actionsIndex >= 0, "Share actions are missing from presentation review: $reviewLandmarkTags")
         assertTrue(
-            verifierIndex < responseProtectionIndex &&
-                responseProtectionIndex < technicalDetailsIndex,
-            "Verifier metadata, response-protection, and technical sections are out of order: $reviewLandmarkTags",
+            verifierIndex < credentialIndex && credentialIndex < actionsIndex,
+            "Verifier, credential, and share action are out of order: $reviewLandmarkTags",
         )
-        assertTrue(
-            technicalDetailsIndex < credentialIndex,
-            "Credential selection should follow request metadata: $reviewLandmarkTags",
-        )
-        assertTrue(
-            credentialIndex < actionsIndex,
-            "Share action should follow shared credential details so the credential is reviewed before consent: $reviewLandmarkTags",
-        )
+        onAllNodesWithTag(WalletUiTestTags.PresentationResponseProtectionSection).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.PresentationTechnicalDetailsSection).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.PresentationReaderTrustSection).assertCountEquals(0)
     }
 
     private fun ComposeUiTest.assertVerifierTechnicalDetailsCollapsedUntilRequested() {

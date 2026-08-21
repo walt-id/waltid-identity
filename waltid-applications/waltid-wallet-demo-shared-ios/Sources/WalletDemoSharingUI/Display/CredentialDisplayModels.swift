@@ -12,6 +12,7 @@ public struct CredentialDetails: Equatable, Identifiable {
     public let metadataJSON: String?
     public let issuerDisplay: MetadataDisplay?
     public let credentialDisplay: MetadataDisplay?
+    public let credentialDataJSON: String?
     /// Wallet-local store identifier used for deletion. Differs from ``id`` for presentation options.
     public let credentialId: String
 
@@ -26,6 +27,7 @@ public struct CredentialDetails: Equatable, Identifiable {
         metadataJSON: String? = nil,
         issuerDisplay: MetadataDisplay? = nil,
         credentialDisplay: MetadataDisplay? = nil,
+        credentialDataJSON: String? = nil,
         credentialId: String? = nil
     ) {
         self.id = id
@@ -40,6 +42,7 @@ public struct CredentialDetails: Equatable, Identifiable {
             ?? StoredCredentialMetadataParser.issuerDisplay(from: metadataJSON)
         self.credentialDisplay = credentialDisplay
             ?? StoredCredentialMetadataParser.credentialDisplay(from: metadataJSON)
+        self.credentialDataJSON = credentialDataJSON
         self.credentialId = credentialId ?? id
     }
 }

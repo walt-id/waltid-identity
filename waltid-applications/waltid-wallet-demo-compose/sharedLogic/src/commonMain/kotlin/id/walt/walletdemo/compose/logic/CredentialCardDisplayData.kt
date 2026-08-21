@@ -30,7 +30,12 @@ fun CredentialDetails.toCardDisplayData(): CredentialCardDisplayData {
 
     return CredentialCardDisplayData(
         id = summary.id,
-        title = cardDisplay?.name?.takeIf { it.isNotBlank() } ?: summary.label,
+        title = resolveCardTitle(
+            format = summary.format,
+            credentialDataJson = summary.credentialDataJson,
+            displayName = cardDisplay?.name,
+            fallback = summary.label,
+        ),
         credentialType = allItems.firstCredentialTypeText(),
         format = summary.format,
         issuer = issuerDisplay?.name?.takeIf { it.isNotBlank() }

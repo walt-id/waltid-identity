@@ -22,6 +22,7 @@ public enum CredentialDisplayNormalizer {
             addedAt: result.addedAt,
             groups: result.groups,
             metadataJSON: credential.metadataJSON,
+            credentialDataJSON: credential.credentialDataJSON,
             credentialId: credential.id
         )
     }
@@ -63,6 +64,7 @@ public enum CredentialDisplayNormalizer {
             format: parsed.format,
             addedAt: parsed.addedAt,
             groups: requestedGroups + parsed.groups,
+            credentialDataJSON: option.credentialDataJSON,
             credentialId: parsed.credentialId
         )
     }
@@ -145,6 +147,7 @@ public enum CredentialDisplayNormalizer {
                 format: format,
                 addedAt: addedAt,
                 groups: [],
+                credentialDataJSON: rawJSON,
                 credentialId: credentialId
             )
         }
@@ -158,6 +161,7 @@ public enum CredentialDisplayNormalizer {
                 format: format,
                 addedAt: addedAt,
                 groups: [],
+                credentialDataJSON: rawJSON,
                 credentialId: credentialId
             )
         }
@@ -194,6 +198,7 @@ public enum CredentialDisplayNormalizer {
             format: format,
             addedAt: addedAt,
             groups: groups,
+            credentialDataJSON: rawJSON,
             credentialId: credentialId
         )
     }

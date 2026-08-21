@@ -14,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -49,7 +50,7 @@ internal fun SharingRequestSections(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        request.requester?.let { RequesterSection(it) }
+        request.requester?.let { RequesterSection(it, compact = compact) }
 
         request.transactionData.forEach { group ->
             ClaimGroupSection(group)
@@ -68,7 +69,7 @@ internal fun SharingRequestSections(
 }
 
 @Composable
-private fun RequesterSection(requester: WalletDemoSharingRequester) {
+private fun RequesterSection(requester: WalletDemoSharingRequester, compact: Boolean = false) {
     val displayName = requester.display?.name?.trim()?.takeIf { it.isNotEmpty() }
     val fallbackName = requester.fallbackName?.trim()?.takeIf { it.isNotEmpty() }
     val identityName = displayName ?: fallbackName
@@ -84,6 +85,16 @@ private fun RequesterSection(requester: WalletDemoSharingRequester) {
     val requesterDetails = requester.details.filter { !it.value.isNullOrBlank() }
 
     if (identityName == null && verifiedOriginDetail == null && requesterDetails.isEmpty()) return
+
+    if (compact) {
+        Text(
+            text = identityName ?: verifiedOrigin ?: "Requester",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.testTag(WalletUiTestTags.PresentationVerifierSection),
+        )
+        return
+    }
 
     ReviewMetadataSection(
         title = "Requester",

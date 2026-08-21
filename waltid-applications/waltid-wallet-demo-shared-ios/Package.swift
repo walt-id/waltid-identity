@@ -32,6 +32,9 @@ let package = Package(
             name: "WalletDemoSharingUI",
             dependencies: [
                 .product(name: "WalletSDK", package: "waltid-wallet-sdk-ios"),
+            ],
+            resources: [
+                .process("Resources"),
             ]
         ),
         .target(

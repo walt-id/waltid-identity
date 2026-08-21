@@ -171,6 +171,7 @@ private fun OfferCreateReviewContent(
         )
         OfferReviewSection(
             preview = preview,
+            cardFirst = true,
             acceptEnabled = acceptEnabled,
             reviewEnabled = enabled,
             txCode = txCode,

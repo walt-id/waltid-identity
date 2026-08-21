@@ -134,6 +134,11 @@ final class WalletE2EUI {
     }
 
     func tapNavigationBack() {
+        let close = app.buttons["wallet.detailsBack"]
+        if close.waitForExistence(timeout: 2) {
+            close.tap()
+            return
+        }
         let button = app.navigationBars.buttons.firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 20), "Navigation back button not found")
         button.tap()
@@ -243,16 +248,16 @@ final class WalletE2EUI {
         switch label {
         case "Credentials":
             return app.staticTexts["No credentials yet"].exists
-                || app.staticTexts["Credential details"].exists
+                || app.otherElements["wallet.credentialDetailsScreen"].exists
                 || firstHittableElement(identifierPrefix: "wallet.credentialCard.") != nil
         case "Receive":
             return textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL").isHittable
                 || app.staticTexts["Received credentials"].exists
-                || app.staticTexts["Credential details"].exists
+                || app.otherElements["wallet.credentialDetailsScreen"].exists
         case "Present":
             return textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").isHittable
                 || app.staticTexts["Review presentation request"].exists
-                || app.staticTexts["Credential details"].exists
+                || app.otherElements["wallet.credentialDetailsScreen"].exists
                 || app.buttons["wallet.presentationNewButton"].exists
         default:
             return false

@@ -142,21 +142,7 @@ struct OfferReviewView: View {
 
 private extension IssuanceCredentialPreview {
     var cardSummary: CredentialCardSummary {
-        CredentialCardSummary(
-            title: name ?? configurationID,
-            credentialType: nil,
-            holderName: nil,
-            issuer: "",
-            dateText: nil,
-            validityText: nil,
-            portraitData: nil,
-            portraitMimeType: nil,
-            backgroundColor: backgroundColor,
-            backgroundImageURI: backgroundImageURI?.absoluteString,
-            textColor: textColor,
-            logoURI: logoURI?.absoluteString,
-            logoAltText: logoAltText
-        )
+        .offered(from: self)
     }
 }
 
