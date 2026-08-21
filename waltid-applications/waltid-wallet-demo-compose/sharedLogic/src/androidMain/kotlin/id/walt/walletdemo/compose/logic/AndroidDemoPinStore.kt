@@ -15,6 +15,11 @@ fun createAndroidDemoPinStore(
                 "PIN verifier could not be persisted"
             }
         },
+        clearRecord = {
+            check(preferences.edit().remove(recordKey).commit()) {
+                "PIN verifier could not be cleared"
+            }
+        },
     )
 }
 

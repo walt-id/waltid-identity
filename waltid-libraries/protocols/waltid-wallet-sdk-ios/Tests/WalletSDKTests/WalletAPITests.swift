@@ -371,6 +371,17 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.deleteLocalDataCallCount, 1)
     }
 
+    func testDeleteCredentialForwardsToBridge() async throws {
+        let bridge = FakeWalletCoreBridge()
+        bridge.deleteCredentialResult = true
+        let wallet = Wallet(bridge: bridge)
+
+        let removed = try await wallet.deleteCredential(id: "cred-1")
+
+        XCTAssertTrue(removed)
+        XCTAssertEqual(bridge.deleteCredentialCalls, ["cred-1"])
+    }
+
     func testPresentForwardsRequestAndReturnsPresentationResult() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
         let redirectURL = URL(string: "https://verifier.example/continue")!
@@ -909,6 +920,8 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var resumedDeferredCredentialIDs: [String] = []
     private(set) var credentialsCallCount = 0
     private(set) var deleteLocalDataCallCount = 0
+    private(set) var deleteCredentialCalls: [String] = []
+    var deleteCredentialResult = true
     private(set) var presentCalls: [PresentCall] = []
     private(set) var previewCalls: [URL] = []
     private(set) var submitCalls: [SubmitCall] = []
@@ -1015,6 +1028,15 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
         credentialsCallCount += 1
         return credentialsResult
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
+        if let error {
+            throw error
+        }
+
+        deleteCredentialCalls.append(id)
+        return deleteCredentialResult
     }
 
     func deleteLocalData() async throws {

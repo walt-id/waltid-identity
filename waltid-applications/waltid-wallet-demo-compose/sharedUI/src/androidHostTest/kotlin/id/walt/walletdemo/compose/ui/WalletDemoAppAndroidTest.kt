@@ -101,4 +101,16 @@ class WalletDemoAppAndroidTest {
     @Test
     fun credentialsPersistAcrossControllerRecreation() =
         scenarios.credentialsPersistAcrossControllerRecreation()
+
+    @Test
+    fun settingsReplacesHeaderLockAndShowsDidAndKey() =
+        scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
+
+    @Test
+    fun credentialDetailsCanCopyAndDelete() =
+        scenarios.credentialDetailsCanCopyAndDelete()
+
+    @Test
+    fun successStatusCanBeDismissedFromTheHeader() =
+        scenarios.successStatusCanBeDismissedFromTheHeader()
 }

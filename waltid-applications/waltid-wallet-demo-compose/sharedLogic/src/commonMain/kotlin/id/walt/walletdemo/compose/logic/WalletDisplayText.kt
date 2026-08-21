@@ -43,6 +43,8 @@ internal object WalletDisplayText {
     const val PresentFailed = "Present failed"
     const val RejectFailed = "Reject failed"
     const val BootstrapFailed = "Bootstrap failed"
+    const val ResetWalletFailed = "Reset wallet failed"
+    const val DeleteCredentialFailed = "Delete credential failed"
     const val InvalidOfferUrl = "invalid offer URL"
     const val InvalidRequestUrl = "invalid request URL"
     const val SelectCredentialForEveryRequest = "select a credential for every requested credential"

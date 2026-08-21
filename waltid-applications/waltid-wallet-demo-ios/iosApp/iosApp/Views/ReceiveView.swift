@@ -34,11 +34,7 @@ struct ReceiveView: View {
                         .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
                     }
 
-                    StatusBannerView(
-                        message: viewModel.statusMessage(for: .receive),
-                        isLoading: viewModel.statusIsLoading(for: .receive),
-                        isError: viewModel.statusIsError(for: .receive)
-                    )
+                    WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
 
                     if let preview = viewModel.offerPreview {
                         OfferReviewView(
@@ -86,6 +82,7 @@ struct ReceiveView: View {
                 .padding()
             }
             .navigationTitle("Receive")
+            .walletSettingsToolbar(viewModel: viewModel)
             .background(detailsNavigationLink)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
@@ -119,7 +116,9 @@ struct ReceiveView: View {
             if let detailsID = selectedDetailsID {
                 CredentialDetailsDestination(
                     detailsID: detailsID,
-                    details: receivedDetails
+                    details: receivedDetails,
+                    viewModel: viewModel,
+                    selectedDetailsID: $selectedDetailsID
                 )
             } else {
                 EmptyView()

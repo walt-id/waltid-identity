@@ -40,11 +40,7 @@ struct PresentView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    StatusBannerView(
-                        message: viewModel.statusMessage(for: .present),
-                        isLoading: viewModel.statusIsLoading(for: .present),
-                        isError: viewModel.statusIsError(for: .present)
-                    )
+                    WalletTabStatusBanner(viewModel: viewModel, tab: .present)
 
                     if let warning = viewModel.transactionDataProfilesWarning {
                         WarningBannerView(message: warning)
@@ -86,6 +82,7 @@ struct PresentView: View {
                 .padding()
             }
             .navigationTitle("Present")
+            .walletSettingsToolbar(viewModel: viewModel)
             .background(detailsNavigationLink)
             .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }
@@ -136,7 +133,9 @@ struct PresentView: View {
             if let detailsID = selectedDetailsID {
                 CredentialDetailsDestination(
                     detailsID: detailsID,
-                    details: presentationDetails
+                    details: presentationDetails,
+                    viewModel: viewModel,
+                    selectedDetailsID: $selectedDetailsID
                 )
             } else {
                 EmptyView()

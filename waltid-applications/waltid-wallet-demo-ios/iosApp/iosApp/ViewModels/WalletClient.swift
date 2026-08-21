@@ -20,6 +20,13 @@ protocol WalletClient {
     ) async throws -> PresentationResult
     func rejectPresentation(previewHandle: PresentationPreviewHandle) async throws -> PresentationResult
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws
+    func deleteCredential(id: String) async throws -> Bool
+    func deleteLocalData() async throws
+}
+
+extension WalletClient {
+    func deleteCredential(id: String) async throws -> Bool { false }
+    func deleteLocalData() async throws {}
 }
 
 final class SDKWalletClient: WalletClient {
@@ -73,6 +80,15 @@ final class SDKWalletClient: WalletClient {
 
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         try await wallet().discardPresentationPreview(previewHandle)
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
+        try await wallet().deleteCredential(id: id)
+    }
+
+    func deleteLocalData() async throws {
+        try await wallet().deleteLocalData()
+        cachedWallet = nil
     }
 
     private func wallet() async throws -> Wallet {

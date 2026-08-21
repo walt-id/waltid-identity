@@ -149,6 +149,17 @@ actor MockWalletClient: WalletClient {
         discardedPresentationPreviewHandles.append(previewHandle)
     }
 
+    func deleteCredential(id: String) async throws -> Bool {
+        let remaining = storedCredentials.filter { $0.id != id }
+        let removed = remaining.count != storedCredentials.count
+        storedCredentials = remaining
+        return removed
+    }
+
+    func deleteLocalData() async throws {
+        storedCredentials = []
+    }
+
     private func delayOperation() async throws {
         guard operationDelayNanoseconds > 0 else { return }
         try await Task.sleep(nanoseconds: operationDelayNanoseconds)

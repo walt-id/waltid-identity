@@ -146,6 +146,19 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun bridgeDeletesCredentialAsSuccessResult() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.deleteCredential("credential-1")
+
+        assertIs<WalletBridgeResult.Success<Boolean>>(result)
+        assertEquals(true, result.value)
+        assertEquals(1, operations.deleteCredentialCalls)
+        assertEquals(listOf("credential-1"), operations.deletedCredentialIds)
+    }
+
+    @Test
     fun bridgePresentationMapsJsonElementToJsonString() = runTest {
         val operations = FakeWalletSdkBridgeOperations()
         val bridge = WalletSdkBridge.forOperations(operations)
@@ -659,6 +672,9 @@ class WalletSdkBridgeTest {
             private set
         var deleteWalletCalls = 0
             private set
+        var deleteCredentialCalls = 0
+            private set
+        val deletedCredentialIds = mutableListOf<String>()
         var previewRequestUrl: String? = null
             private set
         var submittedPreviewHandle: MobileWalletPresentationPreviewHandle? = null
@@ -733,6 +749,12 @@ class WalletSdkBridgeTest {
                     credentialDataJson = """{"given_name":"Ada"}""",
                 )
             )
+
+        override suspend fun deleteCredential(credentialId: String): Boolean {
+            deleteCredentialCalls++
+            deletedCredentialIds += credentialId
+            return true
+        }
 
         override suspend fun deleteWallet() {
             deleteWalletCalls++

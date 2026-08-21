@@ -116,4 +116,15 @@ private class MockDemoWallet : DemoWallet {
     ): WalletDemoOperationResult = WalletDemoOperationResult.Success("Mock presentation rejected")
 
     override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) = Unit
+
+    override suspend fun deleteCredential(credentialId: String): Boolean {
+        val remaining = credentials.filterNot { it.id == credentialId }
+        val removed = remaining.size != credentials.size
+        credentials = remaining
+        return removed
+    }
+
+    override suspend fun deleteWallet() {
+        credentials = emptyList()
+    }
 }
