@@ -10,6 +10,7 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.WalletResolver
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.walt.wallet2.server.models.PresentationPreviewResponse
 import id.walt.wallet2.server.models.ResolveOfferDetailedResponse
 import id.walt.wallet2.server.models.toDetailedResponse
@@ -168,6 +169,8 @@ object Wallet2RouteHandler {
         attestationAssembler: ClientAttestationAssembler?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ) {
         route("/wallet", { tags = listOf(WALLET_MANAGEMENT_TAG) }) {
             registerWalletManagementRoutes(
@@ -176,6 +179,7 @@ object Wallet2RouteHandler {
                 attestationAssembler = attestationAssembler,
                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
+                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             )
         }
         if (getAccountId == null) {
@@ -195,6 +199,8 @@ object Wallet2RouteHandler {
         attestationAssembler: ClientAttestationAssembler?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ) {
 
         post("", Wallet2OpenApiDocs.createWallet()) {
@@ -813,6 +819,7 @@ object Wallet2RouteHandler {
                                 onEvent = {},
                                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
+                                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                             )
                         )
                     }
@@ -831,6 +838,7 @@ object Wallet2RouteHandler {
                                 onEvent = {},
                                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
+                                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                             )
                         )
                     }
@@ -847,6 +855,7 @@ object Wallet2RouteHandler {
                                 wallet = wallet,
                                 request = req,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
+                                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                             )
                         )
                     }
@@ -895,6 +904,7 @@ object Wallet2RouteHandler {
                                 request = req,
                                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
+                                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                             )
                         )
                     }
@@ -917,6 +927,7 @@ object Wallet2RouteHandler {
                                 request = req,
                                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
+                                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                             )
                         )
                     }
@@ -944,6 +955,7 @@ object Wallet2RouteHandler {
                             request = req,
                             transactionDataTypeRegistry = transactionDataTypeRegistry,
                             clientIdTrustConfiguration = clientIdTrustConfiguration,
+                            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                         )
                         call.respond(result.toPreviewResponse())
                     }
@@ -961,6 +973,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.rejectPresentationByRequestUrl(
                                 request = req,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
+                                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                             )
                         )
                     }
