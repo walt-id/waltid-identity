@@ -13,6 +13,7 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletClientIdScheme
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
@@ -31,16 +32,20 @@ import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
+import id.walt.wallet2.mobile.MobileWalletRequestAuthentication
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.waltid.openid4vci.wallet.metadata.MetadataSigner
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -190,6 +195,68 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun bridgePresentationPreviewPreservesAuthenticatedRequestFacts() = runTest {
+        val operations = FakeWalletSdkBridgeOperations(
+            requestAuthentication = MobileWalletRequestAuthentication.Authenticated(
+                compactRequestObject = "signed-request-object",
+                algorithm = "ES256",
+                keyId = "verifier-kid",
+                clientIdScheme = MobileWalletClientIdScheme.PRE_REGISTERED,
+            ),
+        )
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.previewPresentation("openid4vp://request")
+
+        val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(
+            assertIs<WalletBridgeResult.Success<MobileWalletPresentationPreviewResult>>(result).value,
+        ).preview
+        assertEquals(
+            MobileWalletRequestAuthentication.Authenticated(
+                compactRequestObject = "signed-request-object",
+                algorithm = "ES256",
+                keyId = "verifier-kid",
+                clientIdScheme = MobileWalletClientIdScheme.PRE_REGISTERED,
+            ),
+            preview.request.requestAuthentication,
+        )
+    }
+
+    @Test
+    fun bridgeIssuerMetadataTrustResolverPreservesSignerFacts() = runTest {
+        listOf(
+            WalletBridgeIssuerMetadataSignerTrustType.TrustedIssuer to MetadataSignerTrustType.TRUSTED_ISSUER,
+            WalletBridgeIssuerMetadataSignerTrustType.TrustedDelegate to MetadataSignerTrustType.TRUSTED_DELEGATE,
+        ).forEach { (bridgeTrustType, expectedTrustType) ->
+            val configured = WalletBridgeConfiguration(
+                issuerMetadataTrustResolver = object : WalletBridgeIssuerMetadataTrustResolver {
+                    override suspend fun verify(
+                        compactJwt: String,
+                        expectedCredentialIssuer: String,
+                    ) = WalletBridgeIssuerMetadataSigner(
+                        keyId = "issuer-key",
+                        algorithm = "ES256",
+                        trustType = bridgeTrustType,
+                    ).also {
+                        assertEquals("signed-metadata-jwt", compactJwt)
+                        assertEquals("https://issuer.example", expectedCredentialIssuer)
+                    }
+                },
+            ).toMobileWalletConfig()
+
+            val signer = requireNotNull(configured.credentialIssuerMetadataTrustResolver).verify(
+                "signed-metadata-jwt",
+                "https://issuer.example",
+            )
+
+            assertEquals(
+                MetadataSigner("issuer-key", "ES256", expectedTrustType),
+                signer,
+            )
+        }
+    }
+
+    @Test
     fun bridgePresentationPreviewPreservesDetectedProtocolError() = runTest {
         val expected = MobileWalletPresentationPreviewResult.Invalid(
             previewHandle = MobileWalletPresentationPreviewHandle("presentation-preview"),
@@ -206,6 +273,7 @@ class WalletSdkBridgeTest {
                     policyUri = null,
                     termsOfServiceUri = null,
                 ),
+                requestAuthentication = MobileWalletRequestAuthentication.Unauthenticated,
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = null,
@@ -277,6 +345,7 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    @OptIn(ExperimentalSerializationApi::class)
     fun factoryMapsSwiftFriendlyConfigurationToMobileWalletConfig() = runTest {
         var capturedConfig: MobileWalletConfig? = null
         var capturedTrustConfiguration: ClientIdTrustConfiguration? = null
@@ -302,6 +371,9 @@ class WalletSdkBridgeTest {
                 ),
                 clientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(
                     x509TrustAnchorsPem = listOf(validTrustAnchorPem),
+                    preRegisteredClientMetadataJson = mapOf(
+                        "demo-verifier" to """{"jwks":{"keys":[{"kty":"EC","crv":"P-256","x":"x","y":"y"}]}}""",
+                    ),
                 ),
                 preferredLocales = listOf("de-AT", "en"),
                 transactionDataProfiles = listOf(
@@ -330,6 +402,7 @@ class WalletSdkBridgeTest {
             .findCertificateBySubjectDn(expectedTrustAnchor.data.subjectDn)
             .single()
         assertEquals(expectedTrustAnchor.encodedDer, capturedTrustAnchor.encodedDer)
+        assertEquals(setOf("demo-verifier"), capturedTrustConfiguration?.preRegisteredClients?.keys)
         assertEquals(listOf("de-AT", "en"), capturedConfig?.preferredLocales)
         assertEquals(
             listOf(
@@ -571,6 +644,8 @@ class WalletSdkBridgeTest {
 
     private class FakeWalletSdkBridgeOperations(
         private val previewResult: MobileWalletPresentationPreviewResult? = null,
+        private val requestAuthentication: MobileWalletRequestAuthentication =
+            MobileWalletRequestAuthentication.Unauthenticated,
     ) : WalletSdkBridgeOperations {
         var bootstrapKeyType: MobileWalletKeyType? = null
             private set
@@ -694,6 +769,7 @@ class WalletSdkBridgeTest {
                         policyUri = null,
                         termsOfServiceUri = null,
                     ),
+                    requestAuthentication = requestAuthentication,
                     responseUri = "https://verifier.example/direct-post",
                     state = "state-1",
                     nonce = "nonce-1",

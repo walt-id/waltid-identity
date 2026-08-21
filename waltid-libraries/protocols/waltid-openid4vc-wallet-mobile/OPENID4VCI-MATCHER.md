@@ -49,7 +49,13 @@ JSON offset, optional icon bytes, then UTF-8 JSON. The JSON registered by this S
     }
   ],
   "filter": { "Pass": {} },
-  "preferred_protocols": ["openid4vci-v1"],
+  "preferred_protocols": [
+    "openid4vci-v1",
+    "openid4vci1.0",
+    "openid4vci-1.0",
+    "openid4vci1.1",
+    "openid4vci-1.1"
+  ],
   "package_info": {
     "name": "<host application label>",
     "icon": [4, "4 + icon length"]
@@ -62,10 +68,11 @@ packed blob. It follows AndroidX's auto-resolved package metadata; this provider
 privileged `self_declared_package_info` override.
 
 The non-empty `preferred_protocols` list is load-bearing. The upstream matcher gives exact preferred
-protocols precedence over its historical fallback list, so only `openid4vci-v1` is intentionally
-advertised and matched here. The binary still contains upstream fallback literals such as
-`openid4vci1.0`, but this registration never reaches that fallback. The Android provider separately
-accepts only `openid4vci-v1`; no historical aliases are part of this SDK's public/provider contract.
+protocols precedence over its historical fallback list, so this registration advertises the canonical
+`openid4vci-v1` identifier first, then the historical aliases still compiled into the matcher
+(`openid4vci1.0`, `openid4vci-1.0`, `openid4vci1.1`, `openid4vci-1.1`). The Android create provider
+accepts the same ordered set and echoes the selected protocol in the create acknowledgement. Bare
+`openid4vci` is not part of this contract.
 
 The `Pass` filter is deliberately broad. It lets this wallet be surfaced as a candidate for supported
 OpenID4VCI Digital Credentials API requests; the platform-neutral issuance engine remains responsible

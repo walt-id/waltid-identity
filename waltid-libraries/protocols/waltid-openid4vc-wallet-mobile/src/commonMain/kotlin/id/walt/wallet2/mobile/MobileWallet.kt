@@ -45,6 +45,17 @@ import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.openid4vp.clientidprefix.prefixes.ClientId
+import id.walt.openid4vp.clientidprefix.prefixes.DecentralizedIdentifier
+import id.walt.openid4vp.clientidprefix.prefixes.OpenIdFederation
+import id.walt.openid4vp.clientidprefix.prefixes.PreRegistered
+import id.walt.openid4vp.clientidprefix.prefixes.RedirectUri
+import id.walt.openid4vp.clientidprefix.prefixes.Unsupported
+import id.walt.openid4vp.clientidprefix.prefixes.VerifierAttestation
+import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
+import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import id.waltid.openid4vp.wallet.DcApiCredentialResponse
 import id.waltid.openid4vp.wallet.DcApiWallet
@@ -200,6 +211,7 @@ public class MobileWallet internal constructor(
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+    private val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
     private val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
@@ -242,6 +254,7 @@ public class MobileWallet internal constructor(
     private val issuanceSessions = WalletIssuanceSessionService(
         wallet = wallet,
         attestationAssembler = attestationAssembler,
+        metadataTrustResolver = credentialIssuerMetadataTrustResolver,
         onEvent = ::emitSessionEvent,
         sessionStore = issuanceSessionStore,
         httpClient = issuanceHttpClient,
@@ -722,7 +735,10 @@ public class MobileWallet internal constructor(
             is PreviewPresentationResult.Invalid ->
                 MobileWalletPresentationPreviewResult.Invalid(
                     previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
-                    request = result.authorizationRequest.toMobileRequestContext(preferredLocales),
+                    request = result.authorizationRequest.toMobileRequestContext(
+                        preferredLocales = preferredLocales,
+                        resolvedAuthorizationRequest = result.resolvedAuthorizationRequest,
+                    ),
                     errorCode = result.error.code.toMobileErrorCode(),
                     message = result.error.message,
                 )
@@ -745,6 +761,7 @@ public class MobileWallet internal constructor(
                         previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
                         request = result.authorizationRequest.toMobileRequestInfo(
                             preferredLocales = preferredLocales,
+                            resolvedAuthorizationRequest = result.resolvedAuthorizationRequest,
                             responseEncryption = result.responseEncryption,
                             transactionData = transactionData,
                         ),
@@ -1020,16 +1037,19 @@ internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPrese
         }
     }
 
-private fun AuthorizationRequest.toMobileRequestInfo(
+internal fun AuthorizationRequest.toMobileRequestInfo(
     preferredLocales: List<String>,
+    resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
     responseEncryption: ResponseEncryption.Metadata? = null,
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 ): MobileWalletPresentationRequestInfo {
-    return MobileWalletPresentationRequestInfo(
-        clientId = requireNotNull(clientId) {
+    val verifiedClientId = requireNotNull(clientId) {
             "A validated presentation request must contain client_id."
-        },
+        }
+    return MobileWalletPresentationRequestInfo(
+        clientId = verifiedClientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+        requestAuthentication = resolvedAuthorizationRequest.toMobileRequestAuthentication(),
         responseUri = responseUri,
         state = state,
         nonce = requireNotNull(nonce) {
@@ -1056,19 +1076,46 @@ private fun AuthorizationRequest.toMobileDigitalCredentialRequestInfo(
         transactionData = transactionData,
     )
 
-private fun AuthorizationRequest.toMobileRequestContext(
+internal fun AuthorizationRequest.toMobileRequestContext(
     preferredLocales: List<String>,
-): MobileWalletPresentationRequestContext =
-    MobileWalletPresentationRequestContext(
-        clientId = requireNotNull(clientId) {
+    resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
+): MobileWalletPresentationRequestContext {
+    val verifiedClientId = requireNotNull(clientId) {
             "A reportable invalid presentation request must contain client_id."
-        },
+        }
+    return MobileWalletPresentationRequestContext(
+        clientId = verifiedClientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+        requestAuthentication = resolvedAuthorizationRequest.toMobileRequestAuthentication(),
         responseUri = responseUri,
         state = state,
         nonce = nonce,
         responseEncryption = null.toMobileResponseEncryption(),
     )
+}
+
+internal fun ResolvedAuthorizationRequest.toMobileRequestAuthentication(): MobileWalletRequestAuthentication =
+    when (this) {
+        is ResolvedAuthorizationRequest.Plain -> MobileWalletRequestAuthentication.Unauthenticated
+        is ResolvedAuthorizationRequest.UnsignedRequestObject -> MobileWalletRequestAuthentication.Unauthenticated
+        is ResolvedAuthorizationRequest.AuthenticatedRequestObject -> MobileWalletRequestAuthentication.Authenticated(
+            compactRequestObject = requestObject,
+            algorithm = authentication.algorithm,
+            keyId = authentication.keyId,
+            clientIdScheme = authentication.clientId.toMobileClientIdScheme(),
+        )
+    }
+
+private fun ClientId.toMobileClientIdScheme(): MobileWalletClientIdScheme = when (this) {
+    is PreRegistered -> MobileWalletClientIdScheme.PRE_REGISTERED
+    is RedirectUri -> MobileWalletClientIdScheme.REDIRECT_URI
+    is X509SanDns -> MobileWalletClientIdScheme.X509_SAN_DNS
+    is X509Hash -> MobileWalletClientIdScheme.X509_HASH
+    is DecentralizedIdentifier -> MobileWalletClientIdScheme.DECENTRALIZED_IDENTIFIER
+    is VerifierAttestation -> MobileWalletClientIdScheme.VERIFIER_ATTESTATION
+    is OpenIdFederation -> MobileWalletClientIdScheme.OPENID_FEDERATION
+    is Unsupported -> error("Unsupported client identifier cannot be authenticated: $prefix")
+}
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
     WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied

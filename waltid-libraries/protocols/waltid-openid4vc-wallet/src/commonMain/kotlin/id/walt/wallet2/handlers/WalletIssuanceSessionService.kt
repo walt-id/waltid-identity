@@ -3,27 +3,32 @@ package id.walt.wallet2.handlers
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.selectJwsAlgorithm
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
-import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import id.walt.wallet2.data.*
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
+import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeRequestBuilder
+import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeRequestError
+import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeRequestException
 import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
 import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
 import id.waltid.openid4vci.wallet.authorization.RetryablePushedAuthorizationRequestException
@@ -33,7 +38,10 @@ import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
+import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
 import id.waltid.openid4vci.wallet.nonce.NonceRequestError
 import id.waltid.openid4vci.wallet.nonce.NonceRequestException
@@ -91,7 +99,30 @@ data class WalletIssuanceIssuerPreview(
     val locale: String?,
     val logoUri: String?,
     val logoAltText: String?,
+    /** Whether the issuer metadata was unsigned or verified signed metadata. */
+    val metadataProvenance: WalletIssuanceMetadataProvenance,
 )
+
+/** Verification provenance of issuer metadata retained by an issuance session. */
+@Serializable
+sealed interface WalletIssuanceMetadataProvenance {
+    /** Metadata was received as an unsigned JSON document. */
+    @Serializable
+    data object Unsigned : WalletIssuanceMetadataProvenance
+
+    /** Metadata was received in a JWS verified by the configured trust resolver. */
+    @Serializable
+    data class Signed(
+        /** Exact compact JWS returned by the issuer. */
+        val compactJwt: String,
+        /** JWS algorithm verified by the configured trust resolver. */
+        val algorithm: String,
+        /** Identifier of the trusted verification key, as reported by the trust resolver. */
+        val keyId: String?,
+        /** Authority relationship established by the trust resolver. */
+        val trustType: MetadataSignerTrustType,
+    ) : WalletIssuanceMetadataProvenance
+}
 
 /** Offered credential information safe for an app review screen. */
 @Serializable
@@ -235,6 +266,7 @@ sealed interface WalletIssuanceOutcome {
 class WalletIssuanceSessionService(
     private val wallet: Wallet,
     private val attestationAssembler: ClientAttestationAssembler? = null,
+    private val metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
     private val sessionStore: WalletIssuanceSessionStore? = null,
     httpClient: HttpClient? = null,
@@ -338,7 +370,7 @@ class WalletIssuanceSessionService(
         if (!claimed) throw IllegalStateException("Issuance session is not awaiting acceptance")
         try {
             persistActive(active)
-            val authorization = buildAuthorization(active.resolved, active.request, active.keyMaterial)
+            val authorization = buildAuthorization(active)
             mutex.withLock {
                 check(sessions[sessionId] === active && active.state == SessionState.PROCESSING) {
                     "Issuance session changed while authorization was being built"
@@ -599,7 +631,7 @@ class WalletIssuanceSessionService(
             } catch (error: Exception) {
                 throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO, error)
             }
-            val proofNonce = if (proof.required) fetchNonce(active.resolved.issuerMetadata) else null
+            val proofNonce = if (proof.required) fetchNonce(active.resolved.issuerMetadata.metadata) else null
             val proofJwt = if (proof.required) {
                 try {
                     buildCredentialProof(
@@ -627,7 +659,7 @@ class WalletIssuanceSessionService(
                 }
             }.toString()
             val protected = postProtected(
-                endpoint = active.resolved.issuerMetadata.credentialEndpoint,
+                endpoint = active.resolved.issuerMetadata.metadata.credentialEndpoint,
                 accessToken = token.access_token,
                 tokenType = token.token_type,
                 dpop = dpopAlgorithms,
@@ -678,7 +710,7 @@ class WalletIssuanceSessionService(
                     }
                     val transactionId = response.transactionId
                         ?: throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
-                    val deferredEndpoint = active.resolved.issuerMetadata.deferredCredentialEndpoint
+                    val deferredEndpoint = active.resolved.issuerMetadata.metadata.deferredCredentialEndpoint
                         ?: throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
                     val public = WalletDeferredCredential(
                         id = Uuid.random().toString(),
@@ -727,18 +759,27 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestation = attestationHeaders(metadata, active.request.clientId, active.keyMaterial)
+        val attestationJwt = obtainAttestationJwt(active)
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
-                active.request.tokenRequestHeaders.isEmpty() && attestation == null
-        return TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
+            active.request.tokenRequestHeaders.isEmpty() && attestationJwt == null
+        val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthorizedCode,
             txCode = transactionCode,
             additionalHeaders = active.request.tokenRequestHeaders,
-            attestationHeaders = attestation,
+            attestationHeadersFactory = attestationJwt?.let { reusableAttestationJwt ->
+                { buildAttestationHeaders(active, reusableAttestationJwt) }
+            },
             anonymous = anonymous,
             dpopProofFactory = active.dpopFactory(),
+            onResponseHeaders = { headers ->
+                rememberAttestationChallenge(
+                    active,
+                    headers[CLIENT_ATTESTATION_CHALLENGE],
+                )
+            },
         )
+        return token
     }
 
     private suspend fun tokenForAuthorizationCode(
@@ -748,15 +789,24 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestation = attestationHeaders(metadata, active.request.clientId, active.keyMaterial)
-        return TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
+        val attestationJwt = obtainAttestationJwt(active)
+        val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
             tokenEndpoint = tokenEndpoint,
             code = code,
             codeVerifier = codeVerifier,
             additionalHeaders = active.request.tokenRequestHeaders,
-            attestationHeaders = attestation,
+            attestationHeadersFactory = attestationJwt?.let { reusableAttestationJwt ->
+                { buildAttestationHeaders(active, reusableAttestationJwt) }
+            },
             dpopProofFactory = active.dpopFactory(),
+            onResponseHeaders = { headers ->
+                rememberAttestationChallenge(
+                    active,
+                    headers[CLIENT_ATTESTATION_CHALLENGE],
+                )
+            },
         )
+        return token
     }
 
     /**
@@ -790,11 +840,10 @@ class WalletIssuanceSessionService(
             }
         }
 
-    private suspend fun buildAuthorization(
-        resolved: ResolvedOffer,
-        request: WalletIssuanceSessionRequest,
-        keyMaterial: WalletKeyStoreEntry,
-    ): AuthorizationState {
+    private suspend fun buildAuthorization(active: ActiveSession): AuthorizationState {
+        val resolved = active.resolved
+        val request = active.request
+        val keyMaterial = active.keyMaterial
         val metadata = resolved.authorizationServerMetadata
         val endpoint = requireNotNull(metadata.authorizationEndpoint) {
             "Authorization server has no authorization endpoint"
@@ -821,12 +870,20 @@ class WalletIssuanceSessionService(
                 redirectUri = request.redirectUri.toString(),
                 dpopJkt = dpopJkt,
             )
-            val attestation = attestationHeaders(metadata, request.clientId, keyMaterial)
+            val attestation = obtainAttestationJwt(active)?.let { reusableAttestationJwt ->
+                buildAttestationHeaders(active, reusableAttestationJwt)
+            }
             val par = PushedAuthorizationRequestExecutor.execute(
                 httpClient = httpClient,
                 parEndpoint = parEndpoint,
                 parameters = pushed.parameters,
                 attestationHeaders = attestation,
+                onResponseHeaders = { headers ->
+                    rememberAttestationChallenge(
+                        active,
+                        headers[CLIENT_ATTESTATION_CHALLENGE],
+                    )
+                },
             )
             val browserUrl = URLBuilder(endpoint).apply {
                 parameters.append("client_id", request.clientId)
@@ -895,9 +952,12 @@ class WalletIssuanceSessionService(
             val parsed = CredentialOfferParser.parseCredentialOfferUrl(request.getEffectiveOfferString())
             CredentialOfferResolver(httpClient).resolveCredentialOffer(parsed.credentialOffer, parsed.credentialOfferUri)
         }
-        val resolver = IssuerMetadataResolver(httpClient)
+        val resolver = IssuerMetadataResolver(httpClient, metadataTrustResolver)
+        // Operational metadata is always resolved from issuer-derived well-known endpoints.
+        // Unrecognized offer parameters are caller-controlled and must not select network
+        // endpoints for issuance.
         val issuerMetadata = resolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
-        require(issuerMetadata.credentialIssuer == offer.credentialIssuer) {
+        require(issuerMetadata.metadata.credentialIssuer == offer.credentialIssuer) {
             "Credential issuer metadata identifier does not match the offer"
         }
         val grantAuthorizationServer = when (offer.getGrantType()) {
@@ -905,12 +965,12 @@ class WalletIssuanceSessionService(
             is GrantType.PreAuthorizedCode -> offer.grants?.preAuthorizedCode?.authorizationServer
             else -> null
         }
-        val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata, grantAuthorizationServer)
+        val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata.metadata, grantAuthorizationServer)
         val authorizationServerMetadata = resolver.resolveAuthorizationServerMetadata(selectedAuthorizationServer)
         require(authorizationServerMetadata.issuer == selectedAuthorizationServer) {
             "Authorization server metadata issuer does not match the selected server"
         }
-        val offered = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
+        val offered = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
         require(offered.isNotEmpty()) { "Credential offer resolved no supported credentials" }
         return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered)
     }
@@ -931,7 +991,7 @@ class WalletIssuanceSessionService(
     }
 
     private fun ResolvedOffer.toPreview(grant: GrantType): WalletIssuanceOfferPreview {
-        val issuerDisplay = issuerMetadata.display?.firstOrNull()
+        val issuerDisplay = issuerMetadata.metadata.display?.firstOrNull()
         val txCode = offer.grants?.preAuthorizedCode?.txCode
         return WalletIssuanceOfferPreview(
             grant = when (grant) {
@@ -940,11 +1000,12 @@ class WalletIssuanceSessionService(
                 else -> error("Unsupported credential offer grant")
             },
             issuer = WalletIssuanceIssuerPreview(
-                identifier = offer.credentialIssuer,
+                identifier = issuerMetadata.metadata.credentialIssuer,
                 name = issuerDisplay?.name,
                 locale = issuerDisplay?.locale,
                 logoUri = issuerDisplay?.logo?.uri,
                 logoAltText = issuerDisplay?.logo?.altText,
+                metadataProvenance = issuerMetadata.toPreviewProvenance(),
             ),
             credentials = offeredCredentials.map { offered ->
                 val display = offered.configuration.credentialMetadata?.display?.firstOrNull()
@@ -959,6 +1020,16 @@ class WalletIssuanceSessionService(
             transactionCode = txCode?.let {
                 WalletIssuanceTransactionCode(it.inputMode, it.length, it.description)
             },
+        )
+    }
+
+    private fun ResolvedCredentialIssuerMetadata.toPreviewProvenance(): WalletIssuanceMetadataProvenance = when (this) {
+        is ResolvedCredentialIssuerMetadata.Unsigned -> WalletIssuanceMetadataProvenance.Unsigned
+        is ResolvedCredentialIssuerMetadata.Signed -> WalletIssuanceMetadataProvenance.Signed(
+            compactJwt = compactJwt,
+            algorithm = signer.algorithm,
+            keyId = signer.keyId,
+            trustType = signer.trustType,
         )
     }
 
@@ -1121,21 +1192,78 @@ class WalletIssuanceSessionService(
         error("DPoP nonce retry exhausted")
     }
 
-    private suspend fun attestationHeaders(
-        metadata: AuthorizationServerMetadata,
-        clientId: String,
-        keyMaterial: WalletKeyStoreEntry,
-    ): ClientAttestationHeaders? {
+    private suspend fun obtainAttestationJwt(active: ActiveSession): String? {
+        val metadata = active.resolved.authorizationServerMetadata
         val assembler = attestationAssembler ?: return null
         if (metadata.tokenEndpointAuthMethodsSupported
                 ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) != true
         ) {
             return null
         }
-        val crypto2Key = keyMaterial.requireCrypto2SigningKey()
-        return assembler.buildAttestationHeaders(crypto2Key, clientId, metadata.issuer).also {
+        val advertisedAttestationAlgorithms = metadata.clientAttestationSigningAlgValuesSupported
+        metadata.clientAttestationPopSigningAlgValuesSupported?.let { advertised ->
+            require(ClientAttestationSigningAlgorithms.ES256 in advertised) {
+                "Authorization server does not advertise a supported client attestation PoP signing algorithm"
+            }
+        }
+        val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
+        return assembler.obtainAttestationJwt(crypto2Key, active.request.clientId).also { attestationJwt ->
+            advertisedAttestationAlgorithms?.let { advertised ->
+                validateClientAttestationAlgorithm(attestationJwt, advertised)
+            }
             emitEvent(WalletSessionEvent.issuance_attestation_obtained)
         }
+    }
+
+    private suspend fun buildAttestationHeaders(
+        active: ActiveSession,
+        attestationJwt: String,
+    ): ClientAttestationHeaders {
+        val assembler = requireNotNull(attestationAssembler)
+        val metadata = active.resolved.authorizationServerMetadata
+        val challenge = active.attestationChallenge ?: metadata.challengeEndpoint?.let { endpoint ->
+            try {
+                WalletAttestationChallengeRequestBuilder(httpClient).requestChallenge(endpoint).attestationChallenge
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: WalletAttestationChallengeRequestException) {
+                val code = when (error.error) {
+                    WalletAttestationChallengeRequestError.INVALID_ENDPOINT -> WalletIssuanceErrorCode.ISSUER_METADATA
+                    WalletAttestationChallengeRequestError.NETWORK -> WalletIssuanceErrorCode.NETWORK
+                    WalletAttestationChallengeRequestError.AUTHORIZATION_SERVER_RESPONSE ->
+                        WalletIssuanceErrorCode.ISSUER_RESPONSE
+                    WalletAttestationChallengeRequestError.INVALID_RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
+                }
+                throw IssuanceStageException(code, error)
+            }
+        }
+        if (challenge != active.attestationChallenge) {
+            active.attestationChallenge = challenge
+            persistActive(active)
+        }
+        val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
+        val popJwt = assembler.buildPopJwt(crypto2Key, active.request.clientId, metadata.issuer, challenge)
+        return ClientAttestationHeaders(attestationJwt, popJwt)
+    }
+
+    private fun validateClientAttestationAlgorithm(jwt: String, advertised: Set<String>) {
+        val algorithm = try {
+            CompactJws.decodeUnverified(jwt).algorithm.identifier
+        } catch (_: Exception) {
+            null
+        }
+        require(!algorithm.isNullOrBlank()) {
+            "Wallet Attestation JWT must contain a protected JOSE alg header"
+        }
+        require(algorithm in advertised) {
+            "Authorization server does not advertise the Wallet Attestation JWT algorithm $algorithm"
+        }
+    }
+
+    private suspend fun rememberAttestationChallenge(active: ActiveSession, challenge: String?) {
+        val next = challenge?.takeIf { it.isNotBlank() } ?: return
+        active.attestationChallenge = next
+        persistActive(active)
     }
 
     private suspend fun Wallet.parseAndStore(issued: IssuedCredential, label: String?): StoredCredential {
@@ -1200,10 +1328,12 @@ class WalletIssuanceSessionService(
         }
 
         val offer = json.decodeFromString<CredentialOffer>(persisted.offer)
-        val issuerMetadata = json.decodeFromString<CredentialIssuerMetadata>(persisted.issuerMetadata)
+        // The store is an integrity-protected persistence boundary. Restore the resolution snapshot
+        // established when the session started, then revalidate its protocol bindings below.
+        val issuerMetadata = json.decodeFromString<ResolvedCredentialIssuerMetadata>(persisted.issuerMetadata)
         val authorizationServerMetadata =
             json.decodeFromString<AuthorizationServerMetadata>(persisted.authorizationServerMetadata)
-        val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
+        val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
         val resolved = ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offeredCredentials)
         validatePersistedResolution(persisted.public, resolved)
 
@@ -1257,6 +1387,7 @@ class WalletIssuanceSessionService(
             authorization = authorization,
             state = persisted.state,
             expiresAtEpochMilliseconds = persisted.expiresAtEpochMilliseconds,
+            attestationChallenge = persisted.attestationChallenge,
         )
         return mutex.withLock {
             sessions[sessionId] ?: active.also { sessions[sessionId] = it }
@@ -1270,10 +1401,10 @@ class WalletIssuanceSessionService(
         require(resolved.offer.credentialIssuer == public.offer.issuer.identifier) {
             "Stored issuance session issuer binding is invalid"
         }
-        require(resolved.issuerMetadata.credentialIssuer == resolved.offer.credentialIssuer) {
+        require(resolved.issuerMetadata.metadata.credentialIssuer == resolved.offer.credentialIssuer) {
             "Stored credential issuer metadata binding is invalid"
         }
-        require(resolved.authorizationServerMetadata.issuer in resolved.issuerMetadata.authorizationServerIssuers()) {
+        require(resolved.authorizationServerMetadata.issuer in resolved.issuerMetadata.metadata.authorizationServerIssuers()) {
             "Stored authorization server binding is invalid"
         }
         require(
@@ -1320,6 +1451,7 @@ class WalletIssuanceSessionService(
             codeVerifier = active.authorization?.pkce?.codeVerifier,
             state = active.state,
             expiresAtEpochMilliseconds = active.expiresAtEpochMilliseconds,
+            attestationChallenge = active.attestationChallenge,
         )
         store.put(
             WalletIssuanceSessionRecord(
@@ -1556,7 +1688,7 @@ class WalletIssuanceSessionService(
 
     private data class ResolvedOffer(
         val offer: CredentialOffer,
-        val issuerMetadata: CredentialIssuerMetadata,
+        val issuerMetadata: ResolvedCredentialIssuerMetadata,
         val authorizationServerMetadata: AuthorizationServerMetadata,
         val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
     )
@@ -1576,6 +1708,7 @@ class WalletIssuanceSessionService(
         var authorization: AuthorizationState?,
         var state: SessionState,
         var expiresAtEpochMilliseconds: Long,
+        var attestationChallenge: String? = null,
     ) {
         val persistable: Boolean get() = request.key == null
     }
@@ -1628,6 +1761,7 @@ class WalletIssuanceSessionService(
         val codeVerifier: String? = null,
         val state: SessionState,
         val expiresAtEpochMilliseconds: Long,
+        val attestationChallenge: String? = null,
     )
 
     @Serializable
