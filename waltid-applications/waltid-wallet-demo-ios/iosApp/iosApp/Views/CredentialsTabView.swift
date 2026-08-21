@@ -24,10 +24,8 @@ struct CredentialsTabView: View {
                     if details.isEmpty {
                         EmptyCredentialsView()
                     } else {
-                        ForEach(details) { item in
-                            CredentialCardButton(details: item) {
-                                selectedDetailsID = item.id
-                            }
+                        CredentialCardStackView(details: details) { id in
+                            selectedDetailsID = id
                         }
                     }
                 }

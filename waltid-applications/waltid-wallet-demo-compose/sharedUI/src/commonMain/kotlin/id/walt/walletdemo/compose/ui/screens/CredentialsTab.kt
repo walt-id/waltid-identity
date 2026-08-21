@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
-import id.walt.walletdemo.compose.ui.components.CredentialCard
+import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 
 @Composable
 internal fun CredentialsTab(credentials: List<WalletDemoCredential>, onCredentialClick: (String) -> Unit) {
@@ -33,12 +33,10 @@ internal fun CredentialsTab(credentials: List<WalletDemoCredential>, onCredentia
         if (credentials.isEmpty()) {
             EmptyCredentialsState()
         } else {
-            credentials.forEach { credential ->
-                CredentialCard(
-                    details = credential.toCredentialDetails(),
-                    onClick = { onCredentialClick(credential.id) },
-                )
-            }
+            CredentialCardStack(
+                details = credentials.map { it.toCredentialDetails() },
+                onOpenDetails = onCredentialClick,
+            )
         }
     }
 }
