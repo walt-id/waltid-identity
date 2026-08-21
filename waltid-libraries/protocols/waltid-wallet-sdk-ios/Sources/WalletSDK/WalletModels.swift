@@ -897,6 +897,15 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     /// Accessibility text for the credential logo when advertised.
     public let logoAltText: String?
 
+    /// Suggested credential background color from OpenID4VCI display metadata.
+    public let backgroundColor: String?
+
+    /// Suggested credential background image URI from OpenID4VCI display metadata.
+    public let backgroundImageURI: URL?
+
+    /// Suggested credential text color from OpenID4VCI display metadata.
+    public let textColor: String?
+
     /// Creates a credential preview.
     ///
     /// - Parameters:
@@ -906,13 +915,19 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     ///   - descriptionText: Localized credential description.
     ///   - logoURI: Credential logo URL.
     ///   - logoAltText: Accessibility text for the credential logo.
+    ///   - backgroundColor: Suggested credential background color.
+    ///   - backgroundImageURI: Suggested credential background image URI.
+    ///   - textColor: Suggested credential text color.
     public init(
         configurationID: String,
         format: String,
         name: String?,
         descriptionText: String?,
         logoURI: URL?,
-        logoAltText: String? = nil
+        logoAltText: String? = nil,
+        backgroundColor: String? = nil,
+        backgroundImageURI: URL? = nil,
+        textColor: String? = nil
     ) {
         self.configurationID = configurationID
         self.format = format
@@ -920,6 +935,9 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
         self.descriptionText = descriptionText
         self.logoURI = logoURI
         self.logoAltText = logoAltText
+        self.backgroundColor = backgroundColor
+        self.backgroundImageURI = backgroundImageURI
+        self.textColor = textColor
     }
 }
 
