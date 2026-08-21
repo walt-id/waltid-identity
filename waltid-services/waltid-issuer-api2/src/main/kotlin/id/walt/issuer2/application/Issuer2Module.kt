@@ -93,6 +93,7 @@ class Issuer2Module @JvmOverloads constructor(
         metadataService = metadataService,
         protocolService = protocolService,
         offerService = credentialOfferService,
+        notificationService = notificationService,
     )
 
     companion object {

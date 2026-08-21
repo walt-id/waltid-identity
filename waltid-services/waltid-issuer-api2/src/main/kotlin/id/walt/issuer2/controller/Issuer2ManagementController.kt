@@ -2,6 +2,7 @@ package id.walt.issuer2.controller
 
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
+import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.CredentialOfferService
@@ -12,6 +13,7 @@ import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.callid.callId
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -44,13 +46,14 @@ class Issuer2ManagementController(
             }
 
             post("credential-offers", Issuer2ManagementRoutesDocs.createCredentialOffer()) {
+                val requestId = requireNotNull(call.callId) { "Missing call ID" }
                 val request = try {
                     call.receive<CredentialOfferCreateRequest>()
                 } catch (ex: BadRequestException) {
                     val validationMessage = ex.cause?.cause?.message ?: ex.cause?.message ?: ex.message
                     throw BadRequestException("${ex.message}: $validationMessage")
                 }
-                call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request))
+                call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request, requestId))
             }
 
             get("sessions", Issuer2ManagementRoutesDocs.listSessions()) {
@@ -60,6 +63,17 @@ class Issuer2ManagementController(
             get("sessions/{sessionId}", Issuer2ManagementRoutesDocs.getSession()) {
                 val sessionId = requireNotNull(call.parameters["sessionId"]) { "Missing sessionId" }
                 call.respond(sessionService.getSession(sessionId))
+            }
+
+            route(Issuer2ManagementRoutesDocs.issuerEvents()) {
+                sse("events") {
+                    val sseFlow = SseNotifier.getSseFlow(IssuanceNotificationService.ISSUER_EVENT_STREAM_TARGET)
+
+                    send("{}")
+                    sseFlow.collect { update ->
+                        send(Json.encodeToString(update))
+                    }
+                }
             }
 
             route(Issuer2ManagementRoutesDocs.sessionEvents()) {

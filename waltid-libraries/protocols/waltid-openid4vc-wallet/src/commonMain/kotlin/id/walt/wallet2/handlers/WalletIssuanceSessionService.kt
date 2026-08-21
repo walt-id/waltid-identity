@@ -422,8 +422,11 @@ class WalletIssuanceSessionService(
             restoreSession(active, SessionState.AWAITING_ACCEPTANCE)
             return failed(sessionId, WalletIssuanceErrorCode.INVALID_INPUT)
         }
+        // OpenID4VCI 1.0 §6.3: a tx_code may only be sent when the offer's grant requested one.
+        // Issuers now reject an unsolicited tx_code, so never forward one the offer did not ask for.
+        val effectiveTransactionCode = transactionCode?.takeIf { requirement != null }
         return complete(active, retryTokenRejection = requirement != null) {
-            tokenForPreAuthorized(active, grant.preAuthorizedCode, transactionCode)
+            tokenForPreAuthorized(active, grant.preAuthorizedCode, effectiveTransactionCode)
         }
     }
 
