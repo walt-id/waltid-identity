@@ -9,6 +9,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
@@ -44,7 +45,9 @@ import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
 import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.ClientAssertionFactory
+import id.waltid.openid4vci.wallet.token.ClientAttestationHeadersFactory
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
+import id.waltid.openid4vci.wallet.token.TokenResponseHeadersHandler
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -721,7 +724,7 @@ object WalletIssuanceHandler {
             ?: error("Authorization server metadata contains no token_endpoint")
         log.trace { "Requesting token from $tokenEndpoint" }
 
-        val attestationHeaders = buildClientAttestationHeaders(
+        val tokenAttestation = tokenClientAttestation(
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
@@ -737,12 +740,12 @@ object WalletIssuanceHandler {
             asMetadata = asMetadata,
             clientId = request.clientId,
             keyMaterial = keyMaterial,
-        ).takeIf { attestationHeaders == null }
+        ).takeIf { tokenAttestation == null }
 
         val anonymousPreAuthorizedCode =
             asMetadata.preAuthorizedGrantAnonymousAccessSupported == true &&
                     request.tokenRequestHeaders.isEmpty() &&
-                    attestationHeaders == null &&
+                    tokenAttestation == null &&
                     clientAssertionFactory == null
 
         // Sender constraining (RFC 9449): used when the authorization server advertises DPoP *and*
@@ -755,7 +758,6 @@ object WalletIssuanceHandler {
             preAuthorizedCode = preAuthGrant.preAuthorizedCode,
             txCode = request.txCode,
             additionalHeaders = request.tokenRequestHeaders,
-            attestationHeaders = attestationHeaders,
             anonymous = anonymousPreAuthorizedCode,
             dpopProofFactory = dpopAlgorithms?.let { algorithms ->
                 { endpoint: String, nonce: String? ->
@@ -763,6 +765,8 @@ object WalletIssuanceHandler {
                 }
             },
             clientAssertionFactory = clientAssertionFactory,
+            onResponseHeaders = tokenAttestation?.onResponseHeaders ?: {},
+            attestationHeadersFactory = tokenAttestation?.factory,
         )
         log.trace { "Token obtained" }
         onEvent(WalletSessionEvent.issuance_token_obtained)
@@ -1030,7 +1034,7 @@ object WalletIssuanceHandler {
     suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult =
         requestToken(
             request = request,
-            attestationHeaders = null,
+            tokenAttestation = null,
             anonymousPreAuthorizedCode = request.anonymousPreAuthorizedCode,
         )
 
@@ -1047,8 +1051,8 @@ object WalletIssuanceHandler {
             val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(it).metadata
             metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         }
-        val attestationHeaders = asMetadata?.let {
-            buildClientAttestationHeaders(
+        val tokenAttestation = asMetadata?.let {
+            tokenClientAttestation(
                 asMetadata = it,
                 clientId = request.clientId,
                 attestationAssembler = attestationAssembler,
@@ -1062,11 +1066,11 @@ object WalletIssuanceHandler {
             request.anonymousPreAuthorizedCode ||
                     (asMetadata?.preAuthorizedGrantAnonymousAccessSupported == true &&
                             request.tokenRequestHeaders.isEmpty() &&
-                            attestationHeaders == null)
+                            tokenAttestation == null)
 
         return requestToken(
             request = request,
-            attestationHeaders = attestationHeaders,
+            tokenAttestation = tokenAttestation,
             anonymousPreAuthorizedCode = anonymousPreAuthorizedCode,
             httpClient = httpClient,
         )
@@ -1074,7 +1078,7 @@ object WalletIssuanceHandler {
 
     private suspend fun requestToken(
         request: RequestTokenRequest,
-        attestationHeaders: ClientAttestationHeaders?,
+        tokenAttestation: TokenClientAttestation?,
         anonymousPreAuthorizedCode: Boolean,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestTokenResult {
@@ -1087,8 +1091,11 @@ object WalletIssuanceHandler {
             preAuthorizedCode = request.preAuthorizedCode,
             txCode = request.txCode,
             additionalHeaders = request.tokenRequestHeaders,
-            attestationHeaders = attestationHeaders,
             anonymous = anonymousPreAuthorizedCode,
+            dpopProofFactory = null,
+            clientAssertionFactory = null,
+            onResponseHeaders = tokenAttestation?.onResponseHeaders ?: {},
+            attestationHeadersFactory = tokenAttestation?.factory,
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,
@@ -1560,10 +1567,55 @@ object WalletIssuanceHandler {
     }
 
     /**
+     * Token-endpoint client attestation that can be rebuilt per HTTP attempt.
+     *
+     * The Wallet Attestation JWT is obtained once; each factory invocation mints a fresh PoP `jti`
+     * (and honors `OAuth-Client-Attestation-Challenge` from the previous response). Static headers
+     * reused the same PoP across a DPoP `use_dpop_nonce` retry, which HAIP conformance rejects.
+     */
+    private class TokenClientAttestation(
+        val factory: ClientAttestationHeadersFactory,
+        val onResponseHeaders: TokenResponseHeadersHandler,
+    )
+
+    private suspend fun tokenClientAttestation(
+        asMetadata: AuthorizationServerMetadata,
+        clientId: String,
+        attestationAssembler: ClientAttestationAssembler?,
+        resolveInstanceKey: suspend () -> Crypto2Key?,
+        onAttestationObtained: suspend () -> Unit = {},
+    ): TokenClientAttestation? {
+        val assembler = attestationAssembler ?: return null
+        if (!asMetadata.supportsAttestationBasedClientAuthentication()) return null
+
+        log.debug { "Issuer supports attestation-based client auth, building attestation headers" }
+        val key = resolveInstanceKey()
+            ?: error("No key available for client attestation")
+        val attestationJwt = assembler.obtainAttestationJwt(key, clientId)
+        onAttestationObtained()
+        var challenge: String? = null
+        return TokenClientAttestation(
+            factory = {
+                ClientAttestationHeaders(
+                    attestationJwt = attestationJwt,
+                    popJwt = assembler.buildPopJwt(key, clientId, asMetadata.issuer, challenge),
+                )
+            },
+            onResponseHeaders = { headers ->
+                headers[CLIENT_ATTESTATION_CHALLENGE]?.takeIf { it.isNotBlank() }?.let { challenge = it }
+            },
+        )
+    }
+
+    /**
      * Client attestation headers for any request that authenticates this client to the authorization
      * server - the token request and the pushed authorization request alike. Both take the
      * authorization server's issuer as the PoP audience (OAuth 2.0 Attestation-Based Client
      * Authentication Section 5.2), so one builder serves both.
+     *
+     * Token requests should use [tokenClientAttestation] instead so DPoP/challenge retries mint a
+     * new PoP. PAR still uses this one-shot builder because [PushedAuthorizationRequestExecutor]
+     * does not retry with a factory.
      */
     private suspend fun buildClientAttestationHeaders(
         asMetadata: AuthorizationServerMetadata,
@@ -1761,7 +1813,7 @@ object WalletIssuanceHandler {
             request = request,
             tokenEndpoint = asMetadata.tokenEndpoint
                 ?: error("Authorization server metadata contains no token_endpoint"),
-            attestationHeaders = null,
+            tokenAttestation = null,
             httpClient = httpClient,
         )
     }
@@ -1791,22 +1843,24 @@ object WalletIssuanceHandler {
         val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
-        val attestationHeaders = buildClientAttestationHeaders(
+        val resolvedKeyMaterial = keyMaterial ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
+        val tokenAttestation = tokenClientAttestation(
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
             resolveInstanceKey = {
-                wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))?.crypto2AttestationKey()
+                resolvedKeyMaterial?.crypto2AttestationKey()
+                    ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))?.crypto2AttestationKey()
             },
             onAttestationObtained = onAttestationObtained,
         )
         return exchangeCode(
             request = request,
             tokenEndpoint = tokenEndpoint,
-            attestationHeaders = attestationHeaders,
+            tokenAttestation = tokenAttestation,
             httpClient = httpClient,
             asMetadata = asMetadata,
-            keyMaterial = keyMaterial ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)),
+            keyMaterial = resolvedKeyMaterial,
             useDpop = useDpop,
         )
     }
@@ -1814,7 +1868,7 @@ object WalletIssuanceHandler {
     private suspend fun exchangeCode(
         request: ExchangeCodeRequest,
         tokenEndpoint: String,
-        attestationHeaders: ClientAttestationHeaders?,
+        tokenAttestation: TokenClientAttestation?,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         /**
          * Authorization server metadata and wallet key, needed to client authenticate and sender
@@ -1833,7 +1887,7 @@ object WalletIssuanceHandler {
         // Mirrors the pre-authorized-code exchange. Attestation wins over private_key_jwt when both
         // are advertised, because it additionally attests the wallet instance rather than only proving
         // key control.
-        val clientAssertionFactory = if (attestationHeaders == null && asMetadata != null && keyMaterial != null) {
+        val clientAssertionFactory = if (tokenAttestation == null && asMetadata != null && keyMaterial != null) {
             clientAssertionFactory(asMetadata = asMetadata, clientId = request.clientId, keyMaterial = keyMaterial)
         } else {
             null
@@ -1852,13 +1906,14 @@ object WalletIssuanceHandler {
             code = request.code,
             codeVerifier = request.codeVerifier,
             additionalHeaders = request.tokenRequestHeaders,
-            attestationHeaders = attestationHeaders,
             dpopProofFactory = senderConstraining?.let { (key, algorithms) ->
                 { endpoint: String, nonce: String? ->
                     buildDpopProof(key, algorithms, endpoint, nonce = nonce)
                 }
             },
             clientAssertionFactory = clientAssertionFactory,
+            onResponseHeaders = tokenAttestation?.onResponseHeaders ?: {},
+            attestationHeadersFactory = tokenAttestation?.factory,
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,

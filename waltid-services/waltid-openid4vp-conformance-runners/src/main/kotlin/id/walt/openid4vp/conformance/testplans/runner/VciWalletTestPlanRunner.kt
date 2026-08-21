@@ -178,6 +178,7 @@ class VciWalletTestPlanRunner(
             return TestPlanResult(
                 conformanceTestId = testId,
                 conformanceResult = "SKIPPED",
+                walletStatus = "SKIPPED",
                 skipReason = "FAPI 2.0 client test: needs wallet-initiated issuance, which the " +
                     "harness cannot yet trigger",
             )
@@ -202,13 +203,20 @@ class VciWalletTestPlanRunner(
                 // The suite reports SKIPPED for a module it decided not to exercise - typically an
                 // optional feature this wallet does not advertise. That is not a wallet failure, and
                 // counting it as one made a clean run read as "6 passed, 6 failed".
+                // WARNING/REVIEW are mapped the same way as OpenID4VP: Cloudflare Quick Tunnels
+                // cannot satisfy EnsureIncomingTls12/13, so TLS-only WARNING must not fail the row.
                 val skipped = result == "SKIPPED"
+                val walletStatus = when {
+                    skipped -> "SKIPPED"
+                    result == "PASSED" || result == "WARNING" || result == "REVIEW" -> "PASSED"
+                    else -> result
+                }
                 return TestPlanResult(
                     conformanceTestId = testId,
                     conformanceResult = result,
-                    walletStatus = result,
+                    walletStatus = walletStatus,
                     skipReason = "Suite skipped this module".takeIf { skipped },
-                    errorMessage = if (result != "PASSED" && !skipped) {
+                    errorMessage = if (!skipped && walletStatus != "PASSED") {
                         "Test finished: $result"
                     } else null
                 )

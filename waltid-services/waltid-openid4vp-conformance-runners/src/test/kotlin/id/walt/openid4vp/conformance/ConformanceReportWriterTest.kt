@@ -3,6 +3,7 @@ package id.walt.openid4vp.conformance
 import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportFormat
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
+import id.walt.openid4vp.conformance.report.isAccepted
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import java.nio.file.Files
 import kotlin.test.Test
@@ -224,6 +225,62 @@ class ConformanceReportWriterTest {
         assertFalse(summary.contains("## Failed and skipped"))
         assertFalse(summary.contains("- Fix:"))
         assertFalse(summary.contains("| `$producerId/oid4vp-1final-wallet-happy-flow` |"))
+    }
+
+    @Test
+    fun vciTlsWarningIsAcceptedWhileKeepingTheSuiteResult() {
+        val warning = TestPlanResult(
+            testName = "oid4vci-1_0-wallet-test-credential-issuance",
+            conformanceTestId = "warn-1",
+            conformanceResult = "WARNING",
+            walletStatus = "PASSED",
+        )
+        assertTrue(warning.isAccepted())
+
+        val reportRoot = Files.createTempDirectory("openid-conformance-vci-warning").toString()
+        ConformanceReportWriter.writeTestPlanResults(
+            role = ConformanceReportWriter.Role.VCI_WALLET,
+            results = listOf(warning),
+            conformanceHost = "conformance.example",
+            conformancePort = 443,
+            reportRoot = reportRoot,
+            allowFailure = true,
+        )
+        val summary = Files.readString(
+            ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VCI_WALLET, reportRoot)
+                .resolve("summary.md")
+        )
+        assertTrue(summary.contains("`passed`"))
+        assertTrue(summary.contains("WARNING"))
+        assertFalse(summary.contains("`failed`"))
+    }
+
+    @Test
+    fun skippedFapi2ClientModuleIsAccepted() {
+        val skipped = TestPlanResult(
+            testName = "fapi2-security-profile-final-client-test-happy-path",
+            conformanceTestId = "fapi-1",
+            conformanceResult = "SKIPPED",
+            walletStatus = "SKIPPED",
+            skipReason = "FAPI 2.0 client test: needs wallet-initiated issuance, which the " +
+                "harness cannot yet trigger",
+        )
+        assertTrue(skipped.isAccepted())
+
+        val reportRoot = Files.createTempDirectory("openid-conformance-fapi2-skip").toString()
+        ConformanceReportWriter.writeTestPlanResults(
+            role = ConformanceReportWriter.Role.VCI_WALLET,
+            results = listOf(skipped),
+            reportRoot = reportRoot,
+            allowFailure = true,
+        )
+        val summary = Files.readString(
+            ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VCI_WALLET, reportRoot)
+                .resolve("summary.md")
+        )
+        assertTrue(summary.contains("`skipped`"))
+        assertTrue(summary.contains("wallet-initiated issuance"))
+        assertFalse(summary.contains("`failed`"))
     }
 
     @Test
