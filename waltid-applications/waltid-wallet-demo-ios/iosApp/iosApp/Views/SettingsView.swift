@@ -29,6 +29,10 @@ struct SettingsView: View {
                 .accessibilityIdentifier(WalletAccessibilityID.settingsKeyIdCopy)
             }
             Section {
+                Button("Lock") {
+                    viewModel.lock()
+                }
+                .accessibilityIdentifier(WalletAccessibilityID.settingsLock)
                 Button("Reset wallet", role: .destructive) {
                     confirmReset = true
                 }
@@ -47,7 +51,7 @@ struct SettingsView: View {
             .accessibilityIdentifier(WalletAccessibilityID.settingsResetConfirm)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes the wallet DID, keys, and credentials. This cannot be undone.")
+            Text("This deletes the wallet DID, keys, credentials, and PIN. This cannot be undone.")
         }
     }
 }

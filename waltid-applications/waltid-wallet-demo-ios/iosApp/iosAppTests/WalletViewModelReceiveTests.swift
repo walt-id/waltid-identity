@@ -8,6 +8,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     func testRequiredTransactionCodeIsPromptedAndForwardedOnce() async throws {
         let client = TransactionCodeWalletClient()
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.selectedTab = .receive
@@ -46,6 +47,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     func testChangingOfferClearsTransactionCodeState() async throws {
         let client = TransactionCodeWalletClient()
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/first"
@@ -64,6 +66,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             transactionCode: IssuanceTransactionCode(inputMode: "numeric", length: 6, descriptionText: nil)
         )
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example"
@@ -83,6 +86,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     func testAuthorizationCodeOfferOpensIssuerSignInContinuation() async throws {
         let client = TransactionCodeWalletClient(transactionCode: nil, issuanceGrant: .authorizationCode)
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example"
@@ -100,6 +104,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     func testStaleIssuanceStartCannotOverwriteIncomingDeepLink() async throws {
         let client = TransactionCodeWalletClient(issuanceStartDelayNanoseconds: 100_000_000)
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/original"
@@ -116,6 +121,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     func testPresentationDeepLinkCancelsActiveIssuanceSession() async throws {
         let client = TransactionCodeWalletClient(startsWithCredential: true)
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example"
@@ -142,6 +148,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             presentationPreviewDelayNanoseconds: 100_000_000
         )
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.presentationRequestUrl = "openid4vp://verifier.example"
@@ -161,6 +168,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             presentationPreviewDelayNanoseconds: 100_000_000
         )
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.presentationRequestUrl = "openid4vp://verifier.example"
@@ -183,6 +191,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             presentationActionDelayNanoseconds: 100_000_000
         )
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.presentationRequestUrl = "openid4vp://verifier.example"

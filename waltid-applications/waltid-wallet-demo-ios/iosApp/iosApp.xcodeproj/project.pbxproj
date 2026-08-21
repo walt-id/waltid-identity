@@ -26,6 +26,9 @@
 		A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000430AAAA000000000030 /* OfferReviewView.swift */; };
 		A1000440AAAA000100000040 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000440AAAA000000000040 /* SettingsView.swift */; };
 		A1000441AAAA000100000041 /* WalletTabChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000441AAAA000000000041 /* WalletTabChrome.swift */; };
+		A1000442AAAA000100000042 /* PinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000442AAAA000000000042 /* PinView.swift */; };
+		A1000443AAAA000100000043 /* DemoPinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000443AAAA000000000043 /* DemoPinStore.swift */; };
+		A1000444AAAA000100000044 /* DemoBiometricAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000444AAAA000000000044 /* DemoBiometricAuthenticator.swift */; };
 		A1000500AAAA000100000050 /* CodeScanner in Frameworks */ = {isa = PBXBuildFile; productRef = A1000501AAAA000000000051 /* CodeScanner */; };
 		A7520000000000000000000A /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDK */; };
 		A7520000000000000000000C /* IdentityDocumentProvider.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = A75200000000000000000002 /* IdentityDocumentProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -122,6 +125,9 @@
 		A1000430AAAA000000000030 /* OfferReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferReviewView.swift; sourceTree = "<group>"; };
 		A1000440AAAA000000000040 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000441AAAA000000000041 /* WalletTabChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletTabChrome.swift; sourceTree = "<group>"; };
+		A1000442AAAA000000000042 /* PinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinView.swift; sourceTree = "<group>"; };
+		A1000443AAAA000000000043 /* DemoPinStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoPinStore.swift; sourceTree = "<group>"; };
+		A1000444AAAA000000000044 /* DemoBiometricAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoBiometricAuthenticator.swift; sourceTree = "<group>"; };
 		A75200000000000000000002 /* IdentityDocumentProvider.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = IdentityDocumentProvider.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A75200000000000000000010 /* IdentityDocumentRegistrationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityDocumentRegistrationCoordinator.swift; sourceTree = "<group>"; };
 		A75200000000000000000013 /* IdentityDocumentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityDocumentProvider.swift; sourceTree = "<group>"; };
@@ -221,6 +227,8 @@
 				A1000001AAAA000000000001 /* WalletViewModel.swift */,
 				A1000420AAAA000000000020 /* WalletClient.swift */,
 				A1000421AAAA000000000021 /* MockWalletClient.swift */,
+				A1000443AAAA000000000043 /* DemoPinStore.swift */,
+				A1000444AAAA000000000044 /* DemoBiometricAuthenticator.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -235,6 +243,7 @@
 				A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */,
 				A1000423AAAA000000000023 /* CredentialDetailsDestination.swift */,
 				A1000440AAAA000000000040 /* SettingsView.swift */,
+				A1000442AAAA000000000042 /* PinView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -609,6 +618,9 @@
 				A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */,
 				A1000440AAAA000100000040 /* SettingsView.swift in Sources */,
 				A1000441AAAA000100000041 /* WalletTabChrome.swift in Sources */,
+				A1000442AAAA000100000042 /* PinView.swift in Sources */,
+				A1000443AAAA000100000043 /* DemoPinStore.swift in Sources */,
+				A1000444AAAA000100000044 /* DemoBiometricAuthenticator.swift in Sources */,
 				A75200000000000000000011 /* IdentityDocumentRegistrationCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
