@@ -4,67 +4,41 @@ import WalletDemoSharingUI
 struct PinView: View {
     @ObservedObject var viewModel: WalletViewModel
 
-    private var isSetup: Bool {
-        if case .setup = viewModel.auth { return true }
-        return false
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("walt.id Wallet")
-                .font(.largeTitle.bold())
-            Text(isSetup ? "Create a PIN" : "Enter your PIN")
+                .font(.largeTitle.weight(.bold))
+            Text(title)
                 .font(.title3.weight(.semibold))
-            Text(
-                isSetup
-                    ? "Use 4 to 8 digits for this local demo unlock flow."
-                    : "Unlock the local demo wallet."
-            )
-            .foregroundStyle(.secondary)
+            Text(subtitle)
+                .foregroundColor(.secondary)
 
             SecureField("PIN", text: $viewModel.pin)
-                .textContentType(.oneTimeCode)
                 .keyboardType(.numberPad)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier(WalletAccessibilityID.pinInput)
 
             if isSetup {
-                SecureField("Confirm PIN", text: $viewModel.pinConfirmation)
-                    .textContentType(.oneTimeCode)
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityIdentifier(WalletAccessibilityID.pinConfirmationInput)
-
-                Toggle(isOn: $viewModel.useBiometrics) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Unlock with biometrics")
-                        Text(
-                            viewModel.isBiometricUnlockAvailable
-                                ? "Use Face ID or fingerprint instead of typing the PIN. The PIN remains a fallback."
-                                : "Biometrics are not available on this device."
-                        )
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-                .disabled(!viewModel.isBiometricUnlockAvailable)
-                .accessibilityIdentifier(WalletAccessibilityID.pinBiometricToggle)
+                setupExtras
             }
 
             if let error = viewModel.pinError {
                 Text(error)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundColor(.red)
             }
 
-            Button(isSetup ? "Set PIN" : "Unlock") {
+            Button {
                 viewModel.submitPin()
+            } label: {
+                Text(isSetup ? "Set PIN" : "Unlock")
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .disabled(viewModel.isAuthenticating)
             .accessibilityIdentifier(WalletAccessibilityID.pinSubmitButton)
 
-            if !isSetup, viewModel.isBiometricUnlockEnabled, viewModel.isBiometricUnlockAvailable {
+            if shouldShowBiometricUnlockButton {
                 Button("Unlock with biometrics") {
                     viewModel.unlockWithBiometrics(force: true)
                 }
@@ -76,9 +50,49 @@ struct PinView: View {
         }
         .padding(24)
         .onAppear {
-            if case .login = viewModel.auth {
-                viewModel.unlockWithBiometrics()
-            }
+            viewModel.promptBiometricUnlockIfNeeded()
         }
+    }
+
+    private var isSetup: Bool {
+        viewModel.auth == .setup
+    }
+
+    private var title: String {
+        isSetup ? "Create a PIN" : "Enter your PIN"
+    }
+
+    private var subtitle: String {
+        if isSetup {
+            return "Use 4 to 8 digits for this local demo unlock flow."
+        }
+        return "Unlock the local demo wallet."
+    }
+
+    private var shouldShowBiometricUnlockButton: Bool {
+        !isSetup && viewModel.isBiometricUnlockEnabled && viewModel.isBiometricUnlockAvailable
+    }
+
+    @ViewBuilder
+    private var setupExtras: some View {
+        SecureField("Confirm PIN", text: $viewModel.pinConfirmation)
+            .keyboardType(.numberPad)
+            .textFieldStyle(.roundedBorder)
+            .accessibilityIdentifier(WalletAccessibilityID.pinConfirmationInput)
+
+        Toggle("Unlock with biometrics", isOn: $viewModel.useBiometrics)
+            .disabled(!viewModel.isBiometricUnlockAvailable)
+            .accessibilityIdentifier(WalletAccessibilityID.pinBiometricToggle)
+
+        Text(biometricsHelpText)
+            .font(.footnote)
+            .foregroundColor(.secondary)
+    }
+
+    private var biometricsHelpText: String {
+        if viewModel.isBiometricUnlockAvailable {
+            return "Use Face ID or fingerprint instead of typing the PIN. The PIN remains a fallback."
+        }
+        return "Biometrics are not available on this device."
     }
 }

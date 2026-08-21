@@ -9,19 +9,23 @@ struct ContentView: View {
         case .setup, .login:
             PinView(viewModel: viewModel)
         case .storageUnavailable(let message):
-            VStack(alignment: .leading, spacing: 16) {
-                Text("walt.id Wallet")
-                    .font(.largeTitle.bold())
-                Text("PIN storage unavailable")
-                    .font(.title3.weight(.semibold))
-                Text("\(message). The wallet remains locked.")
-                    .foregroundStyle(.red)
-                Spacer()
-            }
-            .padding(24)
+            pinStorageUnavailable(message)
         case .unlocked:
             HomeView(viewModel: viewModel)
         }
+    }
+
+    private func pinStorageUnavailable(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("walt.id Wallet")
+                .font(.largeTitle.weight(.bold))
+            Text("PIN storage unavailable")
+                .font(.title3.weight(.semibold))
+            Text("\(message). The wallet remains locked.")
+                .foregroundColor(.red)
+            Spacer()
+        }
+        .padding(24)
     }
 }
 
