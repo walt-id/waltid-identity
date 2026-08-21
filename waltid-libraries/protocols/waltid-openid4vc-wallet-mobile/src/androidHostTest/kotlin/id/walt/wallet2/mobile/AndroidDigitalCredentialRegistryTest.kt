@@ -34,7 +34,7 @@ class AndroidDigitalCredentialRegistryTest {
             it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED
         }
         assertFalse(unsigned.supported)
-        assertTrue(unsigned.unsupportedReason?.contains("not permitted") == true)
+        assertTrue(unsigned.unsupportedReason?.contains("registration") == true)
         val openId4Vci = capabilities.capabilities.single {
             it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1
         }
@@ -55,7 +55,17 @@ class AndroidDigitalCredentialRegistryTest {
             signed.responseProtection,
         )
         assertEquals(
-            listOf(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_SIGNED),
+            listOf(
+                MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
+                MobileWalletDigitalCredentialResponseProtection.JWE,
+            ),
+            unsigned.responseProtection,
+        )
+        assertEquals(
+            listOf(
+                OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_SIGNED,
+                OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED,
+            ),
             registry.advertisedOpenId4VpProtocols(),
         )
         val multisigned = capabilities.capabilities.single {
@@ -68,34 +78,6 @@ class AndroidDigitalCredentialRegistryTest {
                 MobileWalletDigitalCredentialRequestProtection.MULTISIGNED in capability.requestProtection
             },
             "a multisigned request protection must never be advertised as supported",
-        )
-    }
-
-    @Test
-    fun permittingUnsignedRequestsAdvertisesUnsignedBesideSigned() {
-        val unsignedRegistry = AndroidDigitalCredentialRegistry(
-            RuntimeEnvironment.getApplication(),
-            allowUnsignedRequests = true,
-        )
-        val unsigned = unsignedRegistry.capabilities.capabilities.single {
-            it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED
-        }
-
-        assertFalse(unsigned.supported)
-        assertTrue(unsigned.unsupportedReason?.contains("registration") == true)
-        assertEquals(
-            listOf(
-                MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
-                MobileWalletDigitalCredentialResponseProtection.JWE,
-            ),
-            unsigned.responseProtection,
-        )
-        assertEquals(
-            listOf(
-                OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_SIGNED,
-                OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED,
-            ),
-            unsignedRegistry.advertisedOpenId4VpProtocols(),
         )
     }
 

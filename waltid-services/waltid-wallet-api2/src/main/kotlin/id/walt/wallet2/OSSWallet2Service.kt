@@ -22,7 +22,6 @@ import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
-import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -195,7 +194,6 @@ object OSSWallet2Service {
     fun Route.registerRoutes() {
         val attestationAssembler = createAttestationAssembler()
         val clientIdTrustConfiguration = configuredClientIdTrustConfiguration()
-        val unsignedRequestObjectPolicy = configuredUnsignedRequestObjectPolicy()
         val transactionDataTypeRegistry = configuredTransactionDataTypeRegistry()
         val authEnabled = runCatching {
             FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
@@ -211,7 +209,6 @@ object OSSWallet2Service {
                     attestationAssembler = attestationAssembler,
                     clientIdTrustConfiguration = clientIdTrustConfiguration,
                     transactionDataTypeRegistry = transactionDataTypeRegistry,
-                    unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 )
             }
         } else {
@@ -221,7 +218,6 @@ object OSSWallet2Service {
                 attestationAssembler = attestationAssembler,
                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
-                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             )
         }
     }
@@ -236,13 +232,6 @@ object OSSWallet2Service {
 
     internal fun configuredClientIdTrustConfiguration(): ClientIdTrustConfiguration =
         ConfigManager.getConfig<OSSWallet2ServiceConfig>().clientIdTrust.toDomain()
-
-    internal fun configuredUnsignedRequestObjectPolicy() =
-        if (ConfigManager.getConfig<OSSWallet2ServiceConfig>().allowUnsignedRequests) {
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED
-        } else {
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED
-        }
 
     internal fun configuredTransactionDataTypeRegistry(): TransactionDataTypeRegistry {
         val enabled = runCatching {

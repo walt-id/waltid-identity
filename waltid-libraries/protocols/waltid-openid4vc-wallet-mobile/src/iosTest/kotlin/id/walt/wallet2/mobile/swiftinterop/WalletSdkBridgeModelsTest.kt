@@ -163,9 +163,5 @@ class WalletSdkBridgeModelsTest {
 
         assertEquals("group.example", config.crossProcessAccess?.appGroupIdentifier)
         assertEquals("TEAM.example", config.crossProcessAccess?.keychainAccessGroup)
-        assertEquals(false, config.allowUnsignedRequests)
-
-        val permitted = WalletBridgeConfiguration(allowUnsignedRequests = true).toMobileWalletConfig()
-        assertEquals(true, permitted.allowUnsignedRequests)
     }
 }

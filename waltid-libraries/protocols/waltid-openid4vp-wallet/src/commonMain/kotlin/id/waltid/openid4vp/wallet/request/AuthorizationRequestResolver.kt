@@ -67,9 +67,10 @@ object AuthorizationRequestResolver {
      * Policy for unsigned OpenID4VP Authorization Requests (JSON from `request_uri`, query
      * parameters, or `alg: none` JWTs).
      *
-     * [REQUIRE_SIGNED] is HAIP: only signed Request Objects are accepted, and `redirect_uri` is
-     * rejected. [ALLOW_UNSIGNED] also accepts unsigned JSON / `redirect_uri` requests. Signed
-     * Request Objects are accepted under both values.
+     * [ALLOW_UNSIGNED] is the default: signed Request Objects with a signable client ID prefix
+     * (`x509_san_dns`, `x509_hash`, DID, attestation, pre-registered) are accepted, and unsigned
+     * JSON / `redirect_uri` requests fetched via `request_uri` are accepted. [REQUIRE_SIGNED]
+     * rejects unsigned encodings and the `redirect_uri` prefix; reserved for a future HAIP profile.
      */
     enum class UnsignedRequestObjectPolicy {
         ALLOW_UNSIGNED,
@@ -213,7 +214,7 @@ object AuthorizationRequestResolver {
 
     suspend fun resolve(
         requestUrl: Url,
-        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         enforceFinalRequestObject: Boolean = true,
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
     ): ResolvedAuthorizationRequest = resolve(
@@ -226,7 +227,7 @@ object AuthorizationRequestResolver {
 
     suspend fun resolve(
         requestUrl: Url,
-        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         enforceFinalRequestObject: Boolean = true,
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
         trustConfiguration: ClientIdTrustConfiguration,
@@ -600,9 +601,9 @@ object AuthorizationRequestResolver {
     }
 
     /**
-     * Unsigned JSON from `request_uri` is the Verifier2 bootstrap path. It is accepted only when
-     * [UnsignedRequestObjectPolicy.ALLOW_UNSIGNED] is set and the Client Identifier is `redirect_uri`.
-     * Signed-only (HAIP) wallets reject it.
+     * Unsigned JSON from `request_uri` is the Verifier2 bootstrap path. It is accepted when the
+     * Client Identifier is `redirect_uri`. Signed-only wallets ([UnsignedRequestObjectPolicy.REQUIRE_SIGNED])
+     * reject it.
      */
     private fun resolveFromUnsignedJson(
         body: String,
@@ -628,12 +629,12 @@ object AuthorizationRequestResolver {
 
     /**
      * Unsigned Authorization Requests are JSON from `request_uri`, query parameters, or `alg: none`
-     * JWTs. They are accepted only when [UnsignedRequestObjectPolicy.ALLOW_UNSIGNED] is set **and**
+     * JWTs. They are accepted when [UnsignedRequestObjectPolicy.ALLOW_UNSIGNED] is set **and**
      * the Client Identifier Prefix is `redirect_uri`.
      *
      * That is the unsigned Verifier2 bootstrap: JSON at `request_uri` named by `redirect_uri:<response
-     * destination>`. Signed Request Objects remain accepted under either policy, which is the HAIP
-     * profile. [UnsignedRequestObjectPolicy.REQUIRE_SIGNED] rejects `redirect_uri` entirely because
+     * destination>`. Signed Request Objects remain accepted under either policy.
+     * [UnsignedRequestObjectPolicy.REQUIRE_SIGNED] rejects `redirect_uri` entirely because
      * that prefix cannot carry a signature.
      *
      * Unsigned JSON or `alg: none` for a signable prefix (`x509_san_dns`, DID, attestation, …) is

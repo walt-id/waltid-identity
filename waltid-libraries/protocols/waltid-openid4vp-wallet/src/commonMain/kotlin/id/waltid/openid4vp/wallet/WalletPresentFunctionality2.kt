@@ -373,8 +373,8 @@ object WalletPresentFunctionality2 {
      *
      * @param presentationRequestUrl The openid4vp:// or https:// URL containing or
      *   referencing the authorization request.
-     * @param unsignedRequestObjectPolicy Whether to accept unsigned (alg=none) JWTs.
-     *   Defaults to [AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED].
+     * @param unsignedRequestObjectPolicy Whether to accept unsigned JSON / `alg=none` Request
+     *   Objects with `redirect_uri`. Defaults to [AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED].
      * @param legacyFallbackCallback Optional fallback for requests carrying explicit legacy
      *   `presentation_definition` or `presentation_definition_uri` parameters. Only consulted after
      *   strict resolution has failed.
@@ -384,7 +384,7 @@ object WalletPresentFunctionality2 {
     suspend fun resolveAuthorizationRequest(
         presentationRequestUrl: Url,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
     ): AuthorizationRequest = resolveAuthorizationRequest(
         presentationRequestUrl,
@@ -817,7 +817,7 @@ object WalletPresentFunctionality2 {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): Result<WalletPresentResult> = walletPresentHandling(
@@ -847,7 +847,7 @@ object WalletPresentFunctionality2 {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         holderCrypto2Key: Crypto2Key?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
@@ -880,7 +880,7 @@ object WalletPresentFunctionality2 {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
         beforeCredentialsUsed: suspend (Int) -> Unit = {},

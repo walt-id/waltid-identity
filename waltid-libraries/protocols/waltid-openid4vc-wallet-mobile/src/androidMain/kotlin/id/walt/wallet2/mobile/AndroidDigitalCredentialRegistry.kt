@@ -50,13 +50,9 @@ import java.nio.ByteOrder
  * wallet keeps no copy to replay at startup. Verified on API 37 with Google Play services 26.29.32.
  *
  * @property capabilities Current Android platform and registry availability.
- * @param allowUnsignedRequests When true, unsigned compact OpenID4VP Digital Credentials requests
- * are advertised alongside signed. When false, only signed is registered so Credential Manager
- * does not route unsigned requests here.
  */
 public class AndroidDigitalCredentialRegistry(
     context: Context,
-    private val allowUnsignedRequests: Boolean = false,
 ) : MobileWalletCredentialRegistry {
     private val applicationContext: Context = context.applicationContext
     private val registryManager: RegistryManager = RegistryManager.create(applicationContext)
@@ -99,11 +95,8 @@ public class AndroidDigitalCredentialRegistry(
                             MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
                             MobileWalletDigitalCredentialResponseProtection.JWE,
                         ),
-                        supported = runtimeAvailable && allowUnsignedRequests,
-                        unsupportedReason = when {
-                            !allowUnsignedRequests -> UNSIGNED_NOT_PERMITTED_REASON
-                            else -> unavailableReason
-                        },
+                        supported = runtimeAvailable,
+                        unsupportedReason = unavailableReason,
                     ),
                     MobileWalletDigitalCredentialCapability(
                         protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
@@ -442,12 +435,10 @@ public class AndroidDigitalCredentialRegistry(
         else -> value.toString()
     }
 
-    internal fun advertisedOpenId4VpProtocols(): List<String> = buildList {
-        add(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_SIGNED)
-        if (allowUnsignedRequests) {
-            add(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED)
-        }
-    }
+    internal fun advertisedOpenId4VpProtocols(): List<String> = listOf(
+        OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_SIGNED,
+        OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED,
+    )
 
     private companion object {
         // Vendored, not a dependency; package-qualified so it cannot collide with another library's
@@ -462,8 +453,6 @@ public class AndroidDigitalCredentialRegistry(
         private const val MAX_MATCHER_VALUE_LENGTH = 128
         /** Credential Manager selector icons are small; keep registry PNG payloads modest. */
         private const val REGISTRY_ICON_MAX_EDGE_PX = 128
-        private const val UNSIGNED_NOT_PERMITTED_REASON =
-            "The application has not permitted unsigned OpenID4VP Digital Credentials requests"
         private const val MULTISIGNED_UNSUPPORTED_REASON =
             "The wallet does not support JWS JSON Serialization request objects"
     }

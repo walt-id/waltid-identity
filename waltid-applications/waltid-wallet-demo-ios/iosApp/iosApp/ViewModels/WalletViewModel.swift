@@ -214,7 +214,6 @@ class WalletViewModel: ObservableObject {
                 hostHeader: attestationHostHeader
             ),
             transactionDataProfiles: transactionDataProfiles.profiles,
-            allowUnsignedRequests: true,
             crossProcessAccess: Self.crossProcessAccessConfiguration(),
             defaultKeyUseAuthorizationPolicy: biometricEnabled ? .biometricTimedReuse(timeoutSeconds: 10) : .none,
             keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
