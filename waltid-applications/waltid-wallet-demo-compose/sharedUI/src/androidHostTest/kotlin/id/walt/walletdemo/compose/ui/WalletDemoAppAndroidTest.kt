@@ -103,6 +103,9 @@ class WalletDemoAppAndroidTest {
         scenarios.credentialsPersistAcrossControllerRecreation()
 
     @Test
+    fun customBrandingTitleAppearsInTheHeader() =
+        scenarios.customBrandingTitleAppearsInTheHeader()
+
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
 

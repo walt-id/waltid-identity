@@ -23,7 +23,10 @@ import id.walt.walletdemo.compose.ui.screens.PinStorageUnavailableScreen
 import id.walt.walletdemo.compose.ui.screens.WalletScreen
 
 @Composable
-fun WalletDemoApp(controller: WalletDemoController) {
+fun WalletDemoApp(
+    controller: WalletDemoController,
+    branding: WalletDemoBranding = WalletDemoBranding(),
+) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
         continuation = state.pendingPresentationContinuation?.continuation,
@@ -31,7 +34,7 @@ fun WalletDemoApp(controller: WalletDemoController) {
         onFailed = controller::failPresentationContinuation,
     )
 
-    MaterialTheme {
+    WalletDemoTheme(branding) {
         Surface(
             modifier = Modifier
                 .fillMaxSize()

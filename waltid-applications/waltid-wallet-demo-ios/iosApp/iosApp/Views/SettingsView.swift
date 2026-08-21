@@ -4,10 +4,16 @@ import WalletDemoSharingUI
 
 struct SettingsView: View {
     @ObservedObject var viewModel: WalletViewModel
+    @Environment(\.walletDemoBranding) private var branding
     @State private var confirmReset = false
 
     var body: some View {
         List {
+            Section("Wallet") {
+                Text(branding.appTitle)
+                    .font(.headline)
+                    .accessibilityIdentifier(WalletAccessibilityID.settingsAppTitle)
+            }
             Section("Wallet DID") {
                 Text(viewModel.did.isEmpty ? "Not available" : viewModel.did)
                     .font(.footnote)

@@ -83,7 +83,7 @@ fun WalletDemoSharingReviewScreen(
         }
     }
 
-    MaterialTheme {
+    WalletDemoTheme {
         Surface(
             modifier = Modifier
                 .fillMaxSize()

@@ -5,6 +5,7 @@ import WalletSDK
 struct CredentialsTabView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
+    @Environment(\.walletDemoBranding) private var branding
 
     private var details: [CredentialDetails] {
         viewModel.credentials.map(CredentialDisplayNormalizer.details(for:))
@@ -32,7 +33,8 @@ struct CredentialsTabView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Credentials")
+            .navigationTitle(branding.appTitle)
+            .accessibilityIdentifier(WalletAccessibilityID.appTitle)
             .walletSettingsToolbar(viewModel: viewModel)
             .background(detailsNavigationLink)
             .accessibilityIdentifier(WalletAccessibilityID.credentialsTabContent)

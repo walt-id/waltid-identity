@@ -8,6 +8,7 @@ struct StatusBannerView: View {
     var isExpanded: Bool = false
     var onDismiss: (() -> Void)? = nil
     var onToggleExpanded: (() -> Void)? = nil
+    @Environment(\.walletDemoBranding) private var branding
 
     @State private var dragOffset: CGFloat = 0
 
@@ -72,13 +73,13 @@ struct StatusBannerView: View {
     private var backgroundColor: Color {
         if isError { return Color.red.opacity(0.12) }
         if isLoading { return Color.secondary.opacity(0.12) }
-        return Color.waltBlueContainer
+        return branding.primaryContainer
     }
 
     private var foregroundColor: Color {
         if isError { return .red }
         if isLoading { return .secondary }
-        return .waltBlueDark
+        return branding.onPrimaryContainer
     }
 }
 

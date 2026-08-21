@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.ui.LocalWalletDemoBranding
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.StatusCard
 
@@ -42,8 +43,10 @@ internal fun WalletHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "walt.id Wallet",
-                modifier = Modifier.weight(1f),
+                LocalWalletDemoBranding.current.appTitle,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(WalletUiTestTags.AppTitle),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )

@@ -10,6 +10,7 @@ internal object WalletUiTestTags {
     val CopyRawCredential = tag("copyRawCredential")
     val DeleteCredential = tag("deleteCredential")
     val DeleteCredentialConfirm = tag("deleteCredentialConfirm")
+    val AppTitle = tag("appTitle")
     val SettingsButton = tag("settingsButton")
     val SettingsScreen = tag("settingsScreen")
     val SettingsBack = tag("settingsBack")

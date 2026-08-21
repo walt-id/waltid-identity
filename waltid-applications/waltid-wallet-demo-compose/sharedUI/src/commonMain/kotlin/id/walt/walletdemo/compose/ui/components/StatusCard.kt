@@ -23,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,12 +53,12 @@ internal fun StatusCard(
     val containerColor = when {
         state.isError -> MaterialTheme.colorScheme.errorContainer
         state.isStatusBusy -> MaterialTheme.colorScheme.secondaryContainer
-        else -> Color(0xFFD8E2FF)
+        else -> MaterialTheme.colorScheme.primaryContainer
     }
     val contentColor = when {
         state.isError -> MaterialTheme.colorScheme.onErrorContainer
         state.isStatusBusy -> MaterialTheme.colorScheme.onSecondaryContainer
-        else -> Color(0xFF002E69)
+        else -> MaterialTheme.colorScheme.onPrimaryContainer
     }
 
     var dragDistance by remember(banner.key) { mutableStateOf(0f) }

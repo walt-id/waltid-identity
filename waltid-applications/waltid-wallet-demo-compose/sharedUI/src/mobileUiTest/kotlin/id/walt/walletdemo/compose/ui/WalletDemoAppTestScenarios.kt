@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -841,6 +842,18 @@ class WalletDemoAppTestScenarios {
 
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
         assertEquals(2, wallet.bootstrapCalls)
+    }
+
+    fun customBrandingTitleAppearsInTheHeader() = runComposeUiTest {
+        val wallet = FakeDemoWallet()
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+        val branding = WalletDemoBranding(appTitle = "Acme Wallet")
+
+        setContent { WalletDemoApp(controller, branding) }
+        onNodeWithText("Acme Wallet").assertIsDisplayed()
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+        onNodeWithTag(WalletUiTestTags.AppTitle).assertTextEquals("Acme Wallet")
     }
 
     fun settingsReplacesHeaderLockAndShowsDidAndKey() = runComposeUiTest {
