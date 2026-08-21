@@ -1,10 +1,13 @@
 package id.walt.issuer2.controller
 
 import id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs
+import id.walt.issuer2.notifications.IssuanceNotificationService
+import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.openid4vci.dpop.DPoPConstants
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.responses.credential.CredentialResponseBody
@@ -21,6 +24,9 @@ import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.auth.OAuthAccessTokenResponse
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
+import io.ktor.server.plugins.NotFoundException
+import io.ktor.server.plugins.callid.callId
+import io.ktor.server.request.ContentTransformationException
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.request.receiveText
@@ -30,13 +36,13 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.util.toMap
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlin.coroutines.cancellation.CancellationException
 
 class OpenId4VciController(
     private val metadataService: MetadataService,
     private val protocolService: OpenId4VciProtocolService,
     private val offerService: CredentialOfferService,
+    private val notificationService: IssuanceNotificationService,
 ) {
     fun register(route: Route) {
         route.get(".well-known/openid-credential-issuer/openid4vci", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
@@ -71,24 +77,36 @@ class OpenId4VciController(
             }
 
             get("credential-offer", OpenId4VciRoutesDocs.credentialOffer()) {
+                val requestId = requireNotNull(call.callId) { "Missing call ID" }
                 val sessionId = requireNotNull(call.parameters["id"]) { "Missing credential offer id" }
                 call.respond(
-                    offerService.getCredentialOffer(sessionId)
-                        ?: throw IllegalArgumentException("Credential offer not found: $sessionId")
+                    offerService.getCredentialOffer(sessionId, requestId)
+                        ?: throw NotFoundException("Credential offer not found: $sessionId")
                 )
             }
 
             post("par", OpenId4VciRoutesDocs.pushedAuthorizationRequest()) {
+                val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                val parameters = try {
+                    call.receiveParameters().toMap()
+                } catch (_: ContentTransformationException) {
+                    emptyMap()
+                }
                 val response = protocolService.processPushedAuthorizationRequest(
-                    parameters = call.receiveParameters().toMap(),
+                    parameters = parameters,
                     headers = call.request.headers.toMap(),
+                    requestId = requestId,
                 )
                 response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                 call.respond(HttpStatusCode.fromValue(response.status), response.payload)
             }
 
             get("authorize", OpenId4VciRoutesDocs.authorize()) {
-                val response = protocolService.processAuthorizeRequest(call.parameters.toMap())
+                val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                val response = protocolService.processAuthorizeRequest(
+                    parameters = call.parameters.toMap(),
+                    requestId = requestId,
+                )
                 response.redirectUri?.let { redirectUri ->
                     response.headers.filterKeys { it.lowercase() != "location" }
                         .forEach { (name, value) -> call.response.headers.append(name, value) }
@@ -103,9 +121,11 @@ class OpenId4VciController(
                 onCallRespond { call ->
                     val authorizationRequestEnvelope = call.parameters["internalAuthReq"]
                         ?: return@onCallRespond
+                    val requestId = requireNotNull(call.callId) { "Missing call ID" }
                     protocolService.processExternalLoginInterception(
                         externalAuthorizationRequest = call.response.headers.allValues().toMap()["Location"]?.firstOrNull(),
                         authorizationRequestEnvelope = authorizationRequestEnvelope,
+                        requestId = requestId,
                     )
                 }
             }
@@ -118,16 +138,15 @@ class OpenId4VciController(
                 }
 
                 get("external/oauth/callback", OpenId4VciRoutesDocs.externalOAuthCallback()) {
+                    val requestId = requireNotNull(call.callId) { "Missing call ID" }
                     val principal = call.principal<OAuthAccessTokenResponse.OAuth2>()
-                        ?: throw IllegalArgumentException("External OAuth callback is missing OAuth principal")
-                    val idToken = principal.extraParameters["id_token"]
-                        ?: throw IllegalArgumentException("id_token is missing in the callback request")
+                    val idToken = principal?.extraParameters?.get("id_token")
                     val state = call.request.queryParameters["state"]
-                        ?: throw IllegalArgumentException("state parameter is missing in the callback request")
 
                     val response = protocolService.processExternalAuthorizationCallback(
                         authServerState = state,
                         idToken = idToken,
+                        requestId = requestId,
                     )
                     response.redirectUri?.let { redirectUri ->
                         response.headers.filterKeys { it.lowercase() != "location" }
@@ -141,23 +160,30 @@ class OpenId4VciController(
             }
 
             post("token", OpenId4VciRoutesDocs.token()) {
+                val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                val parameters = try {
+                    call.receiveParameters().toMap()
+                } catch (_: ContentTransformationException) {
+                    emptyMap()
+                }
                 val response = protocolService.processTokenRequest(
-                    parameters = call.receiveParameters().toMap(),
+                    parameters = parameters,
                     headers = call.request.headers.toMap(),
+                    requestId = requestId,
                 )
                 response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                 call.respond(HttpStatusCode.fromValue(response.status), response.payload)
             }
 
             post("nonce", OpenId4VciRoutesDocs.nonce()) {
-                val issuedNonce = protocolService.createNonceResponse()
-                call.response.headers.append(HttpHeaders.CacheControl, "no-store")
-                call.respond(buildJsonObject {
-                    put("c_nonce", issuedNonce.nonce)
-                })
+                val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                val response = protocolService.processNonceRequest(requestId)
+                response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
+                call.respond(HttpStatusCode.fromValue(response.status), response.payload)
             }
 
             post("credential", OpenId4VciRoutesDocs.credential()) {
+                val requestId = requireNotNull(call.callId) { "Missing call ID" }
                 val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
                 val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
                 val response =
@@ -166,12 +192,28 @@ class OpenId4VciController(
                             authorizationHeaders = authorizationHeaders,
                             dpopProofHeaderValues = dpopProofHeaderValues,
                             encryptedCredentialRequest = call.receiveText(),
+                            requestId = requestId,
                         )
                     } else {
+                        val parameters = try {
+                            call.receive<JsonObject>()
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: ContentTransformationException) {
+                            notificationService.notify(
+                                requestId = requestId,
+                                session = null,
+                                event = IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED,
+                                error = CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+                                errorDescription = "Invalid credential request",
+                            )
+                            throw e
+                        }
                         protocolService.processCredentialRequest(
                             authorizationHeaders = authorizationHeaders,
                             dpopProofHeaderValues = dpopProofHeaderValues,
-                            parameters = call.receive<JsonObject>(),
+                            parameters = parameters,
+                            requestId = requestId,
                         )
                     }
                 call.respondCredentialResponse(response)
