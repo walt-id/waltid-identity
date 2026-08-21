@@ -74,8 +74,8 @@ role-specific guide for a runnable environment and its intended command.
 
 The reusable OSS Gradle workflow
 (`.github/workflows/gradle.yml`) always publishes these role sections to the
-GitHub Actions job summary, using the same heading and table shape as the
-OpenID4VP verifier report:
+GitHub Actions job summary, using the same heading, totals, failed-and-skipped
+section, and compact passed table for every role:
 
 1. OpenID4VP Verifier
 2. OpenID4VP Wallet
@@ -89,9 +89,12 @@ tunnel on 7003. Those wallet suites therefore run live. The OpenID4VCI issuer
 matrix still only runs when its dedicated workflow inputs and issuer URL are
 configured.
 
-When a role produced `summary.md`, that file is appended. When it did not, the
-workflow still writes the same heading, totals, and table, with a note that no
-results were produced.
+When a role produced `summary.md`, that file is appended. Failed and skipped
+rows are listed with a compact module name, variant values, and a Fix line.
+Passed rows stay in a short table (test, variant, suite, log) so GitHub does
+not have to render the full producer-id string. When a role did not write a
+report, the workflow still writes the same heading and totals, with a note that
+no results were produced.
 
 Artifacts (when a role actually runs):
 

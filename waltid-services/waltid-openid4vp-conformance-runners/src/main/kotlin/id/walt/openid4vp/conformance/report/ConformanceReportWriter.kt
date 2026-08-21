@@ -179,18 +179,75 @@ object ConformanceReportWriter {
         appendLine("- Total: ${entries.size}")
         appendLine("- Passed: ${entries.count { it.accepted && it.status != "skipped" }}")
         appendLine("- Failed: ${entries.count { !it.accepted }}")
-        if (skipped > 0) appendLine("- Skipped (not applicable to this variant): $skipped")
+        if (skipped > 0) appendLine("- Skipped: $skipped")
         appendLine()
-        appendLine("| Test | Status | Suite | Log | Error |")
-        appendLine("|------|--------|-------|-----|-------|")
-        entries.forEach { entry ->
-            val log = entry.logUrl?.let { "[log]($it)" } ?: ""
-            appendLine(
-                "| `${entry.name.sanitizeMarkdownCell()}` | `${entry.status}` | " +
-                        "${entry.suiteResult ?: entry.suiteStatus ?: ""} | $log | " +
-                        "${entry.error?.sanitizeMarkdownCell() ?: ""} |"
-            )
+
+        val attention = entries
+            .filter { it.status != "passed" }
+            .sortedBy { attentionOrder(it.status) }
+        if (attention.isNotEmpty()) {
+            appendLine("## Failed and skipped")
+            appendLine()
+            attention.forEach { entry ->
+                appendAttention(entry)
+            }
         }
+
+        val passed = entries.filter { it.status == "passed" }
+        if (passed.isNotEmpty()) {
+            appendLine("## Passed")
+            appendLine()
+            appendLine("| Test | Variant | Suite | Log |")
+            appendLine("|------|---------|-------|-----|")
+            passed.forEach { entry ->
+                val display = ConformanceReportFormat.displayName(entry.name)
+                val log = entry.logUrl?.let { "[log]($it)" } ?: ""
+                appendLine(
+                    "| `${display.title.sanitizeMarkdownCell()}` | " +
+                        "${display.variant?.sanitizeMarkdownCell() ?: ""} | " +
+                        "${entry.suiteResult ?: entry.suiteStatus ?: ""} | $log |"
+                )
+            }
+            appendLine()
+        }
+    }
+
+    private fun StringBuilder.appendAttention(entry: Entry) {
+        val display = ConformanceReportFormat.displayName(entry.name)
+        appendLine("### `${display.title.sanitizeMarkdownCell()}` — `${entry.status}`")
+        appendLine()
+        display.variant?.let { appendLine("- Variant: `$it`") }
+        display.plan?.let { appendLine("- Plan: `$it`") }
+        val suite = entry.suiteResult ?: entry.suiteStatus
+        val log = entry.logUrl?.let { "[log]($it)" }
+        when {
+            suite != null && log != null -> appendLine("- Suite: `$suite` · $log")
+            suite != null -> appendLine("- Suite: `$suite`")
+            log != null -> appendLine("- Suite log: $log")
+        }
+        entry.error?.takeIf { it.isNotBlank() }?.let {
+            appendLine("- Detail: ${it.sanitizeMarkdownCell()}")
+        }
+        ConformanceReportFormat.remediation(entry.status, entry.error, entry.name)?.let { fix ->
+            appendLine("- Fix: ${fix.sanitizeMarkdownCell()}")
+        }
+        if (display.full != display.title) {
+            appendLine()
+            appendLine("<details><summary>Full name</summary>")
+            appendLine()
+            appendLine("`${display.full.sanitizeMarkdownCell()}`")
+            appendLine()
+            appendLine("</details>")
+        }
+        appendLine()
+    }
+
+    private fun attentionOrder(status: String): Int = when (status) {
+        "failed" -> 0
+        "timeout" -> 1
+        "error" -> 2
+        "skipped" -> 3
+        else -> 4
     }
 
     private fun logUrl(host: String?, port: Int?, testId: String?): String? {
