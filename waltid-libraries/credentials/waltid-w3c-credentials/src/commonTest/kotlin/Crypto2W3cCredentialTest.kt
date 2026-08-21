@@ -6,6 +6,9 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
+import id.walt.did.dids.registrar.local.jwk.Crypto2DidJwkRegistrar
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.PresentationBuilder
 import id.walt.w3c.issuance.Issuer
@@ -160,6 +163,53 @@ class Crypto2W3cCredentialTest {
             Issuer.getKidHeader(key("ignored-for-self-identifying-did"), didKey),
         )
         assertEquals(didKeyVerificationMethod, Issuer.getKidHeader(key(didKeyVerificationMethod), didKey))
+    }
+
+    @Test
+    fun `did jwk issuer kid uses the method verification fragment`() = runTest {
+        val kmsStyleKey = key("org.tenant.kms.key_issuer")
+        val didJwk = Crypto2DidJwkRegistrar().createByKey(kmsStyleKey, DidJwkCreateOptions()).did
+
+        assertEquals("$didJwk#0", Issuer.getKidHeader(kmsStyleKey, didJwk))
+        assertEquals("$didJwk#0", Issuer.getKidHeader(key("$didJwk#0"), didJwk))
+        assertEquals("$didJwk#0", Issuer.getKidHeader(key("$didJwk#org.tenant.kms.key_issuer"), didJwk))
+        assertEquals("$didJwk#0", Issuer.getKidHeader(key("#0"), didJwk))
+    }
+
+    @Test
+    fun `did jwk credential signature resolves for method kid and non-method kid`() = runTest {
+        DidService.minimalInit()
+        val key = key("org.tenant.kms.key_issuer")
+        val didJwk = Crypto2DidJwkRegistrar().createByKey(key, DidJwkCreateOptions()).did
+        val payload = buildJsonObject {
+            put("iss", didJwk)
+            put("vct", "urn:example:pid")
+        }.toString().encodeToByteArray()
+
+        val methodKid = Issuer.getKidHeader(key, didJwk)
+        assertEquals("$didJwk#0", methodKid)
+        val scheme = JwsSignatureScheme()
+        val issued = CompactJws.sign(
+            payload = payload,
+            key = key,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject {
+                put("kid", methodKid)
+                put("typ", "dc+sd-jwt")
+            },
+        )
+        assertTrue(scheme.verifyCrypto2(issued, setOf(JwsAlgorithm.ES256)).isSuccess)
+
+        val nonMethodKid = CompactJws.sign(
+            payload = payload,
+            key = key,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject {
+                put("kid", "$didJwk#org.tenant.kms.key_issuer")
+                put("typ", "dc+sd-jwt")
+            },
+        )
+        assertTrue(scheme.verifyCrypto2(nonMethodKid, setOf(JwsAlgorithm.ES256)).isSuccess)
     }
 
     private suspend fun publicJwkThumbprint(key: Key) =

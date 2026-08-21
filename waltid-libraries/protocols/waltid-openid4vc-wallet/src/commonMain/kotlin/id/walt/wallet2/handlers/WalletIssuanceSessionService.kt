@@ -2,44 +2,46 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.selectJwsAlgorithm
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.crypto2.serialization.BinaryData
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
-import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
-import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.data.Wallet
-import id.walt.wallet2.data.WalletKeyStoreEntry
-import id.walt.wallet2.data.WalletSessionEvent
-import id.walt.wallet2.data.resolveKeyMaterial
+import id.walt.wallet2.data.*
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
+import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeRequestBuilder
+import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeRequestError
+import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeRequestException
 import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
+import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
+import id.waltid.openid4vci.wallet.authorization.RetryablePushedAuthorizationRequestException
 import id.waltid.openid4vci.wallet.authorization.AuthorizationResponseParser
-import id.waltid.openid4vci.wallet.dpop.DPoPProofBuilder
+import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
+import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
+import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
+import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
+import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
 import id.waltid.openid4vci.wallet.nonce.NonceRequestError
 import id.waltid.openid4vci.wallet.nonce.NonceRequestException
@@ -53,42 +55,18 @@ import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import id.waltid.openid4vci.wallet.token.TokenRequestException
 import io.github.oshai.kotlinlogging.KotlinLogging
-import id.walt.crypto2.keys.Key as Crypto2Key
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.Parameters
-import io.ktor.http.URLBuilder
-import io.ktor.http.Url
-import io.ktor.http.formUrlEncode
-import io.ktor.http.isSuccess
-import io.ktor.http.contentType
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -97,10 +75,6 @@ import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
 private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
-
-private class RetryablePushedAuthorizationRequestException(
-    val statusCode: Int,
-) : Exception("Pushed authorization request failed with HTTP $statusCode")
 
 /** Grant selected for a resolved issuance session. */
 @Serializable
@@ -125,7 +99,30 @@ data class WalletIssuanceIssuerPreview(
     val locale: String?,
     val logoUri: String?,
     val logoAltText: String?,
+    /** Whether the issuer metadata was unsigned or verified signed metadata. */
+    val metadataProvenance: WalletIssuanceMetadataProvenance,
 )
+
+/** Verification provenance of issuer metadata retained by an issuance session. */
+@Serializable
+sealed interface WalletIssuanceMetadataProvenance {
+    /** Metadata was received as an unsigned JSON document. */
+    @Serializable
+    data object Unsigned : WalletIssuanceMetadataProvenance
+
+    /** Metadata was received in a JWS verified by the configured trust resolver. */
+    @Serializable
+    data class Signed(
+        /** Exact compact JWS returned by the issuer. */
+        val compactJwt: String,
+        /** JWS algorithm verified by the configured trust resolver. */
+        val algorithm: String,
+        /** Identifier of the trusted verification key, as reported by the trust resolver. */
+        val keyId: String?,
+        /** Authority relationship established by the trust resolver. */
+        val trustType: MetadataSignerTrustType,
+    ) : WalletIssuanceMetadataProvenance
+}
 
 /** Offered credential information safe for an app review screen. */
 @Serializable
@@ -269,6 +266,7 @@ sealed interface WalletIssuanceOutcome {
 class WalletIssuanceSessionService(
     private val wallet: Wallet,
     private val attestationAssembler: ClientAttestationAssembler? = null,
+    private val metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
     private val sessionStore: WalletIssuanceSessionStore? = null,
     httpClient: HttpClient? = null,
@@ -281,6 +279,7 @@ class WalletIssuanceSessionService(
             "authorizationCallbackTtl must be positive"
         }
     }
+
     private val httpClient = httpClient ?: WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER).httpClient
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
     private val mutex = Mutex()
@@ -315,7 +314,7 @@ class WalletIssuanceSessionService(
             authorization = null,
             state = SessionState.AWAITING_ACCEPTANCE,
             expiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                sessionPolicy.reviewTtl.inWholeMilliseconds,
+                    sessionPolicy.reviewTtl.inWholeMilliseconds,
         )
         val evicted = mutex.withLock {
             val removed = if (sessions.size >= MAX_ACTIVE_SESSIONS) sessions.remove(sessions.keys.first()) else null
@@ -371,7 +370,7 @@ class WalletIssuanceSessionService(
         if (!claimed) throw IllegalStateException("Issuance session is not awaiting acceptance")
         try {
             persistActive(active)
-            val authorization = buildAuthorization(active.resolved, active.request, active.keyMaterial)
+            val authorization = buildAuthorization(active)
             mutex.withLock {
                 check(sessions[sessionId] === active && active.state == SessionState.PROCESSING) {
                     "Issuance session changed while authorization was being built"
@@ -379,7 +378,7 @@ class WalletIssuanceSessionService(
                 active.authorization = authorization
                 active.state = SessionState.AWAITING_CALLBACK
                 active.expiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                    sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
+                        sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
             }
             persistActive(active)
             return authorization.public
@@ -463,10 +462,10 @@ class WalletIssuanceSessionService(
         }
         val removed = try {
             val removedFromMemory = mutex.withLock {
-            if (active?.state == SessionState.PROCESSING) return@withLock false
-            val activeRemoved = sessions.remove(sessionId) != null
-            val deferredRemoved = deferred.entries.removeAll { it.value.sessionId == sessionId }
-            activeRemoved || deferredRemoved
+                if (active?.state == SessionState.PROCESSING) return@withLock false
+                val activeRemoved = sessions.remove(sessionId) != null
+                val deferredRemoved = deferred.entries.removeAll { it.value.sessionId == sessionId }
+                activeRemoved || deferredRemoved
             }
             if (active?.state == SessionState.PROCESSING) return invalidSession(sessionId)
             val persisted = sessionStore?.list().orEmpty().filter { it.sessionId == sessionId }
@@ -585,8 +584,8 @@ class WalletIssuanceSessionService(
         } catch (error: TokenRequestException) {
             log.warn {
                 "Issuance token request failed: status=${error.statusCode}, " +
-                    "oauthError=${error.oauthError}, grant=${active.public.offer.grant}, " +
-                    "clientId=${active.request.clientId}, dpopAdvertised=${active.dpopAlgorithms() != null}"
+                        "oauthError=${error.oauthError}, grant=${active.public.offer.grant}, " +
+                        "clientId=${active.request.clientId}, dpopAdvertised=${active.dpopAlgorithms() != null}"
             }
             if (
                 retryTokenRejection &&
@@ -632,7 +631,7 @@ class WalletIssuanceSessionService(
             } catch (error: Exception) {
                 throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO, error)
             }
-            val proofNonce = if (proof.required) fetchNonce(active.resolved.issuerMetadata) else null
+            val proofNonce = if (proof.required) fetchNonce(active.resolved.issuerMetadata.metadata) else null
             val proofJwt = if (proof.required) {
                 try {
                     buildCredentialProof(
@@ -660,7 +659,7 @@ class WalletIssuanceSessionService(
                 }
             }.toString()
             val protected = postProtected(
-                endpoint = active.resolved.issuerMetadata.credentialEndpoint,
+                endpoint = active.resolved.issuerMetadata.metadata.credentialEndpoint,
                 accessToken = token.access_token,
                 tokenType = token.token_type,
                 dpop = dpopAlgorithms,
@@ -711,7 +710,7 @@ class WalletIssuanceSessionService(
                     }
                     val transactionId = response.transactionId
                         ?: throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
-                    val deferredEndpoint = active.resolved.issuerMetadata.deferredCredentialEndpoint
+                    val deferredEndpoint = active.resolved.issuerMetadata.metadata.deferredCredentialEndpoint
                         ?: throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
                     val public = WalletDeferredCredential(
                         id = Uuid.random().toString(),
@@ -742,9 +741,9 @@ class WalletIssuanceSessionService(
                 else -> {
                     log.warn {
                         "Issuance credential request failed: status=${protected.response.status.value}, " +
-                            "oauthError=${protected.oauthError}, " +
-                            "credentialConfigurationId=${offered.credentialConfigurationId}, " +
-                            "tokenType=${token.token_type}, dpopSent=${dpopAlgorithms != null}"
+                                "oauthError=${protected.oauthError}, " +
+                                "credentialConfigurationId=${offered.credentialConfigurationId}, " +
+                                "tokenType=${token.token_type}, dpopSent=${dpopAlgorithms != null}"
                     }
                     throw IssuanceStageException(WalletIssuanceErrorCode.ISSUER_RESPONSE)
                 }
@@ -760,18 +759,27 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestation = attestationHeaders(metadata, active.request.clientId, active.keyMaterial)
+        val attestationJwt = obtainAttestationJwt(active)
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
-            active.request.tokenRequestHeaders.isEmpty() && attestation == null
-        return TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
+            active.request.tokenRequestHeaders.isEmpty() && attestationJwt == null
+        val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthorizedCode,
             txCode = transactionCode,
             additionalHeaders = active.request.tokenRequestHeaders,
-            attestationHeaders = attestation,
+            attestationHeadersFactory = attestationJwt?.let { reusableAttestationJwt ->
+                { buildAttestationHeaders(active, reusableAttestationJwt) }
+            },
             anonymous = anonymous,
             dpopProofFactory = active.dpopFactory(),
+            onResponseHeaders = { headers ->
+                rememberAttestationChallenge(
+                    active,
+                    headers[CLIENT_ATTESTATION_CHALLENGE],
+                )
+            },
         )
+        return token
     }
 
     private suspend fun tokenForAuthorizationCode(
@@ -781,32 +789,48 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestation = attestationHeaders(metadata, active.request.clientId, active.keyMaterial)
-        return TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
+        val attestationJwt = obtainAttestationJwt(active)
+        val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
             tokenEndpoint = tokenEndpoint,
             code = code,
             codeVerifier = codeVerifier,
             additionalHeaders = active.request.tokenRequestHeaders,
-            attestationHeaders = attestation,
+            attestationHeadersFactory = attestationJwt?.let { reusableAttestationJwt ->
+                { buildAttestationHeaders(active, reusableAttestationJwt) }
+            },
             dpopProofFactory = active.dpopFactory(),
+            onResponseHeaders = { headers ->
+                rememberAttestationChallenge(
+                    active,
+                    headers[CLIENT_ATTESTATION_CHALLENGE],
+                )
+            },
         )
+        return token
     }
 
+    /**
+     * Advertised DPoP algorithms, without checking that the wallet key can sign them.
+     *
+     * Deliberately unlike [usableDpopAlgorithms], which the server-side [WalletIssuanceHandler] uses
+     * to fall back to a Bearer token. A session wallet's key is fixed instance material, so an issuer
+     * demanding algorithms it cannot produce is a misconfiguration worth surfacing rather than
+     * silently downgrading the security posture the wallet was built for. `dpopFactory` therefore
+     * raises `WalletIssuanceErrorCode.CRYPTO` before any token request is attempted - asserted by
+     * `unsupportedDpopKeyInPreAuthorizedGrantFailsAsCryptoBeforeTokenRequest`.
+     */
     private fun ActiveSession.dpopAlgorithms(): Set<String>? =
-        resolved.authorizationServerMetadata.dpopSigningAlgValuesSupported
-            ?.takeIf { it.isNotEmpty() }
+        resolved.authorizationServerMetadata.dpopSigningAlgorithms()
 
     private fun ActiveSession.dpopFactory(): DPoPProofFactory? =
         dpopAlgorithms()?.let { algorithms ->
             { endpoint: String, nonce: String? ->
                 try {
-                    val crypto2Key = keyMaterial.requireCrypto2SigningKey()
-                    DPoPProofBuilder().buildProof(
-                        key = crypto2Key,
-                        httpMethod = "POST",
-                        targetUri = endpoint,
+                    buildDpopProof(
+                        keyMaterial = keyMaterial,
+                        algorithms = algorithms,
+                        endpoint = endpoint,
                         nonce = nonce,
-                        supportedAlgorithms = algorithms,
                     )
                 } catch (error: CancellationException) {
                     throw error
@@ -816,11 +840,10 @@ class WalletIssuanceSessionService(
             }
         }
 
-    private suspend fun buildAuthorization(
-        resolved: ResolvedOffer,
-        request: WalletIssuanceSessionRequest,
-        keyMaterial: WalletKeyStoreEntry,
-    ): AuthorizationState {
+    private suspend fun buildAuthorization(active: ActiveSession): AuthorizationState {
+        val resolved = active.resolved
+        val request = active.request
+        val keyMaterial = active.keyMaterial
         val metadata = resolved.authorizationServerMetadata
         val endpoint = requireNotNull(metadata.authorizationEndpoint) {
             "Authorization server has no authorization endpoint"
@@ -847,34 +870,21 @@ class WalletIssuanceSessionService(
                 redirectUri = request.redirectUri.toString(),
                 dpopJkt = dpopJkt,
             )
-            val attestation = attestationHeaders(metadata, request.clientId, keyMaterial)
-            val response = httpClient.post(parEndpoint) {
-                contentType(ContentType.Application.FormUrlEncoded)
-                setBody(Parameters.build {
-                    pushed.parameters.forEach { (name, value) -> append(name, value) }
-                }.formUrlEncode())
-                attestation?.let { headers ->
-                    header(ClientAttestationHeaders.HEADER_ATTESTATION, headers.attestationJwt)
-                    header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, headers.popJwt)
-                }
+            val attestation = obtainAttestationJwt(active)?.let { reusableAttestationJwt ->
+                buildAttestationHeaders(active, reusableAttestationJwt)
             }
-            when {
-                response.status == HttpStatusCode.Created -> Unit
-
-                response.status == HttpStatusCode.TooManyRequests ||
-                    response.status.value >= 500 -> {
-                    throw RetryablePushedAuthorizationRequestException(
-                        statusCode = response.status.value,
+            val par = PushedAuthorizationRequestExecutor.execute(
+                httpClient = httpClient,
+                parEndpoint = parEndpoint,
+                parameters = pushed.parameters,
+                attestationHeaders = attestation,
+                onResponseHeaders = { headers ->
+                    rememberAttestationChallenge(
+                        active,
+                        headers[CLIENT_ATTESTATION_CHALLENGE],
                     )
-                }
-
-                else -> {
-                    throw IllegalArgumentException(
-                        "Pushed authorization request failed with HTTP ${response.status.value}"
-                    )
-                }
-            }
-            val par = json.decodeFromString<PushedAuthorizationResponse>(response.bodyAsText())
+                },
+            )
             val browserUrl = URLBuilder(endpoint).apply {
                 parameters.append("client_id", request.clientId)
                 parameters.append("request_uri", par.requestUri)
@@ -891,7 +901,7 @@ class WalletIssuanceSessionService(
                     ),
                     pushedAuthorizationRequestUsed = true,
                     requestUriExpiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                        par.expiresIn * 1000L,
+                            par.expiresIn * 1000L,
                 ),
                 pkce = pkce,
             )
@@ -942,9 +952,12 @@ class WalletIssuanceSessionService(
             val parsed = CredentialOfferParser.parseCredentialOfferUrl(request.getEffectiveOfferString())
             CredentialOfferResolver(httpClient).resolveCredentialOffer(parsed.credentialOffer, parsed.credentialOfferUri)
         }
-        val resolver = IssuerMetadataResolver(httpClient)
+        val resolver = IssuerMetadataResolver(httpClient, metadataTrustResolver)
+        // Operational metadata is always resolved from issuer-derived well-known endpoints.
+        // Unrecognized offer parameters are caller-controlled and must not select network
+        // endpoints for issuance.
         val issuerMetadata = resolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
-        require(issuerMetadata.credentialIssuer == offer.credentialIssuer) {
+        require(issuerMetadata.metadata.credentialIssuer == offer.credentialIssuer) {
             "Credential issuer metadata identifier does not match the offer"
         }
         val grantAuthorizationServer = when (offer.getGrantType()) {
@@ -952,12 +965,12 @@ class WalletIssuanceSessionService(
             is GrantType.PreAuthorizedCode -> offer.grants?.preAuthorizedCode?.authorizationServer
             else -> null
         }
-        val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata, grantAuthorizationServer)
+        val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata.metadata, grantAuthorizationServer)
         val authorizationServerMetadata = resolver.resolveAuthorizationServerMetadata(selectedAuthorizationServer)
         require(authorizationServerMetadata.issuer == selectedAuthorizationServer) {
             "Authorization server metadata issuer does not match the selected server"
         }
-        val offered = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
+        val offered = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
         require(offered.isNotEmpty()) { "Credential offer resolved no supported credentials" }
         return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered)
     }
@@ -978,7 +991,7 @@ class WalletIssuanceSessionService(
     }
 
     private fun ResolvedOffer.toPreview(grant: GrantType): WalletIssuanceOfferPreview {
-        val issuerDisplay = issuerMetadata.display?.firstOrNull()
+        val issuerDisplay = issuerMetadata.metadata.display?.firstOrNull()
         val txCode = offer.grants?.preAuthorizedCode?.txCode
         return WalletIssuanceOfferPreview(
             grant = when (grant) {
@@ -987,11 +1000,12 @@ class WalletIssuanceSessionService(
                 else -> error("Unsupported credential offer grant")
             },
             issuer = WalletIssuanceIssuerPreview(
-                identifier = offer.credentialIssuer,
+                identifier = issuerMetadata.metadata.credentialIssuer,
                 name = issuerDisplay?.name,
                 locale = issuerDisplay?.locale,
                 logoUri = issuerDisplay?.logo?.uri,
                 logoAltText = issuerDisplay?.logo?.altText,
+                metadataProvenance = issuerMetadata.toPreviewProvenance(),
             ),
             credentials = offeredCredentials.map { offered ->
                 val display = offered.configuration.credentialMetadata?.display?.firstOrNull()
@@ -1006,6 +1020,16 @@ class WalletIssuanceSessionService(
             transactionCode = txCode?.let {
                 WalletIssuanceTransactionCode(it.inputMode, it.length, it.description)
             },
+        )
+    }
+
+    private fun ResolvedCredentialIssuerMetadata.toPreviewProvenance(): WalletIssuanceMetadataProvenance = when (this) {
+        is ResolvedCredentialIssuerMetadata.Unsigned -> WalletIssuanceMetadataProvenance.Unsigned
+        is ResolvedCredentialIssuerMetadata.Signed -> WalletIssuanceMetadataProvenance.Signed(
+            compactJwt = compactJwt,
+            algorithm = signer.algorithm,
+            keyId = signer.keyId,
+            trustType = signer.trustType,
         )
     }
 
@@ -1047,6 +1071,7 @@ class WalletIssuanceSessionService(
             supportsHolderDid -> ProofKeyBinding.KeyId(requireNotNull(didKeyId))
             methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey } ->
                 ProofKeyBinding.Jwk
+
             else -> error("Issuer requires a DID that is bound to the selected holder key")
         }
         val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
@@ -1123,17 +1148,15 @@ class WalletIssuanceSessionService(
         body: String,
     ): ProtectedResponse {
         var nonce = dpopNonce
-        repeat(2) { attempt ->
+        repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
             val proof = try {
                 dpop?.let { algorithms ->
-                    val crypto2Key = keyMaterial.requireCrypto2SigningKey()
-                    DPoPProofBuilder().buildProof(
-                        key = crypto2Key,
-                        httpMethod = "POST",
-                        targetUri = endpoint,
+                    buildDpopProof(
+                        keyMaterial = keyMaterial,
+                        algorithms = algorithms,
+                        endpoint = endpoint,
                         accessToken = accessToken,
                         nonce = nonce,
-                        supportedAlgorithms = algorithms,
                     )
                 }
             } catch (error: CancellationException) {
@@ -1153,7 +1176,7 @@ class WalletIssuanceSessionService(
             } catch (error: Exception) {
                 throw IssuanceStageException(WalletIssuanceErrorCode.NETWORK, error)
             }
-            val oauthError = response.oauthError()
+            val oauthError = response.oauthErrorCode()
             val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
             if (
                 attempt == 0 &&
@@ -1169,51 +1192,79 @@ class WalletIssuanceSessionService(
         error("DPoP nonce retry exhausted")
     }
 
-    private suspend fun HttpResponse.oauthError(): String? {
-        if (status.isSuccess()) return null
-        if (headers[HttpHeaders.WWWAuthenticate]?.contains(USE_DPOP_NONCE, ignoreCase = true) == true) {
-            return USE_DPOP_NONCE
-        }
-        return try {
-            Json.parseToJsonElement(bodyAsText()).jsonObject["error"]?.jsonPrimitive?.contentOrNull
-        } catch (error: CancellationException) {
-            throw error
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private suspend fun attestationHeaders(
-        metadata: AuthorizationServerMetadata,
-        clientId: String,
-        keyMaterial: WalletKeyStoreEntry,
-    ): ClientAttestationHeaders? {
+    private suspend fun obtainAttestationJwt(active: ActiveSession): String? {
+        val metadata = active.resolved.authorizationServerMetadata
         val assembler = attestationAssembler ?: return null
         if (metadata.tokenEndpointAuthMethodsSupported
                 ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) != true
         ) {
             return null
         }
-        val crypto2Key = keyMaterial.requireCrypto2SigningKey()
-        return assembler.buildAttestationHeaders(crypto2Key, clientId, metadata.issuer).also {
+        val advertisedAttestationAlgorithms = metadata.clientAttestationSigningAlgValuesSupported
+        metadata.clientAttestationPopSigningAlgValuesSupported?.let { advertised ->
+            require(ClientAttestationSigningAlgorithms.ES256 in advertised) {
+                "Authorization server does not advertise a supported client attestation PoP signing algorithm"
+            }
+        }
+        val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
+        return assembler.obtainAttestationJwt(crypto2Key, active.request.clientId).also { attestationJwt ->
+            advertisedAttestationAlgorithms?.let { advertised ->
+                validateClientAttestationAlgorithm(attestationJwt, advertised)
+            }
             emitEvent(WalletSessionEvent.issuance_attestation_obtained)
         }
     }
 
-    private fun dpopAlgorithmsForToken(
-        tokenType: String,
-        advertisedAlgorithms: Set<String>?,
-    ): Set<String>? = when {
-        tokenType.equals("DPoP", ignoreCase = true) -> requireNotNull(advertisedAlgorithms) {
-            "Authorization server returned a DPoP token without advertising DPoP support"
+    private suspend fun buildAttestationHeaders(
+        active: ActiveSession,
+        attestationJwt: String,
+    ): ClientAttestationHeaders {
+        val assembler = requireNotNull(attestationAssembler)
+        val metadata = active.resolved.authorizationServerMetadata
+        val challenge = active.attestationChallenge ?: metadata.challengeEndpoint?.let { endpoint ->
+            try {
+                WalletAttestationChallengeRequestBuilder(httpClient).requestChallenge(endpoint).attestationChallenge
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: WalletAttestationChallengeRequestException) {
+                val code = when (error.error) {
+                    WalletAttestationChallengeRequestError.INVALID_ENDPOINT -> WalletIssuanceErrorCode.ISSUER_METADATA
+                    WalletAttestationChallengeRequestError.NETWORK -> WalletIssuanceErrorCode.NETWORK
+                    WalletAttestationChallengeRequestError.AUTHORIZATION_SERVER_RESPONSE ->
+                        WalletIssuanceErrorCode.ISSUER_RESPONSE
+                    WalletAttestationChallengeRequestError.INVALID_RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
+                }
+                throw IssuanceStageException(code, error)
+            }
         }
-
-        tokenType.equals("Bearer", ignoreCase = true) -> null
-        else -> error("Authorization server returned an unsupported token type")
+        if (challenge != active.attestationChallenge) {
+            active.attestationChallenge = challenge
+            persistActive(active)
+        }
+        val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
+        val popJwt = assembler.buildPopJwt(crypto2Key, active.request.clientId, metadata.issuer, challenge)
+        return ClientAttestationHeaders(attestationJwt, popJwt)
     }
 
-    private fun authorizationScheme(tokenType: String): String =
-        if (tokenType.equals("DPoP", ignoreCase = true)) "DPoP" else "Bearer"
+    private fun validateClientAttestationAlgorithm(jwt: String, advertised: Set<String>) {
+        val algorithm = try {
+            CompactJws.decodeUnverified(jwt).algorithm.identifier
+        } catch (_: Exception) {
+            null
+        }
+        require(!algorithm.isNullOrBlank()) {
+            "Wallet Attestation JWT must contain a protected JOSE alg header"
+        }
+        require(algorithm in advertised) {
+            "Authorization server does not advertise the Wallet Attestation JWT algorithm $algorithm"
+        }
+    }
+
+    private suspend fun rememberAttestationChallenge(active: ActiveSession, challenge: String?) {
+        val next = challenge?.takeIf { it.isNotBlank() } ?: return
+        active.attestationChallenge = next
+        persistActive(active)
+    }
 
     private suspend fun Wallet.parseAndStore(issued: IssuedCredential, label: String?): StoredCredential {
         val raw = issued.credential.let { value ->
@@ -1277,10 +1328,12 @@ class WalletIssuanceSessionService(
         }
 
         val offer = json.decodeFromString<CredentialOffer>(persisted.offer)
-        val issuerMetadata = json.decodeFromString<CredentialIssuerMetadata>(persisted.issuerMetadata)
+        // The store is an integrity-protected persistence boundary. Restore the resolution snapshot
+        // established when the session started, then revalidate its protocol bindings below.
+        val issuerMetadata = json.decodeFromString<ResolvedCredentialIssuerMetadata>(persisted.issuerMetadata)
         val authorizationServerMetadata =
             json.decodeFromString<AuthorizationServerMetadata>(persisted.authorizationServerMetadata)
-        val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
+        val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
         val resolved = ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offeredCredentials)
         validatePersistedResolution(persisted.public, resolved)
 
@@ -1300,9 +1353,11 @@ class WalletIssuanceSessionService(
             SessionState.AWAITING_ACCEPTANCE -> require(persisted.authorization == null) {
                 "Stored review session already contains authorization state"
             }
+
             SessionState.AWAITING_CALLBACK -> require(persisted.authorization != null) {
                 "Stored callback session is missing authorization state"
             }
+
             SessionState.PROCESSING -> Unit
         }
         val authorization = persisted.authorization?.let { public ->
@@ -1332,6 +1387,7 @@ class WalletIssuanceSessionService(
             authorization = authorization,
             state = persisted.state,
             expiresAtEpochMilliseconds = persisted.expiresAtEpochMilliseconds,
+            attestationChallenge = persisted.attestationChallenge,
         )
         return mutex.withLock {
             sessions[sessionId] ?: active.also { sessions[sessionId] = it }
@@ -1345,15 +1401,15 @@ class WalletIssuanceSessionService(
         require(resolved.offer.credentialIssuer == public.offer.issuer.identifier) {
             "Stored issuance session issuer binding is invalid"
         }
-        require(resolved.issuerMetadata.credentialIssuer == resolved.offer.credentialIssuer) {
+        require(resolved.issuerMetadata.metadata.credentialIssuer == resolved.offer.credentialIssuer) {
             "Stored credential issuer metadata binding is invalid"
         }
-        require(resolved.authorizationServerMetadata.issuer in resolved.issuerMetadata.authorizationServerIssuers()) {
+        require(resolved.authorizationServerMetadata.issuer in resolved.issuerMetadata.metadata.authorizationServerIssuers()) {
             "Stored authorization server binding is invalid"
         }
         require(
             resolved.offeredCredentials.map { it.credentialConfigurationId } ==
-                public.offer.credentials.map { it.configurationId }
+                    public.offer.credentials.map { it.configurationId }
         ) { "Stored offered credential binding is invalid" }
         val resolvedGrant = when (resolved.offer.getGrantType()) {
             is GrantType.AuthorizationCode -> WalletIssuanceGrant.AUTHORIZATION_CODE
@@ -1395,6 +1451,7 @@ class WalletIssuanceSessionService(
             codeVerifier = active.authorization?.pkce?.codeVerifier,
             state = active.state,
             expiresAtEpochMilliseconds = active.expiresAtEpochMilliseconds,
+            attestationChallenge = active.attestationChallenge,
         )
         store.put(
             WalletIssuanceSessionRecord(
@@ -1417,8 +1474,8 @@ class WalletIssuanceSessionService(
         val now = nowEpochMilliseconds()
         val expired = records.filter {
             it.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION &&
-                runCatching { json.decodeFromString<PersistedActiveSession>(it.payload).expiresAtEpochMilliseconds <= now }
-                    .getOrDefault(false)
+                    runCatching { json.decodeFromString<PersistedActiveSession>(it.payload).expiresAtEpochMilliseconds <= now }
+                        .getOrDefault(false)
         }
         expired.forEach { record ->
             store.remove(record.id)
@@ -1539,11 +1596,11 @@ class WalletIssuanceSessionService(
                 active.state = state
                 if (state == SessionState.AWAITING_ACCEPTANCE) active.authorization = null
                 active.expiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                    when (state) {
-                        SessionState.AWAITING_ACCEPTANCE -> sessionPolicy.reviewTtl.inWholeMilliseconds
-                        SessionState.AWAITING_CALLBACK -> sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
-                        SessionState.PROCESSING -> PROCESSING_EXPIRY
-                    }
+                        when (state) {
+                            SessionState.AWAITING_ACCEPTANCE -> sessionPolicy.reviewTtl.inWholeMilliseconds
+                            SessionState.AWAITING_CALLBACK -> sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
+                            SessionState.PROCESSING -> PROCESSING_EXPIRY
+                        }
                 restored = true
             }
         }
@@ -1561,7 +1618,7 @@ class WalletIssuanceSessionService(
                 active.authorization = null
                 active.state = SessionState.AWAITING_ACCEPTANCE
                 active.expiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                    sessionPolicy.reviewTtl.inWholeMilliseconds
+                        sessionPolicy.reviewTtl.inWholeMilliseconds
                 true
             }
         }
@@ -1631,14 +1688,14 @@ class WalletIssuanceSessionService(
 
     private data class ResolvedOffer(
         val offer: CredentialOffer,
-        val issuerMetadata: CredentialIssuerMetadata,
+        val issuerMetadata: ResolvedCredentialIssuerMetadata,
         val authorizationServerMetadata: AuthorizationServerMetadata,
         val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
     )
 
     private data class AuthorizationState(
         val public: WalletIssuanceAuthorization,
-        val pkce: id.waltid.openid4vci.wallet.oauth.PKCEManager.PKCEData,
+        val pkce: PKCEManager.PKCEData,
     )
 
     private data class ActiveSession(
@@ -1651,6 +1708,7 @@ class WalletIssuanceSessionService(
         var authorization: AuthorizationState?,
         var state: SessionState,
         var expiresAtEpochMilliseconds: Long,
+        var attestationChallenge: String? = null,
     ) {
         val persistable: Boolean get() = request.key == null
     }
@@ -1675,6 +1733,7 @@ class WalletIssuanceSessionService(
         val public: WalletDeferredCredential,
         val record: DeferredRecord,
     )
+
     private data class ProtectedResponse(
         val response: HttpResponse,
         val dpopNonce: String?,
@@ -1702,6 +1761,7 @@ class WalletIssuanceSessionService(
         val codeVerifier: String? = null,
         val state: SessionState,
         val expiresAtEpochMilliseconds: Long,
+        val attestationChallenge: String? = null,
     )
 
     @Serializable
@@ -1727,20 +1787,6 @@ class WalletIssuanceSessionService(
             ?: wallet.resolveKeyMaterial(keyId, setOf(KeyUsage.SIGN))
             ?: error("No holder key is available for credential issuance")
 
-    private suspend fun WalletKeyStoreEntry.requireCrypto2SigningKey(): Crypto2Key =
-        crypto2Key
-            ?: legacyKey?.let { migrateLocalJwk(it) }?.let { crypto2Runtime.restore(it) }
-            ?: error("Key '$keyId' has no usable crypto2 signing representation")
-
-    private suspend fun migrateLocalJwk(key: Key) =
-        (key as? JWKKey)?.takeUnless { it.keyType == KeyType.secp256k1 }?.let {
-            val jwk = it.exportJWKObject()
-            EncodedKey.Jwk(
-                BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
-                privateMaterial = Jwk.containsPrivateMaterial(jwk),
-            ).toStoredSoftwareKey(KeyId(it.getKeyId()), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
-        }
-
     private suspend fun WalletKeyStoreEntry.exportPublicJwkObject(): JsonObject {
         crypto2Key?.let { key ->
             val exported = requireNotNull(key.capabilities.publicKeyExporter) {
@@ -1752,16 +1798,6 @@ class WalletIssuanceSessionService(
         return legacy.getPublicKey().exportJWKObject()
     }
 
-    private suspend fun WalletKeyStoreEntry.jwkThumbprint(): String {
-        crypto2Key?.let { key ->
-            val exported = requireNotNull(key.capabilities.publicKeyExporter) {
-                "Key '$keyId' does not export public material"
-            }.exportPublicKey().toPublicJwk(key.spec)
-            return Jwk.sha256Thumbprint(exported)
-        }
-        val legacy = requireNotNull(legacyKey) { "Key '$keyId' has no usable public representation" }
-        return legacy.getPublicKey().getThumbprint()
-    }
 
     private class IssuanceStageException(
         val code: WalletIssuanceErrorCode,
@@ -1774,9 +1810,6 @@ class WalletIssuanceSessionService(
     private companion object {
         const val MAX_ACTIVE_SESSIONS = 32
         const val PROCESSING_EXPIRY = Long.MAX_VALUE
-        const val DPOP_HEADER = "DPoP"
-        const val DPOP_NONCE_HEADER = "DPoP-Nonce"
-        const val USE_DPOP_NONCE = "use_dpop_nonce"
         const val ACTIVE_RECORD_PREFIX = "active:"
         const val DEFERRED_RECORD_PREFIX = "deferred:"
 

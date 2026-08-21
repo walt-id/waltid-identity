@@ -185,10 +185,13 @@ value class PresentationPreviewHandle(val value: String) {
 
 sealed interface PreviewPresentationResult {
     val handle: PresentationPreviewHandle
+    val resolvedAuthorizationRequest: ResolvedAuthorizationRequest
+    val authorizationRequest: AuthorizationRequest
+        get() = resolvedAuthorizationRequest.authorizationRequest
 
     data class Ready(
         override val handle: PresentationPreviewHandle,
-        val authorizationRequest: AuthorizationRequest,
+        override val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
         /** Response-encryption selection derived from this authenticated request, or `null` for a plain response. */
         val responseEncryption: ResponseEncryption.Metadata?,
         val credentialOptions: List<PresentationCredentialOption>,
@@ -198,7 +201,7 @@ sealed interface PreviewPresentationResult {
 
     data class Invalid(
         override val handle: PresentationPreviewHandle,
-        val authorizationRequest: AuthorizationRequest,
+        override val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
         val error: PresentationRequestError,
     ) : PreviewPresentationResult
 }
@@ -396,7 +399,9 @@ object WalletPresentationHandler {
     suspend fun presentCredential(
         wallet: Wallet,
         request: PresentCredentialRequest,
-        onEvent: suspend (WalletSessionEvent) -> Unit,
+        // Defaulted so a caller that only cares about transaction data need not opt into session
+        // notifications, matching every other overload here.
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult = presentCredentialWithTrust(
         wallet,
@@ -481,7 +486,9 @@ object WalletPresentationHandler {
     suspend fun presentCredentialIsolated(
         wallet: Wallet,
         request: PresentCredentialIsolatedRequest,
-        onEvent: suspend (WalletSessionEvent) -> Unit,
+        // Defaulted so a caller that only cares about transaction data need not opt into session
+        // notifications, matching every other overload here.
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult = presentCredentialIsolatedWithTrust(
         wallet,
@@ -704,7 +711,7 @@ object WalletPresentationHandler {
                     error = validation.error,
                 ),
             )
-            return PreviewPresentationResult.Invalid(handle, authorizationRequest, validation.error)
+            return PreviewPresentationResult.Invalid(handle, resolvedAuthorizationRequest, validation.error)
         }
 
         val valid = validation as PresentationRequestValidationResult.Valid
@@ -738,7 +745,7 @@ object WalletPresentationHandler {
                     error = availabilityError,
                 ),
             )
-            return PreviewPresentationResult.Invalid(handle, authorizationRequest, availabilityError)
+            return PreviewPresentationResult.Invalid(handle, resolvedAuthorizationRequest, availabilityError)
         }
         onEvent(WalletSessionEvent.presentation_credentials_selected)
         val credentialOptions = matched.flatMap { (queryId, results) ->
@@ -769,7 +776,7 @@ object WalletPresentationHandler {
         )
         return PreviewPresentationResult.Ready(
             handle = handle,
-            authorizationRequest = authorizationRequest,
+            resolvedAuthorizationRequest = resolvedAuthorizationRequest,
             responseEncryption = responseEncryption,
             credentialRequirements = query.requiredCredentialRequirements(),
             credentialOptions = credentialOptions,
@@ -1494,6 +1501,7 @@ object WalletPresentationHandler {
                     requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
                         WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities()),
                         clientIdTrustConfiguration,
+                        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
                     ),
                 )
             },

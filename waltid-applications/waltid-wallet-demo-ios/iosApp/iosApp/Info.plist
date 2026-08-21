@@ -13,6 +13,8 @@
 	<string>$(AppIdentifierPrefix)id.walt.wallet.native.shared</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan credential offer and presentation request QR codes.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to authorize wallet signing.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

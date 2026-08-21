@@ -589,6 +589,7 @@ expect object ETSITrustListInlineResolver {
  * @param trustedIndex Index of the trusted certificate in the chain
  * @return Pair of (isValid, errorMessage)
  */
+@Deprecated("Why trust some parts in the Chain? Not tested, never used")
 expect fun validateCertificateChainToIndex(
     certificateChain: List<String>,
     trustedIndex: Int

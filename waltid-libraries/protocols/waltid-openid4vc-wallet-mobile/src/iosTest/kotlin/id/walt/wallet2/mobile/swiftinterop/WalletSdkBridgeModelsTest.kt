@@ -3,11 +3,18 @@ package id.walt.wallet2.mobile.swiftinterop
 import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.handlers.PreviewSessionFailureReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutValidation
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class WalletSdkBridgeModelsTest {
 
@@ -45,20 +52,102 @@ class WalletSdkBridgeModelsTest {
     }
 
     @Test
+    fun mapsAuthorizationFailuresToDedicatedBridgeCategory() {
+        val error = WalletBridgeError.fromThrowable(
+            KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
+                message = "Protected key unavailable",
+            )
+        )
+
+        assertEquals(WalletBridgeErrorCategory.authorization, error.category)
+        assertEquals(KeyUseAuthorizationFailure.ProtectedKeyUnavailable, error.authorizationFailure)
+    }
+
+    @Test
     fun resultWrapperCarriesSuccessOrTypedFailure() {
         val success: WalletBridgeResult<List<String>> = WalletBridgeResult.Success(listOf("credential-1"))
         val failure: WalletBridgeResult<List<String>> = WalletBridgeResult.Failure(
-            WalletBridgeError(
-                category = WalletBridgeErrorCategory.network,
-                message = "offline",
-            )
+            WalletBridgeError.fromThrowable(IllegalStateException("offline"))
         )
 
         assertIs<WalletBridgeResult.Success<List<String>>>(success)
         assertEquals(listOf("credential-1"), success.value)
 
         assertIs<WalletBridgeResult.Failure>(failure)
-        assertEquals(WalletBridgeErrorCategory.network, failure.error.category)
+        assertEquals(WalletBridgeErrorCategory.internalFailure, failure.error.category)
+    }
+
+    @Test
+    fun bridgePreflightRequiresFailureExactlyWhenUnsupported() {
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeKeyPreflight(supported = true, failure = KeyUseAuthorizationUnsupportedReason.BiometricUnavailable)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeKeyPreflight(supported = false)
+        }
+    }
+
+    @Test
+    fun bridgeTimedAuthorizationPolicyPreservesTimeoutAndProviderValidation() {
+        val timed = WalletBridgeKeyUseAuthorizationPolicy(
+            type = WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse,
+            timeoutSeconds = 10,
+        )
+
+        assertEquals(KeyUseAuthorizationPolicy.BiometricTimedReuse(10), timed.toCorePolicy())
+
+        val preflight = KeyUseAuthorizationSupport.Supported(
+            effectivePolicy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10),
+            reuseEnforcement = KeyUseAuthorizationReuseEnforcement.ProviderProcess,
+            timeoutValidation = KeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly,
+        ).toBridgeModel()
+
+        assertEquals(timed, preflight.effectivePolicy)
+        assertEquals(
+            WalletBridgeKeyUseAuthorizationReuseEnforcement.ProviderProcess,
+            preflight.reuseEnforcement,
+        )
+        assertEquals(
+            WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly,
+            preflight.timeoutValidation,
+        )
+    }
+
+    @Test
+    fun bridgePreflightRejectsIncompleteTimedMetadataButKeepsAxesOrthogonal() {
+        val policy = WalletBridgeKeyUseAuthorizationPolicy(
+            type = WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse,
+            timeoutSeconds = 10,
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeKeyPreflight(supported = true, effectivePolicy = policy)
+        }
+        val valid = WalletBridgeKeyPreflight(
+            supported = true,
+            effectivePolicy = policy,
+            reuseEnforcement = WalletBridgeKeyUseAuthorizationReuseEnforcement.PlatformKeyStore,
+            timeoutValidation = WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly,
+        )
+        assertEquals(
+            WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly,
+            valid.timeoutValidation,
+        )
+    }
+
+    @Test
+    fun bridgeErrorRequiresAuthorizationFailureExactlyForAuthorizationCategory() {
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeError(WalletBridgeErrorCategory.authorization, "missing failure")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeError(
+                WalletBridgeErrorCategory.internalFailure,
+                "unexpected failure field",
+                authorizationFailure = KeyUseAuthorizationFailure.AuthorizationNotCompleted,
+            )
+        }
     }
 
     @Test

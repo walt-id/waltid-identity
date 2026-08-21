@@ -1,5 +1,6 @@
 package id.walt.openid4vci.handlers.credential
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
@@ -40,7 +41,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEnd
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
@@ -73,7 +74,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEnd
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,

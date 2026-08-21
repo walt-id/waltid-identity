@@ -1,19 +1,14 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.testing.test
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.cli.util.KeyUtil
 import id.walt.crypto2.jose.preferredJwsAlgorithm
 import id.walt.w3c.vc.vcs.W3CVC
-import id.walt.x509.CertificateDer
-import id.walt.x509.authorityKeyIdentifier
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
+import kotlinx.io.bytestring.ByteString
+import kotlinx.serialization.json.*
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -177,9 +172,11 @@ class DcqlPresentationCommandTest {
     fun `trusted authorities support AKI and fail closed for mismatches and unsupported types`() {
         val directory = Files.createTempDirectory("cli-vp-authority")
         val x5cCredential = issueX5cCredential(directory)
-        val aki = CertificateDer(Base64.Default.decode(TestCryptoFixtures.mdocIssuerCertificate)).authorityKeyIdentifier
-            ?: error("Test certificate has no AKI")
-        val akiValue = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(aki)
+        val aki = X509CertificateUtil.parseCertificateDerEncoded(
+            ByteString(Base64.Default.decode(TestCryptoFixtures.mdocIssuerCertificate))
+        ).data.extensionAuthorityKeyIdentifier?.keyIdentifier ?: error("Test certificate has no AKI")
+
+        val akiValue = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(aki.toByteArray())
 
         val acceptedQuery = directory.resolve("aki.json").also {
             it.writeText(authorityQuery("aki", akiValue))

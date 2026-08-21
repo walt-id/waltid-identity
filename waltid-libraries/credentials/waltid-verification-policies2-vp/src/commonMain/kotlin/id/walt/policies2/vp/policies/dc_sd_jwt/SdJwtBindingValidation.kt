@@ -39,8 +39,9 @@ internal fun requireFreshKbJwtIssuedAt(
 }
 
 internal fun requireSupportedSdAlgorithm(sdJwt: String) {
+    // RFC 9901 §4.1.1: when _sd_alg is omitted, sha-256 is the default.
     val algorithm = CompactJws.decodeUnverified(sdJwt).payload.payloadJson()["_sd_alg"]?.jsonPrimitive?.contentOrNull
-        ?: throw IllegalArgumentException("SD-JWT is missing required _sd_alg claim")
+        ?: "sha-256"
     require(algorithm.equals("sha-256", ignoreCase = true)) {
         "Unsupported SD-JWT disclosure hash algorithm: $algorithm"
     }

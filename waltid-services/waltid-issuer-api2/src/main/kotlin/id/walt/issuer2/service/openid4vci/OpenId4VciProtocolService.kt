@@ -1,5 +1,6 @@
 package id.walt.issuer2.service.openid4vci
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -52,7 +53,6 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.tokens.access.parseAccessTokenAuthorization
-import id.walt.x509.CertificateDer
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.mdoc.objects.mso.Status as MdocStatus
 import id.walt.mdoc.objects.mso.Status.StatusListInfo as MdocStatusListInfo
@@ -995,7 +995,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         try {
             val issuerKey = KeyManager.resolveSerializedKey(session.issuerKey)
             val crypto2IssuerKey = restoreSessionIssuerCrypto2Key(session, crypto2Runtime)
-            val x5Chain = session.x5Chain?.map { CertificateDer.fromPEMEncodedString(it) }
+            val x5Chain = session.x5Chain?.map { X509CertificateUtil.parseCertificatePem(it) }
 
             credentialProofKeyAcceptance?.let { acceptance ->
                 val accepted = try {

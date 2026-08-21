@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
 class Wallet2IntegrationTest {
 
     private val host = "127.0.0.1"
-    private val port = 17040
+    private val port = freePort()
 
     @Test
     fun testWalletLifecycle() {

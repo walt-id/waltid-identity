@@ -135,11 +135,21 @@ class Issuer2ProfileEndpointTest {
             profilesConfig.defaultIssuerX5chain.single().contains("-----BEGIN CERTIFICATE-----"),
             "Expected defaultIssuerX5chain to contain PEM certificate data",
         )
+        assertEquals(1, profilesConfig.defaultMdocIssuerX5chain.size)
+        assertTrue(
+            profilesConfig.defaultMdocIssuerX5chain.single().contains("-----BEGIN CERTIFICATE-----"),
+            "Expected defaultMdocIssuerX5chain to contain PEM certificate data",
+        )
         assertIssuerKeyShape(assertNotNull(profilesConfig.defaultHaipIssuerKey), "defaultHaipIssuerKey")
         assertEquals(1, profilesConfig.defaultHaipIssuerX5chain.size)
         assertTrue(
             profilesConfig.defaultHaipIssuerX5chain.single().contains("-----BEGIN CERTIFICATE-----"),
             "Expected defaultHaipIssuerX5chain to contain PEM certificate data",
+        )
+        assertEquals(1, profilesConfig.defaultHaipMdocIssuerX5chain.size)
+        assertTrue(
+            profilesConfig.defaultHaipMdocIssuerX5chain.single().contains("-----BEGIN CERTIFICATE-----"),
+            "Expected defaultHaipMdocIssuerX5chain to contain PEM certificate data",
         )
 
         profilesConfig.profiles.forEach { (profileId, profile) ->
@@ -461,12 +471,20 @@ class Issuer2ProfileEndpointTest {
         if (profileId in HAIP_PROFILE_IDS) {
             IssuerMaterial(
                 key = assertNotNull(profilesConfig.defaultHaipIssuerKey, "Expected defaultHaipIssuerKey"),
-                x5Chain = profilesConfig.defaultHaipIssuerX5chain,
+                x5Chain = if (profileId == ISO_MDL_HAIP_PROFILE_ID) {
+                    profilesConfig.defaultHaipMdocIssuerX5chain
+                } else {
+                    profilesConfig.defaultHaipIssuerX5chain
+                },
             )
         } else {
             IssuerMaterial(
                 key = assertNotNull(profilesConfig.defaultIssuerKey, "Expected defaultIssuerKey"),
-                x5Chain = profilesConfig.defaultIssuerX5chain,
+                x5Chain = if (profileId in MDOC_PROFILE_IDS) {
+                    profilesConfig.defaultMdocIssuerX5chain
+                } else {
+                    profilesConfig.defaultIssuerX5chain
+                },
             )
         }
 
@@ -605,6 +623,7 @@ class Issuer2ProfileEndpointTest {
         const val ISO_MDL_HAIP_PROFILE_ID = "isoMdlHaip"
         const val ISO_MDL_HAIP_CONFIGURATION_ID = "org.iso.18013.5.1.mDL.haip"
         const val ISO_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
+        const val SCA_PAYMENT_CARD_MDOC_PROFILE_ID = "scaPaymentCardMdoc"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
         const val IDENTITY_SD_JWT_CONFIGURATION_ID = "identity_credential"
         const val IDENTITY_HAIP_SD_JWT_PROFILE_ID = "identityCredentialHaipSdJwt"
@@ -622,6 +641,16 @@ class Issuer2ProfileEndpointTest {
         const val ISSUER_DID =
             "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6IkcwUklOQmlGLW9RVUQzZDVER25lZ1F1WGVuSTI5SkRhTUdvTXZpb0tSQk0iLCJ5IjoiZWQzZUZHczJwRXRycDd2QVo3QkxjYnJVdHBLa1lXQVQySlBVUUs0bE40RSJ9"
         val HAIP_PROFILE_IDS = setOf(ISO_MDL_HAIP_PROFILE_ID, IDENTITY_HAIP_SD_JWT_PROFILE_ID)
+        val MDOC_PROFILE_IDS = setOf(
+            ISO_MDL_PROFILE_ID,
+            "isoMdlAamva",
+            ISO_PHOTO_ID_PROFILE_ID,
+            "eudiPidMdoc",
+            SCA_PAYMENT_CARD_MDOC_PROFILE_ID,
+            "euAgeVerificationMdoc",
+            "idAustriaMdoc",
+            "googleIdCardMdoc",
+        )
 
         val MDOC_CATALOG_PROFILE_EXPECTATIONS = listOf(
             MdocProfileExpectation(
@@ -663,6 +692,14 @@ class Issuer2ProfileEndpointTest {
                 sampleNamespace = "eu.europa.ec.eudi.pid.1",
                 sampleClaim = "family_name",
                 sampleClaimValue = JsonPrimitive("Musterfrau"),
+            ),
+            MdocProfileExpectation(
+                profileId = SCA_PAYMENT_CARD_MDOC_PROFILE_ID,
+                name = "SCA Payment Card (demo)",
+                credentialConfigurationId = "sca_payment_card_mso_mdoc",
+                sampleNamespace = "eu.europa.ec.eudi.sca.payment_card.1",
+                sampleClaim = "card_last4",
+                sampleClaimValue = JsonPrimitive("4242"),
             ),
             MdocProfileExpectation(
                 profileId = "euAgeVerificationMdoc",

@@ -2,27 +2,21 @@
 
 package id.waltid.openid4vp.wallet.request
 
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webdatafetching.WebDataFetcher
-import id.walt.x509.CertificateDer
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.respond
-import io.ktor.client.request.HttpRequestData
-import io.ktor.http.URLBuilder
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpMethod
-import io.ktor.http.content.OutgoingContent
-import io.ktor.http.contentType
-import io.ktor.http.headersOf
-import io.ktor.http.parseQueryString
+import io.ktor.client.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.http.content.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -34,9 +28,11 @@ import kotlinx.serialization.json.put
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class AuthorizationRequestResolverJvmTest {
 
@@ -67,6 +63,10 @@ class AuthorizationRequestResolverJvmTest {
             metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
         )
         assertEquals(
+            JwsAlgorithm.entries.filterNot { it == JwsAlgorithm.ED448 }.map { it.identifier },
+            metadata.getValue("request_object_signing_alg_values_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
+        assertEquals(
             jsonObjectOf("dc+sd-jwt" to jsonObjectOf()),
             metadata.getValue("vp_formats_supported").jsonObject,
         )
@@ -78,7 +78,7 @@ class AuthorizationRequestResolverJvmTest {
             AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
                 vpFormatsSupported = jsonObjectOf(),
                 trustConfiguration = ClientIdTrustConfiguration(
-                    x509TrustAnchors = listOf(CertificateDer(byteArrayOf(1))),
+                    x509TrustAnchors = InMemoryTrustStore(),
                     trustedVerifierAttestationIssuers = setOf("did:example:attester"),
                 ),
             )
@@ -87,6 +87,28 @@ class AuthorizationRequestResolverJvmTest {
         assertEquals(
             listOf("redirect_uri", "x509_san_dns", "x509_hash", "decentralized_identifier", "verifier_attestation"),
             metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    @Test
+    fun `signed-only wallet metadata advertises configured pre-registered clients but not redirect uri`() {
+        val metadata = Json.parseToJsonElement(
+            AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                vpFormatsSupported = jsonObjectOf(),
+                trustConfiguration = ClientIdTrustConfiguration(
+                    preRegisteredClients = mapOf("verifier2" to ClientMetadata()),
+                ),
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            )
+        ).jsonObject
+
+        assertEquals(
+            listOf("pre-registered", "decentralized_identifier"),
+            metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
+        assertEquals(
+            JwsAlgorithm.entries.filterNot { it == JwsAlgorithm.ED448 }.map { it.identifier },
+            metadata.getValue("request_object_signing_alg_values_supported").jsonArray.map { it.jsonPrimitive.content },
         )
     }
 
@@ -177,7 +199,7 @@ class AuthorizationRequestResolverJvmTest {
             }
         }
 
-        assertIs<ResolvedAuthorizationRequest.WithRequestObject>(resolved)
+        assertIs<ResolvedAuthorizationRequest.UnsignedRequestObject>(resolved)
         assertEquals("verifier2", resolved.authorizationRequest.clientId)
         assertEquals(requestObject, resolved.requestObject)
     }
@@ -243,7 +265,11 @@ class AuthorizationRequestResolverJvmTest {
             ),
         )
 
-        assertIs<ResolvedAuthorizationRequest.WithRequestObject>(resolved)
+        val authenticated = assertIs<ResolvedAuthorizationRequest.AuthenticatedRequestObject>(resolved)
+        assertEquals(requestObject, authenticated.requestObject)
+        assertEquals("EdDSA", authenticated.authentication.algorithm)
+        assertEquals(trustedKey.getKeyId(), authenticated.authentication.keyId)
+        assertIs<id.walt.openid4vp.clientidprefix.prefixes.PreRegistered>(authenticated.authentication.clientId)
     }
 
     @Test
@@ -300,7 +326,10 @@ class AuthorizationRequestResolverJvmTest {
             put("client_id", "verifier2")
             put("nonce", "nonce-123")
         }.toString().encodeToByteArray(),
-        mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+        mapOf(
+            "typ" to JsonPrimitive("oauth-authz-req+jwt"),
+            "kid" to JsonPrimitive(key.getKeyId()),
+        ),
     )
 
     private fun jsonObjectOf(vararg pairs: Pair<String, kotlinx.serialization.json.JsonElement>) =
@@ -308,4 +337,155 @@ class AuthorizationRequestResolverJvmTest {
 
     private fun HttpRequestData.bodyText(): String =
         (body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+
+    /**
+     * A bare `+` in the query must survive as a literal plus, or every Credential Format Identifier
+     * containing one (`dc+sd-jwt`, `vc+sd-jwt`) is mangled into a format that matches nothing. Ktor's
+     * [io.ktor.http.Url.parameters] form-decodes `+` to a space, which broke every SD-JWT VC
+     * presentation over `request_method=url_query` while leaving `mso_mdoc` unaffected.
+     * See AuthorizationRequestResolver.authorizationRequestParameters.
+     */
+    @Test
+    fun `plus in the authorization request query is a literal plus, not a space`() {
+        val url = URLBuilder(
+            "openid4vp://authorize" +
+                    "?client_id=redirect_uri%3Ahttps%3A%2F%2Fverifier.example.com%2Fresponse" +
+                    "&client_metadata=%7B%22vp_formats_supported%22%3A%7B%22dc+sd-jwt%22%3A%7B%7D%7D%7D" +
+                    "&nonce=abc%20def"
+        ).build()
+
+        val parameters = AuthorizationRequestResolver.authorizationRequestParameters(url)
+
+        assertEquals(
+            """{"vp_formats_supported":{"dc+sd-jwt":{}}}""",
+            parameters["client_metadata"],
+            "the format identifier must keep its '+'",
+        )
+        // Ktor's own parsing is what this works around - confirm the difference is real.
+        assertEquals(
+            """{"vp_formats_supported":{"dc sd-jwt":{}}}""",
+            url.parameters["client_metadata"],
+        )
+        // A genuinely intended space is percent-encoded and still decodes.
+        assertEquals("abc def", parameters["nonce"])
+    }
+
+    /**
+     * The conformance suite emits `{"alg":"none"}` - no `typ` - for
+     * `request_method=request_uri_unsigned`, so an unsigned Request Object without `typ` has to be
+     * accepted. A `typ` that is present but wrong must still be refused.
+     * See AuthorizationRequestResolver.requireRequestObjectType.
+     */
+    @Test
+    fun `unsigned request object may omit typ but not misstate it`() = runBlocking {
+        val clientId = "redirect_uri:https://verifier.example.com/response"
+        val claims = buildJsonObject {
+            put("client_id", JsonPrimitive(clientId))
+            put("response_type", JsonPrimitive("vp_token"))
+            put("nonce", JsonPrimitive("n-0S6_WzA2Mj"))
+            put("response_uri", JsonPrimitive("https://verifier.example.com/response"))
+        }
+        val b64 = { value: String ->
+            Base64.getUrlEncoder().withoutPadding().encodeToString(value.encodeToByteArray())
+        }
+        fun plainJwt(header: String) = "${b64(header)}.${b64(Json.encodeToString(claims))}."
+
+        suspend fun resolve(header: String) = AuthorizationRequestResolver.resolve(
+            requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", clientId)
+                parameters.append("request", plainJwt(header))
+            }.build(),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            fetchRequestUri = { _, _ -> error("request_uri must not be fetched for an inline request") },
+        )
+
+        // The suite's shape: alg=none, no typ.
+        assertEquals(clientId, resolve("""{"alg":"none"}""").authorizationRequest.clientId)
+
+        val wrongTyp = assertFails { resolve("""{"alg":"none","typ":"JWT"}""") }
+        assertTrue(
+            "typ must be" in (wrongTyp.message ?: ""),
+            "a wrong typ must still be rejected, was: ${wrongTyp.message}",
+        )
+    }
+
+    /**
+     * `redirect_uri` has no key to sign with - OpenID4VP 1.0 Section 5.9.3 forbids pairing it with a
+     * signed request - so an unsigned Request Object under that prefix must be accepted even when the
+     * policy is REQUIRE_SIGNED. Refusing it made every `request_uri_unsigned` flow impossible, as that
+     * is the only prefix the conformance suite pairs with the request method.
+     *
+     * The second half is the part that must never regress: every other prefix authenticates the
+     * Verifier *through* the signature, so `alg: none` there would let anyone claim the identifier.
+     */
+    @Test
+    fun `unsigned request object is allowed only for prefixes that cannot sign`() = runBlocking {
+        suspend fun resolveUnsigned(clientId: String) = AuthorizationRequestResolver.resolve(
+            requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", clientId)
+                parameters.append(
+                    "request",
+                    unsignedJwt("""{"client_id":"$clientId","nonce":"nonce-123"}"""),
+                )
+            }.build(),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+        ) { _, _ -> error("request_uri fetch should not be called for inline request objects") }
+
+        val redirectUriClientId = "redirect_uri:https://verifier.example.com/response"
+        assertEquals(
+            redirectUriClientId,
+            resolveUnsigned(redirectUriClientId).authorizationRequest.clientId,
+        )
+
+        // An unsigned request must not be able to impersonate a certificate-authenticated verifier.
+        assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+            resolveUnsigned("x509_san_dns:bank.example.com")
+        }
+        assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+            resolveUnsigned("x509_hash:Uvo3HtuIxuhC92rShpgqcT3YXwrqRxWEviRiA0OZszk")
+        }
+        assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+            resolveUnsigned("decentralized_identifier:did:web:verifier.example.com")
+        }
+        Unit
+    }
+
+    /**
+     * OpenID4VP 1.0 Section 5.9.3: under `redirect_uri` the Client Identifier *is* the response
+     * destination, and the Verifier MAY omit the parameter. Both directions matter - deriving the
+     * omitted value, and refusing a value that contradicts the Client Identifier, which would
+     * otherwise have the wallet post a Presentation to a URI the identifier does not authorise.
+     */
+    @Test
+    fun `redirect_uri client id binds the response destination`() = runBlocking {
+        val destination = "https://verifier.example.com/response"
+        val clientId = "redirect_uri:$destination"
+
+        suspend fun resolvePlain(vararg extra: Pair<String, String>) = AuthorizationRequestResolver.resolve(
+            requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", clientId)
+                parameters.append("response_type", "vp_token")
+                parameters.append("response_mode", "direct_post")
+                parameters.append("nonce", "nonce-123")
+                extra.forEach { (k, value) -> parameters.append(k, value) }
+            }.build(),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+        ) { _, _ -> error("request_uri fetch should not be called") }
+
+        // Omitted: derived from the client_id.
+        assertEquals(destination, resolvePlain().authorizationRequest.responseUri)
+
+        // Stated consistently: kept as-is.
+        assertEquals(
+            destination,
+            resolvePlain("response_uri" to destination).authorizationRequest.responseUri,
+        )
+
+        // Contradicting the client_id: refused, so the VP Token cannot be posted elsewhere.
+        val mismatch = assertFails { resolvePlain("response_uri" to "https://attacker.example.org/collect") }
+        assertTrue(
+            "does not match the redirect_uri client_id" in (mismatch.message ?: ""),
+            "expected a binding failure, was: ${mismatch.message}",
+        )
+    }
 }

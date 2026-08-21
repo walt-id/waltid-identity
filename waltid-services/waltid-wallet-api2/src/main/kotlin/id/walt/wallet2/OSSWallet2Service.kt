@@ -1,5 +1,7 @@
 package id.walt.wallet2
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
@@ -9,11 +11,7 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
-import id.walt.wallet2.persistence.ExposedCredentialStore
-import id.walt.wallet2.persistence.ExposedDidStore
-import id.walt.wallet2.persistence.ExposedKeyStore
-import id.walt.wallet2.persistence.ExposedStoreRegistry
-import id.walt.wallet2.persistence.ExposedWalletStore
+import id.walt.wallet2.persistence.*
 import id.walt.wallet2.server.StoreFactory
 import id.walt.wallet2.server.WalletResolver
 import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
@@ -22,15 +20,14 @@ import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
-import id.walt.x509.CertificateDer
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.asFlow
 import org.jetbrains.exposed.v1.jdbc.Database
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * OSS [WalletResolver] and route registration.
@@ -96,6 +93,7 @@ object OSSWallet2Service {
             return if (registry != null) registry.resolveKeyStore(storeId)
             else namedKeyStores.computeIfAbsent(storeId) { keyStoreFactory(storeId) }
         }
+
         override suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) {
             if (persistentStoreRegistry != null) {
                 require(store is ExposedKeyStore && store.storeId == storeId) {
@@ -103,9 +101,11 @@ object OSSWallet2Service {
                 }
             } else namedKeyStores[storeId] = store
         }
+
         override suspend fun createKeyStore(storeId: String): WalletKeyStore =
             persistentStoreRegistry?.createKeyStore(storeId)
                 ?: keyStoreFactory(storeId).also { namedKeyStores[storeId] = it }
+
         override fun listKeyStoreIds() =
             persistentStoreRegistry?.listKeyStoreIds() ?: namedKeyStores.keys.asFlow()
 
@@ -114,6 +114,7 @@ object OSSWallet2Service {
             return if (registry != null) registry.resolveCredentialStore(storeId)
             else namedCredentialStores.computeIfAbsent(storeId) { credentialStoreFactory(storeId) }
         }
+
         override suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) {
             if (persistentStoreRegistry != null) {
                 require(store is ExposedCredentialStore && store.storeId == storeId) {
@@ -121,9 +122,11 @@ object OSSWallet2Service {
                 }
             } else namedCredentialStores[storeId] = store
         }
+
         override suspend fun createCredentialStore(storeId: String): WalletCredentialStore =
             persistentStoreRegistry?.createCredentialStore(storeId)
                 ?: credentialStoreFactory(storeId).also { namedCredentialStores[storeId] = it }
+
         override fun listCredentialStoreIds() =
             persistentStoreRegistry?.listCredentialStoreIds() ?: namedCredentialStores.keys.asFlow()
 
@@ -132,6 +135,7 @@ object OSSWallet2Service {
             return if (registry != null) registry.resolveDidStore(storeId)
             else namedDidStores.computeIfAbsent(storeId) { didStoreFactory(storeId) }
         }
+
         override suspend fun storeDidStore(storeId: String, store: WalletDidStore) {
             if (persistentStoreRegistry != null) {
                 require(store is ExposedDidStore && store.storeId == storeId) {
@@ -139,9 +143,11 @@ object OSSWallet2Service {
                 }
             } else namedDidStores[storeId] = store
         }
+
         override suspend fun createDidStore(storeId: String): WalletDidStore =
             persistentStoreRegistry?.createDidStore(storeId)
                 ?: didStoreFactory(storeId).also { namedDidStores[storeId] = it }
+
         override fun listDidStoreIds() =
             persistentStoreRegistry?.listDidStoreIds() ?: namedDidStores.keys.asFlow()
 
@@ -217,7 +223,9 @@ object OSSWallet2Service {
     }
 
     private fun ClientIdTrustConfig.toDomain() = ClientIdTrustConfiguration(
-        x509TrustAnchors = x509TrustAnchors.map(CertificateDer::fromPEMEncodedString),
+        x509TrustAnchors = x509TrustAnchors.map(X509CertificateUtil::parseCertificatePem)
+            .ifEmpty { null }
+            ?.let { InMemoryTrustStore(it) },
         trustedVerifierAttestationIssuers = trustedVerifierAttestationIssuers,
         preRegisteredClients = preRegisteredClients,
     )

@@ -2,8 +2,9 @@
 
 package id.walt.openid4vp.clientidprefix
 
+import id.walt.certificate.x509.X509CertificateTrustStore
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.x509.CertificateDer
 import kotlinx.serialization.Serializable
 
 /**
@@ -26,10 +27,16 @@ data class RequestContext(
 }
 
 data class ClientIdTrustConfiguration(
-    val x509TrustAnchors: List<CertificateDer> = emptyList(),
+    /**
+     * List of trusted X.509 certificate DERs in base64 format.
+     */
+    val x509TrustAnchors: X509CertificateTrustStore? = null,
     val trustedVerifierAttestationIssuers: Set<String> = emptySet(),
     val preRegisteredClients: Map<String, ClientMetadata> = emptyMap(),
-)
+) {
+    val x509TrustStore: X509CertificateTrustStore
+        get() = x509TrustAnchors ?: InMemoryTrustStore()
+}
 
 /**
  * A sealed class representing all possible validation errors for clear, type-safe error handling.
@@ -47,9 +54,15 @@ sealed class ClientIdError(val message: String) {
     object X509HashMismatch : ClientIdError("The client_id hash does not match the hash of the provided certificate.")
     object MissingX509TrustAnchors : ClientIdError("No X.509 trust anchors are configured.")
 
+    /**
+     * The `redirect_uri`'s FQDN did not match an `x509_san_dns` Client Identifier.
+     *
+     * Only ever raised for `redirect_uri`; see the OpenID4VP 1.0 §5.9.3 / §14.3.1 split documented in
+     * [id.walt.openid4vp.clientidprefix.prefixes.X509SanDns].
+     */
     @Serializable
-    data class ResponseUriHostMismatch(val expectedDnsName: String, val actualHost: String) :
-        ClientIdError("The response URI host '$actualHost' is not within '$expectedDnsName'.")
+    data class RedirectUriHostMismatch(val expectedDnsName: String, val actualHost: String) :
+        ClientIdError("The redirect URI host '$actualHost' is not within '$expectedDnsName'.")
 
     @Serializable
     data class DidResolutionFailed(val reason: String) : ClientIdError("DID resolution failed: $reason")

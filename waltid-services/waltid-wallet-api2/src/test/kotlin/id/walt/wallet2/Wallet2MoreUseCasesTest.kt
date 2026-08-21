@@ -105,7 +105,6 @@ import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
 class Wallet2MoreUseCasesTest {
 
     private val host = "127.0.0.1"
-    private val basePort = 17300
 
     // -----------------------------------------------------------------------
     // Shared issuer builder (avoids duplication)
@@ -274,9 +273,9 @@ class Wallet2MoreUseCasesTest {
 
     @Test
     fun testMultipleFormatsInOneWallet() {
-        val issuerPort1 = basePort
-        val issuerPort2 = basePort + 1
-        val walletPort = basePort + 2
+        val issuerPort1 = freePort()
+        val issuerPort2 = freePort()
+        val walletPort = freePort()
 
         val pidVct = "eu.europa.ec.eudi.pid.1"
         val sdJwtConfig = "pid_sd_jwt"
@@ -424,8 +423,8 @@ class Wallet2MoreUseCasesTest {
 
     @Test
     fun testDeferredCredentialIssuance() {
-        val issuerPort = basePort + 9
-        val walletPort = basePort + 10
+        val issuerPort = freePort()
+        val walletPort = freePort()
         val issuerBase = "http://$host:$issuerPort"
 
         val credConfigId = "pid_deferred"
@@ -538,7 +537,7 @@ class Wallet2MoreUseCasesTest {
 
     @Test
     fun testStaticDidWallet() {
-        val port = basePort + 3
+        val port = freePort()
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = { ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))) },
@@ -596,8 +595,8 @@ class Wallet2MoreUseCasesTest {
 
     @Test
     fun testReceiveWithoutDidStore() {
-        val issuerPort = basePort + 4
-        val walletPort = basePort + 5
+        val issuerPort = freePort()
+        val walletPort = freePort()
         val issuerBase = "http://$host:$issuerPort"
 
         val credConfigId = "pid_no_did"
@@ -668,8 +667,8 @@ class Wallet2MoreUseCasesTest {
 
     @Test
     fun testIsolatedVPPresentation() {
-        val issuerPort = basePort + 6
-        val walletPort = basePort + 7
+        val issuerPort = freePort()
+        val walletPort = freePort()
         val issuerBase = "http://$host:$issuerPort"
         val walletBase = "http://$host:$walletPort"
 
@@ -755,7 +754,7 @@ class Wallet2MoreUseCasesTest {
 
     @Test
     fun testStoreIsolationBetweenTestRuns() {
-        val port = basePort + 8
+        val port = freePort()
 
         // Save the current store so we can restore it after this test
         val originalStore = OSSWallet2Service.walletStore

@@ -100,6 +100,8 @@ data class AuthorizationServerMetadata(
     val preAuthorizedGrantAnonymousAccessSupported: Boolean? = null,
     @SerialName("status_list_aggregation_endpoint")
     val statusListAggregationEndpoint: String? = null,
+    @SerialName("challenge_endpoint")
+    val challengeEndpoint: String? = null,
     val customParameters: Map<String, JsonElement>? = null,
 ) {
     init {
@@ -179,6 +181,7 @@ data class AuthorizationServerMetadata(
 
         // RFC 8414 §2: Validate jwks_uri if present
         jwksUri?.let { validateUrl("jwks_uri", it) }
+        challengeEndpoint?.let { validateUrl("challenge_endpoint", it) }
         statusListAggregationEndpoint?.let { validateUrl("status_list_aggregation_endpoint", it) }
 
         // RFC 8414 §2: "none" is not a valid JWS alg for token endpoint JWT auth.
@@ -193,6 +196,13 @@ data class AuthorizationServerMetadata(
             val requiresSigningAlgs = methods.contains("private_key_jwt") || methods.contains("client_secret_jwt")
             require(!requiresSigningAlgs || !tokenEndpointAuthSigningAlgValuesSupported.isNullOrEmpty()) {
                 "Authorization server token_endpoint_auth_signing_alg_values_supported is required when using JWT auth methods"
+            }
+            val requiresAttestationAlgorithms = methods.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH)
+            require(!requiresAttestationAlgorithms || !clientAttestationSigningAlgValuesSupported.isNullOrEmpty()) {
+                "Authorization server client_attestation_signing_alg_values_supported is required when using attest_jwt_client_auth"
+            }
+            require(!requiresAttestationAlgorithms || !clientAttestationPopSigningAlgValuesSupported.isNullOrEmpty()) {
+                "Authorization server client_attestation_pop_signing_alg_values_supported is required when using attest_jwt_client_auth"
             }
         }
 
@@ -232,6 +242,7 @@ data class AuthorizationServerMetadata(
             statusListAggregationEndpointPath: String? = null,
             preAuthorizedGrantAnonymousAccessSupported: Boolean? = true,
             authorizationResponseIssParameterSupported: Boolean? = true,
+            challengeEndpointPath: String? = null,
         ): AuthorizationServerMetadata {
             val normalized = baseUrl.trimEnd('/')
             val parEndpoint = pushedAuthorizationRequestEndpointPath?.let { normalized + it }
@@ -251,6 +262,7 @@ data class AuthorizationServerMetadata(
                 codeChallengeMethodsSupported = codeChallengeMethodsSupported,
                 requirePushedAuthorizationRequests = requirePushedAuthorizationRequests,
                 pushedAuthorizationRequestEndpoint = parEndpoint,
+                challengeEndpoint = challengeEndpointPath?.let { normalized + it },
                 statusListAggregationEndpoint = statusListAggregationEndpointPath?.let { normalized + it },
                 preAuthorizedGrantAnonymousAccessSupported = preAuthorizedGrantAnonymousAccessSupported,
                 authorizationResponseIssParameterSupported = authorizationResponseIssParameterSupported,
@@ -326,6 +338,7 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
                 )
             }
             value.registrationEndpoint?.let { put("registration_endpoint", JsonPrimitive(it)) }
+            value.challengeEndpoint?.let { put("challenge_endpoint", JsonPrimitive(it)) }
             value.requirePushedAuthorizationRequests?.let {
                 put(
                     "require_pushed_authorization_requests",
@@ -383,6 +396,7 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             tokenEndpoint = element.string("token_endpoint"),
             jwksUri = element.string("jwks_uri"),
             registrationEndpoint = element.string("registration_endpoint"),
+            challengeEndpoint = element.string("challenge_endpoint"),
             scopesSupported = element.stringSet("scopes_supported"),
             responseTypesSupported = responseTypes,
             responseModesSupported = element.stringSet("response_modes_supported"),

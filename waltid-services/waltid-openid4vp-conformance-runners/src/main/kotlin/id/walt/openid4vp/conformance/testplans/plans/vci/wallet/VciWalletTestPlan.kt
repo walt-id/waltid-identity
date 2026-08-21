@@ -38,6 +38,15 @@ interface VciWalletTestPlan {
     /** Test plan configuration JSON for conformance suite */
     val configuration: JsonObject
 
+    /**
+     * Identifies which plan owns a set of report entries.
+     *
+     * Must be unique per variant: [planName] is shared by every variant of the same suite plan, so
+     * using it would make one variant's results overwrite another's in the role report.
+     */
+    val producerId: String
+        get() = "$planName/${variant.entries.sortedBy { it.key }.joinToString(",") { "${it.key}=${it.value}" }}"
+
     // ─────────────────────────────────────────────────────────────────────────────
     // Derived Properties (from variant)
     // ─────────────────────────────────────────────────────────────────────────────

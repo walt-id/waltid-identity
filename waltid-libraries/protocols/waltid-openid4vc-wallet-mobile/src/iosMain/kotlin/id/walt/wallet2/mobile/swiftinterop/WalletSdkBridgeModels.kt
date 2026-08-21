@@ -1,9 +1,14 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -16,13 +21,24 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vci.wallet.metadata.MetadataSigner
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutValidation
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
-import id.walt.x509.CertificateDer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -38,11 +54,14 @@ import kotlin.time.Instant
  * @property databaseKeyProvider Swift-owned database key provider used when [persistence] uses
  * [WalletBridgeDatabaseKeyConfiguration.Provided].
  * @property attestation Optional client-attestation configuration for issuers that require it.
+ * @property issuerMetadataTrustResolver Optional Swift-owned verifier for signed Credential Issuer Metadata.
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
  * @property clientIdTrustConfiguration Trust anchors used to authenticate verifier Request Objects.
  * @property appGroupIdentifier Shared container used by the app and document-provider extension.
  * @property keychainAccessGroup Shared Keychain access group used for database and signing keys.
+ * @property defaultKeyUseAuthorizationPolicy Default authorization policy for newly created wallet keys.
+ * @property keyUseAuthorizationPrompt Prompt text used for protected signing operations.
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
@@ -50,25 +69,161 @@ public data class WalletBridgeConfiguration(
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
+    /** Signed metadata is neither requested nor accepted when this trust resolver is absent. */
+    public val issuerMetadataTrustResolver: WalletBridgeIssuerMetadataTrustResolver? = null,
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
     public val appGroupIdentifier: String? = null,
     public val keychainAccessGroup: String? = null,
+    public val defaultKeyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
+        WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
+    public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 )
+
+/**
+ * Swift-bridge representation of the authorization policy selected for a newly created key.
+ *
+ * @property type Selected authorization-policy variant.
+ * @property timeoutSeconds Fixed timed-reuse interval in seconds, only for [WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse].
+ */
+@Serializable
+public data class WalletBridgeKeyUseAuthorizationPolicy(
+    public val type: WalletBridgeKeyUseAuthorizationPolicyType,
+    public val timeoutSeconds: Int? = null,
+) {
+    init {
+        when (type) {
+            WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse ->
+                require(timeoutSeconds != null && timeoutSeconds in 1..30) {
+                    "Timed biometric reuse timeout must be between 1 and 30 seconds"
+                }
+
+            WalletBridgeKeyUseAuthorizationPolicyType.None,
+            WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet ->
+                require(timeoutSeconds == null) { "Only timed biometric reuse accepts a timeout" }
+        }
+    }
+
+    /** Predefined bridge policies that do not require a timeout. */
+    public companion object {
+        /** Ordinary non-interactive private-key operations. */
+        public val None: WalletBridgeKeyUseAuthorizationPolicy =
+            WalletBridgeKeyUseAuthorizationPolicy(WalletBridgeKeyUseAuthorizationPolicyType.None)
+        /** Strong biometric authentication for every private-key operation. */
+        public val BiometricCurrentSet: WalletBridgeKeyUseAuthorizationPolicy =
+            WalletBridgeKeyUseAuthorizationPolicy(WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet)
+    }
+}
+
+/** Variants supported by [WalletBridgeKeyUseAuthorizationPolicy]. */
+@Serializable
+public enum class WalletBridgeKeyUseAuthorizationPolicyType {
+    None,
+    BiometricCurrentSet,
+    BiometricTimedReuse,
+}
+
+internal fun WalletBridgeKeyUseAuthorizationPolicy.toCorePolicy(): KeyUseAuthorizationPolicy = when (type) {
+    WalletBridgeKeyUseAuthorizationPolicyType.None -> KeyUseAuthorizationPolicy.None
+    WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet -> KeyUseAuthorizationPolicy.BiometricCurrentSet
+    WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse ->
+        KeyUseAuthorizationPolicy.BiometricTimedReuse(requireNotNull(timeoutSeconds))
+}
+
+internal fun KeyUseAuthorizationPolicy.toBridgePolicy(): WalletBridgeKeyUseAuthorizationPolicy = when (this) {
+    KeyUseAuthorizationPolicy.None -> WalletBridgeKeyUseAuthorizationPolicy.None
+    KeyUseAuthorizationPolicy.BiometricCurrentSet -> WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> WalletBridgeKeyUseAuthorizationPolicy(
+        type = WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse,
+        timeoutSeconds = timeoutSeconds,
+    )
+}
+
+/** Swift-friendly result of a key-use authorization preflight. */
+@ConsistentCopyVisibility
+@Serializable
+public data class WalletBridgeKeyPreflight internal constructor(
+    /** Whether the requested authorization policy is supported with the reported metadata. */
+    public val supported: Boolean,
+    /** The authorization policy that will be effective when [supported] is true. */
+    public val effectivePolicy: WalletBridgeKeyUseAuthorizationPolicy? = null,
+    /** The enforcement boundary for timed reuse, when a timed policy is supported. */
+    public val reuseEnforcement: WalletBridgeKeyUseAuthorizationReuseEnforcement? = null,
+    /** How a timed-reuse interval can be validated after key creation or restoration. */
+    public val timeoutValidation: WalletBridgeKeyUseAuthorizationReuseTimeoutValidation? = null,
+    /** Core preflight reason when the request is unsupported. */
+    public val failure: KeyUseAuthorizationUnsupportedReason? = null,
+) {
+    init {
+        require(supported == (failure == null) && supported == (effectivePolicy != null)) {
+            "Wallet bridge preflight must include an effective policy exactly when supported"
+        }
+        val timed = effectivePolicy?.type == WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse
+        require((reuseEnforcement != null) == timed && (timeoutValidation != null) == timed) {
+            "Timed bridge preflight must include enforcement and timeout validation only for timed policy"
+        }
+    }
+}
+
+internal fun KeyUseAuthorizationSupport.toBridgeModel(): WalletBridgeKeyPreflight = when (this) {
+    is KeyUseAuthorizationSupport.Supported -> WalletBridgeKeyPreflight(
+        supported = true,
+        effectivePolicy = effectivePolicy.toBridgePolicy(),
+        reuseEnforcement = reuseEnforcement?.toBridgeModel(),
+        timeoutValidation = timeoutValidation?.toBridgeModel(),
+    )
+    is KeyUseAuthorizationSupport.Unsupported -> WalletBridgeKeyPreflight(supported = false, failure = reason)
+}
+
+/** Enforcement boundary reported for a supported timed-reuse key. */
+@Serializable
+public enum class WalletBridgeKeyUseAuthorizationReuseEnforcement {
+    PlatformKeyStore,
+    ProviderProcess,
+}
+
+/** Timeout-validation capability reported for a supported timed-reuse key. */
+@Serializable
+public enum class WalletBridgeKeyUseAuthorizationReuseTimeoutValidation {
+    IndependentReadback,
+    ProviderConfigurationOnly,
+}
+
+internal fun KeyUseAuthorizationReuseEnforcement.toBridgeModel(): WalletBridgeKeyUseAuthorizationReuseEnforcement = when (this) {
+    KeyUseAuthorizationReuseEnforcement.PlatformKeyStore ->
+        WalletBridgeKeyUseAuthorizationReuseEnforcement.PlatformKeyStore
+    KeyUseAuthorizationReuseEnforcement.ProviderProcess ->
+        WalletBridgeKeyUseAuthorizationReuseEnforcement.ProviderProcess
+}
+
+internal fun KeyUseAuthorizationReuseTimeoutValidation.toBridgeModel():
+    WalletBridgeKeyUseAuthorizationReuseTimeoutValidation = when (this) {
+    KeyUseAuthorizationReuseTimeoutValidation.IndependentReadback ->
+        WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.IndependentReadback
+    KeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly ->
+        WalletBridgeKeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly
+}
 
 /**
  * Verifier Request Object trust configuration exposed to the Swift wallet bridge.
  *
  * @property x509TrustAnchorsPem PEM-encoded trust anchors pinned by the hosting application.
+ * @property preRegisteredClientMetadataJson Explicit pre-registered client metadata, keyed by client ID.
  */
 public data class WalletBridgeClientIdTrustConfiguration(
     public val x509TrustAnchorsPem: List<String> = emptyList(),
+    public val preRegisteredClientMetadataJson: Map<String, String> = emptyMap(),
 )
 
 internal fun WalletBridgeClientIdTrustConfiguration.toClientIdTrustConfiguration(): ClientIdTrustConfiguration =
     ClientIdTrustConfiguration(
-        x509TrustAnchors = x509TrustAnchorsPem.map(CertificateDer::fromPEMEncodedString),
+        x509TrustAnchors = InMemoryTrustStore(x509TrustAnchorsPem.map(X509CertificateUtil::parseCertificatePem)),
+        preRegisteredClients = preRegisteredClientMetadataJson.mapValues { (clientId, metadataJson) ->
+            ClientMetadata.fromJson(metadataJson).getOrElse { cause ->
+                throw IllegalArgumentException("Malformed pre-registered client metadata for '$clientId'", cause)
+            }
+        },
     )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {
@@ -79,9 +234,16 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         walletId = walletId,
         defaultKeyType = defaultKeyType,
         attestationConfig = attestation,
+        credentialIssuerMetadataTrustResolver = issuerMetadataTrustResolver?.let { bridgeResolver ->
+            CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->
+                bridgeResolver.verify(compactJwt, expectedCredentialIssuer).toMetadataSigner()
+            }
+        },
         persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
         preferredLocales = preferredLocales,
         transactionDataProfiles = transactionDataProfiles,
+        defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy.toCorePolicy(),
+        keyUseAuthorizationPrompt = keyUseAuthorizationPrompt,
         crossProcessAccess = appGroupIdentifier?.let { appGroup ->
             MobileWalletCrossProcessAccess(
                 appGroupIdentifier = appGroup,
@@ -90,6 +252,51 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         },
     )
 }
+
+/** Trusted signer details returned after Swift verifies signed Credential Issuer Metadata. */
+public data class WalletBridgeIssuerMetadataSigner(
+    /** Identifier of the trusted verification key, as reported by the trust resolver. */
+    public val keyId: String?,
+    /** JWS algorithm verified by the trust resolver. */
+    public val algorithm: String,
+    /** Authority category established by the trust resolver. */
+    public val trustType: WalletBridgeIssuerMetadataSignerTrustType,
+)
+
+/** Authority category assigned by Swift after it verifies the signed metadata JWS. */
+public enum class WalletBridgeIssuerMetadataSignerTrustType {
+    /** The signer is the trusted credential issuer. */
+    TrustedIssuer,
+    /** The signer is a trusted delegate of the credential issuer. */
+    TrustedDelegate,
+}
+
+/**
+ * Swift-facing trust boundary for signed Credential Issuer Metadata.
+ *
+ * Implementations must verify the JWS and establish that its signer is authorized for the requested issuer.
+ * Returning normally authorizes the metadata for wallet use.
+ */
+public interface WalletBridgeIssuerMetadataTrustResolver {
+    /**
+     * @param compactJwt Compact JWS returned by the Credential Issuer Metadata endpoint.
+     * @param expectedCredentialIssuer Credential issuer for which signer authority must be established.
+     * @return Trusted signer details used to retain metadata provenance.
+     */
+    public suspend fun verify(
+        compactJwt: String,
+        expectedCredentialIssuer: String,
+    ): WalletBridgeIssuerMetadataSigner
+}
+
+private fun WalletBridgeIssuerMetadataSigner.toMetadataSigner(): MetadataSigner = MetadataSigner(
+    keyId = keyId,
+    algorithm = algorithm,
+    trustType = when (trustType) {
+        WalletBridgeIssuerMetadataSignerTrustType.TrustedIssuer -> MetadataSignerTrustType.TRUSTED_ISSUER
+        WalletBridgeIssuerMetadataSignerTrustType.TrustedDelegate -> MetadataSignerTrustType.TRUSTED_DELEGATE
+    },
+)
 
 /**
  * Persistence configuration exposed to the Swift wallet bridge.
@@ -362,6 +569,9 @@ public enum class WalletBridgeErrorCategory {
     /** The operation was cancelled. */
     cancelled,
 
+    /** Key-use authorization was unavailable or was not completed. */
+    authorization,
+
     /** Unexpected wallet failure that does not fit a narrower category. */
     internalFailure,
 }
@@ -372,20 +582,29 @@ public enum class WalletBridgeErrorCategory {
  * @property category Coarse failure category.
  * @property message Human-readable failure message.
  * @property causeClass Kotlin exception class name when available.
+ * @property authorizationFailure Stable key-use authorization failure when authorization is the category.
  */
 @Serializable
-public data class WalletBridgeError(
-    val category: WalletBridgeErrorCategory,
-    val message: String,
-    val causeClass: String? = null,
+public class WalletBridgeError internal constructor(
+    public val category: WalletBridgeErrorCategory,
+    public val message: String,
+    public val causeClass: String? = null,
+    public val authorizationFailure: KeyUseAuthorizationFailure? = null,
 ) {
+    init {
+        require((category == WalletBridgeErrorCategory.authorization) == (authorizationFailure != null)) {
+            "Authorization bridge errors must include exactly one authorization failure"
+        }
+    }
     internal companion object {
         fun fromThrowable(throwable: Throwable): WalletBridgeError {
-            val category = when (throwable) {
-                is CancellationException -> WalletBridgeErrorCategory.cancelled
-                is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
-                is PreviewSessionException -> WalletBridgeErrorCategory.invalidInput
-                is WalletPersistenceException -> WalletBridgeErrorCategory.storage
+            val authorizationFailure = (throwable as? KeyUseAuthorizationException)?.failure
+            val category = when {
+                authorizationFailure != null -> WalletBridgeErrorCategory.authorization
+                throwable is CancellationException -> WalletBridgeErrorCategory.cancelled
+                throwable is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
+                throwable is PreviewSessionException -> WalletBridgeErrorCategory.invalidInput
+                throwable is WalletPersistenceException -> WalletBridgeErrorCategory.storage
                 else -> WalletBridgeErrorCategory.internalFailure
             }
 
@@ -393,6 +612,7 @@ public data class WalletBridgeError(
                 category = category,
                 message = throwable.message ?: throwable::class.simpleName ?: "Unknown wallet error",
                 causeClass = throwable::class.simpleName,
+                authorizationFailure = authorizationFailure,
             )
         }
     }

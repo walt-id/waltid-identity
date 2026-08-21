@@ -34,6 +34,30 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 - Present credentials using OpenID4VP.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
 
+## Key-use authorization
+
+New wallet keys default to `BiometricCurrentSet`; callers that need unprotected
+signing must explicitly select `KeyUseAuthorizationPolicy.None`. The protected
+policy is P-256 only, requires a current resumed Android `FragmentActivity` for
+each signing prompt, rejects device-credential fallback, and invalidates the key
+when the biometric enrollment set changes. iOS protected keys require a physical
+Secure Enclave device and an `NSFaceIDUsageDescription` host-app entry.
+
+The policy is chosen only while creating a new key. Restored keys retain their
+persisted policy; changing the default never weakens or recreates an existing key.
+
+`BiometricTimedReuse(timeoutSeconds)` is available for a fixed 1–30 second,
+non-sliding reuse interval. It also requires P-256, strong biometrics, and no
+device-credential fallback, but intentionally permits new biometric enrollment
+without invalidating the key. Android reports `PlatformKeyStore` with
+`IndependentReadback`: native KeyStore metadata can be read back and compared
+with the requested interval after creation or restoration. iOS reports
+`ProviderProcess` with `ProviderConfigurationOnly`: Signum receives the
+requested interval, but its pinned public API cannot independently expose the
+effective positive timeout after restoration. Timed reuse is recent
+platform or provider authentication, not issuance, presentation, or other
+wallet-action consent, and is not guaranteed to be key-local.
+
 ## Receiving credentials
 
 Start an issuance session to resolve the offer and retain the exact reviewed
@@ -62,7 +86,8 @@ val credentialIds = (outcome as? WalletIssuanceOutcome.Stored)?.credentialIds
 
 `MobileWalletCredentialOffer.Uri` is used for deep-link / QR offers.
 `MobileWalletCredentialOffer.InlineJson` is the Credential Offer object from an
-OpenID4VCI Digital Credentials create request (`openid4vci-v1`). On Android, use
+OpenID4VCI Digital Credentials create request (`openid4vci-v1`, plus historical
+aliases). On Android, use
 `AndroidDigitalCredentialCreateProvider` to extract that request from Credential
 Manager and `AndroidDigitalCredentialRegistry.registerCreationOptions` to
 advertise issuance capability separately from presentation registry replacement.

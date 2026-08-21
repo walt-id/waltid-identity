@@ -22,6 +22,14 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import java.util.regex.Pattern
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.fail
 import org.junit.Assume.assumeTrue
@@ -45,6 +53,34 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalDigitalCredentialApi::class)
 class DigitalCredentialIssuanceE2ETest {
+
+    /**
+     * Mirrors the Portal2 DC API request shape, including standards-valid numeric COSE algorithm IDs
+     * in the issuer's mdoc metadata.
+     *
+     * This protects the matcher/parser boundary: the wallet must surface, complete issuance, and
+     * store the resulting mdoc when the unused numeric metadata field is present.
+     */
+    @Test
+    fun acceptsPortalShapedOfferThroughCreateCredential() = runBlocking {
+        val fixture = start() ?: return@runBlocking
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        val portalOffer = createPortalShapedOffer(scenario)
+
+        launchPortalOffer(fixture, portalOffer)
+
+        fixture.device.selectWalletCreateCandidate()
+        fixture.device.confirmSelectorIfAsked()
+
+        assertNotNull(
+            "Wallet create offer review did not open for the portal-shaped offer",
+            waitForResource(fixture.device, "wallet.offerReview", UI_ELEMENT_TIMEOUT),
+        )
+        clickByTag(fixture.device, "wallet.offerAcceptButton")
+
+        DemoTestBackend.waitForIssuerIssuanceSuccess(portalOffer.offerId)
+        fixture.assertStoredCredentialIs(scenario)
+    }
 
     @Test
     fun acceptsPreAuthorizedOfferThroughCreateCredential() = runBlocking {
@@ -143,6 +179,19 @@ class DigitalCredentialIssuanceE2ETest {
         waitForIdle()
     }
 
+    private fun launchPortalOffer(fixture: Fixture, portalOffer: PortalOffer) {
+        DigitalCredentialTestIssuer.reset(
+            requestJson = """
+                {"requests":[{"protocol":"openid4vci-v1","data":${portalOffer.enrichedOfferJson}}]}
+            """.trimIndent(),
+        )
+        fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
+        fixture.context.startActivity(
+            Intent(fixture.context, DigitalCredentialTestIssuerActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
     /** Some builds add a confirmation step between candidate selection and the provider. */
     private fun UiDevice.confirmSelectorIfAsked() {
         val picker = By.pkg(CREDENTIAL_SELECTOR_PACKAGE)
@@ -173,8 +222,8 @@ class DigitalCredentialIssuanceE2ETest {
         relaunchAndUnlock(context, device)
         clickByTag(device, "wallet.tab.credentials")
 
-        // Both methods issue the same doctype, and another test may already have stored one, so
-        // existence of that doctype alone cannot prove this issuance succeeded.
+        // Multiple tests in this class issue the same doctype, so the card must be new to
+        // distinguish this run from credentials already stored in the wallet.
         val card = device.waitForNewCredentialCard(preexistingCardTags)
         if (card == null) {
             fail(
@@ -269,6 +318,63 @@ class DigitalCredentialIssuanceE2ETest {
             context.packageManager.getPackageInfo("com.google.android.gms", 0)
             true
         }.getOrDefault(false)
+
+    private suspend fun createPortalShapedOffer(
+        scenario: DemoTestBackend.CredentialScenario,
+    ): PortalOffer {
+        val generatedOffer = DemoTestBackend.createOffer(scenario, inlineOffer = true)
+        val offerId = generatedOffer.offerId
+        val offerUrl = generatedOffer.offerUrl
+        val offerJson = requireNotNull(Uri.parse(offerUrl).getQueryParameter("credential_offer")) {
+            "Demo offer was not inline (portal DC API requires BY_VALUE): $offerUrl"
+        }
+        val offerObject = Json.parseToJsonElement(offerJson).jsonObject
+        val credentialIssuer = requireNotNull(
+            offerObject["credential_issuer"]?.jsonPrimitive?.content
+        ) { "Generated offer did not contain credential_issuer" }.trimEnd('/')
+        val enrichedOffer = buildJsonObject {
+            offerObject.forEach { (key, value) -> put(key, value) }
+            // These are the two additional top-level objects Portal2 passes to Chrome.
+            // Their issuer identities remain consistent with the generated inline offer.
+            // They reproduce the matcher-facing request shape; the wallet engine still
+            // performs its normal issuer and authorization-server metadata discovery.
+            putJsonObject("credential_issuer_metadata") {
+                put("credential_issuer", credentialIssuer)
+                put("credential_endpoint", "$credentialIssuer/credential")
+                putJsonObject("credential_configurations_supported") {
+                    putJsonObject("org.iso.18013.5.1.mDL") {
+                        put("format", "mso_mdoc")
+                        put("doctype", "org.iso.18013.5.1.mDL")
+                        putJsonArray("credential_signing_alg_values_supported") {
+                            add(JsonPrimitive(-7))
+                            add(JsonPrimitive(-9))
+                        }
+                        putJsonArray("cryptographic_binding_methods_supported") {
+                            add(JsonPrimitive("cose_key"))
+                        }
+                        putJsonObject("proof_types_supported") {
+                            putJsonObject("jwt") {
+                                putJsonArray("proof_signing_alg_values_supported") {
+                                    add(JsonPrimitive("ES256"))
+                                    add(JsonPrimitive("EdDSA"))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            putJsonObject("authorization_server_metadata") {
+                put("issuer", credentialIssuer)
+                put("token_endpoint", "$credentialIssuer/token")
+            }
+        }
+        return PortalOffer(offerId, enrichedOffer.toString())
+    }
+
+    private data class PortalOffer(
+        val offerId: String,
+        val enrichedOfferJson: String,
+    )
 
     private companion object {
         /** Owns `CredentialSelectorActivity`, i.e. the picker window these tests drive. */

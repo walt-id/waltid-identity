@@ -8,12 +8,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class IssuerMetadataResolverTest {
 
@@ -65,9 +60,10 @@ class IssuerMetadataResolverTest {
         val resolver = IssuerMetadataResolver(client)
         val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl)
 
-        assertEquals(issuerUrl, metadata.credentialIssuer)
-        assertEquals(1, metadata.credentialConfigurationsSupported?.size)
+        assertEquals(issuerUrl, metadata.metadata.credentialIssuer)
+        assertEquals(1, metadata.metadata.credentialConfigurationsSupported.size)
     }
+
     @Test
     fun testResolveCredentialIssuerMetadataWithIssuerPath() = runTest {
         val issuerUrl = "https://example.com/openid4vci"
@@ -101,8 +97,8 @@ class IssuerMetadataResolverTest {
         val resolver = IssuerMetadataResolver(client)
         val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl)
 
-        assertEquals(issuerUrl, metadata.credentialIssuer)
-        assertEquals("$issuerUrl/credential", metadata.credentialEndpoint)
+        assertEquals(issuerUrl, metadata.metadata.credentialIssuer)
+        assertEquals("$issuerUrl/credential", metadata.metadata.credentialEndpoint)
     }
 
     @Test
@@ -204,6 +200,123 @@ class IssuerMetadataResolverTest {
         assertEquals(
             "http://issuer.example.org:8080/.well-known/openid-credential-issuer",
             resolver.buildMetadataUrl("http://issuer.example.org:8080", "/.well-known/openid-credential-issuer"),
+        )
+    }
+
+    @Test
+    fun `falls back to openid-configuration when oauth-authorization-server is absent`() = runTest {
+        val requested = mutableListOf<String>()
+        val resolver = IssuerMetadataResolver(
+            createMockClient { request ->
+                requested += request.url.toString()
+                if (request.url.encodedPath.contains("oauth-authorization-server")) {
+                    respondError(HttpStatusCode.NotFound)
+                } else {
+                    // An OpenID Connect Discovery document: a superset of RFC 8414 metadata.
+                    respond(
+                        content = """
+                            {
+                              "issuer": "https://issuer.example.org",
+                              "authorization_endpoint": "https://issuer.example.org/authorize",
+                              "token_endpoint": "https://issuer.example.org/token",
+                              "response_types_supported": ["code"],
+                              "id_token_signing_alg_values_supported": ["ES256"]
+                            }
+                        """.trimIndent(),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            },
+        )
+
+        val metadata = resolver.resolveAuthorizationServerMetadata("https://issuer.example.org")
+
+        assertEquals("https://issuer.example.org/token", metadata.tokenEndpoint)
+        assertEquals(2, requested.size, "both well-known endpoints should be attempted, in order")
+        assertTrue(requested[0].contains("oauth-authorization-server"))
+        assertTrue(requested[1].contains("openid-configuration"))
+    }
+
+    @Test
+    fun `an empty authorization_servers array is rejected by the issuer metadata itself`() = runTest {
+        // resolveAuthorizationServerMetadataWithFallback uses firstOrNull rather than first so an
+        // empty array would fall back to the credential issuer instead of raising
+        // NoSuchElementException. This asserts why that is only defence in depth: the metadata model
+        // refuses to deserialize the empty array at all, so the state is unreachable in practice.
+        val resolver = IssuerMetadataResolver(
+            createMockClient {
+                respond(
+                    content = """
+                        {
+                          "credential_issuer": "https://issuer.example.org",
+                          "credential_endpoint": "https://issuer.example.org/credential",
+                          "authorization_servers": [],
+                          "credential_configurations_supported": {
+                            "test_id": {
+                              "format": "jwt_vc_json",
+                              "credential_definition": {
+                                "type": ["VerifiableCredential", "TestCredential"]
+                              }
+                            }
+                          }
+                        }
+                    """.trimIndent(),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            },
+        )
+
+        assertFailsWith<Exception> { resolver.resolveCredentialIssuerMetadata("https://issuer.example.org") }
+    }
+
+    @Test
+    fun `strips the issuer's trailing slash for authorization server metadata`() {
+        val resolver = IssuerMetadataResolver(createMockClient { respondError(HttpStatusCode.NotFound) })
+
+        // RFC 8414 §3.1 requires the terminating "/" of the issuer identifier to be removed before
+        // inserting the well-known segment; a request that retains it is non-compliant.
+        assertEquals(
+            "https://issuer.example.org/.well-known/oauth-authorization-server/test/a/alias",
+            resolver.buildMetadataUrl(
+                "https://issuer.example.org/test/a/alias/",
+                "/.well-known/oauth-authorization-server",
+            ),
+        )
+    }
+
+    @Test
+    fun `keeps the issuer's trailing slash for credential issuer metadata`() {
+        val resolver = IssuerMetadataResolver(createMockClient { respondError(HttpStatusCode.NotFound) })
+
+        // OpenID4VCI 1.0 §12.2.2 appends the Credential Issuer Identifier's path verbatim, so unlike
+        // RFC 8414 the trailing slash survives. The two rules are deliberately different.
+        assertEquals(
+            "https://issuer.example.org/.well-known/openid-credential-issuer/test/a/alias/",
+            resolver.buildMetadataUrl(
+                "https://issuer.example.org/test/a/alias/",
+                "/.well-known/openid-credential-issuer",
+                preserveTrailingSlash = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `a root issuer yields no path suffix under either rule`() {
+        val resolver = IssuerMetadataResolver(createMockClient { respondError(HttpStatusCode.NotFound) })
+
+        assertEquals(
+            "https://issuer.example.org/.well-known/openid-credential-issuer",
+            resolver.buildMetadataUrl(
+                "https://issuer.example.org/",
+                "/.well-known/openid-credential-issuer",
+                preserveTrailingSlash = true,
+            ),
+        )
+        assertEquals(
+            "https://issuer.example.org/.well-known/oauth-authorization-server",
+            resolver.buildMetadataUrl("https://issuer.example.org/", "/.well-known/oauth-authorization-server"),
         )
     }
 

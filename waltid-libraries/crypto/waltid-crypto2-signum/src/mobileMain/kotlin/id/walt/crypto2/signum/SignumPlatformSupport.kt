@@ -113,19 +113,24 @@ internal class SignumPlatformKeyHandle(
     override val attestation: SignumKeyAttestation?,
     private val authentication: SignumAuthenticationPolicy,
     private val signerFor: suspend (SignatureAlgorithm) -> PlatformSigningProviderSigner<*, *>,
-    defaultSigner: PlatformSigningProviderSigner<*, *>,
+    private val operationFailureMapper: (Throwable) -> Throwable = { it },
+    private val nativePublicKey: CryptoPublicKey,
     keyAgreementEnabled: Boolean,
 ) : SignumPlatformKey {
-    override val publicKey = EncodedKey.SpkiDer(BinaryData(defaultSigner.publicKey.encodeToTlv().derEncoded))
+    override val publicKey = EncodedKey.SpkiDer(BinaryData(nativePublicKey.encodeToTlv().derEncoded))
     override val signatureAlgorithms = spec.nativeSignatureAlgorithms()
     override val keyAgreementAlgorithms = if (keyAgreementEnabled) setOf(KeyAgreementAlgorithm.Ecdh) else emptySet()
 
     override suspend fun sign(data: ByteArray, algorithm: SignatureAlgorithm): ByteArray {
         require(algorithm in signatureAlgorithms) { "Unsupported Signum signature algorithm" }
-        return when (val result = signerFor(algorithm).sign(data)) {
-            is SignatureResult.Success -> result.signature.rawByteArray
-            is SignatureResult.Failure -> throw SignumUserCancelledException(result.problem)
-            is SignatureResult.Error -> throw result.exception
+        return try {
+            when (val result = signerFor(algorithm).sign(data)) {
+                is SignatureResult.Success -> result.signature.rawByteArray
+                is SignatureResult.Failure -> throw SignumUserCancelledException(result.problem)
+                is SignatureResult.Error -> throw result.exception
+            }
+        } catch (cause: Throwable) {
+            throw operationFailureMapper(cause)
         }
     }
 
@@ -137,7 +142,7 @@ internal class SignumPlatformKeyHandle(
             is KeySpec.Rsa -> CryptoSignature.RSA(signature)
             else -> error("Unsupported Signum key specification")
         }
-        return signumAlgorithm.verifierFor(signerFor(algorithm).publicKey).getOrThrow()
+        return signumAlgorithm.verifierFor(nativePublicKey).getOrThrow()
             .verify(SignatureInput(data), cryptoSignature).isSuccess
     }
 
