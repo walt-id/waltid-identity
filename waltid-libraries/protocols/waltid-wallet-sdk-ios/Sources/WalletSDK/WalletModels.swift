@@ -894,6 +894,9 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     /// Credential logo URL when advertised.
     public let logoURI: URL?
 
+    /// Accessibility text for the credential logo when advertised.
+    public let logoAltText: String?
+
     /// Creates a credential preview.
     ///
     /// - Parameters:
@@ -902,12 +905,21 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     ///   - name: Localized credential name.
     ///   - descriptionText: Localized credential description.
     ///   - logoURI: Credential logo URL.
-    public init(configurationID: String, format: String, name: String?, descriptionText: String?, logoURI: URL?) {
+    ///   - logoAltText: Accessibility text for the credential logo.
+    public init(
+        configurationID: String,
+        format: String,
+        name: String?,
+        descriptionText: String?,
+        logoURI: URL?,
+        logoAltText: String? = nil
+    ) {
         self.configurationID = configurationID
         self.format = format
         self.name = name
         self.descriptionText = descriptionText
         self.logoURI = logoURI
+        self.logoAltText = logoAltText
     }
 }
 

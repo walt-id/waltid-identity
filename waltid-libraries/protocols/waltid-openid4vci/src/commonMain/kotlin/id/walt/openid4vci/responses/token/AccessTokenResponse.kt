@@ -82,7 +82,10 @@ sealed class AccessTokenResponseResult {
         val request: AccessTokenRequest,
         val response: AccessTokenResponse,
     ) : AccessTokenResponseResult()
-    data class Failure(val error: OAuthError) : AccessTokenResponseResult()
+    data class Failure(
+        val request: AccessTokenRequest,
+        val error: OAuthError,
+    ) : AccessTokenResponseResult()
 
     fun isSuccess(): Boolean = this is Success
 }

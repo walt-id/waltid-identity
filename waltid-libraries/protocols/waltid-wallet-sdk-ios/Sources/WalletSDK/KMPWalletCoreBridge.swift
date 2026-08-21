@@ -423,7 +423,8 @@ private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
             format: format,
             name: name,
             descriptionText: descriptionText,
-            logoURI: logoUri.flatMap(URL.init(string:))
+            logoURI: logoUri.flatMap(URL.init(string:)),
+            logoAltText: logoAltText
         )
     }
 }

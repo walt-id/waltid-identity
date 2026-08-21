@@ -105,6 +105,7 @@ class PreAuthorizedCodeGrantHandlerTest {
         assertTrue(result is AccessTokenResponseResult.Failure)
         assertEquals("invalid_client", result.error.error)
         assertEquals("Client authentication is required for this pre-authorized code", result.error.description)
+        assertEquals("bound-subject", assertNotNull(result.request.session).subject)
         assertNotNull(repository.get(issued.code))
     }
 
@@ -129,6 +130,7 @@ class PreAuthorizedCodeGrantHandlerTest {
         assertTrue(result is AccessTokenResponseResult.Failure)
         assertEquals("invalid_grant", result.error.error)
         assertEquals("Client mismatch for pre-authorized code", result.error.description)
+        assertEquals("bound-subject", assertNotNull(result.request.session).subject)
         assertNotNull(repository.get(issued.code))
     }
 
@@ -170,6 +172,9 @@ class PreAuthorizedCodeGrantHandlerTest {
 
         val failure = handler.handleTokenEndpointRequest(firstAttempt)
         assertTrue(failure is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_grant", failure.error.error)
+        assertEquals("pin-subject", assertNotNull(failure.request.session).subject)
+        assertEquals(failure.request, failure.copy().request)
         assertNotNull(repository.get(code))
 
         val secondAttempt = createAccessRequestWithGrant(code = code, txCode = "4321")
@@ -194,6 +199,7 @@ class PreAuthorizedCodeGrantHandlerTest {
         val second = createAccessRequestWithGrant(code = code)
         val failure = handler.handleTokenEndpointRequest(second)
         assertTrue(failure is AccessTokenResponseResult.Failure)
+        assertNull(failure.request.session)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -239,6 +245,44 @@ class PreAuthorizedCodeGrantHandlerTest {
         val result = handler.handleTokenEndpointRequest(request)
         assertTrue(result is AccessTokenResponseResult.Success)
         assertNull(repository.get(issued.code))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `missing required tx_code is reported as invalid_request`() = runTest {
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                txCode = TxCode(length = 4, description = "Enter your transaction code"),
+                txCodeValue = "4321",
+                session = DefaultSession(subject = "missing-pin-subject"),
+            ),
+        )
+
+        val result = handler.handleTokenEndpointRequest(createAccessRequestWithGrant(code = issued.code))
+
+        assertTrue(result is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_request", result.error.error)
+        assertEquals("missing-pin-subject", assertNotNull(result.request.session).subject)
+        assertNotNull(repository.get(issued.code))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `unexpected tx_code is reported as invalid_request`() = runTest {
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                session = DefaultSession(subject = "no-pin-subject"),
+            ),
+        )
+
+        val result = handler.handleTokenEndpointRequest(
+            createAccessRequestWithGrant(code = issued.code, txCode = "0000"),
+        )
+
+        assertTrue(result is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_request", result.error.error)
+        assertEquals("no-pin-subject", assertNotNull(result.request.session).subject)
+        assertNotNull(repository.get(issued.code))
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

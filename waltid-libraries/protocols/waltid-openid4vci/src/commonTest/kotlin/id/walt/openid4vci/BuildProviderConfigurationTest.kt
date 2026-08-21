@@ -496,7 +496,7 @@ class BuildProviderConfigurationTest {
     private class DuplicateGrantHandler : TokenEndpointHandler {
         override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean = true
         override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessTokenResponseResult =
-            AccessTokenResponseResult.Failure(OAuthError("unsupported_grant_type"))
+            AccessTokenResponseResult.Failure(request, OAuthError("unsupported_grant_type"))
     }
 
     private class CustomGrantHandler : TokenEndpointHandler {

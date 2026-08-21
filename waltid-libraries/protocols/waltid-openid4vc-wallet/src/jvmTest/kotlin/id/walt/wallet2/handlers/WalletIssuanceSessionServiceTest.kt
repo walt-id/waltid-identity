@@ -48,6 +48,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -862,6 +863,104 @@ class WalletIssuanceSessionServiceTest {
         )
 
         assertEquals(stored.credentialIds, credentialStore.credentials.map { it.id })
+    }
+
+    @Test
+    fun localizedIssuancePreviewAndDeferredLabelStayConsistentAfterServiceRecreation() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val credential = key.signJws(
+            """{"iss":"https://issuer.example","sub":"did:key:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"did:key:holder"}}}"""
+                .encodeToByteArray()
+        )
+        val records = RecordingSessionStore()
+        val credentialStore = RecordingCredentialStore()
+        val localizedMetadata = issuerMetadata(proofRequired = false)
+            .replace(
+                "\"credential_endpoint\":\"$CREDENTIAL_ENDPOINT\",",
+                "\"display\":[{\"name\":\"English Issuer\",\"locale\":\"en\"},{\"name\":\"Deutscher Aussteller\",\"locale\":\"de\",\"logo\":{\"uri\":\"https://issuer.example/de.png\",\"alt_text\":\"Aussteller-Logo\"}}],\"credential_endpoint\":\"$CREDENTIAL_ENDPOINT\",",
+            )
+            .replace(
+                "\"credential_definition\":{\"type\":[\"VerifiableCredential\",\"TestCredential\"]}",
+                "\"credential_metadata\":{\"display\":[{\"name\":\"English Credential\",\"locale\":\"en\",\"description\":\"English description\"},{\"name\":\"Deutscher Nachweis\",\"locale\":\"de\",\"description\":\"Deutsche Beschreibung\",\"logo\":{\"uri\":\"https://issuer.example/credential-de.png\",\"alt_text\":\"Nachweis-Logo\"}}]},\"credential_definition\":{\"type\":[\"VerifiableCredential\",\"TestCredential\"]}",
+            )
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> {
+                    assertEquals("de-AT", request.headers[HttpHeaders.AcceptLanguage])
+                    jsonResponse(localizedMetadata)
+                }
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    """{"transaction_id":"transaction-1","interval":1}""",
+                    HttpStatusCode.Accepted,
+                )
+                DEFERRED_ENDPOINT -> jsonResponse(
+                    """{"credentials":[{"credential":${Json.encodeToString(credential)}}]}""",
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val wallet = Wallet("localized", staticKey = key, credentialStores = listOf(credentialStore))
+        val startedBy = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
+
+        val session = startedBy.start(preAuthorizedRequest(), preferredLocales = listOf("de-AT"))
+        assertEquals("Deutscher Aussteller", session.offer.issuer.name)
+        assertEquals("https://issuer.example/de.png", session.offer.issuer.logoUri)
+        assertEquals("Deutscher Nachweis", session.offer.credentials.single().name)
+        assertEquals("Deutsche Beschreibung", session.offer.credentials.single().descriptionText)
+        assertEquals("Nachweis-Logo", session.offer.credentials.single().logoAltText)
+        assertFalse(records.records.values.single().payload.contains("preferredLocales"))
+
+        val resumedBy = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
+        val deferred = assertIs<WalletIssuanceOutcome.Deferred>(resumedBy.continuePreAuthorized(session.id))
+        assertIs<WalletIssuanceOutcome.Stored>(resumedBy.resumeDeferred(deferred.credentials.single().id))
+
+        assertEquals("Deutscher Nachweis", credentialStore.credentials.single().label)
+    }
+
+    @Test
+    fun mdocPreviewSelectsLocalizedNameLogoAltTextAndDescription() = runTest {
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> {
+                    assertEquals("de-AT", request.headers[HttpHeaders.AcceptLanguage])
+                    jsonResponse(
+                        """
+                        {
+                          "credential_issuer":"$ISSUER",
+                          "credential_endpoint":"$CREDENTIAL_ENDPOINT",
+                          "credential_configurations_supported":{
+                            "mdl":{
+                              "format":"mso_mdoc",
+                              "doctype":"org.iso.18013.5.1.mDL",
+                              "credential_metadata":{"display":[
+                                {"name":"Mobile Driving Licence","locale":"en","description":"English description","logo":{"uri":"https://issuer.example/mdl-en.png","alt_text":"English licence logo"}},
+                                {"name":"Mobiler Fuehrerschein","locale":"de","description":"Deutsche Beschreibung","logo":{"uri":"https://issuer.example/mdl-de.png","alt_text":"Fuehrerschein-Logo"}}
+                              ]}
+                            }
+                          }
+                        }
+                        """.trimIndent(),
+                    )
+                }
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            Wallet("localized-mdoc", staticKey = JWKKey.generate(KeyType.secp256r1)),
+            httpClient = client,
+        )
+
+        val preview = service.start(preAuthorizedRequest(configurationIds = listOf("mdl")), listOf("de-AT"))
+        val credential = preview.offer.credentials.single()
+
+        assertEquals("mso_mdoc", credential.format)
+        assertEquals("Mobiler Fuehrerschein", credential.name)
+        assertEquals("Deutsche Beschreibung", credential.descriptionText)
+        assertEquals("https://issuer.example/mdl-de.png", credential.logoUri)
+        assertEquals("Fuehrerschein-Logo", credential.logoAltText)
     }
 
     @Test

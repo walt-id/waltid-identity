@@ -27,6 +27,19 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(configuration.preferredLocales, Locale.preferredLanguages)
     }
 
+    func testIssuanceCredentialPreviewRetainsLogoAccessibilityText() {
+        let preview = IssuanceCredentialPreview(
+            configurationID: "mdl",
+            format: "mso_mdoc",
+            name: "Mobile Driving Licence",
+            descriptionText: nil,
+            logoURI: URL(string: "https://issuer.example/mdl.png"),
+            logoAltText: "Driving licence logo"
+        )
+
+        XCTAssertEqual(preview.logoAltText, "Driving licence logo")
+    }
+
     func testPublicPersistenceConfigurationUsesEncryptedDefault() {
         let configuration = WalletConfiguration(persistence: WalletPersistence(databaseKey: .managed))
 
