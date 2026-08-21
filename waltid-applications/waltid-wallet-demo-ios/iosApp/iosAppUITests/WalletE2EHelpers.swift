@@ -5,6 +5,7 @@ import TestHelpers
 @MainActor
 final class WalletE2EUI {
     let app: XCUIApplication
+    private let pin = "1234"
 
     init(app: XCUIApplication) {
         self.app = app
@@ -21,6 +22,7 @@ final class WalletE2EUI {
             app.launchEnvironment[key] = value
         }
         app.launch()
+        unlockWallet()
     }
 
     func waitForStatus(prefixes: [String], timeout: TimeInterval) -> String? {
@@ -289,6 +291,28 @@ final class WalletE2EUI {
             return element
         }
         return elements[0]
+    }
+
+    private func unlockWallet() {
+        let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        guard pinInput.waitForExistence(timeout: 10) else {
+            return
+        }
+
+        replaceText(in: pinInput, value: pin)
+
+        let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+        if confirmation.waitForExistence(timeout: 2) {
+            replaceText(in: confirmation, value: pin)
+        }
+
+        let submit = firstExisting([
+            app.buttons["wallet.pinSubmitButton"],
+            app.buttons["Set PIN"],
+            app.buttons["Unlock"],
+        ])
+        XCTAssertTrue(submit.waitForExistence(timeout: 10), "PIN submit button not found")
+        submit.tap()
     }
 }
 

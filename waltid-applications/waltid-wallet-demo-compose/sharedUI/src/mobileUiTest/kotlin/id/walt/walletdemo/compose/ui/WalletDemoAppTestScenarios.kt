@@ -85,6 +85,20 @@ class WalletDemoAppTestScenarios {
         onAllNodesWithTag("wallet.pinConfirmationInput").assertCountEquals(0)
     }
 
+    fun pinSetupShowsDisabledBiometricToggleWhenUnavailable() = runComposeUiTest {
+        val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+
+        onNodeWithText("Create a PIN").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinBiometricToggle)
+            .performScrollTo()
+            .assertIsDisplayed()
+        onNodeWithText("Biometrics are not available on this device.")
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
@@ -1160,6 +1174,10 @@ private class RecoverableDemoPinStore : DemoPinStore {
     override suspend fun setPin(pin: String) = Unit
 
     override suspend fun verifyPin(pin: String): Boolean = true
+
+    override fun isBiometricUnlockEnabled(): Boolean = false
+
+    override fun setBiometricUnlockEnabled(enabled: Boolean) = Unit
 
     override fun clear() = Unit
 }

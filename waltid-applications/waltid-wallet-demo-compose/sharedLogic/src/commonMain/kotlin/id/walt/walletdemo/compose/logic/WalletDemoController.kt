@@ -24,6 +24,7 @@ import kotlin.time.Duration.Companion.seconds
 class WalletDemoController(
     private val wallet: DemoWallet,
     private val pinStore: DemoPinStore,
+    private val biometricAuthenticator: DemoBiometricAuthenticator = UnavailableDemoBiometricAuthenticator,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
@@ -77,6 +78,53 @@ class WalletDemoController(
                 is WalletAuthState.StorageUnavailable,
                 WalletAuthState.Unlocked,
                 -> state
+            }
+        }
+    }
+
+    fun updateUseBiometrics(enabled: Boolean) {
+        _state.update { state ->
+            when (val auth = state.auth) {
+                is WalletAuthState.Setup -> state.copy(auth = auth.copy(useBiometrics = enabled, error = null))
+                is WalletAuthState.Login,
+                is WalletAuthState.StorageUnavailable,
+                WalletAuthState.Unlocked,
+                -> state
+            }
+        }
+    }
+
+    fun isBiometricUnlockAvailable(): Boolean = biometricAuthenticator.isAvailable()
+
+    fun isBiometricUnlockEnabled(): Boolean = pinStore.isBiometricUnlockEnabled()
+
+    fun unlockWithBiometrics(force: Boolean = false) {
+        val auth = _state.value.auth as? WalletAuthState.Login ?: return
+        if ((!force && auth.biometricPromptConsumed) || _state.value.isAuthenticating) return
+        if (!pinStore.isBiometricUnlockEnabled() || !biometricAuthenticator.isAvailable()) return
+
+        _state.update { state ->
+            val login = state.auth as? WalletAuthState.Login ?: return@update state
+            state.copy(
+                auth = login.copy(biometricPromptConsumed = true),
+                isAuthenticating = true,
+            )
+        }
+        scope.launch(dispatcher) {
+            when (biometricAuthenticator.authenticate(WalletDisplayText.UnlockWithBiometrics)) {
+                DemoBiometricResult.Succeeded -> {
+                    _state.update {
+                        it.copy(
+                            auth = WalletAuthState.Unlocked,
+                            isAuthenticating = false,
+                        )
+                    }
+                    bootstrapIfNeeded()
+                }
+                DemoBiometricResult.Cancelled,
+                DemoBiometricResult.Failed,
+                DemoBiometricResult.Unavailable,
+                -> _state.update { it.copy(isAuthenticating = false) }
             }
         }
     }
@@ -1066,7 +1114,10 @@ class WalletDemoController(
 
         _state.update { it.copy(isAuthenticating = true) }
         scope.launch(dispatcher) {
-            runCatching { pinStore.setPin(pin) }
+            runCatching {
+                pinStore.setPin(pin)
+                pinStore.setBiometricUnlockEnabled(auth.useBiometrics && biometricAuthenticator.isAvailable())
+            }
                 .onSuccess {
                     _state.update {
                         it.copy(

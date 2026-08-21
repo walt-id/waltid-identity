@@ -6,6 +6,7 @@ import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createIosDemoWallet
 import id.walt.walletdemo.compose.logic.createIosDemoPinStore
+import id.walt.walletdemo.compose.logic.createIosDemoBiometricAuthenticator
 import platform.UIKit.UIViewController
 
 private var iosController: WalletDemoController? = null
@@ -71,6 +72,7 @@ fun walletDemoViewController(
             onDigitalCredentialRegistryChanged = { onDigitalCredentialRegistryChanged() },
         ),
         pinStore = createIosDemoPinStore(config.walletId),
+        biometricAuthenticator = createIosDemoBiometricAuthenticator(),
     )
     iosController = controller
     pendingDeepLink?.let(controller::handleDeepLink)

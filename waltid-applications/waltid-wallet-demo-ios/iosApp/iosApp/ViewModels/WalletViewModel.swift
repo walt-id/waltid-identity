@@ -9,6 +9,13 @@ enum WalletTab: Hashable {
     case present
 }
 
+enum WalletAuthState: Equatable {
+    case setup
+    case login
+    case storageUnavailable(String)
+    case unlocked
+}
+
 enum WalletStatusKind: Hashable {
     case busy
     case info
@@ -60,6 +67,9 @@ private enum WalletStatusText {
     static let invalidOfferURL = "invalid offer URL"
     static let invalidRequestURL = "invalid request URL"
     static let selectCredentialForEveryRequest = "select a credential for every requested credential"
+    static let pinMustContain4To8Digits = "PIN must contain 4 to 8 digits"
+    static let pinConfirmationDoesNotMatch = "PIN confirmation does not match"
+    static let wrongPin = "Wrong PIN"
     static let receivedCredentialsUnavailable = "received credentials are not available locally"
     static let transactionDataProfilesUnavailable = "Transaction data profiles could not be loaded; transaction-data presentation requests will be rejected."
 
@@ -112,6 +122,12 @@ class WalletViewModel: ObservableObject {
     @Published var inputFocusResetKey = 0
     @Published var transactionDataProfilesWarning: String?
     @Published var statusExpanded = false
+    @Published var auth: WalletAuthState = .setup
+    @Published var pin = ""
+    @Published var pinConfirmation = ""
+    @Published var useBiometrics = false
+    @Published var pinError: String?
+    @Published var isAuthenticating = false
     @Published private(set) var pendingPresentationContinuationURL: URL?
     @Published private(set) var pendingPresentationFormPostHTML: String?
     private var statusTab: WalletTab?
@@ -261,6 +277,7 @@ class WalletViewModel: ObservableObject {
         Task {
             do {
                 try await walletClient.deleteLocalData()
+                pinStore.clear()
                 did = ""
                 keyID = ""
                 publicJWK = ""
@@ -281,20 +298,81 @@ class WalletViewModel: ObservableObject {
                 pendingPresentationFormPostHTML = nil
                 statusExpanded = false
                 statusDismissedKey = nil
+                pin = ""
+                pinConfirmation = ""
+                useBiometrics = false
+                pinError = nil
+                isAuthenticating = false
+                biometricPromptConsumed = false
+                auth = .setup
                 do {
                     try await reconcileIdentityDocumentRegistrations()
                 } catch {
                     setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
                 }
-                bootstrap()
             } catch {
                 setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
             }
         }
     }
 
+    func lock() {
+        receiveTask?.cancel()
+        presentationTask?.cancel()
+        cancelIssuanceIfPresent()
+        discardPresentationPreviewIfPresent()
+        pin = ""
+        pinConfirmation = ""
+        pinError = nil
+        isAuthenticating = false
+        biometricPromptConsumed = false
+        auth = .login
+    }
+
+    func submitPin() {
+        guard !isAuthenticating else { return }
+        switch auth {
+        case .setup:
+            submitSetupPin()
+        case .login:
+            submitLoginPin()
+        case .storageUnavailable, .unlocked:
+            break
+        }
+    }
+
+    func unlockWithBiometrics(force: Bool = false) {
+        guard auth == .login else { return }
+        guard force || !biometricPromptConsumed else { return }
+        guard !isAuthenticating else { return }
+        guard pinStore.isBiometricUnlockEnabled, biometricAuthenticator.isAvailable else { return }
+        biometricPromptConsumed = true
+        isAuthenticating = true
+        Task {
+            let result = await biometricAuthenticator.authenticate(reason: "Unlock the wallet")
+            isAuthenticating = false
+            guard auth == .login else { return }
+            if result == .succeeded {
+                auth = .unlocked
+                bootstrapIfNeeded()
+            }
+        }
+    }
+
+    func unlockForTests(pin: String = "1234") {
+        self.pin = pin
+        self.pinConfirmation = pin
+        submitPin()
+    }
+
+    var isBiometricUnlockAvailable: Bool { biometricAuthenticator.isAvailable }
+    var isBiometricUnlockEnabled: Bool { pinStore.isBiometricUnlockEnabled }
+
     private let walletClient: any WalletClient
     private let identityDocumentRegistrationUpdate: @Sendable () async throws -> Void
+    private let pinStore: DemoPinStore
+    private let biometricAuthenticator: any DemoBiometricAuthenticator
+    private var biometricPromptConsumed = false
 
     init(
         walletID: String = "default",
@@ -305,7 +383,9 @@ class WalletViewModel: ObservableObject {
         transactionDataProfilesUrl: String? = nil,
         biometricEnabled: Bool = true,
         walletClient: (any WalletClient)? = nil,
-        identityDocumentRegistrationUpdate: (@Sendable () async throws -> Void)? = nil
+        identityDocumentRegistrationUpdate: (@Sendable () async throws -> Void)? = nil,
+        pinStore: DemoPinStore? = nil,
+        biometricAuthenticator: (any DemoBiometricAuthenticator)? = nil
     ) {
         let transactionDataProfiles: TransactionDataProfilesConfiguration
         if walletClient == nil {
@@ -333,8 +413,18 @@ class WalletViewModel: ObservableObject {
         self.identityDocumentRegistrationUpdate = identityDocumentRegistrationUpdate ?? {
             try await Self.defaultIdentityDocumentRegistrationUpdate()
         }
+        self.pinStore = pinStore ?? (
+            walletClient == nil
+                ? UserDefaultsDemoPinStore(walletID: walletID)
+                : InMemoryDemoPinStore()
+        )
+        self.biometricAuthenticator = biometricAuthenticator ?? (
+            walletClient == nil
+                ? LocalAuthenticationBiometricAuthenticator()
+                : UnavailableDemoBiometricAuthenticator()
+        )
         transactionDataProfilesWarning = transactionDataProfiles.warning
-        bootstrap()
+        auth = self.pinStore.hasPin ? .login : .setup
     }
 
     private static func resolveTransactionDataProfiles(from urlString: String?) -> TransactionDataProfilesConfiguration {
@@ -1049,6 +1139,55 @@ class WalletViewModel: ObservableObject {
         if #available(iOS 26.0, *) {
             try await DemoIdentityDocumentRegistration.update()
         }
+    }
+
+    private func bootstrapIfNeeded() {
+        guard !isReady else { return }
+        bootstrap()
+    }
+
+    private func submitSetupPin() {
+        guard Self.isValidPin(pin) else {
+            pinError = WalletStatusText.pinMustContain4To8Digits
+            return
+        }
+        guard pin == pinConfirmation else {
+            pinError = WalletStatusText.pinConfirmationDoesNotMatch
+            return
+        }
+        isAuthenticating = true
+        pinError = nil
+        Task {
+            await pinStore.setPin(pin)
+            pinStore.isBiometricUnlockEnabled = useBiometrics && biometricAuthenticator.isAvailable
+            isAuthenticating = false
+            auth = .unlocked
+            bootstrapIfNeeded()
+        }
+    }
+
+    private func submitLoginPin() {
+        guard Self.isValidPin(pin) else {
+            pinError = WalletStatusText.pinMustContain4To8Digits
+            return
+        }
+        isAuthenticating = true
+        pinError = nil
+        Task {
+            let matches = await pinStore.verifyPin(pin)
+            isAuthenticating = false
+            guard auth == .login else { return }
+            if matches {
+                auth = .unlocked
+                bootstrapIfNeeded()
+            } else {
+                pinError = WalletStatusText.wrongPin
+            }
+        }
+    }
+
+    private static func isValidPin(_ pin: String) -> Bool {
+        pin.range(of: #"^\d{4,8}$"#, options: .regularExpression) != nil
     }
 
     private func bootstrap() {

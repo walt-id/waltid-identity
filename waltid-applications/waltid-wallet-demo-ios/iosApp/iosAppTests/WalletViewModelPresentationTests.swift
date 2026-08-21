@@ -39,6 +39,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
             walletClient: walletClient
         )
 
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
         viewModel.presentationRequestUrl = request.absoluteString
         viewModel.previewPresentation()
@@ -81,6 +82,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
             )
         )
 
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
         viewModel.presentationRequestUrl = "openid4vp://mock"
         viewModel.previewPresentation()
@@ -116,6 +118,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
             )
         )
 
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
         viewModel.presentationRequestUrl = "openid4vp://mock"
         viewModel.previewPresentation()
@@ -143,6 +146,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
             walletID: "settings-\(UUID().uuidString)",
             walletClient: MockWalletClient()
         )
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         XCTAssertEqual(viewModel.did, "did:key:mock")
@@ -178,6 +182,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
                 ]
             )
         )
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
         XCTAssertEqual(viewModel.credentials.map(\.id), ["cred-1"])
 
@@ -205,6 +210,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
                 ]
             )
         )
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
         viewModel.deleteCredential(id: "cred-1")
         try await waitUntil { viewModel.credentials.isEmpty }

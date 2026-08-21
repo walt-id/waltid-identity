@@ -13,11 +13,19 @@ internal class PersistentDemoPinStore(
     private val readRecord: () -> String?,
     private val writeRecord: (String) -> Unit,
     private val clearRecord: () -> Unit,
+    private val readBiometricUnlock: () -> Boolean,
+    private val writeBiometricUnlock: (Boolean) -> Unit,
     private val provider: CryptographyProvider = CryptographyProvider.Default,
 ) : DemoPinStore {
     private val pbkdf2 by lazy { provider.get(PBKDF2) }
 
     override fun hasPin(): Boolean = readRecord() != null
+
+    override fun isBiometricUnlockEnabled(): Boolean = readBiometricUnlock()
+
+    override fun setBiometricUnlockEnabled(enabled: Boolean) {
+        writeBiometricUnlock(enabled)
+    }
 
     override suspend fun setPin(pin: String) {
         val salt = CryptographyRandom.nextBytes(SALT_SIZE_BYTES)

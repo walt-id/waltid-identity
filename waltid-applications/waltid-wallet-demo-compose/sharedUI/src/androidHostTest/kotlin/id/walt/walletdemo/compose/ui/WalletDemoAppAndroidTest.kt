@@ -15,6 +15,10 @@ class WalletDemoAppAndroidTest {
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
     @Test
+    fun pinSetupShowsDisabledBiometricToggleWhenUnavailable() =
+        scenarios.pinSetupShowsDisabledBiometricToggleWhenUnavailable()
+
+    @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
 
