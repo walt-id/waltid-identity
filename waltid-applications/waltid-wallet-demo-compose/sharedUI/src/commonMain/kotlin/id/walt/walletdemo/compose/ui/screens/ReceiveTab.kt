@@ -24,7 +24,7 @@ import id.walt.walletdemo.compose.logic.receiveUrlEntryEnabled
 import id.walt.walletdemo.compose.logic.receivedCredentials
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
-import id.walt.walletdemo.compose.ui.components.CredentialCard
+import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.OfferReviewSection
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
@@ -97,12 +97,10 @@ internal fun ReceiveTab(
                 Text("New receive")
             }
             Text("Received credentials", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            receivedCredentials.forEach { credential ->
-                CredentialCard(
-                    details = credential.toCredentialDetails(),
-                    onClick = { onCredentialClick(credential.id) },
-                )
-            }
+            CredentialCardStack(
+                details = receivedCredentials.map { it.toCredentialDetails() },
+                onOpenDetails = onCredentialClick,
+            )
         }
     }
 }

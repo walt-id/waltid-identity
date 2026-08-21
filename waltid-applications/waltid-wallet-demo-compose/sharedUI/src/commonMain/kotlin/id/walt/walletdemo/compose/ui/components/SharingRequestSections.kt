@@ -40,7 +40,11 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
  * readable as "the protocol has no such notion" instead of "the answer was bad".
  */
 @Composable
-internal fun SharingRequestSections(request: WalletDemoSharingRequest, modifier: Modifier = Modifier) {
+internal fun SharingRequestSections(
+    request: WalletDemoSharingRequest,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -51,12 +55,14 @@ internal fun SharingRequestSections(request: WalletDemoSharingRequest, modifier:
             ClaimGroupSection(group)
         }
 
-        request.readerTrust?.let { ReaderTrustSection(it) }
+        if (!compact) {
+            request.readerTrust?.let { ReaderTrustSection(it) }
 
-        ResponseProtectionSection(request.responseProtection)
+            ResponseProtectionSection(request.responseProtection)
 
-        if (request.technicalDetails.any { !it.value.isNullOrBlank() }) {
-            TechnicalDetailsSection(request.technicalDetails)
+            if (request.technicalDetails.any { !it.value.isNullOrBlank() }) {
+                TechnicalDetailsSection(request.technicalDetails)
+            }
         }
     }
 }

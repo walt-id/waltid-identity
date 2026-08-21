@@ -10,10 +10,12 @@ import WalletSDK
 /// readable as "the protocol has no such notion" instead of "the answer was bad".
 public struct SharingRequestSections: View {
     private let request: SharingRequest
+    private let compact: Bool
 
     /// Renders the request concepts of a sharing review.
-    public init(request: SharingRequest) {
+    public init(request: SharingRequest, compact: Bool = false) {
         self.request = request
+        self.compact = compact
     }
 
     public var body: some View {
@@ -26,14 +28,16 @@ public struct SharingRequestSections: View {
                 ClaimGroupView(group: group)
             }
 
-            if let readerTrust = request.readerTrust {
-                ReaderTrustSection(readerTrust: readerTrust)
-            }
+            if !compact {
+                if let readerTrust = request.readerTrust {
+                    ReaderTrustSection(readerTrust: readerTrust)
+                }
 
-            ResponseProtectionSection(protection: request.responseProtection)
+                ResponseProtectionSection(protection: request.responseProtection)
 
-            if request.technicalDetails.contains(where: { $0.value?.isPresentableValue == true }) {
-                TechnicalDetailsSection(details: request.technicalDetails)
+                if request.technicalDetails.contains(where: { $0.value?.isPresentableValue == true }) {
+                    TechnicalDetailsSection(details: request.technicalDetails)
+                }
             }
         }
     }

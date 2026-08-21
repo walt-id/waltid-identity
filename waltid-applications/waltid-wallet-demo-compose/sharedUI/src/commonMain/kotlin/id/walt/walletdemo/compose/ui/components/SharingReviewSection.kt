@@ -49,6 +49,7 @@ internal fun SharingReviewSection(
     onCancel: () -> Unit,
     onReject: (() -> Unit)? = null,
     readOnly: Boolean = false,
+    compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -57,8 +58,23 @@ internal fun SharingReviewSection(
             .testTag(WalletUiTestTags.PresentationReview),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        SharingRequestSections(review.request)
+        SharingRequestSections(review.request, compact = compact)
 
+        if (compact) {
+            CredentialCardStack(
+                details = review.credentialOptions.map { it.toCredentialDetails() },
+                onOpenDetails = onCredentialClick,
+            )
+            if (!readOnly) {
+                SharingActionsRow(
+                    enabled = enabled,
+                    selectionComplete = selectionComplete,
+                    onSubmit = onSubmit,
+                    onCancel = onCancel,
+                    onReject = onReject,
+                )
+            }
+        } else {
         Text(
             "Select credentials to share",
             style = MaterialTheme.typography.titleMedium,
@@ -125,6 +141,7 @@ internal fun SharingReviewSection(
                 onCancel = onCancel,
                 onReject = onReject,
             )
+        }
         }
     }
 }

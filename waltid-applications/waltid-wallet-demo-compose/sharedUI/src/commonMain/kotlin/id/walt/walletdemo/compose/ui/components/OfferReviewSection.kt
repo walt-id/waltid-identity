@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
 import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
@@ -84,8 +85,19 @@ internal fun OfferReviewSection(
                 title = "Offered credentials",
                 modifier = Modifier.testTag(WalletUiTestTags.OfferCredentialsSection),
             ) {
-                preview.offeredCredentials.forEachIndexed { index, credential ->
-                    if (index > 0) HorizontalDivider()
+                preview.offeredCredentials.forEach { credential ->
+                    val id = credential.configurationId
+                    CredentialCardArt(
+                        art = (credential.display ?: WalletDemoMetadataDisplay(
+                            name = credential.vct ?: credential.doctype ?: id,
+                            logoUri = null,
+                            logoAltText = null,
+                        )).toCardArt(
+                            id = id,
+                            fallbackName = credential.vct ?: credential.doctype ?: id,
+                        ),
+                    )
+                    HorizontalDivider()
                     OfferedCredentialContent(credential)
                 }
             }
