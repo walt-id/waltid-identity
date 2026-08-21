@@ -2,6 +2,7 @@ package id.walt.issuer2.notifications
 
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
+import id.walt.ktornotifications.SseNotifier
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -20,34 +21,63 @@ class IssuanceNotificationService {
     suspend fun notify(
         session: IssuanceSession,
         event: IssuanceSessionEvent,
+    ) = notify(
+        requestId = session.sessionId,
+        session = session,
+        event = event,
+        error = session.failure?.error,
+        errorDescription = session.failure?.errorDescription,
+    )
+
+    suspend fun notify(
+        requestId: String,
+        session: IssuanceSession?,
+        event: IssuanceSessionEvent,
+        error: String? = null,
+        errorDescription: String? = null,
     ) {
-        val update = session.toSessionUpdate(event)
+        require(requestId.isNotBlank()) { "requestId must not be blank" }
+        val update = KtorSessionUpdate(
+            target = session?.sessionId ?: requestId,
+            event = event.value,
+            session = session?.toNotificationJson() ?: buildJsonObject {},
+            requestId = requestId,
+            error = error,
+            errorDescription = errorDescription,
+        )
         runCatching {
-            update.notifySessionUpdate(
-                sessionId = session.sessionId,
-                sessionNotifications = session.notifications.toKtorSessionNotifications(),
-            )
+            SseNotifier.notify(ISSUER_EVENT_STREAM_TARGET, update)
+            session?.let {
+                update.notifySessionUpdate(
+                    sessionId = it.sessionId,
+                    sessionNotifications = it.notifications.toKtorSessionNotifications(),
+                )
+            }
         }.getOrElse { ex ->
             if (ex is CancellationException) throw ex
-            logger.warn(ex) { "Failed to send issuance notification for session ${session.sessionId} (event=$event)" }
+            logger.warn(ex) {
+                "Failed to send issuance notification (requestId=$requestId, sessionId=${session?.sessionId}, event=$event)"
+            }
         }
     }
 
-    suspend fun emitIssuanceStatus(session: IssuanceSession) =
+    suspend fun emitIssuanceStatus(
+        requestId: String,
+        session: IssuanceSession,
+    ) =
         notify(
+            requestId = requestId,
             session = session,
-            event = IssuanceSessionEvent.ISSUANCE_STATUS,
+            event = IssuanceSessionEvent.ISSUANCE_STATUS_CHANGED,
+            error = session.failure?.error,
+            errorDescription = session.failure?.errorDescription,
         )
 
-    private fun IssuanceSession.toSessionUpdate(event: IssuanceSessionEvent) =
-        KtorSessionUpdate(
-            target = sessionId,
-            event = event.value,
-            session = Json.encodeToJsonElement(forNotificationPayload()).jsonObject,
-        )
+    private fun IssuanceSession.toNotificationJson(): JsonObject =
+        Json.encodeToJsonElement(forNotificationPayload()).jsonObject
 
     private fun IssuanceSession.forNotificationPayload(): IssuanceSession =
-        copy(issuerKey = REDACTED_ISSUER_KEY)
+        copy(issuerKey = REDACTED_ISSUER_KEY, failure = null)
 
     private fun IssuanceNotifications?.toKtorSessionNotifications(): KtorSessionNotifications? =
         this?.webhook?.let { webhook ->
@@ -59,6 +89,8 @@ class IssuanceNotificationService {
         }
 
     companion object {
+        const val ISSUER_EVENT_STREAM_TARGET = "issuer2"
+
         private val REDACTED_ISSUER_KEY: JsonObject = buildJsonObject {
             put("type", JsonPrimitive("redacted"))
         }

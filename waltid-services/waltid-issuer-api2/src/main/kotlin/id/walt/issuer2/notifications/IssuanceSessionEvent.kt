@@ -12,57 +12,69 @@ enum class IssuanceSessionEvent(val value: String) {
     @SerialName("credential_offer_created")
     CREDENTIAL_OFFER_CREATED("credential_offer_created"),
 
-    @SerialName("credential_offer_resolved")
-    CREDENTIAL_OFFER_RESOLVED("credential_offer_resolved"),
+    @SerialName("credential_offer_retrieved")
+    CREDENTIAL_OFFER_RETRIEVED("credential_offer_retrieved"),
 
-    @SerialName("pushed_authorization_request_received")
-    PUSHED_AUTHORIZATION_REQUEST_RECEIVED("pushed_authorization_request_received"),
+    @SerialName("pushed_authorization_request_succeeded")
+    PUSHED_AUTHORIZATION_REQUEST_SUCCEEDED("pushed_authorization_request_succeeded"),
 
     @SerialName("pushed_authorization_request_failed")
     PUSHED_AUTHORIZATION_REQUEST_FAILED("pushed_authorization_request_failed"),
 
-    @SerialName("authorization_request_received")
-    AUTHORIZATION_REQUEST_RECEIVED("authorization_request_received"),
+    @SerialName("authorization_request_succeeded")
+    AUTHORIZATION_REQUEST_SUCCEEDED("authorization_request_succeeded"),
 
     @SerialName("authorization_request_failed")
     AUTHORIZATION_REQUEST_FAILED("authorization_request_failed"),
 
-    @SerialName("authorization_code_issued")
-    AUTHORIZATION_CODE_ISSUED("authorization_code_issued"),
-
-    @SerialName("access_token_issued")
-    ACCESS_TOKEN_ISSUED("access_token_issued"),
-
-    @SerialName("tx_code_validation_failed")
-    TX_CODE_VALIDATION_FAILED("tx_code_validation_failed"),
-
     @SerialName("token_request_failed")
     TOKEN_REQUEST_FAILED("token_request_failed"),
 
-    @SerialName("access_token_refreshed")
-    ACCESS_TOKEN_REFRESHED("access_token_refreshed"),
+    @SerialName("token_request_authorization_code_succeeded")
+    TOKEN_REQUEST_AUTHORIZATION_CODE_SUCCEEDED("token_request_authorization_code_succeeded"),
 
-    @SerialName("credential_request_received")
-    CREDENTIAL_REQUEST_RECEIVED("credential_request_received"),
+    @SerialName("token_request_authorization_code_failed")
+    TOKEN_REQUEST_AUTHORIZATION_CODE_FAILED("token_request_authorization_code_failed"),
 
-    @SerialName("dpop_proof_validation_failed")
-    DPOP_PROOF_VALIDATION_FAILED("dpop_proof_validation_failed"),
+    @SerialName("token_request_pre_authorized_code_succeeded")
+    TOKEN_REQUEST_PRE_AUTHORIZED_CODE_SUCCEEDED("token_request_pre_authorized_code_succeeded"),
 
-    @SerialName("credential_proof_validation_failed")
-    CREDENTIAL_PROOF_VALIDATION_FAILED("credential_proof_validation_failed"),
+    @SerialName("token_request_pre_authorized_code_failed")
+    TOKEN_REQUEST_PRE_AUTHORIZED_CODE_FAILED("token_request_pre_authorized_code_failed"),
+
+    @SerialName("token_request_refresh_token_succeeded")
+    TOKEN_REQUEST_REFRESH_TOKEN_SUCCEEDED("token_request_refresh_token_succeeded"),
+
+    @SerialName("token_request_refresh_token_failed")
+    TOKEN_REQUEST_REFRESH_TOKEN_FAILED("token_request_refresh_token_failed"),
+
+    @SerialName("nonce_request_succeeded")
+    NONCE_REQUEST_SUCCEEDED("nonce_request_succeeded"),
+
+    @SerialName("nonce_request_failed")
+    NONCE_REQUEST_FAILED("nonce_request_failed"),
 
     @SerialName("credential_request_failed")
     CREDENTIAL_REQUEST_FAILED("credential_request_failed"),
 
-    @SerialName("sd_jwt_issued")
-    SD_JWT_ISSUED("sd_jwt_issued"),
+    @SerialName("credential_request_sd_jwt_vc_succeeded")
+    CREDENTIAL_REQUEST_SD_JWT_VC_SUCCEEDED("credential_request_sd_jwt_vc_succeeded"),
 
-    @SerialName("jwt_issued")
-    JWT_ISSUED("jwt_issued"),
+    @SerialName("credential_request_sd_jwt_vc_failed")
+    CREDENTIAL_REQUEST_SD_JWT_VC_FAILED("credential_request_sd_jwt_vc_failed"),
 
-    @SerialName("mdoc_issued")
-    MDOC_ISSUED("mdoc_issued"),
+    @SerialName("credential_request_w3c_vc_succeeded")
+    CREDENTIAL_REQUEST_W3C_VC_SUCCEEDED("credential_request_w3c_vc_succeeded"),
 
-    @SerialName("issuance_status")
-    ISSUANCE_STATUS("issuance_status"),
+    @SerialName("credential_request_w3c_vc_failed")
+    CREDENTIAL_REQUEST_W3C_VC_FAILED("credential_request_w3c_vc_failed"),
+
+    @SerialName("credential_request_mso_mdoc_succeeded")
+    CREDENTIAL_REQUEST_MSO_MDOC_SUCCEEDED("credential_request_mso_mdoc_succeeded"),
+
+    @SerialName("credential_request_mso_mdoc_failed")
+    CREDENTIAL_REQUEST_MSO_MDOC_FAILED("credential_request_mso_mdoc_failed"),
+
+    @SerialName("issuance_status_changed")
+    ISSUANCE_STATUS_CHANGED("issuance_status_changed"),
 }
