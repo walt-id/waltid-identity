@@ -48,14 +48,12 @@ class ConformanceReportWriterTest {
         assertTrue(summary.contains("MdlBaseline"))
         assertTrue(summary.contains("SdJwtHaip"))
         assertTrue(summary.contains("audience mismatch"))
-        assertTrue(summary.contains("Align `aud`"))
-        assertTrue(summary.contains("## Failed and skipped"))
-        assertTrue(summary.contains("## Passed"))
-        assertTrue(summary.contains("| Test | Variant | Suite | Log |"))
-        assertFalse(summary.contains("| Test | Status | Suite | Log | Error |"))
         assertTrue(summary.contains("Soft-fail"))
         assertTrue(summary.contains("[log](https://conformance.example:443/log-detail.html?log=def-456)"))
         assertTrue(summary.contains("# OpenID4VP Verifier Conformance Summary"))
+        assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
+        assertFalse(summary.contains("## Failed and skipped"))
+        assertFalse(summary.contains("- Fix:"))
     }
 
     @Test
@@ -86,7 +84,7 @@ class ConformanceReportWriterTest {
                     ConformanceReportWriter.reportDir(role, reportRoot).resolve("summary.md")
                 )
                 assertTrue(summary.contains("# ${role.title} Conformance Summary"))
-                assertTrue(summary.contains("| Test | Variant | Suite | Log |"))
+                assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
                 assertTrue(summary.contains("wallet-module"))
                 assertTrue(summary.contains("Soft-fail"))
             }
@@ -136,11 +134,11 @@ class ConformanceReportWriterTest {
                 .resolve("summary.md")
         )
         assertTrue(summary.contains("# OpenID4VCI Wallet Conformance Summary"))
-        assertTrue(summary.contains("## Failed and skipped"))
+        assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
         assertTrue(summary.contains("conformance-suite"))
         assertTrue(summary.contains("not available"))
-        assertTrue(summary.contains("Start the OpenID conformance suite"))
-        assertFalse(summary.contains("| Test | Status | Suite | Log | Error |"))
+        assertFalse(summary.contains("## Failed and skipped"))
+        assertFalse(summary.contains("- Fix:"))
     }
 
     @Test
@@ -167,7 +165,7 @@ class ConformanceReportWriterTest {
     }
 
     @Test
-    fun compactWalletNamesAndExplainsFailuresAndSkips() {
+    fun compactWalletNamesStayInTheSameTable() {
         val reportRoot = Files.createTempDirectory("openid-conformance-compact").toString()
         val producerId =
             "oid4vp-1final-wallet-test-plan/client_id_prefix=x509_hash,credential_format=sd_jwt_vc," +
@@ -215,12 +213,16 @@ class ConformanceReportWriterTest {
             "sd_jwt_vc · x509_hash · request_uri_signed · direct_post.jwt · plain",
             compact.variant,
         )
-        assertTrue(summary.contains("`happy-flow`"))
-        assertTrue(summary.contains("`negative-test-missing-nonce`"))
+        assertTrue(summary.contains("happy-flow"))
+        assertTrue(summary.contains("negative-test-missing-nonce"))
         assertTrue(summary.contains(compact.variant!!))
-        assertTrue(summary.contains("Expected skip"))
-        assertTrue(summary.contains("Align `aud`"))
-        assertTrue(summary.contains("- Fix:"))
+        assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
+        assertTrue(summary.contains("`skipped`"))
+        assertTrue(summary.contains("`failed`"))
+        assertTrue(summary.contains("audience mismatch"))
+        assertTrue(summary.contains("Not applicable to this variant"))
+        assertFalse(summary.contains("## Failed and skipped"))
+        assertFalse(summary.contains("- Fix:"))
         assertFalse(summary.contains("| `$producerId/oid4vp-1final-wallet-happy-flow` |"))
     }
 

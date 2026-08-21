@@ -219,6 +219,9 @@ jobs:
                 echo "- Passed: 0"
                 echo "- Failed: 0"
                 echo
+                echo "| Test | Status | Suite | Log | Error |"
+                echo "|------|--------|-------|-----|-------|"
+                echo
                 echo "_No ${title} conformance results were produced (suite skipped, unavailable, or failed before writing a report)._"
               } >> "$GITHUB_STEP_SUMMARY"
             fi
