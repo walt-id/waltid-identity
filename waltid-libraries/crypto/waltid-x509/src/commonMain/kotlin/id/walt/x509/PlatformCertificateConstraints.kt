@@ -39,10 +39,11 @@ internal fun X509Certificate.platformCertificateConstraints(): PlatformCertifica
         ?.let(Asn1Element::parse)
         ?.asPrimitive()
         ?.content
-    fun hasKeyUsageBit(bit: Int): Boolean = keyUsageContent?.let { content ->
-        val byte = content.getOrNull(1 + bit / Byte.SIZE_BITS)?.toInt() ?: return@let false
-        (byte and (0x80 ushr (bit % Byte.SIZE_BITS))) != 0
-    } ?: false
+    fun hasKeyUsageBit(bit: Int): Boolean {
+        val content = keyUsageContent ?: return true
+        val byte = content.getOrNull(1 + bit / Byte.SIZE_BITS)?.toInt() ?: return false
+        return (byte and (0x80 ushr (bit % Byte.SIZE_BITS))) != 0
+    }
     val extendedKeyUsageOids = extensions.firstOrNull { it.oid == extendedKeyUsageOid }
         ?.value?.asOctetString()?.content
         ?.let(Asn1Element::parse)

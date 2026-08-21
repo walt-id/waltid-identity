@@ -26,10 +26,16 @@ internal actual class PlatformX509Certificate private constructor(
         get() = certificate.basicConstraints.takeIf { it >= 0 && it != Int.MAX_VALUE }
 
     actual val canSignCertificates: Boolean
-        get() = certificate.keyUsage?.getOrNull(5) == true
+        get() {
+            val usage = certificate.keyUsage ?: return true
+            return usage.getOrNull(5) == true
+        }
 
     actual val canSignData: Boolean
-        get() = certificate.keyUsage?.getOrNull(0) == true
+        get() {
+            val usage = certificate.keyUsage ?: return true
+            return usage.getOrNull(0) == true
+        }
 
     actual val extendedKeyUsageOids: Set<String>?
         get() = certificate.extendedKeyUsage?.toSet()

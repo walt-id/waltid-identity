@@ -1,6 +1,7 @@
 package id.walt.wallet2.mobile
 
 import androidx.credentials.registry.digitalcredentials.mdoc.MdocEntry
+import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegistry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
 import id.walt.cose.coseCompliantCbor
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -24,7 +25,7 @@ class AndroidDigitalCredentialRegistryTest {
     private val registry = AndroidDigitalCredentialRegistry(RuntimeEnvironment.getApplication())
 
     @Test
-    fun capabilityMatrixReportsUnsignedOpenId4VpAndOpenId4VciAsSupportableWhenRegistered() {
+    fun capabilityMatrixReportsSignedOpenId4VpAndOpenId4VciAsSupportableWhenRegistered() {
         val capabilities = registry.capabilities
 
         assertTrue(capabilities.platformAvailable)
@@ -32,7 +33,6 @@ class AndroidDigitalCredentialRegistryTest {
         val unsigned = capabilities.capabilities.single {
             it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED
         }
-        // Unsupported here only because registration has not run; the combination itself is implemented.
         assertFalse(unsigned.supported)
         assertTrue(unsigned.unsupportedReason?.contains("registration") == true)
         val openId4Vci = capabilities.capabilities.single {
@@ -40,7 +40,20 @@ class AndroidDigitalCredentialRegistryTest {
         }
         assertFalse(openId4Vci.supported)
         assertTrue(openId4Vci.unsupportedReason?.contains("creation registration") == true)
+        val signed = capabilities.capabilities.single {
+            it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED
+        }
+        // Unsupported here only because registration has not run; signed itself is always implemented.
+        assertFalse(signed.supported)
+        assertTrue(signed.unsupportedReason?.contains("registration") == true)
         // Both DC API response modes: dc_api and dc_api.jwt.
+        assertEquals(
+            listOf(
+                MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
+                MobileWalletDigitalCredentialResponseProtection.JWE,
+            ),
+            signed.responseProtection,
+        )
         assertEquals(
             listOf(
                 MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
@@ -48,24 +61,23 @@ class AndroidDigitalCredentialRegistryTest {
             ),
             unsigned.responseProtection,
         )
-        val signed = capabilities.capabilities.single {
-            it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED
-        }
-        assertFalse(signed.supported)
-        assertTrue(signed.unsupportedReason?.contains("unsigned") == true)
+        assertEquals(
+            listOf(
+                OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_SIGNED,
+                OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED,
+            ),
+            registry.advertisedOpenId4VpProtocols(),
+        )
         val multisigned = capabilities.capabilities.single {
             it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED
         }
         assertFalse(multisigned.supported)
         assertTrue(multisigned.unsupportedReason?.contains("JWS JSON Serialization") == true)
-        // A capability that is not implemented must not be advertised as available on any protocol,
-        // whatever this wallet does implement elsewhere.
         assertTrue(
             capabilities.capabilities.filter { it.supported }.none { capability ->
-                MobileWalletDigitalCredentialRequestProtection.SIGNED in capability.requestProtection ||
-                    MobileWalletDigitalCredentialRequestProtection.MULTISIGNED in capability.requestProtection
+                MobileWalletDigitalCredentialRequestProtection.MULTISIGNED in capability.requestProtection
             },
-            "a signed request protection must never be advertised as supported",
+            "a multisigned request protection must never be advertised as supported",
         )
     }
 

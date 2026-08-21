@@ -421,27 +421,43 @@ class AndroidDigitalCredentialProviderTest {
     }
 
     /**
-     * A selected signed alternative fails, and specifically does not fall through to the unsigned
+     * A selected signed alternative is answered as signed. It must not fall through to the unsigned
      * sibling, which would answer a request the user never saw.
      */
     @Test
-    fun rejectsASelectedSignedAlternativeInsteadOfSwitchingToTheUnsignedSibling() {
-        listOf(
-            MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
-            MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
-        ).forEach { signedProtocol ->
-            assertFailsWith<IllegalArgumentException>("$signedProtocol was not rejected") {
-                AndroidDigitalCredentialProvider.resolveSelectedProtocolRequest(
-                    requestJson = """
-                        {"requests":[
-                          {"protocol":"$signedProtocol","data":{"request":"a.b.c"}},
-                          {"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}
-                        ]}
-                    """.trimIndent(),
-                    verifiedOrigin = "https://verifier.example",
-                    selection = openId4VpSelection(requestIndex = 0, registryEntryIds = listOf("signed-entry")),
-                )
-            }
+    fun acceptsASelectedSignedAlternativeInsteadOfSwitchingToTheUnsignedSibling() {
+        val request = AndroidDigitalCredentialProvider.resolveSelectedProtocolRequest(
+            requestJson = """
+                {"requests":[
+                  {"protocol":"openid4vp-v1-signed","data":{"request":"a.b.c"}},
+                  {"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}
+                ]}
+            """.trimIndent(),
+            verifiedOrigin = "https://verifier.example",
+            selection = openId4VpSelection(requestIndex = 0, registryEntryIds = listOf("signed-entry")),
+        )
+        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED, request.protocol)
+        assertEquals("""{"request":"a.b.c"}""", request.dataJson)
+        assertEquals(listOf("signed-entry"), request.selectedRegistryEntryIds)
+    }
+
+    /**
+     * A selected multisigned alternative fails, and specifically does not fall through to the unsigned
+     * sibling, which would answer a request the user never saw.
+     */
+    @Test
+    fun rejectsASelectedMultisignedAlternativeInsteadOfSwitchingToTheUnsignedSibling() {
+        assertFailsWith<IllegalArgumentException> {
+            AndroidDigitalCredentialProvider.resolveSelectedProtocolRequest(
+                requestJson = """
+                    {"requests":[
+                      {"protocol":"openid4vp-v1-multisigned","data":{"request":{}}},
+                      {"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}
+                    ]}
+                """.trimIndent(),
+                verifiedOrigin = "https://verifier.example",
+                selection = openId4VpSelection(requestIndex = 0, registryEntryIds = listOf("signed-entry")),
+            )
         }
     }
 
@@ -521,14 +537,13 @@ class AndroidDigitalCredentialProviderTest {
         }
     }
 
-    /** Signed variants stay unsupported: an envelope offering only those must fail closed. */
+    /** Multisigned stays unsupported: an envelope offering only that must fail closed. */
     @Test
     fun rejectsAnEnvelopeThatOffersOnlyUnsupportedProtocols() {
         assertFailsWith<IllegalArgumentException> {
             AndroidDigitalCredentialProvider.resolveSelectedProtocolRequest(
                 requestJson = """
                     {"requests":[
-                      {"protocol":"openid4vp-v1-signed","data":{"request":"a.b.c"}},
                       {"protocol":"openid4vp-v1-multisigned","data":{"request":{}}}
                     ]}
                 """.trimIndent(),

@@ -141,6 +141,13 @@ public expect class MobileWalletFactory {
 
     /**
      * Creates a mobile wallet with explicit verifier client-ID trust configuration.
+     *
+     * Pin X.509 trust anchors on [ClientIdTrustConfiguration.x509TrustAnchors] to allow OpenID4VP
+     * `x509_san_dns` and `x509_hash` clients. An empty list fails those prefixes closed.
+     * `decentralized_identifier` clients still authenticate through DID resolution.
+     *
+     * Consuming apps pin their own CAs. walt.id Verifier2's `verifier-service.conf` publishes a demo
+     * `x5c` for `x509_san_dns:verifier.example.com` that wallets can copy as a starting PEM.
      */
     public suspend fun create(
         config: MobileWalletConfig,

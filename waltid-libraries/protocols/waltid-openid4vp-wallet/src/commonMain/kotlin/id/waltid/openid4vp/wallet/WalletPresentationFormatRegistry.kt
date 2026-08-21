@@ -61,7 +61,7 @@ object WalletPresentationFormatRegistry {
             .distinct()
             .sorted()
         val supportedMdocCoseAlgorithms = signingKeys
-            .mapNotNull { it.spec.toMdocDeviceAuthCoseAlgorithm() }
+            .flatMap { it.spec.toMdocDeviceAuthCoseAlgorithms() }
             .distinct()
             .sorted()
 
@@ -95,7 +95,7 @@ object WalletPresentationFormatRegistry {
             .sorted()
 
         val supportedMdocCoseAlgorithms = keyTypes
-            .mapNotNull { it.toMdocDeviceAuthCoseAlgorithm() }
+            .flatMap { it.toMdocDeviceAuthCoseAlgorithms() }
             .distinct()
             .sorted()
 
@@ -105,19 +105,20 @@ object WalletPresentationFormatRegistry {
     /**
      * COSE algorithms this wallet can use for ISO 18013-5 device authentication.
      *
-     * P-256 device authentication is advertised with the fully specified identifier (ESP256);
-     * Ed25519 device authentication uses EdDSA.
+     * P-256 is advertised as both ES256 (-7) and ESP256 (-9). Device signatures are produced as
+     * ES256; ESP256 is included so verifiers that only list the fully specified identifier still
+     * negotiate the format. Ed25519 uses EdDSA.
      */
-    private fun KeySpec.toMdocDeviceAuthCoseAlgorithm(): Int? = when (this) {
-        KeySpec.Ec(EcCurve.P256) -> Cose.Algorithm.ESP256
-        KeySpec.Edwards(EdwardsCurve.ED25519) -> Cose.Algorithm.EdDSA
-        else -> null
+    private fun KeySpec.toMdocDeviceAuthCoseAlgorithms(): List<Int> = when (this) {
+        KeySpec.Ec(EcCurve.P256) -> listOf(Cose.Algorithm.ES256, Cose.Algorithm.ESP256)
+        KeySpec.Edwards(EdwardsCurve.ED25519) -> listOf(Cose.Algorithm.EdDSA)
+        else -> emptyList()
     }
 
-    private fun KeyType.toMdocDeviceAuthCoseAlgorithm(): Int? = when (this) {
-        KeyType.secp256r1 -> Cose.Algorithm.ESP256
-        KeyType.Ed25519 -> Cose.Algorithm.EdDSA
-        else -> null
+    private fun KeyType.toMdocDeviceAuthCoseAlgorithms(): List<Int> = when (this) {
+        KeyType.secp256r1 -> listOf(Cose.Algorithm.ES256, Cose.Algorithm.ESP256)
+        KeyType.Ed25519 -> listOf(Cose.Algorithm.EdDSA)
+        else -> emptyList()
     }
 
     private fun capabilities(
