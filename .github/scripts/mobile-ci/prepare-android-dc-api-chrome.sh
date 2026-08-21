@@ -302,7 +302,7 @@ chrome_click_ui_node() {
 
 chrome_wait_for_tabbed_ui() {
   local deadline=$((SECONDS + DC_API_CHROME_READY_TIMEOUT_SECONDS))
-  local activity toolbar_count
+  local activity omnibox_count search_box_count
   while (( SECONDS < deadline )); do
     activity="$(chrome_current_activity)"
     if [[ "$activity" == *"$DC_API_CHROME_FIRST_RUN_ACTIVITY"* ]]; then
@@ -310,8 +310,10 @@ chrome_wait_for_tabbed_ui() {
       continue
     fi
     if chrome_dump_ui; then
-      toolbar_count="$(chrome_ui_count resource-id-suffix=url_bar visible=true 2>/dev/null || printf 0)"
-      if (( toolbar_count == 1 )) && [[ "$activity" == *"$DC_API_CHROME_TABBED_ACTIVITY"* || "$activity" == *"$DC_API_CHROME_MAIN_ACTIVITY"* ]]; then
+      omnibox_count="$(chrome_ui_count resource-id-suffix=url_bar visible=true 2>/dev/null || printf 0)"
+      search_box_count="$(chrome_ui_count resource-id-suffix=search_box_text visible=true 2>/dev/null || printf 0)"
+      if (( omnibox_count + search_box_count == 1 )) && \
+        [[ "$activity" == *"$DC_API_CHROME_TABBED_ACTIVITY"* || "$activity" == *"$DC_API_CHROME_MAIN_ACTIVITY"* ]]; then
         return 0
       fi
     fi
@@ -328,10 +330,12 @@ chrome_complete_first_run() {
   while (( SECONDS < deadline )); do
     activity="$(chrome_current_activity)"
     if chrome_dump_ui; then
-      dismiss_count="$(chrome_ui_count resource-id-suffix=signin_fre_dismiss_button text='Use without an account' enabled=true visible=true 2>/dev/null || printf 0)"
+      # Chrome uses different localized/campaign labels for this stable control (for example,
+      # "Use without an account" and "Stay signed out") across otherwise identical builds.
+      dismiss_count="$(chrome_ui_count resource-id-suffix=signin_fre_dismiss_button enabled=true visible=true 2>/dev/null || printf 0)"
       if (( dismiss_count == 1 )); then
-        chrome_click_ui_node "Chrome Use without an account button" "$DC_API_CHROME_READY_TIMEOUT_SECONDS" \
-          resource-id-suffix=signin_fre_dismiss_button text='Use without an account' enabled=true clickable=true visible=true || return 1
+        chrome_click_ui_node "Chrome first-run account dismissal button" "$DC_API_CHROME_READY_TIMEOUT_SECONDS" \
+          resource-id-suffix=signin_fre_dismiss_button enabled=true clickable=true visible=true || return 1
         break
       fi
       negative_count="$(chrome_ui_count resource-id-suffix=negative_button text='No thanks' enabled=true visible=true 2>/dev/null || printf 0)"
