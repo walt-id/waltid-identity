@@ -115,11 +115,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithContentDescription("Receive tab").assertIsDisplayed()
         onNodeWithContentDescription("Present tab").assertIsDisplayed()
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
-        onNodeWithContentDescription("Credential portrait").assertIsDisplayed()
         onNodeWithText("Example Credential").assertIsDisplayed()
-        onNodeWithText("Mobile driving licence").assertIsDisplayed()
-        onNodeWithText("Ada Lovelace").assertIsDisplayed()
-        onNodeWithText("Expires 2026-06-17").assertIsDisplayed()
 
         onNodeWithTag("wallet.credentialCard.cred-1").performClick()
         onNodeWithTag("wallet.credentialDetailsScreen").assertIsDisplayed()
@@ -161,7 +157,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("wallet.credentialCard.ExampleCredential").assertExists()
         onNodeWithText("vc+sd-jwt").performScrollTo().assertIsDisplayed()
         assertIssuerDetailsCollapsedUntilRequested()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)

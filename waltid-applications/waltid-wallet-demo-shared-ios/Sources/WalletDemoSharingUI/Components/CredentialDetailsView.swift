@@ -44,36 +44,7 @@ private struct CredentialOverviewView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                CredentialPortraitView(summary: summary, size: 64)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(summary.title)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
-
-                    if let credentialType = summary.credentialType {
-                        Text(credentialType)
-                            .font(.caption)
-                            .foregroundStyle(.tint)
-                    }
-
-                    if let holderName = summary.holderName {
-                        Text(holderName)
-                            .font(.caption)
-                    }
-
-                    HStack(spacing: 8) {
-                        Text(details.format)
-                        if let validityText = summary.validityText {
-                            Text(validityText)
-                        }
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
+            CredentialCardView(details: details, compact: true)
 
             if let issuerDisplay = details.issuerDisplay {
                 let supporting = details.issuer?
