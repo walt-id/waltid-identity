@@ -299,6 +299,9 @@ internal fun MobileWalletMetadataDisplay.toDemoMetadataDisplay(): WalletDemoMeta
         logoUri = logoUri,
         logoAltText = logoAltText,
         description = description,
+        backgroundColor = backgroundColor,
+        backgroundImageUri = backgroundImageUri,
+        textColor = textColor,
     )
 
 internal fun MobileWalletVerifierMetadata.toDemoMetadata(): WalletDemoVerifierMetadata =

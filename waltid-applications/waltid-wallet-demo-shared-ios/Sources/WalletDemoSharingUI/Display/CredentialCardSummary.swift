@@ -9,6 +9,11 @@ public struct CredentialCardSummary {
     public let validityText: String?
     public let portraitData: Data?
     public let portraitMimeType: String?
+    public let backgroundColor: String?
+    public let backgroundImageURI: String?
+    public let textColor: String?
+    public let logoURI: String?
+    public let logoAltText: String?
 }
 
 extension CredentialDetails {
@@ -28,14 +33,19 @@ extension CredentialDetails {
             ?? CredentialDisplayText.unknown
 
         return CredentialCardSummary(
-            title: title,
+            title: credentialDisplay?.name?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? title,
             credentialType: firstCredentialType(in: items),
             holderName: holderName.isEmpty ? subject : holderName,
             issuer: issuerName,
             dateText: expiryDate ?? addedDate,
             validityText: expiryDate.map(CredentialDisplayText.expires) ?? addedDate.map(CredentialDisplayText.added),
             portraitData: portrait?.data,
-            portraitMimeType: portrait?.mimeType
+            portraitMimeType: portrait?.mimeType,
+            backgroundColor: credentialDisplay?.backgroundColor,
+            backgroundImageURI: credentialDisplay?.backgroundImageURI,
+            textColor: credentialDisplay?.textColor,
+            logoURI: credentialDisplay?.logoURI,
+            logoAltText: credentialDisplay?.logoAltText
         )
     }
 

@@ -5,6 +5,9 @@ data class WalletDemoMetadataDisplay(
     val logoUri: String?,
     val logoAltText: String?,
     val description: String? = null,
+    val backgroundColor: String? = null,
+    val backgroundImageUri: String? = null,
+    val textColor: String? = null,
 )
 
 data class WalletDemoIssuerMetadata(
