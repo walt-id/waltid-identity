@@ -13,7 +13,7 @@ struct WalletTabStatusBanner: View {
                 isError: viewModel.statusIsError(for: tab),
                 isExpanded: viewModel.statusExpanded,
                 onDismiss: dismissAction,
-                onToggleExpanded: viewModel.statusKind(for: tab) == .error ? viewModel.toggleStatusExpanded : nil
+                onToggleExpanded: expandAction
             )
         }
     }
@@ -21,10 +21,15 @@ struct WalletTabStatusBanner: View {
     private var dismissAction: (() -> Void)? {
         switch viewModel.statusKind(for: tab) {
         case .success, .error:
-            return viewModel.dismissStatus
+            return { viewModel.dismissStatus() }
         case .busy, .info, nil:
             return nil
         }
+    }
+
+    private var expandAction: (() -> Void)? {
+        guard viewModel.statusKind(for: tab) == .error else { return nil }
+        return { viewModel.toggleStatusExpanded() }
     }
 }
 
@@ -32,7 +37,9 @@ extension View {
     func walletSettingsToolbar(viewModel: WalletViewModel) -> some View {
         toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink(destination: SettingsView(viewModel: viewModel)) {
+                NavigationLink {
+                    SettingsView(viewModel: viewModel)
+                } label: {
                     Image(systemName: "gearshape")
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsButton)
