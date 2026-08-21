@@ -31,8 +31,6 @@ import kotlinx.serialization.json.JsonObject
  *     #         -----END CERTIFICATE-----"""
  *     #     ]
  *     # }
- *     # HAIP signed-only is the default. Set true to also accept unsigned JSON redirect_uri:
- *     # allowUnsignedRequests = true
  * }
  * ```
  */
@@ -42,13 +40,6 @@ data class OSSWallet2ServiceConfig(
     val publicBaseUrl: Url,
     val attestationConfig: WalletAttestationConfig? = null,
     val clientIdTrust: ClientIdTrustConfig = ClientIdTrustConfig(),
-    /**
-     * When false (default), this wallet follows HAIP: only signed Authorization Request Objects
-     * are accepted, and the `redirect_uri` client ID prefix is rejected. When true, unsigned
-     * JSON Authorization Requests that use `redirect_uri` are also accepted. Signed requests
-     * remain accepted either way.
-     */
-    val allowUnsignedRequests: Boolean = false,
     /**
      * `transaction_data` types this wallet understands, e.g. `["payment"]`.
      *

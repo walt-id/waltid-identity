@@ -53,7 +53,6 @@ public struct IdentityDocumentNamespace: Sendable {
         }
         return WalletConfiguration(
             walletID: walletID,
-            allowUnsignedRequests: true,
             crossProcessAccess: WalletCrossProcessAccess(
                 appGroupIdentifier: appGroupIdentifier,
                 keychainAccessGroup: keychainAccessGroup

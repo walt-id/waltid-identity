@@ -57,9 +57,6 @@ import kotlin.time.Instant
  * @property issuerMetadataTrustResolver Optional Swift-owned verifier for signed Credential Issuer Metadata.
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
- * @property allowUnsignedRequests Whether this wallet accepts unsigned OpenID4VP requests.
- * When false (default), HAIP signed-only: `redirect_uri` is rejected. When true, unsigned JSON
- * `redirect_uri` requests are also accepted. Signed Request Objects are accepted either way.
  * @property clientIdTrustConfiguration Trust anchors used to authenticate verifier Request Objects.
  * @property appGroupIdentifier Shared container used by the app and document-provider extension.
  * @property keychainAccessGroup Shared Keychain access group used for database and signing keys.
@@ -76,7 +73,6 @@ public data class WalletBridgeConfiguration(
     public val issuerMetadataTrustResolver: WalletBridgeIssuerMetadataTrustResolver? = null,
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
-    public val allowUnsignedRequests: Boolean = false,
     public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
     public val appGroupIdentifier: String? = null,
     public val keychainAccessGroup: String? = null,
@@ -248,7 +244,6 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
         preferredLocales = preferredLocales,
         transactionDataProfiles = transactionDataProfiles,
-        allowUnsignedRequests = allowUnsignedRequests,
         defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy.toCorePolicy(),
         keyUseAuthorizationPrompt = keyUseAuthorizationPrompt,
         crossProcessAccess = appGroupIdentifier?.let { appGroup ->
