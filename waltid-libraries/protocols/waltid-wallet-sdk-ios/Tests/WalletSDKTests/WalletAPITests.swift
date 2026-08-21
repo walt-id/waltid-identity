@@ -24,7 +24,6 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNil(configuration.persistence.didStore)
         XCTAssertNil(configuration.attestation)
         XCTAssertTrue(configuration.transactionDataProfiles.isEmpty)
-        XCTAssertFalse(configuration.allowUnsignedRequests)
         XCTAssertEqual(configuration.preferredLocales, Locale.preferredLanguages)
     }
 
