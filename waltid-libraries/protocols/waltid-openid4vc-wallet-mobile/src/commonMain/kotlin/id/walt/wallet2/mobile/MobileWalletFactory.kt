@@ -43,10 +43,11 @@ import kotlin.uuid.Uuid
  * @property credentialIssuerMetadataTrustResolver Optional trust boundary for signed Credential Issuer Metadata.
  * When absent, signed metadata is neither requested nor accepted.
  * @property allowUnsignedRequests Whether this wallet accepts unsigned OpenID4VP requests.
- * Signed compact Request Objects are always accepted. When false, unsigned Digital Credentials
- * `openid4vp-v1-unsigned` requests are not advertised to the platform and are rejected if they
- * still arrive, and unsigned JAR request objects (`alg=none`) are rejected. Multisigned remains
- * unsupported. Defaults to false so consuming apps opt in.
+ * When false (default), this wallet follows HAIP: only signed compact Request Objects are
+ * accepted, and the `redirect_uri` client ID prefix is rejected. Unsigned Digital Credentials
+ * `openid4vp-v1-unsigned` is not advertised and is rejected if it arrives. When true, unsigned
+ * JSON / `redirect_uri` Authorization Requests and `openid4vp-v1-unsigned` are also accepted.
+ * Signed requests remain accepted either way. Multisigned remains unsupported.
  * @property credentialRegistry Platform metadata registry. Platform factories install their native default when omitted.
  * @property readerTrustEvaluator Application trust policy for verified ISO 18013-7 reader chains.
  * @property crossProcessAccess Optional shared-container/keychain configuration for provider extensions.

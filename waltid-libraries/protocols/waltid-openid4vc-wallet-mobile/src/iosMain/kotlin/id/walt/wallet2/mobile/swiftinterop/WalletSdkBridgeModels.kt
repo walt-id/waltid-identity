@@ -58,7 +58,8 @@ import kotlin.time.Instant
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
  * @property allowUnsignedRequests Whether this wallet accepts unsigned OpenID4VP requests.
- * Signed compact Request Objects are always accepted. Defaults to false so consuming apps opt in.
+ * When false (default), HAIP signed-only: `redirect_uri` is rejected. When true, unsigned JSON
+ * `redirect_uri` requests are also accepted. Signed Request Objects are accepted either way.
  * @property clientIdTrustConfiguration Trust anchors used to authenticate verifier Request Objects.
  * @property appGroupIdentifier Shared container used by the app and document-provider extension.
  * @property keychainAccessGroup Shared Keychain access group used for database and signing keys.
