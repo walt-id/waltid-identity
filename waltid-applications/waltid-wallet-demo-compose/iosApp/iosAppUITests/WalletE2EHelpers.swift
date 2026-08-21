@@ -283,6 +283,10 @@ final class WalletE2EUI {
             return
         }
 
+        // Setup now includes a biometric toggle; wait for the full form before the first tap.
+        _ = button(identifier: "wallet.pinSubmitButton", fallbackLabel: "Set PIN")
+            .waitForExistence(timeout: 5)
+
         replaceText(in: pinInput, value: pin)
 
         let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
