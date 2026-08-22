@@ -66,6 +66,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
         when (state.selectedTab) {
             WalletDemoTab.Credentials -> CredentialsTab(
                 credentials = credentials,
+                onDeleteCredential = controller::deleteCredential,
                 modifier = modifier,
             )
             WalletDemoTab.Receive -> {
