@@ -10,36 +10,41 @@ struct CredentialDetailsScreen: View {
     @State private var confirmDelete = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            ScrollView {
-                CredentialDetailsView(details: details, onCardTap: { dismiss() })
-                    .padding()
-                    .padding(.top, 28)
-            }
-            HStack {
-                Button("Copy") {
-                    UIPasteboard.general.string = rawCredentialJSON?.nilIfEmpty ?? "No raw credential available"
-                }
-                .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
-                if onDelete != nil {
-                    Button("Delete", role: .destructive) {
-                        confirmDelete = true
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 40, height: 40)
+                            .background(.ultraThinMaterial, in: Circle())
                     }
-                    .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
+                    .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
                 }
-                Spacer()
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 36, height: 36)
-                        .background(.ultraThinMaterial, in: Circle())
+                CredentialDetailsView(details: details, onCardTap: { dismiss() })
+                HStack(spacing: 12) {
+                    Button("Copy") {
+                        UIPasteboard.general.string = rawCredentialJSON?.nilIfEmpty ?? "No raw credential available"
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
+                    if onDelete != nil {
+                        Button("Delete", role: .destructive) {
+                            confirmDelete = true
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
+                    }
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
             }
-            .padding(12)
+            .padding()
         }
         .accessibilityIdentifier(WalletAccessibilityID.credentialDetailsScreen)
         .navigationBarTitleDisplayMode(.inline)

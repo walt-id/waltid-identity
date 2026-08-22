@@ -4,8 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,14 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,7 +26,6 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -44,6 +36,8 @@ import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
+import id.walt.walletdemo.compose.ui.components.CredentialDetailsActionButtons
+import id.walt.walletdemo.compose.ui.components.CredentialDetailsCloseButton
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 
 @Composable
@@ -61,6 +55,7 @@ internal fun CredentialsTab(
     val expanded = details.firstOrNull { it.summary.id == expandedId }
     val rawCredential = expanded?.summary?.credentialDataJson?.takeIf { it.isNotBlank() }
         ?: "No raw credential available"
+    val showingDetails = expanded != null || closing
 
     fun requestClose() {
         if (expandedId == null || closing) return
@@ -80,7 +75,7 @@ internal fun CredentialsTab(
 
     LaunchedEffect(expandedId) {
         if (expandedId != null && !closing) {
-            delay(600)
+            delay(DetailsRevealDelayMillis)
             if (expandedId != null && !closing) showDetailsBody = true
         }
     }
@@ -92,7 +87,7 @@ internal fun CredentialsTab(
         closing = false
     }
 
-    SystemBackHandler(enabled = expanded != null || closing) {
+    SystemBackHandler(enabled = showingDetails) {
         requestClose()
     }
 
@@ -100,7 +95,7 @@ internal fun CredentialsTab(
         modifier = modifier
             .fillMaxSize()
             .then(
-                if (expanded != null || closing) Modifier.testTag(WalletUiTestTags.CredentialDetailsScreen)
+                if (showingDetails) Modifier.testTag(WalletUiTestTags.CredentialDetailsScreen)
                 else Modifier,
             ),
     ) {
@@ -115,6 +110,14 @@ internal fun CredentialsTab(
             if (credentials.isEmpty()) {
                 EmptyCredentialsState()
             } else {
+                if (showingDetails) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        CredentialDetailsCloseButton(onClose = ::requestClose)
+                    }
+                }
                 CredentialCardStack(
                     details = details,
                     expandedId = expandedId,
@@ -122,65 +125,27 @@ internal fun CredentialsTab(
                 )
                 AnimatedVisibility(
                     visible = showDetailsBody && expanded != null,
-                    enter = fadeIn(tween(200)),
-                    exit = fadeOut(tween(220)),
+                    enter = fadeIn(tween(160)),
+                    exit = fadeOut(tween(180)),
                 ) {
                     expanded?.let { selected ->
-                        CredentialDetailsContent(
-                            details = selected,
-                            showCard = false,
-                            onCardClick = { requestClose() },
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                            CredentialDetailsContent(
+                                details = selected,
+                                showCard = false,
+                                onCardClick = { requestClose() },
+                            )
+                            CredentialDetailsActionButtons(
+                                onCopy = { clipboard.setText(AnnotatedString(rawCredential)) },
+                                onDelete = if (onDeleteCredential != null) {
+                                    { confirmDelete = true }
+                                } else {
+                                    null
+                                },
+                            )
+                        }
                     }
                 }
-            }
-        }
-        AnimatedVisibility(
-            visible = expanded != null,
-            modifier = Modifier.align(Alignment.TopStart),
-            enter = fadeIn(tween(200)),
-            exit = fadeOut(tween(180)),
-        ) {
-            Row(
-                modifier = Modifier.padding(start = 8.dp, top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(
-                    onClick = { clipboard.setText(AnnotatedString(rawCredential)) },
-                    modifier = Modifier.testTag(WalletUiTestTags.CopyRawCredential),
-                ) {
-                    Text("Copy")
-                }
-                if (onDeleteCredential != null && expandedId != null) {
-                    TextButton(
-                        onClick = { confirmDelete = true },
-                        modifier = Modifier.testTag(WalletUiTestTags.DeleteCredential),
-                    ) {
-                        Text("Delete")
-                    }
-                }
-            }
-        }
-        AnimatedVisibility(
-            visible = expanded != null,
-            modifier = Modifier.align(Alignment.TopEnd),
-            enter = fadeIn(tween(200)),
-            exit = fadeOut(tween(180)),
-        ) {
-            Box(
-                modifier = Modifier
-                    .padding(12.dp)
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-                    .clickable { requestClose() }
-                    .testTag(WalletUiTestTags.DetailsBack),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Close",
-                )
             }
         }
     }
@@ -196,8 +161,10 @@ internal fun CredentialsTab(
                         val id = expandedId
                         confirmDelete = false
                         if (id != null) {
+                            expandedId = null
+                            closing = false
+                            showDetailsBody = false
                             onDeleteCredential?.invoke(id)
-                            requestClose()
                         }
                     },
                     modifier = Modifier.testTag(WalletUiTestTags.DeleteCredentialConfirm),
@@ -213,6 +180,8 @@ internal fun CredentialsTab(
         )
     }
 }
+
+private const val DetailsRevealDelayMillis = 220L
 
 @Composable
 private fun EmptyCredentialsState() {
