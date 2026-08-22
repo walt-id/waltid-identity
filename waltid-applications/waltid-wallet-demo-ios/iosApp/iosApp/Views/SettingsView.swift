@@ -28,6 +28,17 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsKeyIdCopy)
             }
+            Section("Credential Sharing") {
+                Toggle(
+                    "Show Walt Wallet preview for DC API Presentation",
+                    isOn: $viewModel.showDcApiPresentationPreview
+                )
+                .accessibilityIdentifier(WalletAccessibilityID.settingsShowDcApiPreview)
+                Text("When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
             Section {
                 Button("Lock") {
                     viewModel.lock()

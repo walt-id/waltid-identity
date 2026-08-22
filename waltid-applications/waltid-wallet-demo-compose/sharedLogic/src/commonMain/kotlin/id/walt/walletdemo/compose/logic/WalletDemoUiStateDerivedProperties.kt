@@ -31,7 +31,7 @@ val WalletDemoUiState.isStatusBusy: Boolean
         (operation.belongsTo(selectedTab) && operation.isBusyOperation)
 
 val WalletDemoUiState.receiveUrlEntryEnabled: Boolean
-    get() = !isBusy && offerPreview == null && !receiveCompleted
+    get() = !isBusy && offerPreview == null
 
 val WalletDemoUiState.receiveActionEnabled: Boolean
     get() = session is WalletSessionState.Ready &&
@@ -39,13 +39,13 @@ val WalletDemoUiState.receiveActionEnabled: Boolean
         receiveUrlEntryEnabled
 
 val WalletDemoUiState.offerReviewEnabled: Boolean
-    get() = !isBusy && offerPreview != null && !receiveCompleted
+    get() = !isBusy && offerPreview != null
 
 val WalletDemoUiState.acceptOfferEnabled: Boolean
     get() = offerReviewEnabled && (offerPreview?.transactionCode?.accepts(requestDrafts.txCode) ?: true)
 
 val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
-    get() = !isBusy && presentationReview == null && !presentationCompleted
+    get() = !isBusy && presentationReview == null
 
 val WalletDemoUiState.presentationPreviewActionEnabled: Boolean
     get() = session is WalletSessionState.Ready &&
@@ -53,7 +53,7 @@ val WalletDemoUiState.presentationPreviewActionEnabled: Boolean
         presentationUrlEntryEnabled
 
 val WalletDemoUiState.presentationReviewEnabled: Boolean
-    get() = !isBusy && presentationReview != null && !presentationCompleted
+    get() = !isBusy && presentationReview != null
 
 val WalletDemoUiState.statusText: String
     get() = statusText(selectedTab)
@@ -101,13 +101,8 @@ private fun WalletDemoUiState.isErrorFor(tab: WalletDemoTab): Boolean =
 private fun WalletDemoUiState.tabStatusText(tab: WalletDemoTab): String? =
     when (tab) {
         WalletDemoTab.Credentials -> null
-        WalletDemoTab.Receive -> if (receiveCompleted && lastReceivedCredentialIds.isNotEmpty()) {
-            WalletDisplayText.receivedCredentials(lastReceivedCredentialIds.size)
-        } else {
-            null
-        }
+        WalletDemoTab.Receive -> null
         WalletDemoTab.Present -> when {
-            presentationCompleted -> WalletDisplayText.PresentationSent
             presentationReview is WalletDemoPresentationPreviewResult.Invalid -> WalletDisplayText.ReviewPresentationError
             presentationReview is WalletDemoPresentationPreviewResult.Ready -> WalletDisplayText.ReviewPresentationRequest
             else -> null

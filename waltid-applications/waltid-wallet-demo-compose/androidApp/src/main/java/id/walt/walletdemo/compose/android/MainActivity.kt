@@ -14,6 +14,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
+import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.logic.createAndroidDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.ui.WalletDemoApp
 import kotlinx.coroutines.launch
@@ -50,6 +51,7 @@ class MainActivity : FragmentActivity() {
                 ),
                 pinStore = createAndroidDemoPinStore(applicationContext, walletConfig.walletId),
                 biometricAuthenticator = createAndroidDemoBiometricAuthenticator { this@MainActivity },
+                sharingSettings = createAndroidDemoSharingSettingsStore(applicationContext),
             )
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         handleIntent(intent)

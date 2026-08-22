@@ -908,7 +908,7 @@ class CredentialDisplayNormalizerTest {
         ).toCardDisplayData()
 
         assertEquals("cred-1", details.id)
-        assertEquals("PID", details.title)
+        assertEquals("Mobile Driving Licence", details.title)
         assertEquals("Mobile driving licence", details.credentialType)
         assertEquals("Ada Lovelace", details.holderName)
         assertEquals("Expires 2026-06-17", details.validity)

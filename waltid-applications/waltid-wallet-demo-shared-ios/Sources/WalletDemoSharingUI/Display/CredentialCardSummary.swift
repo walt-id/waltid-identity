@@ -1,4 +1,5 @@
 import Foundation
+import WalletSDK
 
 public struct CredentialCardSummary {
     public let title: String
@@ -9,6 +10,57 @@ public struct CredentialCardSummary {
     public let validityText: String?
     public let portraitData: Data?
     public let portraitMimeType: String?
+    public let backgroundColor: String?
+    public let backgroundImageURI: String?
+    public let textColor: String?
+    public let logoURI: String?
+    public let logoAltText: String?
+
+    public init(
+        title: String,
+        credentialType: String? = nil,
+        holderName: String? = nil,
+        issuer: String = "",
+        dateText: String? = nil,
+        validityText: String? = nil,
+        portraitData: Data? = nil,
+        portraitMimeType: String? = nil,
+        backgroundColor: String? = nil,
+        backgroundImageURI: String? = nil,
+        textColor: String? = nil,
+        logoURI: String? = nil,
+        logoAltText: String? = nil
+    ) {
+        self.title = title
+        self.credentialType = credentialType
+        self.holderName = holderName
+        self.issuer = issuer
+        self.dateText = dateText
+        self.validityText = validityText
+        self.portraitData = portraitData
+        self.portraitMimeType = portraitMimeType
+        self.backgroundColor = backgroundColor
+        self.backgroundImageURI = backgroundImageURI
+        self.textColor = textColor
+        self.logoURI = logoURI
+        self.logoAltText = logoAltText
+    }
+
+    public static func offered(from credential: IssuanceCredentialPreview) -> CredentialCardSummary {
+        CredentialCardSummary(
+            title: CredentialTitles.displayName(
+                format: credential.format,
+                credentialDataJSON: nil,
+                displayName: credential.name,
+                fallback: credential.configurationID
+            ),
+            backgroundColor: credential.backgroundColor,
+            backgroundImageURI: credential.backgroundImageURI?.absoluteString,
+            textColor: credential.textColor,
+            logoURI: credential.logoURI?.absoluteString,
+            logoAltText: credential.logoAltText
+        )
+    }
 }
 
 extension CredentialDetails {
@@ -28,14 +80,24 @@ extension CredentialDetails {
             ?? CredentialDisplayText.unknown
 
         return CredentialCardSummary(
-            title: title,
+            title: CredentialTitles.displayName(
+                format: format,
+                credentialDataJSON: credentialDataJSON,
+                displayName: credentialDisplay?.name,
+                fallback: title
+            ),
             credentialType: firstCredentialType(in: items),
             holderName: holderName.isEmpty ? subject : holderName,
             issuer: issuerName,
             dateText: expiryDate ?? addedDate,
             validityText: expiryDate.map(CredentialDisplayText.expires) ?? addedDate.map(CredentialDisplayText.added),
             portraitData: portrait?.data,
-            portraitMimeType: portrait?.mimeType
+            portraitMimeType: portrait?.mimeType,
+            backgroundColor: credentialDisplay?.backgroundColor,
+            backgroundImageURI: credentialDisplay?.backgroundImageURI,
+            textColor: credentialDisplay?.textColor,
+            logoURI: credentialDisplay?.logoURI,
+            logoAltText: credentialDisplay?.logoAltText
         )
     }
 

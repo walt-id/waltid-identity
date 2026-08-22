@@ -6,6 +6,7 @@ import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createIosDemoWallet
 import id.walt.walletdemo.compose.logic.createIosDemoPinStore
+import id.walt.walletdemo.compose.logic.createIosDemoSharingSettingsStore
 import id.walt.walletdemo.compose.logic.createIosDemoBiometricAuthenticator
 import platform.UIKit.UIViewController
 
@@ -73,6 +74,7 @@ fun walletDemoViewController(
         ),
         pinStore = createIosDemoPinStore(config.walletId),
         biometricAuthenticator = createIosDemoBiometricAuthenticator(),
+        sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier),
     )
     iosController = controller
     pendingDeepLink?.let(controller::handleDeepLink)

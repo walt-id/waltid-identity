@@ -6,84 +6,18 @@ import WalletSDK
 struct PresentView: View {
     @Environment(\.openURL) private var openURL
     @ObservedObject var viewModel: WalletViewModel
-    @Binding var selectedDetailsID: String?
-
-    private var presentationDetails: [CredentialDetails] {
-        viewModel.presentationPreview?.credentialOptions.map(CredentialDisplayNormalizer.details(for:)) ?? []
-    }
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    ScannableUrlEditor(
-                        title: "Present",
-                        label: "OpenID4VP request URL",
-                        text: $viewModel.presentationRequestUrl,
-                        inputIdentifier: WalletAccessibilityID.presentationInput,
-                        scanButtonIdentifier: WalletAccessibilityID.presentationScanButton,
-                        isEnabled: viewModel.presentationUrlEntryEnabled,
-                        focusResetKey: viewModel.inputFocusResetKey
-                    )
-
-                    Button("Preview") {
-                        viewModel.previewPresentation()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
-                    .disabled(!viewModel.presentationPreviewActionEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentButton)
-
-                    if viewModel.credentials.isEmpty {
-                        Text("No credentials available")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    WalletTabStatusBanner(viewModel: viewModel, tab: .present)
-
-                    if let warning = viewModel.transactionDataProfilesWarning {
-                        WarningBannerView(message: warning)
-                    }
-
-                    if viewModel.presentationCompleted {
-                        Button("New presentation", action: viewModel.startNewPresentationFlow)
-                            .buttonStyle(.bordered)
-                            .accessibilityIdentifier(WalletAccessibilityID.presentationNewButton)
-                    }
-
-                    if let review = viewModel.presentationSharingReview {
-                        SharingReviewView(
-                            review: review,
-                            selection: viewModel.presentationSharingSelection,
-                            selectionComplete: viewModel.presentationCredentialSelectionComplete,
-                            isLoading: !viewModel.presentationReviewEnabled,
-                            isReadOnly: viewModel.presentationCompleted,
-                            onToggleCredential: viewModel.togglePresentationCredential,
-                            onToggleDisclosure: viewModel.togglePresentationDisclosure,
-                            onCredentialSelected: { detailsID in selectedDetailsID = detailsID },
-                            onSubmit: viewModel.submitPresentation,
-                            // Normal OpenID4VP can tell the verifier it was refused, so Reject is
-                            // offered alongside dismissing the review locally.
-                            onReject: viewModel.rejectPresentation,
-                            onCancel: viewModel.cancelPresentationReview
-                        )
-                    }
-
-                    if let error = viewModel.presentationError {
-                        PresentationErrorView(
-                            error: error,
-                            isEnabled: viewModel.presentationReviewEnabled,
-                            onNotifyVerifier: viewModel.rejectPresentation,
-                            onDismiss: viewModel.cancelPresentationReview
-                        )
-                    }
+            Group {
+                if let review = viewModel.presentationSharingReview {
+                    reviewContent(review: review)
+                } else {
+                    entryContent
                 }
-                .padding()
             }
             .navigationTitle("Present")
             .walletSettingsToolbar(viewModel: viewModel)
-            .background(detailsNavigationLink)
             .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }
         .navigationViewStyle(.stack)
@@ -111,35 +45,89 @@ struct PresentView: View {
         }
     }
 
-    private var detailsNavigationLink: some View {
-        NavigationLink(
-            destination: detailsDestination,
-            isActive: Binding(
-                get: { selectedDetailsID != nil },
-                set: { isActive in
-                    if !isActive {
-                        selectedDetailsID = nil
-                    }
+    private var entryContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                ScannableUrlEditor(
+                    title: "Present",
+                    label: "OpenID4VP request URL",
+                    text: $viewModel.presentationRequestUrl,
+                    inputIdentifier: WalletAccessibilityID.presentationInput,
+                    scanButtonIdentifier: WalletAccessibilityID.presentationScanButton,
+                    isEnabled: viewModel.presentationUrlEntryEnabled,
+                    focusResetKey: viewModel.inputFocusResetKey
+                )
+
+                Button("Preview") {
+                    viewModel.previewPresentation()
                 }
-            )
-        ) {
-            EmptyView()
+                .buttonStyle(.borderedProminent)
+                .tint(.waltBlue)
+                .disabled(!viewModel.presentationPreviewActionEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.presentButton)
+
+                if viewModel.credentials.isEmpty {
+                    Text("No credentials available")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+
+                if let warning = viewModel.transactionDataProfilesWarning {
+                    WarningBannerView(message: warning)
+                }
+
+                if let error = viewModel.presentationError {
+                    PresentationErrorView(
+                        error: error,
+                        isEnabled: viewModel.presentationReviewEnabled,
+                        onNotifyVerifier: viewModel.rejectPresentation,
+                        onDismiss: viewModel.cancelPresentationReview
+                    )
+                }
+            }
+            .padding()
         }
-        .hidden()
     }
 
-    private var detailsDestination: some View {
-        Group {
-            if let detailsID = selectedDetailsID {
-                CredentialDetailsDestination(
-                    detailsID: detailsID,
-                    details: presentationDetails,
-                    viewModel: viewModel,
-                    selectedDetailsID: $selectedDetailsID
+    private func reviewContent(review: SharingReviewModel) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+
+                if let warning = viewModel.transactionDataProfilesWarning {
+                    WarningBannerView(message: warning)
+                }
+
+                SharingReviewView(
+                    review: review,
+                    selection: viewModel.presentationSharingSelection,
+                    selectionComplete: viewModel.presentationCredentialSelectionComplete,
+                    isLoading: !viewModel.presentationReviewEnabled,
+                    isReadOnly: false,
+                    onToggleCredential: viewModel.togglePresentationCredential,
+                    onToggleDisclosure: viewModel.togglePresentationDisclosure,
+                    onSubmit: viewModel.submitPresentation,
+                    onReject: viewModel.rejectPresentation,
+                    onCancel: viewModel.cancelPresentationReview,
+                    compact: false,
+                    showActions: false
                 )
-            } else {
-                EmptyView()
             }
+            .padding()
+        }
+        .safeAreaInset(edge: .bottom) {
+            ReviewActions(
+                selectionComplete: viewModel.presentationCredentialSelectionComplete,
+                isLoading: !viewModel.presentationReviewEnabled,
+                onSubmit: viewModel.submitPresentation,
+                onReject: viewModel.rejectPresentation,
+                onCancel: viewModel.cancelPresentationReview
+            )
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.bar)
         }
     }
 }

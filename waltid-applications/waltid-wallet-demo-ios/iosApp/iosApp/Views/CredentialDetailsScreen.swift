@@ -6,27 +6,45 @@ struct CredentialDetailsScreen: View {
     let details: CredentialDetails
     var rawCredentialJSON: String?
     var onDelete: (() -> Void)?
+    @Environment(\.dismiss) private var dismiss
     @State private var confirmDelete = false
 
     var body: some View {
         ScrollView {
-            CredentialDetailsView(details: details)
+            CredentialDetailsView(details: details, onCardTap: { dismiss() })
                 .padding()
         }
-        .navigationTitle("Credential details")
+        .accessibilityIdentifier(WalletAccessibilityID.credentialDetailsScreen)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Button("Copy") {
-                    UIPasteboard.general.string = rawCredentialJSON?.nilIfEmpty ?? "No raw credential available"
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
-                if onDelete != nil {
-                    Button("Delete", role: .destructive) {
-                        confirmDelete = true
+                .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button("Copy") {
+                        UIPasteboard.general.string = rawCredentialJSON?.nilIfEmpty ?? "No raw credential available"
                     }
-                    .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
+                    .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
+                    if onDelete != nil {
+                        Button("Delete", role: .destructive) {
+                            confirmDelete = true
+                        }
+                        .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
                 }
+                .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
             }
         }
         .confirmationDialog(

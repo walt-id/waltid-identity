@@ -44,6 +44,7 @@ kotlin {
             implementation(identityLibs.compose.navigation3.ui)
             implementation(identityLibs.coil.compose)
             implementation(identityLibs.coil.network.ktor3)
+            implementation(compose.components.resources)
         }
 
         if (enableAndroidBuild || enableIosBuild) {
@@ -99,6 +100,13 @@ kotlin {
                 }
             }
         }
+    }
+}
+
+compose {
+    resources {
+        publicResClass = true
+        packageOfResClass = "id.walt.walletdemo.compose.ui.resources"
     }
 }
 

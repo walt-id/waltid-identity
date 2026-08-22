@@ -25,6 +25,7 @@ class WalletDemoController(
     private val wallet: DemoWallet,
     private val pinStore: DemoPinStore,
     private val biometricAuthenticator: DemoBiometricAuthenticator = UnavailableDemoBiometricAuthenticator,
+    private val sharingSettings: DemoSharingSettingsStore = InMemoryDemoSharingSettingsStore(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
@@ -34,6 +35,7 @@ class WalletDemoController(
     private val _state = MutableStateFlow(
         WalletDemoUiState(
             auth = readInitialAuthState(),
+            showDcApiPresentationPreview = sharingSettings.showDcApiPresentationPreview(),
         ),
     )
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
@@ -97,6 +99,11 @@ class WalletDemoController(
     fun isBiometricUnlockAvailable(): Boolean = biometricAuthenticator.isAvailable()
 
     fun isBiometricUnlockEnabled(): Boolean = pinStore.isBiometricUnlockEnabled()
+
+    fun setShowDcApiPresentationPreview(enabled: Boolean) {
+        sharingSettings.setShowDcApiPresentationPreview(enabled)
+        _state.update { it.copy(showDcApiPresentationPreview = enabled) }
+    }
 
     fun unlockWithBiometrics(force: Boolean = false) {
         val auth = _state.value.auth as? WalletAuthState.Login ?: return
@@ -224,7 +231,10 @@ class WalletDemoController(
                 pinStore.clear()
             }.onSuccess {
                 statusHideJob?.cancel()
-                _state.value = WalletDemoUiState(auth = WalletAuthState.Setup())
+                _state.value = WalletDemoUiState(
+                    auth = WalletAuthState.Setup(),
+                    showDcApiPresentationPreview = sharingSettings.showDcApiPresentationPreview(),
+                )
             }.onFailure { error ->
                 setOperationError(WalletDisplayText.ResetWalletFailed, error, _state.value.selectedTab)
             }
@@ -262,7 +272,8 @@ class WalletDemoController(
                     message = pending.successMessage,
                     tab = WalletDemoTab.Present,
                 ),
-                presentationCompleted = true,
+                presentationCompleted = false,
+                requestDrafts = state.requestDrafts.copy(presentationRequestUrl = ""),
                 pendingPresentationContinuation = null,
             )
         }
@@ -523,7 +534,8 @@ class WalletDemoController(
         _state.update {
             it.copy(
                 offerPreview = null, authorizationRequestUrl = null,
-                requestDrafts = it.requestDrafts.copy(txCode = ""),
+                requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
+                receiveCompleted = false,
                 operation = WalletOperationState.Succeeded(
                     message = WalletDisplayText.CredentialOfferDeclined,
                     tab = WalletDemoTab.Receive,
@@ -553,7 +565,7 @@ class WalletDemoController(
                         deferredCredentials = (it.deferredCredentials + outcome.credentials)
                             .distinctBy(WalletDemoDeferredCredential::id),
                         lastReceivedCredentialIds = outcome.storedCredentialIds,
-                        receiveCompleted = outcome.storedCredentialIds.isNotEmpty(),
+                        receiveCompleted = false,
                         operation = WalletOperationState.Succeeded(
                             "Credential issuance deferred",
                             WalletDemoTab.Receive,
@@ -600,13 +612,15 @@ class WalletDemoController(
                 session = ready.copy(credentials = credentials),
                 offerPreview = null,
                 authorizationRequestUrl = null,
-                requestDrafts = it.requestDrafts.copy(txCode = ""),
+                requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
                 operation = WalletOperationState.Succeeded(
                     WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
-                    WalletDemoTab.Receive,
+                    WalletDemoTab.Credentials,
                 ),
                 lastReceivedCredentialIds = displayableReceivedCredentialIds,
-                receiveCompleted = true,
+                receiveCompleted = false,
+                receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
+                selectedTab = WalletDemoTab.Credentials,
             )
         }
     }
@@ -623,14 +637,28 @@ class WalletDemoController(
                     is WalletDemoIssuanceOutcome.Stored -> {
                         val credentials = wallet.listCredentials()
                         _state.update {
+                            val remainingDeferred = it.deferredCredentials.filterNot { pending -> pending.id == deferredCredentialId }
+                            val received = outcome.credentialIds.isNotEmpty() && remainingDeferred.isEmpty()
                             it.copy(
                                 session = ready.copy(credentials = credentials),
-                                deferredCredentials = it.deferredCredentials.filterNot { pending -> pending.id == deferredCredentialId },
+                                deferredCredentials = remainingDeferred,
                                 lastReceivedCredentialIds = outcome.credentialIds,
-                                receiveCompleted = true,
+                                receiveCompleted = false,
+                                offerPreview = if (received) null else it.offerPreview,
+                                requestDrafts = if (received) {
+                                    it.requestDrafts.copy(offerUrl = "", txCode = "")
+                                } else {
+                                    it.requestDrafts
+                                },
+                                receiveNavigationResetKey = if (received) {
+                                    it.receiveNavigationResetKey + 1
+                                } else {
+                                    it.receiveNavigationResetKey
+                                },
+                                selectedTab = if (received) WalletDemoTab.Credentials else it.selectedTab,
                                 operation = WalletOperationState.Succeeded(
                                     WalletDisplayText.receivedCredentials(outcome.credentialIds.size),
-                                    WalletDemoTab.Receive,
+                                    if (received) WalletDemoTab.Credentials else WalletDemoTab.Receive,
                                 ),
                             )
                         }
@@ -753,7 +781,6 @@ class WalletDemoController(
         if (
             requestUrl.isBlank() ||
             current.presentationReview != null ||
-            current.presentationCompleted ||
             current.isBusy
         ) {
             return
@@ -937,6 +964,7 @@ class WalletDemoController(
                             tab = WalletDemoTab.Present,
                         ),
                         presentationReview = null,
+                        requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -973,14 +1001,19 @@ class WalletDemoController(
                 )
             },
             presentationReview = if (clearPreview) null else presentationReview,
+            requestDrafts = if (clearPreview) {
+                requestDrafts.copy(presentationRequestUrl = "")
+            } else {
+                requestDrafts
+            },
             selectedPresentationCredentialOptions =
                 if (clearSelections) emptySet() else selectedPresentationCredentialOptions,
             selectedPresentationDisclosureOptions =
                 if (clearSelections) emptySet() else selectedPresentationDisclosureOptions,
-            presentationCompleted = success != null && pending == null,
+            presentationCompleted = false,
             pendingPresentationContinuation = pending,
             presentationNavigationResetKey =
-                if (resetNavigation) presentationNavigationResetKey + 1 else presentationNavigationResetKey,
+                if (resetNavigation || clearPreview) presentationNavigationResetKey + 1 else presentationNavigationResetKey,
         )
     }
 
@@ -996,6 +1029,7 @@ class WalletDemoController(
                         tab = WalletDemoTab.Present,
                     ),
                     presentationReview = null,
+                    requestDrafts = current.requestDrafts.copy(presentationRequestUrl = ""),
                     selectedPresentationCredentialOptions = emptySet(),
                     selectedPresentationDisclosureOptions = emptySet(),
                     presentationCompleted = false,
@@ -1048,6 +1082,7 @@ class WalletDemoController(
                             tab = WalletDemoTab.Present,
                         ),
                         presentationReview = null,
+                        requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -1074,7 +1109,7 @@ class WalletDemoController(
     }
 
     private fun WalletDemoUiState.activePresentationPreviewHandle(): WalletDemoPresentationPreviewHandle? =
-        takeUnless { presentationCompleted }?.presentationReview?.previewHandle()
+        presentationReview?.previewHandle()
 
     private fun WalletDemoPresentationPreviewResult.previewHandle(): WalletDemoPresentationPreviewHandle =
         when (this) {

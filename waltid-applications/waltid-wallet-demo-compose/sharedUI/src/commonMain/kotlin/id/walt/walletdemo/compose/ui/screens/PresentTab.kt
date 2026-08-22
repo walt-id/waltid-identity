@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -24,8 +23,10 @@ import id.walt.walletdemo.compose.logic.presentationReviewEnabled
 import id.walt.walletdemo.compose.logic.presentationUrlEntryEnabled
 import id.walt.walletdemo.compose.logic.toSharingReview
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
-import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
+import id.walt.walletdemo.compose.ui.components.ReviewScaffold
+import id.walt.walletdemo.compose.ui.components.SharingActionsRow
+import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
 @Composable
@@ -34,22 +35,55 @@ internal fun PresentTab(
     requestDrafts: WalletRequestDrafts,
     onPresentationRequestUrlChange: (String) -> Unit,
     onPreview: () -> Unit,
-    onStartNew: () -> Unit,
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
-    onCredentialClick: (String) -> Unit,
     onSubmit: () -> Unit,
     onReject: () -> Unit,
     onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val scrollState = rememberScrollState()
     val credentials = (state.session as? WalletSessionState.Ready)?.credentials.orEmpty()
+    val preview = state.presentationPreview
+    val error = state.presentationError
+
+    if (preview != null) {
+        ReviewScaffold(
+            modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
+            actions = {
+                SharingActionsRow(
+                    enabled = state.presentationReviewEnabled,
+                    selectionComplete = state.presentationCredentialSelectionComplete(),
+                    onSubmit = onSubmit,
+                    onCancel = onCancel,
+                    onReject = onReject,
+                )
+            },
+        ) {
+            SharingReviewSection(
+                review = preview.toSharingReview(),
+                selectedCredentialOptions = state.selectedPresentationCredentialOptions,
+                selectedDisclosureOptions = state.selectedPresentationDisclosureOptions,
+                selectionComplete = state.presentationCredentialSelectionComplete(),
+                enabled = state.presentationReviewEnabled,
+                readOnly = false,
+                onToggleCredential = onToggleCredential,
+                onToggleDisclosure = onToggleDisclosure,
+                onCredentialClick = {},
+                onSubmit = onSubmit,
+                onReject = onReject,
+                onCancel = onCancel,
+                compact = false,
+                showActions = false,
+            )
+        }
+        return
+    }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .testTag(WalletUiTestTags.PresentTabContent)
-            .verticalScroll(scrollState)
+            .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -75,35 +109,9 @@ internal fun PresentTab(
             )
         }
 
-        if (state.presentationCompleted) {
-            OutlinedButton(
-                onClick = onStartNew,
-                modifier = Modifier.testTag(WalletUiTestTags.PresentationNewButton),
-            ) {
-                Text("New presentation")
-            }
-        }
-
-        state.presentationPreview?.let { preview ->
-            SharingReviewSection(
-                review = preview.toSharingReview(),
-                selectedCredentialOptions = state.selectedPresentationCredentialOptions,
-                selectedDisclosureOptions = state.selectedPresentationDisclosureOptions,
-                selectionComplete = state.presentationCredentialSelectionComplete(),
-                enabled = state.presentationReviewEnabled,
-                readOnly = state.presentationCompleted,
-                onToggleCredential = onToggleCredential,
-                onToggleDisclosure = onToggleDisclosure,
-                onCredentialClick = onCredentialClick,
-                onSubmit = onSubmit,
-                onReject = onReject,
-                onCancel = onCancel,
-            )
-        }
-
-        state.presentationError?.let { error ->
+        error?.let {
             PresentationErrorSection(
-                error = error,
+                error = it,
                 enabled = state.presentationReviewEnabled,
                 onNotifyVerifier = onReject,
                 onDismiss = onCancel,

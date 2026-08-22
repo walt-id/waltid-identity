@@ -1,15 +1,20 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,7 +30,8 @@ import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toggleCredential
 import id.walt.walletdemo.compose.logic.toggleDisclosure
-import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import id.walt.walletdemo.compose.ui.components.ReviewScaffold
+import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.screens.CredentialDetailsScreen
 
@@ -58,12 +64,12 @@ fun WalletDemoSharingReviewScreen(
     onReject: (() -> Unit)? = null,
     enabled: Boolean = true,
     onBackAtRoot: (() -> Unit)? = null,
+    compact: Boolean = true,
 ) {
     var selection by remember(review) {
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
     var openCredentialDetailsId by remember(review) { mutableStateOf<String?>(null) }
-    val scrollState = rememberScrollState()
     val openDetails = openCredentialDetailsId?.let { detailsId ->
         review.credentialOptions
             .map { it.toCredentialDetails() }
@@ -96,13 +102,19 @@ fun WalletDemoSharingReviewScreen(
                     onBack = { openCredentialDetailsId = null },
                 )
             } else {
-                Column(
+                ReviewScaffold(
                     modifier = Modifier
                         .fillMaxSize()
-                        .safeDrawingPadding()
-                        .verticalScroll(scrollState)
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                        .safeDrawingPadding(),
+                    actions = {
+                        SharingActionsRow(
+                            enabled = enabled,
+                            selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
+                            onSubmit = { onSubmit(selection) },
+                            onCancel = onCancel,
+                            onReject = onReject,
+                        )
+                    },
                 ) {
                     Text(
                         title,
@@ -115,6 +127,8 @@ fun WalletDemoSharingReviewScreen(
                         selectedDisclosureOptions = selection.disclosures,
                         selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
                         enabled = enabled,
+                        compact = compact,
+                        showActions = false,
                         onToggleCredential = { credential ->
                             selection = selection.toggleCredential(
                                 selection = credential,
@@ -127,6 +141,106 @@ fun WalletDemoSharingReviewScreen(
                         onCancel = onCancel,
                         onReject = onReject,
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Compact in-tray sharing review for Digital Credentials GET fulfillment.
+ *
+ * Cancel ends the caller's `getCredential`. Dismissing the sheet or backing out at the review root
+ * leaves the provider without a Credential Manager result so the system selector can return.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WalletDemoSharingReviewSheet(
+    review: WalletDemoSharingReview,
+    title: String,
+    onSubmit: (WalletDemoSharingSelection) -> Unit,
+    onCancel: () -> Unit,
+    onBackAtRoot: () -> Unit,
+    enabled: Boolean = true,
+) {
+    var selection by remember(review) {
+        mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
+    }
+    var openCredentialDetailsId by remember(review) { mutableStateOf<String?>(null) }
+    val openDetails = openCredentialDetailsId?.let { detailsId ->
+        review.credentialOptions
+            .map { it.toCredentialDetails() }
+            .firstOrNull { it.summary.id == detailsId }
+    }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    SystemBackHandler(enabled = true) {
+        when {
+            openDetails != null -> openCredentialDetailsId = null
+            !enabled -> Unit
+            else -> onBackAtRoot()
+        }
+    }
+
+    MaterialTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .exportTestTagsForPlatformAutomation(),
+        ) {
+            ModalBottomSheet(
+                onDismissRequest = {
+                    if (enabled) onBackAtRoot()
+                },
+                sheetState = sheetState,
+            ) {
+                Box(modifier = Modifier.exportTestTagsForPlatformAutomation()) {
+                    if (openDetails != null) {
+                        CredentialDetailsScreen(
+                            details = openDetails,
+                            onBack = { openCredentialDetailsId = null },
+                        )
+                    } else {
+                        ReviewScaffold(
+                            fillViewport = false,
+                            actions = {
+                                SharingActionsRow(
+                                    enabled = enabled,
+                                    selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
+                                    onSubmit = { onSubmit(selection) },
+                                    onCancel = onCancel,
+                                    onReject = null,
+                                )
+                            },
+                        ) {
+                            Text(
+                                title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            SharingReviewSection(
+                                review = review,
+                                selectedCredentialOptions = selection.credentials,
+                                selectedDisclosureOptions = selection.disclosures,
+                                selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
+                                enabled = enabled,
+                                compact = true,
+                                showActions = false,
+                                onToggleCredential = { credential ->
+                                    selection = selection.toggleCredential(
+                                        selection = credential,
+                                        option = review.credentialOptions.firstOrNull { it.selection == credential },
+                                    )
+                                },
+                                onToggleDisclosure = { disclosure ->
+                                    selection = selection.toggleDisclosure(disclosure)
+                                },
+                                onCredentialClick = { detailsId -> openCredentialDetailsId = detailsId },
+                                onSubmit = { onSubmit(selection) },
+                                onCancel = onCancel,
+                            )
+                        }
+                    }
                 }
             }
         }
