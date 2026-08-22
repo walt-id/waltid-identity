@@ -33,6 +33,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
     if (showingSettings) {
         SettingsScreen(
             state = state,
+            onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
             onBack = { showingSettings = false },
             onLock = controller::lock,
             onResetWallet = controller::resetWallet,

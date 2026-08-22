@@ -28,6 +28,7 @@ class WalletDemoController(
     private val signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
     private val signingProtectionStore: WalletDemoSigningProtectionStore =
         InMemoryWalletDemoSigningProtectionStore(),
+    private val sharingSettings: DemoSharingSettingsStore = InMemoryDemoSharingSettingsStore(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
@@ -46,6 +47,7 @@ class WalletDemoController(
         biometricUnlockAvailable = biometricAuthenticator.isAvailable(),
         signingProtectionMode = signingProtectionMode,
         selectedSigningProtection = signingProtectionMode.resolve(signingProtectionStore.load()),
+        showDcApiPresentationPreview = sharingSettings.showDcApiPresentationPreview(),
     )
 
     init {
@@ -159,6 +161,11 @@ class WalletDemoController(
 
     fun dismissSigningProtectionWarning() {
         _state.update { it.copy(signingProtectionWarning = null) }
+    }
+
+    fun setShowDcApiPresentationPreview(enabled: Boolean) {
+        sharingSettings.setShowDcApiPresentationPreview(enabled)
+        _state.update { it.copy(showDcApiPresentationPreview = enabled) }
     }
 
     fun unlockWithBiometrics(force: Boolean = false) {

@@ -2,6 +2,16 @@ import Foundation
 
 /// Format-aware display title for a stored credential when OpenID4VCI card art is not used.
 public enum CredentialTitles {
+    /// Resolves a human-readable credential title from stored display metadata or payload fields.
+    ///
+    /// Prefers an explicit display name, then a format-specific title extracted from the credential
+    /// JSON, then `fallback`, and finally the raw format string.
+    ///
+    /// - Parameters:
+    ///   - format: Credential format used to choose the payload title rules.
+    ///   - credentialDataJSON: Serialized credential payload, when one is available.
+    ///   - displayName: Issuer or wallet display name that should win over extracted titles.
+    ///   - fallback: Label to use when neither display metadata nor the payload yields a title.
     public static func displayName(
         format: String,
         credentialDataJSON: String?,

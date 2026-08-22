@@ -139,6 +139,16 @@ class WalletViewModel: ObservableObject {
     @Published var pinConfirmation = ""
     @Published var useBiometrics = false
     @Published private(set) var isBiometricUnlockAvailable = false
+    @Published var showDcApiPresentationPreview: Bool = DemoSharingSettings.showDcApiPresentationPreview(
+        appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+    ) {
+        didSet {
+            DemoSharingSettings.setShowDcApiPresentationPreview(
+                showDcApiPresentationPreview,
+                appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+            )
+        }
+    }
     @Published var pinError: String?
     @Published var isAuthenticating = false
     @Published private(set) var pendingPresentationContinuationURL: URL?

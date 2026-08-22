@@ -20,6 +20,8 @@ internal object WalletUiTestTags {
     val SettingsKeyIdCopy = tag("settingsKeyIdCopy")
     val SettingsPublicJwk = tag("settingsPublicJwk")
     val SettingsPublicJwkCopy = tag("settingsPublicJwkCopy")
+    val SettingsCredentialSharing = tag("settingsCredentialSharing")
+    val SettingsShowDcApiPreview = tag("settingsShowDcApiPreview")
     val SettingsLock = tag("settingsLock")
     val SettingsReset = tag("settingsReset")
     val SettingsResetConfirm = tag("settingsResetConfirm")

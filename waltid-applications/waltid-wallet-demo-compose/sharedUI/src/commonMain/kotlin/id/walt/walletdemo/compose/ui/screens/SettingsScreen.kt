@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,6 +49,7 @@ import id.walt.walletdemo.compose.ui.components.title
 @Composable
 internal fun SettingsScreen(
     state: WalletDemoUiState,
+    onShowDcApiPresentationPreviewChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onLock: () -> Unit,
     onResetWallet: () -> Unit,
@@ -124,6 +126,43 @@ internal fun SettingsScreen(
                 ready = ready,
                 onRequestChange = onRequestSigningProtectionChange,
             )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(WalletUiTestTags.SettingsCredentialSharing),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "Credential Sharing",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            "Show Walt Wallet preview for DC API Presentation",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            "When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = state.showDcApiPresentationPreview,
+                        onCheckedChange = onShowDcApiPresentationPreviewChange,
+                        modifier = Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview),
+                    )
+                }
+            }
             OutlinedButton(
                 onClick = onLock,
                 modifier = Modifier
