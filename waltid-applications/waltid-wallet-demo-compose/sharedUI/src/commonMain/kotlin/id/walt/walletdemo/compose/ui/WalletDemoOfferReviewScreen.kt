@@ -158,6 +158,7 @@ private fun OfferCreateReviewContent(
     val acceptEnabled = enabled && (txRequirement == null || txRequirement.accepts(txCode))
 
     ReviewScaffold(
+        fillViewport = false,
         actions = {
             OfferReviewActions(
                 requiresIssuerAuthentication = preview.requiresIssuerAuthentication,
