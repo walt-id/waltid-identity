@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -21,7 +22,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.components.CredentialDetailsCloseButton
+import id.walt.walletdemo.compose.ui.components.CredentialDetailsOverflowMenu
 import id.walt.walletdemo.compose.ui.components.StatusCard
+
+internal val WalletHeaderHorizontalPadding = 20.dp
+internal val WalletHeaderVerticalPadding = 14.dp
+internal val WalletHeaderTitleRowHeight = 48.dp
 
 @Composable
 internal fun WalletHeader(
@@ -33,11 +40,13 @@ internal fun WalletHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .padding(horizontal = WalletHeaderHorizontalPadding, vertical = WalletHeaderVerticalPadding),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(WalletHeaderTitleRowHeight),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -65,6 +74,30 @@ internal fun WalletHeader(
         state.warning?.let { warning ->
             WarningCard(warning)
         }
+    }
+}
+
+internal data class CredentialDetailsChrome(
+    val onClose: () -> Unit,
+    val onCopy: () -> Unit,
+    val onDelete: (() -> Unit)?,
+)
+
+@Composable
+internal fun CredentialDetailsTopBar(chrome: CredentialDetailsChrome) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = WalletHeaderHorizontalPadding, vertical = WalletHeaderVerticalPadding)
+            .height(WalletHeaderTitleRowHeight),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CredentialDetailsCloseButton(onClose = chrome.onClose)
+        CredentialDetailsOverflowMenu(
+            onCopy = chrome.onCopy,
+            onDelete = chrome.onDelete,
+        )
     }
 }
 

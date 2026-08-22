@@ -120,8 +120,14 @@ class WalletDemoAppTestScenarios {
 
         onNodeWithTag("wallet.credentialCard.cred-1").performClick()
         onNodeWithTag("wallet.credentialDetailsScreen").assertIsDisplayed()
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(WalletUiTestTags.SettingsButton).fetchSemanticsNodes().isEmpty()
+        }
+        onAllNodesWithText("walt.id Wallet").assertCountEquals(0)
         onNodeWithContentDescription("Close").assertIsDisplayed()
         onNodeWithTag("wallet.detailsBack").assertIsDisplayed()
+        onNodeWithContentDescription("More").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.DetailsMenu).assertIsDisplayed()
         waitUntil(timeoutMillis = 5_000) {
             onAllNodesWithTag(WalletUiTestTags.claimGroup("About this credential")).fetchSemanticsNodes().isNotEmpty()
         }
@@ -143,6 +149,10 @@ class WalletDemoAppTestScenarios {
         onAllNodesWithText("Raw credential data").assertCountEquals(0)
         onNodeWithTag("wallet.detailsBack").performClick()
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(WalletUiTestTags.SettingsButton).fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithText("walt.id Wallet").assertIsDisplayed()
         assertEquals(1, wallet.bootstrapCalls)
     }
 
@@ -911,11 +921,12 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         onNodeWithTag("wallet.credentialCard.cred-1").performClick()
+        onNodeWithTag(WalletUiTestTags.DetailsMenu).assertIsDisplayed().performClick()
         waitUntil(timeoutMillis = 5_000) {
             onAllNodesWithTag(WalletUiTestTags.CopyRawCredential).fetchSemanticsNodes().isNotEmpty()
         }
-        onNodeWithTag(WalletUiTestTags.CopyRawCredential).performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.DeleteCredential).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.CopyRawCredential).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.DeleteCredential).performClick()
         onNodeWithTag(WalletUiTestTags.DeleteCredentialConfirm).performClick()
         waitUntil(timeoutMillis = 5_000) {
             (controller.state.value.session as? WalletSessionState.Ready)?.credentials.orEmpty().isEmpty()

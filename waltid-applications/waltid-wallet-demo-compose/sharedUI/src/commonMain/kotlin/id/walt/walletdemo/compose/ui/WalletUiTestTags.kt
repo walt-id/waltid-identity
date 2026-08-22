@@ -7,6 +7,7 @@ internal object WalletUiTestTags {
     val CredentialsEmpty = tag("credentials", "empty")
     val CredentialDetailsScreen = tag("credentialDetailsScreen")
     val DetailsBack = tag("detailsBack")
+    val DetailsMenu = tag("detailsMenu")
     val CopyRawCredential = tag("copyRawCredential")
     val DeleteCredential = tag("deleteCredential")
     val DeleteCredentialConfirm = tag("deleteCredentialConfirm")
