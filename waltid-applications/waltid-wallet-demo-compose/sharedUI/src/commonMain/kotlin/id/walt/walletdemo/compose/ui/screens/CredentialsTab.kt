@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -48,26 +49,48 @@ internal fun CredentialsTab(
     val details = remember(credentials) { credentials.map { it.toCredentialDetails() } }
     var expandedId by remember { mutableStateOf<String?>(null) }
     var showDetailsBody by remember { mutableStateOf(false) }
+    var closing by remember { mutableStateOf(false) }
     val expanded = details.firstOrNull { it.summary.id == expandedId }
 
-    LaunchedEffect(expandedId) {
-        if (expandedId == null) {
-            showDetailsBody = false
+    fun requestClose() {
+        if (expandedId == null || closing) return
+        closing = true
+        showDetailsBody = false
+    }
+
+    fun toggleCard(id: String) {
+        if (closing) return
+        if (expandedId == id) {
+            requestClose()
         } else {
-            delay(600)
-            showDetailsBody = true
+            expandedId = id
+            showDetailsBody = false
         }
     }
 
-    SystemBackHandler(enabled = expanded != null) {
+    LaunchedEffect(expandedId) {
+        if (expandedId != null && !closing) {
+            delay(600)
+            if (expandedId != null && !closing) showDetailsBody = true
+        }
+    }
+
+    LaunchedEffect(closing) {
+        if (!closing) return@LaunchedEffect
+        delay(220)
         expandedId = null
+        closing = false
+    }
+
+    SystemBackHandler(enabled = expanded != null || closing) {
+        requestClose()
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .then(
-                if (expanded != null) Modifier.testTag(WalletUiTestTags.CredentialDetailsScreen)
+                if (expanded != null || closing) Modifier.testTag(WalletUiTestTags.CredentialDetailsScreen)
                 else Modifier,
             ),
     ) {
@@ -85,34 +108,36 @@ internal fun CredentialsTab(
                 CredentialCardStack(
                     details = details,
                     expandedId = expandedId,
-                    onOpenDetails = { id ->
-                        expandedId = if (expandedId == id) null else id
-                    },
+                    onOpenDetails = ::toggleCard,
                 )
                 AnimatedVisibility(
                     visible = showDetailsBody && expanded != null,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
+                    enter = fadeIn(tween(200)),
+                    exit = fadeOut(tween(220)),
                 ) {
                     expanded?.let { selected ->
                         CredentialDetailsContent(
                             details = selected,
                             showCard = false,
-                            onCardClick = { expandedId = null },
+                            onCardClick = { requestClose() },
                         )
                     }
                 }
             }
         }
-        if (expanded != null) {
+        AnimatedVisibility(
+            visible = expanded != null,
+            modifier = Modifier.align(Alignment.TopEnd),
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(180)),
+        ) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
                     .padding(12.dp)
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-                    .clickable { expandedId = null }
+                    .clickable { requestClose() }
                     .testTag(WalletUiTestTags.DetailsBack),
                 contentAlignment = Alignment.Center,
             ) {

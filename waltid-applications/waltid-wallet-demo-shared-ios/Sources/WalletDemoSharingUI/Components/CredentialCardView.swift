@@ -148,9 +148,12 @@ public struct CredentialCardStackView: View {
             }
             .frame(width: width, height: stackHeight, alignment: .top)
             .clipped()
+            .animation(.spring(response: 0.42, dampingFraction: 0.86), value: selectedAtTop)
+            .animation(.easeInOut(duration: 0.22), value: othersHidden)
         }
         .frame(maxWidth: .infinity)
         .frame(height: displayedHeight(forWidth: UIScreen.main.bounds.width - 40))
+        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: selectedAtTop)
     }
 
     private func displayedHeight(forWidth width: CGFloat) -> CGFloat {

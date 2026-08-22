@@ -9,6 +9,7 @@ struct CredentialsTabView: View {
     @State private var othersHidden = false
     @State private var selectedAtTop = false
     @State private var showDetailsBody = false
+    @State private var motionGeneration = 0
 
     private var details: [CredentialDetails] {
         viewModel.credentials.map(CredentialDisplayNormalizer.details(for:))
@@ -60,6 +61,7 @@ struct CredentialsTabView: View {
                     .padding(.horizontal)
                     .padding(.top, 8)
                     .padding(.bottom)
+                    .animation(.easeOut(duration: 0.2), value: showDetailsBody)
                 }
 
                 if selectedDetailsID != nil {
@@ -74,8 +76,10 @@ struct CredentialsTabView: View {
                     }
                     .padding(12)
                     .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+                    .transition(.opacity)
                 }
             }
+            .animation(.easeOut(duration: 0.2), value: selectedDetailsID)
             .navigationTitle(branding.appTitle)
             .accessibilityIdentifier(WalletAccessibilityID.appTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -89,6 +93,8 @@ struct CredentialsTabView: View {
     }
 
     private func openDetails(_ id: String) {
+        motionGeneration += 1
+        let generation = motionGeneration
         selectedDetailsID = id
         showDetailsBody = false
         selectedAtTop = false
@@ -96,12 +102,12 @@ struct CredentialsTabView: View {
             othersHidden = true
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            guard selectedDetailsID == id else { return }
+            guard generation == motionGeneration, selectedDetailsID == id else { return }
             withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
                 selectedAtTop = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
-                guard selectedDetailsID == id else { return }
+                guard generation == motionGeneration, selectedDetailsID == id else { return }
                 withAnimation(.easeIn(duration: 0.2)) {
                     showDetailsBody = true
                 }
@@ -110,18 +116,25 @@ struct CredentialsTabView: View {
     }
 
     private func closeDetails(resetSelection: Bool = true) {
-        withAnimation(.easeOut(duration: 0.15)) {
+        guard selectedDetailsID != nil else { return }
+        motionGeneration += 1
+        let generation = motionGeneration
+        withAnimation(.easeOut(duration: 0.2)) {
             showDetailsBody = false
         }
-        withAnimation(.spring(response: 0.38, dampingFraction: 0.9)) {
-            selectedAtTop = false
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-            withAnimation(.easeIn(duration: 0.22)) {
-                othersHidden = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            guard generation == motionGeneration else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                selectedAtTop = false
             }
-            if resetSelection {
-                selectedDetailsID = nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
+                guard generation == motionGeneration else { return }
+                withAnimation(.easeIn(duration: 0.22)) {
+                    othersHidden = false
+                }
+                if resetSelection {
+                    selectedDetailsID = nil
+                }
             }
         }
     }

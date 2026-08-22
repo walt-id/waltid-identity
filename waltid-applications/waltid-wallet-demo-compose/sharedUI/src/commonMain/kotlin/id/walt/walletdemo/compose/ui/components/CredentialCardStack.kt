@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
@@ -29,14 +32,17 @@ internal fun CredentialCardStack(
     if (details.isEmpty()) return
     val othersVisibility = remember { Animatable(1f) }
     val selectedProgress = remember { Animatable(0f) }
+    var displayedExpandedId by remember { mutableStateOf(expandedId) }
 
     LaunchedEffect(expandedId) {
         if (expandedId != null) {
+            displayedExpandedId = expandedId
             othersVisibility.animateTo(0f, tween(durationMillis = 220, easing = FastOutSlowInEasing))
             selectedProgress.animateTo(1f, tween(durationMillis = 380, easing = FastOutSlowInEasing))
         } else {
-            selectedProgress.animateTo(0f, tween(durationMillis = 280, easing = FastOutSlowInEasing))
+            selectedProgress.animateTo(0f, tween(durationMillis = 380, easing = FastOutSlowInEasing))
             othersVisibility.animateTo(1f, tween(durationMillis = 220, easing = FastOutSlowInEasing))
+            displayedExpandedId = null
         }
     }
 
@@ -58,7 +64,7 @@ internal fun CredentialCardStack(
         ) {
             details.forEachIndexed { index, item ->
                 val id = item.summary.id
-                val isSelected = id == expandedId
+                val isSelected = id == displayedExpandedId
                 val restOffset = offsets.getOrElse(index) { 0.dp }
                 val y = if (isSelected) restOffset * (1f - selectedProgress.value) else restOffset
                 Box(
