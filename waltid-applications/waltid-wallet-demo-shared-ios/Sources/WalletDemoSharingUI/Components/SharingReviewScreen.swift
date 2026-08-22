@@ -1,8 +1,8 @@
 import SwiftUI
 import WalletSDK
 
-/// A whole-screen sharing review, for hosts the operating system launched with no app chrome around
-/// them.
+/// A compact sharing review, for hosts the operating system launched with no app chrome around
+/// them. It sizes to the heading, credential, and actions rather than filling the display.
 ///
 /// It adds only what a standalone surface needs - a heading naming the request, a preparing state, a
 /// failure state and a way to inspect a credential in full - on top of ``SharingReviewView``. The
@@ -63,35 +63,49 @@ public struct SharingReviewScreen: View {
     }
 
     public var body: some View {
-        NavigationStack {
-            ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(title)
+                    .font(.title2.weight(.semibold))
                 content
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
             }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(item: $openCredentialDetails) { details in
-                ZStack(alignment: .topTrailing) {
-                    ScrollView {
-                        CredentialDetailsView(details: details, onCardTap: { openCredentialDetails = nil })
-                            .padding()
-                            .padding(.top, 28)
-                    }
-                    Button {
-                        openCredentialDetails = nil
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .padding(12)
-                    .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+            .padding(20)
+
+            if review != nil && failure == nil {
+                Divider()
+                ReviewActions(
+                    selectionComplete: selectionComplete,
+                    isLoading: isSubmitting,
+                    onSubmit: onSubmit,
+                    onReject: onReject,
+                    onCancel: onCancel
+                )
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
+        .sheet(item: $openCredentialDetails) { details in
+            ZStack(alignment: .topTrailing) {
+                ScrollView {
+                    CredentialDetailsView(details: details, onCardTap: { openCredentialDetails = nil })
+                        .padding()
+                        .padding(.top, 28)
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.credentialDetailsScreen)
+                Button {
+                    openCredentialDetails = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 36, height: 36)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .padding(12)
+                .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
             }
+            .accessibilityIdentifier(WalletAccessibilityID.credentialDetailsScreen)
         }
     }
 
@@ -115,7 +129,8 @@ public struct SharingReviewScreen: View {
                 onSubmit: onSubmit,
                 onReject: onReject,
                 onCancel: onCancel,
-                compact: true
+                compact: true,
+                showActions: false
             )
         } else {
             // No request content is shown while preparing: what a request asks for is only known once

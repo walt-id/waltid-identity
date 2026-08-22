@@ -202,6 +202,7 @@ fun WalletDemoSharingReviewSheet(
                         )
                     } else {
                         ReviewScaffold(
+                            fillViewport = false,
                             actions = {
                                 SharingActionsRow(
                                     enabled = enabled,

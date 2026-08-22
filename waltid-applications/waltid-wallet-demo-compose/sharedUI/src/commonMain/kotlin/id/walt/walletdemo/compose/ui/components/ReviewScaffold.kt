@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,18 +18,28 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Review chrome for receive and share: details scroll, actions stay pinned.
+ *
+ * @param fillViewport When true, the scaffold occupies the host (in-app tabs). When false, it wraps
+ * the review and only grows as tall as the heading, credential, and actions — the Digital Credentials
+ * trays — while still scrolling if that content would overflow the screen.
  */
 @Composable
 internal fun ReviewScaffold(
     modifier: Modifier = Modifier,
+    fillViewport: Boolean = true,
     actions: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
+    val body: @Composable ColumnScope.() -> Unit = {
         Column(
             modifier = Modifier
-                .weight(1f, fill = true)
-                .heightIn(min = 240.dp)
+                .then(
+                    if (fillViewport) {
+                        Modifier.weight(1f, fill = true).heightIn(min = 240.dp)
+                    } else {
+                        Modifier.weight(1f, fill = false)
+                    },
+                )
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
@@ -47,6 +58,19 @@ internal fun ReviewScaffold(
                     actions()
                 }
             }
+        }
+    }
+
+    if (fillViewport) {
+        Column(modifier = modifier.fillMaxSize(), content = body)
+    } else {
+        BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxHeight),
+                content = body,
+            )
         }
     }
 }
