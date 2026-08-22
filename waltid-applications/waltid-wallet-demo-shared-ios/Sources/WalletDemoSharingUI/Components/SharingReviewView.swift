@@ -19,6 +19,7 @@ public struct SharingReviewView: View {
     private let onReject: (() -> Void)?
     private let onCancel: () -> Void
     private let compact: Bool
+    private let showActions: Bool
 
     /// Renders one sharing review.
     ///
@@ -46,7 +47,8 @@ public struct SharingReviewView: View {
         onSubmit: @escaping () -> Void,
         onReject: (() -> Void)? = nil,
         onCancel: @escaping () -> Void,
-        compact: Bool = false
+        compact: Bool = false,
+        showActions: Bool = true
     ) {
         self.review = review
         self.selection = selection
@@ -60,11 +62,12 @@ public struct SharingReviewView: View {
         self.onReject = onReject
         self.onCancel = onCancel
         self.compact = compact
+        self.showActions = showActions
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SharingRequestSections(request: review.request, compact: compact)
+            SharingRequestSections(request: review.request)
 
             if compact {
                 CredentialCardStackView(
@@ -76,6 +79,12 @@ public struct SharingReviewView: View {
                 Text("Select credentials to share")
                     .font(.subheadline.weight(.semibold))
 
+                if review.credentialOptions.isEmpty {
+                    Text("No credentials available")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 ForEach(review.credentialOptions) { option in
                     CredentialReviewCard(
                         option: option,
@@ -83,13 +92,12 @@ public struct SharingReviewView: View {
                         isLoading: isLoading,
                         isReadOnly: isReadOnly,
                         onToggleCredential: onToggleCredential,
-                        onToggleDisclosure: onToggleDisclosure,
-                        onCredentialSelected: onCredentialSelected
+                        onToggleDisclosure: onToggleDisclosure
                     )
                 }
             }
 
-            if !isReadOnly {
+            if !isReadOnly && showActions {
                 ReviewActions(
                     selectionComplete: selectionComplete,
                     isLoading: isLoading,
@@ -110,7 +118,7 @@ struct CredentialReviewCard: View {
     let isReadOnly: Bool
     let onToggleCredential: (PresentationCredentialSelection) -> Void
     let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    let onCredentialSelected: ((String) -> Void)?
+    @State private var claimsExpanded = false
 
     var body: some View {
         let details = CredentialDisplayNormalizer.details(for: option)
@@ -119,30 +127,54 @@ struct CredentialReviewCard: View {
             .items ?? []
 
         VStack(alignment: .leading, spacing: 10) {
-            if !isReadOnly {
-                Toggle(isOn: Binding(get: {
-                    selection.credentials.contains(option.selection)
-                }, set: { _ in
-                    onToggleCredential(option.selection)
-                })) {
-                    Text(option.label ?? option.format)
-                        .font(.subheadline.weight(.medium))
+            HStack(alignment: .center, spacing: 8) {
+                if !isReadOnly {
+                    Toggle(isOn: Binding(get: {
+                        selection.credentials.contains(option.selection)
+                    }, set: { _ in
+                        onToggleCredential(option.selection)
+                    })) {
+                        EmptyView()
+                    }
+                    .labelsHidden()
+                    .disabled(isLoading)
+                    .accessibilityIdentifier(WalletAccessibilityID.presentationCredentialToggle(option.selection.id))
                 }
-                .disabled(isLoading)
-                .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
-            }
 
-            if let onCredentialSelected {
-                CredentialCardButton(details: details) {
-                    onCredentialSelected(details.id)
+                Button {
+                    guard !option.disclosures.isEmpty else { return }
+                    claimsExpanded.toggle()
+                } label: {
+                    HStack(alignment: .center, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(option.label ?? option.format)
+                                .font(.subheadline.weight(.medium))
+                            if let issuer = details.issuer, !issuer.isEmpty {
+                                Text(issuer)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(option.format)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        if !option.disclosures.isEmpty {
+                            Image(systemName: claimsExpanded ? "chevron.up" : "chevron.down")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .contentShape(Rectangle())
                 }
-                .padding(.leading, isReadOnly ? 0 : 28)
-            } else {
-                CredentialCardView(details: details)
-                    .padding(.leading, isReadOnly ? 0 : 28)
+                .buttonStyle(.plain)
+                .disabled(option.disclosures.isEmpty)
+                .accessibilityLabel(claimsExpanded ? "Hide claims" : "Show claims")
+                .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsToggle(option.selection.id))
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
 
-            if !option.disclosures.isEmpty {
+            if claimsExpanded && !option.disclosures.isEmpty {
                 DisclosureList(
                     option: option,
                     credentialSelected: selection.credentials.contains(option.selection),
@@ -152,7 +184,6 @@ struct CredentialReviewCard: View {
                     isReadOnly: isReadOnly,
                     onToggleDisclosure: onToggleDisclosure
                 )
-                .padding(.leading, isReadOnly ? 0 : 28)
             }
 
             Divider()
@@ -248,14 +279,28 @@ private struct DisclosureTextView: View {
 }
 
 /// Share, and the ways of declining the transport actually supports.
-struct ReviewActions: View {
+public struct ReviewActions: View {
     let selectionComplete: Bool
     let isLoading: Bool
     let onSubmit: () -> Void
     let onReject: (() -> Void)?
     let onCancel: () -> Void
 
-    var body: some View {
+    public init(
+        selectionComplete: Bool,
+        isLoading: Bool,
+        onSubmit: @escaping () -> Void,
+        onReject: (() -> Void)?,
+        onCancel: @escaping () -> Void
+    ) {
+        self.selectionComplete = selectionComplete
+        self.isLoading = isLoading
+        self.onSubmit = onSubmit
+        self.onReject = onReject
+        self.onCancel = onCancel
+    }
+
+    public var body: some View {
         HStack(spacing: 10) {
             Button("Share", action: onSubmit)
                 .buttonStyle(.borderedProminent)

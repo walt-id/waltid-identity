@@ -600,13 +600,15 @@ class WalletDemoController(
                 session = ready.copy(credentials = credentials),
                 offerPreview = null,
                 authorizationRequestUrl = null,
-                requestDrafts = it.requestDrafts.copy(txCode = ""),
+                requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
                 operation = WalletOperationState.Succeeded(
                     WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
-                    WalletDemoTab.Receive,
+                    WalletDemoTab.Credentials,
                 ),
                 lastReceivedCredentialIds = displayableReceivedCredentialIds,
-                receiveCompleted = true,
+                receiveCompleted = false,
+                receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
+                selectedTab = WalletDemoTab.Credentials,
             )
         }
     }
@@ -623,14 +625,28 @@ class WalletDemoController(
                     is WalletDemoIssuanceOutcome.Stored -> {
                         val credentials = wallet.listCredentials()
                         _state.update {
+                            val remainingDeferred = it.deferredCredentials.filterNot { pending -> pending.id == deferredCredentialId }
+                            val received = outcome.credentialIds.isNotEmpty() && remainingDeferred.isEmpty()
                             it.copy(
                                 session = ready.copy(credentials = credentials),
-                                deferredCredentials = it.deferredCredentials.filterNot { pending -> pending.id == deferredCredentialId },
+                                deferredCredentials = remainingDeferred,
                                 lastReceivedCredentialIds = outcome.credentialIds,
-                                receiveCompleted = true,
+                                receiveCompleted = false,
+                                offerPreview = if (received) null else it.offerPreview,
+                                requestDrafts = if (received) {
+                                    it.requestDrafts.copy(offerUrl = "", txCode = "")
+                                } else {
+                                    it.requestDrafts
+                                },
+                                receiveNavigationResetKey = if (received) {
+                                    it.receiveNavigationResetKey + 1
+                                } else {
+                                    it.receiveNavigationResetKey
+                                },
+                                selectedTab = if (received) WalletDemoTab.Credentials else it.selectedTab,
                                 operation = WalletOperationState.Succeeded(
                                     WalletDisplayText.receivedCredentials(outcome.credentialIds.size),
-                                    WalletDemoTab.Receive,
+                                    if (received) WalletDemoTab.Credentials else WalletDemoTab.Receive,
                                 ),
                             )
                         }

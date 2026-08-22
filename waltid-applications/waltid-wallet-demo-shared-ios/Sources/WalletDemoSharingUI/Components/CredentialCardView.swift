@@ -103,9 +103,21 @@ public struct CredentialCardButton: View {
 public struct CredentialCardStackView: View {
     public let details: [CredentialDetails]
     public let onOpenDetails: (String) -> Void
+    public var expandedID: String? = nil
+    public var othersHidden: Bool = false
+    public var selectedAtTop: Bool = false
 
-    public init(details: [CredentialDetails], onOpenDetails: @escaping (String) -> Void) {
+    public init(
+        details: [CredentialDetails],
+        expandedID: String? = nil,
+        othersHidden: Bool = false,
+        selectedAtTop: Bool = false,
+        onOpenDetails: @escaping (String) -> Void
+    ) {
         self.details = details
+        self.expandedID = expandedID
+        self.othersHidden = othersHidden
+        self.selectedAtTop = selectedAtTop
         self.onOpenDetails = onOpenDetails
     }
 
@@ -118,26 +130,34 @@ public struct CredentialCardStackView: View {
                 peek: credentialCardPeek,
                 cardHeight: cardHeight
             )
-            let stackHeight = (offsets.last ?? 0) + cardHeight
+            let restHeight = (offsets.last ?? 0) + cardHeight
+            let stackHeight = selectedAtTop ? cardHeight : restHeight
 
             ZStack(alignment: .topLeading) {
                 ForEach(Array(details.enumerated()), id: \.element.id) { index, item in
+                    let isSelected = item.id == expandedID
                     CredentialCardButton(details: item) {
                         onOpenDetails(item.id)
                     }
                     .frame(width: width)
-                    .offset(y: offsets[index])
-                    .zIndex(Double(index))
+                    .offset(y: isSelected && selectedAtTop ? 0 : offsets[index])
+                    .opacity(isSelected || !othersHidden ? 1 : 0)
+                    .zIndex(isSelected ? Double(details.count) : Double(index))
+                    .allowsHitTesting(isSelected || !othersHidden)
                 }
             }
             .frame(width: width, height: stackHeight, alignment: .top)
+            .clipped()
         }
         .frame(maxWidth: .infinity)
-        .frame(height: stackHeight(forWidth: UIScreen.main.bounds.width - 40))
+        .frame(height: displayedHeight(forWidth: UIScreen.main.bounds.width - 40))
     }
 
-    private func stackHeight(forWidth width: CGFloat) -> CGFloat {
+    private func displayedHeight(forWidth width: CGFloat) -> CGFloat {
         let cardHeight = width / id1AspectRatio
+        if selectedAtTop {
+            return cardHeight
+        }
         let offsets = cardOffsets(
             count: details.count,
             peek: credentialCardPeek,

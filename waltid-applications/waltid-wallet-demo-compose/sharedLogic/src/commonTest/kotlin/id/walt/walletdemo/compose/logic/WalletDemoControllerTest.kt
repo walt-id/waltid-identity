@@ -343,7 +343,7 @@ class WalletDemoControllerTest {
         assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
         assertEquals(1, wallet.receiveCalls)
         assertEquals(
-            WalletOperationState.Succeeded("Received 1 credential(s)", WalletDemoTab.Receive),
+            WalletOperationState.Succeeded("Received 1 credential(s)", WalletDemoTab.Credentials),
             controller.state.value.operation,
         )
         assertEquals("Received 1 credential(s)", controller.state.value.statusText)
@@ -396,7 +396,8 @@ class WalletDemoControllerTest {
 
         assertEquals(1, wallet.receiveCalls)
         assertEquals("abc-123", wallet.receivedTxCode)
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
         assertEquals("", controller.state.value.requestDrafts.txCode)
         assertEquals(null, controller.state.value.offerPreview)
     }
@@ -480,7 +481,8 @@ class WalletDemoControllerTest {
 
         assertEquals(listOf("openid://callback?code=code-1&state=state-1"), wallet.authorizationCallbackUris)
         assertEquals(listOf("cred-auth"), controller.state.value.lastReceivedCredentialIds)
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
         assertEquals(null, controller.state.value.offerPreview)
     }
 
@@ -515,7 +517,8 @@ class WalletDemoControllerTest {
         assertEquals(listOf(deferredCredential.id), wallet.resumedDeferredCredentialIds)
         assertEquals(emptyList(), controller.state.value.deferredCredentials)
         assertEquals(listOf("cred-deferred"), controller.state.value.lastReceivedCredentialIds)
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
     }
 
     @Test
@@ -542,7 +545,8 @@ class WalletDemoControllerTest {
 
         assertEquals(1, wallet.startIssuanceCalls)
         assertEquals(1, wallet.receiveCalls)
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
     }
 
     @Test
@@ -1343,7 +1347,8 @@ class WalletDemoControllerTest {
         runCurrent()
         controller.acceptOffer()
         runCurrent()
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
 
         controller.updatePresentationRequestUrl(presentationUrl)
         controller.previewPresentation()
@@ -1357,7 +1362,7 @@ class WalletDemoControllerTest {
 
         assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
         assertEquals(offerUrl, controller.state.value.requestDrafts.offerUrl)
-        assertEquals(1, controller.state.value.receiveNavigationResetKey)
+        assertEquals(2, controller.state.value.receiveNavigationResetKey)
         assertEquals(presentationResetKeyBeforeOfferLink + 1, controller.state.value.presentationNavigationResetKey)
         assertEquals(emptyList(), controller.state.value.lastReceivedCredentialIds)
         assertFalse(controller.state.value.receiveCompleted)
@@ -1406,23 +1411,18 @@ class WalletDemoControllerTest {
         controller.acceptOffer()
         runCurrent()
 
-        assertTrue(controller.state.value.receiveCompleted)
-        assertFalse(controller.state.value.receiveUrlEntryEnabled)
-        assertFalse(controller.state.value.receiveActionEnabled)
-        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
-        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
-
-        val resetKeyBeforeNewFlow = controller.state.value.receiveNavigationResetKey
-        controller.startNewReceiveFlow()
-
-        assertEquals("", controller.state.value.requestDrafts.offerUrl)
-        assertEquals(emptyList(), controller.state.value.lastReceivedCredentialIds)
-        assertTrue(!controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
         assertTrue(controller.state.value.receiveUrlEntryEnabled)
         assertFalse(controller.state.value.receiveActionEnabled)
-        assertEquals(resetKeyBeforeNewFlow + 1, controller.state.value.receiveNavigationResetKey)
-        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
-        assertEquals("Wallet ready", controller.state.value.statusText)
+        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
+        assertEquals("", controller.state.value.requestDrafts.offerUrl)
+        assertEquals("Received 1 credential(s)", controller.state.value.statusText)
+
+        controller.selectTab(WalletDemoTab.Receive)
+        assertTrue(controller.state.value.receiveUrlEntryEnabled)
+        assertEquals("", controller.state.value.requestDrafts.offerUrl)
+        assertFalse(controller.state.value.receiveActionEnabled)
     }
 
     @Test
@@ -1440,7 +1440,8 @@ class WalletDemoControllerTest {
         controller.acceptOffer()
         runCurrent()
 
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
         assertEquals(listOf("new-cred"), controller.state.value.lastReceivedCredentialIds)
         assertEquals("Received 1 credential(s)", controller.state.value.statusText)
         assertEquals(listOf(newCredential), controller.state.value.receivedCredentials())

@@ -27,7 +27,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
+import id.walt.walletdemo.compose.ui.components.OfferReviewActions
 import id.walt.walletdemo.compose.ui.components.OfferReviewSection
+import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 
 /**
  * UI states for the Credential Manager CREATE_CREDENTIAL fulfillment sheet.
@@ -152,17 +154,19 @@ private fun OfferCreateReviewContent(
     onDecline: () -> Unit,
 ) {
     var txCode by remember(preview) { mutableStateOf("") }
-    val scrollState = rememberScrollState()
     val txRequirement = preview.transactionCode
     val acceptEnabled = enabled && (txRequirement == null || txRequirement.accepts(txCode))
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ReviewScaffold(
+        actions = {
+            OfferReviewActions(
+                requiresIssuerAuthentication = preview.requiresIssuerAuthentication,
+                acceptEnabled = acceptEnabled,
+                reviewEnabled = enabled,
+                onAccept = { onAccept(txCode.trim().ifBlank { null }) },
+                onDecline = onDecline,
+            )
+        },
     ) {
         Text(
             title,
@@ -182,6 +186,7 @@ private fun OfferCreateReviewContent(
                 onAccept(txCode.trim().ifBlank { null })
             },
             onDecline = onDecline,
+            showActions = false,
         )
     }
 }

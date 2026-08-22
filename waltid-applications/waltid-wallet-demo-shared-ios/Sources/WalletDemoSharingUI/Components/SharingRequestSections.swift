@@ -1,102 +1,99 @@
 import SwiftUI
 import WalletSDK
 
-/// Renders the request concepts of a sharing review: requester, transaction authorization, reader
-/// trust, response protection and technical details.
+/// Renders requester identity plus the technical request facts revealed by tapping that box.
 ///
 /// Only the concepts ``request`` actually carries are rendered. A transport that has no reader
 /// authentication or no requester metadata gets no such section rather than a section saying the
-/// request is anonymous or unauthenticated - that distinction is what makes an absent section
-/// readable as "the protocol has no such notion" instead of "the answer was bad".
+/// request is anonymous or unauthenticated.
 public struct SharingRequestSections: View {
     private let request: SharingRequest
-    private let compact: Bool
 
-    /// Renders the request concepts of a sharing review.
     public init(request: SharingRequest, compact: Bool = false) {
         self.request = request
-        self.compact = compact
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if let requester = request.requester {
-                RequesterSection(requester: requester, compact: compact)
-            }
+            VerifierMetadataCard(request: request)
 
             ForEach(request.transactionData) { group in
-                ClaimGroupView(group: group)
-            }
-
-            if !compact {
-                if let readerTrust = request.readerTrust {
-                    ReaderTrustSection(readerTrust: readerTrust)
-                }
-
-                ResponseProtectionSection(protection: request.responseProtection)
-
-                if request.technicalDetails.contains(where: { $0.value?.isPresentableValue == true }) {
-                    TechnicalDetailsSection(details: request.technicalDetails)
-                }
+                ClaimGroupView(group: group, collapsible: false)
             }
         }
     }
 }
 
-/// Who is asking, headed by whatever the request lets the wallet name truthfully.
-struct RequesterSection: View {
-    let requester: SharingRequester
-    var compact: Bool = false
+private struct VerifierMetadataCard: View {
+    let request: SharingRequest
+    @State private var isExpanded = false
+
+    private var requester: SharingRequester? { request.requester }
 
     private var verifiedOriginDetail: MetadataDetailItem? {
-        guard !requester.verifiedOriginIsIdentityName,
+        guard let requester, !requester.verifiedOriginIsIdentityName,
               let origin = requester.verifiedOrigin?.presentableValue else { return nil }
         return MetadataDetailItem(label: SharingRequester.verifiedOriginLabel, value: origin)
     }
 
     private var requesterDetails: [MetadataDetailItem] {
-        requester.details.map { MetadataDetailItem(label: $0.label, value: $0.value, linkURI: $0.linkURI) }
+        requester?.details.map { MetadataDetailItem(label: $0.label, value: $0.value, linkURI: $0.linkURI) }
+            .filter(\.isVisible) ?? []
+    }
+
+    private var technicalDetails: [MetadataDetailItem] {
+        request.technicalDetails
+            .map { MetadataDetailItem(label: $0.label, value: $0.value, linkURI: $0.linkURI) }
             .filter(\.isVisible)
     }
 
+    private var hasAnyContent: Bool {
+        requester?.identityName != nil ||
+            requester?.verifiedOrigin?.presentableValue != nil ||
+            !requesterDetails.isEmpty ||
+            request.readerTrust != nil ||
+            request.responseProtection != .none ||
+            !technicalDetails.isEmpty
+    }
+
     var body: some View {
-        let verifiedOriginDetail = verifiedOriginDetail
-        let requesterDetails = requesterDetails
-        if compact {
-            if let name = requester.identityName ?? requester.verifiedOrigin?.presentableValue {
-                Text(name)
-                    .font(.headline)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentationVerifierSection)
-            }
-        } else if requester.identityName != nil || verifiedOriginDetail != nil || !requesterDetails.isEmpty {
-            ReviewMetadataSection(
-                title: "Requester",
-                titleAccessibilityIdentifier: WalletAccessibilityID.presentationVerifierSection
+        if hasAnyContent {
+            ExpandableMetadataCard(
+                title: "Verifier",
+                titleAccessibilityIdentifier: WalletAccessibilityID.presentationVerifierSection,
+                toggleAccessibilityIdentifier: WalletAccessibilityID.presentationRequesterDetailsToggle,
+                isExpanded: $isExpanded
             ) {
-                if let identityName = requester.identityName {
+                if let identityName = requester?.identityName {
                     MetadataIdentityView(
-                        display: requester.display,
+                        display: requester?.display,
                         fallbackName: identityName,
-                        supportingText: requester.identityNameCaption
+                        supportingText: requester?.identityNameCaption
                     )
-                    if verifiedOriginDetail != nil || !requesterDetails.isEmpty {
-                        Divider()
-                    }
+                } else {
+                    Text(requester?.verifiedOrigin?.presentableValue ?? "Verifier")
+                        .font(.body.weight(.semibold))
                 }
-                if let verifiedOriginDetail {
-                    MetadataDetailList(items: [verifiedOriginDetail])
-                    if !requesterDetails.isEmpty {
-                        Divider()
-                    }
-                }
-                if !requesterDetails.isEmpty {
-                    MetadataDisclosure(
-                        title: "Requester details",
-                        initiallyExpanded: false,
-                        accessibilityIdentifier: WalletAccessibilityID.presentationRequesterDetailsToggle
-                    ) {
-                        MetadataDetailList(items: requesterDetails)
+            } details: {
+                VStack(alignment: .leading, spacing: 12) {
+                    let identityItems = [verifiedOriginDetail].compactMap { $0 } + requesterDetails
+                    if !identityItems.isEmpty {
+                        MetadataDetailList(items: identityItems)
                             .accessibilityIdentifier(WalletAccessibilityID.presentationRequesterDetails)
+                    }
+                    if let readerTrust = request.readerTrust {
+                        if !identityItems.isEmpty { Divider() }
+                        ReaderTrustDetails(readerTrust: readerTrust)
+                    }
+                    if !identityItems.isEmpty || request.readerTrust != nil { Divider() }
+                    ResponseProtectionDetails(protection: request.responseProtection)
+                    if !technicalDetails.isEmpty {
+                        Divider()
+                        Text("Technical request details")
+                            .font(.caption.weight(.semibold))
+                            .accessibilityIdentifier(WalletAccessibilityID.presentationTechnicalDetailsSection)
+                        MetadataDetailList(items: technicalDetails)
+                            .accessibilityIdentifier(WalletAccessibilityID.verifierTechnicalDetails)
                     }
                 }
             }
@@ -104,16 +101,13 @@ struct RequesterSection: View {
     }
 }
 
-/// Whether the wallet can name the reader, and why it cannot when it cannot.
-struct ReaderTrustSection: View {
+private struct ReaderTrustDetails: View {
     let readerTrust: SharingReaderTrust
 
     private var headline: String {
         switch readerTrust {
         case .notAuthenticated: return "Reader not authenticated"
         case .pendingVerification: return "Reader authentication will be verified before sharing"
-        // Deliberately not phrased as a signature failure: a failed signature never reaches review at
-        // all, so saying so here would misdescribe a verified but unrecognised reader.
         case .untrusted: return "Reader identity not trusted by this wallet"
         case .trusted: return "Trusted reader"
         }
@@ -132,31 +126,19 @@ struct ReaderTrustSection: View {
         }
     }
 
-    private var identity: MetadataDetailItem? {
-        guard case .trusted(let readerIdentity) = readerTrust else { return nil }
-        return MetadataDetailItem(label: "Reader identity", value: readerIdentity)
-    }
-
     var body: some View {
-        ReviewMetadataSection(
-            title: "Reader authentication",
-            titleAccessibilityIdentifier: WalletAccessibilityID.presentationReaderTrustSection
-        ) {
-            Text(headline)
-                .font(.subheadline)
-            Text(explanation)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if let identity {
-                Divider()
-                MetadataDetailList(items: [identity])
+        VStack(alignment: .leading, spacing: 4) {
+            Text(headline).font(.subheadline.weight(.medium))
+            Text(explanation).font(.caption).foregroundStyle(.secondary)
+            if case .trusted(let readerIdentity) = readerTrust {
+                MetadataDetailList(items: [MetadataDetailItem(label: "Reader identity", value: readerIdentity)])
             }
         }
+        .accessibilityIdentifier(WalletAccessibilityID.presentationReaderTrustSection)
     }
 }
 
-/// What protects the response the wallet is about to produce.
-struct ResponseProtectionSection: View {
+private struct ResponseProtectionDetails: View {
     let protection: SharingResponseProtection
 
     private var items: [MetadataDetailItem] {
@@ -179,49 +161,11 @@ struct ResponseProtectionSection: View {
     }
 
     var body: some View {
-        ReviewMetadataSection(
-            title: "Response protection",
-            titleAccessibilityIdentifier: WalletAccessibilityID.presentationResponseProtectionSection
-        ) {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Response protection")
+                .font(.caption.weight(.semibold))
             MetadataDetailList(items: items)
         }
-    }
-}
-
-/// Protocol-level values, collapsed so they inform without competing with the decision.
-struct TechnicalDetailsSection: View {
-    let details: [SharingDetail]
-    @State private var expanded = false
-
-    var body: some View {
-        ReviewMetadataSection(
-            title: "Technical request details",
-            titleAccessibilityIdentifier: WalletAccessibilityID.presentationTechnicalDetailsSection,
-            contentInsets: expanded
-                ? EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
-                : EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16)
-        ) {
-            Button {
-                expanded.toggle()
-            } label: {
-                HStack {
-                    Text(expanded ? "Hide details" : "Show details")
-                    Spacer()
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(WalletAccessibilityID.verifierTechnicalDetailsToggle)
-
-            if expanded {
-                Divider()
-                MetadataDetailList(
-                    items: details.map { MetadataDetailItem(label: $0.label, value: $0.value, linkURI: $0.linkURI) }
-                )
-                .accessibilityIdentifier(WalletAccessibilityID.verifierTechnicalDetails)
-            }
-        }
+        .accessibilityIdentifier(WalletAccessibilityID.presentationResponseProtectionSection)
     }
 }

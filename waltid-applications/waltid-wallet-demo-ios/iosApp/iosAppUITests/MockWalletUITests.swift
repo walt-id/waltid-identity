@@ -311,12 +311,13 @@ final class MockWalletUITests: XCTestCase {
             ui.waitForStatus(prefixes: ["Review presentation request", "Preview failed"], timeout: 10),
             "Review presentation request"
         )
-        ui.tapElement(identifierPrefix: "wallet.credentialCard.")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 10))
+        ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
+        XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
 
         ui.openDeepLink(presentationUrl)
         XCTAssertTrue(app.tabBars.buttons["Present"].isSelected)
-        XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
+        XCTAssertFalse(app.staticTexts["Requested disclosures"].exists)
         XCTAssertTrue(
             ui.waitForTextInputValue(
                 identifier: "wallet.presentationInput",
@@ -364,17 +365,13 @@ final class MockWalletUITests: XCTestCase {
             "Review presentation request"
         )
 
+        XCTAssertFalse(app.staticTexts["Requested disclosures"].exists)
+        ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
         XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Portrait"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["$.portrait"].exists)
         XCTAssertTrue(app.images["Credential image"].waitForExistence(timeout: 10))
-
-        ui.tapElement(identifierPrefix: "wallet.credentialCard.")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Portrait"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.staticTexts["$.portrait"].exists)
-        XCTAssertTrue(app.images["Credential image"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
     }
 
     func testCredentialDetailsStayScopedToCredentialsTabNavigationStack() {
@@ -539,12 +536,11 @@ final class MockWalletUITests: XCTestCase {
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
         )
-        XCTAssertFalse(ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL").isEnabled)
-        XCTAssertTrue(app.buttons["wallet.receiveNewButton"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.tabBars.buttons["Credentials"].isSelected)
+        XCTAssertFalse(app.buttons["wallet.receiveNewButton"].exists)
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         XCTAssertTrue(app.staticTexts["Mobile driving licence"].waitForExistence(timeout: 10))
         ui.tapElement(identifierPrefix: "wallet.credentialCard.")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Mobile driving licence"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Expires 2026-06-17"].waitForExistence(timeout: 10))
         ui.tapButton(
@@ -555,9 +551,10 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["jwt_vc_json"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.images["Credential image"].waitForExistence(timeout: 10))
-        ui.tapNavigationBack()
-        ui.tapButton(identifier: "wallet.receiveNewButton", fallbackLabel: "New receive")
+
+        ui.tapTab(label: "Receive")
         let resetOfferInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
+        XCTAssertTrue(resetOfferInput.waitForExistence(timeout: 10))
         XCTAssertTrue(resetOfferInput.isEnabled)
         XCTAssertTrue(["", "Credential offer URL"].contains(resetOfferInput.value as? String))
         XCTAssertFalse(app.buttons["wallet.receiveButton"].isEnabled)
@@ -576,9 +573,9 @@ final class MockWalletUITests: XCTestCase {
             ui.waitForStatus(prefixes: ["Review presentation request", "Preview failed"], timeout: 10),
             "Review presentation request"
         )
-        XCTAssertFalse(ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").isEnabled)
+        XCTAssertFalse(ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").exists)
         XCTAssertTrue(app.staticTexts["Example Verifier"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["wallet.presentationRequesterDetailsToggle"].exists)
+        XCTAssertTrue(app.buttons["wallet.presentationRequesterDetailsToggle"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Required"].exists)
         XCTAssertFalse(app.staticTexts["ECDH-ES"].exists)
         XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
@@ -589,15 +586,13 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Payee"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Example Merchant"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["wallet.verifierTechnicalDetailsToggle"].exists)
-        ui.assertExists(identifierPrefix: "wallet.credentialCard.")
+        ui.assertExists(identifierPrefix: "wallet.presentationCredential.")
         assertPresentationActionsFollowReviewContent(app: app)
 
-        ui.tapElement(identifierPrefix: "wallet.credentialCard.")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 10))
+        ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
         XCTAssertTrue(app.staticTexts["Mobile driving licence"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Expires 2026-06-17"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))
-        ui.tapNavigationBack()
+        XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
         XCTAssertEqual(
@@ -613,11 +608,10 @@ final class MockWalletUITests: XCTestCase {
             ui.waitForStatus(prefixes: ["Presentation sent", "Present failed"], timeout: 10),
             "Presentation sent"
         )
-        ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         XCTAssertFalse(app.buttons["wallet.presentationSubmitButton"].exists)
         XCTAssertFalse(app.buttons["wallet.presentationRejectButton"].exists)
         XCTAssertTrue(app.buttons["wallet.presentationNewButton"].waitForExistence(timeout: 10))
-        assertPresentationNewActionPrecedesReadOnlyReview(app: app)
+        XCTAssertFalse(app.staticTexts["Example Verifier"].exists)
         ui.tapButton(identifier: "wallet.presentationNewButton", fallbackLabel: "New presentation")
         let resetPresentationInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
         XCTAssertTrue(resetPresentationInput.isEnabled)
@@ -694,9 +688,10 @@ final class MockWalletUITests: XCTestCase {
             "Review presentation request"
         )
 
-        XCTAssertFalse(app.descendants(matching: .any)["wallet.presentationVerifierSection"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.presentationVerifierSection"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts[Self.didClientID].exists)
-        XCTAssertFalse(app.buttons["wallet.verifierTechnicalDetailsToggle"].exists)
+        ui.tapButton(identifier: "wallet.presentationRequesterDetailsToggle", fallbackLabel: "Show Verifier details")
+        XCTAssertTrue(app.staticTexts[Self.didClientID].waitForExistence(timeout: 10))
     }
 
     func testCredentialDetailsStayScopedToReceiveTabNavigationStack() {
@@ -725,15 +720,16 @@ final class MockWalletUITests: XCTestCase {
             "Received 1 credential(s)"
         )
 
+        XCTAssertTrue(app.tabBars.buttons["Credentials"].isSelected)
         ui.tapElement(identifierPrefix: "wallet.credentialCard.")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))
+
+        ui.tapTab(label: "Receive")
+        XCTAssertTrue(ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL").waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Given name"].exists)
 
         ui.tapTab(label: "Credentials")
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
-        XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
-
-        ui.tapTab(label: "Receive")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))
     }
 
@@ -774,17 +770,17 @@ final class MockWalletUITests: XCTestCase {
             "Review presentation request"
         )
 
-        ui.tapElement(identifierPrefix: "wallet.credentialCard.")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 10))
+        ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
         XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
 
         ui.tapTab(label: "Credentials")
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
 
         ui.tapTab(label: "Present")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Example Verifier"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
     }
 
     func testPresentationDetailsResolveDuplicateCredentialOptionsIndependently() {
@@ -830,17 +826,17 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertFalse(app.switches["wallet.presentationDisclosureToggle.8:identity6:cred-112:$.given_name"].exists)
         XCTAssertFalse(app.switches["wallet.presentationDisclosureToggle.3:age6:cred-113:$.age_over_18"].exists)
 
-        ui.tapElement(identifier: "wallet.credentialCard.3:age6:cred-1")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 10))
+        ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.3:age6:cred-1")
         XCTAssertTrue(app.staticTexts["Age disclosure"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Over 18"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Identity disclosure"].exists)
+        XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
     }
 
     private func assertPresentationActionsFollowReviewContent(app: XCUIApplication) {
         let verifier = app.descendants(matching: .any)["wallet.presentationVerifierSection"].firstMatch
         let credential = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.presentationCredential."))
             .firstMatch
         let share = app.buttons["wallet.presentationSubmitButton"]
 
@@ -861,33 +857,6 @@ final class MockWalletUITests: XCTestCase {
         )
     }
 
-    private func assertVerifierTechnicalDetailsCollapsedUntilRequested(app: XCUIApplication, ui: WalletE2EUI) {
-        XCTAssertFalse(app.staticTexts["Client ID"].exists, "Technical verifier fields should not be expanded by default")
-        XCTAssertTrue(app.staticTexts["wallet.presentationTechnicalDetailsSection"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["wallet.verifierTechnicalDetailsToggle"].waitForExistence(timeout: 10))
-        ui.tapButton(identifier: "wallet.verifierTechnicalDetailsToggle", fallbackLabel: "Show details")
-        XCTAssertTrue(app.staticTexts["Client ID"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["https://verifier.example/response"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["state-123"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["nonce-456"].waitForExistence(timeout: 10))
-    }
-
-    private func assertRequesterDetailsCollapsedUntilRequested(app: XCUIApplication, ui: WalletE2EUI) {
-        XCTAssertFalse(app.descendants(matching: .any)["https://verifier.example"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["https://verifier.example/privacy"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["https://verifier.example/terms"].exists)
-        XCTAssertTrue(app.buttons["wallet.presentationRequesterDetailsToggle"].waitForExistence(timeout: 10))
-        ui.tapButton(identifier: "wallet.presentationRequesterDetailsToggle", fallbackLabel: "Requester details")
-        ui.assertExists(identifier: "wallet.presentationRequesterDetails", timeout: 10)
-        XCTAssertTrue(app.descendants(matching: .any)["https://verifier.example"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.descendants(matching: .any)["https://verifier.example/privacy"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.descendants(matching: .any)["https://verifier.example/terms"].waitForExistence(timeout: 10))
-        ui.tapButton(identifier: "wallet.presentationRequesterDetailsToggle", fallbackLabel: "Requester details")
-        XCTAssertFalse(app.descendants(matching: .any)["https://verifier.example"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["https://verifier.example/privacy"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["https://verifier.example/terms"].exists)
-    }
-
     private func receiveMockCredential(app: XCUIApplication, ui: WalletE2EUI) {
         ui.tapTab(label: "Receive")
         ui.replaceText(
@@ -903,20 +872,6 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
-        )
-    }
-
-    private func assertPresentationNewActionPrecedesReadOnlyReview(app: XCUIApplication) {
-        let elements = app.descendants(matching: .any).allElementsBoundByIndex
-        let newActionIndex = elements.firstIndex { $0.identifier == "wallet.presentationNewButton" }
-        let verifierIndex = elements.firstIndex { $0.label == "Example Verifier" }
-
-        XCTAssertNotNil(newActionIndex, "New presentation action is missing")
-        XCTAssertNotNil(verifierIndex, "Read-only presentation review is missing")
-        XCTAssertLessThan(
-            newActionIndex ?? Int.max,
-            verifierIndex ?? Int.min,
-            "New presentation action should precede the read-only review so starting over stays easy"
         )
     }
 }

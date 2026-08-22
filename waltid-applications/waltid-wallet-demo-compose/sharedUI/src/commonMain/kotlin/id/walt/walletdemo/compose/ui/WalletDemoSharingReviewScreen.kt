@@ -30,6 +30,8 @@ import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toggleCredential
 import id.walt.walletdemo.compose.logic.toggleDisclosure
+import id.walt.walletdemo.compose.ui.components.ReviewScaffold
+import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.screens.CredentialDetailsScreen
 
@@ -68,7 +70,6 @@ fun WalletDemoSharingReviewScreen(
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
     var openCredentialDetailsId by remember(review) { mutableStateOf<String?>(null) }
-    val scrollState = rememberScrollState()
     val openDetails = openCredentialDetailsId?.let { detailsId ->
         review.credentialOptions
             .map { it.toCredentialDetails() }
@@ -101,13 +102,19 @@ fun WalletDemoSharingReviewScreen(
                     onBack = { openCredentialDetailsId = null },
                 )
             } else {
-                Column(
+                ReviewScaffold(
                     modifier = Modifier
                         .fillMaxSize()
-                        .safeDrawingPadding()
-                        .verticalScroll(scrollState)
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                        .safeDrawingPadding(),
+                    actions = {
+                        SharingActionsRow(
+                            enabled = enabled,
+                            selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
+                            onSubmit = { onSubmit(selection) },
+                            onCancel = onCancel,
+                            onReject = onReject,
+                        )
+                    },
                 ) {
                     Text(
                         title,
@@ -121,6 +128,7 @@ fun WalletDemoSharingReviewScreen(
                         selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
                         enabled = enabled,
                         compact = compact,
+                        showActions = false,
                         onToggleCredential = { credential ->
                             selection = selection.toggleCredential(
                                 selection = credential,
@@ -193,13 +201,16 @@ fun WalletDemoSharingReviewSheet(
                             onBack = { openCredentialDetailsId = null },
                         )
                     } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 20.dp)
-                                .padding(bottom = 28.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                        ReviewScaffold(
+                            actions = {
+                                SharingActionsRow(
+                                    enabled = enabled,
+                                    selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
+                                    onSubmit = { onSubmit(selection) },
+                                    onCancel = onCancel,
+                                    onReject = null,
+                                )
+                            },
                         ) {
                             Text(
                                 title,
@@ -213,6 +224,7 @@ fun WalletDemoSharingReviewSheet(
                                 selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
                                 enabled = enabled,
                                 compact = true,
+                                showActions = false,
                                 onToggleCredential = { credential ->
                                     selection = selection.toggleCredential(
                                         selection = credential,

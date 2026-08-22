@@ -19,6 +19,7 @@ internal fun CredentialOverviewSection(
     details: CredentialDetails,
     modifier: Modifier = Modifier,
     onCardClick: (() -> Unit)? = null,
+    showCard: Boolean = true,
 ) {
     val display = details.toCardDisplayData()
     val issuerFallback = details.summary.issuer?.takeIf { it.isNotBlank() } ?: display.issuer
@@ -29,11 +30,13 @@ internal fun CredentialOverviewSection(
             .testTag(WalletUiTestTags.credentialOverview(display.id)),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CredentialCardArt(
-            art = display.toCardArt(),
-            compact = true,
-            modifier = if (onCardClick != null) Modifier.clickable(onClick = onCardClick) else Modifier,
-        )
+        if (showCard) {
+            CredentialCardArt(
+                art = display.toCardArt(),
+                compact = true,
+                modifier = if (onCardClick != null) Modifier.clickable(onClick = onCardClick) else Modifier,
+            )
+        }
 
         val issuerDisplay = details.issuerDisplay
         if (issuerDisplay != null) {
