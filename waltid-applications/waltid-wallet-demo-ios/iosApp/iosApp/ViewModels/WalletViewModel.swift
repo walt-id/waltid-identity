@@ -1000,8 +1000,11 @@ class WalletViewModel: ObservableObject {
         authorizationRequestURL = nil
         lastReceivedCredentialIDs = displayableReceivedCredentialIDs
         self.txCode = ""
-        receiveCompleted = true
-        setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .receive)
+        offerUrl = ""
+        receiveCompleted = false
+        receiveNavigationResetKey += 1
+        selectedTab = .credentials
+        setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .credentials)
     }
 
     func updateTxCode(_ value: String) {
@@ -1021,8 +1024,15 @@ class WalletViewModel: ObservableObject {
                     try await reconcileIdentityDocumentRegistrations()
                     deferredCredentials.removeAll { $0.id == credential.id }
                     lastReceivedCredentialIDs = credentialIDs
-                    receiveCompleted = !credentialIDs.isEmpty
-                    setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .receive)
+                    receiveCompleted = false
+                    if deferredCredentials.isEmpty && !credentialIDs.isEmpty {
+                        offerUrl = ""
+                        receiveNavigationResetKey += 1
+                        selectedTab = .credentials
+                        setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .credentials)
+                    } else {
+                        setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .receive)
+                    }
                 case let .deferred(_, _, credentials):
                     deferredCredentials.removeAll { $0.id == credential.id }
                     deferredCredentials.append(contentsOf: credentials)
@@ -1246,6 +1256,13 @@ class WalletViewModel: ObservableObject {
         presentationNavigationResetKey += 1
     }
 
+    private func finishSuccessfulPresentation() {
+        presentationReview = nil
+        selectedPresentationCredentialOptions = []
+        selectedPresentationDisclosureOptions = []
+        presentationCompleted = true
+    }
+
     func cancelPresentationReview() {
         resetInputFocus()
         guard !isLoading, let previewHandle = presentationReview?.previewHandle else { return }
@@ -1262,7 +1279,7 @@ class WalletViewModel: ObservableObject {
     func completePresentationContinuation() {
         guard let successMessage = pendingPresentationSuccessMessage else { return }
         clearPendingPresentationContinuation()
-        presentationCompleted = true
+        finishSuccessfulPresentation()
         setSuccess(successMessage, tab: .present)
     }
 
@@ -1300,7 +1317,7 @@ class WalletViewModel: ObservableObject {
                 pendingPresentationContinuationURL = redirectURL
                 presentationCompleted = false
             } else {
-                presentationCompleted = true
+                finishSuccessfulPresentation()
                 setSuccess(successMessage, tab: .present)
             }
         }

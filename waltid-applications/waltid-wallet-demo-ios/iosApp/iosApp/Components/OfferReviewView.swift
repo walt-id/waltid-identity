@@ -11,38 +11,36 @@ struct OfferReviewView: View {
     let onTxCodeChange: (String) -> Void
     let onAccept: () -> Void
     let onDecline: () -> Void
+    var showActions: Bool = true
     @State private var openOfferedID: String?
+    @State private var issuerExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Credential offer")
                 .font(.headline)
 
-            ReviewMetadataSection(
+            ExpandableMetadataCard(
                 title: "Issuer",
-                titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection
+                titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection,
+                toggleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerDetailsToggle,
+                isExpanded: $issuerExpanded
             ) {
                 MetadataIdentityView(
                     display: issuerDisplay,
                     fallbackName: preview.issuer.identifier,
                     supportingText: nil
                 )
+            } details: {
                 if issuerHasFriendlyName {
-                    Divider()
-                    MetadataDisclosure(
-                        title: "Issuer details",
-                        initiallyExpanded: false,
-                        accessibilityIdentifier: WalletAccessibilityID.offerIssuerDetailsToggle
-                    ) {
-                        MetadataDetailList(items: [
-                            MetadataDetailItem(
-                                label: "Credential Issuer",
-                                value: preview.issuer.identifier,
-                                linkURI: preview.issuer.identifier
-                            ),
-                        ])
-                        .accessibilityIdentifier(WalletAccessibilityID.offerIssuerDetails)
-                    }
+                    MetadataDetailList(items: [
+                        MetadataDetailItem(
+                            label: "Credential Issuer",
+                            value: preview.issuer.identifier,
+                            linkURI: preview.issuer.identifier
+                        ),
+                    ])
+                    .accessibilityIdentifier(WalletAccessibilityID.offerIssuerDetails)
                 }
             }
 
@@ -108,17 +106,14 @@ struct OfferReviewView: View {
                 }
             }
 
-            HStack(spacing: 8) {
-                Button(preview.grant == .authorizationCode ? "Continue to sign in" : "Accept", action: onAccept)
-                    .buttonStyle(.borderedProminent)
-                    .tint(branding.primary)
-                    .disabled(!isAcceptEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
-
-                Button("Decline", action: onDecline)
-                    .buttonStyle(.bordered)
-                    .disabled(!isReviewEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
+            if showActions {
+                OfferReviewActions(
+                    requiresIssuerAuthentication: preview.grant == .authorizationCode,
+                    isAcceptEnabled: isAcceptEnabled,
+                    isReviewEnabled: isReviewEnabled,
+                    onAccept: onAccept,
+                    onDecline: onDecline
+                )
             }
         }
     }
@@ -137,6 +132,29 @@ struct OfferReviewView: View {
             return false
         }
         return name != preview.issuer.identifier
+    }
+}
+
+struct OfferReviewActions: View {
+    let requiresIssuerAuthentication: Bool
+    let isAcceptEnabled: Bool
+    let isReviewEnabled: Bool
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(requiresIssuerAuthentication ? "Continue to sign in" : "Accept", action: onAccept)
+                .buttonStyle(.borderedProminent)
+                .tint(.waltBlue)
+                .disabled(!isAcceptEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
+
+            Button("Decline", action: onDecline)
+                .buttonStyle(.bordered)
+                .disabled(!isReviewEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
+        }
     }
 }
 

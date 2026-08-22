@@ -13,6 +13,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -38,8 +42,10 @@ internal fun OfferReviewSection(
     onDecline: () -> Unit,
     modifier: Modifier = Modifier,
     cardFirst: Boolean = false,
+    showActions: Boolean = true,
 ) {
     val focusManager = LocalFocusManager.current
+    var issuerExpanded by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -50,37 +56,36 @@ internal fun OfferReviewSection(
         if (!cardFirst) {
         Text("Credential offer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 
-        ReviewMetadataSection(
+        val issuerName = preview.issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
+        val issuerIdentifier = preview.issuer.credentialIssuer.trim()
+        val issuerDetails = listOf(
+            MetadataDetailItem(
+                label = "Credential Issuer",
+                value = issuerIdentifier.takeIf { issuerName != null && it != issuerName },
+                linkUri = issuerIdentifier,
+            ),
+        ).filter { !it.value.isNullOrBlank() }
+        ExpandableMetadataCard(
             title = "Issuer",
+            expanded = issuerExpanded,
+            onToggle = { issuerExpanded = !issuerExpanded },
             modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerSection),
-        ) {
-            val issuerName = preview.issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
-            val issuerIdentifier = preview.issuer.credentialIssuer.trim()
-            val issuerDetails = listOf(
-                MetadataDetailItem(
-                    label = "Credential Issuer",
-                    value = issuerIdentifier.takeIf { issuerName != null && it != issuerName },
-                    linkUri = issuerIdentifier,
-                ),
-            ).filter { !it.value.isNullOrBlank() }
-            MetadataIdentityRow(
-                display = preview.issuer.display,
-                fallbackName = issuerIdentifier,
-            )
-            if (issuerDetails.isNotEmpty()) {
-                MetadataRowDivider()
-                MetadataDisclosure(
-                    title = "Issuer details",
-                    initiallyExpanded = false,
-                    modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerDetailsToggle),
-                ) {
+            toggleTestTag = WalletUiTestTags.OfferIssuerDetailsToggle,
+            summary = {
+                MetadataIdentityRow(
+                    display = preview.issuer.display,
+                    fallbackName = issuerIdentifier,
+                )
+            },
+            details = {
+                if (issuerDetails.isNotEmpty()) {
                     MetadataDetailList(
                         issuerDetails,
                         modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerDetails),
                     )
                 }
-            }
-        }
+            },
+        )
 
         }
 
@@ -175,21 +180,40 @@ internal fun OfferReviewSection(
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = onAccept,
-                enabled = acceptEnabled,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferAcceptButton),
-            ) {
-                Text(if (preview.requiresIssuerAuthentication) "Continue to sign in" else "Accept")
-            }
-            TextButton(
-                onClick = onDecline,
-                enabled = reviewEnabled,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferDeclineButton),
-            ) {
-                Text("Decline")
-            }
+        if (showActions) {
+            OfferReviewActions(
+                requiresIssuerAuthentication = preview.requiresIssuerAuthentication,
+                acceptEnabled = acceptEnabled,
+                reviewEnabled = reviewEnabled,
+                onAccept = onAccept,
+                onDecline = onDecline,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun OfferReviewActions(
+    requiresIssuerAuthentication: Boolean,
+    acceptEnabled: Boolean,
+    reviewEnabled: Boolean,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = onAccept,
+            enabled = acceptEnabled,
+            modifier = Modifier.testTag(WalletUiTestTags.OfferAcceptButton),
+        ) {
+            Text(if (requiresIssuerAuthentication) "Continue to sign in" else "Accept")
+        }
+        TextButton(
+            onClick = onDecline,
+            enabled = reviewEnabled,
+            modifier = Modifier.testTag(WalletUiTestTags.OfferDeclineButton),
+        ) {
+            Text("Decline")
         }
     }
 }

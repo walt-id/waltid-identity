@@ -106,6 +106,14 @@ public enum WalletAccessibilityID {
         identifier("presentationCredential", id)
     }
 
+    public static func presentationCredentialToggle(_ id: String) -> String {
+        identifier("presentationCredentialToggle", id)
+    }
+
+    public static func presentationClaimsToggle(_ id: String) -> String {
+        identifier("presentationClaimsToggle", id)
+    }
+
     public static func presentationDisclosureToggle(_ id: String) -> String {
         identifier("presentationDisclosureToggle", id)
     }

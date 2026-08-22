@@ -6,68 +6,122 @@ struct CredentialsTabView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
     @Environment(\.walletDemoBranding) private var branding
+    @State private var othersHidden = false
+    @State private var selectedAtTop = false
+    @State private var showDetailsBody = false
 
     private var details: [CredentialDetails] {
         viewModel.credentials.map(CredentialDisplayNormalizer.details(for:))
     }
 
+    private var expanded: CredentialDetails? {
+        details.first { $0.id == selectedDetailsID }
+    }
+
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
+            ZStack(alignment: .topTrailing) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        if selectedDetailsID == nil {
+                            WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
 
-                    if let warning = viewModel.transactionDataProfilesWarning {
-                        WarningBannerView(message: warning)
-                    }
+                            if let warning = viewModel.transactionDataProfilesWarning {
+                                WarningBannerView(message: warning)
+                            }
+                        }
 
-                    if details.isEmpty {
-                        EmptyCredentialsView()
-                    } else {
-                        CredentialCardStackView(details: details) { id in
-                            selectedDetailsID = id
+                        if details.isEmpty {
+                            EmptyCredentialsView()
+                        } else {
+                            CredentialCardStackView(
+                                details: details,
+                                expandedID: selectedDetailsID,
+                                othersHidden: othersHidden,
+                                selectedAtTop: selectedAtTop
+                            ) { id in
+                                if selectedDetailsID == id {
+                                    closeDetails()
+                                } else {
+                                    openDetails(id)
+                                }
+                            }
+
+                            if showDetailsBody, let expanded {
+                                CredentialDetailsView(
+                                    details: expanded,
+                                    onCardTap: { closeDetails() },
+                                    showCard: false
+                                )
+                                .transition(.opacity)
+                            }
                         }
                     }
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom)
                 }
-                .padding()
+
+                if selectedDetailsID != nil {
+                    Button {
+                        closeDetails()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+                    .padding(12)
+                    .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+                }
             }
             .navigationTitle(branding.appTitle)
             .accessibilityIdentifier(WalletAccessibilityID.appTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(selectedDetailsID != nil)
             .walletSettingsToolbar(viewModel: viewModel)
-            .background(detailsNavigationLink)
-            .accessibilityIdentifier(WalletAccessibilityID.credentialsTabContent)
+            .accessibilityIdentifier(selectedDetailsID == nil
+                ? WalletAccessibilityID.credentialsTabContent
+                : WalletAccessibilityID.credentialDetailsScreen)
         }
         .navigationViewStyle(.stack)
     }
 
-    private var detailsNavigationLink: some View {
-        NavigationLink(
-            destination: detailsDestination,
-            isActive: Binding(
-                get: { selectedDetailsID != nil },
-                set: { isActive in
-                    if !isActive {
-                        selectedDetailsID = nil
-                    }
-                }
-            )
-        ) {
-            EmptyView()
+    private func openDetails(_ id: String) {
+        selectedDetailsID = id
+        showDetailsBody = false
+        selectedAtTop = false
+        withAnimation(.easeOut(duration: 0.22)) {
+            othersHidden = true
         }
-        .hidden()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            guard selectedDetailsID == id else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                selectedAtTop = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
+                guard selectedDetailsID == id else { return }
+                withAnimation(.easeIn(duration: 0.2)) {
+                    showDetailsBody = true
+                }
+            }
+        }
     }
 
-    private var detailsDestination: some View {
-        Group {
-            if let detailsID = selectedDetailsID {
-                CredentialDetailsDestination(
-                    detailsID: detailsID,
-                    details: details,
-                    viewModel: viewModel,
-                    selectedDetailsID: $selectedDetailsID
-                )
-            } else {
-                EmptyView()
+    private func closeDetails(resetSelection: Bool = true) {
+        withAnimation(.easeOut(duration: 0.15)) {
+            showDetailsBody = false
+        }
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.9)) {
+            selectedAtTop = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+            withAnimation(.easeIn(duration: 0.22)) {
+                othersHidden = false
+            }
+            if resetSelection {
+                selectedDetailsID = nil
             }
         }
     }
