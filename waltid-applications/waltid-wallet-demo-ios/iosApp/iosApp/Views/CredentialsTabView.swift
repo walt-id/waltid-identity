@@ -36,20 +36,6 @@ struct CredentialsTabView: View {
                         if let warning = viewModel.transactionDataProfilesWarning {
                             WarningBannerView(message: warning)
                         }
-                    } else {
-                        HStack {
-                            Spacer()
-                            Button {
-                                closeDetails()
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.primary)
-                                    .frame(width: 40, height: 40)
-                                    .background(.ultraThinMaterial, in: Circle())
-                            }
-                            .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
-                        }
                     }
 
                     if details.isEmpty {
@@ -69,28 +55,11 @@ struct CredentialsTabView: View {
                         }
 
                         if showDetailsBody, let expanded {
-                            VStack(alignment: .leading, spacing: 16) {
-                                CredentialDetailsView(
-                                    details: expanded,
-                                    onCardTap: { closeDetails() },
-                                    showCard: false
-                                )
-                                HStack(spacing: 12) {
-                                    Button("Copy") {
-                                        UIPasteboard.general.string = expandedRawCredential
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .frame(maxWidth: .infinity)
-                                    .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
-                                    Button("Delete", role: .destructive) {
-                                        confirmDelete = true
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .tint(.red)
-                                    .frame(maxWidth: .infinity)
-                                    .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
-                                }
-                            }
+                            CredentialDetailsView(
+                                details: expanded,
+                                onCardTap: { closeDetails() },
+                                showCard: false
+                            )
                             .transition(.opacity)
                         }
                     }
@@ -101,11 +70,48 @@ struct CredentialsTabView: View {
                 .animation(.easeOut(duration: 0.16), value: showDetailsBody)
             }
             .animation(.easeOut(duration: 0.2), value: selectedDetailsID)
-            .navigationTitle(branding.appTitle)
+            .navigationTitle(selectedDetailsID == nil ? branding.appTitle : "")
             .accessibilityIdentifier(WalletAccessibilityID.appTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .navigationBarHidden(selectedDetailsID != nil)
-            .walletSettingsToolbar(viewModel: viewModel)
+            .navigationBarBackButtonHidden(selectedDetailsID != nil)
+            .toolbar {
+                if selectedDetailsID != nil {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            closeDetails()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Menu {
+                            Button("Copy") {
+                                UIPasteboard.general.string = expandedRawCredential
+                            }
+                            .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
+                            Button("Delete", role: .destructive) {
+                                confirmDelete = true
+                            }
+                            .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
+                    }
+                } else {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        NavigationLink {
+                            SettingsView(viewModel: viewModel)
+                        } label: {
+                            Image(systemName: "gearshape")
+                        }
+                        .accessibilityIdentifier(WalletAccessibilityID.settingsButton)
+                    }
+                }
+            }
             .accessibilityIdentifier(selectedDetailsID == nil
                 ? WalletAccessibilityID.credentialsTabContent
                 : WalletAccessibilityID.credentialDetailsScreen)

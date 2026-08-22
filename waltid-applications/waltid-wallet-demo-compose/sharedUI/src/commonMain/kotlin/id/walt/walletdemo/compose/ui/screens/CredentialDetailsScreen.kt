@@ -1,10 +1,9 @@
 package id.walt.walletdemo.compose.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
@@ -23,9 +23,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
-import id.walt.walletdemo.compose.ui.components.CredentialDetailsActionButtons
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsCloseButton
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import id.walt.walletdemo.compose.ui.components.CredentialDetailsOverflowMenu
 
 @Composable
 internal fun CredentialDetailsScreen(
@@ -38,31 +38,39 @@ internal fun CredentialDetailsScreen(
     val rawCredential = details.summary.credentialDataJson?.takeIf { it.isNotBlank() }
         ?: "No raw credential available"
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp)
             .testTag(WalletUiTestTags.CredentialDetailsScreen),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            CredentialDetailsCloseButton(onClose = onBack)
+            CredentialDetailsContent(
+                details = details,
+                onCardClick = onBack,
+            )
         }
-        CredentialDetailsContent(
-            details = details,
-            onCardClick = onBack,
+        CredentialDetailsCloseButton(
+            onClose = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         )
-        CredentialDetailsActionButtons(
+        CredentialDetailsOverflowMenu(
             onCopy = { clipboard.setText(AnnotatedString(rawCredential)) },
             onDelete = if (onDelete != null) {
                 { confirmDelete = true }
             } else {
                 null
             },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         )
     }
 

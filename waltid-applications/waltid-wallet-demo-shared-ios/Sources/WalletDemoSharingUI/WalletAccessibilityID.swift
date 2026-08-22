@@ -38,6 +38,7 @@ public enum WalletAccessibilityID {
     public static let credentialsEmpty = identifier("credentials", "empty")
     public static let credentialDetailsScreen = identifier("credentialDetailsScreen")
     public static let detailsBack = identifier("detailsBack")
+    public static let detailsMenu = identifier("detailsMenu")
     public static let credentialsTabContent = identifier("credentialsTabContent")
     public static let offerInput = identifier("offerInput")
     public static let offerScanButton = identifier("offerScanButton")

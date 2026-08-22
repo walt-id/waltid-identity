@@ -11,45 +11,42 @@ struct CredentialDetailsScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    Spacer()
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 40, height: 40)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+            CredentialDetailsView(details: details, onCardTap: { dismiss() })
+                .padding()
+        }
+        .accessibilityIdentifier(WalletAccessibilityID.credentialDetailsScreen)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
                 }
-                CredentialDetailsView(details: details, onCardTap: { dismiss() })
-                HStack(spacing: 12) {
+                .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
                     Button("Copy") {
                         UIPasteboard.general.string = rawCredentialJSON?.nilIfEmpty ?? "No raw credential available"
                     }
-                    .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
                     .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
                     if onDelete != nil {
                         Button("Delete", role: .destructive) {
                             confirmDelete = true
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                        .frame(maxWidth: .infinity)
                         .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
                     }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
                 }
+                .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
             }
-            .padding()
         }
-        .accessibilityIdentifier(WalletAccessibilityID.credentialDetailsScreen)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .navigationBarHidden(true)
         .confirmationDialog(
             "Delete credential?",
             isPresented: $confirmDelete,

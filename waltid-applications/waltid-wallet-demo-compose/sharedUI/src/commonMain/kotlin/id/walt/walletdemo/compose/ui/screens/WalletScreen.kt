@@ -22,6 +22,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
     val credentials = ready?.credentials.orEmpty()
     val uriHandler = LocalUriHandler.current
     var showingSettings by remember { mutableStateOf(false) }
+    var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
 
     LaunchedEffect(state.authorizationRequestUrl) {
         state.authorizationRequestUrl?.let { authorizationUrl ->
@@ -46,12 +47,17 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
 
     Scaffold(
         topBar = {
-            WalletHeader(
-                state = state,
-                onSettings = { showingSettings = true },
-                onDismissStatus = controller::dismissStatus,
-                onToggleStatusExpanded = controller::toggleStatusExpanded,
-            )
+            val chrome = detailsChrome
+            if (chrome != null) {
+                CredentialDetailsTopBar(chrome)
+            } else {
+                WalletHeader(
+                    state = state,
+                    onSettings = { showingSettings = true },
+                    onDismissStatus = controller::dismissStatus,
+                    onToggleStatusExpanded = controller::toggleStatusExpanded,
+                )
+            }
         },
         bottomBar = {
             WalletBottomBar(
@@ -68,6 +74,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             WalletDemoTab.Credentials -> CredentialsTab(
                 credentials = credentials,
                 onDeleteCredential = controller::deleteCredential,
+                onDetailsChromeChange = { detailsChrome = it },
                 modifier = modifier,
             )
             WalletDemoTab.Receive -> {

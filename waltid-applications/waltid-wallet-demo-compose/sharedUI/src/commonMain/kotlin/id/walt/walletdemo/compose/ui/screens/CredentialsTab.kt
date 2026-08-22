@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,8 +36,6 @@ import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
-import id.walt.walletdemo.compose.ui.components.CredentialDetailsActionButtons
-import id.walt.walletdemo.compose.ui.components.CredentialDetailsCloseButton
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 
 @Composable
@@ -45,6 +43,7 @@ internal fun CredentialsTab(
     credentials: List<WalletDemoCredential>,
     modifier: Modifier = Modifier,
     onDeleteCredential: ((String) -> Unit)? = null,
+    onDetailsChromeChange: (CredentialDetailsChrome?) -> Unit = {},
 ) {
     val details = remember(credentials) { credentials.map { it.toCredentialDetails() } }
     var expandedId by remember { mutableStateOf<String?>(null) }
@@ -87,6 +86,27 @@ internal fun CredentialsTab(
         closing = false
     }
 
+    LaunchedEffect(showingDetails, rawCredential, onDeleteCredential) {
+        onDetailsChromeChange(
+            if (showingDetails) {
+                CredentialDetailsChrome(
+                    onClose = ::requestClose,
+                    onCopy = { clipboard.setText(AnnotatedString(rawCredential)) },
+                    onDelete = if (onDeleteCredential != null) {
+                        { confirmDelete = true }
+                    } else {
+                        null
+                    },
+                )
+            } else {
+                null
+            },
+        )
+    }
+    DisposableEffect(Unit) {
+        onDispose { onDetailsChromeChange(null) }
+    }
+
     SystemBackHandler(enabled = showingDetails) {
         requestClose()
     }
@@ -110,14 +130,6 @@ internal fun CredentialsTab(
             if (credentials.isEmpty()) {
                 EmptyCredentialsState()
             } else {
-                if (showingDetails) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        CredentialDetailsCloseButton(onClose = ::requestClose)
-                    }
-                }
                 CredentialCardStack(
                     details = details,
                     expandedId = expandedId,
@@ -129,21 +141,11 @@ internal fun CredentialsTab(
                     exit = fadeOut(tween(180)),
                 ) {
                     expanded?.let { selected ->
-                        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                            CredentialDetailsContent(
-                                details = selected,
-                                showCard = false,
-                                onCardClick = { requestClose() },
-                            )
-                            CredentialDetailsActionButtons(
-                                onCopy = { clipboard.setText(AnnotatedString(rawCredential)) },
-                                onDelete = if (onDeleteCredential != null) {
-                                    { confirmDelete = true }
-                                } else {
-                                    null
-                                },
-                            )
-                        }
+                        CredentialDetailsContent(
+                            details = selected,
+                            showCard = false,
+                            onCardClick = { requestClose() },
+                        )
                     }
                 }
             }
