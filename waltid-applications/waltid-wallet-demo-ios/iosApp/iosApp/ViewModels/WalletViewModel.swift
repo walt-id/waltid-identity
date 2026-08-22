@@ -147,7 +147,7 @@ class WalletViewModel: ObservableObject {
     }
 
     var receiveUrlEntryEnabled: Bool {
-        !isLoading && offerPreview == nil && !receiveCompleted
+        !isLoading && offerPreview == nil
     }
 
     var receiveActionEnabled: Bool {
@@ -157,7 +157,7 @@ class WalletViewModel: ObservableObject {
     }
 
     var offerReviewEnabled: Bool {
-        !isLoading && offerPreview != nil && !receiveCompleted
+        !isLoading && offerPreview != nil
     }
 
     var acceptOfferEnabled: Bool {
@@ -181,7 +181,7 @@ class WalletViewModel: ObservableObject {
     }
 
     var presentationUrlEntryEnabled: Bool {
-        !isLoading && presentationReview == nil && !presentationCompleted
+        !isLoading && presentationReview == nil
     }
 
     var presentationPreviewActionEnabled: Bool {
@@ -191,7 +191,7 @@ class WalletViewModel: ObservableObject {
     }
 
     var presentationReviewEnabled: Bool {
-        !isLoading && presentationReview != nil && !presentationCompleted
+        !isLoading && presentationReview != nil
     }
 
     /// The review the shared SwiftUI surface renders for a ready OpenID4VP preview.
@@ -587,7 +587,7 @@ class WalletViewModel: ObservableObject {
 
     func previewOffer() {
         resetInputFocus()
-        guard !isLoading, offerPreview == nil, !receiveCompleted else { return }
+        guard !isLoading, offerPreview == nil else { return }
         let trimmedOfferUrl = offerUrl.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let offer = URL(string: trimmedOfferUrl) else {
             setError(WalletStatusText.failure(WalletStatusText.receiveFailed, WalletStatusText.invalidOfferURL), tab: .receive)
@@ -678,7 +678,9 @@ class WalletViewModel: ObservableObject {
         issuanceSession = nil
         offerPreview = nil
         authorizationRequestURL = nil
+        offerUrl = ""
         txCode = ""
+        receiveCompleted = false
         receiveNavigationResetKey += 1
         setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
         if let sessionID {
@@ -739,13 +741,17 @@ class WalletViewModel: ObservableObject {
                 if !result.contains(where: { $0.id == credential.id }) { result.append(credential) }
             }
             lastReceivedCredentialIDs = storedIDs
-            receiveCompleted = !storedIDs.isEmpty
+            receiveCompleted = false
             setSuccess("Credential issuance deferred", tab: .receive)
             return
         case .cancelled:
             issuanceSession = nil
             offerPreview = nil
             authorizationRequestURL = nil
+            offerUrl = ""
+            txCode = ""
+            receiveCompleted = false
+            receiveNavigationResetKey += 1
             setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
             return
         case let .failed(_, error, _):
@@ -891,7 +897,7 @@ class WalletViewModel: ObservableObject {
 
     func previewPresentation() {
         resetInputFocus()
-        guard !isLoading, presentationReview == nil, !presentationCompleted else { return }
+        guard !isLoading, presentationReview == nil else { return }
         let trimmedRequestUrl = presentationRequestUrl.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let request = URL(string: trimmedRequestUrl) else {
             setError(WalletStatusText.failure(WalletStatusText.previewFailed, WalletStatusText.invalidRequestURL), tab: .present)
@@ -983,9 +989,7 @@ class WalletViewModel: ObservableObject {
                     did: selectedDid
                 )
                 try Task.checkCancellation()
-                presentationReview = nil
-                selectedPresentationCredentialOptions = []
-                selectedPresentationDisclosureOptions = []
+                resetPresentationToEntry()
                 handlePresentationResult(
                     result,
                     successMessage: WalletStatusText.presentationSent,
@@ -995,10 +999,7 @@ class WalletViewModel: ObservableObject {
                 return
             } catch {
                 guard !Task.isCancelled else { return }
-                presentationReview = nil
-                selectedPresentationCredentialOptions = []
-                selectedPresentationDisclosureOptions = []
-                presentationCompleted = false
+                resetPresentationToEntry()
                 setError(WalletStatusText.failure(WalletStatusText.presentFailed, error), tab: .present)
             }
         }
@@ -1033,36 +1034,34 @@ class WalletViewModel: ObservableObject {
                 return
             } catch {
                 guard !Task.isCancelled else { return }
-                finishRejection()
-                presentationCompleted = false
+                resetPresentationToEntry()
                 setError(WalletStatusText.failure(WalletStatusText.rejectFailed, error), tab: .present)
             }
         }
     }
 
     private func finishRejection() {
-        presentationReview = nil
-        selectedPresentationCredentialOptions = []
-        selectedPresentationDisclosureOptions = []
-        presentationNavigationResetKey += 1
+        resetPresentationToEntry()
     }
 
     private func finishSuccessfulPresentation() {
+        resetPresentationToEntry()
+    }
+
+    private func resetPresentationToEntry() {
         presentationReview = nil
+        presentationRequestUrl = ""
         selectedPresentationCredentialOptions = []
         selectedPresentationDisclosureOptions = []
-        presentationCompleted = true
+        presentationCompleted = false
+        presentationNavigationResetKey += 1
     }
 
     func cancelPresentationReview() {
         resetInputFocus()
         guard !isLoading, let previewHandle = presentationReview?.previewHandle else { return }
         presentationTask?.cancel()
-        presentationReview = nil
-        selectedPresentationCredentialOptions = []
-        selectedPresentationDisclosureOptions = []
-        presentationCompleted = false
-        presentationNavigationResetKey += 1
+        resetPresentationToEntry()
         setSuccess(WalletStatusText.presentationReviewCancelled, tab: .present)
         Task { try? await walletClient.discardPresentationPreview(previewHandle) }
     }
@@ -1077,7 +1076,7 @@ class WalletViewModel: ObservableObject {
     func failPresentationContinuation(_ reason: String) {
         guard pendingPresentationSuccessMessage != nil else { return }
         clearPendingPresentationContinuation()
-        presentationCompleted = false
+        resetPresentationToEntry()
         setError(
             WalletStatusText.failure(WalletStatusText.presentationContinuationFailed, reason),
             tab: .present
@@ -1121,7 +1120,6 @@ class WalletViewModel: ObservableObject {
     }
 
     private func cancelIssuanceIfPresent() {
-        guard !receiveCompleted else { return }
         guard let sessionID = issuanceSession?.id else { return }
         issuanceSession = nil
         authorizationRequestURL = nil
@@ -1129,7 +1127,6 @@ class WalletViewModel: ObservableObject {
     }
 
     private func discardPresentationPreviewIfPresent() {
-        guard !presentationCompleted else { return }
         guard let previewHandle = presentationReview?.previewHandle else { return }
         Task { try? await walletClient.discardPresentationPreview(previewHandle) }
     }

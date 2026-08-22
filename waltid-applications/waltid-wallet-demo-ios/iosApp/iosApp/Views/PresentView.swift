@@ -78,12 +78,6 @@ struct PresentView: View {
                     WarningBannerView(message: warning)
                 }
 
-                if viewModel.presentationCompleted {
-                    Button("New presentation", action: viewModel.startNewPresentationFlow)
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier(WalletAccessibilityID.presentationNewButton)
-                }
-
                 if let error = viewModel.presentationError {
                     PresentationErrorView(
                         error: error,
@@ -111,7 +105,7 @@ struct PresentView: View {
                     selection: viewModel.presentationSharingSelection,
                     selectionComplete: viewModel.presentationCredentialSelectionComplete,
                     isLoading: !viewModel.presentationReviewEnabled,
-                    isReadOnly: viewModel.presentationCompleted,
+                    isReadOnly: false,
                     onToggleCredential: viewModel.togglePresentationCredential,
                     onToggleDisclosure: viewModel.togglePresentationDisclosure,
                     onSubmit: viewModel.submitPresentation,
@@ -124,18 +118,16 @@ struct PresentView: View {
             .padding()
         }
         .safeAreaInset(edge: .bottom) {
-            if !viewModel.presentationCompleted {
-                ReviewActions(
-                    selectionComplete: viewModel.presentationCredentialSelectionComplete,
-                    isLoading: !viewModel.presentationReviewEnabled,
-                    onSubmit: viewModel.submitPresentation,
-                    onReject: viewModel.rejectPresentation,
-                    onCancel: viewModel.cancelPresentationReview
-                )
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.bar)
-            }
+            ReviewActions(
+                selectionComplete: viewModel.presentationCredentialSelectionComplete,
+                isLoading: !viewModel.presentationReviewEnabled,
+                onSubmit: viewModel.submitPresentation,
+                onReject: viewModel.rejectPresentation,
+                onCancel: viewModel.cancelPresentationReview
+            )
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.bar)
         }
     }
 }

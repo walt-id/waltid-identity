@@ -84,7 +84,6 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                     requestDrafts = state.requestDrafts,
                     onPresentationRequestUrlChange = controller::updatePresentationRequestUrl,
                     onPreview = controller::previewPresentation,
-                    onStartNew = controller::startNewPresentationFlow,
                     onToggleCredential = controller::togglePresentationCredential,
                     onToggleDisclosure = controller::togglePresentationDisclosure,
                     onSubmit = controller::submitPresentation,

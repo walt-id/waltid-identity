@@ -766,7 +766,9 @@ class WalletDemoControllerTest {
             controller.state.value.operation,
         )
 
-        controller.startNewPresentationFlow()
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
+
         controller.updatePresentationRequestUrl("openid4vp://example")
         controller.previewPresentation()
         runCurrent()
@@ -778,10 +780,13 @@ class WalletDemoControllerTest {
             controller.state.value.operation,
         )
         assertEquals(null, controller.state.value.presentationPreview)
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
         assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
         assertEquals(emptySet(), controller.state.value.selectedPresentationDisclosureOptions)
         assertEquals(listOf(presentationPreviewHandle), wallet.discardedPresentationPreviewHandles)
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
 
+        controller.updatePresentationRequestUrl("openid4vp://example")
         controller.previewPresentation()
         runCurrent()
         controller.rejectPresentation()
@@ -1355,7 +1360,9 @@ class WalletDemoControllerTest {
         runCurrent()
         controller.submitPresentation()
         runCurrent()
-        assertTrue(controller.state.value.presentationCompleted)
+        assertFalse(controller.state.value.presentationCompleted)
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
 
         val presentationResetKeyBeforeOfferLink = controller.state.value.presentationNavigationResetKey
         controller.handleDeepLink(offerUrl)
@@ -1476,7 +1483,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun presentationCompletionCanStartNewFlow() = runTest {
+    fun presentationCompletionReturnsToDefaultEntry() = runTest {
         val preview = WalletDemoPresentationPreview(
             previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
@@ -1513,26 +1520,18 @@ class WalletDemoControllerTest {
         controller.submitPresentation()
         runCurrent()
 
-        assertTrue(controller.state.value.presentationCompleted)
+        assertFalse(controller.state.value.presentationCompleted)
         assertEquals(null, controller.state.value.presentationPreview)
         assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
-        assertFalse(controller.state.value.presentationUrlEntryEnabled)
-        assertFalse(controller.state.value.presentationPreviewActionEnabled)
-        assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
-
-        val resetKeyBeforeNewFlow = controller.state.value.presentationNavigationResetKey
-        controller.startNewPresentationFlow()
-
         assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
-        assertEquals(null, controller.state.value.presentationPreview)
-        assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
-        assertEquals(emptySet(), controller.state.value.selectedPresentationDisclosureOptions)
-        assertTrue(!controller.state.value.presentationCompleted)
         assertTrue(controller.state.value.presentationUrlEntryEnabled)
         assertFalse(controller.state.value.presentationPreviewActionEnabled)
-        assertEquals(resetKeyBeforeNewFlow + 1, controller.state.value.presentationNavigationResetKey)
-        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
-        assertEquals("Wallet ready", controller.state.value.statusText)
+        assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
+        assertEquals(
+            WalletOperationState.Succeeded("Presentation sent", WalletDemoTab.Present),
+            controller.state.value.operation,
+        )
+        assertEquals("Presentation sent", controller.state.value.statusText)
     }
 
     @Test
@@ -1563,7 +1562,9 @@ class WalletDemoControllerTest {
         controller.completePresentationContinuation()
 
         assertEquals(null, controller.state.value.pendingPresentationContinuation)
-        assertTrue(controller.state.value.presentationCompleted)
+        assertFalse(controller.state.value.presentationCompleted)
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
         assertEquals(
             WalletOperationState.Succeeded(WalletDisplayText.PresentationRejected, WalletDemoTab.Present),
             controller.state.value.operation,

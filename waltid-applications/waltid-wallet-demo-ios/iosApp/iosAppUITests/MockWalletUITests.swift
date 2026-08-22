@@ -129,7 +129,12 @@ final class MockWalletUITests: XCTestCase {
             ui.waitForStatus(prefixes: ["Credential offer declined", "Receive failed"], timeout: 10),
             "Credential offer declined"
         )
-        XCTAssertTrue(app.buttons["wallet.receiveButton"].waitForExistence(timeout: 10))
+        let declinedOfferInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
+        XCTAssertTrue(declinedOfferInput.waitForExistence(timeout: 10))
+        XCTAssertTrue(declinedOfferInput.isEnabled)
+        XCTAssertTrue(["", "Credential offer URL"].contains(declinedOfferInput.value as? String))
+        XCTAssertFalse(app.buttons["wallet.receiveButton"].isEnabled)
+        XCTAssertFalse(app.buttons["wallet.receiveNewButton"].exists)
     }
 
     func testPresentationDeclineSendsProtocolRejection() {
@@ -169,7 +174,12 @@ final class MockWalletUITests: XCTestCase {
             "Presentation rejected"
         )
         XCTAssertFalse(app.buttons["wallet.presentationRejectButton"].exists)
-        XCTAssertTrue(app.buttons["wallet.presentationNewButton"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["wallet.presentationNewButton"].exists)
+        let rejectedPresentationInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
+        XCTAssertTrue(rejectedPresentationInput.waitForExistence(timeout: 10))
+        XCTAssertTrue(rejectedPresentationInput.isEnabled)
+        XCTAssertTrue(["", "OpenID4VP request URL"].contains(rejectedPresentationInput.value as? String))
+        XCTAssertFalse(app.buttons["wallet.presentButton"].isEnabled)
     }
 
     func testOfferClaimsUseSemanticGroupsAndInclusionLabels() {
@@ -612,10 +622,10 @@ final class MockWalletUITests: XCTestCase {
         )
         XCTAssertFalse(app.buttons["wallet.presentationSubmitButton"].exists)
         XCTAssertFalse(app.buttons["wallet.presentationRejectButton"].exists)
-        XCTAssertTrue(app.buttons["wallet.presentationNewButton"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["wallet.presentationNewButton"].exists)
         XCTAssertFalse(app.staticTexts["Example Verifier"].exists)
-        ui.tapButton(identifier: "wallet.presentationNewButton", fallbackLabel: "New presentation")
         let resetPresentationInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
+        XCTAssertTrue(resetPresentationInput.waitForExistence(timeout: 10))
         XCTAssertTrue(resetPresentationInput.isEnabled)
         XCTAssertTrue(["", "OpenID4VP request URL"].contains(resetPresentationInput.value as? String))
         XCTAssertFalse(app.buttons["wallet.presentButton"].isEnabled)

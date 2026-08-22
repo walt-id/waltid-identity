@@ -49,12 +49,13 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertTrue(viewModel.presentationReviewEnabled)
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Review presentation error")
 
-        viewModel.startNewPresentationFlow()
+        viewModel.cancelPresentationReview()
         try await waitUntilAsync {
             await walletClient.discardedPresentationPreviewHandles == [previewHandle]
         }
 
         XCTAssertNil(viewModel.presentationError)
+        XCTAssertEqual(viewModel.presentationRequestUrl, "")
         XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
         let rejectedAfterDismiss = await walletClient.rejectedPresentationPreviewHandles
         XCTAssertEqual(rejectedAfterDismiss, [])
@@ -63,12 +64,14 @@ final class WalletViewModelPresentationTests: XCTestCase {
         viewModel.previewPresentation()
         try await waitUntil { viewModel.presentationError == previewError }
         viewModel.rejectPresentation()
-        try await waitUntil { viewModel.presentationCompleted }
+        try await waitUntil { viewModel.presentationError == nil && viewModel.presentationRequestUrl.isEmpty && !viewModel.isLoading }
 
         XCTAssertNil(viewModel.presentationError)
         let rejectedAfterNotify = await walletClient.rejectedPresentationPreviewHandles
         XCTAssertEqual(rejectedAfterNotify, [previewHandle])
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Verifier notified")
+        XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
+        XCTAssertFalse(viewModel.presentationCompleted)
     }
 
     @MainActor
@@ -103,7 +106,9 @@ final class WalletViewModelPresentationTests: XCTestCase {
         viewModel.completePresentationContinuation()
 
         XCTAssertNil(viewModel.pendingPresentationContinuationURL)
-        XCTAssertTrue(viewModel.presentationCompleted)
+        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertEqual(viewModel.presentationRequestUrl, "")
+        XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Presentation rejected")
     }
 
