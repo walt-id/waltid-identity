@@ -590,9 +590,11 @@ final class MockWalletUITests: XCTestCase {
         assertPresentationActionsFollowReviewContent(app: app)
 
         ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
+        XCTAssertTrue(app.otherElements["wallet.presentationClaimsDialog"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Mobile driving licence"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
+        ui.tapButton(identifier: "wallet.presentationClaimsClose", fallbackLabel: "Close")
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
         XCTAssertEqual(
@@ -773,6 +775,7 @@ final class MockWalletUITests: XCTestCase {
         ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
         XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
+        ui.tapButton(identifier: "wallet.presentationClaimsClose", fallbackLabel: "Close")
 
         ui.tapTab(label: "Credentials")
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")

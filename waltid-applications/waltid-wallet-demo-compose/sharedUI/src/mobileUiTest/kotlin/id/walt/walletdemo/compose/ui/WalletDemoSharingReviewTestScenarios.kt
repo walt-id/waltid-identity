@@ -306,6 +306,7 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(firstOptionalDisclosure.id))
             .performScrollTo()
             .assertIsOn()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(second.selection.id))
             .performScrollTo()
@@ -345,19 +346,23 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithText("Required by request").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOff()
         onNodeWithText("Optional disclosure").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
 
         // A required disclosure is not carried as a selection, so an empty disclosure set is what
         // "the user approved nothing optional" looks like.
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(emptySet<WalletDemoPresentationDisclosureSelection>(), submitted?.disclosures)
 
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(optional), submitted?.disclosures)
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id))
             .performScrollTo()
             .performClick()
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id))
             .performScrollTo()
             .assertIsNotEnabled()

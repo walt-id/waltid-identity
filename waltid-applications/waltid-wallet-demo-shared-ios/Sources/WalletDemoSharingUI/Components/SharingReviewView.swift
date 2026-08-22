@@ -110,7 +110,7 @@ public struct SharingReviewView: View {
     }
 }
 
-/// One offered credential: what it is, and what would be disclosed from it.
+/// One offered credential: a selectable card that opens claim details.
 struct CredentialReviewCard: View {
     let option: PresentationCredentialOption
     let selection: SharingSelection
@@ -118,76 +118,133 @@ struct CredentialReviewCard: View {
     let isReadOnly: Bool
     let onToggleCredential: (PresentationCredentialSelection) -> Void
     let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    @State private var claimsExpanded = false
+    @State private var claimsOpen = false
 
     var body: some View {
         let details = CredentialDisplayNormalizer.details(for: option)
         let requestedDisclosureItems = details.groups
             .first { $0.title == CredentialDisplayVocabulary.requestedDisclosuresTitle }?
             .items ?? []
+        let credentialSelected = selection.credentials.contains(option.selection)
 
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 8) {
-                if !isReadOnly {
-                    Toggle(isOn: Binding(get: {
-                        selection.credentials.contains(option.selection)
-                    }, set: { _ in
-                        onToggleCredential(option.selection)
-                    })) {
-                        EmptyView()
-                    }
-                    .labelsHidden()
-                    .disabled(isLoading)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentationCredentialToggle(option.selection.id))
+        HStack(alignment: .center, spacing: 12) {
+            if !isReadOnly {
+                Toggle(isOn: Binding(get: {
+                    credentialSelected
+                }, set: { _ in
+                    onToggleCredential(option.selection)
+                })) {
+                    EmptyView()
                 }
-
-                Button {
-                    guard !option.disclosures.isEmpty else { return }
-                    claimsExpanded.toggle()
-                } label: {
-                    HStack(alignment: .center, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(option.label ?? option.format)
-                                .font(.subheadline.weight(.medium))
-                            if let issuer = details.issuer, !issuer.isEmpty {
-                                Text(issuer)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text(option.format)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        if !option.disclosures.isEmpty {
-                            Image(systemName: claimsExpanded ? "chevron.up" : "chevron.down")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(option.disclosures.isEmpty)
-                .accessibilityLabel(claimsExpanded ? "Hide claims" : "Show claims")
-                .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsToggle(option.selection.id))
-            }
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
-
-            if claimsExpanded && !option.disclosures.isEmpty {
-                DisclosureList(
-                    option: option,
-                    credentialSelected: selection.credentials.contains(option.selection),
-                    selectedDisclosureOptions: selection.disclosures,
-                    requestedDisclosureItems: requestedDisclosureItems,
-                    isLoading: isLoading,
-                    isReadOnly: isReadOnly,
-                    onToggleDisclosure: onToggleDisclosure
-                )
+                .toggleStyle(SharingCheckboxToggleStyle())
+                .labelsHidden()
+                .disabled(isLoading)
+                .accessibilityIdentifier(WalletAccessibilityID.presentationCredentialToggle(option.selection.id))
             }
 
-            Divider()
+            CredentialCardButton(details: details, compact: true) {
+                claimsOpen = true
+            }
+            .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsToggle(option.selection.id))
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
+        .sheet(isPresented: $claimsOpen) {
+            SharingClaimsSheet(
+                option: option,
+                details: details,
+                credentialSelected: credentialSelected,
+                selectedDisclosureOptions: selection.disclosures,
+                requestedDisclosureItems: requestedDisclosureItems,
+                isLoading: isLoading,
+                isReadOnly: isReadOnly,
+                onToggleDisclosure: onToggleDisclosure,
+                onDismiss: { claimsOpen = false }
+            )
+        }
+    }
+}
+
+/// Scrollable claim review the user can leave without changing the Share decision.
+private struct SharingClaimsSheet: View {
+    let option: PresentationCredentialOption
+    let details: CredentialDetails
+    let credentialSelected: Bool
+    let selectedDisclosureOptions: Set<PresentationDisclosureSelection>
+    let requestedDisclosureItems: [ClaimItem]
+    let isLoading: Bool
+    let isReadOnly: Bool
+    let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
+                Text(option.label ?? option.format)
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button("Close", action: onDismiss)
+                    .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsClose)
+            }
+            .padding(.horizontal)
+            .padding(.top)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    SharingClaimsIssuerRow(details: details)
+                    if option.disclosures.isEmpty {
+                        Text("No additional claims to review")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        DisclosureList(
+                            option: option,
+                            credentialSelected: credentialSelected,
+                            selectedDisclosureOptions: selectedDisclosureOptions,
+                            requestedDisclosureItems: requestedDisclosureItems,
+                            isLoading: isLoading,
+                            isReadOnly: isReadOnly,
+                            onToggleDisclosure: onToggleDisclosure
+                        )
+                    }
+                }
+                .padding()
+            }
+        }
+        .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsDialog)
+    }
+}
+
+private struct SharingClaimsIssuerRow: View {
+    let details: CredentialDetails
+
+    var body: some View {
+        if let issuerDisplay = details.issuerDisplay {
+            let issuer = details.issuer?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            MetadataIdentityView(
+                display: issuerDisplay,
+                fallbackName: details.cardSummary.issuer,
+                supportingText: issuer.isEmpty || issuer == issuerDisplay.name ? nil : issuer
+            )
+        } else {
+            Text("Issuer: \(details.cardSummary.issuer)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct SharingCheckboxToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
+                .font(.title2)
+                .foregroundStyle(configuration.isOn ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(configuration.isOn ? [.isSelected] : [])
     }
 }
 
