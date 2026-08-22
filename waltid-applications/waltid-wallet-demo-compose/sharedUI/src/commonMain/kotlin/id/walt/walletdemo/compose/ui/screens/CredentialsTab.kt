@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,9 +19,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,7 +34,9 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
@@ -45,12 +50,17 @@ import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 internal fun CredentialsTab(
     credentials: List<WalletDemoCredential>,
     modifier: Modifier = Modifier,
+    onDeleteCredential: ((String) -> Unit)? = null,
 ) {
     val details = remember(credentials) { credentials.map { it.toCredentialDetails() } }
     var expandedId by remember { mutableStateOf<String?>(null) }
     var showDetailsBody by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
     val expanded = details.firstOrNull { it.summary.id == expandedId }
+    val rawCredential = expanded?.summary?.credentialDataJson?.takeIf { it.isNotBlank() }
+        ?: "No raw credential available"
 
     fun requestClose() {
         if (expandedId == null || closing) return
@@ -127,6 +137,32 @@ internal fun CredentialsTab(
         }
         AnimatedVisibility(
             visible = expanded != null,
+            modifier = Modifier.align(Alignment.TopStart),
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(180)),
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 8.dp, top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = { clipboard.setText(AnnotatedString(rawCredential)) },
+                    modifier = Modifier.testTag(WalletUiTestTags.CopyRawCredential),
+                ) {
+                    Text("Copy")
+                }
+                if (onDeleteCredential != null && expandedId != null) {
+                    TextButton(
+                        onClick = { confirmDelete = true },
+                        modifier = Modifier.testTag(WalletUiTestTags.DeleteCredential),
+                    ) {
+                        Text("Delete")
+                    }
+                }
+            }
+        }
+        AnimatedVisibility(
+            visible = expanded != null,
             modifier = Modifier.align(Alignment.TopEnd),
             enter = fadeIn(tween(200)),
             exit = fadeOut(tween(180)),
@@ -147,6 +183,34 @@ internal fun CredentialsTab(
                 )
             }
         }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete credential?") },
+            text = { Text("This removes the credential from the wallet. This cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val id = expandedId
+                        confirmDelete = false
+                        if (id != null) {
+                            onDeleteCredential?.invoke(id)
+                            requestClose()
+                        }
+                    },
+                    modifier = Modifier.testTag(WalletUiTestTags.DeleteCredentialConfirm),
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 

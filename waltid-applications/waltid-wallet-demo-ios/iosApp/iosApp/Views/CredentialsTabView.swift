@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WalletDemoSharingUI
 import WalletSDK
 
@@ -9,6 +10,7 @@ struct CredentialsTabView: View {
     @State private var selectedAtTop = false
     @State private var showDetailsBody = false
     @State private var motionGeneration = 0
+    @State private var confirmDelete = false
 
     private var details: [CredentialDetails] {
         viewModel.credentials.map(CredentialDisplayNormalizer.details(for:))
@@ -16,6 +18,11 @@ struct CredentialsTabView: View {
 
     private var expanded: CredentialDetails? {
         details.first { $0.id == selectedDetailsID }
+    }
+
+    private var expandedRawCredential: String {
+        viewModel.credentials.first(where: { $0.id == selectedDetailsID })?.credentialDataJSON
+            ?? "No raw credential available"
     }
 
     var body: some View {
@@ -64,17 +71,28 @@ struct CredentialsTabView: View {
                 }
 
                 if selectedDetailsID != nil {
-                    Button {
-                        closeDetails()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial, in: Circle())
+                    HStack {
+                        Button("Copy") {
+                            UIPasteboard.general.string = expandedRawCredential
+                        }
+                        .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
+                        Button("Delete", role: .destructive) {
+                            confirmDelete = true
+                        }
+                        .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
+                        Spacer()
+                        Button {
+                            closeDetails()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 36, height: 36)
+                                .background(.ultraThinMaterial, in: Circle())
+                        }
+                        .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
                     }
                     .padding(12)
-                    .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
                     .transition(.opacity)
                 }
             }
@@ -86,6 +104,21 @@ struct CredentialsTabView: View {
             .accessibilityIdentifier(selectedDetailsID == nil
                 ? WalletAccessibilityID.credentialsTabContent
                 : WalletAccessibilityID.credentialDetailsScreen)
+            .confirmationDialog(
+                "Delete credential?",
+                isPresented: $confirmDelete,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    if let id = selectedDetailsID {
+                        viewModel.deleteCredential(id: id)
+                        closeDetails()
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes the credential from the wallet. This cannot be undone.")
+            }
         }
         .navigationViewStyle(.stack)
     }
