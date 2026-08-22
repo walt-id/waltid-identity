@@ -28,74 +28,77 @@ struct CredentialsTabView: View {
 
     var body: some View {
         NavigationView {
-            ZStack(alignment: .topTrailing) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        if selectedDetailsID == nil {
-                            WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if selectedDetailsID == nil {
+                        WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
 
-                            if let warning = viewModel.transactionDataProfilesWarning {
-                                WarningBannerView(message: warning)
+                        if let warning = viewModel.transactionDataProfilesWarning {
+                            WarningBannerView(message: warning)
+                        }
+                    } else {
+                        HStack {
+                            Spacer()
+                            Button {
+                                closeDetails()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 40, height: 40)
+                                    .background(.ultraThinMaterial, in: Circle())
+                            }
+                            .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+                        }
+                    }
+
+                    if details.isEmpty {
+                        EmptyCredentialsView()
+                    } else {
+                        CredentialCardStackView(
+                            details: details,
+                            expandedID: selectedDetailsID,
+                            othersHidden: othersHidden,
+                            selectedAtTop: selectedAtTop
+                        ) { id in
+                            if selectedDetailsID == id {
+                                closeDetails()
+                            } else {
+                                openDetails(id)
                             }
                         }
 
-                        if details.isEmpty {
-                            EmptyCredentialsView()
-                        } else {
-                            CredentialCardStackView(
-                                details: details,
-                                expandedID: selectedDetailsID,
-                                othersHidden: othersHidden,
-                                selectedAtTop: selectedAtTop
-                            ) { id in
-                                if selectedDetailsID == id {
-                                    closeDetails()
-                                } else {
-                                    openDetails(id)
-                                }
-                            }
-
-                            if showDetailsBody, let expanded {
+                        if showDetailsBody, let expanded {
+                            VStack(alignment: .leading, spacing: 16) {
                                 CredentialDetailsView(
                                     details: expanded,
                                     onCardTap: { closeDetails() },
                                     showCard: false
                                 )
-                                .transition(.opacity)
+                                HStack(spacing: 12) {
+                                    Button("Copy") {
+                                        UIPasteboard.general.string = expandedRawCredential
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .frame(maxWidth: .infinity)
+                                    .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
+                                    Button("Delete", role: .destructive) {
+                                        confirmDelete = true
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(.red)
+                                    .frame(maxWidth: .infinity)
+                                    .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
+                                }
                             }
+                            .transition(.opacity)
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    .padding(.bottom)
-                    .animation(.easeOut(duration: 0.2), value: showDetailsBody)
                 }
-
-                if selectedDetailsID != nil {
-                    HStack {
-                        Button("Copy") {
-                            UIPasteboard.general.string = expandedRawCredential
-                        }
-                        .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
-                        Button("Delete", role: .destructive) {
-                            confirmDelete = true
-                        }
-                        .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
-                        Spacer()
-                        Button {
-                            closeDetails()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.primary)
-                                .frame(width: 36, height: 36)
-                                .background(.ultraThinMaterial, in: Circle())
-                        }
-                        .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
-                    }
-                    .padding(12)
-                    .transition(.opacity)
-                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom)
+                .animation(.easeOut(duration: 0.16), value: showDetailsBody)
             }
             .animation(.easeOut(duration: 0.2), value: selectedDetailsID)
             .navigationTitle(branding.appTitle)
@@ -113,8 +116,12 @@ struct CredentialsTabView: View {
             ) {
                 Button("Delete", role: .destructive) {
                     if let id = selectedDetailsID {
+                        motionGeneration += 1
+                        selectedDetailsID = nil
+                        showDetailsBody = false
+                        othersHidden = false
+                        selectedAtTop = false
                         viewModel.deleteCredential(id: id)
-                        closeDetails()
                     }
                 }
                 Button("Cancel", role: .cancel) {}
@@ -139,11 +146,8 @@ struct CredentialsTabView: View {
             withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
                 selectedAtTop = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
-                guard generation == motionGeneration, selectedDetailsID == id else { return }
-                withAnimation(.easeIn(duration: 0.2)) {
-                    showDetailsBody = true
-                }
+            withAnimation(.easeIn(duration: 0.16)) {
+                showDetailsBody = true
             }
         }
     }

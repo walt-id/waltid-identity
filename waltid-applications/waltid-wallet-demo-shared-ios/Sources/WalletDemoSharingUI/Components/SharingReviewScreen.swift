@@ -87,23 +87,24 @@ public struct SharingReviewScreen: View {
         .frame(maxWidth: .infinity)
         .background(Color(.systemBackground))
         .sheet(item: $openCredentialDetails) { details in
-            ZStack(alignment: .topTrailing) {
-                ScrollView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Spacer()
+                        Button {
+                            openCredentialDetails = nil
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 40, height: 40)
+                                .background(.ultraThinMaterial, in: Circle())
+                        }
+                        .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+                    }
                     CredentialDetailsView(details: details, onCardTap: { openCredentialDetails = nil })
-                        .padding()
-                        .padding(.top, 28)
                 }
-                Button {
-                    openCredentialDetails = nil
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 36, height: 36)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
-                .padding(12)
-                .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+                .padding()
             }
             .accessibilityIdentifier(WalletAccessibilityID.credentialDetailsScreen)
         }

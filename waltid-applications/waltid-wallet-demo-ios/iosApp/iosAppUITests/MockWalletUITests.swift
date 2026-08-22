@@ -206,17 +206,10 @@ final class MockWalletUITests: XCTestCase {
             "Review credential offer"
         )
 
+        ui.assertExists(identifierPrefix: "wallet.credentialCard.")
+        XCTAssertFalse(app.buttons["wallet.offerSupportedClaims"].exists)
+        XCTAssertFalse(app.staticTexts["mso_mdoc"].exists)
         XCTAssertFalse(app.staticTexts["18 or older"].exists)
-        ui.tapButton(identifier: "wallet.offerSupportedClaims", fallbackLabel: "Supported claims (5)")
-        XCTAssertTrue(app.staticTexts["Age attestations"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["18 or older"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["65 or older"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Always included"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["May be included"].waitForExistence(timeout: 10))
-        ui.assertExists(identifier: "wallet.offerSupportedClaims")
-        XCTAssertTrue(app.staticTexts["Travel document data"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Document security object (SOD)"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["DG1: Machine-readable zone"].waitForExistence(timeout: 10))
     }
 
     func testPresentTabAllowsPreviewAndDeclineWithoutCredentials() {

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -26,9 +25,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
-import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
-import id.walt.walletdemo.compose.logic.claimDisplayGroups
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -116,8 +113,6 @@ internal fun OfferReviewSection(
                             fallbackName = credential.vct ?: credential.doctype ?: id,
                         ),
                     )
-                    HorizontalDivider()
-                    OfferedCredentialContent(credential)
                 }
             }
             }
@@ -214,58 +209,6 @@ internal fun OfferReviewActions(
             modifier = Modifier.testTag(WalletUiTestTags.OfferDeclineButton),
         ) {
             Text("Decline")
-        }
-    }
-}
-
-@Composable
-private fun OfferedCredentialContent(credential: WalletDemoOfferedCredentialMetadata) {
-    val title = credential.display?.name
-        ?: credential.vct
-        ?: credential.doctype
-        ?: credential.configurationId
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        MetadataIdentityRow(
-            display = credential.display,
-            fallbackName = title,
-            supportingText = credential.display?.description,
-        )
-        val details = listOf(
-            MetadataDetailItem("Format", credential.format),
-            MetadataDetailItem("Type", credential.vct ?: credential.doctype),
-        ).filter { !it.value.isNullOrBlank() }
-        if (details.isNotEmpty()) {
-            MetadataRowDivider()
-            MetadataDetailList(details)
-        }
-        if (credential.claims.isNotEmpty()) {
-            MetadataRowDivider()
-            MetadataDisclosure(
-                title = "Supported claims (${credential.claims.size})",
-                initiallyExpanded = false,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferSupportedClaims),
-            ) {
-                credential.claimDisplayGroups().forEachIndexed { groupIndex, group ->
-                    if (groupIndex > 0) MetadataRowDivider()
-                    Text(
-                        text = group.title,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    group.claims.forEachIndexed { index, claim ->
-                        if (index > 0) MetadataRowDivider()
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(claim.label, style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                text = claim.inclusion,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }

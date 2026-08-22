@@ -12,7 +12,6 @@ struct OfferReviewView: View {
     let onAccept: () -> Void
     let onDecline: () -> Void
     var showActions: Bool = true
-    @State private var openOfferedID: String?
     @State private var issuerExpanded = false
 
     var body: some View {
@@ -51,12 +50,6 @@ struct OfferReviewView: View {
                 ) {
                     ForEach(preview.credentials, id: \.configurationID) { credential in
                         CredentialCardArtView(summary: credential.cardSummary)
-                            .onTapGesture { openOfferedID = credential.configurationID }
-                    }
-                    if let openOfferedID,
-                       let credential = preview.credentials.first(where: { $0.configurationID == openOfferedID }) {
-                        Divider()
-                        OfferedCredentialView(credential: credential)
                     }
                 }
             }
@@ -161,35 +154,5 @@ struct OfferReviewActions: View {
 private extension IssuanceCredentialPreview {
     var cardSummary: CredentialCardSummary {
         .offered(from: self)
-    }
-}
-
-private struct OfferedCredentialView: View {
-    let credential: IssuanceCredentialPreview
-
-    private var title: String {
-        credential.name ?? credential.configurationID
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            MetadataIdentityView(
-                display: MetadataDisplay(
-                    name: credential.name,
-                    locale: nil,
-                    logoURI: credential.logoURI?.absoluteString,
-                    logoAltText: credential.logoAltText
-                ),
-                fallbackName: title,
-                supportingText: credential.descriptionText
-            )
-            let details = [
-                MetadataDetailItem(label: "Format", value: credential.format),
-            ].filter(\.isVisible)
-            if !details.isEmpty {
-                Divider()
-                MetadataDetailList(items: details)
-            }
-        }
     }
 }
