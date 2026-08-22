@@ -9,6 +9,8 @@ public enum WalletAccessibilityID {
     public static let settingsDidCopy = identifier("settingsDidCopy")
     public static let settingsKeyId = identifier("settingsKeyId")
     public static let settingsKeyIdCopy = identifier("settingsKeyIdCopy")
+    public static let settingsCredentialSharing = identifier("settingsCredentialSharing")
+    public static let settingsShowDcApiPreview = identifier("settingsShowDcApiPreview")
     public static let settingsLock = identifier("settingsLock")
     public static let settingsReset = identifier("settingsReset")
     public static let settingsResetConfirm = identifier("settingsResetConfirm")

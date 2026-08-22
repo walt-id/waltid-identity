@@ -60,6 +60,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeRequirement
 import id.walt.walletdemo.compose.logic.WalletDemoVerifierMetadata
 import id.walt.walletdemo.compose.logic.WalletOperationState
 import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.isStatusVisible
 import id.walt.walletdemo.compose.logic.statusText
 import kotlinx.coroutines.CompletableDeferred
 import kotlin.test.assertEquals
@@ -108,7 +109,6 @@ class WalletDemoAppTestScenarios {
         unlockWithPin()
 
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
-        onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
         onNodeWithTag("wallet.tab.credentials").assertIsDisplayed()
         onNodeWithTag("wallet.tab.receive").assertIsDisplayed()
         onNodeWithTag("wallet.tab.present").assertIsDisplayed()
@@ -718,8 +718,11 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
         onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(samplePresentationCredentialOption.selection.id)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
         onNodeWithText("Requested disclosures").performScrollTo().assertIsDisplayed()
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
 
         onNodeWithTag("wallet.tab.credentials").performClick()
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
@@ -882,8 +885,22 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsDid).assertTextContains("did:key:test")
         onNodeWithTag(WalletUiTestTags.SettingsKeyId).assertTextContains("key-1")
-        onNodeWithTag(WalletUiTestTags.SettingsLock).assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.SettingsReset).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsCredentialSharing)
+            .performScrollTo()
+            .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertIsOn()
+        onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).assertIsOff()
+        assertEquals(false, controller.state.value.showDcApiPresentationPreview)
+        onNodeWithTag(WalletUiTestTags.SettingsLock)
+            .performScrollTo()
+            .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsReset)
+            .performScrollTo()
+            .assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.SettingsLock).performClick()
         onNodeWithText("Enter your PIN").assertIsDisplayed()
@@ -914,7 +931,11 @@ class WalletDemoAppTestScenarios {
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+        waitUntil(timeoutMillis = 5_000) {
+            controller.state.value.session is WalletSessionState.Ready &&
+                controller.state.value.statusText == "Wallet ready" &&
+                controller.state.value.isStatusVisible
+        }
         onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
         onNodeWithTag(WalletUiTestTags.StatusDismiss).performClick()
         onAllNodesWithTag("wallet.status").assertCountEquals(0)

@@ -22,6 +22,7 @@ data class WalletDemoUiState(
     val pendingPresentationContinuation: WalletDemoPendingPresentationContinuation? = null,
     val statusDismissedKey: String? = null,
     val statusExpanded: Boolean = false,
+    val showDcApiPresentationPreview: Boolean = true,
 ) {
     val presentationPreview: WalletDemoPresentationPreview?
         get() = (presentationReview as? WalletDemoPresentationPreviewResult.Ready)?.preview

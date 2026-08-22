@@ -244,12 +244,14 @@ class WalletDemoControllerTest {
     fun resetWalletDeletesDataClearsPinAndReturnsToSetup() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val pinStore = InMemoryDemoPinStore()
-        val controller = controllerWith(wallet, this, pinStore)
+        val sharingSettings = InMemoryDemoSharingSettingsStore()
+        val controller = controllerWith(wallet, this, pinStore, sharingSettings = sharingSettings)
         controller.updatePin("1234")
         controller.updatePinConfirmation("1234")
         controller.submitPin()
         runCurrent()
         assertTrue(pinStore.hasPin())
+        controller.setShowDcApiPresentationPreview(false)
 
         controller.resetWallet()
         runCurrent()
@@ -258,6 +260,22 @@ class WalletDemoControllerTest {
         assertFalse(pinStore.hasPin())
         assertTrue(controller.state.value.auth is WalletAuthState.Setup)
         assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
+        assertFalse(controller.state.value.showDcApiPresentationPreview)
+        assertFalse(sharingSettings.showDcApiPresentationPreview())
+    }
+
+    @Test
+    fun dcApiPresentationPreviewPreferencePersistsAcrossControllerRecreation() = runTest {
+        val sharingSettings = InMemoryDemoSharingSettingsStore()
+        val firstController = controllerWith(FakeDemoWallet(), this, sharingSettings = sharingSettings)
+        assertTrue(firstController.state.value.showDcApiPresentationPreview)
+
+        firstController.setShowDcApiPresentationPreview(false)
+        assertFalse(firstController.state.value.showDcApiPresentationPreview)
+        assertFalse(sharingSettings.showDcApiPresentationPreview())
+
+        val recreatedController = controllerWith(FakeDemoWallet(), this, sharingSettings = sharingSettings)
+        assertFalse(recreatedController.state.value.showDcApiPresentationPreview)
     }
 
     @Test
@@ -1613,11 +1631,13 @@ class WalletDemoControllerTest {
         scope: TestScope,
         pinStore: DemoPinStore = InMemoryDemoPinStore(),
         biometricAuthenticator: DemoBiometricAuthenticator = UnavailableDemoBiometricAuthenticator,
+        sharingSettings: DemoSharingSettingsStore = InMemoryDemoSharingSettingsStore(),
     ): WalletDemoController =
         WalletDemoController(
             wallet = wallet,
             pinStore = pinStore,
             biometricAuthenticator = biometricAuthenticator,
+            sharingSettings = sharingSettings,
             scope = scope.backgroundScope,
             dispatcher = StandardTestDispatcher(scope.testScheduler),
         )

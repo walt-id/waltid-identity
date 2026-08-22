@@ -25,6 +25,7 @@ class WalletDemoController(
     private val wallet: DemoWallet,
     private val pinStore: DemoPinStore,
     private val biometricAuthenticator: DemoBiometricAuthenticator = UnavailableDemoBiometricAuthenticator,
+    private val sharingSettings: DemoSharingSettingsStore = InMemoryDemoSharingSettingsStore(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
@@ -34,6 +35,7 @@ class WalletDemoController(
     private val _state = MutableStateFlow(
         WalletDemoUiState(
             auth = readInitialAuthState(),
+            showDcApiPresentationPreview = sharingSettings.showDcApiPresentationPreview(),
         ),
     )
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
@@ -97,6 +99,11 @@ class WalletDemoController(
     fun isBiometricUnlockAvailable(): Boolean = biometricAuthenticator.isAvailable()
 
     fun isBiometricUnlockEnabled(): Boolean = pinStore.isBiometricUnlockEnabled()
+
+    fun setShowDcApiPresentationPreview(enabled: Boolean) {
+        sharingSettings.setShowDcApiPresentationPreview(enabled)
+        _state.update { it.copy(showDcApiPresentationPreview = enabled) }
+    }
 
     fun unlockWithBiometrics(force: Boolean = false) {
         val auth = _state.value.auth as? WalletAuthState.Login ?: return
@@ -224,7 +231,10 @@ class WalletDemoController(
                 pinStore.clear()
             }.onSuccess {
                 statusHideJob?.cancel()
-                _state.value = WalletDemoUiState(auth = WalletAuthState.Setup())
+                _state.value = WalletDemoUiState(
+                    auth = WalletAuthState.Setup(),
+                    showDcApiPresentationPreview = sharingSettings.showDcApiPresentationPreview(),
+                )
             }.onFailure { error ->
                 setOperationError(WalletDisplayText.ResetWalletFailed, error, _state.value.selectedTab)
             }

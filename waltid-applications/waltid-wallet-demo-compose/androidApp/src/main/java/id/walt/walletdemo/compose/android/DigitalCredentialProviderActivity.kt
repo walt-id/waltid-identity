@@ -22,6 +22,8 @@ import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
+import id.walt.walletdemo.compose.logic.defaultCredentialSelection
 import id.walt.walletdemo.compose.logic.toSharingReview
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewSheet
 import kotlinx.coroutines.CoroutineScope
@@ -57,20 +59,24 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
                     interactionContextProvider = { this@DigitalCredentialProviderActivity },
                 ).wallet
                 wallet.bootstrap()
+                val showPreview = createAndroidDemoSharingSettingsStore(applicationContext)
+                    .showDcApiPresentationPreview()
                 if (input.request.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
                     val annexCRequest = wallet.annexCRequest(input.request)
                     val preview = wallet.previewAnnexCPresentation(annexCRequest)
-                    showReview(
+                    presentOrSubmit(
                         review = preview.toSharingReview(),
                         title = "Share mobile document?",
+                        showPreview = showPreview,
                     ) { selection ->
                         submitAnnexC(wallet, preview, annexCRequest, selection, input.providerRequest)
                     }
                 } else {
                     val preview = wallet.previewDigitalCredentialPresentation(input.request)
-                    showReview(
+                    presentOrSubmit(
                         review = preview.toSharingReview(),
                         title = "Share digital credential?",
+                        showPreview = showPreview,
                     ) { selection ->
                         submitDigitalCredential(wallet, preview, selection, input.providerRequest)
                     }
@@ -79,6 +85,26 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
                 reportFailure(it)
             }
         }
+    }
+
+    /**
+     * Shows the shared review, or submits the default selection when the Settings toggle is off.
+     *
+     * Cancel and back resolve to different Credential Manager outcomes: Cancel ends the caller's whole
+     * operation, while backing out of this provider's review returns [RESULT_CANCELED] so Credential
+     * Manager can put its selector back up and another provider can still answer.
+     */
+    private fun presentOrSubmit(
+        review: WalletDemoSharingReview,
+        title: String,
+        showPreview: Boolean,
+        onSubmit: (WalletDemoSharingSelection) -> Unit,
+    ) {
+        if (showPreview) {
+            showReview(review, title, onSubmit)
+            return
+        }
+        onSubmit(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
 
     /**
