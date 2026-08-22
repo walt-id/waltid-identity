@@ -81,6 +81,36 @@ object ConformanceReportWriter {
         println("Wrote ${role.title} conformance report to $dir (${merged.size} entries)")
     }
 
+    /**
+     * Writes a skipped-suite placeholder when this role has no `summary.md` yet.
+     *
+     * Used by conformance test classes after a skipped run so GitHub Actions can still
+     * publish the same per-role heading and table shape as a completed verifier report.
+     */
+    fun writeSkippedIfEmpty(
+        role: Role,
+        reason: String,
+        reportRoot: String = DEFAULT_REPORT_ROOT,
+        allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
+    ) {
+        if (Files.exists(reportDir(role, reportRoot).resolve("summary.md"))) return
+        write(
+            role = role,
+            entries = listOf(
+                Entry(
+                    name = "conformance-suite",
+                    status = "skipped",
+                    error = reason,
+                    accepted = true,
+                )
+            ),
+            reportRoot = reportRoot,
+            allowFailure = allowFailure,
+            mergeExisting = false,
+            producer = "suite-availability",
+        )
+    }
+
     fun writeTestPlanResults(
         role: Role,
         results: List<TestPlanResult>,
@@ -106,7 +136,7 @@ object ConformanceReportWriter {
                 suiteStatus = result.conformanceStatus ?: result.walletStatus ?: result.verifierStatus?.name,
                 testId = result.conformanceTestId.takeIf { it != "N/A" },
                 logUrl = logUrl(conformanceHost, conformancePort, result.conformanceTestId),
-                error = result.skipReason ?: result.message,
+                error = result.skipReason ?: result.message.takeIf { !accepted },
                 accepted = accepted,
             )
         }
@@ -154,11 +184,13 @@ object ConformanceReportWriter {
         appendLine("| Test | Status | Suite | Log | Error |")
         appendLine("|------|--------|-------|-----|-------|")
         entries.forEach { entry ->
+            val display = ConformanceReportFormat.displayName(entry.name)
+            val test = listOfNotNull(display.title, display.variant).joinToString(" · ")
             val log = entry.logUrl?.let { "[log]($it)" } ?: ""
             appendLine(
-                "| `${entry.name.sanitizeMarkdownCell()}` | `${entry.status}` | " +
-                        "${entry.suiteResult ?: entry.suiteStatus ?: ""} | $log | " +
-                        "${entry.error?.sanitizeMarkdownCell() ?: ""} |"
+                "| `${test.sanitizeMarkdownCell()}` | `${entry.status}` | " +
+                    "${entry.suiteResult ?: entry.suiteStatus ?: ""} | $log | " +
+                    "${entry.error?.sanitizeMarkdownCell() ?: ""} |"
             )
         }
     }

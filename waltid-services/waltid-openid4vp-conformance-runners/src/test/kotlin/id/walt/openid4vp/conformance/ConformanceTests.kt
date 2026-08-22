@@ -1,8 +1,10 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.ConformanceTestRunner
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 
@@ -25,6 +27,16 @@ class ConformanceTests {
 
         @JvmStatic
         val isConformanceAvailable = conformanceServerVersionResult.isSuccess
+
+        @JvmStatic
+        @AfterAll
+        fun writeSkippedSummaryIfSuiteUnavailable() {
+            if (isConformanceAvailable) return
+            ConformanceReportWriter.writeSkippedIfEmpty(
+                role = ConformanceReportWriter.Role.VP_VERIFIER,
+                reason = "Conformance suite not available at $conformanceHost:$conformancePort",
+            )
+        }
     }
 
     @Test
