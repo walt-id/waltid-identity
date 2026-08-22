@@ -258,7 +258,6 @@ final class WalletE2EUI {
             return textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").isHittable
                 || app.staticTexts["Review presentation request"].exists
                 || app.otherElements["wallet.credentialDetailsScreen"].exists
-                || app.buttons["wallet.presentationNewButton"].exists
         default:
             return false
         }

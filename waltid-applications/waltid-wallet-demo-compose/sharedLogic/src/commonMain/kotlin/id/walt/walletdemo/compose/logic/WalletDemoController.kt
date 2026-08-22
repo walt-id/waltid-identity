@@ -510,7 +510,8 @@ class WalletDemoController(
                     message = pending.successMessage,
                     tab = WalletDemoTab.Present,
                 ),
-                presentationCompleted = true,
+                presentationCompleted = false,
+                requestDrafts = state.requestDrafts.copy(presentationRequestUrl = ""),
                 pendingPresentationContinuation = null,
             )
         }
@@ -767,7 +768,8 @@ class WalletDemoController(
         _state.update {
             it.copy(
                 offerPreview = null, authorizationRequestUrl = null,
-                requestDrafts = it.requestDrafts.copy(txCode = ""),
+                requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
+                receiveCompleted = false,
                 operation = WalletOperationState.Succeeded(
                     message = WalletDisplayText.CredentialOfferDeclined,
                     tab = WalletDemoTab.Receive,
@@ -797,7 +799,7 @@ class WalletDemoController(
                         deferredCredentials = (it.deferredCredentials + outcome.credentials)
                             .distinctBy(WalletDemoDeferredCredential::id),
                         lastReceivedCredentialIds = outcome.storedCredentialIds,
-                        receiveCompleted = outcome.storedCredentialIds.isNotEmpty(),
+                        receiveCompleted = false,
                         operation = WalletOperationState.Succeeded(
                             "Credential issuance deferred",
                             WalletDemoTab.Receive,
@@ -1011,7 +1013,6 @@ class WalletDemoController(
         if (
             requestUrl.isBlank() ||
             current.presentationReview != null ||
-            current.presentationCompleted ||
             current.isBusy
         ) {
             return
@@ -1190,6 +1191,7 @@ class WalletDemoController(
                         WalletDemoTab.Present,
                     ).copy(
                         presentationReview = null,
+                        requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -1227,14 +1229,19 @@ class WalletDemoController(
                 )
             },
             presentationReview = if (clearPreview) null else presentationReview,
+            requestDrafts = if (clearPreview) {
+                requestDrafts.copy(presentationRequestUrl = "")
+            } else {
+                requestDrafts
+            },
             selectedPresentationCredentialOptions =
                 if (clearSelections) emptySet() else selectedPresentationCredentialOptions,
             selectedPresentationDisclosureOptions =
                 if (clearSelections) emptySet() else selectedPresentationDisclosureOptions,
-            presentationCompleted = success != null && pending == null,
+            presentationCompleted = false,
             pendingPresentationContinuation = pending,
             presentationNavigationResetKey =
-                if (resetNavigation) presentationNavigationResetKey + 1 else presentationNavigationResetKey,
+                if (resetNavigation || clearPreview) presentationNavigationResetKey + 1 else presentationNavigationResetKey,
         )
     }
 
@@ -1250,6 +1257,7 @@ class WalletDemoController(
                         tab = WalletDemoTab.Present,
                     ),
                     presentationReview = null,
+                    requestDrafts = current.requestDrafts.copy(presentationRequestUrl = ""),
                     selectedPresentationCredentialOptions = emptySet(),
                     selectedPresentationDisclosureOptions = emptySet(),
                     presentationCompleted = false,
@@ -1301,6 +1309,7 @@ class WalletDemoController(
                         WalletDemoTab.Present,
                     ).copy(
                         presentationReview = null,
+                        requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -1335,7 +1344,7 @@ class WalletDemoController(
     }
 
     private fun WalletDemoUiState.activePresentationPreviewHandle(): WalletDemoPresentationPreviewHandle? =
-        takeUnless { presentationCompleted }?.presentationReview?.previewHandle()
+        presentationReview?.previewHandle()
 
     private fun WalletDemoPresentationPreviewResult.previewHandle(): WalletDemoPresentationPreviewHandle =
         when (this) {

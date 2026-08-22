@@ -335,7 +335,9 @@ class WalletDemoAppTestScenarios {
             .performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview == null }
         onNodeWithTag("wallet.status").assertTextContains("Credential offer declined")
-        onNodeWithTag(WalletUiTestTags.ReceiveButton).assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.OfferInput).assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.OfferInput).assertTextContains("")
+        onNodeWithTag(WalletUiTestTags.ReceiveButton).assertIsNotEnabled()
         assertEquals(null, wallet.receivedOfferUrl)
     }
 
@@ -466,8 +468,14 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("No credentials available").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsNotEnabled()
         onNodeWithTag(WalletUiTestTags.PresentationRejectButton).assertIsEnabled().performClick()
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationCompleted }
+        waitUntil(timeoutMillis = 5_000) {
+            controller.state.value.presentationPreview == null &&
+                controller.state.value.requestDrafts.presentationRequestUrl.isEmpty()
+        }
         assertEquals("openid4vp://example", wallet.rejectedRequestUrl)
+        onNodeWithTag(WalletUiTestTags.PresentationInput).assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentButton).assertIsNotEnabled()
+        onAllNodesWithTag(WalletUiTestTags.PresentationNewButton).assertCountEquals(0)
     }
 
     fun invalidPresentationCanBeDismissedLocallyOrReportedToVerifier() = runComposeUiTest {
@@ -512,10 +520,16 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentButton).performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationError == error }
         onNodeWithTag(WalletUiTestTags.PresentationErrorNotifyButton).performScrollTo().performClick()
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationCompleted }
+        waitUntil(timeoutMillis = 5_000) {
+            controller.state.value.presentationError == null &&
+                controller.state.value.requestDrafts.presentationRequestUrl.isEmpty()
+        }
 
         assertEquals("openid4vp://invalid", wallet.rejectedRequestUrl)
         onNodeWithTag(WalletUiTestTags.Status).assertTextContains("Verifier notified")
+        onNodeWithTag(WalletUiTestTags.PresentationInput).assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentButton).assertIsNotEnabled()
+        onAllNodesWithTag(WalletUiTestTags.PresentationNewButton).assertCountEquals(0)
     }
 
     fun presentTabPreviewsCredentialsAndCanStartNewFlowAfterSuccess() = runComposeUiTest {
@@ -560,13 +574,12 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
         onNodeWithTag("wallet.tab.present").performClick()
         onNodeWithTag("wallet.status").assertTextContains("Presentation sent")
-        onNodeWithTag("wallet.presentationInput").assertIsNotEnabled()
-        onNodeWithTag(WalletUiTestTags.PresentationNewButton).performScrollTo().assertIsDisplayed()
+        onNodeWithTag("wallet.presentationInput").assertIsEnabled()
+        onNodeWithTag("wallet.presentationInput").assertTextContains("")
+        onAllNodesWithTag(WalletUiTestTags.PresentationNewButton).assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.PresentationReview).assertCountEquals(0)
         onAllNodesWithTag("wallet.presentationSubmitButton").assertCountEquals(0)
         onAllNodesWithTag("wallet.presentationRejectButton").assertCountEquals(0)
-        onNodeWithTag("wallet.presentationNewButton").performScrollTo().performClick()
-        onNodeWithTag("wallet.presentationInput").assertIsEnabled()
         onNodeWithTag("wallet.presentButton").assertIsNotEnabled()
         assertEquals("openid4vp://example", wallet.previewedRequestUrl)
         assertEquals("openid4vp://example", wallet.submittedRequestUrl)
@@ -588,13 +601,30 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentButton).performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
+        onNodeWithTag(WalletUiTestTags.PresentationCancelButton).performClick()
+        waitUntil(timeoutMillis = 5_000) {
+            controller.state.value.presentationPreview == null &&
+                controller.state.value.requestDrafts.presentationRequestUrl.isEmpty()
+        }
+        onNodeWithTag(WalletUiTestTags.Status).assertTextContains("Presentation review cancelled")
+        onNodeWithTag(WalletUiTestTags.PresentationInput).assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentButton).assertIsNotEnabled()
+        onAllNodesWithTag(WalletUiTestTags.PresentationNewButton).assertCountEquals(0)
+
+        onNodeWithTag(WalletUiTestTags.PresentationInput).performTextInput("openid4vp://example")
+        onNodeWithTag(WalletUiTestTags.PresentButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+
         onNodeWithTag(WalletUiTestTags.PresentationRejectButton).performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText == "Presentation declined" }
 
         assertEquals("openid4vp://example", wallet.rejectedRequestUrl)
         onNodeWithTag(WalletUiTestTags.Status).assertTextContains("Presentation declined")
         onAllNodesWithTag(WalletUiTestTags.PresentationReview).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.PresentationNewButton).performScrollTo().assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.PresentationNewButton).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationInput).assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentationInput).assertTextContains("")
+        onNodeWithTag(WalletUiTestTags.PresentButton).assertIsNotEnabled()
     }
 
     fun presentTabShowsUnencryptedResponseState() = runComposeUiTest {

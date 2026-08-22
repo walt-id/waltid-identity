@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -36,7 +35,6 @@ internal fun PresentTab(
     requestDrafts: WalletRequestDrafts,
     onPresentationRequestUrlChange: (String) -> Unit,
     onPreview: () -> Unit,
-    onStartNew: () -> Unit,
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
     onSubmit: () -> Unit,
@@ -51,18 +49,14 @@ internal fun PresentTab(
     if (preview != null) {
         ReviewScaffold(
             modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
-            actions = if (!state.presentationCompleted) {
-                {
-                    SharingActionsRow(
-                        enabled = state.presentationReviewEnabled,
-                        selectionComplete = state.presentationCredentialSelectionComplete(),
-                        onSubmit = onSubmit,
-                        onCancel = onCancel,
-                        onReject = onReject,
-                    )
-                }
-            } else {
-                null
+            actions = {
+                SharingActionsRow(
+                    enabled = state.presentationReviewEnabled,
+                    selectionComplete = state.presentationCredentialSelectionComplete(),
+                    onSubmit = onSubmit,
+                    onCancel = onCancel,
+                    onReject = onReject,
+                )
             },
         ) {
             SharingReviewSection(
@@ -71,7 +65,7 @@ internal fun PresentTab(
                 selectedDisclosureOptions = state.selectedPresentationDisclosureOptions,
                 selectionComplete = state.presentationCredentialSelectionComplete(),
                 enabled = state.presentationReviewEnabled,
-                readOnly = state.presentationCompleted,
+                readOnly = false,
                 onToggleCredential = onToggleCredential,
                 onToggleDisclosure = onToggleDisclosure,
                 onCredentialClick = {},
@@ -113,15 +107,6 @@ internal fun PresentTab(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
-        }
-
-        if (state.presentationCompleted) {
-            OutlinedButton(
-                onClick = onStartNew,
-                modifier = Modifier.testTag(WalletUiTestTags.PresentationNewButton),
-            ) {
-                Text("New presentation")
-            }
         }
 
         error?.let {
