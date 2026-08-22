@@ -546,8 +546,11 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(samplePresentationCredentialOption.selection.id)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
         onNodeWithText("Disclosure 7").performScrollTo().assertIsDisplayed()
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
 
         onNodeWithTag("wallet.presentationSubmitButton").performSemanticsAction(SemanticsActions.OnClick)
 

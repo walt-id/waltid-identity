@@ -66,6 +66,8 @@ public enum WalletAccessibilityID {
     public static let presentationCancelButton = identifier("presentationCancelButton")
     public static let presentationVerifier = identifier("presentationVerifier")
     public static let presentationVerifierSection = identifier("presentationVerifierSection")
+    public static let presentationClaimsDialog = identifier("presentationClaimsDialog")
+    public static let presentationClaimsClose = identifier("presentationClaimsClose")
     public static let presentationRequesterDetailsToggle = identifier("presentationRequesterDetailsToggle")
     public static let presentationRequesterDetails = identifier("presentationRequesterDetails")
     public static let presentationReaderTrustSection = identifier("presentationReaderTrustSection")

@@ -75,19 +75,11 @@ private fun VerifierMetadataCard(request: WalletDemoSharingRequest) {
         modifier = Modifier.testTag(WalletUiTestTags.PresentationVerifierSection),
         toggleTestTag = WalletUiTestTags.PresentationRequesterDetailsToggle,
         summary = {
-            if (identityName != null) {
-                MetadataIdentityRow(
-                    display = requester?.display,
-                    fallbackName = identityName,
-                    supportingText = VERIFIED_ORIGIN_LABEL.takeIf { originIsIdentity },
-                )
-            } else {
-                Text(
-                    text = verifiedOrigin ?: "Verifier",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+            MetadataIdentityRow(
+                display = requester?.display,
+                fallbackName = identityName ?: verifiedOrigin ?: "Verifier",
+                supportingText = VERIFIED_ORIGIN_LABEL.takeIf { originIsIdentity },
+            )
         },
         details = {
             Column(

@@ -64,16 +64,13 @@ private struct VerifierMetadataCard: View {
                 toggleAccessibilityIdentifier: WalletAccessibilityID.presentationRequesterDetailsToggle,
                 isExpanded: $isExpanded
             ) {
-                if let identityName = requester?.identityName {
-                    MetadataIdentityView(
-                        display: requester?.display,
-                        fallbackName: identityName,
-                        supportingText: requester?.identityNameCaption
-                    )
-                } else {
-                    Text(requester?.verifiedOrigin?.presentableValue ?? "Verifier")
-                        .font(.body.weight(.semibold))
-                }
+                MetadataIdentityView(
+                    display: requester?.display,
+                    fallbackName: requester?.identityName
+                        ?? requester?.verifiedOrigin?.presentableValue
+                        ?? "Verifier",
+                    supportingText: requester?.identityNameCaption
+                )
             } details: {
                 VStack(alignment: .leading, spacing: 12) {
                     let identityItems = [verifiedOriginDetail].compactMap { $0 } + requesterDetails
