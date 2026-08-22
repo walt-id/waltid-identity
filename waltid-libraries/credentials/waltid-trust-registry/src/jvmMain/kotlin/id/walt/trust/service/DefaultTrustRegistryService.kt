@@ -10,12 +10,14 @@ import id.walt.trust.parser.tsl.TslXmlParser
 import id.walt.trust.signature.CompactJwsValidator
 import id.walt.trust.signature.SignatureValidationConfig
 import id.walt.trust.store.TrustStore
+import id.walt.trust.utils.HashUtils
 import id.walt.trust.utils.HashUtils.computeCertificateSha256
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.json.Json
 import java.io.ByteArrayInputStream
 import java.security.cert.CertPathBuilder
 import java.security.cert.CertPathValidator
@@ -204,11 +206,26 @@ class DefaultTrustRegistryService(
         expectedEntityType: TrustedEntityType?,
         expectedServiceType: String?
     ): TrustDecision {
-        // JWK thumbprint matching is not yet implemented.
-        return TrustDecision(
-            decision = TrustDecisionCode.UNSUPPORTED_SOURCE,
-            warnings = listOf("JWK-based lookup is not yet implemented")
-        )
+        val thumbprint = runCatching { Json.parseToJsonElement(jwk) }
+            .getOrNull()
+            ?.let(HashUtils::computeJwkSha256Thumbprint)
+            ?: return TrustDecision(
+                decision = TrustDecisionCode.PROCESSING_ERROR,
+                warnings = listOf("Failed to parse public key JWK or compute its thumbprint")
+            )
+
+        val matchedIdentities = store.findIdentitiesByJwkThumbprint(thumbprint).toList()
+
+        if (matchedIdentities.isEmpty()) {
+            return TrustDecision(
+                decision = TrustDecisionCode.NOT_TRUSTED,
+                evidence = listOf(
+                    TrustEvidence("LOOKUP", "No identity found for public key JWK thumbprint: $thumbprint")
+                )
+            )
+        }
+
+        return buildDecisionFromIdentities(matchedIdentities, instant, expectedEntityType, expectedServiceType)
     }
 
     override suspend fun resolveByProviderId(
