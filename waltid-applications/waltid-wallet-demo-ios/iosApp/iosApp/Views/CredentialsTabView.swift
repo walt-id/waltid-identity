@@ -101,7 +101,10 @@ struct CredentialsTabView: View {
                         }
                         .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
                     }
-                } else {
+                }
+            }
+            .toolbar {
+                if selectedDetailsID == nil {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         NavigationLink {
                             SettingsView(viewModel: viewModel)
