@@ -4,32 +4,66 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLING_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceVisibleAfterScrolling
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.foregroundWindowSnapshot
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.scrollUp
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class PublicDemoBackendE2ETest {
 
     @Test
+    fun authorizationCodeOfferReviewAgainstPublicDemoIssuer2() = runBlocking {
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-mdoc" }
+        val offer = DemoTestBackend.createOffer(
+            scenario = scenario,
+            authorizationMethod = DemoTestBackend.OfferAuthorizationMethod.Authorized,
+        )
+        WalletGalleryCapture.recordRequest("issuance-authorization-code", offer.offerUrl)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+
+        launchAndUnlock(context, device)
+        clickByTag(device, "wallet.scanEmptyAction")
+        setTextByTag(device, "wallet.scanInput", offer.offerUrl)
+        clickByTag(device, "wallet.scanSubmit")
+        val previewVisible = device.wait(
+            Until.hasObject(By.res("wallet.offerReview")),
+            CREDENTIAL_OPERATION_TIMEOUT,
+        )
+        assertTrue(
+            "Authorization-code offer preview did not appear.\n${foregroundWindowSnapshot(device)}",
+            previewVisible,
+        )
+        assertResourceVisibleAfterScrolling(
+            device,
+            "wallet.reviewIslandToggle.required_action",
+            "Issuer sign-in action missing",
+        )
+        WalletGalleryCapture.capture(device, "wallet-issuance-authorization-code-review")
+    }
+
+    @Test
     fun transactionCodePromptRejectsWrongCodeAndRetriesAgainstPublicDemoIssuer2() = runBlocking {
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-mdoc" }
         val offer = DemoTestBackend.createOffer(scenario, withGeneratedTransactionCode = true)
+        WalletGalleryCapture.recordRequest("issuance-transaction-code", offer.offerUrl)
         val transactionCode = requireNotNull(offer.txCode) {
             "Public demo issuer2 did not return a transaction code"
         }
@@ -38,36 +72,28 @@ class PublicDemoBackendE2ETest {
         val device = UiDevice.getInstance(instrumentation)
 
         launchAndUnlock(context, device)
-        sendDeepLink(context, offer.offerUrl)
-        assertResourceTextEquals(
-            device = device,
-            tag = "wallet.offerInput",
-            expected = offer.offerUrl,
-            timeoutMs = UI_ELEMENT_TIMEOUT,
-            message = "Offer URL did not appear in UI after deep link",
+        submitThroughUnifiedScan(device, "wallet.scanEmptyAction", offer.offerUrl)
+        val previewVisible = device.wait(
+            Until.hasObject(By.res("wallet.offerReview")),
+            CREDENTIAL_OPERATION_TIMEOUT,
         )
-
-        clickByTag(device, "wallet.receiveButton")
         assertTrue(
-            "Offer preview did not appear. Latest status: ${latestStatus(device)}",
-            waitForStatus(
-                device = device,
-                timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-                matcher = { it.startsWith("Review credential offer") },
-                failurePrefixes = listOf("Receive failed", "Bootstrap failed"),
-            ),
+            "Offer preview did not appear.\n${foregroundWindowSnapshot(device)}",
+            previewVisible,
         )
+        WalletGalleryCapture.capture(device, "wallet-issuance-transaction-code-review")
 
         setTextByTag(device, "wallet.txCodeInput", incorrectCodeFor(transactionCode))
         clickByTag(device, "wallet.offerAcceptButton")
         assertTrue(
-            "Incorrect transaction code was not rejected. Latest status: ${latestStatus(device)}",
-            waitForStatus(
-                device = device,
-                timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-                matcher = { it.startsWith("Receive failed") },
-                failurePrefixes = emptyList(),
-            ),
+            "Incorrect transaction code was not reported as rejected.\n" +
+                foregroundWindowSnapshot(device),
+            waitForReceiveFailureAfterScrolling(device),
+        )
+        assertTextContainingVisibleAfterScrolling(
+            device = device,
+            substring = "Receive failed",
+            message = "Incorrect transaction code was not reported as rejected",
         )
 
         // The reviewed offer remains active so the corrected code can be retried directly.
@@ -88,6 +114,7 @@ class PublicDemoBackendE2ETest {
     fun receiveAndPresentAgainstPublicDemoIssuer2Verifier2() = runBlocking {
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-mdoc" }
         val offer = DemoTestBackend.createOffer(scenario)
+        WalletGalleryCapture.recordRequest("issuance", offer.offerUrl)
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
@@ -95,23 +122,16 @@ class PublicDemoBackendE2ETest {
 
         launchAndUnlock(context, device)
 
-        sendDeepLink(context, offer.offerUrl)
-        assertResourceTextEquals(
-            device = device,
-            tag = "wallet.offerInput",
-            expected = offer.offerUrl,
-            timeoutMs = UI_ELEMENT_TIMEOUT,
-            message = "Offer URL did not appear in UI after deep link",
+        submitThroughUnifiedScan(device, "wallet.scanEmptyAction", offer.offerUrl)
+        val offerPreviewReady = device.wait(
+            Until.hasObject(By.res("wallet.offerReview")),
+            CREDENTIAL_OPERATION_TIMEOUT,
         )
-
-        clickByTag(device, "wallet.receiveButton")
-        val offerPreviewReady = waitForStatus(
-            device = device,
-            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-            matcher = { it.startsWith("Review credential offer") },
-            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
+        assertTrue(
+            "Offer preview did not appear.\n${foregroundWindowSnapshot(device)}",
+            offerPreviewReady,
         )
-        assertTrue("Offer preview did not appear. Latest status: ${latestStatus(device)}", offerPreviewReady)
+        WalletGalleryCapture.capture(device, "wallet-issuance-${scenario.id}-review")
         clickByTag(device, "wallet.offerAcceptButton")
         val receiveSuccess = waitForStatus(
             device = device,
@@ -123,23 +143,17 @@ class PublicDemoBackendE2ETest {
         assertTrue("No credentials were shown in UI", device.findObject(By.text("No credentials")) == null)
 
         val session = DemoTestBackend.createVerifierSession(scenario)
-        sendDeepLink(context, session.authorizationRequestUri)
-        assertResourceTextEquals(
-            device = device,
-            tag = "wallet.presentationInput",
-            expected = session.authorizationRequestUri,
-            timeoutMs = UI_ELEMENT_TIMEOUT,
-            message = "Presentation request URL did not appear in UI after deep link",
+        WalletGalleryCapture.recordRequest("presentation", session.authorizationRequestUri)
+        submitThroughUnifiedScan(device, "wallet.scanAction", session.authorizationRequestUri)
+        val previewReady = device.wait(
+            Until.hasObject(By.res("wallet.presentationReview")),
+            CREDENTIAL_OPERATION_TIMEOUT,
         )
-
-        clickByTag(device, "wallet.presentButton")
-        val previewReady = waitForStatus(
-            device = device,
-            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-            matcher = { it == "Review presentation request" },
-            failurePrefixes = listOf("Preview failed", "Present failed", "Receive failed", "Bootstrap failed")
+        assertTrue(
+            "Presentation preview did not load.\n${foregroundWindowSnapshot(device)}",
+            previewReady,
         )
-        assertTrue("Presentation preview did not load. Latest status: ${latestStatus(device)}", previewReady)
+        WalletGalleryCapture.capture(device, "wallet-presentation-${scenario.id}-review")
 
         clickByTag(device, "wallet.presentationSubmitButton")
         val presentSuccess = waitForStatus(
@@ -169,6 +183,7 @@ class PublicDemoBackendE2ETest {
     fun transactionDataPreviewAgainstPublicDemoIssuer2Verifier2() = runBlocking {
         val scenario = DemoTestBackend.transactionDataPresentationScenario
         val offer = DemoTestBackend.createOffer(scenario)
+        WalletGalleryCapture.recordRequest("issuance", offer.offerUrl)
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
@@ -176,23 +191,15 @@ class PublicDemoBackendE2ETest {
 
         launchAndUnlock(context, device)
 
-        sendDeepLink(context, offer.offerUrl)
-        assertResourceTextEquals(
-            device = device,
-            tag = "wallet.offerInput",
-            expected = offer.offerUrl,
-            timeoutMs = UI_ELEMENT_TIMEOUT,
-            message = "Offer URL did not appear in UI after deep link",
+        submitThroughUnifiedScan(device, "wallet.scanEmptyAction", offer.offerUrl)
+        val offerPreviewReady2 = device.wait(
+            Until.hasObject(By.res("wallet.offerReview")),
+            CREDENTIAL_OPERATION_TIMEOUT,
         )
-
-        clickByTag(device, "wallet.receiveButton")
-        val offerPreviewReady2 = waitForStatus(
-            device = device,
-            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-            matcher = { it.startsWith("Review credential offer") },
-            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
+        assertTrue(
+            "Offer preview did not appear.\n${foregroundWindowSnapshot(device)}",
+            offerPreviewReady2,
         )
-        assertTrue("Offer preview did not appear. Latest status: ${latestStatus(device)}", offerPreviewReady2)
         clickByTag(device, "wallet.offerAcceptButton")
         val receiveSuccess = waitForStatus(
             device = device,
@@ -203,30 +210,18 @@ class PublicDemoBackendE2ETest {
         assertTrue("Receive did not complete successfully. Latest status: ${latestStatus(device)}", receiveSuccess)
 
         val session = DemoTestBackend.createTransactionDataVerifierSession(scenario)
-        sendDeepLink(context, session.authorizationRequestUri)
-        assertResourceTextEquals(
-            device = device,
-            tag = "wallet.presentationInput",
-            expected = session.authorizationRequestUri,
-            timeoutMs = UI_ELEMENT_TIMEOUT,
-            message = "Presentation request URL did not appear in UI after deep link",
+        WalletGalleryCapture.recordRequest("presentation-transaction-data", session.authorizationRequestUri)
+        submitThroughUnifiedScan(device, "wallet.scanAction", session.authorizationRequestUri)
+        val previewReady = device.wait(
+            Until.hasObject(By.res("wallet.presentationReview")),
+            CREDENTIAL_OPERATION_TIMEOUT,
+        )
+        assertTrue(
+            "Transaction-data preview did not load.\n${foregroundWindowSnapshot(device)}",
+            previewReady,
         )
 
-        clickByTag(device, "wallet.presentButton")
-        val previewReady = waitForStatus(
-            device = device,
-            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-            matcher = { it == "Review presentation request" },
-            failurePrefixes = listOf("Preview failed", "Present failed", "Receive failed", "Bootstrap failed")
-        )
-        assertTrue("Transaction-data preview did not load. Latest status: ${latestStatus(device)}", previewReady)
-
-        val screenshot = File("/sdcard/Download/wal1077-compose-android-transaction-data.png")
-        if (device.takeScreenshot(screenshot)) {
-            println("WAL1077_SCREENSHOT=${screenshot.absolutePath}")
-        } else {
-            println("WAL1077_SCREENSHOT_CAPTURE_FAILED=${screenshot.absolutePath}")
-        }
+        WalletGalleryCapture.capture(device, "wallet-presentation-transaction-data-review")
 
         assertTextVisibleAfterScrolling(
             device,
@@ -254,6 +249,22 @@ class PublicDemoBackendE2ETest {
             expectedValues = listOf("ACME Corp"),
             message = "Payment merchant name missing",
         )
+    }
+
+    private fun submitThroughUnifiedScan(device: UiDevice, actionTag: String, value: String) {
+        clickByTag(device, actionTag)
+        setTextByTag(device, "wallet.scanInput", value)
+        clickByTag(device, "wallet.scanSubmit")
+    }
+
+    private fun waitForReceiveFailureAfterScrolling(device: UiDevice): Boolean {
+        val deadline = System.currentTimeMillis() + CREDENTIAL_OPERATION_TIMEOUT
+        while (System.currentTimeMillis() < deadline) {
+            device.scrollUp()
+            if (latestStatus(device).startsWith("Receive failed")) return true
+            Thread.sleep(400)
+        }
+        return false
     }
 
     private fun incorrectCodeFor(code: String): String {

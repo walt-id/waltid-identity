@@ -12,14 +12,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.logic.WalletDemoReviewSurfaceContext
+import id.walt.walletdemo.compose.logic.WalletDemoReviewRoute
 import id.walt.walletdemo.compose.logic.defaultCredentialSelection
 import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
 import id.walt.walletdemo.compose.logic.toCredentialDetails
@@ -29,6 +31,7 @@ import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 import id.walt.walletdemo.compose.ui.components.SharingReviewActionBar
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.screens.CredentialDetailsScreen
+import id.walt.walletdemo.compose.ui.screens.WalletSheetHeader
 
 /**
  * Standalone presentation-review screen for a platform-invoked sharing flow.
@@ -65,6 +68,9 @@ fun WalletDemoSharingReviewScreen(
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
     var openCredentialDetailsId by remember(review) { mutableStateOf<String?>(null) }
+    var reviewRoute by remember(review) { mutableStateOf<WalletDemoReviewRoute>(WalletDemoReviewRoute.Summary) }
+    var technicalTitle by remember(review) { mutableStateOf<String?>(null) }
+    var technicalBackSignal by remember(review) { mutableIntStateOf(0) }
     val openDetails = openCredentialDetailsId?.let { detailsId ->
         review.credentialOptions
             .map { it.toCredentialDetails() }
@@ -75,10 +81,12 @@ fun WalletDemoSharingReviewScreen(
     // consumes the gesture and does nothing: the response is on its way, so neither closing this
     // screen nor abandoning it is an outcome the user can still choose.
     SystemBackHandler(
-        enabled = openDetails != null || !enabled || onBackAtRoot != null,
+        enabled = openDetails != null || reviewRoute != WalletDemoReviewRoute.Summary ||
+            !enabled || onBackAtRoot != null,
     ) {
         when {
             openDetails != null -> openCredentialDetailsId = null
+            reviewRoute != WalletDemoReviewRoute.Summary -> technicalBackSignal += 1
             !enabled -> Unit
             else -> onBackAtRoot?.invoke()
         }
@@ -102,13 +110,15 @@ fun WalletDemoSharingReviewScreen(
                         .fillMaxSize()
                         .safeDrawingPadding(),
                 ) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    WalletSheetHeader(
+                        title = technicalTitle ?: title,
+                        onBack = if (reviewRoute != WalletDemoReviewRoute.Summary) {
+                            { technicalBackSignal += 1 }
+                        } else {
+                            null
+                        },
+                        onClose = onCancel,
+                        enabled = enabled,
                     )
                     SharingReviewSection(
                         review = review,
@@ -117,10 +127,7 @@ fun WalletDemoSharingReviewScreen(
                         selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
                         enabled = enabled,
                         onToggleCredential = { credential ->
-                            selection = selection.toggleCredential(
-                                selection = credential,
-                                option = review.credentialOptions.firstOrNull { it.selection == credential },
-                            )
+                            selection = review.toggleCredential(selection, credential)
                         },
                         onToggleDisclosure = { disclosure -> selection = selection.toggleDisclosure(disclosure) },
                         onCredentialClick = { detailsId -> openCredentialDetailsId = detailsId },
@@ -130,6 +137,16 @@ fun WalletDemoSharingReviewScreen(
                         showActions = false,
                         scrollContent = true,
                         context = WalletDemoReviewSurfaceContext.PlatformInvoked,
+                        hostOwnsTopChrome = true,
+                        technicalBackSignal = technicalBackSignal,
+                        onRouteChanged = { route, island ->
+                            reviewRoute = route
+                            technicalTitle = if (route is WalletDemoReviewRoute.TechnicalDetails) {
+                                island?.title
+                            } else {
+                                null
+                            }
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 16.dp),

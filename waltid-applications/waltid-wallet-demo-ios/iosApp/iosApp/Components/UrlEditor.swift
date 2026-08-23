@@ -3,7 +3,7 @@ import SwiftUI
 import WalletDemoSharingUI
 
 struct UrlEditor: View {
-    let title: String
+    let title: String?
     let label: String
     @Binding var text: String
     let inputIdentifier: String
@@ -13,8 +13,10 @@ struct UrlEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
+            if let title {
+                Text(title)
+                    .font(.headline)
+            }
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -57,7 +59,7 @@ struct UrlEditor: View {
 }
 
 struct ScannableUrlEditor: View {
-    let title: String
+    let title: String?
     let label: String
     @Binding var text: String
     let inputIdentifier: String
@@ -83,7 +85,7 @@ struct ScannableUrlEditor: View {
             } label: {
                 Label("Scan QR", systemImage: "qrcode.viewfinder")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(WalletSecondaryButtonStyle())
             .disabled(!isEnabled)
             .accessibilityIdentifier(scanButtonIdentifier)
         }
@@ -108,9 +110,12 @@ struct ScannableUrlEditor: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") {
+                        Button {
                             scannerVisible = false
+                        } label: {
+                            Image(systemName: "xmark")
                         }
+                        .accessibilityLabel("Close")
                     }
                 }
             }

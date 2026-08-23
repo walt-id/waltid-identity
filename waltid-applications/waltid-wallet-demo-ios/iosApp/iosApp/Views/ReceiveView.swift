@@ -2,23 +2,23 @@ import SwiftUI
 import WalletDemoSharingUI
 
 struct ReceiveView: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
     var showsInput = true
     var onClose: (() -> Void)? = nil
     @Environment(\.openURL) private var openURL
+    @State private var reviewRoute: ReviewRoute = .summary
 
     private var receivedDetails: [CredentialDetails] {
         viewModel.receivedCredentials.map(CredentialDisplayNormalizer.details(for:))
     }
 
     private var screenTitle: String {
-        viewModel.offerPreview == nil ? "Receive" : "Add credential"
-    }
-
-    private var usesAccessibilityContentTitle: Bool {
-        dynamicTypeSize.isAccessibilitySize && viewModel.offerPreview != nil
+        if case .technicalDetails(let islandID) = reviewRoute,
+           let island = viewModel.offerPreview?.reviewIslands.first(where: { $0.id == islandID }) {
+            return island.title
+        }
+        return viewModel.offerPreview == nil ? "Receive" : "Add credential"
     }
 
     var body: some View {
@@ -30,16 +30,9 @@ struct ReceiveView: View {
                         .accessibilityElement()
                         .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
 
-                    if usesAccessibilityContentTitle {
-                        Text(screenTitle)
-                            .font(.title.bold())
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityAddTraits(.isHeader)
-                    }
-
                     if viewModel.offerPreview == nil && showsInput {
                         ScannableUrlEditor(
-                            title: "Receive",
+                            title: nil,
                             label: "Credential offer URL",
                             text: $viewModel.offerUrl,
                             inputIdentifier: WalletAccessibilityID.offerInput,
@@ -51,8 +44,7 @@ struct ReceiveView: View {
                         Button("Receive") {
                             viewModel.previewOffer()
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.waltBlue)
+                        .buttonStyle(WalletPrimaryButtonStyle())
                         .disabled(!viewModel.receiveActionEnabled)
                         .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
                     }
@@ -73,6 +65,8 @@ struct ReceiveView: View {
                             isReviewEnabled: viewModel.offerReviewEnabled,
                             txCode: viewModel.txCode,
                             showsActions: false,
+                            route: $reviewRoute,
+                            showsTechnicalHeader: false,
                             onTxCodeChange: viewModel.updateTxCode,
                             onAccept: viewModel.acceptOffer,
                             onDecline: viewModel.declineOffer
@@ -114,12 +108,23 @@ struct ReceiveView: View {
                 .padding(.vertical, 12)
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle(usesAccessibilityContentTitle ? "" : screenTitle)
+            .navigationTitle(screenTitle)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { onClose?() }
+                    if reviewRoute != .summary {
+                        Button { reviewRoute = .summary } label: {
+                            Image(systemName: "chevron.left")
+                        }
+                        .accessibilityLabel("Back to review")
+                    } else {
+                        Button { onClose?() } label: {
+                            Image(systemName: "xmark")
+                        }
+                        .accessibilityLabel("Close")
                         .disabled(onClose == nil)
                         .opacity(onClose == nil ? 0 : 1)
+                    }
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -144,6 +149,7 @@ struct ReceiveView: View {
             openURL(authorizationURL)
             viewModel.authorizationRequestOpened()
         }
+        .onChange(of: viewModel.offerPreview == nil) { _ in reviewRoute = .summary }
     }
 
     private var detailsNavigationLink: some View {

@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletDemoReviewIsland
+import id.walt.walletdemo.compose.logic.WalletDemoReviewRoute
 import id.walt.walletdemo.compose.logic.WalletRequestDrafts
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.presentationCredentialSelectionComplete
@@ -45,6 +47,8 @@ internal fun PresentTab(
     onCancel: () -> Unit,
     onDismissStatus: () -> Unit,
     showsInput: Boolean = true,
+    technicalBackSignal: Int = 0,
+    onReviewRouteChanged: (WalletDemoReviewRoute, WalletDemoReviewIsland?) -> Unit = { _, _ -> },
 ) {
     val scrollState = rememberScrollState()
     val credentials = (state.session as? WalletSessionState.Ready)?.credentials.orEmpty()
@@ -65,7 +69,6 @@ internal fun PresentTab(
 
             if (showsInput) {
                 UrlActionSection(
-                    title = "Share information",
                     value = requestDrafts.presentationRequestUrl,
                     onValueChange = onPresentationRequestUrlChange,
                     label = "Request URL",
@@ -77,8 +80,6 @@ internal fun PresentTab(
                     scanButtonTestTag = WalletUiTestTags.PresentationScanButton,
                     onClick = onPreview,
                 )
-            } else if (state.presentationReview == null) {
-                Text("Share information", style = MaterialTheme.typography.titleLarge)
             }
 
             if (credentials.isEmpty()) {
@@ -99,10 +100,6 @@ internal fun PresentTab(
             }
 
             state.presentationPreview?.let { preview ->
-                Text(
-                    "Share information",
-                    style = MaterialTheme.typography.titleLarge,
-                )
                 SharingReviewSection(
                     review = preview.toSharingReview(),
                     selectedCredentialOptions = state.selectedPresentationCredentialOptions,
@@ -117,6 +114,9 @@ internal fun PresentTab(
                     onReject = onReject,
                     onCancel = onCancel,
                     showActions = false,
+                    hostOwnsTopChrome = true,
+                    technicalBackSignal = technicalBackSignal,
+                    onRouteChanged = onReviewRouteChanged,
                 )
             }
 

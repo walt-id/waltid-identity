@@ -15,20 +15,23 @@ struct EmptyCredentialsView: View {
             Text("Scan a credential offer to add your first one.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Button {
-                onScan()
-            } label: {
-                Label("Scan a code", systemImage: "qrcode.viewfinder")
+            HStack {
+                Spacer()
+                Button {
+                    onScan()
+                } label: {
+                    Label("Scan a code", systemImage: "qrcode.viewfinder")
+                }
+                .buttonStyle(WalletPrimaryButtonStyle(compact: true))
+                .disabled(!scanEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.scanEmptyAction)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.waltBlue)
-            .disabled(!scanEnabled)
-            .accessibilityIdentifier(WalletAccessibilityID.scanEmptyAction)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.separator), lineWidth: 1))
         .accessibilityIdentifier(WalletAccessibilityID.credentialsEmpty)
     }
 }

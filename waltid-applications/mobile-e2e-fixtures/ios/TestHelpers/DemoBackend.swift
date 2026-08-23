@@ -15,6 +15,11 @@ public struct DemoOffer {
     public let txCode: String?
 }
 
+public enum DemoOfferAuthorizationMethod: String {
+    case preAuthorized = "PRE_AUTHORIZED"
+    case authorized = "AUTHORIZED"
+}
+
 public struct DemoVerifierSession {
     public let sessionID: String
     public let authorizationRequestUri: String
@@ -98,14 +103,16 @@ public final class DemoBackend {
 
     public func createOffer(
         scenario: DemoCredentialScenario,
-        withGeneratedTransactionCode: Bool = false
+        withGeneratedTransactionCode: Bool = false,
+        authorizationMethod: DemoOfferAuthorizationMethod = .preAuthorized
     ) async throws -> DemoOffer {
+        precondition(!withGeneratedTransactionCode || authorizationMethod == .preAuthorized)
         let endpoint = Self.issuerBaseURL
             .appendingPathComponent("issuer2")
             .appendingPathComponent("credential-offers")
         var payload: [String: Any] = [
             "profileId": scenario.profileId,
-            "authMethod": "PRE_AUTHORIZED",
+            "authMethod": authorizationMethod.rawValue,
         ]
         if withGeneratedTransactionCode {
             payload["txCode"] = [

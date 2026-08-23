@@ -343,6 +343,7 @@ public extension SharingReviewModel {
         in current: SharingSelection
     ) -> SharingSelection {
         let option = credentialOptions.first { $0.selection == selection }
+        let wasSelected = current.credentials.contains(selection)
         var credentials = current.credentials
         if credentials.contains(selection) {
             credentials.remove(selection)
@@ -362,10 +363,31 @@ public extension SharingReviewModel {
             retained = Set(current.disclosures.filter { $0.queryID != selection.queryID })
         }
 
-        return SharingSelection(
+        var next = SharingSelection(
             credentials: credentials,
             disclosures: retained.forSelectedCredentials(credentials)
         )
+        guard !wasSelected else { return next }
+
+        for requirement in credentialRequirements {
+            guard let selectedCombination = requirement.options.first(where: {
+                $0.contains(selection.queryID)
+            }) else { continue }
+            let requirementQueryIDs = Set(requirement.options.flatMap { $0 })
+            var selectedCredentials = Set(next.credentials.filter {
+                !requirementQueryIDs.contains($0.queryID) || selectedCombination.contains($0.queryID)
+            })
+            for queryID in selectedCombination where !selectedCredentials.contains(where: { $0.queryID == queryID }) {
+                if let first = credentialOptions.first(where: { $0.queryID == queryID })?.selection {
+                    selectedCredentials.insert(first)
+                }
+            }
+            next = SharingSelection(
+                credentials: selectedCredentials,
+                disclosures: next.disclosures.forSelectedCredentials(selectedCredentials)
+            )
+        }
+        return next
     }
 
     /// Applies a disclosure toggle, keeping only disclosures that belong to a selected credential.

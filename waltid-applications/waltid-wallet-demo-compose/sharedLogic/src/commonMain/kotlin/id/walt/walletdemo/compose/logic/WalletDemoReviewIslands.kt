@@ -20,6 +20,20 @@ fun CredentialDetails.toStoredReviewIslands(): List<WalletDemoReviewIsland> {
     val issuerName = issuerDisplay?.name.presentableOrNull()
         ?: this.summary.issuer.presentableOrNull()
         ?: "Issuer unavailable"
+    val credentialInformation = groups.flatMap { group ->
+        group.items.map { item ->
+            WalletDemoReviewValue(item.label, item.value.reviewText(), supportingText = group.title)
+        }
+    }
+    val credentialInformationSections = groups.mapIndexed { index, group ->
+        WalletDemoReviewTechnicalSection(
+            id = "stored-information-$index",
+            title = group.title,
+            values = group.items.map { item ->
+                WalletDemoReviewValue(item.path.id, item.rawValue ?: item.value.reviewText())
+            },
+        )
+    }
 
     return buildList {
         add(
@@ -34,9 +48,8 @@ fun CredentialDetails.toStoredReviewIslands(): List<WalletDemoReviewIsland> {
                     contentDescription = summary.portrait?.let { "Credential portrait" },
                     fallbackText = summary.title.firstOrNull()?.uppercase() ?: "C",
                 ),
-                expandedValues = listOf(
-                    WalletDemoReviewValue("Holder", summary.holderName),
-                ),
+                expandedValues = listOf(WalletDemoReviewValue("Holder", summary.holderName)) +
+                    credentialInformation,
                 technicalSections = listOf(
                     WalletDemoReviewTechnicalSection(
                         id = "credential-identity",
@@ -47,7 +60,7 @@ fun CredentialDetails.toStoredReviewIslands(): List<WalletDemoReviewIsland> {
                             WalletDemoReviewValue("Subject", this@toStoredReviewIslands.summary.subject),
                         ),
                     )
-                ),
+                ) + credentialInformationSections,
                 initiallyExpanded = true,
             )
         )
@@ -79,35 +92,6 @@ fun CredentialDetails.toStoredReviewIslands(): List<WalletDemoReviewIsland> {
                 ),
             )
         )
-        if (groups.isNotEmpty()) {
-            add(
-                WalletDemoReviewIsland(
-                    id = WalletDemoReviewIslandId("information"),
-                    kind = WalletDemoReviewIslandKind.Information,
-                    context = WalletDemoReviewSurfaceContext.Stored,
-                    title = "Information",
-                    subtitle = groups.flatMap(ClaimGroup::items).size.let { count ->
-                        "$count ${if (count == 1) "field" else "fields"}"
-                    },
-                    visual = WalletDemoReviewVisual(fallbackText = "i"),
-                    expandedValues = groups.flatMap { group ->
-                        group.items.map { item ->
-                            WalletDemoReviewValue(item.label, item.value.reviewText(), supportingText = group.title)
-                        }
-                    },
-                    technicalSections = groups.mapIndexed { index, group ->
-                        WalletDemoReviewTechnicalSection(
-                            id = "stored-information-$index",
-                            title = group.title,
-                            values = group.items.map { item ->
-                                WalletDemoReviewValue(item.path.id, item.rawValue ?: item.value.reviewText())
-                            },
-                        )
-                    },
-                    initiallyExpanded = true,
-                )
-            )
-        }
         summary.validity?.let { validity ->
             add(
                 WalletDemoReviewIsland(
@@ -116,7 +100,7 @@ fun CredentialDetails.toStoredReviewIslands(): List<WalletDemoReviewIsland> {
                     context = WalletDemoReviewSurfaceContext.Stored,
                     title = "Dates and status",
                     subtitle = validity,
-                    visual = WalletDemoReviewVisual(fallbackText = "✓"),
+                    visual = null,
                     expandedValues = listOf(WalletDemoReviewValue("Available information", validity)),
                     technicalSections = listOf(
                         WalletDemoReviewTechnicalSection(
@@ -152,6 +136,7 @@ data class WalletDemoReviewValue(
     val value: String?,
     val supportingText: String? = null,
     val linkUri: String? = null,
+    val sourcePath: String? = null,
 ) {
     val isVisible: Boolean
         get() = !value.isNullOrBlank()
@@ -232,8 +217,7 @@ fun WalletDemoOfferPreview.toReviewIslands(
     context: WalletDemoReviewSurfaceContext = WalletDemoReviewSurfaceContext.Offered,
 ): List<WalletDemoReviewIsland> = buildList {
     add(issuerReviewIsland(context))
-    add(credentialOfferReviewIsland(context))
-    informationOfferReviewIsland(context)?.let(::add)
+    addAll(credentialOfferReviewIslands(context))
     requiredActionOfferReviewIsland(context)?.let(::add)
 }
 
@@ -242,8 +226,7 @@ fun WalletDemoSharingReview.toReviewIslands(
     context: WalletDemoReviewSurfaceContext = WalletDemoReviewSurfaceContext.SelectedForSharing,
 ): List<WalletDemoReviewIsland> = buildList {
     verifierReviewIsland(context)?.let(::add)
-    credentialSharingReviewIsland(context)?.let(::add)
-    informationSharingReviewIsland(context)?.let(::add)
+    addAll(credentialSharingReviewIslands(context))
     purposeAndTransactionReviewIsland(context)?.let(::add)
 }
 
@@ -275,40 +258,27 @@ private fun WalletDemoOfferPreview.issuerReviewIsland(
     )
 }
 
-private fun WalletDemoOfferPreview.credentialOfferReviewIsland(
+private fun WalletDemoOfferPreview.credentialOfferReviewIslands(
     context: WalletDemoReviewSurfaceContext,
-): WalletDemoReviewIsland {
-    val firstCredential = offeredCredentials.firstOrNull()
-    val title = if (offeredCredentials.size == 1 && firstCredential != null) {
-        firstCredential.friendlyTitle()
-    } else {
-        "Credentials"
+): List<WalletDemoReviewIsland> = offeredCredentials.mapIndexed { index, credential ->
+    val title = credential.friendlyTitle()
+    val claimValues = credential.claimDisplayGroups().flatMap { group ->
+        group.claims.map { claim ->
+            WalletDemoReviewValue(claim.label, claim.inclusion, supportingText = group.title)
+        }
     }
-    return WalletDemoReviewIsland(
-        id = WalletDemoReviewIslandId("credential"),
+    WalletDemoReviewIsland(
+        id = WalletDemoReviewIslandId(credential.offerReviewIslandId(index)),
         kind = WalletDemoReviewIslandKind.Credential,
         context = context,
         title = title,
-        subtitle = if (offeredCredentials.size == 1) {
-            "Offered credential"
-        } else {
-            "${offeredCredentials.size} offered credentials"
-        },
-        visual = firstCredential?.display.toReviewVisual(title),
-        expandedValues = if (offeredCredentials.size == 1) {
-            listOf(WalletDemoReviewValue("Description", firstCredential?.display?.description))
-        } else {
-            offeredCredentials.map { credential ->
-                WalletDemoReviewValue(
-                    label = credential.friendlyTitle(),
-                    value = credential.display?.description ?: "Ready to add",
-                )
-            }
-        },
-        technicalSections = offeredCredentials.mapIndexed { index, credential ->
+        subtitle = "Offered credential",
+        visual = credential.display.toReviewVisual(title),
+        expandedValues = listOf(WalletDemoReviewValue("Description", credential.display?.description)) + claimValues,
+        technicalSections = listOf(
             WalletDemoReviewTechnicalSection(
-                id = "credential-$index",
-                title = credential.friendlyTitle(),
+                id = "credential-identity",
+                title = "Credential identity",
                 values = listOf(
                     WalletDemoReviewValue("Configuration identifier", credential.configurationId),
                     WalletDemoReviewValue("Format", credential.format),
@@ -319,48 +289,26 @@ private fun WalletDemoOfferPreview.credentialOfferReviewIsland(
                         linkUri = credential.display?.logoUri,
                     ),
                 ),
-            )
-        },
-        initiallyExpanded = offeredCredentials.size > 1,
-    )
-}
-
-private fun WalletDemoOfferPreview.informationOfferReviewIsland(
-    context: WalletDemoReviewSurfaceContext,
-): WalletDemoReviewIsland? {
-    val claims = offeredCredentials.flatMap { credential ->
-        credential.claimDisplayGroups().flatMap { group ->
-            group.claims.map { claim -> credential to (group.title to claim) }
-        }
-    }
-    if (claims.isEmpty()) return null
-
-    return WalletDemoReviewIsland(
-        id = WalletDemoReviewIslandId("information"),
-        kind = WalletDemoReviewIslandKind.Information,
-        context = context,
-        title = "Information",
-        subtitle = "${claims.size} ${if (claims.size == 1) "field" else "fields"} supported",
-        visual = WalletDemoReviewVisual(fallbackText = "i"),
-        expandedValues = claims.map { (_, groupAndClaim) ->
-            val (group, claim) = groupAndClaim
-            WalletDemoReviewValue(claim.label, claim.inclusion, supportingText = group)
-        },
-        technicalSections = offeredCredentials.mapIndexedNotNull { index, credential ->
-            val values = credential.claims.map { claim ->
-                WalletDemoReviewValue(
-                    label = claim.displayName
-                        ?: CredentialDisplayVocabulary.humanizedClaimLabel(claim.path.lastOrNull().orEmpty()),
-                    value = claim.path.joinToString("."),
-                    supportingText = if (claim.mandatory == true) "Always included" else "May be included",
-                )
-            }
+            ),
             WalletDemoReviewTechnicalSection(
-                id = "credential-information-$index",
-                title = credential.friendlyTitle(),
-                values = values,
-            ).takeIf { values.isNotEmpty() }
-        },
+                id = "credential-information",
+                title = "Credential information",
+                values = credential.claims.flatMap { claim ->
+                    listOf(
+                        WalletDemoReviewValue(
+                            label = claim.displayName
+                                ?: CredentialDisplayVocabulary.humanizedClaimLabel(claim.path.lastOrNull().orEmpty()),
+                            value = claim.path.joinToString("."),
+                        ),
+                        WalletDemoReviewValue(
+                            label = "Inclusion",
+                            value = if (claim.mandatory == true) "Always included" else "May be included",
+                        ),
+                    )
+                },
+            ),
+        ),
+        initiallyExpanded = true,
     )
 }
 
@@ -382,7 +330,7 @@ private fun WalletDemoOfferPreview.requiredActionOfferReviewIsland(
         context = context,
         title = title,
         subtitle = subtitle,
-        visual = WalletDemoReviewVisual(fallbackText = "→"),
+        visual = null,
         expandedValues = listOfNotNull(
             "Continuing opens your browser to sign in with the Issuer before the credential is added."
                 .takeIf { requiresIssuerAuthentication }
@@ -478,43 +426,25 @@ internal fun String?.verifiedOriginLabel(): String = when {
     else -> "Verified origin"
 }
 
-private fun WalletDemoSharingReview.credentialSharingReviewIsland(
+private fun WalletDemoSharingReview.credentialSharingReviewIslands(
     context: WalletDemoReviewSurfaceContext,
-): WalletDemoReviewIsland? {
-    if (credentialOptions.isEmpty()) return null
-    val first = credentialOptions.first()
-    val display = first.toCredentialDetails().toCardDisplayData()
-    val title = if (credentialOptions.size == 1) first.label else "Choose credentials"
-    return WalletDemoReviewIsland(
-        id = WalletDemoReviewIslandId("credential"),
+): List<WalletDemoReviewIsland> = credentialOptions.mapIndexed { index, option ->
+    val display = option.toCredentialDetails().toCardDisplayData()
+    WalletDemoReviewIsland(
+        id = WalletDemoReviewIslandId(option.reviewIslandId),
         kind = WalletDemoReviewIslandKind.Credential,
         context = context,
-        title = title,
-        subtitle = if (credentialOptions.size == 1) {
-            first.issuer?.takeIf(String::isNotBlank) ?: "Credential"
-        } else {
-            "${credentialOptions.size} credentials available"
-        },
+        title = option.label,
+        subtitle = option.issuer?.takeIf(String::isNotBlank) ?: "Credential",
         visual = WalletDemoReviewVisual(
             imageUri = display.portrait?.encoded,
             contentDescription = display.portrait?.let { "Credential image" },
-            fallbackText = title.firstOrNull()?.uppercase() ?: "C",
+            fallbackText = option.label.firstOrNull()?.uppercase() ?: "C",
         ),
-        expandedValues = if (credentialOptions.size == 1) {
-            emptyList()
-        } else {
-            credentialOptions.map { option ->
-                WalletDemoReviewValue(
-                    option.label,
-                    option.issuer ?: "Issuer unavailable",
-                    supportingText = option.subject,
-                )
-            }
-        },
-        technicalSections = credentialOptions.mapIndexed { index, option ->
+        technicalSections = listOf(
             WalletDemoReviewTechnicalSection(
-                id = "credential-option-$index",
-                title = option.label,
+                id = "credential-identity-$index",
+                title = "Credential identity",
                 values = listOf(
                     WalletDemoReviewValue("Credential identifier", option.credentialId),
                     WalletDemoReviewValue("Query identifier", option.queryId),
@@ -522,53 +452,21 @@ private fun WalletDemoSharingReview.credentialSharingReviewIsland(
                     WalletDemoReviewValue("Issuer", option.issuer),
                     WalletDemoReviewValue("Subject", option.subject),
                 ),
-            )
-        },
-        initiallyExpanded = true,
-    )
-}
-
-private fun WalletDemoSharingReview.informationSharingReviewIsland(
-    context: WalletDemoReviewSurfaceContext,
-): WalletDemoReviewIsland? {
-    val disclosures = credentialOptions.flatMap { option -> option.disclosures.map { option to it } }
-    if (disclosures.isEmpty()) return null
-    val optionalCount = disclosures.count { (_, disclosure) -> disclosure.selectable }
-    return WalletDemoReviewIsland(
-        id = WalletDemoReviewIslandId("information"),
-        kind = WalletDemoReviewIslandKind.Information,
-        context = context,
-        title = "Information to share",
-        subtitle = buildString {
-            append(disclosures.size)
-            append(if (disclosures.size == 1) " field" else " fields")
-            if (optionalCount > 0) append(" · $optionalCount optional")
-        },
-        visual = WalletDemoReviewVisual(fallbackText = "i"),
-        expandedValues = disclosures.map { (option, disclosure) ->
-            WalletDemoReviewValue(
-                label = disclosure.label,
-                value = disclosure.displayValue ?: disclosure.valueJson,
-                supportingText = buildString {
-                    append(option.label)
-                    append(" · ")
-                    append(if (disclosure.selectable) "Optional" else "Required")
-                },
-            )
-        },
-        technicalSections = credentialOptions.mapIndexedNotNull { index, option ->
-            val values = option.disclosures.flatMap { disclosure ->
-                listOf(
-                    WalletDemoReviewValue(disclosure.label, disclosure.path),
-                    WalletDemoReviewValue("Selection", if (disclosure.selectable) "Optional" else "Required"),
-                )
-            }
+            ),
             WalletDemoReviewTechnicalSection(
-                id = "requested-information-$index",
-                title = option.label,
-                values = values,
-            ).takeIf { values.isNotEmpty() }
-        },
+                id = "credential-information-$index",
+                title = "Requested information",
+                values = option.disclosures.flatMap { disclosure ->
+                    listOf(
+                        WalletDemoReviewValue(disclosure.label, disclosure.path),
+                        WalletDemoReviewValue(
+                            "Selection",
+                            if (disclosure.selectable) "Optional" else "Required",
+                        ),
+                    )
+                },
+            ),
+        ),
         initiallyExpanded = true,
     )
 }
@@ -584,12 +482,13 @@ private fun WalletDemoSharingReview.purposeAndTransactionReviewIsland(
         context = context,
         title = request.transactionData.singleOrNull()?.title ?: "Purpose and transaction",
         subtitle = "Review before sharing",
-        visual = WalletDemoReviewVisual(fallbackText = "!"),
+        visual = null,
         expandedValues = items.map { (group, item) ->
             WalletDemoReviewValue(
                 item.label,
                 item.value.reviewText(),
                 supportingText = group.takeIf { request.transactionData.size > 1 },
+                sourcePath = item.path.id,
             )
         },
         technicalSections = request.transactionData.mapIndexed { index, group ->
@@ -618,6 +517,12 @@ private fun WalletDemoOfferedCredentialMetadata.friendlyTitle(): String =
         format = format,
         credentialType = vct ?: doctype ?: configurationId,
     )
+
+internal fun WalletDemoOfferedCredentialMetadata.offerReviewIslandId(index: Int): String =
+    "credential-offered-$index"
+
+private val WalletDemoPresentationCredentialOption.reviewIslandId: String
+    get() = "credential-${selection.id}"
 
 private fun String?.presentableOrNull(): String? = this?.trim()?.takeIf(String::isNotEmpty)
 

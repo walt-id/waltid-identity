@@ -32,7 +32,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
         let islands = details.reviewIslands()
 
-        XCTAssertEqual(islands.map(\.kind), [.credential, .issuer, .information, .validityAndStatus])
+        XCTAssertEqual(islands.map(\.kind), [.credential, .issuer, .validityAndStatus])
         XCTAssertTrue(islands.allSatisfy { $0.context == .stored })
         XCTAssertTrue(
             islands.first?.visibleTechnicalSections
@@ -43,6 +43,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             .compactMap(\.value)
         XCTAssertFalse(normalText.contains("vc+sd-jwt"))
         XCTAssertFalse(normalText.contains("urn:eudi:pid:1"))
+        XCTAssertTrue(islands[0].visibleExpandedValues.contains { $0.label == "Given name" && $0.value == "Ada" })
     }
 
     func testFlattensNamespacedMdocObjectClaimsIntoDisplayRows() {
@@ -260,6 +261,36 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(mimeType, "image/png")
         XCTAssertEqual(byteCount, onePixelPNGData.count)
         XCTAssertEqual(data, onePixelPNGData)
+    }
+
+    func testClassifiesMdocSignatureUsualMarkByteArrayAsImage() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "Mobile driving licence",
+            issuer: nil,
+            subject: nil,
+            format: "mso_mdoc",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "org.iso.18013.5.1": {
+                "signature_usual_mark": {
+                  "elementValue": \(onePixelPNGByteArrayJSON())
+                }
+              }
+            }
+            """
+        )
+
+        let signature = try XCTUnwrap(
+            details.groups.flatMap(\.items).first {
+                $0.path.id == "org.iso.18013.5.1.signature_usual_mark.elementValue"
+            }
+        )
+        XCTAssertEqual(signature.label, "Signature or usual mark")
+        guard case .image = signature.value else {
+            return XCTFail("Expected signature or usual mark to decode as an image")
+        }
     }
 
     func testRendersSdJwtProtocolDataAsReadableMetadataAndKeepsClaimsGrouped() throws {

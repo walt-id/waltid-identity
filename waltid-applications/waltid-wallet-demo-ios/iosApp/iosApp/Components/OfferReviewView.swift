@@ -11,6 +11,8 @@ struct OfferReviewView: View {
     let onTxCodeChange: (String) -> Void
     let onAccept: () -> Void
     let onDecline: () -> Void
+    let route: Binding<ReviewRoute>?
+    let showsTechnicalHeader: Bool
 
     init(
         preview: IssuanceOfferPreview,
@@ -18,6 +20,8 @@ struct OfferReviewView: View {
         isReviewEnabled: Bool,
         txCode: String,
         showsActions: Bool = true,
+        route: Binding<ReviewRoute>? = nil,
+        showsTechnicalHeader: Bool = true,
         onTxCodeChange: @escaping (String) -> Void,
         onAccept: @escaping () -> Void,
         onDecline: @escaping () -> Void
@@ -27,6 +31,8 @@ struct OfferReviewView: View {
         self.isReviewEnabled = isReviewEnabled
         self.txCode = txCode
         self.showsActions = showsActions
+        self.route = route
+        self.showsTechnicalHeader = showsTechnicalHeader
         self.onTxCodeChange = onTxCodeChange
         self.onAccept = onAccept
         self.onDecline = onDecline
@@ -36,10 +42,17 @@ struct OfferReviewView: View {
         VStack(alignment: .leading, spacing: 8) {
             ReviewIslandNavigationView(
                 islands: preview.reviewIslands,
-                showsModelExpandedValues: { $0.kind != .information }
+                showsModelExpandedValues: { _ in true },
+                hasCustomExpandedContent: { island in
+                    preview.credential(forReviewIslandID: island.id)?.claims.isEmpty == false ||
+                        (island.kind == .requiredAction && preview.transactionCode != nil)
+                },
+                route: route,
+                showsTechnicalHeader: showsTechnicalHeader
             ) { island in
-                if island.kind == .information {
-                    OfferedInformationContent(credentials: preview.credentials)
+                if island.kind == .credential,
+                   let credential = preview.credential(forReviewIslandID: island.id) {
+                    OfferedCredentialInformationContent(credential: credential)
                 } else if island.kind == .requiredAction, let requirement = preview.transactionCode {
                     transactionCodeInput(requirement)
                 }
@@ -86,27 +99,20 @@ struct OfferReviewView: View {
     }
 }
 
-private struct OfferedInformationContent: View {
-    let credentials: [IssuanceCredentialPreview]
+private struct OfferedCredentialInformationContent: View {
+    let credential: IssuanceCredentialPreview
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(credentials.filter { !$0.claims.isEmpty }.enumerated()), id: \.offset) { index, credential in
-                if index > 0 { Divider() }
-                if credentials.count > 1 {
-                    Text(credential.name?.presentableValue ?? "Credential")
-                        .font(.caption.weight(.semibold))
-                }
-                ForEach(Array(credential.claimDisplayGroups.enumerated()), id: \.offset) { groupIndex, group in
-                    if groupIndex > 0 { Divider() }
-                    Text(group.title)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tint)
-                    ForEach(Array(group.claims.enumerated()), id: \.offset) { _, claim in
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(claim.label).font(.caption)
-                            Text(claim.inclusion).font(.caption2).foregroundStyle(.secondary)
-                        }
+            ForEach(Array(credential.claimDisplayGroups.enumerated()), id: \.offset) { groupIndex, group in
+                if groupIndex > 0 { Divider() }
+                Text(group.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tint)
+                ForEach(Array(group.claims.enumerated()), id: \.offset) { _, claim in
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(claim.label).font(.caption)
+                        Text(claim.inclusion).font(.caption2).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -170,31 +176,34 @@ struct OfferReviewActions: View {
             Button(action: onAccept) {
                 Text(preview.grant == .authorizationCode ? "Continue" : "Add credential")
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.waltBlue)
+            .buttonStyle(WalletPrimaryButtonStyle())
+            .frame(maxWidth: .infinity)
             .disabled(!isAcceptEnabled)
             .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
 
-            Button("Decline", action: onDecline)
-                .buttonStyle(.bordered)
-                .disabled(!isReviewEnabled)
-                .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
+            Button(action: onDecline) {
+                Text("Decline")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(WalletSecondaryButtonStyle())
+            .frame(maxWidth: .infinity)
+            .disabled(!isReviewEnabled)
+            .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
         }
+        .frame(height: 48)
         .frame(maxWidth: .infinity)
     }
 }
 
-private extension IssuanceOfferPreview {
+extension IssuanceOfferPreview {
     var reviewIslands: [ReviewIsland] {
         var islands = [issuerReviewIsland]
-        if let credentialReviewIsland {
-            islands.append(credentialReviewIsland)
-        }
-        if let informationReviewIsland {
-            islands.append(informationReviewIsland)
-        }
+        islands.append(contentsOf: credentialReviewIslands)
         if let requiredActionReviewIsland {
             islands.append(requiredActionReviewIsland)
         }
@@ -233,84 +242,57 @@ private extension IssuanceOfferPreview {
         )
     }
 
-    var credentialReviewIsland: ReviewIsland? {
-        guard let first = credentials.first else { return nil }
-        let title: String
-        if credentials.count == 1 {
-            title = first.name?.presentableValue ?? "Credential"
-        } else {
-            title = "Credentials"
+    var credentialReviewIslands: [ReviewIsland] {
+        credentials.enumerated().map { index, credential in
+            let title = credential.name?.presentableValue ?? "Credential"
+            return ReviewIsland(
+                id: credential.offerReviewIslandID(index: index),
+                kind: .credential,
+                context: .offered,
+                title: title,
+                 subtitle: "Offered credential",
+                 visual: ReviewIslandVisual(
+                     imageURI: credential.logoURI?.absoluteString,
+                     contentDescription: credential.logoAltText,
+                     fallbackText: title.first.map { String($0).uppercased() } ?? "C"
+                 ),
+                expandedValues: [ReviewValue(label: "Description", value: credential.descriptionText)],
+                technicalSections: [
+                    ReviewTechnicalSection(
+                        id: "credential-identity",
+                        title: "Credential identity",
+                        values: [
+                            ReviewValue(label: "Configuration identifier", value: credential.configurationID),
+                            ReviewValue(label: "Format", value: credential.format),
+                            ReviewValue(label: "Logo source", value: credential.logoURI?.absoluteString),
+                        ]
+                    ),
+                    ReviewTechnicalSection(
+                        id: "credential-information",
+                        title: "Credential information",
+                        values: credential.claims.flatMap { claim in
+                            [
+                                ReviewValue(
+                                    label: claim.displayName?.presentableValue ?? claim.path.last ?? "Field",
+                                    value: claim.path.joined(separator: ".")
+                                ),
+                                ReviewValue(
+                                    label: "Inclusion",
+                                    value: claim.mandatory == true ? "Always included" : "May be included"
+                                ),
+                            ]
+                        }
+                    ),
+                ],
+                initiallyExpanded: true
+            )
         }
-        return ReviewIsland(
-            id: "credential",
-            kind: .credential,
-            context: .offered,
-            title: title,
-            subtitle: credentials.count == 1
-                ? "Offered credential"
-                : "\(credentials.count) offered credentials",
-            visual: ReviewIslandVisual(
-                imageURI: first.logoURI?.absoluteString,
-                contentDescription: first.logoAltText,
-                fallbackText: title.first.map { String($0).uppercased() } ?? "C"
-            ),
-            expandedValues: credentials.count == 1
-                ? [ReviewValue(label: "Description", value: first.descriptionText)]
-                : credentials.map {
-                    ReviewValue(
-                        label: $0.name?.presentableValue ?? "Credential",
-                        value: $0.descriptionText?.presentableValue ?? "Ready to add"
-                    )
-                },
-            technicalSections: credentials.enumerated().map { index, credential in
-                ReviewTechnicalSection(
-                    id: "credential-\(index)",
-                    title: credential.name?.presentableValue ?? "Credential",
-                    values: [
-                        ReviewValue(label: "Configuration identifier", value: credential.configurationID),
-                        ReviewValue(label: "Format", value: credential.format),
-                        ReviewValue(label: "Logo source", value: credential.logoURI?.absoluteString),
-                    ]
-                )
-            },
-            initiallyExpanded: credentials.count > 1
-        )
     }
 
-    var informationReviewIsland: ReviewIsland? {
-        let claimEntries = credentials.flatMap { credential in
-            credential.claims.map { (credential, $0) }
-        }
-        guard !claimEntries.isEmpty else { return nil }
-        return ReviewIsland(
-            id: "information",
-            kind: .information,
-            context: .offered,
-            title: "Information",
-            subtitle: "\(claimEntries.count) \(claimEntries.count == 1 ? "field" : "fields") supported",
-            visual: ReviewIslandVisual(fallbackText: "i"),
-            expandedValues: claimEntries.map { credential, claim in
-                ReviewValue(
-                    label: claim.displayName?.presentableValue ?? claim.path.last ?? "Field",
-                    value: claim.mandatory == true ? "Always included" : "May be included",
-                    supportingText: credentials.count > 1 ? credential.name?.presentableValue : nil
-                )
-            },
-            technicalSections: credentials.enumerated().compactMap { index, credential in
-                guard !credential.claims.isEmpty else { return nil }
-                return ReviewTechnicalSection(
-                    id: "offered-information-\(index)",
-                    title: credential.name?.presentableValue ?? "Credential",
-                    values: credential.claims.map { claim in
-                        ReviewValue(
-                            label: claim.path.joined(separator: "."),
-                            value: claim.mandatory == true ? "Mandatory" : "Optional"
-                        )
-                    }
-                )
-            },
-            initiallyExpanded: true
-        )
+    func credential(forReviewIslandID islandID: String) -> IssuanceCredentialPreview? {
+        credentials.enumerated().first { index, credential in
+            credential.offerReviewIslandID(index: index) == islandID
+        }?.element
     }
 
     var requiredActionReviewIsland: ReviewIsland? {
@@ -326,7 +308,7 @@ private extension IssuanceOfferPreview {
             context: .offered,
             title: title,
             subtitle: subtitle,
-            visual: ReviewIslandVisual(fallbackText: "→"),
+            visual: nil,
             expandedValues: grant == .authorizationCode
                 ? [ReviewValue(
                     label: "Next step",
@@ -350,6 +332,10 @@ private extension IssuanceOfferPreview {
             initiallyExpanded: true
         )
     }
+}
+
+private extension IssuanceCredentialPreview {
+    func offerReviewIslandID(index: Int) -> String { "credential-offered-\(index)" }
 }
 
 private extension String {

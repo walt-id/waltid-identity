@@ -88,6 +88,13 @@ public enum CredentialDisplayVocabulary {
         ClaimDescriptor("picture", roles: [.image], displayOrder: 72),
         ClaimDescriptor("image", roles: [.image], displayOrder: 73),
         ClaimDescriptor("logo", roles: [.image], displayOrder: 74),
+        ClaimDescriptor(
+            "signature_usual_mark",
+            label: "Signature or usual mark",
+            group: .personal,
+            roles: [.image],
+            displayOrder: 75
+        ),
         ClaimDescriptor("age", group: .personal, displayOrder: 80),
         ClaimDescriptor("age_over_18", label: "Age over 18", group: .personal, displayOrder: 81),
         ClaimDescriptor("resident_address", label: "Resident address", group: .address, displayOrder: 100),

@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
+import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
 internal fun ReviewMetadataSection(
@@ -146,6 +148,7 @@ internal data class MetadataDetailItem(
     val value: String?,
     val supportingText: String? = null,
     val linkUri: String? = null,
+    val sourcePath: String? = null,
 )
 
 @Composable
@@ -175,7 +178,11 @@ private fun MetadataDetailLine(item: MetadataDetailItem) {
     val prefersStacked = supportingText != null || item.label.length > 28 || value.length > 38 ||
         item.label.contains('\n') || value.contains('\n') || linkUri != null
 
-    BoxWithConstraints {
+    BoxWithConstraints(
+        modifier = item.sourcePath
+            ?.let { Modifier.testTag(WalletUiTestTags.claim(it)) }
+            ?: Modifier,
+    ) {
         if (prefersStacked || maxWidth < 260.dp) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 MetadataLabel(item.label)

@@ -75,6 +75,13 @@ internal object CredentialDisplayVocabulary {
         ClaimDescriptor("picture", roles = setOf(ClaimRole.Image), displayOrder = 72),
         ClaimDescriptor("image", roles = setOf(ClaimRole.Image), displayOrder = 73),
         ClaimDescriptor("logo", roles = setOf(ClaimRole.Image), displayOrder = 74),
+        ClaimDescriptor(
+            "signature_usual_mark",
+            label = "Signature or usual mark",
+            group = ClaimGroupKind.Personal,
+            roles = setOf(ClaimRole.Image),
+            displayOrder = 75,
+        ),
         ClaimDescriptor("age", group = ClaimGroupKind.Personal, displayOrder = 80),
         ClaimDescriptor("age_over_18", label = "Age over 18", group = ClaimGroupKind.Personal, displayOrder = 81),
         ClaimDescriptor("resident_address", label = "Resident address", group = ClaimGroupKind.Address, displayOrder = 100),

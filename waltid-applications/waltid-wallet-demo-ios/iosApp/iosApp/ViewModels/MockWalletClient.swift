@@ -341,6 +341,11 @@ actor MockWalletClient: WalletClient {
         addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
         credentialDataJSON: """
         {
+          "org.iso.18013.5.1": {
+            "signature_usual_mark": {
+              "elementValue": [-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]
+            }
+          },
           "org.iso.23220.1": {
             "given_name": "Erika",
             "family_name": "Mustermann",

@@ -18,6 +18,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -26,9 +27,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
+import id.walt.walletdemo.compose.logic.WalletDemoReviewRoute
 import id.walt.walletdemo.compose.logic.WalletDemoReviewSurfaceContext
 import id.walt.walletdemo.compose.ui.components.OfferReviewActionBar
 import id.walt.walletdemo.compose.ui.components.OfferReviewSection
+import id.walt.walletdemo.compose.ui.screens.WalletSheetHeader
 
 /**
  * UI states for the Credential Manager CREATE_CREDENTIAL fulfillment sheet.
@@ -100,6 +103,7 @@ fun WalletDemoOfferCreateSheet(
                     }
                 },
                 sheetState = sheetState,
+                containerColor = MaterialTheme.colorScheme.background,
             ) {
                 // ModalBottomSheet hosts its content in its own window, which the enclosing Box's
                 // semantics do not reach, so the export has to be repeated here or none of the
@@ -113,6 +117,7 @@ fun WalletDemoOfferCreateSheet(
                             enabled = !state.submitting,
                             onAccept = onAccept,
                             onDecline = onDecline,
+                            onDismiss = onDismiss,
                         )
                         is WalletDemoOfferCreateUiState.WaitingForAuthorization ->
                             OfferCreateWaitingForAuthorizationContent(
@@ -151,8 +156,11 @@ private fun OfferCreateReviewContent(
     enabled: Boolean,
     onAccept: (txCode: String?) -> Unit,
     onDecline: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     var txCode by remember(preview) { mutableStateOf("") }
+    var technicalTitle by remember(preview) { mutableStateOf<String?>(null) }
+    var technicalBackSignal by remember(preview) { mutableIntStateOf(0) }
     val txRequirement = preview.transactionCode
     val acceptEnabled = enabled && (txRequirement == null || txRequirement.accepts(txCode))
 
@@ -161,11 +169,11 @@ private fun OfferCreateReviewContent(
             .fillMaxWidth()
             .fillMaxHeight(0.92f),
     ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        WalletSheetHeader(
+            title = technicalTitle ?: title,
+            onBack = technicalTitle?.let { { technicalBackSignal += 1 } },
+            onClose = onDismiss,
+            enabled = enabled,
         )
         OfferReviewSection(
             preview = preview,
@@ -182,6 +190,15 @@ private fun OfferCreateReviewContent(
             showActions = false,
             scrollContent = true,
             context = WalletDemoReviewSurfaceContext.PlatformInvoked,
+            hostOwnsTopChrome = true,
+            technicalBackSignal = technicalBackSignal,
+            onRouteChanged = { route, island ->
+                technicalTitle = if (route is WalletDemoReviewRoute.TechnicalDetails) {
+                    island?.title
+                } else {
+                    null
+                }
+            },
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 16.dp),

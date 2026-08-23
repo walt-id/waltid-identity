@@ -45,7 +45,7 @@ fun WalletDemoSharingReviewSheet(
             DismissibleScrim(enabled = enabled, onDismiss = onDismiss)
             Surface(
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                tonalElevation = 2.dp,
+                color = MaterialTheme.colorScheme.background,
                 shadowElevation = 12.dp,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)

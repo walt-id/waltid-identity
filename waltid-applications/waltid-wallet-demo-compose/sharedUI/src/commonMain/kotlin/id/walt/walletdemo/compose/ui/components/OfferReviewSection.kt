@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -13,17 +12,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
-import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoReviewIsland
 import id.walt.walletdemo.compose.logic.WalletDemoReviewIslandKind
+import id.walt.walletdemo.compose.logic.WalletDemoReviewRoute
 import id.walt.walletdemo.compose.logic.WalletDemoReviewSurfaceContext
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
-import id.walt.walletdemo.compose.logic.claimDisplayGroups
 import id.walt.walletdemo.compose.logic.toReviewIslands
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
@@ -41,6 +38,9 @@ internal fun OfferReviewSection(
     showActions: Boolean = true,
     scrollContent: Boolean = false,
     context: WalletDemoReviewSurfaceContext = WalletDemoReviewSurfaceContext.Offered,
+    hostOwnsTopChrome: Boolean = false,
+    technicalBackSignal: Int = 0,
+    onRouteChanged: (WalletDemoReviewRoute, WalletDemoReviewIsland?) -> Unit = { _, _ -> },
 ) {
     val islands = preview.toReviewIslands(context)
     Column(
@@ -55,10 +55,14 @@ internal fun OfferReviewSection(
             modifier = if (scrollContent) Modifier.weight(1f) else Modifier,
             scrollContent = scrollContent,
             islandModifier = { island -> offerIslandTestModifier(island) },
-            showModelExpandedValues = { island -> island.kind != WalletDemoReviewIslandKind.Information },
+            hasCustomExpandedContent = { island ->
+                island.kind == WalletDemoReviewIslandKind.RequiredAction && preview.transactionCode != null
+            },
+            technicalBackSignal = technicalBackSignal,
+            onRouteChanged = onRouteChanged,
+            showTechnicalHeader = !hostOwnsTopChrome,
         ) { island ->
             when (island.kind) {
-                WalletDemoReviewIslandKind.Information -> OfferedInformationContent(preview.offeredCredentials)
                 WalletDemoReviewIslandKind.RequiredAction -> TransactionCodeField(
                         preview = preview,
                         txCode = txCode,
@@ -68,6 +72,7 @@ internal fun OfferReviewSection(
                 WalletDemoReviewIslandKind.Issuer,
                 WalletDemoReviewIslandKind.Verifier,
                 WalletDemoReviewIslandKind.Credential,
+                WalletDemoReviewIslandKind.Information,
                 WalletDemoReviewIslandKind.ValidityAndStatus,
                 WalletDemoReviewIslandKind.PurposeAndTransaction,
                 -> Unit
@@ -82,40 +87,6 @@ internal fun OfferReviewSection(
                 onAccept = onAccept,
                 onDecline = onDecline,
             )
-        }
-    }
-}
-
-@Composable
-private fun OfferedInformationContent(credentials: List<WalletDemoOfferedCredentialMetadata>) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        credentials.filter { it.claims.isNotEmpty() }.forEachIndexed { credentialIndex, credential ->
-            if (credentialIndex > 0) HorizontalDivider()
-            if (credentials.size > 1) {
-                Text(
-                    text = credential.display?.name ?: credential.configurationId,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            credential.claimDisplayGroups().forEachIndexed { groupIndex, group ->
-                if (groupIndex > 0) HorizontalDivider()
-                Text(
-                    text = group.title,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                group.claims.forEach { claim ->
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(claim.label, style = MaterialTheme.typography.bodySmall)
-                        Text(
-                            text = claim.inclusion,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
         }
     }
 }

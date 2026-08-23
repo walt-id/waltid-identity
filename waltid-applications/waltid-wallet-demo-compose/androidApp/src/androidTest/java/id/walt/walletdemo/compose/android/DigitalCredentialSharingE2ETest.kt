@@ -133,6 +133,7 @@ class DigitalCredentialSharingE2ETest {
             scenario = scenario,
             expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
         )
+        WalletGalleryCapture.recordRequest("platform-presentation", session.requestJson)
 
         val credential = fixture.share(
             request = fixture.startCredentialRequest(session.requestJson),
@@ -168,6 +169,7 @@ class DigitalCredentialSharingE2ETest {
             expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
             transactionData = listOf(transactionData),
         )
+        WalletGalleryCapture.recordRequest("platform-presentation-transaction-data", session.requestJson)
 
         val credential = fixture.share(
             request = fixture.startCredentialRequest(session.requestJson),
@@ -266,6 +268,7 @@ class DigitalCredentialSharingE2ETest {
                 expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
                 transactionData = listOf(transactionData),
             )
+            WalletGalleryCapture.recordRequest("platform-presentation-multi-credential", session.requestJson)
 
             val credential = fixture.share(
                 request = fixture.startCredentialRequest(session.requestJson),
@@ -289,6 +292,10 @@ class DigitalCredentialSharingE2ETest {
                     )
                 },
                 beforeShare = { device ->
+                    WalletGalleryCapture.capture(
+                        device,
+                        "platform-presentation-multi-credential-selection-review",
+                    )
                     // Labels as well as values: an unqualified "Name" row is the regression this guards.
                     assertClaimValueVisibleAfterScrolling(
                         device = device,
@@ -320,6 +327,7 @@ class DigitalCredentialSharingE2ETest {
                         message = "Review did not receive the second credential",
                     )
                 },
+                captureName = "platform-presentation-multi-credential-transaction-review",
             )
 
             val responseJson = Json.parseToJsonElement(credential.credentialJson).jsonObject
@@ -636,9 +644,11 @@ class DigitalCredentialSharingE2ETest {
         candidateText: String,
         onCredentialManagerPrompt: (UiDevice) -> Unit = {},
         beforeShare: (UiDevice) -> Unit = {},
+        captureName: String = "platform-presentation-review",
     ): DigitalCredential {
         enterProviderReview(request, candidateText, onCredentialManagerPrompt)
         beforeShare(device)
+        WalletGalleryCapture.capture(device, captureName)
         clickByTag(device, WALLET_SHARE_BUTTON_TAG)
 
         val response = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) {

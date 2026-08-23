@@ -26,6 +26,7 @@ internal object WalletUiTestTags {
     val ScanSubmit = tag("scanSubmit")
     val ScanDismiss = tag("scanDismiss")
     val InteractionSheet = tag("interactionSheet")
+    val InteractionDismiss = tag("interactionDismiss")
     val OfferInput = tag("offerInput")
     val OfferScanButton = tag("offerScanButton")
     val TxCodeInput = tag("txCodeInput")

@@ -26,14 +26,13 @@ class WalletDemoReviewIslandsTest {
             listOf(
                 WalletDemoReviewIslandKind.Credential,
                 WalletDemoReviewIslandKind.Issuer,
-                WalletDemoReviewIslandKind.Information,
                 WalletDemoReviewIslandKind.ValidityAndStatus,
             ),
             islands.map(WalletDemoReviewIsland::kind),
         )
         assertTrue(islands.all { it.context == WalletDemoReviewSurfaceContext.Stored })
         assertEquals("Example Issuer", islands[1].title)
-        assertTrue(islands[2].visibleExpandedValues.any { it.label == "Given name" && it.value == "Ada" })
+        assertTrue(islands.first().visibleExpandedValues.any { it.label == "Given name" && it.value == "Ada" })
 
         val normalText = islands.flatMap { it.visibleSummaryValues + it.visibleExpandedValues }
             .flatMap { listOfNotNull(it.label, it.value, it.supportingText) }
@@ -62,7 +61,6 @@ class WalletDemoReviewIslandsTest {
             listOf(
                 WalletDemoReviewIslandKind.Issuer,
                 WalletDemoReviewIslandKind.Credential,
-                WalletDemoReviewIslandKind.Information,
                 WalletDemoReviewIslandKind.RequiredAction,
             ),
             islands.map(WalletDemoReviewIsland::kind),
@@ -88,6 +86,90 @@ class WalletDemoReviewIslandsTest {
             .flatMap { listOfNotNull(it.label, it.value) }
         assertTrue("Expected length" in actionTechnicalText)
         assertTrue("6" in actionTechnicalText)
+    }
+
+    @Test
+    fun islandVisualsRespectSchemaSupportRatherThanInventingSlots() {
+        val issuance = offerPreview(
+            transactionCode = WalletDemoTransactionCodeRequirement(
+                inputMode = WalletDemoTransactionCodeInputMode.Numeric,
+                length = 6,
+                description = null,
+            )
+        ).toReviewIslands()
+
+        val issuer = issuance.single { it.kind == WalletDemoReviewIslandKind.Issuer }
+        val credential = issuance.single { it.kind == WalletDemoReviewIslandKind.Credential }
+        val requiredAction = issuance.single { it.kind == WalletDemoReviewIslandKind.RequiredAction }
+
+        assertEquals("E", issuer.visual?.fallbackText)
+        assertEquals(null, issuer.visual?.imageUri)
+        assertEquals("P", credential.visual?.fallbackText)
+        assertEquals(null, credential.visual?.imageUri)
+        assertEquals(null, requiredAction.visual)
+
+        val suppliedLogo = offerPreview().copy(
+            issuer = offerPreview().issuer.copy(
+                display = offerPreview().issuer.display?.copy(logoUri = "https://issuer.example/logo.svg")
+            )
+        ).toReviewIslands().single { it.kind == WalletDemoReviewIslandKind.Issuer }
+
+        assertEquals("https://issuer.example/logo.svg", suppliedLogo.visual?.imageUri)
+        assertEquals("E", suppliedLogo.visual?.fallbackText)
+    }
+
+    @Test
+    fun issuanceUsesOnePeerIslandPerOfferedCredential() {
+        val first = offerPreview().offeredCredentials.single()
+        val second = first.copy(
+            configurationId = "urn:eudi:pid:1",
+            format = "vc+sd-jwt",
+            vct = "urn:eudi:pid:1",
+            doctype = null,
+            display = first.display?.copy(name = "Personal ID"),
+        )
+
+        val credentials = offerPreview().copy(offeredCredentials = listOf(first, second))
+            .toReviewIslands()
+            .filter { it.kind == WalletDemoReviewIslandKind.Credential }
+
+        assertEquals(listOf("Photo ID", "Personal ID"), credentials.map { it.title })
+        assertTrue(credentials.all { it.initiallyExpanded })
+        assertEquals(2, credentials.map { it.id }.distinct().size)
+    }
+
+    @Test
+    fun choosingAnAlternativeCombinationKeepsOnlyThatCombinationAndItsDisclosures() {
+        val identity = presentationOption("identity", "identity-1", "Personal ID")
+        val age = presentationOption("age", "age-1", "Age credential")
+        val travel = presentationOption("travel", "travel-1", "Travel ID")
+        val review = WalletDemoSharingReview(
+            request = WalletDemoSharingRequest(verifier = null),
+            credentialOptions = listOf(identity, age, travel),
+            credentialRequirements = listOf(
+                WalletDemoPresentationCredentialRequirement(
+                    options = listOf(listOf("identity", "age"), listOf("travel")),
+                )
+            ),
+        )
+        val identityDisclosure = WalletDemoPresentationDisclosureSelection(
+            queryId = identity.queryId,
+            credentialId = identity.credentialId,
+            path = "given_name",
+        )
+        val initial = WalletDemoSharingSelection(
+            credentials = setOf(identity.selection, age.selection),
+            disclosures = setOf(identityDisclosure),
+        )
+
+        val travelSelection = review.toggleCredential(initial, travel.selection)
+        assertEquals(setOf(travel.selection), travelSelection.credentials)
+        assertTrue(travelSelection.disclosures.isEmpty())
+        assertTrue(review.hasCompleteCredentialSelection(travelSelection.credentials))
+
+        val identitySelection = review.toggleCredential(travelSelection, identity.selection)
+        assertEquals(setOf(identity.selection, age.selection), identitySelection.credentials)
+        assertTrue(review.hasCompleteCredentialSelection(identitySelection.credentials))
     }
 
     @Test
@@ -139,7 +221,7 @@ class WalletDemoReviewIslandsTest {
     }
 
     @Test
-    fun severalCredentialOptionsUseOneNeutralIslandHeading() {
+    fun severalCredentialOptionsUsePeerCredentialIslands() {
         val review = WalletDemoSharingReview(
             request = WalletDemoSharingRequest(verifier = null),
             credentialOptions = listOf(
@@ -164,11 +246,11 @@ class WalletDemoReviewIslandsTest {
             ),
         )
 
-        val island = review.toReviewIslands().single { it.kind == WalletDemoReviewIslandKind.Credential }
+        val islands = review.toReviewIslands().filter { it.kind == WalletDemoReviewIslandKind.Credential }
 
-        assertEquals("Choose credentials", island.title)
-        assertEquals("2 credentials available", island.subtitle)
-        assertEquals(listOf("Personal ID", "Travel ID"), island.visibleExpandedValues.map { it.label })
+        assertEquals(listOf("Personal ID", "Travel ID"), islands.map { it.title })
+        assertEquals(listOf("Example Issuer", "Example Issuer"), islands.map { it.subtitle })
+        assertTrue(islands.all { it.initiallyExpanded })
     }
 
     @Test
@@ -245,7 +327,6 @@ class WalletDemoReviewIslandsTest {
             listOf(
                 WalletDemoReviewIslandKind.Verifier,
                 WalletDemoReviewIslandKind.Credential,
-                WalletDemoReviewIslandKind.Information,
                 WalletDemoReviewIslandKind.PurposeAndTransaction,
             ),
             islands.map(WalletDemoReviewIsland::kind),
@@ -253,7 +334,6 @@ class WalletDemoReviewIslandsTest {
         assertEquals("Verified website", islands.first().subtitle)
         assertTrue(islands.first().initiallyExpanded)
         assertTrue(islands[1].initiallyExpanded)
-        assertTrue(islands[2].initiallyExpanded)
         assertEquals("Photo ID", islands[1].title)
         assertEquals("Example Issuer", islands[1].subtitle)
         assertTrue(islands[1].visibleExpandedValues.isEmpty())
@@ -268,6 +348,8 @@ class WalletDemoReviewIslandsTest {
             .flatMap { it.visibleValues }
             .flatMap { listOfNotNull(it.label, it.value) }
         assertTrue("OpenID4VP encrypted response" in verifierTechnicalText)
+        assertTrue(islands[1].visibleTechnicalSections.any { it.title == "Requested information" })
+        assertEquals(null, islands.last().visual)
     }
 
     @Test
@@ -327,5 +409,19 @@ class WalletDemoReviewIslandsTest {
         ),
         transactionCode = transactionCode,
         requiresIssuerAuthentication = requiresIssuerAuthentication,
+    )
+
+    private fun presentationOption(
+        queryId: String,
+        credentialId: String,
+        label: String,
+    ): WalletDemoPresentationCredentialOption = WalletDemoPresentationCredentialOption(
+        queryId = queryId,
+        credentialId = credentialId,
+        label = label,
+        issuer = null,
+        format = "vc+sd-jwt",
+        credentialDataJson = "{}",
+        disclosures = emptyList(),
     )
 }

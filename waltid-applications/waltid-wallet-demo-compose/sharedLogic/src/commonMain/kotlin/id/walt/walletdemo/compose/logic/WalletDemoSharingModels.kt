@@ -205,6 +205,42 @@ fun WalletDemoSharingSelection.toggleDisclosure(
         .forSelectedCredentials(credentials),
 )
 
+/**
+ * Applies a credential choice with the request's alternative query combinations in scope.
+ *
+ * Choosing a credential from a different combination switches the complete requirement to that
+ * combination, retains already selected credentials that still belong to it, and selects the first
+ * available credential for any newly required companion query. The protocol/session owner still
+ * owns the resulting selection and submission lifecycle.
+ */
+fun WalletDemoSharingReview.toggleCredential(
+    current: WalletDemoSharingSelection,
+    selection: WalletDemoPresentationCredentialSelection,
+): WalletDemoSharingSelection {
+    val option = credentialOptions.firstOrNull { it.selection == selection }
+    val wasSelected = selection in current.credentials
+    var next = current.toggleCredential(selection, option)
+    if (wasSelected) return next
+
+    credentialRequirements.forEach { requirement ->
+        val selectedCombination = requirement.options.firstOrNull { selection.queryId in it } ?: return@forEach
+        val requirementQueryIds = requirement.options.flatten().toSet()
+        var credentials = next.credentials.filterTo(linkedSetOf()) { selected ->
+            selected.queryId !in requirementQueryIds || selected.queryId in selectedCombination
+        }
+        selectedCombination.forEach { queryId ->
+            if (credentials.none { it.queryId == queryId }) {
+                credentialOptions.firstOrNull { it.queryId == queryId }?.selection?.let(credentials::add)
+            }
+        }
+        next = next.copy(
+            credentials = credentials,
+            disclosures = next.disclosures.forSelectedCredentials(credentials),
+        )
+    }
+    return next
+}
+
 /** The selection a review opens with: one credential per query needed to satisfy the request. */
 fun WalletDemoSharingReview.defaultCredentialSelection(): Set<WalletDemoPresentationCredentialSelection> =
     defaultCredentialSelection(credentialOptions, credentialRequirements)

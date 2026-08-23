@@ -798,6 +798,33 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun classifiesMdocSignatureUsualMarkByteArrayAsImage() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "Mobile driving licence",
+                credentialDataJson = """
+                    {
+                      "org.iso.18013.5.1": {
+                        "signature_usual_mark": {
+                          "elementValue": ${onePixelPngByteArrayJson()}
+                        }
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val signature = details.groups
+            .flatMap { it.items }
+            .first { it.path.id == "org.iso.18013.5.1.signature_usual_mark.elementValue" }
+        assertEquals("Signature or usual mark", signature.label)
+        assertIs<DisplayValue.Image>(signature.value)
+    }
+
+    @Test
     fun presentationCredentialOptionPrependsReadableRequestedDisclosures() {
         val option = WalletDemoPresentationCredentialOption(
             queryId = "pid",

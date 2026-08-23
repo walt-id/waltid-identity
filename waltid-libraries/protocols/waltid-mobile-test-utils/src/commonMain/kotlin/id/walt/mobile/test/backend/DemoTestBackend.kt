@@ -170,6 +170,11 @@ object DemoTestBackend {
         val verifierCredentialQuery: JsonObject,
     )
 
+    enum class OfferAuthorizationMethod(val apiValue: String) {
+        PreAuthorized("PRE_AUTHORIZED"),
+        Authorized("AUTHORIZED"),
+    }
+
     /**
      * @property offerId The issuer-side session id, so callers can poll `/issuer2/sessions/{id}`
      *   to confirm the issuer actually completed issuance rather than trusting a wallet-side ack.
@@ -196,10 +201,14 @@ object DemoTestBackend {
         scenario: CredentialScenario,
         withGeneratedTransactionCode: Boolean = false,
         inlineOffer: Boolean = false,
+        authorizationMethod: OfferAuthorizationMethod = OfferAuthorizationMethod.PreAuthorized,
     ): GeneratedOffer {
+        require(!withGeneratedTransactionCode || authorizationMethod == OfferAuthorizationMethod.PreAuthorized) {
+            "Transaction codes are only valid for pre-authorized offers"
+        }
         val payload = buildJsonObject {
             put("profileId", scenario.profileId)
-            put("authMethod", "PRE_AUTHORIZED")
+            put("authMethod", authorizationMethod.apiValue)
             if (inlineOffer) put("valueMode", "BY_VALUE")
             if (withGeneratedTransactionCode) {
                 putJsonObject("txCode") {

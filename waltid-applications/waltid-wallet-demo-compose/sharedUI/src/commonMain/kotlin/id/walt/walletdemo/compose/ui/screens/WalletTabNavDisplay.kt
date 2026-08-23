@@ -6,6 +6,8 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.WalletDemoReviewIsland
+import id.walt.walletdemo.compose.logic.WalletDemoReviewRoute
 import id.walt.walletdemo.compose.ui.WalletRoute
 
 @Composable
@@ -15,6 +17,8 @@ internal fun WalletTabNavDisplay(
     modifier: Modifier,
     storedCredentialActions: Boolean = false,
     onDeleteCredential: (String) -> Unit = {},
+    detailsTechnicalBackSignal: Int = 0,
+    onDetailsReviewRouteChanged: (WalletDemoReviewRoute, WalletDemoReviewIsland?) -> Unit = { _, _ -> },
     settings: (@Composable () -> Unit)? = null,
     root: @Composable () -> Unit,
 ) {
@@ -38,6 +42,9 @@ internal fun WalletTabNavDisplay(
                         onBack = { backStack.removeLastOrNull() },
                         storedCredentialActions = storedCredentialActions,
                         onDeleteCredential = onDeleteCredential,
+                        showHeader = false,
+                        technicalBackSignal = detailsTechnicalBackSignal,
+                        onReviewRouteChanged = onDetailsReviewRouteChanged,
                     )
                 }
             }

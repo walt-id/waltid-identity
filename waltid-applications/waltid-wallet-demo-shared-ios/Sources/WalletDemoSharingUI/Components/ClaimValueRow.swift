@@ -8,16 +8,40 @@ public struct ClaimValueRow: View {
         self.item = item
     }
 
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(item.label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityIdentifier(WalletAccessibilityID.claim(item.path.id))
-            ClaimValueView(value: item.value, path: item.path)
-                .frame(maxWidth: .infinity, alignment: .leading)
+    private var inlineValue: String? {
+        switch item.value {
+        case .bool(let value): return value ? "Yes" : "No"
+        case .decodedText(let value), .text(let value), .number(let value): return value
+        case .null: return "Not provided"
+        default: return nil
         }
+    }
+
+    @ViewBuilder
+    public var body: some View {
+        if let inlineValue, item.label.count <= 28, inlineValue.count <= 38 {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                label.frame(maxWidth: .infinity, alignment: .leading)
+                Text(inlineValue)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .multilineTextAlignment(.trailing)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                label.frame(maxWidth: .infinity, alignment: .leading)
+                ClaimValueView(value: item.value, path: item.path)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var label: some View {
+        Text(item.label)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier(WalletAccessibilityID.claim(item.path.id))
     }
 }
 

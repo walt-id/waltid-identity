@@ -16,6 +16,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletDemoReviewIsland
+import id.walt.walletdemo.compose.logic.WalletDemoReviewRoute
 import id.walt.walletdemo.compose.logic.WalletRequestDrafts
 import id.walt.walletdemo.compose.logic.acceptOfferEnabled
 import id.walt.walletdemo.compose.logic.offerReviewEnabled
@@ -44,6 +46,8 @@ internal fun ReceiveTab(
     onCredentialClick: (String) -> Unit,
     onDismissStatus: () -> Unit,
     showsInput: Boolean = true,
+    technicalBackSignal: Int = 0,
+    onReviewRouteChanged: (WalletDemoReviewRoute, WalletDemoReviewIsland?) -> Unit = { _, _ -> },
 ) {
     val receivedCredentials = state.receivedCredentials()
 
@@ -63,7 +67,6 @@ internal fun ReceiveTab(
 
             if (state.offerPreview == null && showsInput) {
                 UrlActionSection(
-                    title = "Receive",
                     value = requestDrafts.offerUrl,
                     onValueChange = onOfferUrlChange,
                     label = "Credential offer URL",
@@ -76,11 +79,6 @@ internal fun ReceiveTab(
                     onClick = onPreviewOffer,
                 )
             } else if (state.offerPreview != null) {
-                Text(
-                    "Add credential",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
                 OfferReviewSection(
                     preview = state.offerPreview!!,
                     acceptEnabled = state.acceptOfferEnabled,
@@ -90,9 +88,10 @@ internal fun ReceiveTab(
                     onAccept = onAcceptOffer,
                     onDecline = onDeclineOffer,
                     showActions = false,
+                    hostOwnsTopChrome = true,
+                    technicalBackSignal = technicalBackSignal,
+                    onRouteChanged = onReviewRouteChanged,
                 )
-            } else {
-                Text("Credential offer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
 
             if (state.deferredCredentials.isNotEmpty()) {

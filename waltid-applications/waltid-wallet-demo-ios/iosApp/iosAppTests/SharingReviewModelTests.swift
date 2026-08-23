@@ -295,7 +295,7 @@ final class SharingReviewModelTests: XCTestCase {
         let islands = review.reviewIslands(context: .selectedForSharing)
         XCTAssertEqual(
             islands.map(\.kind),
-            [.verifier, .credential, .information, .purposeAndTransaction]
+            [.verifier, .credential, .purposeAndTransaction]
         )
         XCTAssertEqual(islands.first?.title, "Example Verifier")
         XCTAssertEqual(islands.first?.summaryValues.first?.value, "Protected response")
@@ -327,6 +327,43 @@ final class SharingReviewModelTests: XCTestCase {
         let values = review.reviewIslands().flatMap(\.technicalSections).flatMap(\.values)
         XCTAssertTrue(values.contains { $0.value == "OpenID4VP encrypted response" })
         XCTAssertFalse(values.contains { $0.value == "dc_api.jwt" })
+    }
+
+    func testIslandVisualsRespectSchemaSupportRatherThanInventingSlots() throws {
+        let transaction = PresentationTransactionData(
+            type: "urn:test:payment",
+            displayName: "Payment authorization",
+            credentialQueryIDs: ["pid"],
+            supportedFields: ["amount"],
+            rawJSON: #"{"amount":"42.00 EUR"}"#,
+            detailsJSON: #"{"amount":"42.00 EUR"}"#
+        )
+        let islands = openIDPreview(transactionData: [transaction]).sharingReview().reviewIslands()
+        let verifier = try XCTUnwrap(islands.first { $0.kind == .verifier })
+        let credential = try XCTUnwrap(islands.first { $0.kind == .credential })
+        let transactionIsland = try XCTUnwrap(islands.first { $0.kind == .purposeAndTransaction })
+
+        XCTAssertEqual(verifier.visual?.fallbackText, "E")
+        XCTAssertNil(verifier.visual?.imageURI)
+        XCTAssertEqual(credential.visual?.fallbackText, "M")
+        XCTAssertNil(transactionIsland.visual)
+
+        let suppliedLogo = openIDPreview(
+            verifierMetadata: VerifierMetadata(
+                display: MetadataDisplay(
+                    name: "Example Verifier",
+                    locale: "en",
+                    logoURI: "https://verifier.example/logo.svg",
+                    logoAltText: "Example Verifier logo"
+                ),
+                clientURI: nil,
+                policyURI: nil,
+                termsOfServiceURI: nil
+            )
+        ).sharingReview().reviewIslands().first { $0.kind == .verifier }
+
+        XCTAssertEqual(suppliedLogo?.visual?.imageURI, "https://verifier.example/logo.svg")
+        XCTAssertEqual(suppliedLogo?.visual?.fallbackText, "E")
     }
 
     func testConfiguredCredentialLabelIsPreservedForTheIslandSummary() throws {
@@ -376,7 +413,7 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(island.title, configuredLabel)
     }
 
-    func testSeveralCredentialOptionsUseOneNeutralIslandHeading() throws {
+    func testSeveralCredentialOptionsUsePeerCredentialIslands() throws {
         let credentials = ["Personal ID", "Travel ID"].enumerated().map { index, label in
             PresentationCredentialOption(
                 queryID: "pid",
@@ -394,11 +431,12 @@ final class SharingReviewModelTests: XCTestCase {
             credentialOptions: credentials
         )
 
-        let island = try XCTUnwrap(review.reviewIslands().first { $0.kind == .credential })
+        let islands = review.reviewIslands().filter { $0.kind == .credential }
 
-        XCTAssertEqual(island.title, "Choose credentials")
-        XCTAssertEqual(island.subtitle, "2 credentials available")
-        XCTAssertEqual(island.expandedValues.map(\.label), ["Personal ID", "Travel ID"])
+        XCTAssertEqual(islands.map(\.title), ["Personal ID", "Travel ID"])
+        XCTAssertEqual(islands.map(\.subtitle), ["Example Issuer", "Example Issuer"])
+        XCTAssertTrue(islands.allSatisfy(\.initiallyExpanded))
+        XCTAssertEqual(Set(islands.map(\.id)).count, 2)
     }
 
     // MARK: - Transaction data and technical details
@@ -577,6 +615,37 @@ final class SharingReviewModelTests: XCTestCase {
             [],
             "A disclosure approved for one credential must not travel with the request once that credential is gone"
         )
+    }
+
+    func testChoosingAnAlternativeCombinationKeepsOnlyThatCombinationAndItsDisclosures() {
+        let identity = option(queryID: "identity", credentialID: "identity-1")
+        let age = option(queryID: "age", credentialID: "age-1")
+        let travel = option(queryID: "travel", credentialID: "travel-1")
+        let review = SharingReviewModel(
+            request: SharingRequest(verifier: nil),
+            credentialOptions: [identity, age, travel],
+            credentialRequirements: [
+                PresentationCredentialRequirement(options: [["identity", "age"], ["travel"]])
+            ]
+        )
+        let disclosure = PresentationDisclosureSelection(
+            queryID: identity.queryID,
+            credentialID: identity.credentialID,
+            path: "$.given_name"
+        )
+        let initial = SharingSelection(
+            credentials: [identity.selection, age.selection],
+            disclosures: [disclosure]
+        )
+
+        let travelSelection = review.toggling(credential: travel.selection, in: initial)
+        XCTAssertEqual(travelSelection.credentials, [travel.selection])
+        XCTAssertTrue(travelSelection.disclosures.isEmpty)
+        XCTAssertTrue(review.hasCompleteCredentialSelection(travelSelection.credentials))
+
+        let identitySelection = review.toggling(credential: identity.selection, in: travelSelection)
+        XCTAssertEqual(identitySelection.credentials, [identity.selection, age.selection])
+        XCTAssertTrue(review.hasCompleteCredentialSelection(identitySelection.credentials))
     }
 
     // MARK: - Action availability

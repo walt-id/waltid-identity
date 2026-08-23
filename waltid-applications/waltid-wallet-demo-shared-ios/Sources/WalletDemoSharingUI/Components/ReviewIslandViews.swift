@@ -2,23 +2,39 @@ import SwiftUI
 import UIKit
 
 /// Container-independent expandable islands with horizontal, in-surface technical navigation.
-public struct ReviewIslandNavigationView<ExpandedContent: View>: View {
+public struct ReviewIslandNavigationView<HeaderContent: View, ExpandedContent: View>: View {
     private let islands: [ReviewIsland]
+    private let headerContent: (ReviewIsland) -> HeaderContent
     private let expandedContent: (ReviewIsland) -> ExpandedContent
     private let showsModelExpandedValues: (ReviewIsland) -> Bool
+    private let hasCustomExpandedContent: (ReviewIsland) -> Bool
+    private let routeBinding: Binding<ReviewRoute>?
+    private let showsTechnicalHeader: Bool
+    private let onRouteChanged: (ReviewRoute, ReviewIsland?) -> Void
 
-    @State private var route: ReviewRoute = .summary
+    @State private var localRoute: ReviewRoute = .summary
     @State private var expandedIslandIDs: Set<String>
+    @Namespace private var islandTransitionNamespace
     @AccessibilityFocusState private var accessibilityFocus: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         islands: [ReviewIsland],
         showsModelExpandedValues: @escaping (ReviewIsland) -> Bool = { _ in true },
+        hasCustomExpandedContent: @escaping (ReviewIsland) -> Bool = { _ in false },
+        route: Binding<ReviewRoute>? = nil,
+        showsTechnicalHeader: Bool = true,
+        onRouteChanged: @escaping (ReviewRoute, ReviewIsland?) -> Void = { _, _ in },
+        @ViewBuilder headerContent: @escaping (ReviewIsland) -> HeaderContent,
         @ViewBuilder expandedContent: @escaping (ReviewIsland) -> ExpandedContent
     ) {
         self.islands = islands
         self.showsModelExpandedValues = showsModelExpandedValues
+        self.hasCustomExpandedContent = hasCustomExpandedContent
+        self.routeBinding = route
+        self.showsTechnicalHeader = showsTechnicalHeader
+        self.onRouteChanged = onRouteChanged
+        self.headerContent = headerContent
         self.expandedContent = expandedContent
         _expandedIslandIDs = State(initialValue: Set(islands.filter(\.initiallyExpanded).map(\.id)))
     }
@@ -33,7 +49,9 @@ public struct ReviewIslandNavigationView<ExpandedContent: View>: View {
                 if let island = islands.first(where: { $0.id == islandID }) {
                     ReviewTechnicalPage(
                         island: island,
+                        transitionNamespace: islandTransitionNamespace,
                         accessibilityFocus: $accessibilityFocus,
+                        showsHeader: showsTechnicalHeader,
                         onBack: { showSummary(originatingIslandID: island.id) }
                     )
                     .transition(routeTransition(forward: true))
@@ -41,11 +59,15 @@ public struct ReviewIslandNavigationView<ExpandedContent: View>: View {
             }
         }
         .clipped()
+        .onAppear { notifyRouteChanged(route) }
+        .onChange(of: route) { notifyRouteChanged($0) }
         .onChange(of: islands.map(\.id)) { _ in
-            route = .summary
+            setRoute(.summary)
             expandedIslandIDs = Set(islands.filter(\.initiallyExpanded).map(\.id))
         }
     }
+
+    private var route: ReviewRoute { routeBinding?.wrappedValue ?? localRoute }
 
     private var summary: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -54,9 +76,12 @@ public struct ReviewIslandNavigationView<ExpandedContent: View>: View {
                     island: island,
                     isExpanded: expandedIslandIDs.contains(island.id),
                     showsModelExpandedValues: showsModelExpandedValues(island),
+                    hasCustomExpandedContent: hasCustomExpandedContent(island),
                     accessibilityFocus: $accessibilityFocus,
+                    transitionNamespace: islandTransitionNamespace,
                     onToggle: { toggle(island.id) },
                     onTechnicalDetails: island.hasTechnicalDetails ? { showTechnicalDetails(island.id) } : nil,
+                    headerContent: headerContent(island),
                     expandedContent: expandedContent(island)
                 )
             }
@@ -64,15 +89,22 @@ public struct ReviewIslandNavigationView<ExpandedContent: View>: View {
     }
 
     private func toggle(_ islandID: String) {
-        if expandedIslandIDs.contains(islandID) {
-            expandedIslandIDs.remove(islandID)
+        let change = {
+            if expandedIslandIDs.contains(islandID) {
+                expandedIslandIDs.remove(islandID)
+            } else {
+                expandedIslandIDs.insert(islandID)
+            }
+        }
+        if reduceMotion {
+            change()
         } else {
-            expandedIslandIDs.insert(islandID)
+            withAnimation(.easeInOut(duration: 0.22), change)
         }
     }
 
     private func showTechnicalDetails(_ islandID: String) {
-        performRouteAnimation { route = .technicalDetails(islandID: islandID) }
+        performRouteAnimation { setRoute(.technicalDetails(islandID: islandID)) }
         DispatchQueue.main.async {
             accessibilityFocus = "technical-title-\(islandID)"
             UIAccessibility.post(notification: .screenChanged, argument: nil)
@@ -80,7 +112,7 @@ public struct ReviewIslandNavigationView<ExpandedContent: View>: View {
     }
 
     private func showSummary(originatingIslandID: String) {
-        performRouteAnimation { route = .summary }
+        performRouteAnimation { setRoute(.summary) }
         DispatchQueue.main.async {
             accessibilityFocus = "technical-link-\(originatingIslandID)"
             UIAccessibility.post(notification: .screenChanged, argument: nil)
@@ -95,6 +127,25 @@ public struct ReviewIslandNavigationView<ExpandedContent: View>: View {
         }
     }
 
+    private func setRoute(_ route: ReviewRoute) {
+        if let routeBinding {
+            routeBinding.wrappedValue = route
+        } else {
+            localRoute = route
+        }
+    }
+
+    private func notifyRouteChanged(_ route: ReviewRoute) {
+        let island: ReviewIsland?
+        switch route {
+        case .summary:
+            island = nil
+        case .technicalDetails(let islandID):
+            island = islands.first { $0.id == islandID }
+        }
+        onRouteChanged(route, island)
+    }
+
     private func routeTransition(forward: Bool) -> AnyTransition {
         guard !reduceMotion else { return .opacity }
         return .asymmetric(
@@ -105,65 +156,120 @@ public struct ReviewIslandNavigationView<ExpandedContent: View>: View {
 }
 
 /// Convenience initializer for islands that need no custom expanded content.
-public extension ReviewIslandNavigationView where ExpandedContent == EmptyView {
+public extension ReviewIslandNavigationView where HeaderContent == EmptyView {
     init(
         islands: [ReviewIsland],
-        showsModelExpandedValues: @escaping (ReviewIsland) -> Bool = { _ in true }
+        showsModelExpandedValues: @escaping (ReviewIsland) -> Bool = { _ in true },
+        hasCustomExpandedContent: @escaping (ReviewIsland) -> Bool = { _ in false },
+        route: Binding<ReviewRoute>? = nil,
+        showsTechnicalHeader: Bool = true,
+        onRouteChanged: @escaping (ReviewRoute, ReviewIsland?) -> Void = { _, _ in },
+        @ViewBuilder expandedContent: @escaping (ReviewIsland) -> ExpandedContent
     ) {
-        self.init(islands: islands, showsModelExpandedValues: showsModelExpandedValues) { _ in EmptyView() }
+        self.init(
+            islands: islands,
+            showsModelExpandedValues: showsModelExpandedValues,
+            hasCustomExpandedContent: hasCustomExpandedContent,
+            route: route,
+            showsTechnicalHeader: showsTechnicalHeader,
+            onRouteChanged: onRouteChanged,
+            headerContent: { _ in EmptyView() },
+            expandedContent: expandedContent
+        )
     }
 }
 
-private struct ReviewIslandCard<ExpandedContent: View>: View {
+public extension ReviewIslandNavigationView where HeaderContent == EmptyView, ExpandedContent == EmptyView {
+    init(
+        islands: [ReviewIsland],
+        showsModelExpandedValues: @escaping (ReviewIsland) -> Bool = { _ in true },
+        hasCustomExpandedContent: @escaping (ReviewIsland) -> Bool = { _ in false },
+        route: Binding<ReviewRoute>? = nil,
+        showsTechnicalHeader: Bool = true,
+        onRouteChanged: @escaping (ReviewRoute, ReviewIsland?) -> Void = { _, _ in }
+    ) {
+        self.init(
+            islands: islands,
+            showsModelExpandedValues: showsModelExpandedValues,
+            hasCustomExpandedContent: hasCustomExpandedContent,
+            route: route,
+            showsTechnicalHeader: showsTechnicalHeader,
+            onRouteChanged: onRouteChanged
+        ) { _ in EmptyView() }
+    }
+}
+
+private struct ReviewIslandCard<HeaderContent: View, ExpandedContent: View>: View {
     let island: ReviewIsland
     let isExpanded: Bool
     let showsModelExpandedValues: Bool
+    let hasCustomExpandedContent: Bool
     @AccessibilityFocusState.Binding var accessibilityFocus: String?
+    let transitionNamespace: Namespace.ID
     let onToggle: () -> Void
     let onTechnicalDetails: (() -> Void)?
+    let headerContent: HeaderContent
     let expandedContent: ExpandedContent
 
     var body: some View {
         let accentColor = island.kind.accentColor
+        let hasModelExpandedContent = island.warning?.presentableValue != nil ||
+            island.status?.isVisible == true ||
+            (showsModelExpandedValues && !island.visibleExpandedValues.isEmpty)
+        let hasContentBeforeTechnicalDetails = hasModelExpandedContent || hasCustomExpandedContent
+        let hasExpandedContent = hasContentBeforeTechnicalDetails || onTechnicalDetails != nil
+        let effectiveExpanded = isExpanded && hasExpandedContent
         VStack(alignment: .leading, spacing: 0) {
             Color.clear
                 .frame(width: 1, height: 1)
                 .accessibilityElement()
                 .accessibilityIdentifier(WalletAccessibilityID.reviewIsland(island.id))
 
-            Button(action: onToggle) {
-                HStack(spacing: 10) {
-                    ReviewIslandVisualView(island: island, accentColor: accentColor)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(island.title)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let subtitle = island.subtitle?.presentableValue {
-                            Text(subtitle)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                headerContent
+                Button(action: { if hasExpandedContent { onToggle() } }) {
+                    HStack(spacing: 10) {
+                        if island.visual != nil {
+                            ReviewIslandVisualView(island: island, accentColor: accentColor)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(island.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
+                            if let subtitle = island.subtitle?.presentableValue {
+                                Text(subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
+                        if hasExpandedContent {
+                            Spacer(minLength: 8)
+                            Image(systemName: "chevron.down")
+                                .foregroundStyle(accentColor)
+                                .rotationEffect(.degrees(effectiveExpanded ? 180 : 0))
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .layoutPriority(1)
-                    Spacer(minLength: 8)
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .foregroundStyle(accentColor)
+                    .contentShape(Rectangle())
                 }
-                .contentShape(Rectangle())
-                .padding(12)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(
+                    island.context == .offered && island.kind == .information
+                        ? WalletAccessibilityID.offerSupportedClaims
+                        : WalletAccessibilityID.reviewIslandToggle(island.id)
+                )
+                .accessibilityValue(
+                    hasExpandedContent
+                        ? (effectiveExpanded ? "Expanded" : "Collapsed")
+                        : "No additional details"
+                )
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(
-                island.context == .offered && island.kind == .information
-                    ? WalletAccessibilityID.offerSupportedClaims
-                    : WalletAccessibilityID.reviewIslandToggle(island.id)
-            )
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+            .padding(12)
 
             if !island.visibleSummaryValues.isEmpty {
                 Divider()
@@ -171,7 +277,7 @@ private struct ReviewIslandCard<ExpandedContent: View>: View {
                     .padding(12)
             }
 
-            if isExpanded {
+            if effectiveExpanded {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
                     if let warning = island.warning?.presentableValue {
@@ -187,7 +293,7 @@ private struct ReviewIslandCard<ExpandedContent: View>: View {
                     }
                     expandedContent
                     if let onTechnicalDetails {
-                        Divider()
+                        if hasContentBeforeTechnicalDetails { Divider() }
                         Button(action: onTechnicalDetails) {
                             HStack {
                                 Text("Technical details")
@@ -204,14 +310,22 @@ private struct ReviewIslandCard<ExpandedContent: View>: View {
                     }
                 }
                 .padding(12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isExpanded ? accentColor.opacity(0.42) : Color(.separator), lineWidth: 1)
+                .stroke(effectiveExpanded ? accentColor.opacity(0.42) : Color(.separator), lineWidth: 1)
+        )
+        .matchedGeometryEffect(
+            id: "review-island-shell-\(island.id)",
+            in: transitionNamespace,
+            properties: .frame,
+            anchor: .top,
+            isSource: true
         )
     }
 }
@@ -277,23 +391,38 @@ private struct ReviewValueList: View {
     let values: [ReviewValue]
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    private var displayValues: [ReviewValue] {
+        var previousSupportingText: String?
+        return values.filter(\.isVisible).map { value in
+            let supportingText = value.supportingText == previousSupportingText ? nil : value.supportingText
+            previousSupportingText = value.supportingText
+            return ReviewValue(
+                label: value.label,
+                value: value.value,
+                supportingText: supportingText,
+                linkURI: value.linkURI
+            )
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(values.filter(\.isVisible).enumerated()), id: \.offset) { index, value in
+            ForEach(Array(displayValues.enumerated()), id: \.offset) { index, value in
                 if index > 0 { Divider() }
                 if let rendered = value.value?.presentableValue {
                     let supportingText = value.supportingText?.presentableValue
                     let link = safeHTTPSURL(value.linkURI)
-                    let stacked = dynamicTypeSize.isAccessibilitySize || supportingText != nil ||
-                        value.label.count > 28 || rendered.count > 30 ||
+                    let stacked = dynamicTypeSize.isAccessibilitySize || value.label.count > 28 || rendered.count > 30 ||
                         value.label.contains("\n") || rendered.contains("\n") || link != nil
+                    if let supportingText {
+                        Text(supportingText)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tint)
+                    }
                     if stacked {
                         VStack(alignment: .leading, spacing: 2) {
                             valueLabel(value.label)
                             renderedValue(rendered, link: link)
-                            if let supportingText {
-                                Text(supportingText).font(.caption2).foregroundStyle(.secondary)
-                            }
                         }
                     } else {
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -336,7 +465,9 @@ private struct ReviewValueList: View {
 
 private struct ReviewTechnicalPage: View {
     let island: ReviewIsland
+    let transitionNamespace: Namespace.ID
     @AccessibilityFocusState.Binding var accessibilityFocus: String?
+    let showsHeader: Bool
     let onBack: () -> Void
 
     var body: some View {
@@ -346,7 +477,7 @@ private struct ReviewTechnicalPage: View {
                 .accessibilityElement()
                 .accessibilityIdentifier(WalletAccessibilityID.reviewTechnicalDetailsPage)
 
-            HStack(spacing: 8) {
+            if showsHeader { HStack(spacing: 8) {
                 Button(action: onBack) {
                     Label("Back", systemImage: "chevron.left")
                         .labelStyle(.iconOnly)
@@ -362,7 +493,7 @@ private struct ReviewTechnicalPage: View {
                         .accessibilityFocused($accessibilityFocus, equals: "technical-title-\(island.id)")
                     Text("Technical details").font(.caption).foregroundStyle(.secondary)
                 }
-            }
+            } }
 
             ForEach(island.visibleTechnicalSections) { section in
                 VStack(alignment: .leading, spacing: 6) {
@@ -372,12 +503,19 @@ private struct ReviewTechnicalPage: View {
                     ReviewValueList(values: section.visibleValues)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(.secondarySystemBackground))
+                        .background(Color(.systemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator), lineWidth: 1))
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .matchedGeometryEffect(
+            id: "review-island-shell-\(island.id)",
+            in: transitionNamespace,
+            properties: .frame,
+            anchor: .top,
+            isSource: false
+        )
     }
 }

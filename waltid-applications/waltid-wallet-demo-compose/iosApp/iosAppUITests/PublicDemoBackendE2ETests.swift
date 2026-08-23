@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 
 /// End-to-end UI tests for the Compose wallet demo app against the public demo stack.
@@ -14,6 +15,34 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     private let credentialOperationTimeout: TimeInterval = 90
     private let presentationOperationTimeout: TimeInterval = 180
     private let verifierPollingTimeout: TimeInterval = 30
+
+    func testAuthorizationCodeOfferReviewAgainstPublicDemoIssuer2() async throws {
+        let scenario = try publicDemoScenario()
+        let offer = try await backend.createOffer(
+            scenario: scenario,
+            authorizationMethod: .authorized
+        )
+        recordGalleryRequest(kind: "issuance-authorization-code", value: offer.offerUrl)
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: walletReadyTimeout),
+            "Wallet ready"
+        )
+        ui.openDeepLink(offer.offerUrl)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(
+                prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
+                timeout: credentialOperationTimeout
+            ),
+            "Review credential offer"
+        )
+        ui.assertExists(identifier: "wallet.reviewIslandToggle.required_action")
+        captureGallery("compose-ios-wallet-issuance-authorization-code-review")
+    }
 
     func testPinPersistsAcrossAppRestart() throws {
         let app = XCUIApplication()
@@ -50,6 +79,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     func testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2() async throws {
         let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
+        recordGalleryRequest(kind: "issuance", value: offer.offerUrl)
 
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -75,6 +105,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             timeout: credentialOperationTimeout
         )
         XCTAssertEqual(offerPreviewStatus, "Review credential offer", "Offer preview did not appear, status: \(offerPreviewStatus ?? "nil")")
+        captureGallery("compose-ios-wallet-issuance-\(scenario.id)-review")
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         let receiveStatus = ui.waitForStatus(
@@ -84,6 +115,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
 
         let session = try await backend.createVerifierSession(scenario: scenario)
+        recordGalleryRequest(kind: "presentation", value: session.authorizationRequestUri)
         ui.openDeepLink(session.authorizationRequestUri)
         let presentationURLApplied = ui.waitForTextInputValue(
             identifier: "wallet.presentationInput",
@@ -99,16 +131,17 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             timeout: credentialOperationTimeout
         )
         XCTAssertEqual(previewStatus, "Review presentation request", "Presentation preview did not load, status: \(previewStatus ?? "nil")")
+        captureGallery("compose-ios-wallet-presentation-\(scenario.id)-review")
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share", useCoordinateTap: true)
         var submitStatus = ui.waitForStatus(
-            prefixes: ["Presenting credential", "Presentation sent", "Present failed", "Receive failed", "Bootstrap failed"],
+            prefixes: ["Presenting credential", "Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
             timeout: 10
         )
         if submitStatus == nil {
             ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share", useCoordinateTap: true)
             submitStatus = ui.waitForStatus(
-                prefixes: ["Presenting credential", "Presentation sent", "Present failed", "Receive failed", "Bootstrap failed"],
+                prefixes: ["Presenting credential", "Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
                 timeout: 10
             )
         }
@@ -151,6 +184,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             scenario: scenario,
             withGeneratedTransactionCode: true
         )
+        recordGalleryRequest(kind: "issuance-transaction-code", value: offer.offerUrl)
         let transactionCode = try XCTUnwrap(offer.txCode)
 
         let app = XCUIApplication()
@@ -187,6 +221,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             XCTFail("Transaction-code input did not appear in offer review, status: \(status ?? "nil")")
             return
         }
+        captureGallery("compose-ios-wallet-issuance-transaction-code-review")
 
         ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode))
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
@@ -202,7 +237,11 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         }
 
         // The reviewed offer remains active so the corrected code can be retried directly.
-        ui.replaceText(in: txCodeInput, value: transactionCode)
+        let retryTxCodeInput = ui.textInput(
+            identifier: "wallet.txCodeInput",
+            fallbackLabel: "Transaction code"
+        )
+        ui.replaceText(in: retryTxCodeInput, value: transactionCode)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         let receivedStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -217,6 +256,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     func testTransactionDataPreviewAgainstPublicDemoIssuer2Verifier2() async throws {
         let scenario = DemoBackend.transactionDataPresentationScenario
         let offer = try await backend.createOffer(scenario: scenario)
+        recordGalleryRequest(kind: "issuance", value: offer.offerUrl)
 
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -251,6 +291,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
 
         let session = try await backend.createTransactionDataVerifierSession(scenario: scenario)
+        recordGalleryRequest(kind: "presentation-transaction-data", value: session.authorizationRequestUri)
         ui.openDeepLink(session.authorizationRequestUri)
         let presentationURLApplied = ui.waitForTextInputValue(
             identifier: "wallet.presentationInput",
@@ -271,6 +312,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["ACME Corp"].waitForExistence(timeout: 10))
+        captureGallery("compose-ios-wallet-presentation-transaction-data-review")
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "WAL-1077 Compose iOS transaction data preview"
         screenshot.lifetime = .keepAlways
@@ -324,6 +366,25 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
     private func publicDemoScenario() throws -> DemoCredentialScenario {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == "eudi-pid-mdoc" })
+    }
+
+    private func captureGallery(_ defaultName: String) {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["WALLET_GALLERY_CAPTURE"] == "1" else { return }
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = environment["WALLET_GALLERY_CAPTURE_NAME"] ?? defaultName
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    private func recordGalleryRequest(kind: String, value: String) {
+        guard ProcessInfo.processInfo.environment["WALLET_GALLERY_CAPTURE"] == "1" else { return }
+        let digest = SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
+        print("WALLET_GALLERY_REQUEST_DIGEST=\(kind):\(digest)")
+        let attachment = XCTAttachment(string: digest)
+        attachment.name = "WALLET_GALLERY_REQUEST_DIGEST-\(kind)-\(digest)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     private func incorrectCode(for code: String) -> String {

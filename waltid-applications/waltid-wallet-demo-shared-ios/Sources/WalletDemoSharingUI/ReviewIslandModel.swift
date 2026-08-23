@@ -19,6 +19,20 @@ public extension CredentialDetails {
         let issuerName = issuerDisplay?.name.flatMap { $0.isPresentableValue ? $0 : nil }
             ?? issuer?.presentableValue
             ?? "Issuer unavailable"
+        let credentialInformation = groups.flatMap { group in
+            group.items.map {
+                ReviewValue(label: $0.label, value: $0.value.reviewText, supportingText: group.title)
+            }
+        }
+        let credentialInformationSections = groups.enumerated().map { index, group in
+            ReviewTechnicalSection(
+                id: "stored-information-\(index)",
+                title: group.title,
+                values: group.items.map {
+                    ReviewValue(label: $0.path.id, value: $0.rawValue ?? $0.value.reviewText)
+                }
+            )
+        }
         var islands = [
             ReviewIsland(
                 id: "credential",
@@ -31,7 +45,7 @@ public extension CredentialDetails {
                     contentDescription: summary.portraitData == nil ? nil : "Credential portrait",
                     fallbackText: summary.title.first.map { String($0).uppercased() } ?? "C"
                 ),
-                expandedValues: [ReviewValue(label: "Holder", value: summary.holderName)],
+                expandedValues: [ReviewValue(label: "Holder", value: summary.holderName)] + credentialInformation,
                 technicalSections: [
                     ReviewTechnicalSection(
                         id: "credential-identity",
@@ -42,7 +56,7 @@ public extension CredentialDetails {
                             ReviewValue(label: "Subject", value: subject),
                         ]
                     )
-                ],
+                ] + credentialInformationSections,
                 initiallyExpanded: true
             ),
             ReviewIsland(
@@ -71,35 +85,6 @@ public extension CredentialDetails {
             ),
         ]
 
-        if !groups.isEmpty {
-            let fieldCount = groups.flatMap(\.items).count
-            islands.append(
-                ReviewIsland(
-                    id: "information",
-                    kind: .information,
-                    context: context,
-                    title: "Information",
-                    subtitle: "\(fieldCount) \(fieldCount == 1 ? "field" : "fields")",
-                    visual: ReviewIslandVisual(fallbackText: "i"),
-                    expandedValues: groups.flatMap { group in
-                        group.items.map {
-                            ReviewValue(label: $0.label, value: $0.value.reviewText, supportingText: group.title)
-                        }
-                    },
-                    technicalSections: groups.enumerated().map { index, group in
-                        ReviewTechnicalSection(
-                            id: "stored-information-\(index)",
-                            title: group.title,
-                            values: group.items.map {
-                                ReviewValue(label: $0.path.id, value: $0.rawValue ?? $0.value.reviewText)
-                            }
-                        )
-                    },
-                    initiallyExpanded: true
-                )
-            )
-        }
-
         if let validity = summary.validityText {
             islands.append(
                 ReviewIsland(
@@ -108,7 +93,7 @@ public extension CredentialDetails {
                     context: context,
                     title: "Dates and status",
                     subtitle: validity,
-                    visual: ReviewIslandVisual(fallbackText: "✓"),
+                    visual: nil,
                     expandedValues: [ReviewValue(label: "Available information", value: validity)],
                     technicalSections: [
                         ReviewTechnicalSection(
@@ -255,8 +240,7 @@ public extension SharingReviewModel {
     func reviewIslands(context: ReviewSurfaceContext = .selectedForSharing) -> [ReviewIsland] {
         var islands: [ReviewIsland] = []
         if let verifier = verifierIsland(context: context) { islands.append(verifier) }
-        if let credential = credentialIsland(context: context) { islands.append(credential) }
-        if let information = informationIsland(context: context) { islands.append(information) }
+        islands.append(contentsOf: credentialIslands(context: context))
         islands.append(contentsOf: request.transactionData.map { transactionIsland($0, context: context) })
         return islands
     }
@@ -318,84 +302,53 @@ public extension SharingReviewModel {
         )
     }
 
-    private func credentialIsland(context: ReviewSurfaceContext) -> ReviewIsland? {
-        guard let first = credentialOptions.first else { return nil }
-        let firstDetails = CredentialDisplayNormalizer.details(for: first)
-        let title = credentialOptions.count == 1
-            ? first.userFacingLabel
-            : "Choose credentials"
-        return ReviewIsland(
-            id: "credential",
-            kind: .credential,
-            context: context,
-            title: title,
-            subtitle: credentialOptions.count == 1
-                ? first.issuer?.presentableValue
-                : "\(credentialOptions.count) credentials available",
-            visual: ReviewIslandVisual(
-                imageData: firstDetails.cardSummary.portraitData,
-                contentDescription: firstDetails.cardSummary.portraitData == nil ? nil : "Credential portrait",
-                fallbackText: title.first.map { String($0).uppercased() } ?? "C"
-            ),
-            expandedValues: credentialOptions.count == 1 ? [] : credentialOptions.map {
-                ReviewValue(
-                    label: $0.userFacingLabel,
-                    value: $0.issuer ?? "Issuer unavailable",
-                    supportingText: $0.subject
-                )
-            },
-            technicalSections: credentialOptions.enumerated().map { index, option in
-                ReviewTechnicalSection(
-                    id: "credential-option-\(index)",
-                    title: option.userFacingLabel,
-                    values: [
-                        ReviewValue(label: "Credential identifier", value: option.credentialID),
-                        ReviewValue(label: "Query identifier", value: option.queryID),
-                        ReviewValue(label: "Format", value: option.format),
-                        ReviewValue(label: "Issuer", value: option.issuer),
-                        ReviewValue(label: "Subject", value: option.subject),
-                    ]
-                )
-            },
-            initiallyExpanded: true
-        )
-    }
-
-    private func informationIsland(context: ReviewSurfaceContext) -> ReviewIsland? {
-        let disclosures = credentialOptions.flatMap { option in option.disclosures.map { (option, $0) } }
-        guard !disclosures.isEmpty else { return nil }
-        let optionalCount = disclosures.filter { $0.1.selectable }.count
-        var subtitle = "\(disclosures.count) \(disclosures.count == 1 ? "field" : "fields")"
-        if optionalCount > 0 { subtitle += " · \(optionalCount) optional" }
-        return ReviewIsland(
-            id: "information",
-            kind: .information,
-            context: context,
-            title: "Information to share",
-            subtitle: subtitle,
-            visual: ReviewIslandVisual(fallbackText: "i"),
-            expandedValues: disclosures.map { option, disclosure in
-                ReviewValue(
-                    label: disclosure.name?.presentableValue ?? disclosure.path,
-                    value: disclosure.displayValue ?? disclosure.valueJSON,
-                    supportingText: "\(option.userFacingLabel) · \(disclosure.selectable ? "Optional" : "Required")"
-                )
-            },
-            technicalSections: credentialOptions.enumerated().compactMap { index, option in
-                let values = option.disclosures.flatMap { disclosure in
-                    [
-                        ReviewValue(label: disclosure.name?.presentableValue ?? "Claim path", value: disclosure.path),
-                        ReviewValue(label: "Selection", value: disclosure.selectable ? "Optional" : "Required"),
-                    ]
-                }
-                return values.isEmpty ? nil : ReviewTechnicalSection(
-                    id: "requested-information-\(index)",
-                    title: option.userFacingLabel,
-                    values: values
-                )
-            },
-            initiallyExpanded: true
-        )
+    private func credentialIslands(context: ReviewSurfaceContext) -> [ReviewIsland] {
+        credentialOptions.enumerated().map { index, option in
+            let details = CredentialDisplayNormalizer.details(for: option)
+            let title = option.userFacingLabel
+            return ReviewIsland(
+                id: option.reviewIslandID,
+                kind: .credential,
+                context: context,
+                title: title,
+                subtitle: option.issuer?.presentableValue ?? "Credential",
+                visual: ReviewIslandVisual(
+                    imageData: details.cardSummary.portraitData,
+                    contentDescription: details.cardSummary.portraitData == nil ? nil : "Credential portrait",
+                    fallbackText: title.first.map { String($0).uppercased() } ?? "C"
+                ),
+                technicalSections: [
+                    ReviewTechnicalSection(
+                        id: "credential-identity-\(index)",
+                        title: "Credential identity",
+                        values: [
+                            ReviewValue(label: "Credential identifier", value: option.credentialID),
+                            ReviewValue(label: "Query identifier", value: option.queryID),
+                            ReviewValue(label: "Format", value: option.format),
+                            ReviewValue(label: "Issuer", value: option.issuer),
+                            ReviewValue(label: "Subject", value: option.subject),
+                        ]
+                    ),
+                    ReviewTechnicalSection(
+                        id: "credential-information-\(index)",
+                        title: "Requested information",
+                        values: option.disclosures.flatMap { disclosure in
+                            [
+                                ReviewValue(
+                                    label: disclosure.name?.presentableValue ?? "Claim path",
+                                    value: disclosure.path
+                                ),
+                                ReviewValue(
+                                    label: "Selection",
+                                    value: disclosure.selectable ? "Optional" : "Required"
+                                ),
+                            ]
+                        }
+                    ),
+                ],
+                initiallyExpanded: true
+            )
+        }
     }
 
     private func transactionIsland(_ group: ClaimGroup, context: ReviewSurfaceContext) -> ReviewIsland {
@@ -405,7 +358,7 @@ public extension SharingReviewModel {
             context: context,
             title: group.title,
             subtitle: "Review before sharing",
-            visual: ReviewIslandVisual(fallbackText: "!"),
+            visual: nil,
             expandedValues: group.items.map {
                 ReviewValue(label: $0.label, value: $0.value.reviewText)
             },
@@ -422,6 +375,8 @@ public extension SharingReviewModel {
 }
 
 extension PresentationCredentialOption {
+    var reviewIslandID: String { "credential-\(selection.id)" }
+
     var userFacingLabel: String {
         CredentialReviewDisplayNameResolver.resolve(
             label: label,

@@ -27,6 +27,15 @@ public struct SharingReviewScreen: View {
     private let onCancel: () -> Void
 
     @State private var openCredentialDetails: CredentialDetails?
+    @State private var reviewRoute: ReviewRoute = .summary
+
+    private var screenTitle: String {
+        if case .technicalDetails(let islandID) = reviewRoute,
+           let island = review?.reviewIslands(context: .platformInvoked).first(where: { $0.id == islandID }) {
+            return island.title
+        }
+        return title
+    }
 
     /// Renders a standalone sharing review.
     ///
@@ -69,8 +78,23 @@ public struct SharingReviewScreen: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(20)
             }
-            .navigationTitle(title)
+            .navigationTitle(screenTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    if reviewRoute != .summary {
+                        Button { reviewRoute = .summary } label: {
+                            Image(systemName: "chevron.left")
+                        }
+                        .accessibilityLabel("Back to review")
+                    } else {
+                        Button(action: onCancel) {
+                            Image(systemName: "xmark")
+                        }
+                        .accessibilityLabel("Cancel")
+                    }
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 if failure == nil, review != nil {
                     SharingReviewActions(
@@ -115,6 +139,8 @@ public struct SharingReviewScreen: View {
                 isLoading: isSubmitting,
                 showsActions: false,
                 context: .platformInvoked,
+                reviewRoute: $reviewRoute,
+                showsTechnicalHeader: false,
                 onToggleCredential: onToggleCredential,
                 onToggleDisclosure: onToggleDisclosure,
                 onCredentialSelected: { detailsID in

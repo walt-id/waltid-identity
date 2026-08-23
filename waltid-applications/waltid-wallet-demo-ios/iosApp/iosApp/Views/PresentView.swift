@@ -5,43 +5,48 @@ import WalletSDK
 
 struct PresentView: View {
     @Environment(\.openURL) private var openURL
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var viewModel: WalletViewModel
-    @Binding var selectedDetailsID: String?
     var showsInput = true
     var onClose: (() -> Void)? = nil
+    @State private var reviewRoute: ReviewRoute = .summary
+    @State private var selectedDetailsID: String?
 
     private var presentationDetails: [CredentialDetails] {
         viewModel.presentationPreview?.credentialOptions.map(CredentialDisplayNormalizer.details(for:)) ?? []
     }
 
     private var screenTitle: String {
-        viewModel.presentationSharingReview == nil ? "Present" : "Share information"
+        if case .technicalDetails(let islandID) = reviewRoute,
+           let island = viewModel.presentationSharingReview?.reviewIslands().first(where: { $0.id == islandID }) {
+            return island.title
+        }
+        return viewModel.presentationSharingReview == nil ? "Present" : "Share information"
     }
 
-    private var usesAccessibilityContentTitle: Bool {
-        dynamicTypeSize.isAccessibilitySize && viewModel.presentationSharingReview != nil
+    private var showsNoCredentialsMessage: Bool {
+        guard viewModel.credentials.isEmpty else { return false }
+        return viewModel.presentationSharingReview?.credentialOptions.isEmpty ?? true
     }
 
     var body: some View {
         NavigationView {
-            ScrollView {
+            if let selectedDetails {
+                CredentialDetailsScreen(
+                    details: selectedDetails,
+                    storedCredentialActions: false,
+                    onBack: { selectedDetailsID = nil }
+                )
+            } else {
+                ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     Color.clear
                         .frame(width: 1, height: 1)
                         .accessibilityElement()
                         .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
 
-                    if usesAccessibilityContentTitle {
-                        Text(screenTitle)
-                            .font(.title.bold())
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityAddTraits(.isHeader)
-                    }
-
                     if showsInput {
                         ScannableUrlEditor(
-                            title: "Share information",
+                            title: nil,
                             label: "Request URL",
                             text: $viewModel.presentationRequestUrl,
                             inputIdentifier: WalletAccessibilityID.presentationInput,
@@ -53,13 +58,12 @@ struct PresentView: View {
                         Button("Preview") {
                             viewModel.previewPresentation()
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.waltBlue)
+                        .buttonStyle(WalletPrimaryButtonStyle())
                         .disabled(!viewModel.presentationPreviewActionEnabled)
                         .accessibilityIdentifier(WalletAccessibilityID.presentButton)
                     }
 
-                    if viewModel.credentials.isEmpty {
+                    if showsNoCredentialsMessage {
                         Text("No credentials available")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -92,6 +96,8 @@ struct PresentView: View {
                             isLoading: !viewModel.presentationReviewEnabled,
                             isReadOnly: viewModel.presentationCompleted,
                             showsActions: false,
+                            reviewRoute: $reviewRoute,
+                            showsTechnicalHeader: false,
                             onToggleCredential: viewModel.togglePresentationCredential,
                             onToggleDisclosure: viewModel.togglePresentationDisclosure,
                             onCredentialSelected: { detailsID in selectedDetailsID = detailsID },
@@ -114,31 +120,42 @@ struct PresentView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle(usesAccessibilityContentTitle ? "" : screenTitle)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { onClose?() }
-                        .disabled(onClose == nil)
-                        .opacity(onClose == nil ? 0 : 1)
+                }
+                .background(Color(.systemGroupedBackground))
+                .navigationTitle(screenTitle)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        if reviewRoute != .summary {
+                            Button { reviewRoute = .summary } label: {
+                                Image(systemName: "chevron.left")
+                            }
+                            .accessibilityLabel("Back to review")
+                        } else {
+                            Button { onClose?() } label: {
+                                Image(systemName: "xmark")
+                            }
+                            .accessibilityLabel("Close")
+                            .disabled(onClose == nil)
+                            .opacity(onClose == nil ? 0 : 1)
+                        }
+                    }
+                }
+                .safeAreaInset(edge: .bottom) {
+                    if viewModel.presentationSharingReview != nil, !viewModel.presentationCompleted {
+                        SharingReviewActions(
+                            selectionComplete: viewModel.presentationCredentialSelectionComplete,
+                            isLoading: !viewModel.presentationReviewEnabled,
+                            onSubmit: viewModel.submitPresentation,
+                            onReject: viewModel.rejectPresentation,
+                            onCancel: viewModel.cancelPresentationReview
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(.regularMaterial)
+                    }
                 }
             }
-            .safeAreaInset(edge: .bottom) {
-                if viewModel.presentationSharingReview != nil, !viewModel.presentationCompleted {
-                    SharingReviewActions(
-                        selectionComplete: viewModel.presentationCredentialSelectionComplete,
-                        isLoading: !viewModel.presentationReviewEnabled,
-                        onSubmit: viewModel.submitPresentation,
-                        onReject: viewModel.rejectPresentation,
-                        onCancel: viewModel.cancelPresentationReview
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(.regularMaterial)
-                }
-            }
-            .background(detailsNavigationLink)
         }
         .navigationViewStyle(.stack)
         .onChange(of: viewModel.pendingPresentationContinuationURL) { url in
@@ -163,36 +180,13 @@ struct PresentView: View {
                 .accessibilityHidden(true)
             }
         }
+        .onChange(of: viewModel.presentationSharingReview == nil) { _ in reviewRoute = .summary }
+        .onChange(of: viewModel.presentationNavigationResetKey) { _ in selectedDetailsID = nil }
     }
 
-    private var detailsNavigationLink: some View {
-        NavigationLink(
-            destination: detailsDestination,
-            isActive: Binding(
-                get: { selectedDetailsID != nil },
-                set: { isActive in
-                    if !isActive {
-                        selectedDetailsID = nil
-                    }
-                }
-            )
-        ) {
-            EmptyView()
-        }
-        .hidden()
-    }
-
-    private var detailsDestination: some View {
-        Group {
-            if let detailsID = selectedDetailsID {
-                CredentialDetailsDestination(
-                    detailsID: detailsID,
-                    details: presentationDetails
-                )
-            } else {
-                EmptyView()
-            }
-        }
+    private var selectedDetails: CredentialDetails? {
+        guard let selectedDetailsID else { return nil }
+        return presentationDetails.first { $0.id == selectedDetailsID }
     }
 }
 

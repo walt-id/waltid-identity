@@ -94,6 +94,32 @@ final class WalletE2EUI {
     }
 
     func latestStatus(prefixes: [String]) -> String? {
+        if prefixes.contains("Wallet ready") {
+            let scanAction = app.descendants(matching: .any)["wallet.scanAction"]
+            if scanAction.exists, scanAction.isEnabled {
+                return "Wallet ready"
+            }
+        }
+        if prefixes.contains("Review credential offer"),
+           app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.reviewIsland."))
+            .firstMatch.exists {
+            return "Review credential offer"
+        }
+        if prefixes.contains("Review presentation request"),
+           app.descendants(matching: .any)["wallet.reviewIsland.verifier"].exists {
+            return "Review presentation request"
+        }
+        if prefixes.contains("Received"),
+           app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
+            .firstMatch.exists {
+            return "Received"
+        }
+        if prefixes.contains("Presentation finished"),
+           app.descendants(matching: .any)["wallet.presentationNewButton"].exists {
+            return "Presentation finished"
+        }
         for prefix in prefixes {
             let predicate = NSPredicate(format: "label BEGINSWITH %@", prefix)
             let match = app.staticTexts.matching(predicate).firstMatch
@@ -144,6 +170,18 @@ final class WalletE2EUI {
         } else {
             targetButton.tap()
         }
+    }
+
+    func assertExists(identifier: String, timeout: TimeInterval = 20) {
+        let element = app.descendants(matching: .any)[identifier]
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if element.exists, element.isHittable { return }
+            app.swipeUp()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTAssertTrue(element.exists, "Element not found with identifier: \(identifier)")
+        XCTAssertTrue(element.isHittable, "Element is not visible with identifier: \(identifier)")
     }
 
     func replaceText(in element: XCUIElement, value: String) {

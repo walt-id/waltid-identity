@@ -1,9 +1,16 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -27,19 +34,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,8 +52,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -86,6 +90,11 @@ internal fun ReviewIslandNavigationHost(
         androidx.compose.foundation.layout.PaddingValues(0.dp),
     islandModifier: (WalletDemoReviewIsland) -> Modifier = { Modifier },
     showModelExpandedValues: (WalletDemoReviewIsland) -> Boolean = { true },
+    islandHeaderContent: @Composable (WalletDemoReviewIsland) -> Unit = {},
+    hasCustomExpandedContent: (WalletDemoReviewIsland) -> Boolean = { false },
+    technicalBackSignal: Int = 0,
+    onRouteChanged: (WalletDemoReviewRoute, WalletDemoReviewIsland?) -> Unit = { _, _ -> },
+    showTechnicalHeader: Boolean = true,
     islandExpandedContent: @Composable (WalletDemoReviewIsland) -> Unit = {},
 ) {
     var technicalIslandId by rememberSaveable(reviewKey) { mutableStateOf<String?>(null) }
@@ -94,6 +103,17 @@ internal fun ReviewIslandNavigationHost(
         ?: WalletDemoReviewRoute.Summary
     val summaryScrollState = rememberScrollState()
     val technicalScrollState = rememberScrollState()
+
+    LaunchedEffect(route, islands) {
+        onRouteChanged(
+            route,
+            (route as? WalletDemoReviewRoute.TechnicalDetails)
+                ?.let { details -> islands.firstOrNull { it.id == details.islandId } },
+        )
+    }
+    LaunchedEffect(technicalBackSignal) {
+        if (technicalBackSignal > 0) technicalIslandId = null
+    }
 
     SystemBackHandler(enabled = route is WalletDemoReviewRoute.TechnicalDetails) {
         technicalIslandId = null
@@ -121,6 +141,8 @@ internal fun ReviewIslandNavigationHost(
                             onTechnicalDetails = { technicalIslandId = island.id.value },
                             modifier = islandModifier(island),
                             showModelExpandedValues = showModelExpandedValues(island),
+                            hasCustomExpandedContent = hasCustomExpandedContent(island),
+                            headerContent = { islandHeaderContent(island) },
                         ) {
                             islandExpandedContent(island)
                         }
@@ -136,6 +158,7 @@ internal fun ReviewIslandNavigationHost(
                     ReviewIslandTechnicalPage(
                         island = island,
                         onBack = { technicalIslandId = null },
+                        showHeader = showTechnicalHeader,
                         modifier = Modifier
                             .fillMaxWidth()
                             .then(if (scrollContent) Modifier.verticalScroll(technicalScrollState) else Modifier)
@@ -153,18 +176,33 @@ internal fun ReviewIslandCard(
     onTechnicalDetails: (() -> Unit)?,
     modifier: Modifier = Modifier,
     showModelExpandedValues: Boolean = true,
+    hasCustomExpandedContent: Boolean = false,
+    headerContent: @Composable () -> Unit = {},
     expandedContent: @Composable () -> Unit = {},
 ) {
     var expanded by rememberSaveable(island.id.value) { mutableStateOf(island.initiallyExpanded) }
     val islandColors = reviewIslandColors(island.kind)
+    val hasModelExpandedContent =
+        (showModelExpandedValues && island.visibleExpandedValues.isNotEmpty()) ||
+            island.status?.isVisible == true || island.warning != null
+    val hasContentBeforeTechnicalDetails = hasModelExpandedContent || hasCustomExpandedContent
+    val hasExpandedContent = hasContentBeforeTechnicalDetails || island.hasTechnicalDetails
+    val effectiveExpanded = expanded && hasExpandedContent
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (effectiveExpanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "Island chevron",
+    )
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = tween(durationMillis = 220)),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = reviewIslandSurfaceColor(),
         border = BorderStroke(
             width = 1.dp,
-            color = if (expanded) islandColors.accent.copy(alpha = 0.42f)
+            color = if (effectiveExpanded) islandColors.accent.copy(alpha = 0.42f)
             else MaterialTheme.colorScheme.outlineVariant,
         ),
     ) {
@@ -172,40 +210,70 @@ internal fun ReviewIslandCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(role = Role.Button) { expanded = !expanded }
-                    .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
-                    .testTag(WalletUiTestTags.reviewIslandToggle(island.id.value))
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ReviewIslandVisual(island, islandColors)
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                headerContent()
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(enabled = hasExpandedContent, role = Role.Button) {
+                            expanded = !expanded
+                        }
+                        .semantics {
+                            stateDescription = when {
+                                !hasExpandedContent -> "No additional details"
+                                effectiveExpanded -> "Expanded"
+                                else -> "Collapsed"
+                            }
+                        }
+                        .testTag(WalletUiTestTags.reviewIslandToggle(island.id.value)),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = island.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    island.subtitle?.takeIf(String::isNotBlank)?.let { subtitle ->
+                    island.visual?.let { visual ->
+                        ReviewIslandVisual(
+                            island = island,
+                            visual = visual,
+                            colors = islandColors,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
                         Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = island.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        island.subtitle?.takeIf(String::isNotBlank)?.let { subtitle ->
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (hasExpandedContent) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (effectiveExpanded) {
+                                "Collapse ${island.title}"
+                            } else {
+                                "Expand ${island.title}"
+                            },
+                            tint = islandColors.accent,
+                            modifier = Modifier.graphicsLayer { rotationZ = chevronRotation },
+                        )
                     }
                 }
-                Icon(
-                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse ${island.title}" else "Expand ${island.title}",
-                    tint = islandColors.accent,
-                )
             }
 
             if (island.visibleSummaryValues.isNotEmpty()) {
@@ -216,52 +284,58 @@ internal fun ReviewIslandCard(
                 )
             }
 
-            if (expanded) {
-                val hasExpandedContent = (showModelExpandedValues && island.visibleExpandedValues.isNotEmpty()) ||
-                    island.status?.isVisible == true || island.warning != null || island.hasTechnicalDetails
-                if (hasExpandedContent) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    island.warning?.let { warning ->
-                        Text(
-                            text = warning,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                    island.status?.takeIf { it.isVisible }?.let { status ->
-                        ReviewValueList(values = listOf(status))
-                    }
-                    if (showModelExpandedValues && island.visibleExpandedValues.isNotEmpty()) {
-                        ReviewValueList(values = island.visibleExpandedValues)
-                    }
-                    expandedContent()
-                    if (island.hasTechnicalDetails && onTechnicalDetails != null) {
+            AnimatedVisibility(
+                visible = effectiveExpanded,
+                enter = expandVertically(animationSpec = tween(220)) + fadeIn(animationSpec = tween(160)),
+                exit = shrinkVertically(animationSpec = tween(200)) + fadeOut(animationSpec = tween(140)),
+            ) {
+                Column {
+                    if (hasExpandedContent) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable(role = Role.Button, onClick = onTechnicalDetails)
-                                .testTag(WalletUiTestTags.reviewIslandTechnicalDetails(island.id.value))
-                                .padding(vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
+                    }
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        island.warning?.let { warning ->
                             Text(
-                                text = "Technical details",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.weight(1f),
+                                text = warning,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
                             )
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = null,
-                            )
+                        }
+                        island.status?.takeIf { it.isVisible }?.let { status ->
+                            ReviewValueList(values = listOf(status))
+                        }
+                        if (showModelExpandedValues && island.visibleExpandedValues.isNotEmpty()) {
+                            ReviewValueList(values = island.visibleExpandedValues)
+                        }
+                        expandedContent()
+                        if (island.hasTechnicalDetails && onTechnicalDetails != null) {
+                            if (hasContentBeforeTechnicalDetails) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(role = Role.Button, onClick = onTechnicalDetails)
+                                    .testTag(WalletUiTestTags.reviewIslandTechnicalDetails(island.id.value))
+                                    .padding(vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "Technical details",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                )
+                            }
                         }
                     }
                 }
@@ -271,8 +345,11 @@ internal fun ReviewIslandCard(
 }
 
 @Composable
-private fun ReviewIslandVisual(island: WalletDemoReviewIsland, colors: ReviewIslandColors) {
-    val visual = island.visual
+private fun ReviewIslandVisual(
+    island: WalletDemoReviewIsland,
+    visual: id.walt.walletdemo.compose.logic.WalletDemoReviewVisual,
+    colors: ReviewIslandColors,
+) {
     Box(
         modifier = Modifier
             .size(44.dp)
@@ -280,7 +357,7 @@ private fun ReviewIslandVisual(island: WalletDemoReviewIsland, colors: ReviewIsl
             .background(colors.container),
         contentAlignment = Alignment.Center,
     ) {
-        val imageUri = visual?.imageUri?.takeIf(::isSafeReviewImage)
+        val imageUri = visual.imageUri?.takeIf(::isSafeReviewImage)
         if (imageUri != null) {
             SubcomposeAsyncImage(
                 model = imageUri,
@@ -291,7 +368,7 @@ private fun ReviewIslandVisual(island: WalletDemoReviewIsland, colors: ReviewIsl
                 error = { ReviewVisualFallback(visual.fallbackText, colors.accent) },
             )
         } else {
-            ReviewVisualFallback(visual?.fallbackText ?: island.title.take(1), colors.accent)
+            ReviewVisualFallback(visual.fallbackText, colors.accent)
         }
     }
 }
@@ -307,6 +384,10 @@ private fun ReviewVisualFallback(text: String, color: Color) {
 }
 
 private data class ReviewIslandColors(val accent: Color, val container: Color)
+
+@Composable
+private fun reviewIslandSurfaceColor(): Color =
+    if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surface else Color.White
 
 @Composable
 private fun reviewIslandColors(kind: WalletDemoReviewIslandKind): ReviewIslandColors {
@@ -338,30 +419,61 @@ private fun ReviewValueList(
     values: List<id.walt.walletdemo.compose.logic.WalletDemoReviewValue>,
     modifier: Modifier = Modifier,
 ) {
-    MetadataDetailList(
-        items = values.map { value ->
-            MetadataDetailItem(
+    val groups = values
+        .filter(id.walt.walletdemo.compose.logic.WalletDemoReviewValue::isVisible)
+        .fold(mutableListOf<ReviewValueGroup>()) { result, value ->
+            val groupTitle = value.supportingText?.takeIf(String::isNotBlank)
+            val item = MetadataDetailItem(
                 label = value.label,
                 value = value.value,
-                supportingText = value.supportingText,
                 linkUri = value.linkUri,
+                sourcePath = value.sourcePath,
             )
-        },
+            val current = result.lastOrNull()
+            if (current != null && current.title == groupTitle) {
+                current.items += item
+            } else {
+                result += ReviewValueGroup(groupTitle, mutableListOf(item))
+            }
+            result
+        }
+
+    Column(
         modifier = modifier,
-    )
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        groups.forEachIndexed { index, group ->
+            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            group.title?.let { title ->
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            MetadataDetailList(items = group.items)
+        }
+    }
 }
+
+private data class ReviewValueGroup(
+    val title: String?,
+    val items: MutableList<MetadataDetailItem>,
+)
 
 @Composable
 private fun ReviewIslandTechnicalPage(
     island: WalletDemoReviewIsland,
     onBack: () -> Unit,
+    showHeader: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.testTag(WalletUiTestTags.ReviewTechnicalDetailsPage),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
+        if (showHeader) Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -397,7 +509,7 @@ private fun ReviewIslandTechnicalPage(
                 )
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surface,
+                    color = reviewIslandSurfaceColor(),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -423,13 +535,11 @@ internal fun ReviewActionBar(
     secondaryEnabled: Boolean,
     onSecondary: () -> Unit,
     secondaryTestTag: String,
-    secondaryCompactIcon: ImageVector = Icons.Default.Close,
     modifier: Modifier = Modifier,
     tertiaryLabel: String? = null,
     tertiaryEnabled: Boolean = true,
     onTertiary: (() -> Unit)? = null,
     tertiaryTestTag: String? = null,
-    tertiaryCompactIcon: ImageVector = Icons.Default.Close,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -452,7 +562,8 @@ internal fun ReviewActionBar(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Button(
+                    val hasTertiary = tertiaryLabel != null && onTertiary != null
+                    WalletPrimaryButton(
                         onClick = onPrimary,
                         enabled = primaryEnabled,
                         contentPadding = PaddingValues(horizontal = if (compact) 12.dp else 20.dp, vertical = 10.dp),
@@ -461,7 +572,7 @@ internal fun ReviewActionBar(
                             .testTag(primaryTestTag),
                     ) {
                         Text(
-                            text = if (compact) primaryCompactLabel else primaryLabel,
+                            text = if (compact || hasTertiary) primaryCompactLabel else primaryLabel,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -469,21 +580,19 @@ internal fun ReviewActionBar(
 
                     ReviewCompactAction(
                         label = secondaryLabel,
-                        icon = secondaryCompactIcon,
                         enabled = secondaryEnabled,
-                        compact = compact && tertiaryLabel != null,
                         onClick = onSecondary,
-                        modifier = Modifier.testTag(secondaryTestTag),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(secondaryTestTag),
                     )
 
-                    if (tertiaryLabel != null && onTertiary != null) {
+                    if (hasTertiary) {
                         ReviewCompactAction(
                             label = tertiaryLabel,
-                            icon = tertiaryCompactIcon,
                             enabled = tertiaryEnabled,
-                            compact = compact,
                             onClick = onTertiary,
-                            modifier = tertiaryTestTag?.let { Modifier.testTag(it) } ?: Modifier,
+                            modifier = (tertiaryTestTag?.let { Modifier.testTag(it) } ?: Modifier).weight(1f),
                         )
                     }
                 }
@@ -495,29 +604,17 @@ internal fun ReviewActionBar(
 @Composable
 private fun ReviewCompactAction(
     label: String,
-    icon: ImageVector,
     enabled: Boolean,
-    compact: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (compact) {
-        OutlinedIconButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = modifier.size(48.dp),
-        ) {
-            Icon(imageVector = icon, contentDescription = label)
-        }
-    } else {
-        OutlinedButton(
-            onClick = onClick,
-            enabled = enabled,
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-            modifier = modifier,
-        ) {
-            Text(label, maxLines = 1)
-        }
+    WalletSecondaryButton(
+        onClick = onClick,
+        enabled = enabled,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

@@ -31,6 +31,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.WalletDemoReviewIsland
+import id.walt.walletdemo.compose.logic.WalletDemoReviewRoute
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 import id.walt.walletdemo.compose.ui.components.StoredCredentialDetailsContent
@@ -42,6 +44,9 @@ internal fun CredentialDetailsScreen(
     onBack: () -> Unit,
     storedCredentialActions: Boolean = false,
     onDeleteCredential: (String) -> Unit = {},
+    showHeader: Boolean = true,
+    technicalBackSignal: Int = 0,
+    onReviewRouteChanged: (WalletDemoReviewRoute, WalletDemoReviewIsland?) -> Unit = { _, _ -> },
 ) {
     val clipboard = LocalClipboardManager.current
     var confirmDelete by remember(details.summary.id) { mutableStateOf(false) }
@@ -58,28 +63,30 @@ internal fun CredentialDetailsScreen(
             .testTag(WalletUiTestTags.CredentialDetailsScreen),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 4.dp, end = 20.dp, top = 8.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.testTag(WalletUiTestTags.DetailsBack),
+        if (showHeader) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp, end = 20.dp, top = 8.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.testTag(WalletUiTestTags.DetailsBack),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                    )
+                }
+                Text(
+                    "Credential details",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
-            Text(
-                "Credential details",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
         }
         if (storedCredentialActions) {
             StoredCredentialDetailsContent(
@@ -87,6 +94,8 @@ internal fun CredentialDetailsScreen(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 20.dp, vertical = 8.dp),
+                technicalBackSignal = technicalBackSignal,
+                onRouteChanged = onReviewRouteChanged,
             )
         } else {
             CredentialDetailsContent(

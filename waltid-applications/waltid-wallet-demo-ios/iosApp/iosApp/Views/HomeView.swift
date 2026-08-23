@@ -5,7 +5,6 @@ struct HomeView: View {
     @ObservedObject var viewModel: WalletViewModel
     @State private var selectedCredentialDetailsID: String?
     @State private var selectedReceiveDetailsID: String?
-    @State private var selectedPresentationDetailsID: String?
     @State private var scanVisible = false
 
     var body: some View {
@@ -35,10 +34,7 @@ struct HomeView: View {
         .onChange(of: viewModel.receiveNavigationResetKey) { _ in
             selectedReceiveDetailsID = nil
         }
-        .onChange(of: viewModel.presentationNavigationResetKey) { _ in
-            selectedPresentationDetailsID = nil
-        }
-        .overlay(alignment: .top) {
+        .overlay(alignment: .bottom) {
             if let message = viewModel.transientMessage {
                 Text(message)
                     .font(.subheadline.weight(.semibold))
@@ -46,9 +42,9 @@ struct HomeView: View {
                     .padding(.vertical, 10)
                     .background(.regularMaterial, in: Capsule())
                     .shadow(radius: 4, y: 2)
-                    .padding(.top, 8)
+                    .padding(.bottom, 16)
                     .padding(.horizontal)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.easeInOut, value: viewModel.transientMessage)
@@ -80,7 +76,6 @@ struct HomeView: View {
         case .present:
             PresentView(
                 viewModel: viewModel,
-                selectedDetailsID: $selectedPresentationDetailsID,
                 showsInput: viewModel.presentationUrlEntryEnabled,
                 onClose: viewModel.dismissInteraction
             )

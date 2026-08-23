@@ -182,6 +182,17 @@ internal object WalletComposeE2EHelper {
         fail("$message. Expected one of $texts.\n${visibleUiSnapshot(device)}")
     }
 
+    fun assertResourceVisibleAfterScrolling(
+        device: UiDevice,
+        tag: String,
+        message: String,
+    ) {
+        val resource = waitForVisibleResource(device, tag, CLICK_VISIBLE_TIMEOUT)
+            ?: findResourceAfterScrolling(device, tag)
+        if (resource != null) return
+        fail("$message. Expected resource $tag.\n${visibleUiSnapshot(device)}")
+    }
+
     /**
      * Asserts [substring] appears in some wallet text node, scrolling to look for it. For values the
      * review renders wrapped in surrounding label text, where an exact match would fail on content that
@@ -370,12 +381,28 @@ internal object WalletComposeE2EHelper {
     }
 
     fun latestStatus(device: UiDevice): String {
-        val tagged = device.findObject(By.res("wallet.status"))
-        if (tagged?.text != null) return tagged.text
+        if (runCatching {
+                device.findObject(By.res("wallet.receiveNewButton")) != null
+            }.getOrDefault(false)
+        ) {
+            return "Received"
+        }
+        if (runCatching {
+                device.findObject(By.res("wallet.presentationNewButton")) != null
+            }.getOrDefault(false)
+        ) {
+            return "Presentation finished"
+        }
+        val taggedText = runCatching {
+            device.findObject(By.res("wallet.status"))?.text
+        }.getOrNull()
+        if (taggedText != null) return taggedText
 
         for (prefix in statusPrefixes) {
-            val obj = device.findObject(By.textStartsWith(prefix))
-            if (obj != null) return obj.text
+            val matchingText = runCatching {
+                device.findObject(By.textStartsWith(prefix))?.text
+            }.getOrNull()
+            if (matchingText != null) return matchingText
         }
         return "UNKNOWN"
     }

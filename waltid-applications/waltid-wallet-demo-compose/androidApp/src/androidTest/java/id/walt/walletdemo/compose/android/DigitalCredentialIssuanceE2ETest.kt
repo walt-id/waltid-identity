@@ -67,6 +67,7 @@ class DigitalCredentialIssuanceE2ETest {
         val fixture = start() ?: return@runBlocking
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val portalOffer = createPortalShapedOffer(scenario)
+        WalletGalleryCapture.recordRequest("platform-issuance-portal-shaped", portalOffer.enrichedOfferJson)
 
         launchPortalOffer(fixture, portalOffer)
 
@@ -77,6 +78,13 @@ class DigitalCredentialIssuanceE2ETest {
             "Wallet create offer review did not open for the portal-shaped offer",
             waitForResource(fixture.device, "wallet.offerReview", UI_ELEMENT_TIMEOUT),
         )
+        clickByTag(fixture.device, "wallet.reviewIslandTechnicalDetails.credential_offered_0")
+        assertNotNull(
+            "Credential details did not open for the portal-shaped offer",
+            waitForResource(fixture.device, "wallet.reviewTechnicalDetailsPage", UI_ELEMENT_TIMEOUT),
+        )
+        WalletGalleryCapture.capture(fixture.device, "platform-issuance-portal-shaped-review")
+        clickByTag(fixture.device, "wallet.reviewTechnicalDetailsBack")
         clickByTag(fixture.device, "wallet.offerAcceptButton")
 
         DemoTestBackend.waitForIssuerIssuanceSuccess(portalOffer.offerId)
@@ -88,6 +96,7 @@ class DigitalCredentialIssuanceE2ETest {
         val fixture = start() ?: return@runBlocking
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val offer = DemoTestBackend.createOffer(scenario, inlineOffer = true)
+        WalletGalleryCapture.recordRequest("platform-issuance", offer.offerUrl)
         val offerJson = requireNotNull(Uri.parse(offer.offerUrl).getQueryParameter("credential_offer")) {
             "Demo offer URL did not carry an inline credential_offer"
         }
@@ -110,6 +119,7 @@ class DigitalCredentialIssuanceE2ETest {
             "Wallet create offer review did not open",
             waitForResource(fixture.device, "wallet.offerReview", UI_ELEMENT_TIMEOUT),
         )
+        WalletGalleryCapture.capture(fixture.device, "platform-issuance-${scenario.id}-review")
         clickByTag(fixture.device, "wallet.offerAcceptButton")
 
         DemoTestBackend.waitForIssuerIssuanceSuccess(offer.offerId)
@@ -125,6 +135,7 @@ class DigitalCredentialIssuanceE2ETest {
             withGeneratedTransactionCode = true,
             inlineOffer = true,
         )
+        WalletGalleryCapture.recordRequest("platform-issuance-transaction-code", offer.offerUrl)
         val txCode = requireNotNull(offer.txCode) { "Issuer did not return a transaction code" }
         val offerJson = requireNotNull(Uri.parse(offer.offerUrl).getQueryParameter("credential_offer")) {
             "Demo offer URL did not carry an inline credential_offer"
@@ -152,6 +163,7 @@ class DigitalCredentialIssuanceE2ETest {
             "Transaction code field was not shown",
             waitForResource(fixture.device, "wallet.txCodeInput", UI_ELEMENT_TIMEOUT),
         )
+        WalletGalleryCapture.capture(fixture.device, "platform-issuance-transaction-code-review")
         setTextByTag(fixture.device, "wallet.txCodeInput", txCode)
         clickByTag(fixture.device, "wallet.offerAcceptButton")
 

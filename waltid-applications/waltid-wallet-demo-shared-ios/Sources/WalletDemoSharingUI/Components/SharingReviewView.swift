@@ -14,6 +14,8 @@ public struct SharingReviewView: View {
     private let isReadOnly: Bool
     private let showsActions: Bool
     private let context: ReviewSurfaceContext
+    private let reviewRoute: Binding<ReviewRoute>?
+    private let showsTechnicalHeader: Bool
     private let onToggleCredential: (PresentationCredentialSelection) -> Void
     private let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
     private let onCredentialSelected: ((String) -> Void)?
@@ -43,6 +45,8 @@ public struct SharingReviewView: View {
         isReadOnly: Bool = false,
         showsActions: Bool = true,
         context: ReviewSurfaceContext = .selectedForSharing,
+        reviewRoute: Binding<ReviewRoute>? = nil,
+        showsTechnicalHeader: Bool = true,
         onToggleCredential: @escaping (PresentationCredentialSelection) -> Void,
         onToggleDisclosure: @escaping (PresentationDisclosureSelection) -> Void,
         onCredentialSelected: ((String) -> Void)? = nil,
@@ -57,6 +61,8 @@ public struct SharingReviewView: View {
         self.isReadOnly = isReadOnly
         self.showsActions = showsActions
         self.context = context
+        self.reviewRoute = reviewRoute
+        self.showsTechnicalHeader = showsTechnicalHeader
         self.onToggleCredential = onToggleCredential
         self.onToggleDisclosure = onToggleDisclosure
         self.onCredentialSelected = onCredentialSelected
@@ -66,14 +72,40 @@ public struct SharingReviewView: View {
     }
 
     public var body: some View {
+        let islands = review.reviewIslands(context: context)
+        let credentialIslands = islands.filter { $0.kind == .credential }
+        let optionByIslandID = Dictionary(
+            uniqueKeysWithValues: zip(credentialIslands, review.credentialOptions).map { ($0.id, $1) }
+        )
         VStack(alignment: .leading, spacing: 8) {
             ReviewIslandNavigationView(
-                islands: review.reviewIslands(context: context),
+                islands: islands,
                 showsModelExpandedValues: { island in
-                    island.kind != .credential && island.kind != .information
+                    island.kind != .credential
+                },
+                hasCustomExpandedContent: { island in
+                    if island.kind == .verifier { return true }
+                    guard island.kind == .credential, let option = optionByIslandID[island.id] else {
+                        return false
+                    }
+                    return !option.disclosures.isEmpty || onCredentialSelected != nil
+                },
+                route: reviewRoute,
+                showsTechnicalHeader: showsTechnicalHeader,
+                headerContent: { island in
+                    if let option = optionByIslandID[island.id] {
+                        CredentialSelectionControl(
+                            option: option,
+                            style: review.selectionStyle(for: option),
+                            selected: selection.credentials.contains(option.selection),
+                            enabled: !isLoading,
+                            readOnly: isReadOnly,
+                            onToggleCredential: onToggleCredential
+                        )
+                    }
                 }
             ) { island in
-                expandedContent(for: island)
+                expandedContent(for: island, option: optionByIslandID[island.id])
             }
 
             if showsActions && !isReadOnly {
@@ -89,39 +121,26 @@ public struct SharingReviewView: View {
     }
 
     @ViewBuilder
-    private func expandedContent(for island: ReviewIsland) -> some View {
+    private func expandedContent(
+        for island: ReviewIsland,
+        option: PresentationCredentialOption?
+    ) -> some View {
         switch island.kind {
         case .verifier:
             VerifierReviewFacts(request: review.request)
         case .credential:
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(review.credentialOptions) { option in
-                    CredentialReviewCard(
+            if let option {
+                CredentialIslandExpandedContent(
                         option: option,
-                        showsCredentialName: review.credentialOptions.count > 1,
                         selection: selection,
                         isLoading: isLoading,
                         isReadOnly: isReadOnly,
-                        onToggleCredential: onToggleCredential,
+                        requestedDisclosureItems: requestedDisclosureItems(for: option),
+                        onToggleDisclosure: onToggleDisclosure,
                         onCredentialSelected: onCredentialSelected
                     )
-                }
             }
-        case .information:
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(review.credentialOptions.filter { !$0.disclosures.isEmpty }) { option in
-                    DisclosureList(
-                        option: option,
-                        credentialSelected: selection.credentials.contains(option.selection),
-                        selectedDisclosureOptions: selection.disclosures,
-                        requestedDisclosureItems: requestedDisclosureItems(for: option),
-                        isLoading: isLoading,
-                        isReadOnly: isReadOnly,
-                        onToggleDisclosure: onToggleDisclosure
-                    )
-                }
-            }
-        case .issuer, .validityAndStatus, .purposeAndTransaction, .requiredAction:
+        case .issuer, .information, .validityAndStatus, .purposeAndTransaction, .requiredAction:
             EmptyView()
         }
     }
@@ -133,64 +152,136 @@ public struct SharingReviewView: View {
     }
 }
 
-/// One offered credential: what it is, and what would be disclosed from it.
-struct CredentialReviewCard: View {
+/// One credential's requested fields and optional route to its stored details.
+private struct CredentialIslandExpandedContent: View {
     let option: PresentationCredentialOption
-    let showsCredentialName: Bool
     let selection: SharingSelection
     let isLoading: Bool
     let isReadOnly: Bool
-    let onToggleCredential: (PresentationCredentialSelection) -> Void
+    let requestedDisclosureItems: [ClaimItem]
+    let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
     let onCredentialSelected: ((String) -> Void)?
 
     var body: some View {
         let details = CredentialDisplayNormalizer.details(for: option)
-        HStack(alignment: .center, spacing: 10) {
-            if !isReadOnly {
-                Toggle(isOn: Binding(get: {
-                    selection.credentials.contains(option.selection)
-                }, set: { _ in
-                    onToggleCredential(option.selection)
-                })) {
-                    EmptyView()
-                }
-                .labelsHidden()
-                .disabled(isLoading)
-                .accessibilityLabel(showsCredentialName ? option.userFacingLabel : "Use this credential")
-                .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
+        VStack(alignment: .leading, spacing: 8) {
+            if !option.disclosures.isEmpty {
+                DisclosureList(
+                    option: option,
+                    credentialSelected: selection.credentials.contains(option.selection),
+                    selectedDisclosureOptions: selection.disclosures,
+                    requestedDisclosureItems: requestedDisclosureItems,
+                    isLoading: isLoading,
+                    isReadOnly: isReadOnly,
+                    onToggleDisclosure: onToggleDisclosure
+                )
             }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(showsCredentialName ? option.userFacingLabel : "Use this credential")
-                    .font(.subheadline.weight(.medium))
-                if showsCredentialName, let issuer = option.issuer?.presentableValue {
-                    Text(issuer)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if let subject = option.subject?.presentableValue {
-                    Text(subject)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let onCredentialSelected {
-                Button {
-                    onCredentialSelected(details.id)
-                } label: {
+                HStack {
+                    Text("View credential")
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
                     Image(systemName: "chevron.right")
-                        .frame(width: 32, height: 32)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.tint)
-                .accessibilityLabel("View credential details")
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
+                .onTapGesture { onCredentialSelected(details.id) }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel("View credential")
                 .accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
+                .accessibilityAction { onCredentialSelected(details.id) }
             }
         }
-        .padding(.vertical, 2)
+    }
+}
+
+private enum ReviewSelectionStyle {
+    case checkbox
+    case radio
+    case included
+}
+
+private extension SharingReviewModel {
+    func selectionStyle(for option: PresentationCredentialOption) -> ReviewSelectionStyle {
+        if option.multiple { return .checkbox }
+        let candidateCount = credentialOptions.filter { $0.queryID == option.queryID }.count
+        let belongsToAlternative = credentialRequirements.contains { requirement in
+            requirement.options.count > 1 && requirement.options.contains { $0.contains(option.queryID) }
+        }
+        return candidateCount > 1 || belongsToAlternative ? .radio : .included
+    }
+}
+
+private struct CredentialSelectionControl: View {
+    let option: PresentationCredentialOption
+    let style: ReviewSelectionStyle
+    let selected: Bool
+    let enabled: Bool
+    let readOnly: Bool
+    let onToggleCredential: (PresentationCredentialSelection) -> Void
+
+    private var isInteractive: Bool { enabled && !readOnly && style != .included }
+
+    var body: some View {
+        Group {
+            if isInteractive {
+                Button { onToggleCredential(option.selection) } label: { indicator }
+                    .buttonStyle(.plain)
+            } else {
+                indicator
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(selected ? (style == .included ? "Included" : "Selected") : "Not selected")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
+    }
+
+    private var accessibilityLabel: String {
+        switch style {
+        case .checkbox: return "Include \(option.userFacingLabel)"
+        case .radio: return "Select \(option.userFacingLabel)"
+        case .included: return "\(option.userFacingLabel) included"
+        }
+    }
+
+    private var indicator: some View {
+        ReviewSelectionIndicator(style: style, selected: selected)
+            .frame(width: 22, height: 22)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+    }
+}
+
+private struct ReviewSelectionIndicator: View {
+    let style: ReviewSelectionStyle
+    let selected: Bool
+
+    var body: some View {
+        ZStack {
+            if style == .radio {
+                Circle()
+                    .stroke(Color.accentColor, lineWidth: 2)
+                if selected {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .padding(6)
+                }
+            } else {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(selected ? Color.accentColor : Color.clear)
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.accentColor, lineWidth: 2)
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                }
+            }
+        }
     }
 }
 
@@ -264,29 +355,41 @@ struct DisclosureList: View {
                     path: disclosure.path
                 )
 
-                VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .top, spacing: 8) {
+                    let selected = disclosure.selectable
+                        ? selectedDisclosureOptions.contains(selection)
+                        : credentialSelected
                     if disclosure.selectable && !isReadOnly {
-                        Toggle(isOn: Binding(get: {
-                            selectedDisclosureOptions.contains(selection)
-                        }, set: { _ in
-                            onToggleDisclosure(selection)
-                        })) {
-                            disclosureLabel(index: index, disclosure: disclosure)
+                        Button { onToggleDisclosure(selection) } label: {
+                            ReviewSelectionIndicator(style: .checkbox, selected: selected)
+                                .frame(width: 22, height: 22)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                         .disabled(isLoading || !credentialSelected)
+                        .accessibilityLabel("Include \(disclosure.name ?? disclosure.path)")
+                        .accessibilityValue(selected ? "Selected" : "Not selected")
                         .accessibilityIdentifier(WalletAccessibilityID.presentationDisclosureToggle(selection.id))
                     } else {
-                        disclosureLabel(index: index, disclosure: disclosure)
+                        ReviewSelectionIndicator(style: .included, selected: selected)
+                            .frame(width: 22, height: 22)
+                            .frame(width: 44, height: 44)
+                            .accessibilityLabel("\(disclosure.name ?? disclosure.path) included")
+                            .accessibilityValue(selected ? "Included" : "Not included")
+                            .accessibilityIdentifier(WalletAccessibilityID.presentationDisclosureToggle(selection.id))
                     }
 
-                    Text(disclosure.disclosureStatusText)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        disclosureLabel(index: index, disclosure: disclosure)
+                        Text(disclosure.disclosureStatusText)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(10)
+                .padding(.vertical, 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
     }
@@ -350,34 +453,21 @@ public struct SharingReviewActions: View {
         self.onCancel = onCancel
     }
 
-    @ViewBuilder public var body: some View {
-        if #available(iOS 16.0, *) {
-            ViewThatFits(in: .horizontal) {
-                actionRow(compact: false)
-                actionRow(compact: true)
-            }
-        } else {
-            actionRow(compact: true)
-        }
-    }
-
-    private func actionRow(compact: Bool) -> some View {
+    public var body: some View {
         HStack(spacing: 8) {
             Button(action: onSubmit) {
                 Text("Share")
                     .lineLimit(1)
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.waltBlue)
+            .buttonStyle(WalletPrimaryButtonStyle())
+            .frame(maxWidth: .infinity)
             .disabled(isLoading || !selectionComplete)
             .accessibilityLabel("Share information")
             .accessibilityIdentifier(WalletAccessibilityID.presentationSubmitButton)
 
             reviewAction(
                 title: "Cancel",
-                systemImage: "xmark",
-                compact: compact,
                 accessibilityLabel: "Cancel",
                 identifier: WalletAccessibilityID.presentationCancelButton,
                 action: onCancel
@@ -386,34 +476,30 @@ public struct SharingReviewActions: View {
             if let onReject {
                 reviewAction(
                     title: "Reject",
-                    systemImage: "hand.raised",
-                    compact: compact,
                     accessibilityLabel: "Reject request",
                     identifier: WalletAccessibilityID.presentationRejectButton,
                     action: onReject
                 )
             }
         }
+        .frame(height: 48)
         .frame(maxWidth: .infinity)
     }
 
     private func reviewAction(
         title: String,
-        systemImage: String,
-        compact: Bool,
         accessibilityLabel: String,
         identifier: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            if compact {
-                Image(systemName: systemImage)
-                    .frame(width: 20, height: 20)
-            } else {
-                Text(title).lineLimit(1)
-            }
+            Text(title)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(WalletSecondaryButtonStyle())
+        .frame(maxWidth: .infinity)
         .disabled(isLoading)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityIdentifier(identifier)

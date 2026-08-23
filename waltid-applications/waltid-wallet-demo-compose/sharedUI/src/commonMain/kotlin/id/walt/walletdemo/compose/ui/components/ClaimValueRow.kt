@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import id.walt.walletdemo.compose.logic.ClaimItem
@@ -30,20 +31,53 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
 internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(WalletUiTestTags.claim(item.path.id)),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            item.label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ClaimValue(value = item.value, path = item.path, modifier = Modifier.fillMaxWidth())
+    val inlineValue = item.value.inlineValue()
+    val rowModifier = modifier
+        .fillMaxWidth()
+        .testTag(WalletUiTestTags.claim(item.path.id))
+    if (inlineValue != null && item.label.length <= 28 && inlineValue.length <= 38) {
+        Row(
+            modifier = rowModifier,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ClaimLabel(item.label, Modifier.weight(1f))
+            Text(
+                inlineValue,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.End,
+            )
+        }
+    } else {
+        Column(
+            modifier = rowModifier,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            ClaimLabel(item.label)
+            ClaimValue(value = item.value, path = item.path, modifier = Modifier.fillMaxWidth())
+        }
     }
+}
+
+@Composable
+private fun ClaimLabel(label: String, modifier: Modifier = Modifier) {
+    Text(
+        label,
+        modifier = modifier,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+private fun DisplayValue.inlineValue(): String? = when (this) {
+    is DisplayValue.BooleanValue -> if (value) "Yes" else "No"
+    is DisplayValue.DecodedText -> value
+    DisplayValue.NullValue -> "Not provided"
+    is DisplayValue.NumberValue -> value
+    is DisplayValue.Text -> value
+    else -> null
 }
 
 @Composable

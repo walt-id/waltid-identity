@@ -10,6 +10,7 @@ struct UnifiedScanView: View {
     @State private var input = ""
     @State private var error: String?
     @State private var accepted = false
+    @State private var scannerID = UUID()
 
     var body: some View {
         NavigationView {
@@ -32,6 +33,7 @@ struct UnifiedScanView: View {
                             error = "QR scanning is unavailable. Check camera access or enter the link manually."
                         }
                     }
+                    .id(scannerID)
                     .frame(height: 320)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
 
@@ -60,8 +62,7 @@ struct UnifiedScanView: View {
                     Button("Continue") {
                         submit(input)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
+                    .buttonStyle(WalletPrimaryButtonStyle())
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .disabled(accepted || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityIdentifier(WalletAccessibilityID.scanSubmit)
@@ -72,8 +73,22 @@ struct UnifiedScanView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", action: onDismiss)
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .frame(width: 32, height: 32)
+                    }
+                        .accessibilityLabel("Close")
                         .accessibilityIdentifier(WalletAccessibilityID.scanDismiss)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        error = nil
+                        scannerID = UUID()
+                    } label: {
+                        Image(systemName: "camera.viewfinder")
+                            .frame(width: 32, height: 32)
+                    }
+                    .accessibilityLabel("Restart camera")
                 }
             }
             .accessibilityIdentifier(WalletAccessibilityID.scanSheet)
