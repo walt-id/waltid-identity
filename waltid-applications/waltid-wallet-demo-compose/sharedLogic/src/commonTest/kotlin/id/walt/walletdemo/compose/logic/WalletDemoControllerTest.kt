@@ -175,7 +175,7 @@ class WalletDemoControllerTest {
     @Test
     fun setupPinDoesNotEnableBiometricsWhenAuthorizationFails() = runTest {
         val pinStore = InMemoryDemoPinStore()
-        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Cancelled)
+        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Failed)
         val controller = controllerWith(FakeDemoWallet(), this, pinStore, biometrics)
 
         controller.updatePin("1234")
@@ -217,7 +217,7 @@ class WalletDemoControllerTest {
         pinStore.setPin("1234")
         pinStore.setBiometricUnlockEnabled(true)
         val wallet = FakeDemoWallet()
-        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Cancelled)
+        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Failed)
         val controller = controllerWith(wallet, this, pinStore, biometrics)
 
         controller.unlockWithBiometrics()
@@ -230,6 +230,36 @@ class WalletDemoControllerTest {
         controller.submitPin()
         runCurrent()
 
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertEquals(1, wallet.bootstrapCalls)
+    }
+
+    @Test
+    fun lockDoesNotAutoPromptBiometrics() = runTest {
+        val pinStore = InMemoryDemoPinStore()
+        pinStore.setPin("1234")
+        pinStore.setBiometricUnlockEnabled(true)
+        val wallet = FakeDemoWallet()
+        val biometrics = FakeDemoBiometricAuthenticator()
+        val controller = controllerWith(wallet, this, pinStore, biometrics)
+
+        controller.unlockWithBiometrics()
+        runCurrent()
+        assertEquals(1, biometrics.authenticateCalls)
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+
+        controller.lock()
+        val login = controller.state.value.auth as WalletAuthState.Login
+        assertTrue(login.biometricPromptConsumed)
+
+        controller.unlockWithBiometrics()
+        runCurrent()
+        assertEquals(1, biometrics.authenticateCalls)
+        assertTrue(controller.state.value.auth is WalletAuthState.Login)
+
+        controller.unlockWithBiometrics(force = true)
+        runCurrent()
+        assertEquals(2, biometrics.authenticateCalls)
         assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
         assertEquals(1, wallet.bootstrapCalls)
     }

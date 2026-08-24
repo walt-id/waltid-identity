@@ -324,11 +324,31 @@ class WalletViewModel: ObservableObject {
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
         discardPresentationPreviewIfPresent()
+        offerUrl = ""
+        txCode = ""
+        offerPreview = nil
+        presentationRequestUrl = ""
+        presentationReview = nil
+        selectedPresentationCredentialOptions = []
+        selectedPresentationDisclosureOptions = []
+        lastReceivedCredentialIDs = []
+        receiveCompleted = false
+        presentationCompleted = false
+        pendingPresentationContinuationURL = nil
+        pendingPresentationFormPostHTML = nil
+        receiveNavigationResetKey += 1
+        presentationNavigationResetKey += 1
+        isLoading = false
+        isError = false
+        statusTab = nil
+        statusMessage = isReady ? WalletStatusText.walletReady : WalletStatusText.startingWallet
+        statusExpanded = false
+        statusHideTask?.cancel()
         pin = ""
         pinConfirmation = ""
         pinError = nil
         isAuthenticating = false
-        biometricPromptConsumed = false
+        biometricPromptConsumed = true
         auth = .login
     }
 
@@ -1196,11 +1216,16 @@ class WalletViewModel: ObservableObject {
         isAuthenticating = true
         pinError = nil
         Task {
-            await pinStore.setPin(pin)
-            pinStore.isBiometricUnlockEnabled = useBiometrics
-            isAuthenticating = false
-            auth = .unlocked
-            bootstrapIfNeeded()
+            do {
+                try await pinStore.setPin(pin)
+                pinStore.isBiometricUnlockEnabled = useBiometrics
+                isAuthenticating = false
+                auth = .unlocked
+                bootstrapIfNeeded()
+            } catch {
+                isAuthenticating = false
+                pinError = "PIN could not be saved"
+            }
         }
     }
 

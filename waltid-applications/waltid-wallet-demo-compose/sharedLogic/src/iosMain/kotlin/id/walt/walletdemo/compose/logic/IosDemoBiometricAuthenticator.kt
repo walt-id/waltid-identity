@@ -14,10 +14,6 @@ import platform.Foundation.NSThread
 import platform.LocalAuthentication.LAContext
 import platform.darwin.dispatch_get_main_queue
 import platform.darwin.dispatch_sync
-import platform.LocalAuthentication.LAErrorBiometryNotAvailable
-import platform.LocalAuthentication.LAErrorBiometryNotEnrolled
-import platform.LocalAuthentication.LAErrorUserCancel
-import platform.LocalAuthentication.LAErrorUserFallback
 import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthenticationWithBiometrics
 import kotlin.coroutines.resume
 
@@ -29,23 +25,17 @@ private class IosDemoBiometricAuthenticator : DemoBiometricAuthenticator {
 
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     override suspend fun authenticate(reason: String): DemoBiometricResult = withContext(Dispatchers.Main) {
-        if (!evaluateAvailability()) return@withContext DemoBiometricResult.Unavailable
+        if (!evaluateAvailability()) return@withContext DemoBiometricResult.Failed
         val context = LAContext()
         return@withContext suspendCancellableCoroutine { continuation ->
             context.evaluatePolicy(
                 LAPolicyDeviceOwnerAuthenticationWithBiometrics,
                 localizedReason = reason,
-            ) { success, error ->
+            ) { success, _ ->
                 if (!continuation.isActive) return@evaluatePolicy
-                val result = when {
-                    success -> DemoBiometricResult.Succeeded
-                    error?.code == LAErrorUserCancel || error?.code == LAErrorUserFallback ->
-                        DemoBiometricResult.Cancelled
-                    error?.code == LAErrorBiometryNotAvailable || error?.code == LAErrorBiometryNotEnrolled ->
-                        DemoBiometricResult.Unavailable
-                    else -> DemoBiometricResult.Failed
-                }
-                continuation.resume(result)
+                continuation.resume(
+                    if (success) DemoBiometricResult.Succeeded else DemoBiometricResult.Failed,
+                )
             }
         }
     }

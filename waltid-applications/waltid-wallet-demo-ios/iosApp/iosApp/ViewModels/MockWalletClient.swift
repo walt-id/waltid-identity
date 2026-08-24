@@ -44,8 +44,11 @@ actor MockWalletClient: WalletClient {
         self.mdocMetadata = mdocMetadata
     }
 
+    private(set) var bootstrapCalls = 0
+
     func bootstrap() async throws -> WalletBootstrapResult {
-        WalletBootstrapResult(
+        bootstrapCalls += 1
+        return WalletBootstrapResult(
             keyID: "mock-key-1",
             did: "did:key:mock",
             publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#

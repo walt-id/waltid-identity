@@ -110,6 +110,10 @@ class WalletDemoAppIosTest {
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
 
     @Test
+    fun lockDoesNotAutoPromptBiometrics() =
+        scenarios.lockDoesNotAutoPromptBiometrics()
+
+    @Test
     fun credentialDetailsCanCopyAndDelete() =
         scenarios.credentialDetailsCanCopyAndDelete()
 

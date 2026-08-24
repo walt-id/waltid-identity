@@ -160,10 +160,7 @@ class WalletDemoController(
                     }
                     bootstrapIfNeeded()
                 }
-                DemoBiometricResult.Cancelled,
-                DemoBiometricResult.Failed,
-                DemoBiometricResult.Unavailable,
-                -> _state.update { it.copy(isAuthenticating = false) }
+                DemoBiometricResult.Failed -> _state.update { it.copy(isAuthenticating = false) }
             }
         }
     }
@@ -193,7 +190,7 @@ class WalletDemoController(
         presentationJob?.cancel()
         val previous = getAndUpdateState {
             it.copy(
-                auth = WalletAuthState.Login(),
+                auth = WalletAuthState.Login(biometricPromptConsumed = true),
                 operation = WalletOperationState.Idle,
                 requestDrafts = it.requestDrafts.copy(txCode = ""),
                 offerPreview = null,

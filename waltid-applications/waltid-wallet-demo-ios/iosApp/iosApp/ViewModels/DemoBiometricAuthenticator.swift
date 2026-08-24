@@ -3,8 +3,6 @@ import LocalAuthentication
 enum DemoBiometricResult: Equatable {
     case succeeded
     case failed
-    case cancelled
-    case unavailable
 }
 
 protocol DemoBiometricAuthenticator {
@@ -16,7 +14,7 @@ struct UnavailableDemoBiometricAuthenticator: DemoBiometricAuthenticator {
     var isAvailable: Bool { false }
 
     func authenticate(reason: String) async -> DemoBiometricResult {
-        .unavailable
+        .failed
     }
 }
 
@@ -33,7 +31,7 @@ struct LocalAuthenticationBiometricAuthenticator: DemoBiometricAuthenticator {
     private func authenticateOnMain(reason: String) async -> DemoBiometricResult {
         let context = LAContext()
         guard Self.canEvaluateBiometrics(context: context) else {
-            return .unavailable
+            return .failed
         }
         do {
             let success = try await context.evaluatePolicy(
@@ -41,15 +39,6 @@ struct LocalAuthenticationBiometricAuthenticator: DemoBiometricAuthenticator {
                 localizedReason: reason
             )
             return success ? .succeeded : .failed
-        } catch let error as LAError {
-            switch error.code {
-            case .userCancel, .userFallback, .systemCancel, .appCancel, .notInteractive:
-                return .cancelled
-            case .biometryNotAvailable, .biometryNotEnrolled:
-                return .unavailable
-            default:
-                return .failed
-            }
         } catch {
             return .failed
         }

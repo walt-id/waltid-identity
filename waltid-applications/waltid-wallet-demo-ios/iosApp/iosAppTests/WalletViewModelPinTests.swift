@@ -85,7 +85,7 @@ final class WalletViewModelPinTests: XCTestCase {
 
     func testCancelledBiometricEnableLeavesPinOnly() async throws {
         let pinStore = InMemoryDemoPinStore()
-        let biometrics = FakeDemoBiometricAuthenticator(result: .cancelled)
+        let biometrics = FakeDemoBiometricAuthenticator(result: .failed)
         let viewModel = WalletViewModel(
             walletID: "pin-bio-enable-cancel-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
@@ -107,7 +107,7 @@ final class WalletViewModelPinTests: XCTestCase {
 
     func testBiometricUnlockSkipsPinWhenEnabled() async throws {
         let pinStore = InMemoryDemoPinStore()
-        await pinStore.setPin("1234")
+        try await pinStore.setPin("1234")
         pinStore.isBiometricUnlockEnabled = true
         let biometrics = FakeDemoBiometricAuthenticator()
         let viewModel = WalletViewModel(
@@ -127,9 +127,9 @@ final class WalletViewModelPinTests: XCTestCase {
 
     func testCancelledBiometricsLeavesPinFallback() async throws {
         let pinStore = InMemoryDemoPinStore()
-        await pinStore.setPin("1234")
+        try await pinStore.setPin("1234")
         pinStore.isBiometricUnlockEnabled = true
-        let biometrics = FakeDemoBiometricAuthenticator(result: .cancelled)
+        let biometrics = FakeDemoBiometricAuthenticator(result: .failed)
         let viewModel = WalletViewModel(
             walletID: "pin-bio-cancel-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
@@ -146,6 +146,39 @@ final class WalletViewModelPinTests: XCTestCase {
         viewModel.submitPin()
         try await waitUntil { viewModel.isReady }
         XCTAssertEqual(viewModel.auth, .unlocked)
+    }
+
+    func testLockDoesNotAutoPromptBiometrics() async throws {
+        let pinStore = InMemoryDemoPinStore()
+        try await pinStore.setPin("1234")
+        pinStore.isBiometricUnlockEnabled = true
+        let biometrics = FakeDemoBiometricAuthenticator()
+        let walletClient = MockWalletClient()
+        let viewModel = WalletViewModel(
+            walletID: "pin-lock-no-auto-\(UUID().uuidString)",
+            walletClient: walletClient,
+            pinStore: pinStore,
+            biometricAuthenticator: biometrics
+        )
+
+        viewModel.unlockWithBiometrics()
+        try await waitUntil { viewModel.auth == .unlocked && viewModel.isReady }
+        XCTAssertEqual(biometrics.authenticateCalls, 1)
+        let bootstrapCallsAfterUnlock = await walletClient.bootstrapCalls
+        XCTAssertEqual(bootstrapCallsAfterUnlock, 1)
+
+        viewModel.lock()
+        XCTAssertEqual(viewModel.auth, .login)
+        viewModel.promptBiometricUnlockIfNeeded()
+        await Task.yield()
+        XCTAssertEqual(biometrics.authenticateCalls, 1)
+        XCTAssertEqual(viewModel.auth, .login)
+
+        viewModel.unlockWithBiometrics(force: true)
+        try await waitUntil { viewModel.auth == .unlocked }
+        XCTAssertEqual(biometrics.authenticateCalls, 2)
+        XCTAssertTrue(viewModel.isReady)
+        XCTAssertEqual(await walletClient.bootstrapCalls, bootstrapCallsAfterUnlock)
     }
 
     private func waitUntil(
