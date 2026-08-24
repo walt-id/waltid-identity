@@ -30,6 +30,7 @@ public struct CredentialCardArtView: View {
     public let summary: CredentialCardSummary
     public var compact: Bool = false
     @State private var loadedMetadataArt: UIImage?
+    @State private var metadataArtFailed = false
 
     public init(summary: CredentialCardSummary, compact: Bool = false) {
         self.summary = summary
@@ -53,7 +54,11 @@ public struct CredentialCardArtView: View {
                         .scaledToFill()
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .clipped()
-                } else {
+                } else if showsConstructedCardArtOverlay(
+                    backgroundImageURI: summary.backgroundImageURI,
+                    hasLoadedMetadataArt: false,
+                    metadataArtFailed: metadataArtFailed
+                ) {
                     Text(summary.title)
                         .font(.system(size: nameSize, weight: .semibold))
                         .foregroundStyle(label)
@@ -70,7 +75,9 @@ public struct CredentialCardArtView: View {
         }
         .aspectRatio(id1AspectRatio, contentMode: .fit)
         .task(id: summary.backgroundImageURI) {
+            metadataArtFailed = false
             loadedMetadataArt = await loadMetadataArt(from: summary.backgroundImageURI)
+            metadataArtFailed = loadedMetadataArt == nil && httpsURL(summary.backgroundImageURI) != nil
         }
     }
 }
@@ -200,6 +207,24 @@ private func bundledWaltLogo() -> UIImage? {
         return nil
     }
     return UIImage(contentsOfFile: url.path)
+}
+
+public func showsConstructedCardArtOverlay(
+    backgroundImageURI: String?,
+    hasLoadedMetadataArt: Bool,
+    metadataArtFailed: Bool
+) -> Bool {
+    if hasLoadedMetadataArt { return false }
+    if httpsURL(backgroundImageURI) == nil { return true }
+    return metadataArtFailed
+}
+
+public func prefetchCredentialCardArt(uris: [String?]) async {
+    await withTaskGroup(of: Void.self) { group in
+        Set(uris.compactMap { $0 }).forEach { uri in
+            group.addTask { _ = await loadMetadataArt(from: uri) }
+        }
+    }
 }
 
 private func loadMetadataArt(from value: String?) async -> UIImage? {

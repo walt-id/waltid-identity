@@ -835,6 +835,9 @@ class WalletViewModel: ObservableObject {
                     return
                 }
                 issuanceSession = session
+                await prefetchCredentialCardArt(
+                    uris: session.offer.credentials.map { $0.backgroundImageURI?.absoluteString }
+                )
                 offerPreview = session.offer
                 newSession = nil
                 setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)

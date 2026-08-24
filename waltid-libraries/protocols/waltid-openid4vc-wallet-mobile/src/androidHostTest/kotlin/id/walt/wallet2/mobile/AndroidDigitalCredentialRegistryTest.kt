@@ -196,4 +196,32 @@ class AndroidDigitalCredentialRegistryTest {
             credential.mdoc.namespaces.getValue("org.iso.18013.5.1").getValue("given_name"),
         )
     }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Test
+    fun annexCMatcherDatabaseUsesPerRecordIconWhenPresent() {
+        val customIcon = byteArrayOf(7, 8, 9, 10)
+        val bytes = registry.encodeAnnexCCredentialDatabase(
+            listOf(
+                MobileWalletCredentialRegistryRecord(
+                    registryEntryId = "opaque-id",
+                    credentialId = "wallet-private-id",
+                    format = MobileWalletDigitalCredentialFormat.MDOC,
+                    type = "org.iso.18013.5.1.mDL",
+                    fields = listOf(
+                        MobileWalletCredentialRegistryField(
+                            path = listOf("org.iso.18013.5.1", "given_name"),
+                            valueJson = "\"Ada\"",
+                            selectivelyDisclosable = true,
+                        )
+                    ),
+                    displayName = "Driving licence",
+                    iconPng = customIcon,
+                )
+            )
+        )
+        val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
+
+        assertEquals(customIcon.toList(), database.credentials.single().bitmap.toList())
+    }
 }

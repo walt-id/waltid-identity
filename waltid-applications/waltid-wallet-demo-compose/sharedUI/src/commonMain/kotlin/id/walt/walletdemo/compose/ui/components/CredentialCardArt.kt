@@ -76,7 +76,15 @@ internal fun CredentialCardArt(
     val constructedColor = parseCssColor(art.backgroundColor) ?: DefaultWaltCardBlue
     val labelColor = parseCssColor(art.textColor) ?: Color.White
     val backgroundImageUri = art.backgroundImageUri?.takeIf(::isHttpsUrl)
-    var metadataArtLoaded by remember(backgroundImageUri) { mutableStateOf(false) }
+    var metadataArtState by remember(backgroundImageUri) {
+        mutableStateOf(
+            if (backgroundImageUri == null) {
+                CredentialCardMetadataArtState.Absent
+            } else {
+                CredentialCardMetadataArtState.Pending
+            },
+        )
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -101,7 +109,13 @@ internal fun CredentialCardArt(
                     val size = state.painter.intrinsicSize
                     val aspect = if (size.height > 0f) size.width / size.height else 0f
                     val accepted = aspect in 1.2f..2.0f
-                    SideEffect { metadataArtLoaded = accepted }
+                    SideEffect {
+                        metadataArtState = if (accepted) {
+                            CredentialCardMetadataArtState.Ready
+                        } else {
+                            CredentialCardMetadataArtState.Rejected
+                        }
+                    }
                     if (accepted) {
                         Image(
                             painter = state.painter,
@@ -112,17 +126,18 @@ internal fun CredentialCardArt(
                     }
                 },
                 error = {
-                    SideEffect { metadataArtLoaded = false }
+                    SideEffect { metadataArtState = CredentialCardMetadataArtState.Rejected }
                 },
             )
         }
 
-        if (!metadataArtLoaded) {
+        if (showConstructedCardArtOverlay(metadataArtState)) {
             DefaultWaltLogo(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(namePadding)
-                    .size(logoSize),
+                    .size(logoSize)
+                    .testTag(WalletUiTestTags.CredentialCardConstructedArt),
             )
             Text(
                 text = art.name,
@@ -139,6 +154,23 @@ internal fun CredentialCardArt(
         }
     }
 }
+
+internal enum class CredentialCardMetadataArtState {
+    Absent,
+    Pending,
+    Ready,
+    Rejected,
+}
+
+internal fun showConstructedCardArtOverlay(state: CredentialCardMetadataArtState): Boolean =
+    when (state) {
+        CredentialCardMetadataArtState.Absent,
+        CredentialCardMetadataArtState.Rejected,
+        -> true
+        CredentialCardMetadataArtState.Pending,
+        CredentialCardMetadataArtState.Ready,
+        -> false
+    }
 
 @Composable
 internal expect fun DefaultWaltLogo(modifier: Modifier)

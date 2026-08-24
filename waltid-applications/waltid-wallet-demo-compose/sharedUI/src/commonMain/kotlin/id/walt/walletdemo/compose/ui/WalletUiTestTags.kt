@@ -88,6 +88,7 @@ internal object WalletUiTestTags {
     fun claim(path: String): String = dynamicTag("claim", path)
     fun claimImage(path: String): String = dynamicTag("claimImage", path)
     fun claimGroup(title: String): String = dynamicTag("claimGroup", title)
+    val CredentialCardConstructedArt = tag("credentialCardConstructedArt")
     fun credentialCard(id: String): String = tag("credentialCard", id)
     fun credentialDetails(id: String): String = tag("credentialDetails", id)
     fun credentialOverview(id: String): String = tag("credentialOverview", id)

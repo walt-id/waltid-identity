@@ -21,6 +21,7 @@ import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.toDemoIssuanceSession
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateSheet
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateUiState
+import id.walt.walletdemo.compose.ui.prefetchOfferCardArt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -100,6 +101,7 @@ class DigitalCredentialCreateActivity : FragmentActivity() {
                     )
                 ).toDemoIssuanceSession()
                 session = started
+                prefetchOfferCardArt(this@DigitalCredentialCreateActivity, started.preview)
                 uiState = WalletDemoOfferCreateUiState.Review(preview = started.preview)
             }.onFailure {
                 reportFailure(it)

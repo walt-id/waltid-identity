@@ -3,6 +3,7 @@ package id.walt.wallet2.mobile
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
@@ -57,8 +58,8 @@ public class AndroidDigitalCredentialRegistry(
     private val applicationContext: Context = context.applicationContext
     private val registryManager: RegistryManager = RegistryManager.create(applicationContext)
     /** Host app icon shown in the Credential Manager wallet / credential picker. */
-    private val icon: Bitmap = loadApplicationIcon(applicationContext)
-    private val iconPng: ByteArray = icon.toPngBytes()
+    private val applicationIcon: Bitmap = loadApplicationIcon(applicationContext)
+    private val applicationIconPng: ByteArray = applicationIcon.toPngBytes()
     private var registrationAvailable: Boolean = false
     private var creationRegistrationAvailable: Boolean = false
 
@@ -214,7 +215,7 @@ public class AndroidDigitalCredentialRegistry(
                         applicationName = applicationDisplayName(),
                         subtitle = "Save a credential to this wallet",
                         explainer = "Save a credential to this wallet.",
-                        icon = iconPng,
+                        icon = applicationIconPng,
                     ),
                     matcher = matcher,
                     type = DigitalCredential.TYPE_DIGITAL_CREDENTIAL,
@@ -292,11 +293,39 @@ public class AndroidDigitalCredentialRegistry(
         }
     }
 
+    private fun MobileWalletCredentialRegistryRecord.entryIconBitmap(): Bitmap =
+        this.iconPng?.decodeRegistryIcon() ?: applicationIcon
+
+    private fun MobileWalletCredentialRegistryRecord.entryIconPng(): ByteArray {
+        val recordIcon = this.iconPng
+        return recordIcon?.decodeRegistryIcon()?.toPngBytes()
+            ?: recordIcon
+            ?: applicationIconPng
+    }
+
+    private fun ByteArray.decodeRegistryIcon(): Bitmap? {
+        if (!isImageBytes(this)) return null
+        val bitmap = BitmapFactory.decodeByteArray(this, 0, size) ?: return null
+        return bitmap.scaleToMaxEdge(REGISTRY_ICON_MAX_EDGE_PX)
+    }
+
     private fun Bitmap.toPngBytes(): ByteArray =
         ByteArrayOutputStream().use { out ->
             compress(CompressFormat.PNG, 100, out)
             out.toByteArray()
         }
+
+    private fun Bitmap.scaleToMaxEdge(maxEdgePx: Int): Bitmap {
+        val longestEdge = maxOf(width, height)
+        if (longestEdge <= maxEdgePx) return this
+        val scale = maxEdgePx.toFloat() / longestEdge.toFloat()
+        return Bitmap.createScaledBitmap(
+            this,
+            (width * scale).toInt().coerceAtLeast(1),
+            (height * scale).toInt().coerceAtLeast(1),
+            true,
+        )
+    }
 
     private fun loadApplicationIcon(context: Context): Bitmap {
         val drawable = context.packageManager.getApplicationIcon(context.applicationInfo)
@@ -316,15 +345,7 @@ public class AndroidDigitalCredentialRegistry(
                 }
             }
         }
-        val longestEdge = maxOf(source.width, source.height)
-        if (longestEdge <= maxEdgePx) return source
-        val scale = maxEdgePx.toFloat() / longestEdge.toFloat()
-        return Bitmap.createScaledBitmap(
-            source,
-            (source.width * scale).toInt().coerceAtLeast(1),
-            (source.height * scale).toInt().coerceAtLeast(1),
-            true,
-        )
+        return source.scaleToMaxEdge(maxEdgePx)
     }
 
     internal fun MobileWalletCredentialRegistryRecord.toAndroidEntry(): DigitalCredentialEntry {
@@ -332,7 +353,7 @@ public class AndroidDigitalCredentialRegistry(
             VerificationEntryDisplayProperties(
                 displayName,
                 type,
-                icon,
+                entryIconBitmap(),
                 null,
                 null,
             )
@@ -385,7 +406,7 @@ public class AndroidDigitalCredentialRegistry(
                     AndroidAnnexCCredential(
                         title = record.displayName,
                         subtitle = record.type,
-                        bitmap = iconPng,
+                        bitmap = record.entryIconPng(),
                         mdoc = AndroidAnnexCMdoc(
                             documentId = record.registryEntryId,
                             docType = record.type,
