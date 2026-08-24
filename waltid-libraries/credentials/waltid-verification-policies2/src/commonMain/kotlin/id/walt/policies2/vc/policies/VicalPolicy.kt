@@ -27,8 +27,13 @@ private val log = KotlinLogging.logger { }
 /**
  * A verification policy for VICAL-based credentials. This policy validates the authenticity,
  * integrity, and trustworthiness of digital credentials using VICAL data. It provides
- * configuration options for document type validation, system trust anchors, trusted chain roots,
- * and revocation checks.
+ * configuration options for document type validation.
+ *
+ * Trust anchors come solely from the VICAL itself. The former `enableTrustedChainRoot` and
+ * `enableSystemTrustAnchors` options were dropped when this policy was ported to the new x509
+ * library API (self-signed roots and system trust anchors are therefore not accepted), but their
+ * KDoc was left behind, so clients kept sending those keys and got a 400 from strict JSON
+ * decoding. Do not re-document an option without a matching constructor parameter.
  *
  * The VICAL can be supplied in one of two ways (exactly one must be set):
  * - [vical]: The trusted VICAL, encoded as Base64 (inline, embedded in the policy config).
@@ -43,9 +48,8 @@ private val log = KotlinLogging.logger { }
  * @property vicalUrl An HTTP(S) URL to fetch the raw VICAL bytes from at verification time.
  * @property enableDocumentTypeValidation Flag to enable or disable validation of the credentials document type
  * against the VICAL data.
- * @property enableTrustedChainRoot Flag to enable or disable the use of a trusted root certificate (self-signed) in the chain.
- * @property enableSystemTrustAnchors Flag to enable or disable the use of system trust anchors.
- * @property enableRevocation Flag to enable or disable revocation checks.
+ * @property enableRevocation Must remain false - certificate revocation checking is not supported
+ * and is rejected by the init block.
  */
 @Serializable
 @SerialName("vical")
