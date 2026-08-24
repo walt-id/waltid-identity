@@ -25,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
@@ -113,7 +115,8 @@ internal fun StatusCard(
                 modifier = Modifier
                     .weight(1f)
                     .padding(vertical = 4.dp)
-                    .testTag(WalletUiTestTags.Status),
+                    .testTag(WalletUiTestTags.Status)
+                    .semantics { contentDescription = banner.message },
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = if (banner.kind == WalletStatusKind.Error && !expanded) 2 else Int.MAX_VALUE,
                 overflow = if (banner.kind == WalletStatusKind.Error && !expanded) {

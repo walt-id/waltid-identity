@@ -28,6 +28,8 @@ final class WalletE2EUI {
         environment: [String: String],
         walletReadyTimeout: TimeInterval = 60
     ) {
+        app.launchEnvironment["WALLET_BIOMETRIC_ENABLED"] =
+            app.launchEnvironment["WALLET_BIOMETRIC_ENABLED"] ?? "false"
         for (key, value) in environment {
             app.launchEnvironment[key] = value
         }
@@ -39,10 +41,7 @@ final class WalletE2EUI {
         XCTAssertFalse(confirmation.waitForExistence(timeout: 2), "PIN setup was shown after relaunch")
         unlockWallet()
 
-        let readyStatus = waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
+        let readyStatus = waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(
             readyStatus,
             "Wallet ready",
@@ -93,7 +92,38 @@ final class WalletE2EUI {
         return nil
     }
 
+    func waitUntilWalletReady(timeout: TimeInterval) -> String? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let failed = latestStatus(prefixes: ["Bootstrap failed"]) {
+                return failed
+            }
+            if latestStatus(prefixes: ["Wallet ready"]) != nil {
+                return "Wallet ready"
+            }
+            let bootstrapping = latestStatus(prefixes: ["Bootstrapping"]) != nil
+            let pinVisible = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN").exists
+            let settings = button(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+            if !bootstrapping && !pinVisible && settings.exists {
+                return "Wallet ready"
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        }
+        return latestStatus(prefixes: ["Wallet ready", "Bootstrap failed", "Bootstrapping"])
+    }
+
     func latestStatus(prefixes: [String]) -> String? {
+        let tagged = app.descendants(matching: .any)["wallet.status"]
+        if tagged.exists {
+            let candidates = [tagged.label, tagged.value as? String]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+            for prefix in prefixes {
+                if let match = candidates.first(where: { $0.hasPrefix(prefix) }) {
+                    return match
+                }
+            }
+        }
         for prefix in prefixes {
             let predicate = NSPredicate(format: "label BEGINSWITH %@", prefix)
             let match = app.staticTexts.matching(predicate).firstMatch

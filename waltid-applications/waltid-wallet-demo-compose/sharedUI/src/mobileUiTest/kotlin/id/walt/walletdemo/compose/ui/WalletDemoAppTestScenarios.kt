@@ -870,10 +870,18 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsDid).assertTextContains("did:key:test")
         onNodeWithTag(WalletUiTestTags.SettingsKeyId).assertTextContains("key-1")
-        // iOS semantics drop JSON quotes, so do not require the compact `"kty":"OKP"` form.
-        onNodeWithTag(WalletUiTestTags.SettingsPublicJwk).assertTextContains("OKP")
-        onNodeWithTag(WalletUiTestTags.SettingsLock).assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.SettingsReset).assertIsDisplayed()
+        val session = controller.state.value.session as WalletSessionState.Ready
+        assertTrue(session.publicJwk.contains("OKP"), session.publicJwk)
+        // iOS Compose text matching does not treat JSON fragments as substrings.
+        onNodeWithTag(WalletUiTestTags.SettingsPublicJwk)
+            .performScrollTo()
+            .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsLock)
+            .performScrollTo()
+            .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsReset)
+            .performScrollTo()
+            .assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.SettingsLock).performClick()
         onNodeWithText("Enter your PIN").assertIsDisplayed()
