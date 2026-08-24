@@ -84,7 +84,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wallet-core-release-xcframework
-          path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release
+          # upload-artifact v4 stores the *contents* of WalletCore.xcframework at the
+          # artifact root. Download into that directory so Info.plist and slices land
+          # under WalletCore.xcframework/, not beside it.
+          path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework
 
       - name: Detect restored WalletCore XCFramework
         id: restore-wallet-core

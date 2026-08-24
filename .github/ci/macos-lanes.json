@@ -39,6 +39,7 @@
         "*/Package.swift",
         "scripts/check-mobile-swift-parity-decision.sh",
         "waltid-applications/waltid-wallet-demo-ios/*",
+        "waltid-applications/waltid-wallet-demo-shared-ios/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
@@ -48,6 +49,7 @@
       "description": "Compose iOS demo and its WalletCore/Swift integration",
       "patterns": [
         "waltid-applications/waltid-wallet-demo-compose/*",
+        "waltid-applications/waltid-wallet-demo-shared-ios/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"

@@ -3,20 +3,8 @@ name: Build and test
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, labeled]
-    paths-ignore: &docs-and-assets
-      - '**/*.md'
-      - '**/*.png'
-      - '**/*.jpg'
-      - '**/*.webp'
-      - '**/*.svg'
-      - '**/*.ico'
-      - '**/LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/PULL_REQUEST_TEMPLATE.md'
-      - 'docs/**'
   push:
     branches: [main]
-    paths-ignore: *docs-and-assets
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -99,6 +87,23 @@ jobs:
       pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
       pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
       pr-draft: ${{ github.event.pull_request.draft || false }}
+  gradle-eligibility:
+    runs-on: ubuntu-22.04
+    outputs:
+      should-run: ${{ steps.decide.outputs.should-run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decide whether the Linux Gradle job should run
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before || '' }}
+          AFTER: ${{ github.sha }}
+        run: .github/scripts/ci/decide-gradle-eligibility.sh
   sdk-docs:
     uses: ./.github/workflows/mobile-sdk-docs.yml
     needs: [macos-eligibility, ios-tests]
@@ -134,7 +139,8 @@ jobs:
   gradle-build:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
-    needs: [android-eligibility, issuer-conformance-eligibility, cacheless-eligibility]
+    needs: [android-eligibility, issuer-conformance-eligibility, cacheless-eligibility, gradle-eligibility]
+    if: ${{ needs.gradle-eligibility.outputs.should-run == 'true' }}
     with:
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       cacheless: ${{ needs.cacheless-eligibility.outputs.should-run == 'true' }}
@@ -152,6 +158,7 @@ jobs:
       - issuer-conformance-eligibility
       - crypto2-eligibility
       - cacheless-eligibility
+      - gradle-eligibility
       - gradle-build
       - android-device-tests
       - ios-tests

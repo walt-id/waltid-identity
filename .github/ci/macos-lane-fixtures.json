@@ -57,11 +57,18 @@
       "lanes": ["native", "compose", "enterprise", "sdk-docs"]
     },
     {
-      "name": "shared iOS package manifest selects native only",
+      "name": "shared iOS package manifest selects native and Compose",
       "files": [
         "waltid-applications/waltid-wallet-demo-shared-ios/Package.swift"
       ],
-      "lanes": ["native"]
+      "lanes": ["native", "compose"]
+    },
+    {
+      "name": "shared iOS package sources select native and Compose",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoShared/Shared.swift"
+      ],
+      "lanes": ["native", "compose"]
     },
     {
       "name": "build-logic change selects every macOS lane",
