@@ -128,39 +128,40 @@ public struct CredentialCardStackView: View {
         self.onOpenDetails = onOpenDetails
     }
 
-    public var body: some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width
-            let cardHeight = width / id1AspectRatio
-            let offsets = cardOffsets(
-                count: details.count,
-                peek: credentialCardPeek,
-                cardHeight: cardHeight
-            )
-            let restHeight = (offsets.last ?? 0) + cardHeight
-            let stackHeight = selectedAtTop ? cardHeight : restHeight
+    @State private var stackWidth: CGFloat = 0
 
-            ZStack(alignment: .topLeading) {
-                ForEach(Array(details.enumerated()), id: \.element.id) { index, item in
-                    let isSelected = item.id == expandedID
-                    CredentialCardButton(details: item) {
-                        onOpenDetails(item.id)
-                    }
-                    .frame(width: width)
-                    .offset(y: isSelected && selectedAtTop ? 0 : offsets[index])
-                    .opacity(isSelected || !othersHidden ? 1 : 0)
-                    .zIndex(isSelected ? Double(details.count) : Double(index))
-                    .allowsHitTesting(isSelected || !othersHidden)
+    public var body: some View {
+        let width = stackWidth
+        let stackHeight = width > 0 ? displayedHeight(forWidth: width) : 0
+
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(details.enumerated()), id: \.element.id) { index, item in
+                let isSelected = item.id == expandedID
+                CredentialCardButton(details: item) {
+                    onOpenDetails(item.id)
                 }
+                .frame(width: width > 0 ? width : nil)
+                .offset(y: isSelected && selectedAtTop ? 0 : cardOffsets(
+                    count: details.count,
+                    peek: credentialCardPeek,
+                    cardHeight: width > 0 ? width / id1AspectRatio : 0
+                )[index])
+                .opacity(isSelected || !othersHidden ? 1 : 0)
+                .zIndex(isSelected ? Double(details.count) : Double(index))
+                .allowsHitTesting(isSelected || !othersHidden)
             }
-            .frame(width: width, height: stackHeight, alignment: .top)
-            .clipped()
-            .animation(.spring(response: 0.42, dampingFraction: 0.86), value: selectedAtTop)
-            .animation(.easeInOut(duration: 0.22), value: othersHidden)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: displayedHeight(forWidth: UIScreen.main.bounds.width - 40))
+        .frame(height: stackHeight > 0 ? stackHeight : nil, alignment: .top)
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: CredentialCardStackWidthKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(CredentialCardStackWidthKey.self) { stackWidth = $0 }
+        .clipped()
         .animation(.spring(response: 0.42, dampingFraction: 0.86), value: selectedAtTop)
+        .animation(.easeInOut(duration: 0.22), value: othersHidden)
     }
 
     private func displayedHeight(forWidth width: CGFloat) -> CGFloat {
@@ -174,6 +175,13 @@ public struct CredentialCardStackView: View {
             cardHeight: cardHeight
         )
         return (offsets.last ?? 0) + cardHeight
+    }
+}
+
+private struct CredentialCardStackWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

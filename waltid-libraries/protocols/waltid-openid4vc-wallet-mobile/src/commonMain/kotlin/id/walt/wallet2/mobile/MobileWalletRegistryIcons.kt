@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import id.walt.credentials.display.DisplayLocales
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -38,9 +39,9 @@ internal object MobileWalletRegistryIcons {
     }
 }
 
-internal expect suspend fun fetchRegistryIconBytes(url: String): ByteArray?
+internal const val MaxRegistryIconBytes = 2_000_000
 
-private const val MaxRegistryIconBytes = 2_000_000
+internal const val RegistryIconFetchTimeoutMs = 5_000L
 
 internal fun isHttpsUrl(value: String): Boolean =
     value.trim().startsWith("https://", ignoreCase = true)
@@ -54,14 +55,7 @@ internal fun JsonObject?.selectDisplay(
         is JsonObject -> listOf(element)
         else -> emptyList()
     }
-    if (displays.isEmpty()) return null
-    val preferences = preferredLocales.mapNotNull(::normalizeLocale).distinct()
-    preferences.forEach { preferred ->
-        localeLookupTags(preferred).forEach { candidate ->
-            displays.firstOrNull { normalizeLocale(it.locale()) == candidate }?.let { return it }
-        }
-    }
-    return displays.firstOrNull { it.locale().isNullOrBlank() } ?: displays.firstOrNull()
+    return DisplayLocales.select(displays, preferredLocales) { it.locale() }
 }
 
 private fun JsonObject.locale(): String? =
@@ -249,18 +243,3 @@ private val Crc32Table: IntArray = IntArray(256) { index ->
     crc
 }
 
-private fun normalizeLocale(locale: String?): String? =
-    locale
-        ?.trim()
-        ?.replace('_', '-')
-        ?.lowercase()
-        ?.takeIf { it.isNotEmpty() }
-
-private fun localeLookupTags(locale: String): List<String> = buildList {
-    val subtags = locale.split('-').filter(String::isNotEmpty).toMutableList()
-    while (subtags.isNotEmpty()) {
-        add(subtags.joinToString("-"))
-        subtags.removeAt(subtags.lastIndex)
-        if (subtags.lastOrNull()?.length == 1) subtags.removeAt(subtags.lastIndex)
-    }
-}

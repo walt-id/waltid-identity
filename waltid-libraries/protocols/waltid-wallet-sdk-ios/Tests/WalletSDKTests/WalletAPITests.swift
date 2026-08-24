@@ -46,6 +46,26 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(preview.textColor, "#FFFFFF")
     }
 
+    func testIssuancePreviewTypePayloadDrivesFriendlyTitle() {
+        let preview = IssuanceCredentialPreview(
+            configurationID: "org.iso.18013.5.1.mDL",
+            format: "mso_mdoc",
+            name: nil,
+            descriptionText: nil,
+            logoURI: nil,
+            doctype: "org.iso.18013.5.1.mDL"
+        )
+
+        XCTAssertEqual(
+            CredentialTitles.displayName(
+                format: preview.format,
+                credentialDataJSON: preview.typePayloadJSON,
+                fallback: preview.format
+            ),
+            "Mobile Driving Licence"
+        )
+    }
+
     func testPublicPersistenceConfigurationUsesEncryptedDefault() {
         let configuration = WalletConfiguration(persistence: WalletPersistence(databaseKey: .managed))
 

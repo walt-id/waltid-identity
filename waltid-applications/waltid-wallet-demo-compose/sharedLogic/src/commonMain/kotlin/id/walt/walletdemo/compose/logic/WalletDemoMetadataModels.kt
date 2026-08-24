@@ -1,5 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
 data class WalletDemoMetadataDisplay(
     val name: String?,
     val logoUri: String?,
@@ -39,6 +42,25 @@ data class WalletDemoOfferedCredentialMetadata(
     val display: WalletDemoMetadataDisplay?,
     val claims: List<WalletDemoCredentialClaimMetadata>,
 )
+
+/** Friendly card title from issuer display or the shared credential-type mapping. */
+fun WalletDemoOfferedCredentialMetadata.resolvedCardTitle(): String =
+    resolveCardTitle(
+        format = format,
+        credentialDataJson = offeredTypePayloadJson(),
+        displayName = display?.name,
+        fallback = format,
+    )
+
+internal fun WalletDemoOfferedCredentialMetadata.offeredTypePayloadJson(): String? {
+    val vct = vct?.trim()?.takeIf { it.isNotBlank() }
+    val doctype = doctype?.trim()?.takeIf { it.isNotBlank() }
+    if (vct == null && doctype == null) return null
+    return buildJsonObject {
+        vct?.let { put("vct", it) }
+        doctype?.let { put("docType", it) }
+    }.toString()
+}
 
 fun WalletDemoOfferedCredentialMetadata.claimDisplayGroups(): List<WalletDemoCredentialClaimDisplayGroup> {
     val entries = claims.mapIndexed { index, claim ->

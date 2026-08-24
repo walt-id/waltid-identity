@@ -444,7 +444,9 @@ private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
             logoAltText: logoAltText,
             backgroundColor: backgroundColor,
             backgroundImageURI: backgroundImageUri.flatMap(URL.init(string:)),
-            textColor: textColor
+            textColor: textColor,
+            vct: vct,
+            doctype: doctype
         )
     }
 }

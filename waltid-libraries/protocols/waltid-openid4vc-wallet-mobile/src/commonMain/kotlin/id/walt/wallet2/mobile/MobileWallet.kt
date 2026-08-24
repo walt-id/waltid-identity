@@ -928,18 +928,6 @@ public class MobileWallet internal constructor(
     private fun digitalCredentialRegistryId(): String =
         "waltid-${ShaUtils.calculateSha256Base64Url(wallet.id).take(24)}"
 
-    private suspend fun registryIconPng(
-        metadata: JsonObject?,
-        credentialData: JsonObject,
-        displayName: String,
-    ): ByteArray = MobileWalletRegistryIcons.resolveIconPng(
-        metadata = metadata,
-        credentialData = credentialData,
-        displayName = displayName,
-        preferredLocales = preferredLocales,
-        fetchHttps = ::fetchRegistryIconBytes,
-    )
-
     private suspend fun registryRecords(): List<MobileWalletCredentialRegistryRecord> =
         wallet.streamAllCredentials().toList().mapNotNull { stored ->
             val registryEntryId = "dc-${ShaUtils.calculateSha256Base64Url("${wallet.id}\u0000${stored.id}").take(32)}"
@@ -970,11 +958,8 @@ public class MobileWallet internal constructor(
                             },
                         displayName = display.title,
                         subtitle = display.subtitle,
-                        iconPng = registryIconPng(
-                            metadata = stored.metadata,
-                            credentialData = credential.credentialData,
-                            displayName = display.title,
-                        ),
+                        iconMetadataJson = stored.metadata?.encodeJsonObject(),
+                        iconCredentialDataJson = credential.credentialData.encodeJsonObject(),
                     )
                 }
                 else -> if (metadata.format in setOf("vc+sd-jwt", "dc+sd-jwt", "sd-jwt-vc")) {
@@ -1006,11 +991,8 @@ public class MobileWallet internal constructor(
                             },
                         displayName = display.title,
                         subtitle = display.subtitle,
-                        iconPng = registryIconPng(
-                            metadata = stored.metadata,
-                            credentialData = data,
-                            displayName = display.title,
-                        ),
+                        iconMetadataJson = stored.metadata?.encodeJsonObject(),
+                        iconCredentialDataJson = data.encodeJsonObject(),
                     )
                 } else null
             }

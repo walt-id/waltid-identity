@@ -957,6 +957,7 @@ class WalletIssuanceSessionServiceTest {
         val credential = preview.offer.credentials.single()
 
         assertEquals("mso_mdoc", credential.format)
+        assertEquals("org.iso.18013.5.1.mDL", credential.doctype)
         assertEquals("Mobiler Fuehrerschein", credential.name)
         assertEquals("Deutsche Beschreibung", credential.descriptionText)
         assertEquals("https://issuer.example/mdl-de.png", credential.logoUri)

@@ -1,7 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 fun CredentialSummary.toCredentialDetails(): CredentialDetails =
-    CredentialDisplayNormalizer.toDetails(this)
+    CredentialDisplayNormalizer.toDetails(this, platformPreferredLocales())
 
 fun WalletDemoPresentationCredentialOption.toCredentialDetails(): CredentialDetails {
     val summary = CredentialSummary(

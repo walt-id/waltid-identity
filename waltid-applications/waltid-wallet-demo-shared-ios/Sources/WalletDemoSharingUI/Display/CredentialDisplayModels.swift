@@ -39,9 +39,15 @@ public struct CredentialDetails: Equatable, Identifiable {
         self.groups = groups
         self.metadataJSON = metadataJSON
         self.issuerDisplay = issuerDisplay
-            ?? StoredCredentialMetadataParser.issuerDisplay(from: metadataJSON)
+            ?? StoredCredentialMetadataParser.issuerDisplay(
+                from: metadataJSON,
+                preferredLocales: Locale.preferredLanguages
+            )
         self.credentialDisplay = credentialDisplay
-            ?? StoredCredentialMetadataParser.credentialDisplay(from: metadataJSON)
+            ?? StoredCredentialMetadataParser.credentialDisplay(
+                from: metadataJSON,
+                preferredLocales: Locale.preferredLanguages
+            )
         self.credentialDataJSON = credentialDataJSON
         self.credentialId = credentialId ?? id
     }

@@ -87,32 +87,8 @@ object StoredCredentialMetadataParser {
     private fun selectPreferredDisplay(
         displays: List<JsonObject>,
         preferredLocales: List<String>,
-    ): JsonObject? {
-        val preferences = preferredLocales.mapNotNull(::normalizeLocale).distinct()
-        preferences.forEach { preferred ->
-            localeLookupTags(preferred).forEach { candidate ->
-                displays.firstOrNull { normalizeLocale(it.locale()) == candidate }?.let { return it }
-            }
-        }
-        return displays.firstOrNull { it.locale().isNullOrBlank() } ?: displays.firstOrNull()
-    }
+    ): JsonObject? = DisplayLocaleSelector.select(displays, preferredLocales) { it.locale() }
 
     private fun JsonObject.locale(): String? =
         this["locale"]?.jsonPrimitive?.contentOrNull
-
-    private fun normalizeLocale(locale: String?): String? =
-        locale
-            ?.trim()
-            ?.replace('_', '-')
-            ?.lowercase()
-            ?.takeIf { it.isNotEmpty() }
-
-    private fun localeLookupTags(locale: String): List<String> = buildList {
-        val subtags = locale.split('-').filter(String::isNotEmpty).toMutableList()
-        while (subtags.isNotEmpty()) {
-            add(subtags.joinToString("-"))
-            subtags.removeAt(subtags.lastIndex)
-            if (subtags.lastOrNull()?.length == 1) subtags.removeAt(subtags.lastIndex)
-        }
-    }
 }

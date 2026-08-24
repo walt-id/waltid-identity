@@ -27,8 +27,8 @@ fun WalletIssuanceSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
                 WalletDemoOfferedCredentialMetadata(
                     configurationId = credential.configurationId,
                     format = credential.format,
-                    vct = null,
-                    doctype = null,
+                    vct = credential.vct,
+                    doctype = credential.doctype,
                     display = WalletDemoMetadataDisplay(
                         name = credential.name,
                         logoUri = credential.logoUri,

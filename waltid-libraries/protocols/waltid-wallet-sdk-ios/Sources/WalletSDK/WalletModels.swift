@@ -921,6 +921,12 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     /// Suggested credential text color from OpenID4VCI display metadata.
     public let textColor: String?
 
+    /// SD-JWT VC type from the offered credential configuration, when present.
+    public let vct: String?
+
+    /// mdoc document type from the offered credential configuration, when present.
+    public let doctype: String?
+
     /// Creates a credential preview.
     ///
     /// - Parameters:
@@ -933,6 +939,8 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     ///   - backgroundColor: Suggested credential background color.
     ///   - backgroundImageURI: Suggested credential background image URI.
     ///   - textColor: Suggested credential text color.
+    ///   - vct: SD-JWT VC type from the offered configuration.
+    ///   - doctype: mdoc document type from the offered configuration.
     public init(
         configurationID: String,
         format: String,
@@ -942,7 +950,9 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
         logoAltText: String? = nil,
         backgroundColor: String? = nil,
         backgroundImageURI: URL? = nil,
-        textColor: String? = nil
+        textColor: String? = nil,
+        vct: String? = nil,
+        doctype: String? = nil
     ) {
         self.configurationID = configurationID
         self.format = format
@@ -953,6 +963,28 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
         self.backgroundColor = backgroundColor
         self.backgroundImageURI = backgroundImageURI
         self.textColor = textColor
+        self.vct = vct
+        self.doctype = doctype
+    }
+
+    /// Minimal payload so `CredentialTitles` can resolve a friendly type when display omits a name.
+    public var typePayloadJSON: String? {
+        var fields: [String] = []
+        if let vct, !vct.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields.append(#""vct":\#(Self.jsonString(vct))"#)
+        }
+        if let doctype, !doctype.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields.append(#""docType":\#(Self.jsonString(doctype))"#)
+        }
+        guard !fields.isEmpty else { return nil }
+        return "{\(fields.joined(separator: ","))}"
+    }
+
+    private static func jsonString(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
     }
 }
 

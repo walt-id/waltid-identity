@@ -137,6 +137,8 @@ data class WalletIssuanceCredentialPreview(
     val backgroundColor: String? = null,
     val backgroundImageUri: String? = null,
     val textColor: String? = null,
+    val vct: String? = null,
+    val doctype: String? = null,
 )
 
 /** Typed offer preview retained by the issuance session. */
@@ -1056,6 +1058,8 @@ class WalletIssuanceSessionService(
                     backgroundColor = display?.backgroundColor,
                     backgroundImageUri = display?.backgroundImage?.uri,
                     textColor = display?.textColor,
+                    vct = offered.configuration.vct,
+                    doctype = offered.configuration.doctype,
                 )
             },
             transactionCode = txCode?.let {

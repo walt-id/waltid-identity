@@ -22,9 +22,12 @@ object CredentialDisplayNormalizer {
     }
     private val valueDecoder = CredentialDisplayValueDecoder(json) { element, path -> element.toDisplayValue(path) }
 
-    fun toDetails(summary: CredentialSummary): CredentialDetails {
-        val issuerDisplay = StoredCredentialMetadataParser.issuerDisplay(summary.metadataJson)
-        val credentialDisplay = StoredCredentialMetadataParser.credentialDisplay(summary.metadataJson)
+    fun toDetails(
+        summary: CredentialSummary,
+        preferredLocales: List<String> = emptyList(),
+    ): CredentialDetails {
+        val issuerDisplay = StoredCredentialMetadataParser.issuerDisplay(summary.metadataJson, preferredLocales)
+        val credentialDisplay = StoredCredentialMetadataParser.credentialDisplay(summary.metadataJson, preferredLocales)
         val rawJson = summary.credentialDataJson?.trim().orEmpty()
         if (rawJson.isBlank()) {
             return CredentialDetails(

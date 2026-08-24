@@ -100,7 +100,12 @@ public data class MobileWalletDigitalCredentialCapabilities(
  * @property subtitle Secondary picker line. Never the raw docType or vct when a mapping or
  * humanized type is available.
  * @property iconPng Optional card-art thumbnail for platform pickers. Android Credential Manager
- * rescales this to a 32x32 entry icon; iOS Identity Document Services ignores it.
+ * rescales this to a 32x32 entry icon; iOS Identity Document Services ignores it. Presentation
+ * preview leaves this empty so remote artwork stays off the consent path.
+ * @property iconMetadataJson Sidecar OpenID4VCI display JSON for Android thumbnail resolution.
+ * Not registered with the platform matcher.
+ * @property iconCredentialDataJson Credential payload JSON for Android portrait fallback.
+ * Not registered with the platform matcher.
  */
 public data class MobileWalletCredentialRegistryRecord(
     public val registryEntryId: String,
@@ -111,6 +116,8 @@ public data class MobileWalletCredentialRegistryRecord(
     public val displayName: String,
     public val subtitle: String = "",
     public val iconPng: ByteArray? = null,
+    public val iconMetadataJson: String? = null,
+    public val iconCredentialDataJson: String? = null,
 ) {
     public override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -123,7 +130,9 @@ public data class MobileWalletCredentialRegistryRecord(
             fields == other.fields &&
             displayName == other.displayName &&
             subtitle == other.subtitle &&
-            iconPng.contentEquals(other.iconPng)
+            iconPng.contentEquals(other.iconPng) &&
+            iconMetadataJson == other.iconMetadataJson &&
+            iconCredentialDataJson == other.iconCredentialDataJson
     }
 
     public override fun hashCode(): Int {
@@ -135,6 +144,8 @@ public data class MobileWalletCredentialRegistryRecord(
         result = 31 * result + displayName.hashCode()
         result = 31 * result + subtitle.hashCode()
         result = 31 * result + (iconPng?.contentHashCode() ?: 0)
+        result = 31 * result + (iconMetadataJson?.hashCode() ?: 0)
+        result = 31 * result + (iconCredentialDataJson?.hashCode() ?: 0)
         return result
     }
 }

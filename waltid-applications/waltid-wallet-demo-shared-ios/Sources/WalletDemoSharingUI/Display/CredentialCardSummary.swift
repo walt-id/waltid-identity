@@ -50,9 +50,9 @@ public struct CredentialCardSummary {
         CredentialCardSummary(
             title: CredentialTitles.displayName(
                 format: credential.format,
-                credentialDataJSON: nil,
+                credentialDataJSON: credential.typePayloadJSON,
                 displayName: credential.name,
-                fallback: credential.configurationID
+                fallback: credential.format
             ),
             backgroundColor: credential.backgroundColor,
             backgroundImageURI: credential.backgroundImageURI?.absoluteString,

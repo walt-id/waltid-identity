@@ -43,7 +43,9 @@ public enum StoredCredentialMetadataParser {
         }
         guard !displays.isEmpty else { return nil }
 
-        guard let selected = selectPreferredDisplay(displays, preferredLocales: preferredLocales) else {
+        guard let selected = DisplayLocales.select(displays, preferredLocales: preferredLocales, localeOf: {
+            stringValue($0["locale"])
+        }) else {
             return nil
         }
 
@@ -76,43 +78,6 @@ public enum StoredCredentialMetadataParser {
             backgroundImageURI: backgroundImageURI,
             textColor: textColor
         )
-    }
-
-    private static func selectPreferredDisplay(
-        _ displays: [[String: Any]],
-        preferredLocales: [String]
-    ) -> [String: Any]? {
-        let preferences = preferredLocales.compactMap(normalizeLocale(_:))
-        for preferred in preferences {
-            for candidate in localeLookupTags(preferred) {
-                if let match = displays.first(where: { normalizeLocale(stringValue($0["locale"])) == candidate }) {
-                    return match
-                }
-            }
-        }
-        return displays.first(where: { stringValue($0["locale"]) == nil }) ?? displays.first
-    }
-
-    private static func normalizeLocale(_ locale: String?) -> String? {
-        guard let locale else { return nil }
-        let normalized = locale
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "_", with: "-")
-            .lowercased()
-        return normalized.isEmpty ? nil : normalized
-    }
-
-    private static func localeLookupTags(_ locale: String) -> [String] {
-        var subtags = locale.split(separator: "-").map(String.init).filter { !$0.isEmpty }
-        var tags: [String] = []
-        while !subtags.isEmpty {
-            tags.append(subtags.joined(separator: "-"))
-            subtags.removeLast()
-            if let last = subtags.last, last.count == 1 {
-                subtags.removeLast()
-            }
-        }
-        return tags
     }
 
     private static func stringValue(_ value: Any?) -> String? {

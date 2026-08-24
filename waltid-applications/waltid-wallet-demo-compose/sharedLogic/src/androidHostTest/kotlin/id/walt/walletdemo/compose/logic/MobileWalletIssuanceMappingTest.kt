@@ -35,15 +35,32 @@ class MobileWalletIssuanceMappingTest {
                         backgroundColor = "#12107c",
                         backgroundImageUri = "https://issuer.example/mdl-bg.png",
                         textColor = "#FFFFFF",
+                        doctype = "org.iso.18013.5.1.mDL",
                     ),
                 ),
                 transactionCode = null,
             ),
         )
 
-        assertEquals("Driving licence logo", session.toDemoIssuanceSession().preview.offeredCredentials.single().display?.logoAltText)
-        assertEquals("#12107c", session.toDemoIssuanceSession().preview.offeredCredentials.single().display?.backgroundColor)
-        assertEquals("https://issuer.example/mdl-bg.png", session.toDemoIssuanceSession().preview.offeredCredentials.single().display?.backgroundImageUri)
-        assertEquals("#FFFFFF", session.toDemoIssuanceSession().preview.offeredCredentials.single().display?.textColor)
+        val offered = session.toDemoIssuanceSession().preview.offeredCredentials.single()
+        assertEquals("Driving licence logo", offered.display?.logoAltText)
+        assertEquals("#12107c", offered.display?.backgroundColor)
+        assertEquals("https://issuer.example/mdl-bg.png", offered.display?.backgroundImageUri)
+        assertEquals("#FFFFFF", offered.display?.textColor)
+        assertEquals("org.iso.18013.5.1.mDL", offered.doctype)
+        assertEquals("Mobile Driving Licence", offered.resolvedCardTitle())
+    }
+
+    @Test
+    fun namelessMdocOfferUsesSharedFriendlyTitleNotConfigurationId() {
+        val offered = WalletDemoOfferedCredentialMetadata(
+            configurationId = "org.iso.18013.5.1.mDL",
+            format = "mso_mdoc",
+            vct = null,
+            doctype = "org.iso.18013.5.1.mDL",
+            display = null,
+            claims = emptyList(),
+        )
+        assertEquals("Mobile Driving Licence", offered.resolvedCardTitle())
     }
 }

@@ -2,20 +2,34 @@ package id.walt.wallet2.mobile
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsBytes
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.contentLength
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.readRemaining
+import kotlinx.io.readByteArray
 
-internal actual suspend fun fetchRegistryIconBytes(url: String): ByteArray? {
+internal suspend fun fetchRegistryIconBytes(url: String): ByteArray? {
     if (!isHttpsUrl(url)) return null
     return runCatching {
-        RegistryImageHttp.client.get(url).let { response ->
-            if (!response.status.isSuccess()) return@runCatching null
-            response.bodyAsBytes()
+        RegistryImageHttp.client.prepareGet(url).execute { response ->
+            if (!response.status.isSuccess()) return@execute null
+            val contentLength = response.contentLength()
+            if (contentLength != null && contentLength > MaxRegistryIconBytes) return@execute null
+            val bytes = response.bodyAsChannel().readRemaining(MaxRegistryIconBytes + 1L).readByteArray()
+            if (bytes.size > MaxRegistryIconBytes) return@execute null
+            bytes
         }
     }.getOrNull()
 }
 
 private object RegistryImageHttp {
-    val client: HttpClient = HttpClient(Android)
+    val client: HttpClient = HttpClient(Android) {
+        install(HttpTimeout) {
+            requestTimeoutMillis = RegistryIconFetchTimeoutMs
+            connectTimeoutMillis = RegistryIconFetchTimeoutMs
+            socketTimeoutMillis = RegistryIconFetchTimeoutMs
+        }
+    }
 }

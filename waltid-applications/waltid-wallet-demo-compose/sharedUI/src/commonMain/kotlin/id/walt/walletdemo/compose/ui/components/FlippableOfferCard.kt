@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
+import id.walt.walletdemo.compose.logic.resolvedCardTitle
 import kotlin.math.absoluteValue
 
 @Composable
@@ -43,13 +44,14 @@ internal fun FlippableOfferCard(
         animationSpec = tween(durationMillis = 420),
         label = "offerCardFlip",
     )
+    val title = credential.resolvedCardTitle()
     val art = (credential.display ?: WalletDemoMetadataDisplay(
-        name = credential.vct ?: credential.doctype ?: credential.configurationId,
+        name = title,
         logoUri = null,
         logoAltText = null,
     )).toCardArt(
         id = credential.configurationId,
-        fallbackName = credential.vct ?: credential.doctype ?: credential.configurationId,
+        fallbackName = title,
     )
 
     Box(
