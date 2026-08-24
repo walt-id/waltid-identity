@@ -870,7 +870,8 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsDid).assertTextContains("did:key:test")
         onNodeWithTag(WalletUiTestTags.SettingsKeyId).assertTextContains("key-1")
-        onNodeWithTag(WalletUiTestTags.SettingsPublicJwk).assertTextContains("\"kty\":\"OKP\"")
+        // iOS semantics drop JSON quotes, so do not require the compact `"kty":"OKP"` form.
+        onNodeWithTag(WalletUiTestTags.SettingsPublicJwk).assertTextContains("OKP")
         onNodeWithTag(WalletUiTestTags.SettingsLock).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsReset).assertIsDisplayed()
 
