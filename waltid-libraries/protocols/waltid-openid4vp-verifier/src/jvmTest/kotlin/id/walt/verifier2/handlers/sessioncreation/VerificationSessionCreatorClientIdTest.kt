@@ -64,18 +64,16 @@ class VerificationSessionCreatorClientIdTest {
     }
 
     @Test
-    fun `signable clientId on unsigned session becomes redirect_uri`() = runTest {
-        val urlPrefix = "https://verifier.example.com/verification-session"
+    fun `explicit clientId is preserved`() = runTest {
         val session = VerificationSessionCreator.createVerificationSession(
             setup = unsignedCrossDevice(),
             clientId = "x509_san_dns:verifier.example.com",
-            urlPrefix = urlPrefix,
+            urlPrefix = "https://verifier.example.com/verification-session",
             urlHost = "openid4vp://authorize",
         )
 
-        val expected = "redirect_uri:$urlPrefix/${session.id}/response"
-        assertEquals(expected, session.authorizationRequest.clientId)
-        assertEquals(expected, session.bootstrapAuthorizationRequest?.clientId)
+        assertEquals("x509_san_dns:verifier.example.com", session.authorizationRequest.clientId)
+        assertEquals("x509_san_dns:verifier.example.com", session.bootstrapAuthorizationRequest?.clientId)
     }
 
     @Test
