@@ -75,43 +75,44 @@ struct CredentialsTabView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(selectedDetailsID != nil)
             .toolbar {
-                if selectedDetailsID != nil {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button {
-                            closeDetails()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Menu {
-                            Button("Copy") {
-                                UIPasteboard.general.string = expandedRawCredential
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Group {
+                        if selectedDetailsID != nil {
+                            Button {
+                                closeDetails()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 14, weight: .semibold))
                             }
-                            .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
-                            Button("Delete", role: .destructive) {
-                                confirmDelete = true
-                            }
-                            .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 16, weight: .semibold))
+                            .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
                         }
-                        .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
                     }
                 }
-            }
-            .toolbar {
-                if selectedDetailsID == nil {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        NavigationLink {
-                            SettingsView(viewModel: viewModel)
-                        } label: {
-                            Image(systemName: "gearshape")
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Group {
+                        if selectedDetailsID != nil {
+                            Menu {
+                                Button("Copy") {
+                                    UIPasteboard.general.string = expandedRawCredential
+                                }
+                                .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
+                                Button("Delete", role: .destructive) {
+                                    confirmDelete = true
+                                }
+                                .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 16, weight: .semibold))
+                            }
+                            .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
+                        } else {
+                            NavigationLink {
+                                SettingsView(viewModel: viewModel)
+                            } label: {
+                                Image(systemName: "gearshape")
+                            }
+                            .accessibilityIdentifier(WalletAccessibilityID.settingsButton)
                         }
-                        .accessibilityIdentifier(WalletAccessibilityID.settingsButton)
                     }
                 }
             }
