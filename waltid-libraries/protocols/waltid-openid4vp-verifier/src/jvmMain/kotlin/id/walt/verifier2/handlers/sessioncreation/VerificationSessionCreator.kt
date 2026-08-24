@@ -685,8 +685,9 @@ object VerificationSessionCreator {
         }
 
     /**
-     * OpenID4VP 1.0 §5.9.3: unsigned requests without another client_id prefix use
-     * `redirect_uri:<response destination>`. That prefix cannot be signed.
+     * OpenID4VP 1.0 §5.9.3: unsigned requests use `redirect_uri:<response destination>`.
+     * That prefix cannot be signed. A configured signable client_id (`verifier2`, `x509_*`, DID)
+     * is used only when the session is signed.
      */
     private fun resolveEffectiveClientId(
         clientId: String?,
@@ -702,14 +703,17 @@ object VerificationSessionCreator {
         // here. A bare prefix carries no URI and is not a usable client identifier on its own, so
         // this is unambiguous.
         val provided = clientId?.takeIf { it.isNotBlank() && it != REDIRECT_URI_CLIENT_ID_PREFIX }
-        if (provided != null) {
-            require(!isSignedRequest || !provided.startsWith("$REDIRECT_URI_CLIENT_ID_PREFIX:")) {
+        if (isSignedRequest) {
+            val signedClientId = requireNotNull(provided) {
+                "Signed requests require a client_id; omitting client_id only auto-generates the unsigned redirect_uri scheme"
+            }
+            require(!signedClientId.startsWith("$REDIRECT_URI_CLIENT_ID_PREFIX:")) {
                 "Signed requests cannot use the redirect_uri client_id prefix"
             }
-            return provided
+            return signedClientId
         }
-        require(!isSignedRequest) {
-            "Signed requests require a client_id; omitting client_id only auto-generates the unsigned redirect_uri scheme"
+        if (provided != null && provided.startsWith("$REDIRECT_URI_CLIENT_ID_PREFIX:")) {
+            return provided
         }
         val destination = requireNotNull(responseUri) {
             "A redirect_uri client identifier is the Response URI, so it is only available for " +

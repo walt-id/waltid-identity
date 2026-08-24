@@ -20,6 +20,12 @@ public struct DemoVerifierSession {
     public let authorizationRequestUri: String
 }
 
+/// Thrown when public demo verifier2 has not deployed signed inline Request Objects.
+public struct PublicDemoSignedRequestContractUnavailable: Error, LocalizedError {
+    public let message: String
+    public var errorDescription: String? { message }
+}
+
 public struct DemoMetadataSigner {
     public let keyID: String?
     public let algorithm: String
@@ -354,18 +360,14 @@ public final class DemoBackend {
             guard let inlineRequest = inlineQuery.first(where: { $0.name == "request" })?.value,
                   !inlineRequest.isEmpty,
                   inlineQuery.contains(where: { $0.name == "request_uri" }) == false else {
-                throw NSError(
-                    domain: "WalletE2E",
-                    code: 302,
-                    userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 has not deployed the signed inline Request Object contract: fullAuthorizationRequestUrl must contain request and must not contain request_uri. Deploy the verifier2 change before running mobile E2E tests. Response: \(response)"]
+                throw PublicDemoSignedRequestContractUnavailable(
+                    message: "Public demo verifier2 has not deployed the signed inline Request Object contract: fullAuthorizationRequestUrl must contain request and must not contain request_uri."
                 )
             }
             guard bootstrapQuery.contains(where: { $0.name == "request_uri" && !($0.value ?? "").isEmpty }),
                   bootstrapQuery.contains(where: { $0.name == "request_uri_method" && $0.value == "post" }) else {
-                throw NSError(
-                    domain: "WalletE2E",
-                    code: 303,
-                    userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 has not deployed the signed POST bootstrap contract: bootstrapAuthorizationRequestUrl must contain request_uri and request_uri_method=post. Deploy the verifier2 change before running mobile E2E tests. Response: \(response)"]
+                throw PublicDemoSignedRequestContractUnavailable(
+                    message: "Public demo verifier2 has not deployed the signed POST bootstrap contract: bootstrapAuthorizationRequestUrl must contain request_uri and request_uri_method=post."
                 )
             }
         }

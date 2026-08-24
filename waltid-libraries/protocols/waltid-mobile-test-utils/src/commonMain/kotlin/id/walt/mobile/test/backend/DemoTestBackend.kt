@@ -38,6 +38,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
+/** Thrown when public demo verifier2 has not deployed signed inline Request Objects. */
+class PublicDemoSignedRequestContractUnavailable(message: String) : IllegalStateException(message)
+
 /**
  * Test helper for the public walt.id issuer2/verifier2 demo stack.
  */
@@ -500,13 +503,17 @@ object DemoTestBackend {
                 "Public demo verifier2 response-bound bootstrap URL is missing request_uri. Response: $response"
             }
         } else if (signedRequest) {
-            check(!inlineParameters["request"].isNullOrBlank() && inlineParameters["request_uri"] == null) {
-                "Public demo verifier2 has not deployed the signed inline Request Object contract: " +
-                    "fullAuthorizationRequestUrl must contain request and must not contain request_uri. Response: $response"
+            if (inlineParameters["request"].isNullOrBlank() || inlineParameters["request_uri"] != null) {
+                throw PublicDemoSignedRequestContractUnavailable(
+                    "Public demo verifier2 has not deployed the signed inline Request Object contract: " +
+                        "fullAuthorizationRequestUrl must contain request and must not contain request_uri.",
+                )
             }
-            check(!bootstrapParameters["request_uri"].isNullOrBlank() && bootstrapParameters["request_uri_method"] == "post") {
-                "Public demo verifier2 has not deployed the signed POST bootstrap contract: " +
-                    "bootstrapAuthorizationRequestUrl must contain request_uri and request_uri_method=post. Response: $response"
+            if (bootstrapParameters["request_uri"].isNullOrBlank() || bootstrapParameters["request_uri_method"] != "post") {
+                throw PublicDemoSignedRequestContractUnavailable(
+                    "Public demo verifier2 has not deployed the signed POST bootstrap contract: " +
+                        "bootstrapAuthorizationRequestUrl must contain request_uri and request_uri_method=post.",
+                )
             }
         }
 

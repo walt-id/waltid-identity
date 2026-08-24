@@ -280,7 +280,7 @@ class OpenId4VpPresentationServiceTest {
         }
 
         assertEquals(
-            "Unsigned AuthorizationRequest object (alg=none) is not allowed",
+            "Unsigned Authorization Request is only allowed for the redirect_uri client identifier prefix",
             error.message,
         )
     }

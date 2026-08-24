@@ -170,7 +170,7 @@ class OSSVerifier2Crypto2StartupTest {
     }
 
     @Test
-    fun `blank per-session clientId falls back to configured service clientId`() = runTest {
+    fun `blank per-session clientId still generates redirect_uri for unsigned sessions`() = runTest {
         loadConfig()
         OSSVerifier2Manager.initialize()
 
@@ -178,7 +178,10 @@ class OSSVerifier2Crypto2StartupTest {
             CrossDeviceFlowSetup(core = GeneralFlowConfig(clientId = "   "))
         )
 
-        assertEquals("verifier2", session.authorizationRequest.clientId)
+        assertEquals(
+            "redirect_uri:http://localhost:7003/verification-session/${session.id}/response",
+            session.authorizationRequest.clientId,
+        )
     }
 
     private fun loadConfig(

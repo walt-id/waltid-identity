@@ -77,8 +77,9 @@ object AuthorizationRequestResolver {
         REQUIRE_SIGNED,
     }
 
-    class UnsignedAuthorizationRequestNotAllowedException :
-        IllegalArgumentException("Unsigned AuthorizationRequest object (alg=none) is not allowed")
+    class UnsignedAuthorizationRequestNotAllowedException(
+        message: String = "Unsigned Authorization Request is not allowed for this client identifier",
+    ) : IllegalArgumentException(message)
 
     private object RequestUriPostWalletMetadata {
         val default: String by lazy {
@@ -642,13 +643,19 @@ object AuthorizationRequestResolver {
      */
     private fun requireUnsignedRequestObjectAllowed(clientId: String?, policy: UnsignedRequestObjectPolicy) {
         if (policy != UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) {
-            throw UnsignedAuthorizationRequestNotAllowedException()
+            throw UnsignedAuthorizationRequestNotAllowedException(
+                "Unsigned Authorization Request is not allowed",
+            )
         }
         val isRedirectUri = clientId
             ?.let { ClientIdPrefixParser.parse(it).getOrNull() }
             ?.let { it is RedirectUri }
             ?: false
-        if (!isRedirectUri) throw UnsignedAuthorizationRequestNotAllowedException()
+        if (!isRedirectUri) {
+            throw UnsignedAuthorizationRequestNotAllowedException(
+                "Unsigned Authorization Request is only allowed for the redirect_uri client identifier prefix",
+            )
+        }
     }
 
     /**
