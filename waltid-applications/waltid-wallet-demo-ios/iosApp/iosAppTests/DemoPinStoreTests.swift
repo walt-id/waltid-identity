@@ -21,8 +21,10 @@ final class DemoPinStoreTests: XCTestCase {
         try await store.setPin(Self.parityPin)
 
         XCTAssertEqual(defaults.string(forKey: "id.walt.walletdemo.pin.parity"), Self.parityRecord)
-        XCTAssertTrue(await store.verifyPin(Self.parityPin))
-        XCTAssertFalse(await store.verifyPin("0000"))
+        let parityMatches = await store.verifyPin(Self.parityPin)
+        let wrongPinMatches = await store.verifyPin("0000")
+        XCTAssertTrue(parityMatches)
+        XCTAssertFalse(wrongPinMatches)
     }
 
     func testSetPinFailsWhenRandomGenerationFails() async {
@@ -51,16 +53,19 @@ final class DemoPinStoreTests: XCTestCase {
             "2:210000:\(Self.paritySaltB64):\(Self.parityVerifierB64)",
             forKey: "id.walt.walletdemo.pin.reject"
         )
-        XCTAssertFalse(await store.verifyPin(Self.parityPin))
+        let wrongVersionMatches = await store.verifyPin(Self.parityPin)
+        XCTAssertFalse(wrongVersionMatches)
 
         defaults.set("1:210000:\(Self.paritySaltB64)", forKey: "id.walt.walletdemo.pin.reject")
-        XCTAssertFalse(await store.verifyPin(Self.parityPin))
+        let truncatedMatches = await store.verifyPin(Self.parityPin)
+        XCTAssertFalse(truncatedMatches)
 
         defaults.set(
             "1:210000:not-base64:\(Self.parityVerifierB64)",
             forKey: "id.walt.walletdemo.pin.reject"
         )
-        XCTAssertFalse(await store.verifyPin(Self.parityPin))
+        let invalidSaltMatches = await store.verifyPin(Self.parityPin)
+        XCTAssertFalse(invalidSaltMatches)
     }
 
     private static let parityPin = "1234"

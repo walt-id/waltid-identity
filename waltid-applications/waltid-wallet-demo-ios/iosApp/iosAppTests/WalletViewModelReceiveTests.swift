@@ -162,7 +162,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.submitPin()
         try await waitUntil { viewModel.auth == .unlocked }
         XCTAssertTrue(viewModel.isReady)
-        XCTAssertEqual(await client.bootstrapCalls, bootstrapCallsAfterUnlock)
+        let bootstrapCallsAfterRelock = await client.bootstrapCalls
+        XCTAssertEqual(bootstrapCallsAfterRelock, bootstrapCallsAfterUnlock)
     }
 
     func testPresentationDeepLinkCancelsActiveIssuanceSession() async throws {

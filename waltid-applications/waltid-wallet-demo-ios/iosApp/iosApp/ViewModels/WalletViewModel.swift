@@ -297,8 +297,7 @@ class WalletViewModel: ObservableObject {
                 lastReceivedCredentialIDs = []
                 receiveCompleted = false
                 presentationCompleted = false
-                pendingPresentationContinuationURL = nil
-                pendingPresentationFormPostHTML = nil
+                clearPendingPresentationContinuation()
                 statusExpanded = false
                 statusDismissedKey = nil
                 pin = ""
@@ -334,8 +333,7 @@ class WalletViewModel: ObservableObject {
         lastReceivedCredentialIDs = []
         receiveCompleted = false
         presentationCompleted = false
-        pendingPresentationContinuationURL = nil
-        pendingPresentationFormPostHTML = nil
+        clearPendingPresentationContinuation()
         receiveNavigationResetKey += 1
         presentationNavigationResetKey += 1
         isLoading = false
@@ -483,6 +481,7 @@ class WalletViewModel: ObservableObject {
         )
         transactionDataProfilesWarning = transactionDataProfiles.warning
         auth = self.pinStore.hasPin ? .login : .setup
+        refreshBiometricAvailability()
     }
 
     private static func resolveTransactionDataProfiles(from urlString: String?) -> TransactionDataProfilesConfiguration {

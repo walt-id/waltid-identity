@@ -51,18 +51,17 @@ struct PinView: View {
         }
         .padding(24)
         .onAppear {
+            viewModel.refreshBiometricAvailability()
             promptBiometricsIfSceneActive()
         }
-        .onChange(of: scenePhase) { phase in
-            if phase == .active {
-                promptBiometricsIfSceneActive()
-            }
+        .onChange(of: scenePhase) { _ in
+            viewModel.refreshBiometricAvailability()
+            promptBiometricsIfSceneActive()
         }
     }
 
     private func promptBiometricsIfSceneActive() {
         guard scenePhase == .active else { return }
-        viewModel.refreshBiometricAvailability()
         viewModel.promptBiometricUnlockIfNeeded()
     }
 

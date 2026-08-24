@@ -178,7 +178,33 @@ final class WalletViewModelPinTests: XCTestCase {
         try await waitUntil { viewModel.auth == .unlocked }
         XCTAssertEqual(biometrics.authenticateCalls, 2)
         XCTAssertTrue(viewModel.isReady)
-        XCTAssertEqual(await walletClient.bootstrapCalls, bootstrapCallsAfterUnlock)
+        let bootstrapCallsAfterForcedUnlock = await walletClient.bootstrapCalls
+        XCTAssertEqual(bootstrapCallsAfterForcedUnlock, bootstrapCallsAfterUnlock)
+    }
+
+    func testFreshSignupReportsBiometricAvailabilityWithoutSceneActivation() {
+        let biometrics = FakeDemoBiometricAuthenticator(isAvailable: true)
+        let viewModel = WalletViewModel(
+            walletID: "pin-signup-available-\(UUID().uuidString)",
+            walletClient: MockWalletClient(),
+            biometricAuthenticator: biometrics
+        )
+
+        XCTAssertEqual(viewModel.auth, .setup)
+        XCTAssertTrue(viewModel.isBiometricUnlockAvailable)
+        XCTAssertFalse(viewModel.useBiometrics)
+    }
+
+    func testFreshSignupKeepsBiometricToggleDisabledWhenUnavailable() {
+        let biometrics = FakeDemoBiometricAuthenticator(isAvailable: false)
+        let viewModel = WalletViewModel(
+            walletID: "pin-signup-unavailable-\(UUID().uuidString)",
+            walletClient: MockWalletClient(),
+            biometricAuthenticator: biometrics
+        )
+
+        XCTAssertEqual(viewModel.auth, .setup)
+        XCTAssertFalse(viewModel.isBiometricUnlockAvailable)
     }
 
     private func waitUntil(
