@@ -70,6 +70,8 @@ private enum WalletStatusText {
     static let pinMustContain4To8Digits = "PIN must contain 4 to 8 digits"
     static let pinConfirmationDoesNotMatch = "PIN confirmation does not match"
     static let wrongPin = "Wrong PIN"
+    static let enableBiometricUnlock = "Enable biometric unlock"
+    static let biometricUnlockNotAuthorized = "Biometric unlock was not authorized. Use the PIN instead."
     static let receivedCredentialsUnavailable = "received credentials are not available locally"
     static let transactionDataProfilesUnavailable = "Transaction data profiles could not be loaded; transaction-data presentation requests will be rejected."
 
@@ -126,6 +128,7 @@ class WalletViewModel: ObservableObject {
     @Published var pin = ""
     @Published var pinConfirmation = ""
     @Published var useBiometrics = false
+    @Published private(set) var isBiometricUnlockAvailable = false
     @Published var pinError: String?
     @Published var isAuthenticating = false
     @Published private(set) var pendingPresentationContinuationURL: URL?
@@ -329,6 +332,33 @@ class WalletViewModel: ObservableObject {
         auth = .login
     }
 
+    func updateUseBiometrics(_ enabled: Bool) {
+        guard auth == .setup else { return }
+        if !enabled {
+            useBiometrics = false
+            pinError = nil
+            return
+        }
+        guard !isAuthenticating else { return }
+        guard biometricAuthenticator.isAvailable else {
+            useBiometrics = false
+            pinError = WalletStatusText.biometricUnlockNotAuthorized
+            return
+        }
+        useBiometrics = true
+        pinError = nil
+        isAuthenticating = true
+        Task {
+            let result = await biometricAuthenticator.authenticate(reason: WalletStatusText.enableBiometricUnlock)
+            isAuthenticating = false
+            guard auth == .setup else { return }
+            useBiometrics = result == .succeeded
+            if result != .succeeded {
+                pinError = WalletStatusText.biometricUnlockNotAuthorized
+            }
+        }
+    }
+
     func submitPin() {
         guard !isAuthenticating else { return }
         switch auth {
@@ -370,8 +400,11 @@ class WalletViewModel: ObservableObject {
         unlockWithBiometrics()
     }
 
-    var isBiometricUnlockAvailable: Bool { biometricAuthenticator.isAvailable }
     var isBiometricUnlockEnabled: Bool { pinStore.isBiometricUnlockEnabled }
+
+    func refreshBiometricAvailability() {
+        isBiometricUnlockAvailable = biometricAuthenticator.isAvailable
+    }
 
     private let walletClient: any WalletClient
     private let identityDocumentRegistrationUpdate: @Sendable () async throws -> Void
@@ -1164,7 +1197,7 @@ class WalletViewModel: ObservableObject {
         pinError = nil
         Task {
             await pinStore.setPin(pin)
-            pinStore.isBiometricUnlockEnabled = useBiometrics && biometricAuthenticator.isAvailable
+            pinStore.isBiometricUnlockEnabled = useBiometrics
             isAuthenticating = false
             auth = .unlocked
             bootstrapIfNeeded()

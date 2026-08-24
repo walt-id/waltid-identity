@@ -60,6 +60,51 @@ final class WalletViewModelPinTests: XCTestCase {
         XCTAssertFalse(pinStore.isBiometricUnlockEnabled)
     }
 
+    func testEnablingBiometricsRequestsPermissionBeforePersisting() async throws {
+        let pinStore = InMemoryDemoPinStore()
+        let biometrics = FakeDemoBiometricAuthenticator()
+        let viewModel = WalletViewModel(
+            walletID: "pin-bio-enable-\(UUID().uuidString)",
+            walletClient: MockWalletClient(),
+            pinStore: pinStore,
+            biometricAuthenticator: biometrics
+        )
+
+        XCTAssertEqual(viewModel.auth, .setup)
+        viewModel.refreshBiometricAvailability()
+        viewModel.updateUseBiometrics(true)
+        try await waitUntil { !viewModel.isAuthenticating }
+
+        XCTAssertTrue(viewModel.useBiometrics)
+        XCTAssertEqual(biometrics.authenticateCalls, 1)
+
+        viewModel.unlockForTests()
+        try await waitUntil { viewModel.auth == .unlocked }
+        XCTAssertTrue(pinStore.isBiometricUnlockEnabled)
+    }
+
+    func testCancelledBiometricEnableLeavesPinOnly() async throws {
+        let pinStore = InMemoryDemoPinStore()
+        let biometrics = FakeDemoBiometricAuthenticator(result: .cancelled)
+        let viewModel = WalletViewModel(
+            walletID: "pin-bio-enable-cancel-\(UUID().uuidString)",
+            walletClient: MockWalletClient(),
+            pinStore: pinStore,
+            biometricAuthenticator: biometrics
+        )
+
+        viewModel.refreshBiometricAvailability()
+        viewModel.updateUseBiometrics(true)
+        try await waitUntil { !viewModel.isAuthenticating }
+
+        XCTAssertFalse(viewModel.useBiometrics)
+        XCTAssertEqual(biometrics.authenticateCalls, 1)
+
+        viewModel.unlockForTests()
+        try await waitUntil { viewModel.auth == .unlocked }
+        XCTAssertFalse(pinStore.isBiometricUnlockEnabled)
+    }
+
     func testBiometricUnlockSkipsPinWhenEnabled() async throws {
         let pinStore = InMemoryDemoPinStore()
         await pinStore.setPin("1234")

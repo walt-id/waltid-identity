@@ -143,6 +143,8 @@ class WalletDemoControllerTest {
         controller.updatePin("1234")
         controller.updatePinConfirmation("1234")
         controller.updateUseBiometrics(true)
+        runCurrent()
+        assertEquals(1, biometrics.authenticateCalls)
         controller.submitPin()
         runCurrent()
 
@@ -163,6 +165,27 @@ class WalletDemoControllerTest {
         controller.updatePin("1234")
         controller.updatePinConfirmation("1234")
         controller.updateUseBiometrics(true)
+        controller.submitPin()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertFalse(pinStore.isBiometricUnlockEnabled())
+    }
+
+    @Test
+    fun setupPinDoesNotEnableBiometricsWhenAuthorizationFails() = runTest {
+        val pinStore = InMemoryDemoPinStore()
+        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Cancelled)
+        val controller = controllerWith(FakeDemoWallet(), this, pinStore, biometrics)
+
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.updateUseBiometrics(true)
+        runCurrent()
+
+        assertFalse((controller.state.value.auth as WalletAuthState.Setup).useBiometrics)
+        assertEquals(1, biometrics.authenticateCalls)
+
         controller.submitPin()
         runCurrent()
 

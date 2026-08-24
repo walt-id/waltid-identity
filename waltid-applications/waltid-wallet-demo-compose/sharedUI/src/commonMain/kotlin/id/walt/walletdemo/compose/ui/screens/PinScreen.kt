@@ -19,6 +19,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -47,11 +51,14 @@ internal fun PinScreen(
         is WalletAuthState.Setup -> auth.error
         is WalletAuthState.Login -> auth.error
     }
-    val biometricAvailable = controller.isBiometricUnlockAvailable()
+    var biometricAvailable by remember { mutableStateOf(false) }
     val biometricUnlockEnabled = controller.isBiometricUnlockEnabled()
 
-    LaunchedEffect(login != null) {
-        if (login != null) {
+    LaunchedEffect(Unit) {
+        biometricAvailable = controller.isBiometricUnlockAvailable()
+    }
+    LaunchedEffect(login != null, biometricUnlockEnabled, biometricAvailable) {
+        if (login != null && biometricUnlockEnabled && biometricAvailable) {
             controller.unlockWithBiometrics()
         }
     }
@@ -131,7 +138,7 @@ internal fun PinScreen(
                 Switch(
                     checked = setup.useBiometrics && biometricAvailable,
                     onCheckedChange = controller::updateUseBiometrics,
-                    enabled = biometricAvailable,
+                    enabled = biometricAvailable && !isBusy,
                 )
             }
         }

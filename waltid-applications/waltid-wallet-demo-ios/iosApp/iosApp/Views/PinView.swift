@@ -3,6 +3,7 @@ import WalletDemoSharingUI
 
 struct PinView: View {
     @ObservedObject var viewModel: WalletViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -50,8 +51,19 @@ struct PinView: View {
         }
         .padding(24)
         .onAppear {
-            viewModel.promptBiometricUnlockIfNeeded()
+            promptBiometricsIfSceneActive()
         }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                promptBiometricsIfSceneActive()
+            }
+        }
+    }
+
+    private func promptBiometricsIfSceneActive() {
+        guard scenePhase == .active else { return }
+        viewModel.refreshBiometricAvailability()
+        viewModel.promptBiometricUnlockIfNeeded()
     }
 
     private var isSetup: Bool {
@@ -80,9 +92,15 @@ struct PinView: View {
             .textFieldStyle(.roundedBorder)
             .accessibilityIdentifier(WalletAccessibilityID.pinConfirmationInput)
 
-        Toggle("Unlock with biometrics", isOn: $viewModel.useBiometrics)
-            .disabled(!viewModel.isBiometricUnlockAvailable)
-            .accessibilityIdentifier(WalletAccessibilityID.pinBiometricToggle)
+        Toggle(
+            "Unlock with biometrics",
+            isOn: Binding(
+                get: { viewModel.useBiometrics },
+                set: { viewModel.updateUseBiometrics($0) }
+            )
+        )
+        .disabled(!viewModel.isBiometricUnlockAvailable || viewModel.isAuthenticating)
+        .accessibilityIdentifier(WalletAccessibilityID.pinBiometricToggle)
 
         Text(biometricsHelpText)
             .font(.footnote)
