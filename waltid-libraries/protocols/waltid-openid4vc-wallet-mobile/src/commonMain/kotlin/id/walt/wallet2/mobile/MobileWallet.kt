@@ -946,7 +946,12 @@ public class MobileWallet internal constructor(
             val metadata = stored.toMetadata()
             when (val credential = stored.credential) {
                 is MdocsCredential -> {
-                    val displayName = metadata.label ?: credential.docType
+                    val display = MobileWalletRegistryDisplay.resolve(
+                        format = MobileWalletDigitalCredentialFormat.MDOC,
+                        type = credential.docType,
+                        credentialData = credential.credentialData,
+                        storedLabel = metadata.label,
+                    )
                     MobileWalletCredentialRegistryRecord(
                         registryEntryId = registryEntryId,
                         credentialId = stored.id,
@@ -963,11 +968,12 @@ public class MobileWallet internal constructor(
                                     )
                                 }
                             },
-                        displayName = displayName,
+                        displayName = display.title,
+                        subtitle = display.subtitle,
                         iconPng = registryIconPng(
                             metadata = stored.metadata,
                             credentialData = credential.credentialData,
-                            displayName = displayName,
+                            displayName = display.title,
                         ),
                     )
                 }
@@ -979,7 +985,12 @@ public class MobileWallet internal constructor(
                         .orEmpty()
                         .mapNotNull { disclosure -> disclosure.location?.toRegistryFieldPath() }
                         .toSet()
-                    val displayName = metadata.label ?: type
+                    val display = MobileWalletRegistryDisplay.resolve(
+                        format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                        type = type,
+                        credentialData = data,
+                        storedLabel = metadata.label,
+                    )
                     MobileWalletCredentialRegistryRecord(
                         registryEntryId = registryEntryId,
                         credentialId = stored.id,
@@ -993,11 +1004,12 @@ public class MobileWallet internal constructor(
                                     selectivelyDisclosablePaths = selectivelyDisclosablePaths,
                                 )
                             },
-                        displayName = displayName,
+                        displayName = display.title,
+                        subtitle = display.subtitle,
                         iconPng = registryIconPng(
                             metadata = stored.metadata,
                             credentialData = data,
-                            displayName = displayName,
+                            displayName = display.title,
                         ),
                     )
                 } else null

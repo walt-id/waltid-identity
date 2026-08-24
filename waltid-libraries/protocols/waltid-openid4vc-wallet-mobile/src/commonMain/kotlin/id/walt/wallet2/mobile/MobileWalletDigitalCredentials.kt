@@ -96,7 +96,9 @@ public data class MobileWalletDigitalCredentialCapabilities(
  * @property format Credential format represented by the entry.
  * @property type Credential type or mdoc document type.
  * @property fields Matcher-visible credential fields, which may contain personal data.
- * @property displayName Human-readable entry label.
+ * @property displayName Human-readable entry title shown in the platform picker.
+ * @property subtitle Secondary picker line. Never the raw docType or vct when a mapping or
+ * humanized type is available.
  * @property iconPng Optional card-art thumbnail for platform pickers. Android Credential Manager
  * rescales this to a 32x32 entry icon; iOS Identity Document Services ignores it.
  */
@@ -107,6 +109,7 @@ public data class MobileWalletCredentialRegistryRecord(
     public val type: String,
     public val fields: List<MobileWalletCredentialRegistryField>,
     public val displayName: String,
+    public val subtitle: String = "",
     public val iconPng: ByteArray? = null,
 ) {
     public override fun equals(other: Any?): Boolean {
@@ -119,6 +122,7 @@ public data class MobileWalletCredentialRegistryRecord(
             type == other.type &&
             fields == other.fields &&
             displayName == other.displayName &&
+            subtitle == other.subtitle &&
             iconPng.contentEquals(other.iconPng)
     }
 
@@ -129,6 +133,7 @@ public data class MobileWalletCredentialRegistryRecord(
         result = 31 * result + type.hashCode()
         result = 31 * result + fields.hashCode()
         result = 31 * result + displayName.hashCode()
+        result = 31 * result + subtitle.hashCode()
         result = 31 * result + (iconPng?.contentHashCode() ?: 0)
         return result
     }

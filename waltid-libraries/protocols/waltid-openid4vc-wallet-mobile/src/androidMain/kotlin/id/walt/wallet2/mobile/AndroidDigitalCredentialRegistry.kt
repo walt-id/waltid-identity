@@ -352,7 +352,7 @@ public class AndroidDigitalCredentialRegistry(
         val display = setOf(
             VerificationEntryDisplayProperties(
                 displayName,
-                type,
+                subtitle,
                 entryIconBitmap(),
                 null,
                 null,
@@ -405,7 +405,7 @@ public class AndroidDigitalCredentialRegistry(
                 .map { record ->
                     AndroidAnnexCCredential(
                         title = record.displayName,
-                        subtitle = record.type,
+                        subtitle = record.subtitle,
                         bitmap = record.entryIconPng(),
                         mdoc = AndroidAnnexCMdoc(
                             documentId = record.registryEntryId,

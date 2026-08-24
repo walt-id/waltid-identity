@@ -1294,7 +1294,7 @@ final class id.walt.wallet2.mobile/MobileWalletCredentialRegistryField { // id.w
 }
 
 final class id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord { // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord|null[0]
-    constructor <init>(kotlin/String, kotlin/String, id.walt.wallet2.mobile/MobileWalletDigitalCredentialFormat, kotlin/String, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletCredentialRegistryField>, kotlin/String, kotlin/ByteArray? = ...) // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.<init>|<init>(kotlin.String;kotlin.String;id.walt.wallet2.mobile.MobileWalletDigitalCredentialFormat;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletCredentialRegistryField>;kotlin.String;kotlin.ByteArray?){}[0]
+    constructor <init>(kotlin/String, kotlin/String, id.walt.wallet2.mobile/MobileWalletDigitalCredentialFormat, kotlin/String, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletCredentialRegistryField>, kotlin/String, kotlin/String = ..., kotlin/ByteArray? = ...) // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.<init>|<init>(kotlin.String;kotlin.String;id.walt.wallet2.mobile.MobileWalletDigitalCredentialFormat;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletCredentialRegistryField>;kotlin.String;kotlin.String;kotlin.ByteArray?){}[0]
 
     final val credentialId // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.credentialId|{}credentialId[0]
         final fun <get-credentialId>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.credentialId.<get-credentialId>|<get-credentialId>(){}[0]
@@ -1308,6 +1308,8 @@ final class id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord { // id.
         final fun <get-iconPng>(): kotlin/ByteArray? // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.iconPng.<get-iconPng>|<get-iconPng>(){}[0]
     final val registryEntryId // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.registryEntryId|{}registryEntryId[0]
         final fun <get-registryEntryId>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.registryEntryId.<get-registryEntryId>|<get-registryEntryId>(){}[0]
+    final val subtitle // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.subtitle|{}subtitle[0]
+        final fun <get-subtitle>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.subtitle.<get-subtitle>|<get-subtitle>(){}[0]
     final val type // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.type|{}type[0]
         final fun <get-type>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.type.<get-type>|<get-type>(){}[0]
 
@@ -1317,8 +1319,9 @@ final class id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord { // id.
     final fun component4(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.component4|component4(){}[0]
     final fun component5(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletCredentialRegistryField> // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.component5|component5(){}[0]
     final fun component6(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.component6|component6(){}[0]
-    final fun component7(): kotlin/ByteArray? // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.component7|component7(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletDigitalCredentialFormat = ..., kotlin/String = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletCredentialRegistryField> = ..., kotlin/String = ..., kotlin/ByteArray? = ...): id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.copy|copy(kotlin.String;kotlin.String;id.walt.wallet2.mobile.MobileWalletDigitalCredentialFormat;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletCredentialRegistryField>;kotlin.String;kotlin.ByteArray?){}[0]
+    final fun component7(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.component7|component7(){}[0]
+    final fun component8(): kotlin/ByteArray? // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.component8|component8(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletDigitalCredentialFormat = ..., kotlin/String = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletCredentialRegistryField> = ..., kotlin/String = ..., kotlin/String = ..., kotlin/ByteArray? = ...): id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.copy|copy(kotlin.String;kotlin.String;id.walt.wallet2.mobile.MobileWalletDigitalCredentialFormat;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletCredentialRegistryField>;kotlin.String;kotlin.String;kotlin.ByteArray?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord.toString|toString(){}[0]

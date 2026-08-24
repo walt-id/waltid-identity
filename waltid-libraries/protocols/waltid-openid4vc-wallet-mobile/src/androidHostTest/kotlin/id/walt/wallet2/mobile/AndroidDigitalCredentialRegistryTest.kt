@@ -2,6 +2,7 @@ package id.walt.wallet2.mobile
 
 import androidx.credentials.registry.digitalcredentials.mdoc.MdocEntry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
+import androidx.credentials.registry.provider.digitalcredentials.VerificationEntryDisplayProperties
 import id.walt.cose.coseCompliantCbor
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
@@ -85,9 +86,13 @@ class AndroidDigitalCredentialRegistryTest {
                     )
                 ),
                 displayName = "Driving licence",
+                subtitle = "D-123-456",
             ).toAndroidEntry()
         } as MdocEntry
 
+        val display = entry.entryDisplayPropertySet.filterIsInstance<VerificationEntryDisplayProperties>().single()
+        assertEquals("Driving licence", display.title)
+        assertEquals("D-123-456", display.subtitle)
         assertEquals("org.iso.18013.5.1.mDL", entry.docType)
         assertEquals("given_name", entry.fields.single().identifier)
         assertEquals("Ada", entry.fields.single().fieldValue)
@@ -110,9 +115,13 @@ class AndroidDigitalCredentialRegistryTest {
                     )
                 ),
                 displayName = "PID",
+                subtitle = "Personal ID",
             ).toAndroidEntry()
         } as SdJwtEntry
 
+        val display = entry.entryDisplayPropertySet.filterIsInstance<VerificationEntryDisplayProperties>().single()
+        assertEquals("PID", display.title)
+        assertEquals("Personal ID", display.subtitle)
         assertEquals(listOf("address", "locality"), entry.claims.single().path)
         assertEquals("Vienna", entry.claims.single().value)
         assertTrue(entry.claims.single().isSelectivelyDisclosable)
@@ -182,12 +191,15 @@ class AndroidDigitalCredentialRegistryTest {
                         )
                     ),
                     displayName = "Driving licence",
+                    subtitle = "D-123-456",
                 )
             )
         )
         val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
         val credential = database.credentials.single()
 
+        assertEquals("Driving licence", credential.title)
+        assertEquals("D-123-456", credential.subtitle)
         assertEquals(listOf("org-iso-mdoc"), database.protocols)
         assertEquals("opaque-id", credential.mdoc.documentId)
         assertEquals("org.iso.18013.5.1.mDL", credential.mdoc.docType)
