@@ -1852,6 +1852,10 @@ private class FailingClearDemoPinStore : DemoPinStore {
 
     override suspend fun verifyPin(pin: String): Boolean = configuredPin == pin
 
+    override fun isBiometricUnlockEnabled(): Boolean = false
+
+    override fun setBiometricUnlockEnabled(enabled: Boolean) = Unit
+
     override fun clear() {
         error("PIN verifier could not be cleared")
     }
