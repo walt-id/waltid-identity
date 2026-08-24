@@ -64,6 +64,7 @@ public enum CredentialDisplayNormalizer {
             format: parsed.format,
             addedAt: parsed.addedAt,
             groups: requestedGroups + parsed.groups,
+            metadataJSON: option.metadataJSON,
             credentialDataJSON: option.credentialDataJSON,
             credentialId: parsed.credentialId
         )

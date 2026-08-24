@@ -112,6 +112,7 @@ private fun MobileWalletPresentationCredentialOption.toDemoCredentialOption(): W
         subject = subject,
         format = format,
         credentialDataJson = credentialDataJson,
+        metadataJson = metadataJson,
         disclosures = disclosures.map { disclosure ->
             WalletDemoPresentationDisclosure(
                 label = CredentialDisplayVocabulary.disclosureLabel(disclosure.name, disclosure.path),

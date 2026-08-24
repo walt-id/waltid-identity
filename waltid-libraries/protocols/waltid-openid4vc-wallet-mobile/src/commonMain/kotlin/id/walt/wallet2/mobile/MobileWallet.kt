@@ -913,6 +913,7 @@ public class MobileWallet internal constructor(
                     selectable = disclosure.selectable,
                 )
             },
+            metadataJson = metadata?.encodeJsonObject(),
         )
 
     private fun PresentationCredentialRequirement.toMobileCredentialRequirement(): MobileWalletPresentationCredentialRequirement =

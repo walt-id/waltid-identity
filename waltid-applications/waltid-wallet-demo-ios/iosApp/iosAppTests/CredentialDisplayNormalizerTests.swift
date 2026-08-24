@@ -751,6 +751,33 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.groups.first?.title, "Personal details")
     }
 
+    func testPresentationCredentialOptionSurfacesStoredCardArt() {
+        let option = PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: "credential-1",
+            format: "dc+sd-jwt",
+            issuer: "https://issuer.example",
+            subject: "did:key:holder",
+            label: "PID",
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
+            metadataJSON: """
+            {
+              "credentialDisplay": [
+                {
+                  "name": "Personal ID",
+                  "background_image": { "uri": "https://issuer.example/pid-bg.png" }
+                }
+              ]
+            }
+            """
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: option)
+
+        XCTAssertEqual(details.cardSummary.backgroundImageURI, "https://issuer.example/pid-bg.png")
+        XCTAssertEqual(details.cardSummary.title, "Personal ID")
+    }
+
     func testBuildsCredentialInfoGroupFromWalletSummaryFields() throws {
         let addedAt = try XCTUnwrap(Self.isoDateFormatter.date(from: "2026-07-09T12:00:00Z"))
         let details = CredentialDisplayNormalizer.details(

@@ -250,6 +250,7 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
                 subject = option.subject,
                 format = option.format,
                 credentialDataJson = option.credentialDataJson,
+                metadataJson = option.metadataJson,
                 disclosures = option.disclosures.map { disclosure ->
                     WalletDemoPresentationDisclosure(
                         label = CredentialDisplayVocabulary.disclosureLabel(disclosure.name, disclosure.path),

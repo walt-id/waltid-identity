@@ -1134,7 +1134,8 @@ private extension MobileWalletPresentationCredentialOption {
             label: label,
             credentialDataJSON: requiredCredentialDataJSON(credentialDataJson),
             disclosures: swiftArray(disclosures, of: MobileWalletPresentationDisclosure.self)
-                .map { $0.toSwiftDisclosure() }
+                .map { $0.toSwiftDisclosure() },
+            metadataJSON: metadataJson
         )
     }
 }

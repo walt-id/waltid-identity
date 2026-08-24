@@ -1566,6 +1566,9 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
     /// Requested credential values shown for informed consent.
     public let disclosures: [PresentationDisclosure]
 
+    /// Optional stored display metadata encoded as JSON, including issuer and credential card art.
+    public let metadataJSON: String?
+
     /// Creates a presentation credential option.
     ///
     /// - Parameters:
@@ -1578,6 +1581,7 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
     ///   - label: User-facing credential label when available.
     ///   - credentialDataJSON: Parsed credential data encoded as JSON.
     ///   - disclosures: Credential values requested from this credential.
+    ///   - metadataJSON: Optional stored display metadata encoded as JSON.
     public init(
         queryID: String,
         credentialID: String,
@@ -1587,7 +1591,8 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
         subject: String?,
         label: String?,
         credentialDataJSON: String,
-        disclosures: [PresentationDisclosure] = []
+        disclosures: [PresentationDisclosure] = [],
+        metadataJSON: String? = nil
     ) {
         precondition(
             isNonBlank(queryID),
@@ -1602,6 +1607,7 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
         self.label = label
         self.credentialDataJSON = credentialDataJSON
         self.disclosures = disclosures
+        self.metadataJSON = metadataJSON
     }
 }
 
