@@ -870,6 +870,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsDid).assertTextContains("did:key:test")
         onNodeWithTag(WalletUiTestTags.SettingsKeyId).assertTextContains("key-1")
+        onNodeWithTag(WalletUiTestTags.SettingsPublicJwk).assertTextContains("\"kty\":\"OKP\"")
         onNodeWithTag(WalletUiTestTags.SettingsLock).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsReset).assertIsDisplayed()
 
@@ -1162,7 +1163,11 @@ private class FakeDemoWallet(
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult {
         bootstrapCalls += 1
-        return WalletDemoBootstrapResult(keyId = "key-1", did = "did:key:test")
+        return WalletDemoBootstrapResult(
+            keyId = "key-1",
+            did = "did:key:test",
+            publicJwk = """{"kty":"OKP","crv":"Ed25519","x":"test"}""",
+        )
     }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials

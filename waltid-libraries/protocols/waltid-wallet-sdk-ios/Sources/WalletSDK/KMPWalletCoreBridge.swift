@@ -59,7 +59,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             operation: "bootstrap wallet"
         )
 
-        return .init(keyID: value.keyId, did: value.did)
+        return .init(keyID: value.keyId, did: value.did, publicJWK: value.publicJwk)
     }
 
     func keyUseAuthorizationPreflight(

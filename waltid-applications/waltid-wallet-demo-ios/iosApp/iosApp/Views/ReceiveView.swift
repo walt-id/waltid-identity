@@ -5,6 +5,7 @@ struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
     @Environment(\.openURL) private var openURL
+    @Environment(\.walletDemoBranding) private var branding
 
     private var receivedDetails: [CredentialDetails] {
         viewModel.receivedCredentials.map(CredentialDisplayNormalizer.details(for:))
@@ -29,7 +30,7 @@ struct ReceiveView: View {
                             viewModel.previewOffer()
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.waltBlue)
+                        .tint(branding.primary)
                         .disabled(!viewModel.receiveActionEnabled)
                         .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
                     }

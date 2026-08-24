@@ -60,7 +60,7 @@ Edit `WalletDemoBranding.default` in:
 waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/WalletDemoBranding.swift
 ```
 
-The existing `.waltBlue*` colour aliases read from that object. The app root can also inject a custom value:
+Views read colours from `@Environment(\.walletDemoBranding)`. The app root can also inject a custom value:
 
 ```swift
 ContentView(viewModel: viewModel)

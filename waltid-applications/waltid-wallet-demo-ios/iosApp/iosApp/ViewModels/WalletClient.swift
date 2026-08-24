@@ -24,11 +24,6 @@ protocol WalletClient {
     func deleteLocalData() async throws
 }
 
-extension WalletClient {
-    func deleteCredential(id: String) async throws -> Bool { false }
-    func deleteLocalData() async throws {}
-}
-
 final class SDKWalletClient: WalletClient {
     private let configuration: WalletConfiguration
     private var cachedWallet: Wallet?

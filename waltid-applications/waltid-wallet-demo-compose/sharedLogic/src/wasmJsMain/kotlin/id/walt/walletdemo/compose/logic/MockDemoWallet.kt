@@ -9,6 +9,7 @@ private class MockDemoWallet : DemoWallet {
         WalletDemoBootstrapResult(
             keyId = "mock-key",
             did = "did:key:mock-wallet-demo",
+            publicJwk = """{"kty":"OKP","crv":"Ed25519","x":"test"}""",
         )
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials

@@ -238,6 +238,7 @@ private struct DisclosureTextView: View {
 
 /// Share, and the ways of declining the transport actually supports.
 struct ReviewActions: View {
+    @Environment(\.walletDemoBranding) private var branding
     let selectionComplete: Bool
     let isLoading: Bool
     let onSubmit: () -> Void
@@ -248,7 +249,7 @@ struct ReviewActions: View {
         HStack(spacing: 10) {
             Button("Share", action: onSubmit)
                 .buttonStyle(.borderedProminent)
-                .tint(.waltBlue)
+                .tint(branding.primary)
                 .disabled(isLoading || !selectionComplete)
                 .accessibilityIdentifier(WalletAccessibilityID.presentationSubmitButton)
 

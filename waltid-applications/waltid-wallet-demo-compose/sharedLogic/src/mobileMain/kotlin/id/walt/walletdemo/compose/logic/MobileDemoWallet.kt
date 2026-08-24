@@ -25,6 +25,7 @@ internal class MobileDemoWallet(
             WalletDemoBootstrapResult(
                 keyId = result.keyId,
                 did = result.did,
+                publicJwk = result.publicJwk,
                 warning = warning,
             )
         }

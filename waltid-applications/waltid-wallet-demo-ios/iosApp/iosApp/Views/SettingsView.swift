@@ -34,6 +34,16 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsKeyIdCopy)
             }
+            Section("Public JWK") {
+                Text(viewModel.publicJWK.isEmpty ? "Not available" : viewModel.publicJWK)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwk)
+                Button("Copy public JWK") {
+                    UIPasteboard.general.string = viewModel.publicJWK
+                }
+                .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwkCopy)
+            }
             Section {
                 Button("Reset wallet", role: .destructive) {
                     confirmReset = true

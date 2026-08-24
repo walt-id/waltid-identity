@@ -99,6 +99,13 @@ internal fun SettingsScreen(
                 copyTag = WalletUiTestTags.SettingsKeyIdCopy,
                 onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
             )
+            SettingsCopyRow(
+                title = "Public JWK",
+                value = ready?.publicJwk.orEmpty().ifBlank { "Not available" },
+                valueTag = WalletUiTestTags.SettingsPublicJwk,
+                copyTag = WalletUiTestTags.SettingsPublicJwkCopy,
+                onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
+            )
             OutlinedButton(
                 onClick = onLock,
                 modifier = Modifier

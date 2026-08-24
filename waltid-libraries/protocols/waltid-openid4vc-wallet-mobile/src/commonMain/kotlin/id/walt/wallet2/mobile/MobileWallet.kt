@@ -6,6 +6,7 @@ import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.utils.ShaUtils
 import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
@@ -100,6 +101,10 @@ private object MobileDidSupport {
 public data class MobileWalletBootstrapResult(
     public val keyId: String,
     public val did: String,
+    /**
+     * Public JWK of [keyId] as a JSON object string. Private material is never included.
+     */
+    public val publicJwk: String,
 )
 
 /**
@@ -292,6 +297,7 @@ public class MobileWallet internal constructor(
             return MobileWalletBootstrapResult(
                 keyId = existingKey.keyId,
                 did = existingDids.first().did,
+                publicJwk = publicJwkJson(existingKey.keyId),
             )
         }
 
@@ -327,7 +333,11 @@ public class MobileWallet internal constructor(
                     document = didResult.didDocument.toJsonObject(),
                 )
             )
-            return MobileWalletBootstrapResult(keyId = key.id.value, did = didResult.did)
+            return MobileWalletBootstrapResult(
+                keyId = key.id.value,
+                did = didResult.did,
+                publicJwk = publicJwkJson(key),
+            )
         } catch (cause: Throwable) {
             try {
                 withContext(NonCancellable) {
@@ -338,6 +348,20 @@ public class MobileWallet internal constructor(
             }
             throw cause
         }
+    }
+
+    private suspend fun publicJwkJson(keyId: String): String {
+        val key = requireNotNull(keyStore.getCrypto2Key(keyId)) {
+            "Wallet '${wallet.id}' persisted key '$keyId' is unavailable"
+        }
+        return publicJwkJson(key)
+    }
+
+    private suspend fun publicJwkJson(key: Key): String {
+        val encoded = requireNotNull(key.capabilities.publicKeyExporter) {
+            "Wallet key '${key.id.value}' does not export public material"
+        }.exportPublicKey().toPublicJwk(key.spec)
+        return encoded.data.toByteArray().decodeToString()
     }
 
     /**

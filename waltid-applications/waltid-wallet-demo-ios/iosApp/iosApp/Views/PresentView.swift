@@ -5,6 +5,7 @@ import WalletSDK
 
 struct PresentView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.walletDemoBranding) private var branding
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
 
@@ -30,7 +31,7 @@ struct PresentView: View {
                         viewModel.previewPresentation()
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
+                    .tint(branding.primary)
                     .disabled(!viewModel.presentationPreviewActionEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.presentButton)
 
@@ -145,6 +146,7 @@ struct PresentView: View {
 }
 
 private struct PresentationErrorView: View {
+    @Environment(\.walletDemoBranding) private var branding
     let error: PresentationPreviewError
     let isEnabled: Bool
     let onNotifyVerifier: () -> Void
@@ -166,7 +168,7 @@ private struct PresentationErrorView: View {
             HStack {
                 Button("Notify verifier", action: onNotifyVerifier)
                     .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
+                    .tint(branding.primary)
                     .disabled(!isEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.presentationErrorNotifyButton)
 

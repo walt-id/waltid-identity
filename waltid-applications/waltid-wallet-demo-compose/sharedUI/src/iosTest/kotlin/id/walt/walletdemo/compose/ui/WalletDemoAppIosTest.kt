@@ -101,6 +101,7 @@ class WalletDemoAppIosTest {
     fun customBrandingTitleAppearsInTheHeader() =
         scenarios.customBrandingTitleAppearsInTheHeader()
 
+    @Test
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
 

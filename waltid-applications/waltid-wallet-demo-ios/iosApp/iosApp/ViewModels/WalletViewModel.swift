@@ -19,8 +19,9 @@ enum WalletStatusKind: Hashable {
 private struct WalletStatusBannerModel {
     let message: String
     let kind: WalletStatusKind
+    let occurrenceId: UInt64
 
-    var key: String { "\(kind):\(message)" }
+    var key: String { "\(kind):\(message):\(occurrenceId)" }
 }
 
 private enum WalletDeepLinkScheme: String {
@@ -80,6 +81,7 @@ class WalletViewModel: ObservableObject {
     @Published var isReady = false
     @Published var did = ""
     @Published var keyID = ""
+    @Published var publicJWK = ""
     @Published var credentials: [Credential] = []
     @Published var statusMessage = WalletStatusText.startingWallet
     @Published var isLoading = false
@@ -113,6 +115,7 @@ class WalletViewModel: ObservableObject {
     @Published private(set) var pendingPresentationContinuationURL: URL?
     @Published private(set) var pendingPresentationFormPostHTML: String?
     private var statusTab: WalletTab?
+    private var statusOccurrenceId: UInt64 = 0
     private var statusDismissedKey: String?
     private var statusHideTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
@@ -235,6 +238,14 @@ class WalletViewModel: ObservableObject {
                 let removed = try await walletClient.deleteCredential(id: id)
                 guard removed else { return }
                 credentials = try await walletClient.credentials()
+                if presentationReview != nil {
+                    discardPresentationPreviewIfPresent()
+                    presentationReview = nil
+                    selectedPresentationCredentialOptions = []
+                    selectedPresentationDisclosureOptions = []
+                    presentationCompleted = false
+                    presentationNavigationResetKey += 1
+                }
             } catch {
                 setError(WalletStatusText.failure(WalletStatusText.deleteCredentialFailed, error), tab: selectedTab)
             }
@@ -251,6 +262,7 @@ class WalletViewModel: ObservableObject {
                 try await walletClient.deleteLocalData()
                 did = ""
                 keyID = ""
+                publicJWK = ""
                 credentials = []
                 isReady = false
                 offerUrl = ""
@@ -1037,6 +1049,7 @@ class WalletViewModel: ObservableObject {
 
                 did = result.did
                 keyID = result.keyID
+                publicJWK = result.publicJWK
                 credentials = list
                 if #available(iOS 26.0, *) {
                     try await DemoIdentityDocumentRegistration.update()
@@ -1107,6 +1120,7 @@ class WalletViewModel: ObservableObject {
         statusTab = tab
         statusMessage = message
         statusExpanded = false
+        statusOccurrenceId += 1
         logE2E("STATUS \(message)")
         scheduleSuccessAutoHide()
     }
@@ -1135,6 +1149,7 @@ class WalletViewModel: ObservableObject {
         statusTab = tab
         statusMessage = message
         statusExpanded = false
+        statusOccurrenceId += 1
         statusHideTask?.cancel()
         logE2E("STATUS \(message)")
     }
@@ -1187,7 +1202,7 @@ class WalletViewModel: ObservableObject {
         } else {
             kind = .success
         }
-        return WalletStatusBannerModel(message: message, kind: kind)
+        return WalletStatusBannerModel(message: message, kind: kind, occurrenceId: statusOccurrenceId)
     }
 
     private func isInfoStatus(_ message: String) -> Bool {

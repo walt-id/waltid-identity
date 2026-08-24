@@ -10,8 +10,9 @@ enum class WalletStatusKind {
 data class WalletStatusBanner(
     val message: String,
     val kind: WalletStatusKind,
+    val occurrenceId: Long = 0,
 ) {
-    val key: String get() = "$kind:$message"
+    val key: String get() = "$kind:$message:$occurrenceId"
 }
 
 val WalletDemoUiState.isBusy: Boolean
@@ -72,7 +73,7 @@ fun WalletDemoUiState.statusBanner(tab: WalletDemoTab = selectedTab): WalletStat
         isSuccessStatus(tab, message) -> WalletStatusKind.Success
         else -> WalletStatusKind.Info
     }
-    return WalletStatusBanner(message = message, kind = kind)
+    return WalletStatusBanner(message = message, kind = kind, occurrenceId = statusOccurrenceId)
 }
 
 val WalletDemoUiState.isStatusVisible: Boolean

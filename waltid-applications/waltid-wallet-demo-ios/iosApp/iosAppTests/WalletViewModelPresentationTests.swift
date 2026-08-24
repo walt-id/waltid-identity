@@ -146,11 +146,17 @@ final class WalletViewModelPresentationTests: XCTestCase {
 
         XCTAssertEqual(viewModel.did, "did:key:mock")
         XCTAssertEqual(viewModel.keyID, "mock-key-1")
+        XCTAssertFalse(viewModel.publicJWK.isEmpty)
+        XCTAssertFalse(viewModel.publicJWK.contains("\"d\""))
         XCTAssertTrue(viewModel.isStatusVisible(for: .credentials))
         XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Wallet ready")
 
         viewModel.dismissStatus()
         XCTAssertFalse(viewModel.isStatusVisible(for: .credentials))
+
+        viewModel.resetWallet()
+        try await waitUntil { viewModel.isReady && viewModel.isStatusVisible(for: .credentials) }
+        XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Wallet ready")
     }
 
     @MainActor
@@ -201,6 +207,39 @@ final class WalletViewModelPresentationTests: XCTestCase {
         try await waitUntil { viewModel.isReady }
         viewModel.deleteCredential(id: "cred-1")
         try await waitUntil { viewModel.credentials.isEmpty }
+    }
+
+    @MainActor
+    func testDeleteCredentialDiscardsAnActivePresentationReview() async throws {
+        let walletClient = MockWalletClient(
+            storedCredentials: [
+                Credential(
+                    id: "cred-1",
+                    format: "jwt_vc_json",
+                    issuer: "Example Issuer",
+                    subject: nil,
+                    label: "Example Credential",
+                    addedAt: nil,
+                    credentialDataJSON: "{}"
+                )
+            ]
+        )
+        let viewModel = WalletViewModel(
+            walletID: "delete-review-\(UUID().uuidString)",
+            walletClient: walletClient
+        )
+        try await waitUntil { viewModel.isReady }
+        viewModel.presentationRequestUrl = "openid4vp://mock"
+        viewModel.previewPresentation()
+        try await waitUntil { viewModel.presentationReviewEnabled }
+
+        viewModel.deleteCredential(id: "cred-1")
+        try await waitUntil { viewModel.credentials.isEmpty && viewModel.presentationReview == nil }
+
+        XCTAssertFalse(viewModel.presentationReviewEnabled)
+        XCTAssertEqual(viewModel.selectedPresentationCredentialOptions, [])
+        let discarded = await walletClient.discardedPresentationPreviewHandles
+        XCTAssertEqual(discarded.count, 1)
     }
 
     /// Waits for `predicate`, bounded by elapsed time rather than by a yield count.

@@ -128,6 +128,7 @@ class WalletDemoControllerTest {
         assertTrue(state.isStatusVisible)
         assertEquals("did:key:test", session.did)
         assertEquals("key-1", session.keyId)
+        assertEquals("""{"kty":"OKP","crv":"Ed25519","x":"test"}""", session.publicJwk)
         assertEquals(listOf(sampleCredential), session.credentials)
         assertEquals(1, wallet.bootstrapCalls)
         assertTrue(pinStore.hasPin())
@@ -151,6 +152,35 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun dismissedSuccessReappearsOnLaterIdenticalOutcome() = runTest {
+        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1"))
+        val controller = unlockedControllerWith(wallet, this)
+        wallet.credentials = listOf(sampleCredential)
+
+        controller.selectTab(WalletDemoTab.Receive)
+        controller.updateOfferUrl("openid-credential-offer://first")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals("Received 1 credential(s)", controller.state.value.statusText)
+        assertTrue(controller.state.value.isStatusVisible)
+        controller.dismissStatus()
+        assertFalse(controller.state.value.isStatusVisible)
+
+        controller.startNewReceiveFlow()
+        controller.updateOfferUrl("openid-credential-offer://second")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals("Received 1 credential(s)", controller.state.value.statusText)
+        assertTrue(controller.state.value.isStatusVisible)
+    }
+
+    @Test
     fun deleteCredentialRemovesItFromTheReadySession() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val controller = unlockedControllerWith(wallet, this)
@@ -159,6 +189,30 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertEquals(listOf("cred-1"), wallet.deletedCredentialIds)
+        val session = controller.state.value.session as WalletSessionState.Ready
+        assertEquals(emptyList(), session.credentials)
+    }
+
+    @Test
+    fun deleteCredentialDiscardsAnActivePresentationReview() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        assertTrue(controller.state.value.presentationReviewEnabled)
+        assertTrue(controller.state.value.presentationReview != null)
+
+        controller.deleteCredential("cred-1")
+        runCurrent()
+
+        assertEquals(null, controller.state.value.presentationReview)
+        assertFalse(controller.state.value.presentationReviewEnabled)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
+        assertEquals(listOf(presentationPreviewHandle), wallet.discardedPresentationPreviewHandles)
         val session = controller.state.value.session as WalletSessionState.Ready
         assertEquals(emptyList(), session.credentials)
     }
@@ -179,6 +233,27 @@ class WalletDemoControllerTest {
 
         assertEquals(1, wallet.deleteWalletCalls)
         assertFalse(pinStore.hasPin())
+        assertTrue(controller.state.value.auth is WalletAuthState.Setup)
+        assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
+    }
+
+    @Test
+    fun resetWalletLeavesSetupWhenPinClearFailsAfterDelete() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val pinStore = FailingClearDemoPinStore()
+        val controller = controllerWith(wallet, this, pinStore)
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+        assertTrue(pinStore.hasPin())
+        assertTrue(controller.state.value.session is WalletSessionState.Ready)
+
+        controller.resetWallet()
+        runCurrent()
+
+        assertEquals(1, wallet.deleteWalletCalls)
+        assertTrue(pinStore.hasPin())
         assertTrue(controller.state.value.auth is WalletAuthState.Setup)
         assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
     }
@@ -1563,6 +1638,22 @@ class WalletDemoControllerTest {
     }
 }
 
+private class FailingClearDemoPinStore : DemoPinStore {
+    private var configuredPin: String? = null
+
+    override fun hasPin(): Boolean = configuredPin != null
+
+    override suspend fun setPin(pin: String) {
+        configuredPin = pin
+    }
+
+    override suspend fun verifyPin(pin: String): Boolean = configuredPin == pin
+
+    override fun clear() {
+        error("PIN verifier could not be cleared")
+    }
+}
+
 private class RecoverableDemoPinStore : DemoPinStore {
     var isAvailable = false
     var setPinCalls = 0
@@ -1676,7 +1767,11 @@ private class FakeDemoWallet(
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult {
         bootstrapCalls += 1
-        return WalletDemoBootstrapResult(keyId = "key-1", did = "did:key:test")
+        return WalletDemoBootstrapResult(
+            keyId = "key-1",
+            did = "did:key:test",
+            publicJwk = """{"kty":"OKP","crv":"Ed25519","x":"test"}""",
+        )
     }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials

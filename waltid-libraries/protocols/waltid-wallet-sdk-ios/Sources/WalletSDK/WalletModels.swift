@@ -712,14 +712,19 @@ public struct WalletBootstrapResult: Equatable, Sendable {
     /// DID created for the wallet.
     public let did: String
 
+    /// Public JWK of ``keyID`` as a JSON object string. Private material is never included.
+    public let publicJWK: String
+
     /// Creates a bootstrap result.
     ///
     /// - Parameters:
     ///   - keyID: Identifier of the created or selected wallet key.
     ///   - did: DID created for the wallet.
-    public init(keyID: String, did: String) {
+    ///   - publicJWK: Public JWK of the wallet key as a JSON object string.
+    public init(keyID: String, did: String, publicJWK: String = #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#) {
         self.keyID = keyID
         self.did = did
+        self.publicJWK = publicJWK
     }
 }
 

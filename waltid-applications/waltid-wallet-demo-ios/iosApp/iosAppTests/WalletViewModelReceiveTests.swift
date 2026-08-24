@@ -277,7 +277,8 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func credentials() async throws -> [Credential] {
-        startsWithCredential || credentialIssued ? [Self.credential] : []
+        let available = startsWithCredential || credentialIssued ? [Self.credential] : []
+        return available.filter { !deletedCredentialIDs.contains($0.id) }
     }
 
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
@@ -317,6 +318,7 @@ private actor TransactionCodeWalletClient: WalletClient {
         issuanceContinuationCalls += 1
         receivedTxCodes.append(transactionCode ?? "")
         credentialIssued = true
+        deletedCredentialIDs.remove(Self.credential.id)
         return .stored(sessionID: sessionID, credentialIDs: [Self.credential.id])
     }
 
@@ -392,6 +394,21 @@ private actor TransactionCodeWalletClient: WalletClient {
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         discardedPresentationPreviewHandles.append(previewHandle)
     }
+
+    func deleteCredential(id: String) async throws -> Bool {
+        let existed = (try await credentials()).contains { $0.id == id }
+        if existed {
+            deletedCredentialIDs.insert(id)
+        }
+        return existed
+    }
+
+    func deleteLocalData() async throws {
+        credentialIssued = false
+        deletedCredentialIDs.insert(Self.credential.id)
+    }
+
+    private var deletedCredentialIDs: Set<String> = []
 
     private static let credential = Credential(
         id: "credential-1",

@@ -3,6 +3,7 @@ import WalletDemoSharingUI
 import WalletSDK
 
 struct OfferReviewView: View {
+    @Environment(\.walletDemoBranding) private var branding
     let preview: IssuanceOfferPreview
     let isAcceptEnabled: Bool
     let isReviewEnabled: Bool
@@ -106,7 +107,7 @@ struct OfferReviewView: View {
             HStack(spacing: 8) {
                 Button(preview.grant == .authorizationCode ? "Continue to sign in" : "Accept", action: onAccept)
                     .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
+                    .tint(branding.primary)
                     .disabled(!isAcceptEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
 
