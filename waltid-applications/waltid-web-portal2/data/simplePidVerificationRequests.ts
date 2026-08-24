@@ -137,6 +137,7 @@ export const SIMPLE_PID_VERIFICATION_REQUEST_OPTIONS: SimplePidVerificationReque
       link: "https://eudi-wallet.gov.de",
       requestBody: createPidRequestBody({
         signedRequest: true,
+        encryptedResponse: true,
         clientId: "x509_hash:cbxrATH66Crh_jzd4JUQriuZpBH_vl5Syc-S_JU8fQE",
         key: GERMAN_EUDI_WALLET_KEY,
         x5c: GERMAN_EUDI_WALLET_X5C,
