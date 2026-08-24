@@ -992,6 +992,7 @@ object WalletPresentationHandler {
                     wallet = wallet,
                     query = query,
                     useWalletCredentialIds = true,
+                    eligibleCredentialIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId },
                 )
                 val selected = matched.selectCredentialOptions(
                     selectedCredentialOptions = request.selectedCredentialOptions,
@@ -1173,6 +1174,7 @@ object WalletPresentationHandler {
                         wallet = wallet,
                         query = query,
                         useWalletCredentialIds = true,
+                        eligibleCredentialIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId },
                     ).selectCredentialOptions(
                         selectedCredentialOptions = request.selectedCredentialOptions,
                         selectedDisclosureOptions = request.selectedDisclosureOptions,
@@ -1373,7 +1375,12 @@ object WalletPresentationHandler {
             selectedQueryIds,
         )
 
-        val matched = selectFromStores(wallet, dcqlQuery, useWalletCredentialIds = true)
+        val matched = selectFromStores(
+            wallet = wallet,
+            query = dcqlQuery,
+            useWalletCredentialIds = true,
+            eligibleCredentialIds = selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId },
+        )
         val selected = matched.selectCredentialOptions(
             selectedCredentialOptions = selectedCredentialOptions,
             selectedDisclosureOptions = request.selectedDisclosureOptions,
@@ -1454,19 +1461,26 @@ object WalletPresentationHandler {
     }
 
     /**
-     * Streams all credentials from all wallet credential stores, converts each
-     * to a [RawDcqlCredential], then runs DCQL matching — mirrors the Enterprise
+     * Streams credentials from wallet credential stores, converts each to a
+     * [RawDcqlCredential], then runs DCQL matching — mirrors the Enterprise
      * WalletPresentFunctionality.selectCredentialsForQuery exactly.
+     *
+     * When [eligibleCredentialIds] is non-null, only those stored credentials are
+     * candidates. Digital Credentials API preview and submit use this so a
+     * `multiple=false` query rematches the OS-selected credential instead of
+     * collapsing to the first store match.
      */
     internal suspend fun selectFromStores(
         wallet: Wallet,
         query: DcqlQuery,
         useWalletCredentialIds: Boolean = false,
+        eligibleCredentialIds: Set<String>? = null,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> = selectFromSnapshot(
         wallet = wallet,
         query = query,
         storedCredentials = wallet.streamAllCredentials().toList(),
         useWalletCredentialIds = useWalletCredentialIds,
+        eligibleCredentialIds = eligibleCredentialIds,
     )
 
     /**
@@ -1499,25 +1513,33 @@ object WalletPresentationHandler {
     /**
      * Matches one immutable credential-store snapshot so eligibility checks and consent options are
      * derived from the same stored records instead of independently re-reading mutable stores.
+     *
+     * When [eligibleCredentialIds] is non-null, only those stored credentials are candidates so a
+     * `multiple=false` query rematches the OS-selected credential instead of collapsing to the first
+     * store match.
      */
     private fun selectFromSnapshot(
         wallet: Wallet,
         query: DcqlQuery,
         storedCredentials: List<StoredCredential>,
         useWalletCredentialIds: Boolean,
+        eligibleCredentialIds: Set<String>? = null,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
         if (wallet.credentialStores.isEmpty()) {
             error("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
         }
 
-        val rawCredentials = storedCredentials.mapIndexed { idx, stored ->
+        val candidates = storedCredentials.filter { stored ->
+            eligibleCredentialIds == null || stored.id in eligibleCredentialIds
+        }
+        val rawCredentials = candidates.mapIndexed { idx, stored ->
             log.trace { "  credential[$idx]: id=${stored.id}, format=${stored.credential.format}, issuer=${stored.credential.issuer}" }
             stored.credential.toRawDcqlCredential(
                 id = if (useWalletCredentialIds) stored.id else idx.toString(),
             )
         }
 
-        log.debug { "DCQL matching against ${storedCredentials.size} stored credential(s), queries=${query.credentials.map { it.id }}" }
+        log.debug { "DCQL matching against ${candidates.size} stored credential(s), queries=${query.credentials.map { it.id }}" }
         val matched = DcqlMatcher.match(query.copy(credentialSets = null), rawCredentials).getOrThrow()
         log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
         return matched
@@ -1539,6 +1561,7 @@ object WalletPresentationHandler {
             query = candidateQuery,
             storedCredentials = storedById.values.toList(),
             useWalletCredentialIds = true,
+            eligibleCredentialIds = allowedCredentialIds,
         ).mapValues { (queryId, results) ->
             val originalQuery = originalQueries.getValue(queryId)
             results.map { it.copy(originalQuery = originalQuery) }

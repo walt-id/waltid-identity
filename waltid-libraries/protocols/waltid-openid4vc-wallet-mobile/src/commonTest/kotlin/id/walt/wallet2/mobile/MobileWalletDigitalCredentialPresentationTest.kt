@@ -402,6 +402,41 @@ class MobileWalletDigitalCredentialPresentationTest {
     }
 
     /**
+     * Credential Manager evaluates each registry entry independently, so two same-VCT
+     * credentials both appear even when the DCQL query defaults to `multiple=false`.
+     * After the user picks the second entry, rematching the whole store would keep
+     * only the first match and reject the selection. Preview and submit must honour
+     * the OS-selected credential.
+     */
+    @Test
+    fun selectingTheSecondUnconstrainedMatchOfASingleQueryIsPresentable() = runTest {
+        val fixture = walletFixture(
+            sdJwtCredential(id = "pid-1"),
+            sdJwtCredential(id = "pid-2"),
+        )
+
+        val preview = fixture.wallet.previewDigitalCredentialPresentation(
+            dcApiRequest(
+                data = sdJwtQuery(),
+                selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-2")),
+            )
+        )
+
+        assertEquals("pid-2", preview.credentialOptions.single().credentialId)
+
+        val response = fixture.wallet.submitDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+        )
+
+        val data = Json.parseToJsonElement(response.dataJson).jsonObject
+        assertTrue(
+            fixture.presentationFor("pid", data).isNotBlank(),
+            "vp_token missing for the OS-selected second match: $data",
+        )
+    }
+
+    /**
      * The verifier's `transaction_data` has to survive the Credential Manager transport and reach the
      * provider UI as a [MobileWalletTransactionDataItem]. Display name and field list come from the
      * wallet's configured profile: a verifier must not be able to label its own authorization prompt.
