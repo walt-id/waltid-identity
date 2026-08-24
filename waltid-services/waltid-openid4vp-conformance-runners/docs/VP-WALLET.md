@@ -165,6 +165,8 @@ val testPlans: List<WalletTestPlan> = listOf(
 | `WALLET_ADAPTER_PORT` | `7006` | Adapter port |
 | `CONFORMANCE_HOST` | `localhost.emobix.co.uk` | Suite hostname |
 | `CONFORMANCE_PORT` | `8443` | Suite HTTPS port |
+| `CONFORMANCE_ADAPTER_HOST` | `host.docker.internal` or `127.0.0.1` | Host the suite uses to reach the adapter |
+| `CONFORMANCE_VP_WALLET_ADAPTER_URL` | `http://$CONFORMANCE_ADAPTER_HOST:7006/openid4vp/authorize` | Full authorization endpoint registered with the suite (HTTPS tunnel URL in CI) |
 
 ---
 

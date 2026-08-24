@@ -9,6 +9,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
@@ -28,13 +29,16 @@ import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
 import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
+import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeRequestBuilder
 import id.waltid.openid4vci.wallet.clientauth.ClientAssertionBuilder
 import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
+import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
@@ -42,7 +46,9 @@ import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
 import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.ClientAssertionFactory
+import id.waltid.openid4vci.wallet.token.ClientAttestationHeadersFactory
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
+import id.waltid.openid4vci.wallet.token.TokenResponseHeadersHandler
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -241,13 +247,14 @@ data class IssuancePreview(
  * consumers can project them into platform-safe API models without parsing raw JSON or refetching.
  *
  * @property previewHandle Opaque handle required to act on this retained preview.
- * @property issuerMetadata Credential issuer metadata used by the retained issuance snapshot.
- * @property offeredCredentials Offered credential configurations resolved against [issuerMetadata].
+ * @property resolvedIssuerMetadata Canonical issuer-metadata resolution retained for this preview.
+ * @property offeredCredentials Offered credential configurations resolved against
+ * [resolvedIssuerMetadata].metadata.
  * @property transactionCode Canonical OpenID4VCI transaction-code metadata, when required.
  */
 data class WalletOfferPreviewResult(
     val previewHandle: IssuancePreviewHandle,
-    val issuerMetadata: CredentialIssuerMetadata,
+    val resolvedIssuerMetadata: ResolvedCredentialIssuerMetadata,
     val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
     val transactionCode: TxCode?,
 )
@@ -263,13 +270,14 @@ data class WalletOfferPreviewResult(
  * stateless "resolve for display" endpoints where issuance is completed by re-sending the offer.
  *
  * @property summary App-facing offer summary (identical to [resolveOffer]'s result).
- * @property issuerMetadata Resolved credential issuer metadata.
- * @property offeredCredentials Offered credential configurations resolved against [issuerMetadata].
+ * @property resolvedIssuerMetadata Canonical issuer-metadata resolution returned with this result.
+ * @property offeredCredentials Offered credential configurations resolved against
+ * [resolvedIssuerMetadata].metadata.
  * @property transactionCode Canonical OpenID4VCI transaction-code metadata, when required.
  */
 data class WalletOfferResolution(
     val summary: ResolveOfferResult,
-    val issuerMetadata: CredentialIssuerMetadata,
+    val resolvedIssuerMetadata: ResolvedCredentialIssuerMetadata,
     val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
     val transactionCode: TxCode?,
 )
@@ -279,15 +287,17 @@ data class WalletOfferResolution(
  *
  * @property summary App-facing metadata derived from the resolution.
  * @property offer Exact parsed credential offer, including its grants.
- * @property issuerMetadata Credential issuer metadata used to validate the offered configurations.
+ * @property resolvedIssuerMetadata Canonical issuer-metadata resolution used to validate the
+ * offered configurations.
  * @property authorizationServerMetadata Authorization server metadata used for the token request.
- * @property offeredCredentials Offered configurations resolved against [issuerMetadata].
+ * @property offeredCredentials Offered configurations resolved against
+ * [resolvedIssuerMetadata].metadata.
  */
 internal class ResolvedIssuanceOffer(
     val source: ResolveOfferRequest,
     val summary: ResolveOfferResult,
     val offer: CredentialOffer,
-    val issuerMetadata: CredentialIssuerMetadata,
+    val resolvedIssuerMetadata: ResolvedCredentialIssuerMetadata,
     val authorizationServerMetadata: AuthorizationServerMetadata,
     val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
 )
@@ -602,6 +612,7 @@ object WalletIssuanceHandler {
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): Flow<StoredCredential> = receiveCredentialFlowInternal(
         wallet = wallet,
         request = request,
@@ -612,6 +623,7 @@ object WalletIssuanceHandler {
         onDeferredTransactionId = onDeferredTransactionId,
         beforeCredentialsStored = beforeCredentialsStored,
         onCredentialStored = onCredentialStored,
+        metadataTrustResolver = metadataTrustResolver,
     )
 
     /**
@@ -644,6 +656,7 @@ object WalletIssuanceHandler {
                 onDeferredTransactionId = onDeferredTransactionId,
                 beforeCredentialsStored = beforeCredentialsStored,
                 onCredentialStored = onCredentialStored,
+                metadataTrustResolver = null,
             ).collect(::send)
         }
     }
@@ -658,6 +671,7 @@ object WalletIssuanceHandler {
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit,
         beforeCredentialsStored: suspend (Int) -> Unit,
         onCredentialStored: suspend (StoredCredential) -> Unit,
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver?,
     ): Flow<StoredCredential> = channelFlow {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -685,11 +699,12 @@ object WalletIssuanceHandler {
         val effectiveResolvedOffer = resolvedOffer ?: resolveIssuanceOffer(
             request.toResolveOfferRequest(),
             httpClient,
+            metadataTrustResolver,
         )
 
         // 2. Reuse issuer metadata and offered configurations from that resolution.
         val offer = effectiveResolvedOffer.offer
-        val issuerMetadata = effectiveResolvedOffer.issuerMetadata
+        val issuerMetadata = effectiveResolvedOffer.resolvedIssuerMetadata.metadata
         val offeredCredentials = effectiveResolvedOffer.offeredCredentials
         val asMetadata = effectiveResolvedOffer.authorizationServerMetadata
         log.trace { "Resolved offer: issuer=${offer.credentialIssuer}, configIds=${offer.credentialConfigurationIds}" }
@@ -710,12 +725,13 @@ object WalletIssuanceHandler {
             ?: error("Authorization server metadata contains no token_endpoint")
         log.trace { "Requesting token from $tokenEndpoint" }
 
-        val attestationHeaders = buildClientAttestationHeaders(
+        val tokenAttestation = tokenClientAttestation(
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
             resolveInstanceKey = { keyMaterial.crypto2AttestationKey() },
             onAttestationObtained = { onEvent(WalletSessionEvent.issuance_attestation_obtained) },
+            httpClient = httpClient,
         )
 
         // private_key_jwt (RFC 7523). Engaged from authorization server metadata for the same reason
@@ -726,12 +742,12 @@ object WalletIssuanceHandler {
             asMetadata = asMetadata,
             clientId = request.clientId,
             keyMaterial = keyMaterial,
-        ).takeIf { attestationHeaders == null }
+        ).takeIf { tokenAttestation == null }
 
         val anonymousPreAuthorizedCode =
             asMetadata.preAuthorizedGrantAnonymousAccessSupported == true &&
                     request.tokenRequestHeaders.isEmpty() &&
-                    attestationHeaders == null &&
+                    tokenAttestation == null &&
                     clientAssertionFactory == null
 
         // Sender constraining (RFC 9449): used when the authorization server advertises DPoP *and*
@@ -739,12 +755,15 @@ object WalletIssuanceHandler {
         // is requested - DPoP is optional for the wallet, so an unusable key must not fail issuance.
         val dpopAlgorithms = usableDpopAlgorithms(asMetadata, keyMaterial)
 
+        // OpenID4VCI 1.0 §6.3: only forward a tx_code when the offer's grant requested one;
+        // issuers now reject an unsolicited tx_code instead of ignoring it.
+        val effectiveTxCode = request.txCode?.takeIf { preAuthGrant.txCode != null }
+
         val tokenResponse = tokenBuilder.exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthGrant.preAuthorizedCode,
-            txCode = request.txCode,
+            txCode = effectiveTxCode,
             additionalHeaders = request.tokenRequestHeaders,
-            attestationHeaders = attestationHeaders,
             anonymous = anonymousPreAuthorizedCode,
             dpopProofFactory = dpopAlgorithms?.let { algorithms ->
                 { endpoint: String, nonce: String? ->
@@ -752,6 +771,8 @@ object WalletIssuanceHandler {
                 }
             },
             clientAssertionFactory = clientAssertionFactory,
+            onResponseHeaders = tokenAttestation?.onResponseHeaders ?: {},
+            attestationHeadersFactory = tokenAttestation?.factory,
         )
         log.trace { "Token obtained" }
         onEvent(WalletSessionEvent.issuance_token_obtained)
@@ -842,6 +863,7 @@ object WalletIssuanceHandler {
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
         val deferredIds = mutableMapOf<String, String>()
@@ -854,6 +876,7 @@ object WalletIssuanceHandler {
             onDeferredTransactionId = { configId, txId -> deferredIds[configId] = txId },
             beforeCredentialsStored = beforeCredentialsStored,
             onCredentialStored = onCredentialStored,
+            metadataTrustResolver = metadataTrustResolver,
         ).collect { ids += it.id }
         return ReceiveCredentialResult(credentialIds = ids, deferredTransactionIds = deferredIds)
     }
@@ -899,14 +922,15 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: ResolveOfferRequest,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): WalletOfferPreviewResult {
-        val resolvedOffer = resolveIssuanceOffer(request, httpClient)
+        val resolvedOffer = resolveIssuanceOffer(request, httpClient, metadataTrustResolver)
         val previewHandle = IssuancePreviewHandle(
             previewedOffers.create(walletId = wallet.id, value = resolvedOffer)
         )
         return WalletOfferPreviewResult(
             previewHandle = previewHandle,
-            issuerMetadata = resolvedOffer.issuerMetadata,
+            resolvedIssuerMetadata = resolvedOffer.resolvedIssuerMetadata,
             offeredCredentials = resolvedOffer.offeredCredentials,
             transactionCode = resolvedOffer.offer.grants?.preAuthorizedCode?.txCode,
         )
@@ -925,10 +949,12 @@ object WalletIssuanceHandler {
     private suspend fun resolveIssuanceOffer(
         request: ResolveOfferRequest,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): ResolvedIssuanceOffer {
         val offer = resolveOffer(request, httpClient)
-        val metadataResolver = IssuerMetadataResolver(httpClient)
-        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        val metadataResolver = IssuerMetadataResolver(httpClient, metadataTrustResolver)
+        val resolvedIssuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        val issuerMetadata = resolvedIssuerMetadata.metadata
         val asMetadata = metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         return ResolvedIssuanceOffer(
@@ -946,7 +972,7 @@ object WalletIssuanceHandler {
                 nonceEndpoint = issuerMetadata.nonceEndpoint?.let { Url(it) },
             ),
             offer = offer,
-            issuerMetadata = issuerMetadata,
+            resolvedIssuerMetadata = resolvedIssuerMetadata,
             authorizationServerMetadata = asMetadata,
             offeredCredentials = offeredCredentials,
         )
@@ -990,15 +1016,22 @@ object WalletIssuanceHandler {
      *
      * Use this for stateless "resolve for display" flows that render an issuer/credential preview and then
      * complete issuance by re-sending the offer (e.g. via the pre-authorized or authorization-code endpoints).
+     *
+     * @param request Credential offer URL or inline offer JSON to resolve.
+     * @param httpClient HTTP client used for offer and metadata resolution.
+     * @param metadataTrustResolver Optional trust boundary for signed Credential Issuer Metadata. When
+     * absent, only unsigned metadata is accepted.
+     * @return Resolved offer summary, issuer metadata resolution, offered credentials, and transaction code.
      */
     suspend fun resolveOfferDetailed(
         request: ResolveOfferRequest,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): WalletOfferResolution {
-        val resolved = resolveIssuanceOffer(request, httpClient)
+        val resolved = resolveIssuanceOffer(request, httpClient, metadataTrustResolver)
         return WalletOfferResolution(
             summary = resolved.summary,
-            issuerMetadata = resolved.issuerMetadata,
+            resolvedIssuerMetadata = resolved.resolvedIssuerMetadata,
             offeredCredentials = resolved.offeredCredentials,
             transactionCode = resolved.offer.grants?.preAuthorizedCode?.txCode,
         )
@@ -1007,7 +1040,7 @@ object WalletIssuanceHandler {
     suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult =
         requestToken(
             request = request,
-            attestationHeaders = null,
+            tokenAttestation = null,
             anonymousPreAuthorizedCode = request.anonymousPreAuthorizedCode,
         )
 
@@ -1021,11 +1054,11 @@ object WalletIssuanceHandler {
         val credentialIssuer = request.credentialIssuer?.takeIf { it.isNotBlank() }
         val asMetadata = credentialIssuer?.let {
             val metadataResolver = IssuerMetadataResolver(httpClient)
-            val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(it)
+            val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(it).metadata
             metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         }
-        val attestationHeaders = asMetadata?.let {
-            buildClientAttestationHeaders(
+        val tokenAttestation = asMetadata?.let {
+            tokenClientAttestation(
                 asMetadata = it,
                 clientId = request.clientId,
                 attestationAssembler = attestationAssembler,
@@ -1033,17 +1066,18 @@ object WalletIssuanceHandler {
                     wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))?.crypto2AttestationKey()
                 },
                 onAttestationObtained = onAttestationObtained,
+                httpClient = httpClient,
             )
         }
         val anonymousPreAuthorizedCode =
             request.anonymousPreAuthorizedCode ||
                     (asMetadata?.preAuthorizedGrantAnonymousAccessSupported == true &&
                             request.tokenRequestHeaders.isEmpty() &&
-                            attestationHeaders == null)
+                            tokenAttestation == null)
 
         return requestToken(
             request = request,
-            attestationHeaders = attestationHeaders,
+            tokenAttestation = tokenAttestation,
             anonymousPreAuthorizedCode = anonymousPreAuthorizedCode,
             httpClient = httpClient,
         )
@@ -1051,7 +1085,7 @@ object WalletIssuanceHandler {
 
     private suspend fun requestToken(
         request: RequestTokenRequest,
-        attestationHeaders: ClientAttestationHeaders?,
+        tokenAttestation: TokenClientAttestation?,
         anonymousPreAuthorizedCode: Boolean,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestTokenResult {
@@ -1064,8 +1098,11 @@ object WalletIssuanceHandler {
             preAuthorizedCode = request.preAuthorizedCode,
             txCode = request.txCode,
             additionalHeaders = request.tokenRequestHeaders,
-            attestationHeaders = attestationHeaders,
             anonymous = anonymousPreAuthorizedCode,
+            dpopProofFactory = null,
+            clientAssertionFactory = null,
+            onResponseHeaders = tokenAttestation?.onResponseHeaders ?: {},
+            attestationHeadersFactory = tokenAttestation?.factory,
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,
@@ -1079,7 +1116,7 @@ object WalletIssuanceHandler {
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestNonceResult {
         val issuerMetadata = IssuerMetadataResolver(httpClient)
-            .resolveCredentialIssuerMetadata(request.credentialIssuer.toString())
+            .resolveCredentialIssuerMetadata(request.credentialIssuer.toString()).metadata
         return RequestNonceResult(
             nonce = requestProofNonce(
                 httpClient = httpClient,
@@ -1097,7 +1134,7 @@ object WalletIssuanceHandler {
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for signing proof")
         val issuerMetadata = IssuerMetadataResolver(httpClient)
-            .resolveCredentialIssuerMetadata(request.issuerUrl.toString())
+            .resolveCredentialIssuerMetadata(request.issuerUrl.toString()).metadata
         val configuration = issuerMetadata.credentialConfigurationsSupported[request.credentialConfigurationId]
             ?: error(
                 "Unknown credential configuration '${request.credentialConfigurationId}' " +
@@ -1308,6 +1345,7 @@ object WalletIssuanceHandler {
         parEndpoint: String,
         keyMaterial: WalletKeyStoreEntry?,
         attestationAssembler: ClientAttestationAssembler?,
+        httpClient: HttpClient,
     ): GenerateAuthorizationUrlResult {
         // Binds the eventual access token to this wallet's key at authorization time (RFC 9449
         // Section 10). Only offered when the key can actually sign an advertised algorithm.
@@ -1339,6 +1377,7 @@ object WalletIssuanceHandler {
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
             resolveInstanceKey = { keyMaterial?.crypto2AttestationKey() },
+            httpClient = httpClient,
         )
 
         val response = PushedAuthorizationRequestExecutor.execute(
@@ -1494,7 +1533,7 @@ object WalletIssuanceHandler {
     ): CredentialStorageContext {
         val resolvedIssuerMetadata = issuerMetadata
             ?: credentialIssuerBaseUrl?.let {
-                IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(it)
+                IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(it).metadata
             }
         return CredentialStorageContext(
             label = labelOverride
@@ -1537,10 +1576,60 @@ object WalletIssuanceHandler {
     }
 
     /**
+     * Token-endpoint client attestation that can be rebuilt per HTTP attempt.
+     *
+     * The Wallet Attestation JWT is obtained once; each factory invocation mints a fresh PoP `jti`
+     * (and honors `OAuth-Client-Attestation-Challenge` from the previous response). Static headers
+     * reused the same PoP across a DPoP `use_dpop_nonce` retry, which HAIP conformance rejects.
+     */
+    private class TokenClientAttestation(
+        val factory: ClientAttestationHeadersFactory,
+        val onResponseHeaders: TokenResponseHeadersHandler,
+    )
+
+    private suspend fun tokenClientAttestation(
+        asMetadata: AuthorizationServerMetadata,
+        clientId: String,
+        attestationAssembler: ClientAttestationAssembler?,
+        resolveInstanceKey: suspend () -> Crypto2Key?,
+        onAttestationObtained: suspend () -> Unit = {},
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+    ): TokenClientAttestation? {
+        val assembler = attestationAssembler ?: return null
+        if (!asMetadata.supportsAttestationBasedClientAuthentication()) return null
+
+        log.debug { "Issuer supports attestation-based client auth, building attestation headers" }
+        val key = resolveInstanceKey()
+            ?: error("No key available for client attestation")
+        val attestationJwt = assembler.obtainAttestationJwt(key, clientId)
+        onAttestationObtained()
+        var challenge: String? = fetchAttestationChallenge(asMetadata, httpClient)
+        return TokenClientAttestation(
+            factory = {
+                ClientAttestationHeaders(
+                    attestationJwt = attestationJwt,
+                    popJwt = assembler.buildPopJwt(key, clientId, asMetadata.issuer, challenge),
+                )
+            },
+            onResponseHeaders = { headers ->
+                headers[CLIENT_ATTESTATION_CHALLENGE]?.takeIf { it.isNotBlank() }?.let { challenge = it }
+            },
+        )
+    }
+
+    /**
      * Client attestation headers for any request that authenticates this client to the authorization
      * server - the token request and the pushed authorization request alike. Both take the
      * authorization server's issuer as the PoP audience (OAuth 2.0 Attestation-Based Client
      * Authentication Section 5.2), so one builder serves both.
+     *
+     * Token requests should use [tokenClientAttestation] instead so DPoP/challenge retries mint a
+     * new PoP. PAR still uses this one-shot builder because [PushedAuthorizationRequestExecutor]
+     * does not retry with a factory.
+     *
+     * When the authorization server advertises `challenge_endpoint`, the challenge is fetched before
+     * the PoP is minted (draft-ietf-oauth-attestation-based-client-auth). Skipping that fetch is
+     * what HAIP `oid4vci-1_0-wallet-test-client-attestation-challenge` fails.
      */
     private suspend fun buildClientAttestationHeaders(
         asMetadata: AuthorizationServerMetadata,
@@ -1548,6 +1637,7 @@ object WalletIssuanceHandler {
         attestationAssembler: ClientAttestationAssembler?,
         resolveInstanceKey: suspend () -> Crypto2Key?,
         onAttestationObtained: suspend () -> Unit = {},
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): ClientAttestationHeaders? {
         val assembler = attestationAssembler ?: return null
         if (!asMetadata.supportsAttestationBasedClientAuthentication()) return null
@@ -1559,9 +1649,18 @@ object WalletIssuanceHandler {
             instanceKey = key,
             clientId = clientId,
             audience = asMetadata.issuer,
+            challenge = fetchAttestationChallenge(asMetadata, httpClient),
         )
         onAttestationObtained()
         return headers
+    }
+
+    private suspend fun fetchAttestationChallenge(
+        asMetadata: AuthorizationServerMetadata,
+        httpClient: HttpClient,
+    ): String? {
+        val endpoint = asMetadata.challengeEndpoint?.takeIf { it.isNotBlank() } ?: return null
+        return WalletAttestationChallengeRequestBuilder(httpClient).requestChallenge(endpoint).attestationChallenge
     }
 
     private suspend fun WalletKeyStoreEntry.crypto2AttestationKey(): Crypto2Key? =
@@ -1575,7 +1674,7 @@ object WalletIssuanceHandler {
         httpClient: HttpClient,
     ): AuthorizationServerMetadata {
         val metadataResolver = IssuerMetadataResolver(httpClient)
-        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(credentialIssuerBaseUrl)
+        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(credentialIssuerBaseUrl).metadata
         return metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
     }
 
@@ -1651,10 +1750,12 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: GenerateAuthorizationUrlRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): GenerateAuthorizationUrlResult = generateAuthorizationUrl(
         request = request,
         keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)),
         attestationAssembler = attestationAssembler,
+        httpClient = httpClient,
     )
 
     suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult =
@@ -1664,9 +1765,10 @@ object WalletIssuanceHandler {
         request: GenerateAuthorizationUrlRequest,
         keyMaterial: WalletKeyStoreEntry?,
         attestationAssembler: ClientAttestationAssembler? = null,
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): GenerateAuthorizationUrlResult {
         val offer = resolveOffer(request, httpClient)
-        val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer).metadata
         val asMetadata =
             IssuerMetadataResolver(httpClient).resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
 
@@ -1700,6 +1802,7 @@ object WalletIssuanceHandler {
                 parEndpoint = parEndpoint,
                 keyMaterial = keyMaterial,
                 attestationAssembler = attestationAssembler,
+                httpClient = httpClient,
             )
         }
 
@@ -1738,7 +1841,7 @@ object WalletIssuanceHandler {
             request = request,
             tokenEndpoint = asMetadata.tokenEndpoint
                 ?: error("Authorization server metadata contains no token_endpoint"),
-            attestationHeaders = null,
+            tokenAttestation = null,
             httpClient = httpClient,
         )
     }
@@ -1768,22 +1871,25 @@ object WalletIssuanceHandler {
         val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
-        val attestationHeaders = buildClientAttestationHeaders(
+        val resolvedKeyMaterial = keyMaterial ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
+        val tokenAttestation = tokenClientAttestation(
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
             resolveInstanceKey = {
-                wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))?.crypto2AttestationKey()
+                resolvedKeyMaterial?.crypto2AttestationKey()
+                    ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))?.crypto2AttestationKey()
             },
             onAttestationObtained = onAttestationObtained,
+            httpClient = httpClient,
         )
         return exchangeCode(
             request = request,
             tokenEndpoint = tokenEndpoint,
-            attestationHeaders = attestationHeaders,
+            tokenAttestation = tokenAttestation,
             httpClient = httpClient,
             asMetadata = asMetadata,
-            keyMaterial = keyMaterial ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)),
+            keyMaterial = resolvedKeyMaterial,
             useDpop = useDpop,
         )
     }
@@ -1791,7 +1897,7 @@ object WalletIssuanceHandler {
     private suspend fun exchangeCode(
         request: ExchangeCodeRequest,
         tokenEndpoint: String,
-        attestationHeaders: ClientAttestationHeaders?,
+        tokenAttestation: TokenClientAttestation?,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         /**
          * Authorization server metadata and wallet key, needed to client authenticate and sender
@@ -1810,7 +1916,7 @@ object WalletIssuanceHandler {
         // Mirrors the pre-authorized-code exchange. Attestation wins over private_key_jwt when both
         // are advertised, because it additionally attests the wallet instance rather than only proving
         // key control.
-        val clientAssertionFactory = if (attestationHeaders == null && asMetadata != null && keyMaterial != null) {
+        val clientAssertionFactory = if (tokenAttestation == null && asMetadata != null && keyMaterial != null) {
             clientAssertionFactory(asMetadata = asMetadata, clientId = request.clientId, keyMaterial = keyMaterial)
         } else {
             null
@@ -1829,13 +1935,14 @@ object WalletIssuanceHandler {
             code = request.code,
             codeVerifier = request.codeVerifier,
             additionalHeaders = request.tokenRequestHeaders,
-            attestationHeaders = attestationHeaders,
             dpopProofFactory = senderConstraining?.let { (key, algorithms) ->
                 { endpoint: String, nonce: String? ->
                     buildDpopProof(key, algorithms, endpoint, nonce = nonce)
                 }
             },
             clientAssertionFactory = clientAssertionFactory,
+            onResponseHeaders = tokenAttestation?.onResponseHeaders ?: {},
+            attestationHeadersFactory = tokenAttestation?.factory,
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,
@@ -1994,7 +2101,7 @@ object WalletIssuanceHandler {
 
         // Resolve issuer metadata again at continuation time and use only its advertised nonce endpoint.
         val issuerMetadata = IssuerMetadataResolver(httpClient)
-            .resolveCredentialIssuerMetadata(credentialIssuerBaseUrl)
+            .resolveCredentialIssuerMetadata(credentialIssuerBaseUrl).metadata
         nonceEndpoint?.let { expected ->
             require(expected == issuerMetadata.nonceEndpoint) {
                 "Provided nonce endpoint does not match credential issuer metadata"

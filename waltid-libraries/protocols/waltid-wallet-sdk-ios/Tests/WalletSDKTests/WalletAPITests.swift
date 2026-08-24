@@ -27,6 +27,19 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(configuration.preferredLocales, Locale.preferredLanguages)
     }
 
+    func testIssuanceCredentialPreviewRetainsLogoAccessibilityText() {
+        let preview = IssuanceCredentialPreview(
+            configurationID: "mdl",
+            format: "mso_mdoc",
+            name: "Mobile Driving Licence",
+            descriptionText: nil,
+            logoURI: URL(string: "https://issuer.example/mdl.png"),
+            logoAltText: "Driving licence logo"
+        )
+
+        XCTAssertEqual(preview.logoAltText, "Driving licence logo")
+    }
+
     func testPublicPersistenceConfigurationUsesEncryptedDefault() {
         let configuration = WalletConfiguration(persistence: WalletPersistence(databaseKey: .managed))
 
@@ -159,6 +172,7 @@ final class WalletAPITests: XCTestCase {
             request: .init(
                 clientID: "https://verifier.example",
                 verifierMetadata: testVerifierMetadata,
+                requestAuthentication: .unauthenticated,
                 responseURI: URL(string: "https://verifier.example/direct-post"),
                 state: "state-1",
                 nonce: "nonce-1",
@@ -197,6 +211,44 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(preview.credentialOptions.single?.selection, PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1"))
         XCTAssertEqual(preview.credentialOptions.single?.id, preview.credentialOptions.single?.selection.id)
         XCTAssertEqual(preview.credentialRequirements.single?.options, [["pid"]])
+    }
+
+    func testAuthenticatedRequestAuthenticationRetainsExactSecurityFacts() {
+        let authentication = PresentationRequestAuthentication.authenticated(
+            compactRequestObject: "signed-request-object",
+            algorithm: "ES256",
+            keyID: "verifier-kid",
+            clientIDScheme: .preRegistered
+        )
+
+        guard case let .authenticated(compactRequestObject, algorithm, keyID, clientIDScheme) = authentication else {
+            return XCTFail("Expected authenticated request object")
+        }
+
+        XCTAssertEqual(compactRequestObject, "signed-request-object")
+        XCTAssertEqual(algorithm, "ES256")
+        XCTAssertEqual(keyID, "verifier-kid")
+        XCTAssertEqual(clientIDScheme, .preRegistered)
+    }
+
+    func testSignedIssuerMetadataProvenanceRetainsTrustResolverFacts() {
+        let provenance = MetadataProvenance.signed(
+            SignedMetadataProvenance(
+                compactJWT: "signed-metadata-jwt",
+                algorithm: "EdDSA",
+                keyID: "issuer-key",
+                trustType: .trustedIssuer
+            )
+        )
+
+        guard case let .signed(signed) = provenance else {
+            return XCTFail("Expected signed issuer metadata provenance")
+        }
+
+        XCTAssertEqual(signed.compactJWT, "signed-metadata-jwt")
+        XCTAssertEqual(signed.algorithm, "EdDSA")
+        XCTAssertEqual(signed.keyID, "issuer-key")
+        XCTAssertEqual(signed.trustType, .trustedIssuer)
     }
 
     func testWalletHasAsyncFacadeShape() async {
@@ -361,6 +413,7 @@ final class WalletAPITests: XCTestCase {
                 request: .init(
                     clientID: "https://verifier.example",
                     verifierMetadata: testVerifierMetadata,
+                    requestAuthentication: .unauthenticated,
                     responseURI: nil,
                     state: nil,
                     nonce: "nonce-1",
@@ -417,6 +470,7 @@ final class WalletAPITests: XCTestCase {
         let requestInfo = PresentationRequestContext(
             clientID: "https://verifier.example",
             verifierMetadata: testVerifierMetadata,
+            requestAuthentication: .unauthenticated,
             responseEncryption: .notRequired
         )
         let bridge = FakeWalletCoreBridge()
@@ -802,7 +856,14 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         id: "issuance-session-1",
         offer: IssuanceOfferPreview(
             grant: .preAuthorizedCode,
-            issuer: .init(identifier: "https://issuer.example", name: nil, locale: nil, logoURI: nil, logoAltText: nil),
+            issuer: .init(
+                identifier: "https://issuer.example",
+                name: nil,
+                locale: nil,
+                logoURI: nil,
+                logoAltText: nil,
+                metadataProvenance: .unsigned
+            ),
             credentials: [],
             transactionCode: nil
         )
@@ -815,6 +876,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             previewHandle: PresentationPreviewHandle(value: "fake-presentation-preview"),
             request: .init(
                 clientID: "https://verifier.example",
+                requestAuthentication: .unauthenticated,
                 nonce: "nonce-1",
                 responseEncryption: .notRequired,
             ),

@@ -345,9 +345,12 @@ class WalletDemoController(
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
         if (!current.acceptOfferEnabled) return
-        current.offerPreview ?: return
+        val preview = current.offerPreview ?: return
         val offerUrl = current.requestDrafts.offerUrl.trim()
+        // Only forward a tx_code when the offer actually requested one; issuers now reject
+        // an unsolicited tx_code (OpenID4VCI 1.0 §6.3).
         val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
+            ?.takeIf { preview.transactionCode != null }
         val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
         if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.Receiving))) return
 

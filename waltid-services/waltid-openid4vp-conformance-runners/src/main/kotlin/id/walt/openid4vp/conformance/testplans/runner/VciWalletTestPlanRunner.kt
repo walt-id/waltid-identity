@@ -4,6 +4,7 @@ import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
+import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletModuleApplicability
 import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletTestPlan
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -52,28 +53,41 @@ class VciWalletTestPlanRunner(
     suspend fun test(): List<TestPlanResult> {
         printHeader()
 
-        // Create test plan
-        val createResponse = createTestPlan()
-        val testPlanId = createResponse.id
-        println("Test plan created: $testPlanId")
-
-        // Get modules
-        val modules = createResponse.modules
-        println("Test modules: ${modules.size}")
-        modules.forEach { println("   - ${it.testModule}") }
-        println()
-
         val results = mutableListOf<TestPlanResult>()
+        var failure: Throwable? = null
+        try {
+            // Create test plan
+            val createResponse = createTestPlan()
+            val testPlanId = createResponse.id
+            println("Test plan created: $testPlanId")
 
-        modules.forEachIndexed { index, module ->
-            println("[${index + 1}/${modules.size}] Running: ${module.testModule}")
-            val result = runModule(testPlanId, module)
-            results.add(result)
-            println("   Status: ${result.conformanceResult}")
-            if (result.errorMessage != null) {
-                println("   Error: ${result.errorMessage}")
-            }
+            // Get modules
+            val modules = createResponse.modules
+            println("Test modules: ${modules.size}")
+            modules.forEach { println("   - ${it.testModule}") }
             println()
+
+            modules.forEachIndexed { index, module ->
+                println("[${index + 1}/${modules.size}] Running: ${module.testModule}")
+                val result = runModule(testPlanId, module)
+                results.add(result)
+                println("   Status: ${result.conformanceResult}")
+                if (result.errorMessage != null) {
+                    println("   Error: ${result.errorMessage}")
+                }
+                println()
+            }
+        } catch (e: Throwable) {
+            failure = e
+            if (results.isEmpty()) {
+                results += TestPlanResult(
+                    testName = testPlan.producerId,
+                    conformanceTestId = "N/A",
+                    conformanceResult = "ERROR",
+                    walletStatus = "ERROR",
+                    errorMessage = e.message ?: e.toString(),
+                )
+            }
         }
 
         val namedResults = results.mapIndexed { index, result ->
@@ -89,6 +103,7 @@ class VciWalletTestPlanRunner(
             conformancePort = conformancePort,
             producer = testPlan.producerId,
         )
+        failure?.let { throw it }
         printSummary(namedResults)
         ConformanceReportWriter.failIfNeededFromTestPlanResults(
             role = ConformanceReportWriter.Role.VCI_WALLET,
@@ -121,31 +136,46 @@ class VciWalletTestPlanRunner(
         testPlanId: String,
         module: id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse.Module
     ): TestPlanResult {
+        var testId: String? = null
+        try {
+            return runModuleAttempt(testPlanId, module) { testId = it }
+        } catch (e: Exception) {
+            return TestPlanResult(
+                testName = "${testPlan.producerId}/${module.testModule}",
+                conformanceTestId = testId ?: module.testModule,
+                conformanceResult = "ERROR",
+                walletStatus = "ERROR",
+                errorMessage = e.message ?: e.toString(),
+            )
+        }
+    }
+
+    private suspend fun runModuleAttempt(
+        testPlanId: String,
+        module: id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse.Module,
+        rememberTestId: (String) -> Unit,
+    ): TestPlanResult {
         // Start test with variant
         val variantJson = module.variant.takeIf { it.isNotEmpty() } ?: JsonObject(emptyMap())
 
         val createTestUrl = conformance.buildCreateTestUrl(testPlanId, module.testModule, variantJson)
         val createTestResponse = conformance.createTest(createTestUrl)
         val testId = createTestResponse.id
+        rememberTestId(testId)
 
         println("   Test ID: $testId")
         println("   View: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
 
-        if (module.testModule.startsWith(FAPI2_CLIENT_MODULE_PREFIX)) {
-            // The HAIP plan bundles the FAPI 2.0 client tests, which exercise the wallet as an OAuth
-            // client rather than as a credential recipient: the suite is only an authorization server,
-            // publishes no credential offer, and waits for the client to start an authorization
-            // request by itself. Driving them needs wallet-initiated issuance, which this harness has
-            // no entry point for, so they are recorded as skipped rather than reported as wallet
-            // failures. Cancelled explicitly because a module left WAITING holds the plan alias and
-            // would take the next module down with it.
-            println("   Not a credential-issuance module - skipping")
+        VciWalletModuleApplicability.skipReason(module.testModule, variantJson)?.let { reason ->
+            // Cancelled explicitly because a module left WAITING holds the plan alias and would
+            // take the next module down with it.
+            println("   Skipping: $reason")
             conformance.cancelTest(testId)
             return TestPlanResult(
                 conformanceTestId = testId,
                 conformanceResult = "SKIPPED",
-                skipReason = "FAPI 2.0 client test: needs wallet-initiated issuance, which the " +
-                    "harness cannot yet trigger",
+                walletStatus = "SKIPPED",
+                skipReason = reason,
             )
         }
 
@@ -163,18 +193,40 @@ class VciWalletTestPlanRunner(
 
             val testInfo = conformance.getTestRunInfo(testId)
 
-            if (testInfo.status in setOf("FINISHED", "INTERRUPTED")) {
+            if (testInfo.status == "INTERRUPTED") {
+                // An interrupted module did not finish its checks. WARNING here is usually TLS plus
+                // a cancelled wait, not a completed pass - do not map it the way FINISHED WARNING is.
+                val result = testInfo.result ?: "UNKNOWN"
+                return TestPlanResult(
+                    conformanceTestId = testId,
+                    conformanceStatus = testInfo.status,
+                    conformanceResult = result,
+                    walletStatus = result,
+                    errorMessage = "Suite interrupted this module",
+                )
+            }
+
+            if (testInfo.status == "FINISHED") {
                 val result = testInfo.result ?: "UNKNOWN"
                 // The suite reports SKIPPED for a module it decided not to exercise - typically an
                 // optional feature this wallet does not advertise. That is not a wallet failure, and
                 // counting it as one made a clean run read as "6 passed, 6 failed".
+                // WARNING/REVIEW are mapped the same way as OpenID4VP verifier REVIEW: Cloudflare
+                // Quick Tunnels cannot satisfy EnsureIncomingTls12/13, so TLS-only WARNING must not
+                // fail the row or fill the GitHub Error column.
                 val skipped = result == "SKIPPED"
+                val walletStatus = when {
+                    skipped -> "SKIPPED"
+                    result == "PASSED" || result == "WARNING" || result == "REVIEW" -> "PASSED"
+                    else -> result
+                }
                 return TestPlanResult(
                     conformanceTestId = testId,
+                    conformanceStatus = testInfo.status,
                     conformanceResult = result,
-                    walletStatus = result,
+                    walletStatus = walletStatus,
                     skipReason = "Suite skipped this module".takeIf { skipped },
-                    errorMessage = if (result != "PASSED" && !skipped) {
+                    errorMessage = if (!skipped && walletStatus != "PASSED") {
                         "Test finished: $result"
                     } else null
                 )
@@ -292,9 +344,6 @@ class VciWalletTestPlanRunner(
     }
 
     private companion object {
-        /** Module-name prefix of the FAPI 2.0 client tests the HAIP plan bundles. */
-        const val FAPI2_CLIENT_MODULE_PREFIX = "fapi2-security-profile-final-client-test-"
-
         /** Offer delivery is either by value or by reference, per OpenID4VCI 1.0. */
         val OFFER_PARAMETER_NAMES = listOf("credential_offer", "credential_offer_uri")
 

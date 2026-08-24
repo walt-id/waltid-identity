@@ -54,7 +54,10 @@ class Issuer2TransactionDataAuthorizationTest {
         // while the wallet only ever device-signs the two transaction data hash elements.
         assertNull(keyAuthorizations.namespaces, "Expected no blanket nameSpaces grant")
         assertEquals(
-            mapOf(SCA_PAYMENT_TYPE to TRANSACTION_DATA_HASH_ELEMENTS),
+            mapOf(
+                SCA_PAYMENT_TYPE to TRANSACTION_DATA_HASH_ELEMENTS,
+                PAYMENT_CARD_TYPE to TRANSACTION_DATA_HASH_ELEMENTS,
+            ),
             keyAuthorizations.dataElements,
         )
     }
@@ -129,6 +132,7 @@ class Issuer2TransactionDataAuthorizationTest {
         const val SCA_PROFILE_ID = "scaPaymentCardMdoc"
         const val EU_AGE_VERIFICATION_PROFILE_ID = "euAgeVerificationMdoc"
         const val SCA_PAYMENT_TYPE = "urn:eudi:sca:payment:1"
+        const val PAYMENT_CARD_TYPE = "payment_card"
 
         val TRANSACTION_DATA_HASH_ELEMENTS = listOf("transaction_data_hash", "transaction_data_hash_alg")
 

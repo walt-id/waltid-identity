@@ -430,6 +430,15 @@ class Issuer2CredentialOfferEndpointTest {
         assertRuntimeOverrides(client)
     }
 
+    @Test
+    fun shouldReturnNotFoundForUnknownCredentialOffer() = testApplication {
+        installIssuer2()
+
+        val response = apiClient().get("/openid4vci/credential-offer?id=unknown-offer")
+
+        assertEquals(HttpStatusCode.NotFound, response.status)
+    }
+
     private suspend fun assertAuthorizedByReferenceOffer(client: HttpClient) {
         val response = client.createCredentialOffer(
             CredentialOfferCreateRequest(

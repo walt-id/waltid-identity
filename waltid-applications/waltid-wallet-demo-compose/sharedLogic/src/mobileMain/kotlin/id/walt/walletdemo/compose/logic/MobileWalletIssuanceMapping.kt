@@ -32,7 +32,7 @@ fun WalletIssuanceSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
                     display = WalletDemoMetadataDisplay(
                         name = credential.name,
                         logoUri = credential.logoUri,
-                        logoAltText = null,
+                        logoAltText = credential.logoAltText,
                         description = credential.descriptionText,
                     ),
                     claims = emptyList(),

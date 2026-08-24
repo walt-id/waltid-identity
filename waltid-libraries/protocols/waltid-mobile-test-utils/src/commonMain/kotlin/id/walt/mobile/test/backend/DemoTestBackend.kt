@@ -1,5 +1,19 @@
 package id.walt.mobile.test.backend
 
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.serialization.BinaryData
+import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vci.wallet.metadata.MetadataSigner
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.*
@@ -29,7 +43,20 @@ import kotlin.uuid.Uuid
 object DemoTestBackend {
 
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
+    private const val ISSUER_IDENTIFIER = "$ISSUER_BASE_URL/openid4vci"
+    // RFC 7638 thumbprint of the issuer2 metadata signing key published at
+    // https://issuer2.demo.walt.id/openid4vci/jwks. This is an independent trust anchor;
+    // it must not be learned from the signed metadata JWT itself.
+    private const val ISSUER_METADATA_SIGNING_KEY_THUMBPRINT =
+        "gzGuLAZEJ5AsVMZ3mRQ1jsRQbbaS78mpHzQmTFytwF0"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
+    // The demo verifier only accepts signed requests for an explicitly configured client ID.
+    const val PUBLIC_DEMO_VERIFIER_CLIENT_ID = "verifier2"
+    // `kid`, `x`, and `y` of the ES256 request-object signing key served by verifier2's x5c header.
+    // This is a pre-registered trust anchor: it must not be learned from the request object itself.
+    private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_ID = "_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug"
+    private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_X = "G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0"
+    private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_Y = "VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"
 
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
@@ -42,6 +69,7 @@ object DemoTestBackend {
     const val SCA_PAYMENT_AMOUNT = 11.56
     const val SCA_PAYMENT_TRANSACTION_ID = "8D8AC610-566D-4EF0-9C22-186B2A5ED793"
     private val requiredPaymentAuthorizationFields = setOf("merchant_name", "amount", "currency")
+    private val metadataCryptoRuntime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
     val scenarios = listOf(
         CredentialScenario(
@@ -248,6 +276,61 @@ object DemoTestBackend {
         return createVerifierSession(scenario.verifierCredentialQuery)
     }
 
+    suspend fun createVerifierSession(
+        scenario: CredentialScenario,
+        signedRequest: Boolean,
+    ): VerifierSession = createVerifierSession(
+        credentialQuery = scenario.verifierCredentialQuery,
+        transactionData = emptyList(),
+        signedRequest = signedRequest,
+    )
+
+    /** Public key that authenticates signed request objects served by the public verifier2 demo. */
+    val publicDemoVerifierRequestObjectSigningJwk = buildJsonObject {
+        put("kty", "EC")
+        put("crv", "P-256")
+        put("kid", VERIFIER_REQUEST_OBJECT_SIGNING_KEY_ID)
+        put("x", VERIFIER_REQUEST_OBJECT_SIGNING_KEY_X)
+        put("y", VERIFIER_REQUEST_OBJECT_SIGNING_KEY_Y)
+    }
+
+    /** Trust resolver for signed metadata served by the public issuer2 demo. */
+    val publicDemoIssuerMetadataTrustResolver = CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->
+        require(expectedCredentialIssuer == ISSUER_IDENTIFIER) {
+            "Unexpected public demo Credential Issuer: $expectedCredentialIssuer"
+        }
+        val decoded = CompactJws.decodeUnverified(compactJwt)
+        val algorithm = decoded.protectedHeader[JwtHeaderParams.ALGORITHM]?.jsonPrimitive?.contentOrNull
+            ?: error("Public demo signed metadata is missing alg")
+        require(algorithm == "ES256") {
+            "Unsupported public demo signed metadata algorithm: $algorithm"
+        }
+        val jwk = decoded.protectedHeader[JwtHeaderParams.JSON_WEB_KEY]?.jsonObject
+            ?: error("Public demo signed metadata is missing jwk")
+        require(jwk["kty"]?.jsonPrimitive?.contentOrNull == "EC") {
+            "Public demo signed metadata jwk must use EC"
+        }
+        require(jwk["crv"]?.jsonPrimitive?.contentOrNull == "P-256") {
+            "Public demo signed metadata jwk must use P-256"
+        }
+        val encodedVerificationKey = EncodedKey.Jwk(
+            data = BinaryData(jwk.toString().encodeToByteArray()),
+            privateMaterial = false,
+        )
+        require(Jwk.sha256Thumbprint(encodedVerificationKey) == ISSUER_METADATA_SIGNING_KEY_THUMBPRINT) {
+            "Public demo signed metadata key is not the pinned issuer2 signing key"
+        }
+        val verificationKey = metadataCryptoRuntime.restore(
+            encodedVerificationKey.toStoredSoftwareKey(KeyId("issuer2-metadata"), setOf(KeyUsage.VERIFY))
+        )
+        CompactJws.verify(compactJwt, verificationKey, JwsAlgorithm.ES256)
+        MetadataSigner(
+            keyId = decoded.protectedHeader[JwtHeaderParams.KEY_ID]?.jsonPrimitive?.contentOrNull,
+            algorithm = algorithm,
+            trustType = MetadataSignerTrustType.TRUSTED_ISSUER,
+        )
+    }
+
     suspend fun createResponseBoundVerifierSession(scenario: CredentialScenario): VerifierSession {
         return createVerifierSession(
             credentialQuery = scenario.verifierCredentialQuery,
@@ -355,11 +438,19 @@ object DemoTestBackend {
         credentialQuery: JsonObject,
         transactionData: List<JsonObject>,
         bindClientIdToResponseUri: Boolean = false,
+        signedRequest: Boolean = false,
     ): VerifierSession {
+        require(!(bindClientIdToResponseUri && signedRequest)) {
+            "A signed verifier request cannot use a response-bound redirect_uri client ID"
+        }
         val requestedSessionId = Uuid.random().toString().takeIf { bindClientIdToResponseUri }
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
+                if (signedRequest) {
+                    put("signed_request", true)
+                    put("clientId", PUBLIC_DEMO_VERIFIER_CLIENT_ID)
+                }
                 requestedSessionId?.let { sessionId ->
                     val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
                     put("sessionId", sessionId)

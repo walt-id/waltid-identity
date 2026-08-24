@@ -183,12 +183,20 @@ object Issuer2ManagementRoutesDocs {
             Establishes an SSE connection to receive real-time updates about an issuance session.
 
             Events:
-            - `resolved_credential_offer` - Wallet has resolved the credential offer
-            - `requested_token` - Wallet has requested an access token
-            - `sdjwt_issue` - SD-JWT VC credential has been issued
-            - `jwt_issue` - JWT VC credential has been issued
-            - `generated_mdoc` - mDoc credential has been generated
-            - `issuance_status` - Session status has changed
+            - `credential_offer_created`, `credential_offer_retrieved`
+            - `pushed_authorization_request_succeeded`, `pushed_authorization_request_failed`
+            - `authorization_request_succeeded`, `authorization_request_failed`
+            - `token_request_<grant>_succeeded`, `token_request_<grant>_failed`
+            - `credential_request_failed`
+            - `credential_request_<format>_succeeded`, `credential_request_<format>_failed`
+            - `issuance_status_changed`
+
+            Token grants are `authorization_code`, `pre_authorized_code`, and `refresh_token`.
+            A token request whose `grant_type` is missing, malformed, or unsupported emits
+            `token_request_failed` because no supported grant can be identified.
+            Credential formats are grouped as `sd_jwt_vc`, `w3c_vc`, and `mso_mdoc`. Once the
+            trusted session configuration is resolved, failures use the format-specific event;
+            earlier failures use `credential_request_failed`.
 
             Events use the same KtorSessionUpdate envelope as webhook notifications.
         """.trimIndent()
@@ -209,6 +217,24 @@ object Issuer2ManagementRoutesDocs {
             }
             HttpStatusCode.NotFound to {
                 description = "Issuance session not found"
+            }
+        }
+    }
+
+    fun issuerEvents(): RouteConfig.() -> Unit = {
+        summary = "Receive issuer protocol events via Server-Sent Events (SSE)"
+        description = """
+            Streams protocol outcomes across the issuer. Each event contains a requestId and may contain
+            a correlated issuance session. Failed events expose error and error_description directly.
+
+            Events without session correlation are available only on this issuer-level stream. Correlated
+            events are also sent to the corresponding session stream and configured session webhook.
+            Nonce request events are always uncorrelated and are available only on this issuer-level stream.
+        """.trimIndent()
+        response {
+            HttpStatusCode.OK to {
+                description = "SSE connection established. Events are streamed as text/event-stream."
+                body<String>()
             }
         }
     }

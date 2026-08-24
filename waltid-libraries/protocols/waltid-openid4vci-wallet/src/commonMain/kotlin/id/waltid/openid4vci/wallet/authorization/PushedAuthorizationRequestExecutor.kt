@@ -11,6 +11,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.http.contentType
@@ -43,6 +44,8 @@ object PushedAuthorizationRequestExecutor {
      *
      * @param clientAssertionFactory invoked once per call so each request carries a fresh `jti`
      *   (RFC 7523 Section 3); a replayed assertion is rejected as reuse.
+     * @param onResponseHeaders invoked before status handling so challenge headers from error
+     *   responses can still be persisted.
      */
     suspend fun execute(
         httpClient: HttpClient,
@@ -50,6 +53,7 @@ object PushedAuthorizationRequestExecutor {
         parameters: Map<String, String>,
         clientAssertionFactory: ClientAssertionFactory? = null,
         attestationHeaders: ClientAttestationHeaders? = null,
+        onResponseHeaders: suspend (Headers) -> Unit = {},
     ): PushedAuthorizationResponse {
         val body = Parameters.build {
             parameters.forEach { (name, value) -> append(name, value) }
@@ -68,6 +72,7 @@ object PushedAuthorizationRequestExecutor {
                 header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, headers.popJwt)
             }
         }
+        onResponseHeaders(response.headers)
 
         when {
             // RFC 9126 Section 2.2: a successful pushed authorization response is 201 Created.

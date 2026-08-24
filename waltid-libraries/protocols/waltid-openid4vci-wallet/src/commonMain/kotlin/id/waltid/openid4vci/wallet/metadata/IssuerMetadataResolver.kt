@@ -1,25 +1,43 @@
 package id.waltid.openid4vci.wallet.metadata
 
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.metadata.oidc.OpenIDProviderMetadata
+import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
+import id.walt.crypto2.jose.CompactJws
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import kotlin.time.Clock
 
 private val log = KotlinLogging.logger {}
 
 /**
- * Resolves issuer metadata from well-known endpoints.
- * Implements §11.2 of OpenID4VCI 1.0 specification (Credential Issuer Metadata).
- * 
- * @property httpClient The HTTP client to use for fetching metadata
+ * Resolves unsigned or signed Credential Issuer Metadata from its well-known endpoint.
+ *
+ * Implements OpenID4VCI 1.0 section 12.2 and signed metadata in section 12.2.3.
+ * A signed response is accepted only after [metadataTrustResolver] independently establishes
+ * both the JWS signature and the signer's authority for the credential issuer.
+ *
+ * @property httpClient HTTP client used to fetch metadata.
+ * @property metadataTrustResolver Optional trust boundary for signed metadata. Without it,
+ * only unsigned metadata is accepted.
  */
 class IssuerMetadataResolver(
     private val httpClient: HttpClient,
+    private val metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
 ) {
 
     companion object {
@@ -29,13 +47,19 @@ class IssuerMetadataResolver(
     }
 
     /**
-     * Resolves credential issuer metadata from the issuer's well-known endpoint
-     * 
-     * @param credentialIssuerUrl The credential issuer identifier URL
-     * @return CredentialIssuerMetadata
-     * @throws Exception if metadata cannot be fetched or parsed
+     * Resolves credential issuer metadata and retains its signed/unsigned provenance.
+     *
+     * Language preferences are sent as `Accept-Language`. Callers must still select a display
+     * locally because issuers can return multiple localized alternatives.
+     *
+     * @param credentialIssuerUrl Credential issuer identifier URL.
+     * @param preferredLocales Ordered BCP 47 locale preferences for the metadata request.
+     * @return Parsed metadata with explicit unsigned or verified signed provenance.
      */
-    suspend fun resolveCredentialIssuerMetadata(credentialIssuerUrl: String): CredentialIssuerMetadata {
+    suspend fun resolveCredentialIssuerMetadata(
+        credentialIssuerUrl: String,
+        preferredLocales: List<String> = emptyList(),
+    ): ResolvedCredentialIssuerMetadata {
         require(credentialIssuerUrl.isNotBlank()) { "Credential issuer URL cannot be blank" }
 
         log.info { "Resolving credential issuer metadata" }
@@ -50,13 +74,23 @@ class IssuerMetadataResolver(
         log.debug { "Attempting to fetch metadata from ${urlsToTry.size} well-known endpoints" }
         log.trace { "Metadata URLs to try: ${urlsToTry.joinToString()}" }
 
+        val acceptLanguage = LocalizedMetadata.acceptLanguageValue(preferredLocales)
         val failures = mutableListOf<ResolveFailure>()
         for ((index, metadataUrl) in urlsToTry.withIndex()) {
             log.debug { "Attempt ${index + 1}/${urlsToTry.size}: Fetching from $metadataUrl" }
 
             val response: HttpResponse = try {
-                httpClient.get(metadataUrl)
+                httpClient.get(metadataUrl) {
+                    header(
+                        HttpHeaders.Accept,
+                        metadataTrustResolver?.let {
+                            "${CredentialIssuerMetadataJwt.MEDIA_TYPE}, ${ContentType.Application.Json}"
+                        } ?: ContentType.Application.Json.toString(),
+                    )
+                    acceptLanguage?.let { header(HttpHeaders.AcceptLanguage, it) }
+                }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 log.warn(e) { "Network error fetching credential issuer metadata from: $metadataUrl" }
                 failures += ResolveFailure.Network(metadataUrl, e)
                 continue
@@ -65,15 +99,30 @@ class IssuerMetadataResolver(
             if (response.status.isSuccess()) {
                 log.trace { "Received successful response (${response.status.value}), parsing metadata" }
                 try {
-                    val metadata = response.body<CredentialIssuerMetadata>()
+                    val body = response.bodyAsText()
+                    val metadata = when (response.contentType()?.withoutParameters()) {
+                        ContentType.Application.Json -> ResolvedCredentialIssuerMetadata.Unsigned(
+                            parseAndValidateMetadata(body, credentialIssuerUrl),
+                        )
+                        ContentType.parse(CredentialIssuerMetadataJwt.MEDIA_TYPE),
+                        ContentType.parse(CredentialIssuerMetadataJwt.TYPED_MEDIA_TYPE) ->
+                            parseSignedMetadata(body, credentialIssuerUrl)
+                        else -> throw IllegalArgumentException(
+                            "Unsupported Credential Issuer Metadata content type: ${response.contentType()}",
+                        )
+                    }
                     log.info {
                         "Successfully resolved credential issuer metadata - " +
-                                "Issuer: ${metadata.credentialIssuer}, " +
-                                "Configurations: ${metadata.credentialConfigurationsSupported.size}"
+                                "Issuer: ${metadata.metadata.credentialIssuer}, " +
+                                "Configurations: ${metadata.metadata.credentialConfigurationsSupported.size}"
                     }
-                    log.trace { "Supported credential configurations: ${metadata.credentialConfigurationsSupported.keys.joinToString()}" }
+                    log.trace {
+                        "Supported credential configurations: " +
+                            metadata.metadata.credentialConfigurationsSupported.keys.joinToString()
+                    }
                     return metadata
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     val responseBody = runCatching { response.bodyAsText() }.getOrDefault("")
                     log.error(e) {
                         "Failed to parse credential issuer metadata from $metadataUrl - " +
@@ -103,6 +152,76 @@ class IssuerMetadataResolver(
             urlsToTry,
             failures,
         )
+    }
+
+    private suspend fun parseSignedMetadata(
+        compactJwt: String,
+        expectedCredentialIssuer: String,
+    ): ResolvedCredentialIssuerMetadata.Signed {
+        val decoded = runCatching { CompactJws.decodeUnverified(compactJwt) }
+            .getOrElse { throw IllegalArgumentException("Invalid signed Credential Issuer Metadata", it) }
+        val algorithm = decoded.algorithm.identifier
+        require(!algorithm.equals("none", ignoreCase = true) && !algorithm.startsWith("HS", ignoreCase = true)) {
+            "Signed Credential Issuer Metadata must use an asymmetric JWS algorithm"
+        }
+        require(decoded.protectedHeader.requiredString("typ", "typ") == CredentialIssuerMetadataJwt.TYPE) {
+            "Signed Credential Issuer Metadata has an invalid typ"
+        }
+        val signer = requireNotNull(metadataTrustResolver) {
+            "Signed Credential Issuer Metadata requires a configured trust resolver"
+        }.verify(compactJwt, expectedCredentialIssuer)
+        require(signer.algorithm == algorithm) { "Trusted signer algorithm does not match JWS alg" }
+
+        val payload = runCatching {
+            lenientJson.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
+        }.getOrElse { throw IllegalArgumentException("Signed Credential Issuer Metadata payload is not a JSON object", it) }
+        val subject = payload.requiredString(JwtPayloadClaims.SUBJECT, "sub")
+        // `iss` identifies the optional attesting party and may be a trusted delegate. `sub` and
+        // `credential_issuer` provide issuer binding; the trust resolver establishes signer authority.
+        payload.optionalString(JwtPayloadClaims.ISSUER, "iss")
+        // The signed-metadata profile requires a numeric `iat` but defines no wallet freshness
+        // window. `exp` is enforced strictly below; `nbf` is not a profile claim.
+        payload.requiredLong(JwtPayloadClaims.ISSUED_AT, "iat")
+        val now = Clock.System.now().epochSeconds
+        payload.optionalLong(JwtPayloadClaims.EXPIRATION, "exp")?.let { expiry ->
+            require(now < expiry) { "Signed Credential Issuer Metadata has expired" }
+        }
+        val metadata = parseAndValidateMetadata(
+            JsonObject(payload.filterKeys { it !in signedMetadataReservedPayloadClaims }).toString(),
+            expectedCredentialIssuer,
+        )
+        require(subject == metadata.credentialIssuer) {
+            "Signed Credential Issuer Metadata sub must match credential_issuer"
+        }
+        return ResolvedCredentialIssuerMetadata.Signed(metadata, compactJwt, signer)
+    }
+
+    private fun JsonObject.requiredString(claim: String, label: String): String =
+        this[claim]?.jsonPrimitive?.takeIf { it.isString }?.content
+            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata is missing or malformed $label")
+
+    private fun JsonObject.requiredLong(claim: String, label: String): Long =
+        this[claim].strictLongOrNull()
+            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata is missing or malformed $label")
+
+    private fun JsonObject.optionalLong(claim: String, label: String): Long? = when (val value = this[claim]) {
+        null -> null
+        else -> value.strictLongOrNull()
+            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata has malformed $label")
+    }
+
+    private fun JsonObject.optionalString(claim: String, label: String): String? = when (val value = this[claim]) {
+        null -> null
+        else -> (value as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata has malformed $label")
+    }
+
+    private fun parseAndValidateMetadata(body: String, expectedCredentialIssuer: String): CredentialIssuerMetadata {
+        val metadata = lenientJson.decodeFromString(CredentialIssuerMetadata.serializer(), body)
+        require(metadata.credentialIssuer == expectedCredentialIssuer) {
+            "Credential Issuer Metadata credential_issuer does not match requested issuer"
+        }
+        return metadata
     }
 
     /**
@@ -136,6 +255,7 @@ class IssuerMetadataResolver(
             val response: HttpResponse = try {
                 httpClient.get(metadataUrl)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 log.warn(e) { "Network error fetching authorization server metadata from: $metadataUrl" }
                 failures += ResolveFailure.Network(metadataUrl, e)
                 continue
@@ -145,6 +265,7 @@ class IssuerMetadataResolver(
                 try {
                     return response.body<AuthorizationServerMetadata>()
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     val responseBody = runCatching { response.bodyAsText() }.getOrDefault("")
                     log.error(e) { "Failed to parse authorization server metadata from $metadataUrl. Body: $responseBody" }
                     failures += ResolveFailure.Parse(metadataUrl, e, bodyPreview(responseBody))
@@ -189,6 +310,7 @@ class IssuerMetadataResolver(
             val response: HttpResponse = try {
                 httpClient.get(metadataUrl)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 log.warn(e) { "Network error fetching OpenID provider metadata from: $metadataUrl" }
                 failures += ResolveFailure.Network(metadataUrl, e)
                 continue
@@ -198,6 +320,7 @@ class IssuerMetadataResolver(
                 try {
                     return response.body<OpenIDProviderMetadata>()
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     val responseBody = runCatching { response.bodyAsText() }.getOrDefault("")
                     log.error(e) { "Failed to parse OpenID provider metadata from $metadataUrl. Body: $responseBody" }
                     failures += ResolveFailure.Parse(metadataUrl, e, bodyPreview(responseBody))
@@ -283,6 +406,18 @@ class IssuerMetadataResolver(
     }
 }
 
+private val signedMetadataReservedPayloadClaims = setOf(
+    JwtPayloadClaims.ISSUER,
+    JwtPayloadClaims.SUBJECT,
+    JwtPayloadClaims.ISSUED_AT,
+    JwtPayloadClaims.EXPIRATION,
+)
+
+private val lenientJson = Json { ignoreUnknownKeys = true }
+
+private fun JsonElement?.strictLongOrNull(): Long? =
+    (this as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull
+
 /**
  * Per-URL failure captured while iterating candidate well-known endpoints. Used to build the
  * final resolution error so wallet integrators can distinguish HTTP status, network, and
@@ -363,5 +498,9 @@ private fun resolutionException(
         }
     }
     val cause = failures.firstNotNullOfOrNull { it.throwable }
-    return Exception(summary, cause)
+    return if (cause is IllegalArgumentException) {
+        IllegalArgumentException(summary, cause)
+    } else {
+        Exception(summary, cause)
+    }
 }
