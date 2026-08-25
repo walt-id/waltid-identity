@@ -709,7 +709,7 @@ class WalletDemoAppTestScenarios {
         val previewGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
-            presentationPreview = samplePresentationPreview,
+            presentationPreview = compactPresentationPreview,
             previewGate = previewGate,
         )
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
@@ -729,7 +729,13 @@ class WalletDemoAppTestScenarios {
 
         previewGate.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
-        onNodeWithTag("wallet.presentationSubmitButton").performScrollTo().assertIsDisplayed()
+        waitForIdle()
+        awaitTaggedNode(WalletUiTestTags.PresentationActions)
+        onNodeWithTag(WalletUiTestTags.PresentationActions)
+            .performScrollTo()
+            .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton, useUnmergedTree = true)
+            .assertIsDisplayed()
     }
 
     fun deepLinksRouteToReceiveAndPresentTabs() = runComposeUiTest {
@@ -947,6 +953,12 @@ class WalletDemoAppTestScenarios {
         onAllNodesWithTag("wallet.status").assertCountEquals(0)
     }
 
+    private fun ComposeUiTest.awaitTaggedNode(tag: String) {
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     private fun ComposeUiTest.unlockWithPin() {
         onNodeWithTag("wallet.pinInput").performClick().performTextInput("1234")
         onNodeWithTag("wallet.pinConfirmationInput").performClick().performTextInput("1234")
@@ -1119,6 +1131,12 @@ class WalletDemoAppTestScenarios {
             ),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
+            ),
+        )
+
+        val compactPresentationPreview = samplePresentationPreview.copy(
+            credentialOptions = listOf(
+                samplePresentationPreview.credentialOptions.single().copy(disclosures = emptyList()),
             ),
         )
 
