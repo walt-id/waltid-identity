@@ -42,6 +42,38 @@ private const val VERIFICATION_SESSION = "verification-session"
 private const val VICAL = "vical"
 private const val ENVELOPE_QUERY_PARAM = "envelope"
 
+/**
+ * Groups of verifier routes that can be registered independently.
+ *
+ * A deployment that only needs to receive presentations from wallets must not expose the
+ * management surface: [SESSION_MANAGEMENT] lets any caller create a session with an arbitrary
+ * DCQL query and its own verification policies, and [VICAL] makes the server fetch a
+ * caller-supplied URL. Registering only the groups a deployment actually uses removes those
+ * routes from the routing tree entirely, so they answer 404 instead of relying on a guard.
+ */
+enum class Verifier2RouteSurface {
+    /** `POST create`, `GET {session}/info`, `SSE {session}/events` - verifier-operator surface. */
+    SESSION_MANAGEMENT,
+
+    /** `GET/POST {session}/request` and `POST {session}/response` - the wallet-facing surface. */
+    CLIENT,
+
+    /** `GET transaction-data-profiles` - discloses the configured transaction data profiles. */
+    TRANSACTION_DATA_PROFILES,
+
+    /** `POST vical/fetch` (fetches an arbitrary URL) and `POST vical/validate`. */
+    VICAL,
+    ;
+
+    companion object {
+        /** Everything, as a full verifier service exposes it. */
+        val all: Set<Verifier2RouteSurface> = entries.toSet()
+
+        /** Only what a wallet needs to answer a presentation request. */
+        val clientOnly: Set<Verifier2RouteSurface> = setOf(CLIENT)
+    }
+}
+
 object Verifier2Service {
 
     /**
@@ -87,10 +119,21 @@ object Verifier2Service {
         }
     }
 
-    fun Route.registerRoute(repository: VerificationSessionRepository = defaultSessionRepository) {
+    /**
+     * Registers the verifier routes for the [surfaces] this deployment needs.
+     *
+     * Defaults to [Verifier2RouteSurface.all] so a full verifier service is unchanged. Deployments
+     * that only receive presentations should pass [Verifier2RouteSurface.clientOnly] - see the
+     * enum for why the management surface must not be public.
+     */
+    fun Route.registerRoute(
+        repository: VerificationSessionRepository = defaultSessionRepository,
+        surfaces: Set<Verifier2RouteSurface> = Verifier2RouteSurface.all,
+    ) {
+        require(surfaces.isNotEmpty()) { "At least one verifier route surface must be registered" }
         val updateSessionCallback = updateSessionCallback(repository)
         route(VERIFICATION_SESSION) {
-            route("", {
+            if (Verifier2RouteSurface.SESSION_MANAGEMENT in surfaces) route("", {
                 tags("Verification Session Management")
             }) {
                 post<VerificationSessionSetup>("create", VerificationSessionCreateOpenApi.createDocs) { sessionSetup ->
@@ -135,7 +178,7 @@ object Verifier2Service {
                     }
                 }
             }
-            route("{$VERIFICATION_SESSION}", {
+            if (Verifier2RouteSurface.CLIENT in surfaces) route("{$VERIFICATION_SESSION}", {
                 tags("Client endpoints")
             }) {
                 get(
@@ -210,7 +253,7 @@ object Verifier2Service {
                 }
             }
         }
-        get("transaction-data-profiles", {
+        if (Verifier2RouteSurface.TRANSACTION_DATA_PROFILES in surfaces) get("transaction-data-profiles", {
             tags("Transaction Data")
             summary = "List available transaction data type profiles"
             response {
@@ -221,7 +264,7 @@ object Verifier2Service {
             call.respond(config.transactionDataProfiles)
         }
 
-        route(VICAL) {
+        if (Verifier2RouteSurface.VICAL in surfaces) route(VICAL) {
             route("", {
                 tags("VICAL")
             }) {
