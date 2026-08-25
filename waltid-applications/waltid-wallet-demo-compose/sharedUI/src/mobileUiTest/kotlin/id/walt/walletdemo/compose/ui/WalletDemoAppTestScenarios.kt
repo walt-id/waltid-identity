@@ -919,7 +919,9 @@ class WalletDemoAppTestScenarios {
         assertEquals(1, biometrics.authenticateCalls)
 
         onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
-        onNodeWithTag(WalletUiTestTags.SettingsLock).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsLock)
+            .performScrollTo()
+            .performClick()
         waitForIdle()
 
         onNodeWithText("Enter your PIN").assertIsDisplayed()

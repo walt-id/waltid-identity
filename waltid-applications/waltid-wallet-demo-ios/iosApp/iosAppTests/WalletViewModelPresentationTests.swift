@@ -224,6 +224,8 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertFalse(viewModel.isStatusVisible(for: .credentials))
 
         viewModel.resetWallet()
+        try await waitUntil { viewModel.auth == .setup && !viewModel.isReady }
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady && viewModel.isStatusVisible(for: .credentials) }
         XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Wallet ready")
     }
@@ -301,6 +303,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
             walletID: "delete-review-\(UUID().uuidString)",
             walletClient: walletClient
         )
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
         viewModel.presentationRequestUrl = "openid4vp://mock"
         viewModel.previewPresentation()
