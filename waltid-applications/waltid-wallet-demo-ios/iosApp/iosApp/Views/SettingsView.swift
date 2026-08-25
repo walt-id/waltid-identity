@@ -44,6 +44,7 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwkCopy)
             }
+            signingProtectionSection
             Section {
                 Button("Lock") {
                     viewModel.lock()
@@ -69,5 +70,117 @@ struct SettingsView: View {
         } message: {
             Text("This deletes the wallet DID, keys, credentials, and PIN. This cannot be undone.")
         }
+        .confirmationDialog(
+            "Change signing protection?",
+            isPresented: signingProtectionConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Create new wallet", role: .destructive) {
+                viewModel.confirmSigningProtectionChange()
+            }
+            .accessibilityIdentifier(WalletAccessibilityID.signingProtectionConfirm)
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelSigningProtectionChange()
+            }
+        } message: {
+            Text("This creates a new key and DID, and removes all credentials. Credentials must be issued again.")
+        }
+    }
+
+    @ViewBuilder
+    private var signingProtectionSection: some View {
+        Section("Signing protection") {
+            HStack {
+                Text("Current")
+                Spacer()
+                Text(viewModel.appliedSigningProtection?.title ?? "Not available")
+            }
+            Text("Changing signing protection creates a new wallet key and DID.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            switch viewModel.signingProtectionMode {
+            case .optional:
+                signingProtectionChoice(.biometric)
+                signingProtectionChoice(.none)
+            case .required, .disabled:
+                let managedProtection = viewModel.signingProtectionMode.defaultSelection
+                signingProtectionChoice(
+                    managedProtection,
+                    managed: viewModel.appliedSigningProtection == managedProtection
+                )
+                Text("Managed by app configuration.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !viewModel.isBiometricSigningAvailable,
+               viewModel.signingProtectionMode != .disabled {
+                Text(
+                    viewModel.biometricSigningAvailability?.message
+                        ?? "Checking strong biometric availability..."
+                )
+                .font(.footnote)
+                .foregroundStyle(
+                    viewModel.biometricSigningAvailability == nil ? Color.secondary : Color.red
+                )
+                .accessibilityIdentifier(WalletAccessibilityID.signingProtectionAvailability)
+            }
+
+            if !viewModel.isReady {
+                Button("Retry wallet setup") {
+                    viewModel.requestSigningProtectionChange(viewModel.selectedSigningProtection)
+                }
+                .disabled(
+                    viewModel.isChangingSigningProtection ||
+                        viewModel.isLoading ||
+                        (viewModel.selectedSigningProtection == .biometric &&
+                            !viewModel.isBiometricSigningAvailable)
+                )
+                .accessibilityIdentifier(WalletAccessibilityID.signingProtectionRetry)
+            }
+
+            if viewModel.isChangingSigningProtection {
+                ProgressView("Changing signing protection...")
+                    .accessibilityIdentifier(WalletAccessibilityID.signingProtectionProgress)
+            }
+            if let error = viewModel.signingProtectionError {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier(WalletAccessibilityID.signingProtectionError)
+            }
+        }
+    }
+
+    private func signingProtectionChoice(
+        _ protection: WalletDemoSigningProtection,
+        managed: Bool = false
+    ) -> some View {
+        SigningProtectionChoiceView(
+            protection: protection,
+            selected: viewModel.selectedSigningProtection == protection,
+            enabled: !managed &&
+                !viewModel.isChangingSigningProtection &&
+                !viewModel.isLoading &&
+                (protection != .biometric || viewModel.isBiometricSigningAvailable),
+            action: { viewModel.requestSigningProtectionChange(protection) }
+        )
+        .accessibilityIdentifier(
+            protection == .biometric
+                ? WalletAccessibilityID.signingProtectionBiometric
+                : WalletAccessibilityID.signingProtectionNone
+        )
+    }
+
+    private var signingProtectionConfirmationPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.pendingSigningProtectionChange != nil },
+            set: { isPresented in
+                if !isPresented, viewModel.pendingSigningProtectionChange != nil {
+                    viewModel.cancelSigningProtectionChange()
+                }
+            }
+        )
     }
 }

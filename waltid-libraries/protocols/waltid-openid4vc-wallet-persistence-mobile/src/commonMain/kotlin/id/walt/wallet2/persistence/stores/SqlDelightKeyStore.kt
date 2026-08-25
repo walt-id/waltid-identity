@@ -19,6 +19,7 @@ import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
+import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
@@ -44,7 +45,7 @@ import kotlin.time.Clock
 public class SqlDelightKeyStore(
     private val managedKeyProvider: PlatformManagedKeyProvider,
     private val queries: WalletPersistenceQueries,
-) : WalletKeyStore {
+) : MobileWalletKeyStore {
     private val softwareRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     /** Legacy key material is not supported by the mobile store. */
@@ -71,6 +72,14 @@ public class SqlDelightKeyStore(
             emit(WalletKeyInfo(keyId = stored.id.value, keyType = stored.spec.toString()))
         }
     }
+
+    override suspend fun keyUseAuthorizationPolicy(keyId: String): KeyUseAuthorizationPolicy? =
+        queries.selectByKeyId(keyId).executeAsOneOrNull()?.let { ref ->
+            when (val stored = decodeStoredKey(ref.key_id, ref.stored_key)) {
+                is StoredKey.Managed -> managedKeyProvider.keyUseAuthorizationPolicy(stored)
+                is StoredKey.Software -> KeyUseAuthorizationPolicy.None
+            }
+        }
 
     /** Legacy keys must be converted to a storable key before they are persisted. */
     override suspend fun addKey(key: Key): String =

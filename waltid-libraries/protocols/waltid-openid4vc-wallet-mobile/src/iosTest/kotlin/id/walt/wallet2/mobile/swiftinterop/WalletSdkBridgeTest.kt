@@ -706,6 +706,7 @@ class WalletSdkBridgeTest {
                 keyId = "key-1",
                 did = "did:jwk:issuer",
                 publicJwk = """{"kty":"OKP","crv":"Ed25519","x":"test"}""",
+                keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10),
             )
         }
 

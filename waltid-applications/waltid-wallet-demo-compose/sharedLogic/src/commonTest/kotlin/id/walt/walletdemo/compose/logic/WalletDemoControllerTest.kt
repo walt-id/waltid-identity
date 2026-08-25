@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -12,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("presentation-preview")
@@ -277,6 +279,297 @@ class WalletDemoControllerTest {
 
         assertTrue(controller.state.value.biometricUnlockAvailable)
         assertTrue(controller.isBiometricUnlockAvailable())
+    }
+
+    @Test
+    fun optionalSetupPersistsAndAppliesTheSelectedSigningProtection() = runTest {
+        val wallet = FakeDemoWallet()
+        val store = InMemoryWalletDemoSigningProtectionStore()
+        val controller = controllerWith(wallet, this, signingProtectionStore = store)
+
+        controller.selectSigningProtection(WalletDemoSigningProtection.None)
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+
+        assertEquals(WalletDemoSigningProtection.None, store.load())
+        assertEquals(listOf(WalletDemoSigningProtection.None), wallet.bootstrappedSigningProtections)
+        val ready = controller.state.value.session as WalletSessionState.Ready
+        assertEquals(WalletDemoSigningProtection.None, ready.signingProtection)
+    }
+
+    @Test
+    fun requiredBiometricSetupFailsBeforePersistingPinOrCreatingWalletWhenNotEnrolled() = runTest {
+        val wallet = FakeDemoWallet().apply {
+            signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+        }
+        val pinStore = InMemoryDemoPinStore()
+        val controller = controllerWith(
+            wallet,
+            this,
+            pinStore,
+            signingProtectionMode = WalletDemoSigningProtectionMode.Required,
+        )
+
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+
+        val setup = controller.state.value.auth as WalletAuthState.Setup
+        assertEquals(WalletDisplayText.BiometricNotEnrolled, setup.error)
+        assertFalse(pinStore.hasPin())
+        assertEquals(0, wallet.bootstrapCalls)
+        assertEquals(0, wallet.deleteWalletCalls)
+    }
+
+    @Test
+    fun unavailableBiometricSigningCannotBeSelectedButNoneRemainsSelectable() = runTest {
+        val wallet = FakeDemoWallet().apply {
+            signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+        }
+        val controller = controllerWith(wallet, this)
+        controller.handleApplicationForegrounded()
+        runCurrent()
+
+        assertEquals(
+            WalletDemoSigningProtectionAvailability.BiometricNotEnrolled,
+            controller.state.value.biometricSigningAvailability,
+        )
+        controller.selectSigningProtection(WalletDemoSigningProtection.None)
+        controller.selectSigningProtection(WalletDemoSigningProtection.Biometric)
+
+        assertEquals(
+            WalletDemoSigningProtection.None,
+            controller.state.value.selectedSigningProtection,
+        )
+    }
+
+    @Test
+    fun cancelledBiometricSigningRefreshDoesNotPublishUnsupportedAvailability() = runTest {
+        val wallet = FakeDemoWallet().apply {
+            signingProtectionAvailabilityError = CancellationException("foreground refresh superseded")
+        }
+        val controller = controllerWith(wallet, this)
+
+        controller.handleApplicationForegrounded()
+        runCurrent()
+
+        assertNull(controller.state.value.biometricSigningAvailability)
+    }
+
+    @Test
+    fun foregroundWarnsWhenAppliedBiometricSigningBecomesUnavailable() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
+        wallet.signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+
+        controller.handleApplicationForegrounded()
+        runCurrent()
+
+        assertEquals(
+            WalletDemoSigningProtectionAvailability.BiometricNotEnrolled,
+            controller.state.value.biometricSigningAvailability,
+        )
+        assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("will fail"))
+
+        controller.dismissSigningProtectionWarning()
+        assertNull(controller.state.value.signingProtectionWarning)
+
+        wallet.signingProtectionAvailability = WalletDemoSigningProtectionAvailability.Available
+        controller.handleApplicationForegrounded()
+        runCurrent()
+
+        assertEquals(
+            WalletDemoSigningProtectionAvailability.Available,
+            controller.state.value.biometricSigningAvailability,
+        )
+        assertNull(controller.state.value.signingProtectionWarning)
+    }
+
+    @Test
+    fun disabledModeStillWarnsUntilExistingBiometricWalletIsReprovisioned() = runTest {
+        val wallet = FakeDemoWallet().apply {
+            reportedSigningProtection = WalletDemoSigningProtection.Biometric
+        }
+        val controller = controllerWith(
+            wallet = wallet,
+            scope = this,
+            signingProtectionMode = WalletDemoSigningProtectionMode.Disabled,
+        )
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+        wallet.signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+
+        controller.handleApplicationForegrounded()
+        runCurrent()
+
+        assertEquals(
+            WalletDemoSigningProtection.Biometric,
+            (controller.state.value.session as WalletSessionState.Ready).signingProtection,
+        )
+        assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("choose no biometric signing"))
+    }
+
+    @Test
+    fun requiredModeWarningDoesNotOfferAProhibitedSigningChoice() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = controllerWith(
+            wallet = wallet,
+            scope = this,
+            signingProtectionMode = WalletDemoSigningProtectionMode.Required,
+        )
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+        wallet.signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+
+        controller.handleApplicationForegrounded()
+        runCurrent()
+
+        assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("required by app configuration"))
+        assertFalse(controller.state.value.signingProtectionWarning.orEmpty().contains("choose no biometric signing"))
+    }
+
+    @Test
+    fun unavailableBiometricSigningWarningWaitsForPinUnlock() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
+        controller.lock()
+        wallet.signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+
+        controller.handleApplicationForegrounded()
+        runCurrent()
+        assertNull(controller.state.value.signingProtectionWarning)
+
+        controller.updatePin("1234")
+        controller.submitPin()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("will fail"))
+    }
+
+    @Test
+    fun biometricUnlockAndStrongBiometricSigningAvailabilityStayIndependent() = runTest {
+        val wallet = FakeDemoWallet().apply {
+            signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+        }
+        val biometrics = FakeDemoBiometricAuthenticator(available = true)
+        val controller = controllerWith(wallet, this, biometricAuthenticator = biometrics)
+        controller.handleApplicationForegrounded()
+        runCurrent()
+
+        assertTrue(controller.state.value.biometricUnlockAvailable)
+        assertEquals(
+            WalletDemoSigningProtectionAvailability.BiometricNotEnrolled,
+            controller.state.value.biometricSigningAvailability,
+        )
+    }
+
+    @Test
+    fun unavailableSigningProtectionDoesNotReplaceTheWallet() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = controllerWith(wallet, this)
+        controller.selectSigningProtection(WalletDemoSigningProtection.None)
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+        wallet.signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+
+        controller.requestSigningProtectionChange(WalletDemoSigningProtection.Biometric)
+        runCurrent()
+
+        assertEquals(0, wallet.deleteWalletCalls)
+        assertEquals(null, controller.state.value.pendingSigningProtectionChange)
+        assertEquals(WalletDemoSigningProtection.None, controller.state.value.selectedSigningProtection)
+        assertEquals(WalletDisplayText.BiometricNotEnrolled, controller.state.value.signingProtectionError)
+    }
+
+    @Test
+    fun confirmedSigningProtectionChangeReprovisionsWalletAndPreservesPin() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val pinStore = InMemoryDemoPinStore()
+        val store = InMemoryWalletDemoSigningProtectionStore()
+        val controller = controllerWith(wallet, this, pinStore, signingProtectionStore = store)
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+
+        controller.requestSigningProtectionChange(WalletDemoSigningProtection.None)
+        runCurrent()
+        assertEquals(WalletDemoSigningProtection.None, controller.state.value.pendingSigningProtectionChange)
+
+        controller.confirmSigningProtectionChange()
+        runCurrent()
+
+        assertEquals(1, wallet.deleteWalletCalls)
+        assertEquals(
+            listOf(WalletDemoSigningProtection.Biometric, WalletDemoSigningProtection.None),
+            wallet.bootstrappedSigningProtections,
+        )
+        assertEquals(WalletDemoSigningProtection.None, store.load())
+        assertTrue(pinStore.hasPin())
+        val ready = controller.state.value.session as WalletSessionState.Ready
+        assertEquals(WalletDemoSigningProtection.None, ready.signingProtection)
+        assertEquals(emptyList(), ready.credentials)
+    }
+
+    @Test
+    fun failedReprovisionKeepsTheTargetAndCanBeRetriedWithoutClearingPin() = runTest {
+        val wallet = FakeDemoWallet()
+        val pinStore = InMemoryDemoPinStore()
+        val store = InMemoryWalletDemoSigningProtectionStore()
+        val controller = controllerWith(wallet, this, pinStore, signingProtectionStore = store)
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+        wallet.bootstrapError = IllegalStateException("provisioning failed")
+
+        controller.requestSigningProtectionChange(WalletDemoSigningProtection.None)
+        runCurrent()
+        controller.confirmSigningProtectionChange()
+        runCurrent()
+
+        assertTrue(controller.state.value.session is WalletSessionState.Failed)
+        assertEquals(WalletDemoSigningProtection.None, store.load())
+        assertTrue(pinStore.hasPin())
+
+        wallet.bootstrapError = null
+        controller.requestSigningProtectionChange(WalletDemoSigningProtection.None)
+        runCurrent()
+
+        val ready = controller.state.value.session as WalletSessionState.Ready
+        assertEquals(WalletDemoSigningProtection.None, ready.signingProtection)
+        assertEquals(2, wallet.deleteWalletCalls)
+        assertNull(controller.state.value.signingProtectionError)
+        assertTrue(pinStore.hasPin())
+    }
+
+    @Test
+    fun reprovisionFailsClosedWhenTheWalletReportsADifferentAppliedPolicy() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
+        wallet.reportedSigningProtection = WalletDemoSigningProtection.Biometric
+
+        controller.requestSigningProtectionChange(WalletDemoSigningProtection.None)
+        runCurrent()
+        controller.confirmSigningProtectionChange()
+        runCurrent()
+
+        assertEquals(1, wallet.deleteWalletCalls)
+        assertTrue(controller.state.value.session is WalletSessionState.Failed)
+        assertTrue(
+            controller.state.value.signingProtectionError.orEmpty()
+                .contains("did not apply the selected signing protection"),
+        )
     }
 
     @Test
@@ -1825,11 +2118,15 @@ class WalletDemoControllerTest {
         scope: TestScope,
         pinStore: DemoPinStore = InMemoryDemoPinStore(),
         biometricAuthenticator: DemoBiometricAuthenticator = UnavailableDemoBiometricAuthenticator,
+        signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
+        signingProtectionStore: WalletDemoSigningProtectionStore = InMemoryWalletDemoSigningProtectionStore(),
     ): WalletDemoController =
         WalletDemoController(
             wallet = wallet,
             pinStore = pinStore,
             biometricAuthenticator = biometricAuthenticator,
+            signingProtectionMode = signingProtectionMode,
+            signingProtectionStore = signingProtectionStore,
             scope = scope.backgroundScope,
             dispatcher = StandardTestDispatcher(scope.testScheduler),
         )
@@ -1986,6 +2283,12 @@ private class FakeDemoWallet(
     private val presentationError: WalletDemoPresentationError? = null,
 ) : DemoWallet {
     var bootstrapCalls = 0
+    var bootstrapError: Throwable? = null
+    var reportedSigningProtection: WalletDemoSigningProtection? = null
+    var signingProtectionAvailability = WalletDemoSigningProtectionAvailability.Available
+    var signingProtectionAvailabilityError: Throwable? = null
+    val bootstrappedSigningProtections = mutableListOf<WalletDemoSigningProtection>()
+    val preflightedSigningProtections = mutableListOf<WalletDemoSigningProtection>()
     var startIssuanceCalls = 0
     var resolvedOfferUrl: String? = null
     var receivedTxCode: String? = null
@@ -2005,13 +2308,26 @@ private class FakeDemoWallet(
     val deletedCredentialIds = mutableListOf<String>()
     var deleteWalletCalls = 0
 
-    override suspend fun bootstrap(): WalletDemoBootstrapResult {
+    override suspend fun bootstrap(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoBootstrapResult {
         bootstrapCalls += 1
+        bootstrappedSigningProtections += signingProtection
+        bootstrapError?.let { throw it }
         return WalletDemoBootstrapResult(
             keyId = "key-1",
             did = "did:key:test",
             publicJwk = """{"kty":"OKP","crv":"Ed25519","x":"test"}""",
+            signingProtection = reportedSigningProtection ?: signingProtection,
         )
+    }
+
+    override suspend fun signingProtectionAvailability(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoSigningProtectionAvailability {
+        preflightedSigningProtections += signingProtection
+        signingProtectionAvailabilityError?.let { throw it }
+        return signingProtectionAvailability
     }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials

@@ -715,16 +715,26 @@ public struct WalletBootstrapResult: Equatable, Sendable {
     /// Public JWK of ``keyID`` as a JSON object string. Private material is never included.
     public let publicJWK: String
 
+    /// Immutable authorization policy of the persisted signing key.
+    public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
     /// Creates a bootstrap result.
     ///
     /// - Parameters:
     ///   - keyID: Identifier of the created or selected wallet key.
     ///   - did: DID created for the wallet.
     ///   - publicJWK: Public JWK of the wallet key as a JSON object string.
-    public init(keyID: String, did: String, publicJWK: String) {
+    ///   - keyUseAuthorizationPolicy: Authorization required for private-key use.
+    public init(
+        keyID: String,
+        did: String,
+        publicJWK: String,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+    ) {
         self.keyID = keyID
         self.did = did
         self.publicJWK = publicJWK
+        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
     }
 }
 

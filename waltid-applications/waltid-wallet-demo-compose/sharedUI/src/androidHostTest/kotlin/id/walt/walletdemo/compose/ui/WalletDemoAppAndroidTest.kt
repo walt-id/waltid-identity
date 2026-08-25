@@ -23,6 +23,14 @@ class WalletDemoAppAndroidTest {
         scenarios.pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable()
 
     @Test
+    fun pinSetupKeepsSubmitReachableWhenScrolled() =
+        scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
+
+    @Test
+    fun unavailableBiometricSigningIsDisabledButNoneRemainsAvailable() =
+        scenarios.unavailableBiometricSigningIsDisabledButNoneRemainsAvailable()
+
+    @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
 
@@ -121,6 +129,10 @@ class WalletDemoAppAndroidTest {
     @Test
     fun lockDoesNotAutoPromptBiometrics() =
         scenarios.lockDoesNotAutoPromptBiometrics()
+
+    @Test
+    fun settingsConfirmsAndAppliesSigningProtectionChange() =
+        scenarios.settingsConfirmsAndAppliesSigningProtectionChange()
 
     @Test
     fun credentialDetailsCanCopyAndDelete() =

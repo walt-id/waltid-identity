@@ -14,8 +14,13 @@ internal class LazyDemoWallet(
             wallet ?: createWallet().also { wallet = it }
         }
 
-    override suspend fun bootstrap(): WalletDemoBootstrapResult =
-        wallet().bootstrap()
+    override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult =
+        wallet().bootstrap(signingProtection)
+
+    override suspend fun signingProtectionAvailability(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoSigningProtectionAvailability =
+        wallet().signingProtectionAvailability(signingProtection)
 
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()

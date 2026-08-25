@@ -19,7 +19,20 @@ import id.walt.wallet2.mobile.MobileWalletFactory
 data class AndroidDemoMobileWallet(
     val wallet: MobileWallet,
     val transactionDataProfilesWarning: String?,
-)
+) {
+    suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult {
+        val demoWallet = MobileDemoWallet(wallet, transactionDataProfilesWarning)
+        val availability = demoWallet.signingProtectionAvailability(signingProtection)
+        check(availability == WalletDemoSigningProtectionAvailability.Available) {
+            "Signing protection is unavailable: $availability"
+        }
+        return demoWallet.bootstrap(signingProtection).also { result ->
+            check(result.signingProtection == signingProtection) {
+                "Open the wallet app to apply the configured signing protection before using Digital Credentials"
+            }
+        }
+    }
+}
 
 /**
  * The single Android [MobileWallet] construction for this demo app.
@@ -45,11 +58,8 @@ suspend fun createAndroidDemoMobileWallet(
                 preferredLocales = LocaleList.getDefault().let { locales ->
                     List(locales.size()) { index -> locales[index].toLanguageTag() }
                 },
-                defaultKeyUseAuthorizationPolicy = if (config.biometricEnabled) {
-                    KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
-                } else {
-                    KeyUseAuthorizationPolicy.None
-                },
+                defaultKeyUseAuthorizationPolicy =
+                    config.signingProtectionMode.defaultSelection.toKeyUseAuthorizationPolicy(),
                 keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
                     reason = "Authorize wallet signing",
                     cancelText = "Cancel",

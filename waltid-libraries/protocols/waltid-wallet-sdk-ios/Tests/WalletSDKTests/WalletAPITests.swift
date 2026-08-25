@@ -259,7 +259,12 @@ final class WalletAPITests: XCTestCase {
 
     func testBootstrapForwardsDefaultKeyTypeAndDidMethod() async throws {
         let bridge = FakeWalletCoreBridge()
-        bridge.bootstrapResult = .init(keyID: "key-1", did: "did:jwk:abc")
+        bridge.bootstrapResult = .init(
+            keyID: "key-1",
+            did: "did:jwk:abc",
+            publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#,
+            keyUseAuthorizationPolicy: .none
+        )
         let wallet = Wallet(
             configuration: .init(defaultKeyType: .ed25519),
             bridge: bridge
@@ -267,7 +272,7 @@ final class WalletAPITests: XCTestCase {
 
         let result = try await wallet.bootstrap(didMethod: "jwk")
 
-        XCTAssertEqual(result, .init(keyID: "key-1", did: "did:jwk:abc"))
+        XCTAssertEqual(result, bridge.bootstrapResult)
         XCTAssertEqual(bridge.bootstrapCalls.count, 1)
         XCTAssertEqual(bridge.bootstrapCalls.first?.keyType, .ed25519)
         XCTAssertEqual(bridge.bootstrapCalls.first?.didMethod, "jwk")
@@ -864,7 +869,8 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var bootstrapResult = WalletBootstrapResult(
         keyID: "key",
         did: "did:key:wallet",
-        publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#
+        publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#,
+        keyUseAuthorizationPolicy: .biometricCurrentSet
     )
     var keyUseAuthorizationPreflightResult: WalletKeyUseAuthorizationPreflight?
     var issuanceSessionResult = IssuanceSession(

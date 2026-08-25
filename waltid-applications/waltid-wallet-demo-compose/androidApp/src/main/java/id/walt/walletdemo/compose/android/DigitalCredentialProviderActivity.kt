@@ -51,12 +51,14 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
                 // The same construction MainActivity uses: Credential Manager launches this activity
                 // without the wallet UI having run, and a wallet configured independently here would
                 // open a different database.
-                val wallet = createAndroidDemoMobileWallet(
+                val config = demoWalletConfig()
+                val created = createAndroidDemoMobileWallet(
                     context = applicationContext,
-                    config = demoWalletConfig(),
+                    config = config,
                     interactionContextProvider = { this@DigitalCredentialProviderActivity },
-                ).wallet
-                wallet.bootstrap()
+                )
+                val wallet = created.wallet
+                created.bootstrap(config.selectedSigningProtection(applicationContext))
                 if (input.request.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
                     val annexCRequest = wallet.annexCRequest(input.request)
                     val preview = wallet.previewAnnexCPresentation(annexCRequest)

@@ -63,6 +63,7 @@ private enum WalletStatusText {
     static let presentationContinuationFailed = "Could not deliver the verifier response"
     static let bootstrapFailed = "Bootstrap failed"
     static let resetWalletFailed = "Reset wallet failed"
+    static let signingProtectionChangeFailed = "Signing protection change failed"
     static let deleteCredentialFailed = "Delete credential failed"
     static let invalidOfferURL = "invalid offer URL"
     static let invalidRequestURL = "invalid request URL"
@@ -98,6 +99,15 @@ class WalletViewModel: ObservableObject {
     @Published var statusMessage = WalletStatusText.startingWallet
     @Published var isLoading = false
     @Published var isError = false
+    @Published private(set) var signingProtectionMode: WalletDemoSigningProtectionMode
+    @Published var selectedSigningProtection: WalletDemoSigningProtection
+    @Published private(set) var appliedSigningProtection: WalletDemoSigningProtection?
+    @Published private(set) var pendingSigningProtectionChange: WalletDemoSigningProtection?
+    @Published private(set) var signingProtectionReprovisionTarget: WalletDemoSigningProtection?
+    @Published private(set) var isChangingSigningProtection = false
+    @Published var signingProtectionError: String?
+    @Published private(set) var biometricSigningAvailability: WalletDemoSigningProtectionAvailability? = nil
+    @Published private(set) var signingProtectionWarning: String? = nil
     @Published var offerUrl = "" {
         didSet {
             guard offerUrl != oldValue else { return }
@@ -141,6 +151,9 @@ class WalletViewModel: ObservableObject {
     private var issuanceSession: IssuanceSession?
     private var pendingPresentationSuccessMessage: String?
     private var presentationTask: Task<Void, Never>?
+    private var biometricSigningAvailabilityTask: Task<Void, Never>?
+    private var foregroundSequence = 0
+    private var lastWarnedForegroundSequence: Int?
 
     var presentationPreview: PresentationPreview? {
         if case .ready(let preview)? = presentationReview { return preview }
@@ -279,27 +292,11 @@ class WalletViewModel: ObservableObject {
         discardPresentationPreviewIfPresent()
         clearPendingPresentationContinuation()
         Task {
+            cancelActiveWalletOperations()
             do {
                 try await walletClient.deleteLocalData()
                 pinStore.clear()
-                did = ""
-                keyID = ""
-                publicJWK = ""
-                credentials = []
-                isReady = false
-                offerUrl = ""
-                txCode = ""
-                offerPreview = nil
-                presentationRequestUrl = ""
-                presentationReview = nil
-                selectedPresentationCredentialOptions = []
-                selectedPresentationDisclosureOptions = []
-                deferredCredentials = []
-                lastReceivedCredentialIDs = []
-                receiveCompleted = false
-                presentationCompleted = false
-                statusExpanded = false
-                statusDismissedKey = nil
+                clearWalletState()
                 pin = ""
                 pinConfirmation = ""
                 useBiometrics = false
@@ -307,6 +304,7 @@ class WalletViewModel: ObservableObject {
                 isAuthenticating = false
                 biometricPromptConsumed = false
                 auth = .setup
+                refreshBiometricSigningAvailability()
                 do {
                     try await reconcileIdentityDocumentRegistrations()
                 } catch {
@@ -402,6 +400,9 @@ class WalletViewModel: ObservableObject {
             guard auth == .login else { return }
             if result == .succeeded {
                 auth = .unlocked
+                showBiometricSigningWarningIfNeeded(
+                    warningSequence: foregroundSequence > 0 ? foregroundSequence : nil
+                )
                 bootstrapIfNeeded()
             }
         }
@@ -420,6 +421,8 @@ class WalletViewModel: ObservableObject {
 
     func handleApplicationBecameActive() {
         refreshBiometricAvailability()
+        foregroundSequence += 1
+        refreshBiometricSigningAvailability(warningSequence: foregroundSequence)
         promptBiometricUnlockIfNeeded()
     }
 
@@ -429,7 +432,126 @@ class WalletViewModel: ObservableObject {
         isBiometricUnlockAvailable = biometricAuthenticator.isAvailable
     }
 
+    var isBiometricSigningAvailable: Bool {
+        biometricSigningAvailability == .available
+    }
+
+    func selectSigningProtection(_ protection: WalletDemoSigningProtection) {
+        guard auth == .setup,
+              signingProtectionMode == .optional,
+              !isAuthenticating,
+              protection != .biometric || isBiometricSigningAvailable else { return }
+        selectedSigningProtection = protection
+        signingProtectionError = nil
+    }
+
+    func dismissSigningProtectionWarning() {
+        signingProtectionWarning = nil
+    }
+
+    func requestSigningProtectionChange(_ protection: WalletDemoSigningProtection) {
+        guard signingProtectionMode.allows(protection), !isChangingSigningProtection, !isLoading else { return }
+        guard protection != .biometric || isBiometricSigningAvailable else { return }
+        if signingProtectionReprovisionTarget != nil {
+            reprovisionWallet(
+                target: protection,
+                previousSelection: selectedSigningProtection,
+                recovering: true
+            )
+            return
+        }
+        guard protection != appliedSigningProtection else {
+            selectedSigningProtection = protection
+            signingProtectionError = nil
+            return
+        }
+
+        let previousSelection = selectedSigningProtection
+        selectedSigningProtection = protection
+        isChangingSigningProtection = true
+        signingProtectionError = nil
+        Task {
+            defer { isChangingSigningProtection = false }
+            guard await validateSigningProtection(protection) else {
+                selectedSigningProtection = previousSelection
+                return
+            }
+            if isReady {
+                pendingSigningProtectionChange = protection
+            } else {
+                signingProtectionStore.save(protection)
+                bootstrap(signingProtection: protection)
+            }
+        }
+    }
+
+    func cancelSigningProtectionChange() {
+        pendingSigningProtectionChange = nil
+        selectedSigningProtection = appliedSigningProtection ?? signingProtectionMode.resolve(signingProtectionStore.load())
+        signingProtectionError = nil
+    }
+
+    func confirmSigningProtectionChange() {
+        guard let target = pendingSigningProtectionChange, !isChangingSigningProtection, !isLoading else { return }
+        pendingSigningProtectionChange = nil
+        reprovisionWallet(
+            target: target,
+            previousSelection: appliedSigningProtection
+                ?? signingProtectionMode.resolve(signingProtectionStore.load()),
+            recovering: false
+        )
+    }
+
+    private func reprovisionWallet(
+        target: WalletDemoSigningProtection,
+        previousSelection: WalletDemoSigningProtection,
+        recovering: Bool
+    ) {
+        isChangingSigningProtection = true
+        signingProtectionError = nil
+
+        Task {
+            defer { isChangingSigningProtection = false }
+            guard await validateSigningProtection(target) else {
+                if recovering {
+                    selectedSigningProtection = target
+                    signingProtectionReprovisionTarget = target
+                    setError(signingProtectionError ?? WalletStatusText.signingProtectionChangeFailed)
+                } else {
+                    selectedSigningProtection = previousSelection
+                }
+                return
+            }
+
+            cancelActiveWalletOperations()
+            signingProtectionStore.save(target)
+            selectedSigningProtection = target
+            do {
+                try await walletClient.deleteLocalData()
+                clearWalletState()
+                setLoading(WalletStatusText.bootstrappingWallet)
+                try await loadWallet(
+                    signingProtection: target,
+                    requiredAppliedSigningProtection: target
+                )
+                signingProtectionReprovisionTarget = nil
+                setSuccess(WalletStatusText.walletReady)
+            } catch {
+                clearWalletState()
+                try? await reconcileIdentityDocumentRegistrations()
+                selectedSigningProtection = target
+                signingProtectionReprovisionTarget = target
+                signingProtectionError = WalletStatusText.failure(
+                    WalletStatusText.signingProtectionChangeFailed,
+                    error
+                )
+                setError(signingProtectionError ?? WalletStatusText.signingProtectionChangeFailed)
+            }
+        }
+    }
+
     private let walletClient: any WalletClient
+    private let signingProtectionStore: any WalletDemoSigningProtectionStore
     private let identityDocumentRegistrationUpdate: @Sendable () async throws -> Void
     private let pinStore: DemoPinStore
     private let biometricAuthenticator: any DemoBiometricAuthenticator
@@ -442,12 +564,16 @@ class WalletViewModel: ObservableObject {
         attestationBearerToken: String? = nil,
         attestationHostHeader: String? = nil,
         transactionDataProfilesUrl: String? = nil,
-        biometricEnabled: Bool = true,
+        signingProtectionMode: WalletDemoSigningProtectionMode = .disabled,
+        signingProtectionStore: (any WalletDemoSigningProtectionStore)? = nil,
         walletClient: (any WalletClient)? = nil,
         identityDocumentRegistrationUpdate: (@Sendable () async throws -> Void)? = nil,
         pinStore: DemoPinStore? = nil,
         biometricAuthenticator: (any DemoBiometricAuthenticator)? = nil
     ) {
+        let resolvedStore = signingProtectionStore ?? UserDefaultsWalletDemoSigningProtectionStore(walletID: walletID)
+        let storedProtection = resolvedStore.load()
+        let selectedProtection = signingProtectionMode.resolve(storedProtection)
         let transactionDataProfiles: TransactionDataProfilesConfiguration
         if walletClient == nil {
             transactionDataProfiles = Self.resolveTransactionDataProfiles(from: transactionDataProfilesUrl)
@@ -464,12 +590,18 @@ class WalletViewModel: ObservableObject {
             ),
             transactionDataProfiles: transactionDataProfiles.profiles,
             crossProcessAccess: Self.crossProcessAccessConfiguration(),
-            defaultKeyUseAuthorizationPolicy: biometricEnabled ? .biometricTimedReuse(timeoutSeconds: 10) : .none,
+            defaultKeyUseAuthorizationPolicy: selectedProtection.authorizationPolicy,
             keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
                 message: "Authorize wallet signing",
                 cancelText: "Cancel"
             )
         )
+        self.signingProtectionMode = signingProtectionMode
+        selectedSigningProtection = selectedProtection
+        appliedSigningProtection = nil
+        pendingSigningProtectionChange = nil
+        signingProtectionReprovisionTarget = nil
+        self.signingProtectionStore = resolvedStore
         self.walletClient = walletClient ?? SDKWalletClient(configuration: configuration)
         self.identityDocumentRegistrationUpdate = identityDocumentRegistrationUpdate ?? {
             try await Self.defaultIdentityDocumentRegistrationUpdate()
@@ -487,6 +619,7 @@ class WalletViewModel: ObservableObject {
         transactionDataProfilesWarning = transactionDataProfiles.warning
         auth = self.pinStore.hasPin ? .login : .setup
         refreshBiometricAvailability()
+        refreshBiometricSigningAvailability()
     }
 
     private static func resolveTransactionDataProfiles(from urlString: String?) -> TransactionDataProfilesConfiguration {
@@ -1205,7 +1338,7 @@ class WalletViewModel: ObservableObject {
 
     private func bootstrapIfNeeded() {
         guard !isReady else { return }
-        bootstrap()
+        bootstrap(signingProtection: selectedSigningProtection)
     }
 
     private func submitSetupPin() {
@@ -1220,7 +1353,14 @@ class WalletViewModel: ObservableObject {
         isAuthenticating = true
         pinError = nil
         Task {
+            let selection = signingProtectionMode.resolve(selectedSigningProtection)
+            guard await validateSigningProtection(selection) else {
+                isAuthenticating = false
+                return
+            }
             do {
+                signingProtectionStore.save(selection)
+                selectedSigningProtection = selection
                 try await pinStore.setPin(pin)
                 pinStore.isBiometricUnlockEnabled = useBiometrics
                 isAuthenticating = false
@@ -1246,6 +1386,9 @@ class WalletViewModel: ObservableObject {
             guard auth == .login else { return }
             if matches {
                 auth = .unlocked
+                showBiometricSigningWarningIfNeeded(
+                    warningSequence: foregroundSequence > 0 ? foregroundSequence : nil
+                )
                 bootstrapIfNeeded()
             } else {
                 pinError = WalletStatusText.wrongPin
@@ -1257,25 +1400,12 @@ class WalletViewModel: ObservableObject {
         pin.range(of: #"^\d{4,8}$"#, options: .regularExpression) != nil
     }
 
-    private func bootstrap() {
+    private func bootstrap(signingProtection: WalletDemoSigningProtection) {
         setLoading(WalletStatusText.bootstrappingWallet)
         logE2E("Bootstrap started")
         Task {
             do {
-                logE2E("Bootstrap: calling wallet.bootstrap()")
-                let result = try await walletClient.bootstrap()
-                logE2E("Bootstrap: success, DID: \(result.did)")
-
-                logE2E("Bootstrap: calling wallet.credentials()")
-                let list = try await walletClient.credentials()
-                logE2E("Bootstrap: listCredentials returned \(list.count) credentials")
-
-                did = result.did
-                keyID = result.keyID
-                publicJWK = result.publicJWK
-                credentials = list
-                try await reconcileIdentityDocumentRegistrations()
-                isReady = true
+                try await loadWallet(signingProtection: signingProtection)
                 setSuccess(WalletStatusText.walletReady)
                 logE2E("Bootstrap: completed successfully, wallet is ready")
             } catch {
@@ -1283,6 +1413,133 @@ class WalletViewModel: ObservableObject {
                 setError(WalletStatusText.failure(WalletStatusText.bootstrapFailed, error))
             }
         }
+    }
+
+    private func loadWallet(
+        signingProtection: WalletDemoSigningProtection,
+        requiredAppliedSigningProtection: WalletDemoSigningProtection? = nil
+    ) async throws {
+        logE2E("Bootstrap: calling wallet.bootstrap()")
+        let result = try await walletClient.bootstrap(signingProtection: signingProtection)
+        logE2E("Bootstrap: success, DID: \(result.did)")
+
+        let appliedProtection = try WalletDemoSigningProtection(
+            appliedPolicy: result.keyUseAuthorizationPolicy
+        )
+        guard requiredAppliedSigningProtection == nil || appliedProtection == requiredAppliedSigningProtection else {
+            throw WalletError.internalFailure(
+                "Reprovisioned wallet did not apply the selected signing protection"
+            )
+        }
+
+        logE2E("Bootstrap: calling wallet.credentials()")
+        let list = try await walletClient.credentials()
+        logE2E("Bootstrap: listCredentials returned \(list.count) credentials")
+
+        did = result.did
+        keyID = result.keyID
+        publicJWK = result.publicJWK
+        credentials = list
+        appliedSigningProtection = appliedProtection
+        selectedSigningProtection = signingProtectionMode.resolve(appliedProtection)
+        signingProtectionStore.save(selectedSigningProtection)
+        signingProtectionReprovisionTarget = nil
+        try await reconcileIdentityDocumentRegistrations()
+        isReady = true
+        showBiometricSigningWarningIfNeeded(
+            warningSequence: foregroundSequence > 0 ? foregroundSequence : nil
+        )
+    }
+
+    private func validateSigningProtection(_ protection: WalletDemoSigningProtection) async -> Bool {
+        do {
+            let availability = try await walletClient.signingProtectionAvailability(protection)
+            if protection == .biometric {
+                biometricSigningAvailability = availability
+                if availability == .available {
+                    signingProtectionWarning = nil
+                }
+            }
+            guard let message = availability.message else {
+                signingProtectionError = nil
+                return true
+            }
+            signingProtectionError = message
+            return false
+        } catch {
+            signingProtectionError = WalletStatusText.failure(
+                WalletStatusText.signingProtectionChangeFailed,
+                error
+            )
+            if protection == .biometric {
+                biometricSigningAvailability = .unsupported
+            }
+            return false
+        }
+    }
+
+    private func refreshBiometricSigningAvailability(warningSequence: Int? = nil) {
+        biometricSigningAvailabilityTask?.cancel()
+        biometricSigningAvailabilityTask = Task { [weak self] in
+            guard let self else { return }
+            let availability: WalletDemoSigningProtectionAvailability
+            do {
+                availability = try await walletClient.signingProtectionAvailability(.biometric)
+            } catch {
+                availability = .unsupported
+            }
+            guard !Task.isCancelled else { return }
+            biometricSigningAvailability = availability
+            if availability == .available {
+                signingProtectionWarning = nil
+            }
+            showBiometricSigningWarningIfNeeded(warningSequence: warningSequence)
+        }
+    }
+
+    private func showBiometricSigningWarningIfNeeded(warningSequence: Int?) {
+        guard let warningSequence,
+              lastWarnedForegroundSequence != warningSequence,
+              auth == .unlocked,
+              appliedSigningProtection == .biometric,
+              let availability = biometricSigningAvailability,
+              let warning = availability.warningMessage(
+                  canChooseNoBiometricSigning: signingProtectionMode.allows(.none)
+              ) else { return }
+        lastWarnedForegroundSequence = warningSequence
+        signingProtectionWarning = warning
+    }
+
+    private func cancelActiveWalletOperations() {
+        receiveTask?.cancel()
+        presentationTask?.cancel()
+        cancelIssuanceIfPresent()
+        discardPresentationPreviewIfPresent()
+    }
+
+    private func clearWalletState() {
+        did = ""
+        keyID = ""
+        publicJWK = ""
+        credentials = []
+        isReady = false
+        appliedSigningProtection = nil
+        offerUrl = ""
+        txCode = ""
+        offerPreview = nil
+        presentationRequestUrl = ""
+        presentationReview = nil
+        selectedPresentationCredentialOptions = []
+        selectedPresentationDisclosureOptions = []
+        deferredCredentials = []
+        lastReceivedCredentialIDs = []
+        receiveCompleted = false
+        presentationCompleted = false
+        pendingPresentationContinuationURL = nil
+        pendingPresentationFormPostHTML = nil
+        statusExpanded = false
+        statusDismissedKey = nil
+        signingProtectionWarning = nil
     }
 
     private static func attestationConfiguration(

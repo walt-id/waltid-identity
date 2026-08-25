@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,17 +33,29 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
+import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.displayMessage
+import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.components.SigningProtectionChoice
+import id.walt.walletdemo.compose.ui.components.title
 
 @Composable
 internal fun SettingsScreen(
-    ready: WalletSessionState.Ready?,
+    state: WalletDemoUiState,
     onBack: () -> Unit,
     onLock: () -> Unit,
     onResetWallet: () -> Unit,
+    onRequestSigningProtectionChange: (WalletDemoSigningProtection) -> Unit,
+    onConfirmSigningProtectionChange: () -> Unit,
+    onCancelSigningProtectionChange: () -> Unit,
 ) {
+    val ready = state.session as? WalletSessionState.Ready
     val clipboard = LocalClipboardManager.current
     var confirmReset by remember { mutableStateOf(false) }
 
@@ -106,6 +119,11 @@ internal fun SettingsScreen(
                 copyTag = WalletUiTestTags.SettingsPublicJwkCopy,
                 onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
             )
+            SigningProtectionSettings(
+                state = state,
+                ready = ready,
+                onRequestChange = onRequestSigningProtectionChange,
+            )
             OutlinedButton(
                 onClick = onLock,
                 modifier = Modifier
@@ -127,6 +145,32 @@ internal fun SettingsScreen(
                 Text("Reset wallet")
             }
         }
+    }
+
+    state.pendingSigningProtectionChange?.let { target ->
+        AlertDialog(
+            onDismissRequest = onCancelSigningProtectionChange,
+            title = { Text("Change signing protection?") },
+            text = {
+                Text(
+                    "Changing to ${target.title().lowercase()} creates a new wallet key and DID. " +
+                        "Your current credentials will be removed and must be issued again.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = onConfirmSigningProtectionChange,
+                    modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionConfirm),
+                ) {
+                    Text("Recreate wallet")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onCancelSigningProtectionChange) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 
     if (confirmReset) {
@@ -151,6 +195,109 @@ internal fun SettingsScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun SigningProtectionSettings(
+    state: WalletDemoUiState,
+    ready: WalletSessionState.Ready?,
+    onRequestChange: (WalletDemoSigningProtection) -> Unit,
+) {
+    val current = ready?.signingProtection
+    val biometricSigningAvailable =
+        state.biometricSigningAvailability == WalletDemoSigningProtectionAvailability.Available
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Signing protection", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("Current: ${current?.title() ?: "Not available"}", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "Changing signing protection creates a new wallet key and DID.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        when (state.signingProtectionMode) {
+            WalletDemoSigningProtectionMode.Optional -> {
+                SigningProtectionChoice(
+                    protection = WalletDemoSigningProtection.Biometric,
+                    selected = state.selectedSigningProtection == WalletDemoSigningProtection.Biometric,
+                    enabled = biometricSigningAvailable && !state.isBusy,
+                    testTag = WalletUiTestTags.SigningProtectionBiometric,
+                    onSelect = { onRequestChange(WalletDemoSigningProtection.Biometric) },
+                )
+                SigningProtectionChoice(
+                    protection = WalletDemoSigningProtection.None,
+                    selected = state.selectedSigningProtection == WalletDemoSigningProtection.None,
+                    enabled = !state.isBusy,
+                    testTag = WalletUiTestTags.SigningProtectionNone,
+                    onSelect = { onRequestChange(WalletDemoSigningProtection.None) },
+                )
+            }
+            WalletDemoSigningProtectionMode.Required,
+            WalletDemoSigningProtectionMode.Disabled,
+            -> {
+                val required = state.signingProtectionMode.defaultSelection
+                SigningProtectionChoice(
+                    protection = required,
+                    selected = state.selectedSigningProtection == required,
+                    enabled = ready != null && ready.signingProtection != required &&
+                        !state.isBusy &&
+                        (required == WalletDemoSigningProtection.None || biometricSigningAvailable),
+                    testTag = if (required == WalletDemoSigningProtection.Biometric) {
+                        WalletUiTestTags.SigningProtectionBiometric
+                    } else {
+                        WalletUiTestTags.SigningProtectionNone
+                    },
+                    onSelect = { onRequestChange(required) },
+                )
+                Text(
+                    "Managed by app configuration.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        if (!biometricSigningAvailable && state.signingProtectionMode != WalletDemoSigningProtectionMode.Disabled) {
+            Text(
+                state.biometricSigningAvailability?.displayMessage()
+                    ?: "Checking strong biometric availability...",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (state.biometricSigningAvailability == null) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+                modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionAvailability),
+            )
+        }
+
+        if (ready == null) {
+            OutlinedButton(
+                onClick = { onRequestChange(state.selectedSigningProtection) },
+                enabled = !state.isBusy && (
+                    state.selectedSigningProtection != WalletDemoSigningProtection.Biometric ||
+                        biometricSigningAvailable
+                    ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(WalletUiTestTags.SigningProtectionRetry),
+            ) {
+                Text("Retry wallet setup")
+            }
+        }
+
+        if (state.isChangingSigningProtection) {
+            CircularProgressIndicator()
+        }
+        state.signingProtectionError?.let { error ->
+            Text(
+                error,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionError),
+            )
+        }
     }
 }
 

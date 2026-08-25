@@ -5,12 +5,17 @@ fun createMockDemoWallet(): DemoWallet = MockDemoWallet()
 private class MockDemoWallet : DemoWallet {
     private var credentials = emptyList<WalletDemoCredential>()
 
-    override suspend fun bootstrap(): WalletDemoBootstrapResult =
+    override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult =
         WalletDemoBootstrapResult(
             keyId = "mock-key",
             did = "did:key:mock-wallet-demo",
             publicJwk = """{"kty":"OKP","crv":"Ed25519","x":"test"}""",
+            signingProtection = signingProtection,
         )
+
+    override suspend fun signingProtectionAvailability(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoSigningProtectionAvailability = WalletDemoSigningProtectionAvailability.Available
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 

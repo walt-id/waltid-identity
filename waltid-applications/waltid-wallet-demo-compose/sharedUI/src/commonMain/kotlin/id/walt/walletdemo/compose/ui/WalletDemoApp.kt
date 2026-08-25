@@ -8,12 +8,16 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationContinuation
@@ -59,6 +63,9 @@ fun WalletDemoApp(
                             auth = auth,
                             isBusy = state.isBusy,
                             biometricAvailable = state.biometricUnlockAvailable,
+                            signingProtectionMode = state.signingProtectionMode,
+                            selectedSigningProtection = state.selectedSigningProtection,
+                            biometricSigningAvailability = state.biometricSigningAvailability,
                         )
                     }
                     is WalletAuthState.StorageUnavailable -> Box(
@@ -74,6 +81,26 @@ fun WalletDemoApp(
                     WalletAuthState.Unlocked -> WalletScreen(controller, state)
                 }
             }
+        }
+        state.signingProtectionWarning?.let { warning ->
+            AlertDialog(
+                onDismissRequest = controller::dismissSigningProtectionWarning,
+                title = { Text("Biometric signing unavailable") },
+                text = {
+                    Text(
+                        warning,
+                        modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionWarning),
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = controller::dismissSigningProtectionWarning,
+                        modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionWarningDismiss),
+                    ) {
+                        Text("OK")
+                    }
+                },
+            )
         }
     }
 }

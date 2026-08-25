@@ -17,6 +17,7 @@ data class WalletStatusBanner(
 
 val WalletDemoUiState.isBusy: Boolean
     get() = isAuthenticating ||
+        isChangingSigningProtection ||
         session is WalletSessionState.Bootstrapping ||
         operation is WalletOperationState.ResolvingOffer ||
         operation is WalletOperationState.Receiving ||

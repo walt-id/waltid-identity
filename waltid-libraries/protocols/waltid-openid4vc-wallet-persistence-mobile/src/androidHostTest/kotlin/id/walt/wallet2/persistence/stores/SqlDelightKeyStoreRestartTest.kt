@@ -481,6 +481,9 @@ class SqlDelightKeyStoreRestartTest {
             return managedKey(descriptor(request.id, request.requirements.spec, request.requirements.usages))
         }
 
+        override fun keyUseAuthorizationPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy =
+            authorizationPolicy
+
         override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
             restoreFailure?.let { throw it }
             metadataFailure?.let { throw it }

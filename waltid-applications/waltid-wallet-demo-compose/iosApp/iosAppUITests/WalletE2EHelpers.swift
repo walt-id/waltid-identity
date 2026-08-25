@@ -11,8 +11,8 @@ final class WalletE2EUI {
     }
 
     func launch(environment: [String: String] = [:]) {
-        app.launchEnvironment["WALLET_BIOMETRIC_ENABLED"] =
-            app.launchEnvironment["WALLET_BIOMETRIC_ENABLED"] ?? "false"
+        app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
+            app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] ?? "disabled"
         for (key, value) in environment {
             app.launchEnvironment[key] = value
         }
@@ -28,8 +28,8 @@ final class WalletE2EUI {
         environment: [String: String],
         walletReadyTimeout: TimeInterval = 60
     ) {
-        app.launchEnvironment["WALLET_BIOMETRIC_ENABLED"] =
-            app.launchEnvironment["WALLET_BIOMETRIC_ENABLED"] ?? "false"
+        app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
+            app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] ?? "disabled"
         for (key, value) in environment {
             app.launchEnvironment[key] = value
         }
@@ -294,9 +294,7 @@ final class WalletE2EUI {
             replaceText(in: confirmation, value: pin)
         }
 
-        let submit = button(identifier: "wallet.pinSubmitButton", fallbackLabel: "Set PIN")
-        XCTAssertTrue(submit.waitForExistence(timeout: 10), "PIN submit button not found")
-        submit.tap()
+        tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Set PIN")
     }
 
     private func firstExisting(_ elements: [XCUIElement]) -> XCUIElement {

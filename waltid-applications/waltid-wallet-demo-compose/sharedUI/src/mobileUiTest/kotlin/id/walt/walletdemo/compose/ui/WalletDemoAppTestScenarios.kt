@@ -58,6 +58,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewResult
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewHandle
 import id.walt.walletdemo.compose.logic.WalletDemoResponseEncryption
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeRequirement
 import id.walt.walletdemo.compose.logic.WalletDemoVerifierMetadata
@@ -120,6 +122,41 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("Use Face ID or fingerprint instead of typing the PIN. The PIN remains a fallback.")
             .performScrollTo()
             .assertIsDisplayed()
+    }
+
+    fun pinSetupKeepsSubmitReachableWhenScrolled() = runComposeUiTest {
+        val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+
+        onNodeWithTag(WalletUiTestTags.PinSubmitButton)
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    fun unavailableBiometricSigningIsDisabledButNoneRemainsAvailable() = runComposeUiTest {
+        val wallet = FakeDemoWallet(
+            signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled,
+        )
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        controller.handleApplicationForegrounded()
+        setContent { WalletDemoApp(controller) }
+        waitUntil(timeoutMillis = 5_000) {
+            controller.state.value.biometricSigningAvailability ==
+                WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+        }
+
+        onNodeWithTag(WalletUiTestTags.SigningProtectionBiometric)
+            .performScrollTo()
+            .assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.SigningProtectionNone)
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.PinSubmitButton)
+            .performScrollTo()
+            .assertIsEnabled()
     }
 
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() = runComposeUiTest {
@@ -963,6 +1000,31 @@ class WalletDemoAppTestScenarios {
         assertEquals(2, biometrics.authenticateCalls)
     }
 
+    fun settingsConfirmsAndAppliesSigningProtectionChange() = runComposeUiTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val pinStore = InMemoryDemoPinStore()
+        val controller = WalletDemoController(wallet, pinStore)
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        onNodeWithTag(WalletUiTestTags.SigningProtectionNone)
+            .performScrollTo()
+            .performClick()
+        onNodeWithText("Change signing protection?").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SigningProtectionConfirm).performClick()
+
+        waitUntil(timeoutMillis = 5_000) {
+            (controller.state.value.session as? WalletSessionState.Ready)?.signingProtection ==
+                WalletDemoSigningProtection.None
+        }
+        assertEquals(1, wallet.deleteWalletCalls)
+        assertTrue(pinStore.hasPin())
+        assertEquals(WalletDemoSigningProtection.None, controller.state.value.selectedSigningProtection)
+    }
+
     fun credentialDetailsCanCopyAndDelete() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
@@ -1292,6 +1354,8 @@ private class FakeDemoWallet(
         ),
         claims = emptyList(),
     ),
+    var signingProtectionAvailability: WalletDemoSigningProtectionAvailability =
+        WalletDemoSigningProtectionAvailability.Available,
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
@@ -1304,14 +1368,21 @@ private class FakeDemoWallet(
     private val issuanceSources = mutableMapOf<String, String>()
     private val presentationSources = mutableMapOf<WalletDemoPresentationPreviewHandle, String>()
 
-    override suspend fun bootstrap(): WalletDemoBootstrapResult {
+    override suspend fun bootstrap(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoBootstrapResult {
         bootstrapCalls += 1
         return WalletDemoBootstrapResult(
             keyId = "key-1",
             did = "did:key:test",
             publicJwk = """{"kty":"OKP","crv":"Ed25519","x":"test"}""",
+            signingProtection = signingProtection,
         )
     }
+
+    override suspend fun signingProtectionAvailability(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoSigningProtectionAvailability = signingProtectionAvailability
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 

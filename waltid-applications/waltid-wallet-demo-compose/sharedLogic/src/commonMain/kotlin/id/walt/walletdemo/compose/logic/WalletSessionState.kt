@@ -8,6 +8,7 @@ sealed interface WalletSessionState {
         val did: String,
         val keyId: String,
         val publicJwk: String,
+        val signingProtection: WalletDemoSigningProtection,
         val credentials: List<WalletDemoCredential>,
     ) : WalletSessionState
 

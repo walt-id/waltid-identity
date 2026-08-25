@@ -16,7 +16,6 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
@@ -438,7 +437,7 @@ class MobileWalletDigitalCredentialPresentationTest {
         }
         val wallet = MobileWallet(
             walletId = "dc-api-presentation-wallet",
-            keyStore = InMemoryKeyStore().also { it.addCrypto2Key(holderKey) },
+            keyStore = InMemoryMobileWalletKeyStore().also { it.addCrypto2Key(holderKey) },
             didStore = InMemoryDidStore().also {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },

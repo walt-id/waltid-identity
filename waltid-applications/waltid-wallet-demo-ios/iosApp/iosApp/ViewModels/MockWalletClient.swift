@@ -52,13 +52,20 @@ actor MockWalletClient: WalletClient {
 
     private(set) var bootstrapCalls = 0
 
-    func bootstrap() async throws -> WalletBootstrapResult {
+    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletBootstrapResult {
         bootstrapCalls += 1
         return WalletBootstrapResult(
             keyID: "mock-key-1",
             did: "did:key:mock",
-            publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#
+            publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#,
+            keyUseAuthorizationPolicy: signingProtection.authorizationPolicy
         )
+    }
+
+    func signingProtectionAvailability(
+        _ signingProtection: WalletDemoSigningProtection
+    ) async throws -> WalletDemoSigningProtectionAvailability {
+        .available
     }
 
     func credentials() async throws -> [Credential] {
