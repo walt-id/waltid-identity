@@ -82,7 +82,7 @@ public final class DemoBackend {
     public static let issuerIdentifier = "https://issuer2.demo.walt.id/openid4vci"
     // RFC 7638 thumbprint of the public issuer2 signing key from /openid4vci/jwks.
     // This independent pin must not be learned from the signed metadata JWT.
-    private static let issuerMetadataSigningKeyThumbprint = "gzGuLAZEJ5AsVMZ3mRQ1jsRQbbaS78mpHzQmTFytwF0"
+    private static let issuerMetadataSigningKeyThumbprint = "zzdUH_zEnMxbcddreuhZGxGescuP-X7Aub_GnAm9IHI"
     private static let verifierBaseURL = URL(string: "https://verifier2.demo.walt.id")!
     /// The public verifier requires this explicit client ID for signed request objects.
     public static let verifierClientID = "verifier2"
