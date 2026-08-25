@@ -51,6 +51,9 @@ internal object WalletDisplayText {
     const val PinMustContain4To8Digits = "PIN must contain 4 to 8 digits"
     const val PinConfirmationDoesNotMatch = "PIN confirmation does not match"
     const val WrongPin = "Wrong PIN"
+    const val UnlockWithBiometrics = "Unlock the wallet"
+    const val EnableBiometricUnlock = "Enable biometric unlock"
+    const val BiometricUnlockNotAuthorized = "Biometric unlock was not authorized. Use the PIN instead."
     const val ReceivedCredentialsUnavailable = "received credentials are not available locally"
     const val UnexpectedError = "Unexpected error"
 

@@ -58,6 +58,7 @@ fun WalletDemoApp(
                             controller = controller,
                             auth = auth,
                             isBusy = state.isBusy,
+                            biometricAvailable = state.biometricUnlockAvailable,
                         )
                     }
                     is WalletAuthState.StorageUnavailable -> Box(

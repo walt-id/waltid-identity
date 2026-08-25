@@ -135,6 +135,151 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun setupPinCanEnableBiometricUnlock() = runTest {
+        val pinStore = InMemoryDemoPinStore()
+        val biometrics = FakeDemoBiometricAuthenticator()
+        val controller = controllerWith(FakeDemoWallet(), this, pinStore, biometrics)
+
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.updateUseBiometrics(true)
+        runCurrent()
+        assertEquals(1, biometrics.authenticateCalls)
+        controller.submitPin()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertTrue(pinStore.isBiometricUnlockEnabled())
+    }
+
+    @Test
+    fun setupPinDoesNotEnableBiometricsWhenUnavailable() = runTest {
+        val pinStore = InMemoryDemoPinStore()
+        val controller = controllerWith(
+            FakeDemoWallet(),
+            this,
+            pinStore,
+            FakeDemoBiometricAuthenticator(available = false),
+        )
+
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.updateUseBiometrics(true)
+        controller.submitPin()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertFalse(pinStore.isBiometricUnlockEnabled())
+    }
+
+    @Test
+    fun setupPinDoesNotEnableBiometricsWhenAuthorizationFails() = runTest {
+        val pinStore = InMemoryDemoPinStore()
+        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Failed)
+        val controller = controllerWith(FakeDemoWallet(), this, pinStore, biometrics)
+
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.updateUseBiometrics(true)
+        runCurrent()
+
+        assertFalse((controller.state.value.auth as WalletAuthState.Setup).useBiometrics)
+        assertEquals(1, biometrics.authenticateCalls)
+
+        controller.submitPin()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertFalse(pinStore.isBiometricUnlockEnabled())
+    }
+
+    @Test
+    fun biometricUnlockOpensWalletWithoutPin() = runTest {
+        val pinStore = InMemoryDemoPinStore()
+        pinStore.setPin("1234")
+        pinStore.setBiometricUnlockEnabled(true)
+        val wallet = FakeDemoWallet()
+        val biometrics = FakeDemoBiometricAuthenticator()
+        val controller = controllerWith(wallet, this, pinStore, biometrics)
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Login)
+        controller.unlockWithBiometrics()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertEquals(1, biometrics.authenticateCalls)
+        assertEquals(1, wallet.bootstrapCalls)
+    }
+
+    @Test
+    fun cancelledBiometricsLeavesPinFallback() = runTest {
+        val pinStore = InMemoryDemoPinStore()
+        pinStore.setPin("1234")
+        pinStore.setBiometricUnlockEnabled(true)
+        val wallet = FakeDemoWallet()
+        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Failed)
+        val controller = controllerWith(wallet, this, pinStore, biometrics)
+
+        controller.unlockWithBiometrics()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Login)
+        assertEquals(0, wallet.bootstrapCalls)
+
+        controller.updatePin("1234")
+        controller.submitPin()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertEquals(1, wallet.bootstrapCalls)
+    }
+
+    @Test
+    fun lockDoesNotAutoPromptBiometrics() = runTest {
+        val pinStore = InMemoryDemoPinStore()
+        pinStore.setPin("1234")
+        pinStore.setBiometricUnlockEnabled(true)
+        val wallet = FakeDemoWallet()
+        val biometrics = FakeDemoBiometricAuthenticator()
+        val controller = controllerWith(wallet, this, pinStore, biometrics)
+
+        controller.unlockWithBiometrics()
+        runCurrent()
+        assertEquals(1, biometrics.authenticateCalls)
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+
+        controller.lock()
+        val login = controller.state.value.auth as WalletAuthState.Login
+        assertTrue(login.biometricPromptConsumed)
+
+        controller.unlockWithBiometrics()
+        runCurrent()
+        assertEquals(1, biometrics.authenticateCalls)
+        assertTrue(controller.state.value.auth is WalletAuthState.Login)
+
+        controller.unlockWithBiometrics(force = true)
+        runCurrent()
+        assertEquals(2, biometrics.authenticateCalls)
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertEquals(1, wallet.bootstrapCalls)
+    }
+
+    @Test
+    fun refreshBiometricUnlockAvailabilityPicksUpEnrollmentChange() = runTest {
+        val biometrics = FakeDemoBiometricAuthenticator(available = false)
+        val controller = controllerWith(FakeDemoWallet(), this, biometricAuthenticator = biometrics)
+
+        assertFalse(controller.state.value.biometricUnlockAvailable)
+        assertFalse(controller.isBiometricUnlockAvailable())
+
+        biometrics.available = true
+        controller.refreshBiometricUnlockAvailability()
+
+        assertTrue(controller.state.value.biometricUnlockAvailable)
+        assertTrue(controller.isBiometricUnlockAvailable())
+    }
+
+    @Test
     fun successStatusCanBeDismissedAndAutoHides() = runTest {
         val controller = unlockedControllerWith(FakeDemoWallet(), this)
         assertTrue(controller.state.value.isStatusVisible)
@@ -1679,10 +1824,12 @@ class WalletDemoControllerTest {
         wallet: DemoWallet,
         scope: TestScope,
         pinStore: DemoPinStore = InMemoryDemoPinStore(),
+        biometricAuthenticator: DemoBiometricAuthenticator = UnavailableDemoBiometricAuthenticator,
     ): WalletDemoController =
         WalletDemoController(
             wallet = wallet,
             pinStore = pinStore,
+            biometricAuthenticator = biometricAuthenticator,
             scope = scope.backgroundScope,
             dispatcher = StandardTestDispatcher(scope.testScheduler),
         )
@@ -1720,6 +1867,10 @@ private class FailingClearDemoPinStore : DemoPinStore {
 
     override suspend fun verifyPin(pin: String): Boolean = configuredPin == pin
 
+    override fun isBiometricUnlockEnabled(): Boolean = false
+
+    override fun setBiometricUnlockEnabled(enabled: Boolean) = Unit
+
     override fun clear() {
         error("PIN verifier could not be cleared")
     }
@@ -1740,7 +1891,25 @@ private class RecoverableDemoPinStore : DemoPinStore {
 
     override suspend fun verifyPin(pin: String): Boolean = true
 
+    override fun isBiometricUnlockEnabled(): Boolean = false
+
+    override fun setBiometricUnlockEnabled(enabled: Boolean) = Unit
+
     override fun clear() = Unit
+}
+
+private class FakeDemoBiometricAuthenticator(
+    var available: Boolean = true,
+    var result: DemoBiometricResult = DemoBiometricResult.Succeeded,
+) : DemoBiometricAuthenticator {
+    var authenticateCalls = 0
+
+    override fun isAvailable(): Boolean = available
+
+    override suspend fun authenticate(reason: String): DemoBiometricResult {
+        authenticateCalls += 1
+        return result
+    }
 }
 
 private fun offerPreview(

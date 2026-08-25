@@ -8,6 +8,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     func testRequiredTransactionCodeIsPromptedAndForwardedOnce() async throws {
         let client = TransactionCodeWalletClient()
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.selectedTab = .receive
@@ -46,6 +47,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     func testChangingOfferClearsTransactionCodeState() async throws {
         let client = TransactionCodeWalletClient()
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/first"
@@ -64,6 +66,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             transactionCode: IssuanceTransactionCode(inputMode: "numeric", length: 6, descriptionText: nil)
         )
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example"
@@ -83,6 +86,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     func testAuthorizationCodeOfferOpensIssuerSignInContinuation() async throws {
         let client = TransactionCodeWalletClient(transactionCode: nil, issuanceGrant: .authorizationCode)
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example"
@@ -100,6 +104,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     func testStaleIssuanceStartCannotOverwriteIncomingDeepLink() async throws {
         let client = TransactionCodeWalletClient(issuanceStartDelayNanoseconds: 100_000_000)
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/original"
@@ -113,9 +118,58 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertFalse(viewModel.isError)
     }
 
+    func testLockClearsActiveOfferReviewAndDoesNotRebootstrap() async throws {
+        let client = TransactionCodeWalletClient()
+        let pinStore = InMemoryDemoPinStore()
+        try await pinStore.setPin("1234")
+        let viewModel = WalletViewModel(walletClient: client, pinStore: pinStore)
+        viewModel.unlockForTests()
+        try await waitUntil { viewModel.isReady }
+        let bootstrapCallsAfterUnlock = await client.bootstrapCalls
+        XCTAssertEqual(bootstrapCallsAfterUnlock, 1)
+
+        viewModel.selectedTab = .receive
+        viewModel.offerUrl = "openid-credential-offer://issuer.example"
+        viewModel.previewOffer()
+        try await waitUntil { viewModel.offerPreview != nil }
+        viewModel.receiveCompleted = true
+        viewModel.presentationCompleted = true
+        let receiveResetKey = viewModel.receiveNavigationResetKey
+        let presentationResetKey = viewModel.presentationNavigationResetKey
+
+        viewModel.lock()
+
+        XCTAssertEqual(viewModel.auth, .login)
+        XCTAssertTrue(viewModel.isReady)
+        XCTAssertEqual(viewModel.offerUrl, "")
+        XCTAssertEqual(viewModel.txCode, "")
+        XCTAssertNil(viewModel.offerPreview)
+        XCTAssertNil(viewModel.presentationReview)
+        XCTAssertTrue(viewModel.selectedPresentationCredentialOptions.isEmpty)
+        XCTAssertTrue(viewModel.selectedPresentationDisclosureOptions.isEmpty)
+        XCTAssertTrue(viewModel.lastReceivedCredentialIDs.isEmpty)
+        XCTAssertFalse(viewModel.receiveCompleted)
+        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertNil(viewModel.pendingPresentationContinuationURL)
+        XCTAssertNil(viewModel.pendingPresentationFormPostHTML)
+        XCTAssertEqual(viewModel.receiveNavigationResetKey, receiveResetKey + 1)
+        XCTAssertEqual(viewModel.presentationNavigationResetKey, presentationResetKey + 1)
+        XCTAssertFalse(viewModel.isLoading)
+        XCTAssertFalse(viewModel.isError)
+        XCTAssertEqual(viewModel.statusMessage, "Wallet ready")
+
+        viewModel.pin = "1234"
+        viewModel.submitPin()
+        try await waitUntil { viewModel.auth == .unlocked }
+        XCTAssertTrue(viewModel.isReady)
+        let bootstrapCallsAfterRelock = await client.bootstrapCalls
+        XCTAssertEqual(bootstrapCallsAfterRelock, bootstrapCallsAfterUnlock)
+    }
+
     func testPresentationDeepLinkCancelsActiveIssuanceSession() async throws {
         let client = TransactionCodeWalletClient(startsWithCredential: true)
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example"
@@ -142,6 +196,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             presentationPreviewDelayNanoseconds: 100_000_000
         )
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.presentationRequestUrl = "openid4vp://verifier.example"
@@ -161,6 +216,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             presentationPreviewDelayNanoseconds: 100_000_000
         )
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.presentationRequestUrl = "openid4vp://verifier.example"
@@ -183,6 +239,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             presentationActionDelayNanoseconds: 100_000_000
         )
         let viewModel = WalletViewModel(walletClient: client)
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
         viewModel.presentationRequestUrl = "openid4vp://verifier.example"
@@ -207,7 +264,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     }
 
     private func waitUntil(
-        timeoutNanoseconds: UInt64 = 2_000_000_000,
+        timeoutNanoseconds: UInt64 = 20_000_000_000,
         condition: @escaping @MainActor () -> Bool
     ) async throws {
         let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
@@ -221,7 +278,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     }
 
     private func waitUntilAsync(
-        timeoutNanoseconds: UInt64 = 2_000_000_000,
+        timeoutNanoseconds: UInt64 = 20_000_000_000,
         condition: @escaping () async -> Bool
     ) async throws {
         let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
@@ -272,8 +329,11 @@ private actor TransactionCodeWalletClient: WalletClient {
         self.presentationActionDelayNanoseconds = presentationActionDelayNanoseconds
     }
 
+    private(set) var bootstrapCalls = 0
+
     func bootstrap() async throws -> WalletBootstrapResult {
-        WalletBootstrapResult(
+        bootstrapCalls += 1
+        return WalletBootstrapResult(
             keyID: "key-1",
             did: "did:key:test",
             publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#

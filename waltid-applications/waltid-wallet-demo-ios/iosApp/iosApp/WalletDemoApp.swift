@@ -62,8 +62,10 @@ struct WalletDemoApp: App {
                 // Reconciling requests authorization on a first run, and afterwards picks up a status
                 // the user changed in Settings - Apple sends no notification either way. Becoming
                 // active is the first moment the app can act on it, so it reconciles here rather
-                // than polling.
+                // than polling. The same foreground signal also drives the one-shot biometric
+                // unlock prompt, because PinView's scenePhase can stay inactive on a cold launch.
                 guard phase == .active else { return }
+                viewModel.handleApplicationBecameActive()
                 if #available(iOS 26.0, *) {
                     Task { await DemoIdentityDocumentRegistration.updateFromPlatformCallback() }
                 }

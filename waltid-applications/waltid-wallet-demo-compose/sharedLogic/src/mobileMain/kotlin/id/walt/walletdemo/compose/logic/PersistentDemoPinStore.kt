@@ -13,14 +13,24 @@ internal class PersistentDemoPinStore(
     private val readRecord: () -> String?,
     private val writeRecord: (String) -> Unit,
     private val clearRecord: () -> Unit,
+    private val readBiometricUnlock: () -> Boolean,
+    private val writeBiometricUnlock: (Boolean) -> Unit,
     private val provider: CryptographyProvider = CryptographyProvider.Default,
+    private val randomSalt: () -> ByteArray = { CryptographyRandom.nextBytes(SALT_SIZE_BYTES) },
 ) : DemoPinStore {
     private val pbkdf2 by lazy { provider.get(PBKDF2) }
 
     override fun hasPin(): Boolean = readRecord() != null
 
+    override fun isBiometricUnlockEnabled(): Boolean = readBiometricUnlock()
+
+    override fun setBiometricUnlockEnabled(enabled: Boolean) {
+        writeBiometricUnlock(enabled)
+    }
+
     override suspend fun setPin(pin: String) {
-        val salt = CryptographyRandom.nextBytes(SALT_SIZE_BYTES)
+        val salt = randomSalt()
+        require(salt.size == SALT_SIZE_BYTES) { "PIN salt generation failed" }
         val verifier = derive(pin, salt, ITERATIONS)
         writeRecord(
             listOf(

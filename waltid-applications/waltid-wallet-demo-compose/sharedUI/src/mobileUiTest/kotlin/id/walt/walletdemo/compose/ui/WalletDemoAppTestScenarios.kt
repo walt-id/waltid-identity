@@ -29,10 +29,13 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runComposeUiTest
+import id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator
+import id.walt.walletdemo.compose.logic.DemoBiometricResult
 import id.walt.walletdemo.compose.logic.DemoPinStore
 import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
+import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
@@ -83,6 +86,40 @@ class WalletDemoAppTestScenarios {
 
         onNodeWithText("Enter your PIN").assertIsDisplayed()
         onAllNodesWithTag("wallet.pinConfirmationInput").assertCountEquals(0)
+    }
+
+    fun pinSetupShowsDisabledBiometricToggleWhenUnavailable() = runComposeUiTest {
+        val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+
+        onNodeWithText("Create a PIN").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinBiometricToggle)
+            .performScrollTo()
+            .assertIsDisplayed()
+        onNodeWithText("Biometrics are not available on this device.")
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() = runComposeUiTest {
+        val biometrics = RecordingDemoBiometricAuthenticator(available = false)
+        val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore(), biometrics)
+
+        setContent { WalletDemoApp(controller) }
+
+        onNodeWithText("Create a PIN").assertIsDisplayed()
+        onNodeWithText("Biometrics are not available on this device.")
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        biometrics.available = true
+        controller.refreshBiometricUnlockAvailability()
+        waitForIdle()
+
+        onNodeWithText("Use Face ID or fingerprint instead of typing the PIN. The PIN remains a fallback.")
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() = runComposeUiTest {
@@ -893,6 +930,39 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("Enter your PIN").assertIsDisplayed()
     }
 
+    fun lockDoesNotAutoPromptBiometrics() = runComposeUiTest {
+        val pinStore = InMemoryDemoPinStore()
+        val biometrics = RecordingDemoBiometricAuthenticator()
+        val controller = WalletDemoController(FakeDemoWallet(), pinStore, biometrics)
+
+        setContent { WalletDemoApp(controller) }
+        controller.updateUseBiometrics(true)
+        waitUntil(timeoutMillis = 5_000) {
+            (controller.state.value.auth as? WalletAuthState.Setup)?.useBiometrics == true
+        }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+        assertEquals(1, biometrics.authenticateCalls)
+
+        onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsLock)
+            .performScrollTo()
+            .performClick()
+        waitForIdle()
+
+        onNodeWithText("Enter your PIN").assertIsDisplayed()
+        assertEquals(1, biometrics.authenticateCalls)
+        val login = controller.state.value.auth as WalletAuthState.Login
+        assertTrue(login.biometricPromptConsumed)
+
+        onNodeWithTag(WalletUiTestTags.PinBiometricButton).performClick()
+        waitForIdle()
+        waitUntil(timeoutMillis = 5_000) {
+            controller.state.value.auth is WalletAuthState.Unlocked
+        }
+        assertEquals(2, biometrics.authenticateCalls)
+    }
+
     fun credentialDetailsCanCopyAndDelete() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
@@ -1167,6 +1237,19 @@ class WalletDemoAppTestScenarios {
     }
 }
 
+private class RecordingDemoBiometricAuthenticator(
+    var available: Boolean = true,
+) : DemoBiometricAuthenticator {
+    var authenticateCalls = 0
+
+    override fun isAvailable(): Boolean = available
+
+    override suspend fun authenticate(reason: String): DemoBiometricResult {
+        authenticateCalls += 1
+        return DemoBiometricResult.Succeeded
+    }
+}
+
 private class RecoverableDemoPinStore : DemoPinStore {
     var isAvailable = false
 
@@ -1178,6 +1261,10 @@ private class RecoverableDemoPinStore : DemoPinStore {
     override suspend fun setPin(pin: String) = Unit
 
     override suspend fun verifyPin(pin: String): Boolean = true
+
+    override fun isBiometricUnlockEnabled(): Boolean = false
+
+    override fun setBiometricUnlockEnabled(enabled: Boolean) = Unit
 
     override fun clear() = Unit
 }

@@ -17,6 +17,8 @@ actor MockWalletClient: WalletClient {
     private let rejectionResult: PresentationResult
     private let responseEncryptionRequired: Bool
     private let mdocMetadata: Bool
+    private let deleteLocalDataDelayNanoseconds: UInt64
+    private let deleteLocalDataError: Error?
     private(set) var rejectedPresentationPreviewHandles: [PresentationPreviewHandle] = []
     private(set) var discardedPresentationPreviewHandles: [PresentationPreviewHandle] = []
 
@@ -30,7 +32,9 @@ actor MockWalletClient: WalletClient {
         presentationPreviewResult: PresentationPreviewResult? = nil,
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
         responseEncryptionRequired: Bool = true,
-        mdocMetadata: Bool = false
+        mdocMetadata: Bool = false,
+        deleteLocalDataDelayMilliseconds: UInt64 = 0,
+        deleteLocalDataError: Error? = nil
     ) {
         self.storedCredentials = storedCredentials
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
@@ -42,10 +46,15 @@ actor MockWalletClient: WalletClient {
         self.rejectionResult = rejectionResult
         self.responseEncryptionRequired = responseEncryptionRequired
         self.mdocMetadata = mdocMetadata
+        self.deleteLocalDataDelayNanoseconds = deleteLocalDataDelayMilliseconds * 1_000_000
+        self.deleteLocalDataError = deleteLocalDataError
     }
 
+    private(set) var bootstrapCalls = 0
+
     func bootstrap() async throws -> WalletBootstrapResult {
-        WalletBootstrapResult(
+        bootstrapCalls += 1
+        return WalletBootstrapResult(
             keyID: "mock-key-1",
             did: "did:key:mock",
             publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#
@@ -161,6 +170,12 @@ actor MockWalletClient: WalletClient {
     }
 
     func deleteLocalData() async throws {
+        if deleteLocalDataDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: deleteLocalDataDelayNanoseconds)
+        }
+        if let deleteLocalDataError {
+            throw deleteLocalDataError
+        }
         storedCredentials = []
     }
 

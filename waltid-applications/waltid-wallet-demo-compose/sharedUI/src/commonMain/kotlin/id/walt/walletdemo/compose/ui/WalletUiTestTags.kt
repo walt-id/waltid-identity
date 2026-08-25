@@ -65,6 +65,8 @@ internal object WalletUiTestTags {
     val PinInput = tag("pinInput")
     val PinConfirmationInput = tag("pinConfirmationInput")
     val PinSubmitButton = tag("pinSubmitButton")
+    val PinBiometricToggle = tag("pinBiometricToggle")
+    val PinBiometricButton = tag("pinBiometricButton")
     val CredentialsTab = tag("tab", "credentials")
     val ReceiveTab = tag("tab", "receive")
     val PresentTab = tag("tab", "present")

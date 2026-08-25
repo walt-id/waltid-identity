@@ -15,6 +15,14 @@ class WalletDemoAppAndroidTest {
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
     @Test
+    fun pinSetupShowsDisabledBiometricToggleWhenUnavailable() =
+        scenarios.pinSetupShowsDisabledBiometricToggleWhenUnavailable()
+
+    @Test
+    fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() =
+        scenarios.pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable()
+
+    @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
 
@@ -109,6 +117,10 @@ class WalletDemoAppAndroidTest {
     @Test
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
+
+    @Test
+    fun lockDoesNotAutoPromptBiometrics() =
+        scenarios.lockDoesNotAutoPromptBiometrics()
 
     @Test
     fun credentialDetailsCanCopyAndDelete() =

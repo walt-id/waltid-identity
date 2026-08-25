@@ -51,6 +51,14 @@ kotlin {
                 androidMain.dependencies {
                     implementation(identityLibs.ktor.client.android)
                     implementation(identityLibs.androidx.fragment)
+                    implementation(identityLibs.androidx.biometric)
+                }
+
+                getByName("androidHostTest").dependencies {
+                    implementation(kotlin("test"))
+                    implementation(identityLibs.junit)
+                    implementation(identityLibs.robolectric)
+                    implementation(identityLibs.kotlinx.coroutines.test)
                 }
 
                 getByName("androidDeviceTest").dependencies {
@@ -76,6 +84,12 @@ kotlin {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
+    }
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    if (name == "testAndroidHostTest") {
+        useJUnit()
     }
 }
 
