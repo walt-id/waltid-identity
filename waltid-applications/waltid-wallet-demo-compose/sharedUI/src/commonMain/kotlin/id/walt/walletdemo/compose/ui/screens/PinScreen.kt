@@ -19,12 +19,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -40,6 +37,7 @@ internal fun PinScreen(
     controller: WalletDemoController,
     auth: WalletAuthState.PinEntry,
     isBusy: Boolean,
+    biometricAvailable: Boolean,
 ) {
     val setup = auth as? WalletAuthState.Setup
     val login = auth as? WalletAuthState.Login
@@ -51,11 +49,13 @@ internal fun PinScreen(
         is WalletAuthState.Setup -> auth.error
         is WalletAuthState.Login -> auth.error
     }
-    var biometricAvailable by remember { mutableStateOf(false) }
     val biometricUnlockEnabled = controller.isBiometricUnlockEnabled()
+    val windowInfo = LocalWindowInfo.current
 
-    LaunchedEffect(Unit) {
-        biometricAvailable = controller.isBiometricUnlockAvailable()
+    LaunchedEffect(windowInfo.isWindowFocused) {
+        if (windowInfo.isWindowFocused) {
+            controller.refreshBiometricUnlockAvailability()
+        }
     }
     LaunchedEffect(login != null, biometricUnlockEnabled, biometricAvailable) {
         if (login != null && biometricUnlockEnabled && biometricAvailable) {

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WalletDemoSharingUI
 
 struct PinView: View {
@@ -52,17 +53,13 @@ struct PinView: View {
         .padding(24)
         .onAppear {
             viewModel.refreshBiometricAvailability()
-            promptBiometricsIfSceneActive()
         }
         .onChange(of: scenePhase) { _ in
             viewModel.refreshBiometricAvailability()
-            promptBiometricsIfSceneActive()
         }
-    }
-
-    private func promptBiometricsIfSceneActive() {
-        guard scenePhase == .active else { return }
-        viewModel.promptBiometricUnlockIfNeeded()
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            viewModel.handleApplicationBecameActive()
+        }
     }
 
     private var isSetup: Bool {

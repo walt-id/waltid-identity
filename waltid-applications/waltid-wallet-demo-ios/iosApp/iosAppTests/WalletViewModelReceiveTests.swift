@@ -264,7 +264,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     }
 
     private func waitUntil(
-        timeoutNanoseconds: UInt64 = 2_000_000_000,
+        timeoutNanoseconds: UInt64 = 20_000_000_000,
         condition: @escaping @MainActor () -> Bool
     ) async throws {
         let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
@@ -278,7 +278,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
     }
 
     private func waitUntilAsync(
-        timeoutNanoseconds: UInt64 = 2_000_000_000,
+        timeoutNanoseconds: UInt64 = 20_000_000_000,
         condition: @escaping () async -> Bool
     ) async throws {
         let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds

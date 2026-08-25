@@ -102,6 +102,26 @@ class WalletDemoAppTestScenarios {
             .assertIsDisplayed()
     }
 
+    fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() = runComposeUiTest {
+        val biometrics = RecordingDemoBiometricAuthenticator(available = false)
+        val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore(), biometrics)
+
+        setContent { WalletDemoApp(controller) }
+
+        onNodeWithText("Create a PIN").assertIsDisplayed()
+        onNodeWithText("Biometrics are not available on this device.")
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        biometrics.available = true
+        controller.refreshBiometricUnlockAvailability()
+        waitForIdle()
+
+        onNodeWithText("Use Face ID or fingerprint instead of typing the PIN. The PIN remains a fallback.")
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
@@ -1199,10 +1219,12 @@ class WalletDemoAppTestScenarios {
     }
 }
 
-private class RecordingDemoBiometricAuthenticator : DemoBiometricAuthenticator {
+private class RecordingDemoBiometricAuthenticator(
+    var available: Boolean = true,
+) : DemoBiometricAuthenticator {
     var authenticateCalls = 0
 
-    override fun isAvailable(): Boolean = true
+    override fun isAvailable(): Boolean = available
 
     override suspend fun authenticate(reason: String): DemoBiometricResult {
         authenticateCalls += 1

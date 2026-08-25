@@ -170,6 +170,7 @@ final class WalletViewModelPinTests: XCTestCase {
         viewModel.lock()
         XCTAssertEqual(viewModel.auth, .login)
         viewModel.promptBiometricUnlockIfNeeded()
+        viewModel.handleApplicationBecameActive()
         await Task.yield()
         XCTAssertEqual(biometrics.authenticateCalls, 1)
         XCTAssertEqual(viewModel.auth, .login)
@@ -180,6 +181,30 @@ final class WalletViewModelPinTests: XCTestCase {
         XCTAssertTrue(viewModel.isReady)
         let bootstrapCallsAfterForcedUnlock = await walletClient.bootstrapCalls
         XCTAssertEqual(bootstrapCallsAfterForcedUnlock, bootstrapCallsAfterUnlock)
+    }
+
+    func testColdLaunchAutoPromptsBiometricsWithoutActiveScenePhase() async throws {
+        let pinStore = InMemoryDemoPinStore()
+        try await pinStore.setPin("1234")
+        pinStore.isBiometricUnlockEnabled = true
+        let biometrics = FakeDemoBiometricAuthenticator()
+        let walletClient = MockWalletClient()
+        let viewModel = WalletViewModel(
+            walletID: "pin-cold-launch-\(UUID().uuidString)",
+            walletClient: walletClient,
+            pinStore: pinStore,
+            biometricAuthenticator: biometrics
+        )
+
+        XCTAssertEqual(viewModel.auth, .login)
+        XCTAssertEqual(biometrics.authenticateCalls, 0)
+
+        viewModel.handleApplicationBecameActive()
+        try await waitUntil { viewModel.auth == .unlocked && viewModel.isReady }
+
+        XCTAssertEqual(biometrics.authenticateCalls, 1)
+        let bootstrapCalls = await walletClient.bootstrapCalls
+        XCTAssertEqual(bootstrapCalls, 1)
     }
 
     func testFreshSignupReportsBiometricAvailabilityWithoutSceneActivation() {

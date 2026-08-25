@@ -277,6 +277,7 @@ class WalletViewModel: ObservableObject {
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
         discardPresentationPreviewIfPresent()
+        clearPendingPresentationContinuation()
         Task {
             do {
                 try await walletClient.deleteLocalData()
@@ -297,7 +298,6 @@ class WalletViewModel: ObservableObject {
                 lastReceivedCredentialIDs = []
                 receiveCompleted = false
                 presentationCompleted = false
-                clearPendingPresentationContinuation()
                 statusExpanded = false
                 statusDismissedKey = nil
                 pin = ""
@@ -416,6 +416,11 @@ class WalletViewModel: ObservableObject {
     func promptBiometricUnlockIfNeeded() {
         guard auth == .login else { return }
         unlockWithBiometrics()
+    }
+
+    func handleApplicationBecameActive() {
+        refreshBiometricAvailability()
+        promptBiometricUnlockIfNeeded()
     }
 
     var isBiometricUnlockEnabled: Bool { pinStore.isBiometricUnlockEnabled }

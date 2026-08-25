@@ -265,6 +265,21 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun refreshBiometricUnlockAvailabilityPicksUpEnrollmentChange() = runTest {
+        val biometrics = FakeDemoBiometricAuthenticator(available = false)
+        val controller = controllerWith(FakeDemoWallet(), this, biometricAuthenticator = biometrics)
+
+        assertFalse(controller.state.value.biometricUnlockAvailable)
+        assertFalse(controller.isBiometricUnlockAvailable())
+
+        biometrics.available = true
+        controller.refreshBiometricUnlockAvailability()
+
+        assertTrue(controller.state.value.biometricUnlockAvailable)
+        assertTrue(controller.isBiometricUnlockAvailable())
+    }
+
+    @Test
     fun successStatusCanBeDismissedAndAutoHides() = runTest {
         val controller = unlockedControllerWith(FakeDemoWallet(), this)
         assertTrue(controller.state.value.isStatusVisible)

@@ -14,6 +14,10 @@ class WalletDemoAppIosTest {
         scenarios.pinSetupShowsDisabledBiometricToggleWhenUnavailable()
 
     @Test
+    fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() =
+        scenarios.pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable()
+
+    @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
 

@@ -205,6 +205,71 @@ final class WalletViewModelPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testResetClearsPendingContinuationBeforeDeleteLocalDataCompletes() async throws {
+        let continuationURL = try XCTUnwrap(URL(string: "wallet-demo://presentation-complete"))
+        let viewModel = WalletViewModel(
+            walletID: "reset-continuation-delay-\(UUID().uuidString)",
+            walletClient: MockWalletClient(
+                rejectionResult: .prepared(.openURL(continuationURL)),
+                deleteLocalDataDelayMilliseconds: 500
+            )
+        )
+        viewModel.unlockForTests()
+        try await waitUntil { viewModel.isReady }
+        viewModel.presentationRequestUrl = "openid4vp://mock"
+        viewModel.previewPresentation()
+        try await waitUntil { viewModel.presentationPreview != nil }
+        viewModel.rejectPresentation()
+        try await waitUntil { viewModel.pendingPresentationContinuationURL == continuationURL }
+
+        viewModel.resetWallet()
+        XCTAssertNil(viewModel.pendingPresentationContinuationURL)
+        XCTAssertNil(viewModel.pendingPresentationFormPostHTML)
+
+        viewModel.completePresentationContinuation()
+        viewModel.failPresentationContinuation("late callback")
+
+        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertFalse(viewModel.isError)
+        XCTAssertEqual(viewModel.auth, .unlocked)
+
+        try await waitUntil { viewModel.auth == .setup && !viewModel.isReady }
+        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertFalse(viewModel.isError)
+    }
+
+    @MainActor
+    func testResetClearsPendingContinuationWhenDeleteLocalDataFails() async throws {
+        enum DeleteFailure: Error { case boom }
+        let continuationURL = try XCTUnwrap(URL(string: "wallet-demo://presentation-complete"))
+        let viewModel = WalletViewModel(
+            walletID: "reset-continuation-fail-\(UUID().uuidString)",
+            walletClient: MockWalletClient(
+                rejectionResult: .prepared(.openURL(continuationURL)),
+                deleteLocalDataError: DeleteFailure.boom
+            )
+        )
+        viewModel.unlockForTests()
+        try await waitUntil { viewModel.isReady }
+        viewModel.presentationRequestUrl = "openid4vp://mock"
+        viewModel.previewPresentation()
+        try await waitUntil { viewModel.presentationPreview != nil }
+        viewModel.rejectPresentation()
+        try await waitUntil { viewModel.pendingPresentationContinuationURL == continuationURL }
+
+        viewModel.resetWallet()
+        viewModel.completePresentationContinuation()
+        viewModel.failPresentationContinuation("late callback")
+
+        try await waitUntil { viewModel.isError }
+
+        XCTAssertNil(viewModel.pendingPresentationContinuationURL)
+        XCTAssertNil(viewModel.pendingPresentationFormPostHTML)
+        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertEqual(viewModel.auth, .unlocked)
+    }
+
+    @MainActor
     func testDidAndKeyAreCapturedAndStatusCanBeDismissed() async throws {
         let viewModel = WalletViewModel(
             walletID: "settings-\(UUID().uuidString)",

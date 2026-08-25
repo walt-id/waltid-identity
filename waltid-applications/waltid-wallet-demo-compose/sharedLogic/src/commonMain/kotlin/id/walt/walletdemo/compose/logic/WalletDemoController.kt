@@ -34,6 +34,7 @@ class WalletDemoController(
     private val _state = MutableStateFlow(
         WalletDemoUiState(
             auth = readInitialAuthState(),
+            biometricUnlockAvailable = biometricAuthenticator.isAvailable(),
         ),
     )
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
@@ -136,6 +137,10 @@ class WalletDemoController(
     fun isBiometricUnlockAvailable(): Boolean = biometricAuthenticator.isAvailable()
 
     fun isBiometricUnlockEnabled(): Boolean = pinStore.isBiometricUnlockEnabled()
+
+    fun refreshBiometricUnlockAvailability() {
+        _state.update { it.copy(biometricUnlockAvailable = biometricAuthenticator.isAvailable()) }
+    }
 
     fun unlockWithBiometrics(force: Boolean = false) {
         val auth = _state.value.auth as? WalletAuthState.Login ?: return
@@ -274,7 +279,10 @@ class WalletDemoController(
             }
             val pinCleared = runCatching { pinStore.clear() }
             statusHideJob?.cancel()
-            _state.value = WalletDemoUiState(auth = WalletAuthState.Setup())
+            _state.value = WalletDemoUiState(
+                auth = WalletAuthState.Setup(),
+                biometricUnlockAvailable = biometricAuthenticator.isAvailable(),
+            )
             pinCleared.exceptionOrNull()?.let { error ->
                 val message = WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, error)
                 _state.update {
