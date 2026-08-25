@@ -1,7 +1,20 @@
+import org.gradle.plugins.signing.SigningExtension
+
 plugins {
     id("com.vanniktech.maven.publish")
     // `maven-publish`
 }
+
+// Maven Central is an *additional* target. Publishing to maven.waltid.dev below is unchanged
+// and stays enabled for every module applying this convention.
+val isCentralArtifact = WaltidCentralPublishing.isCentralArtifact(project.path)
+
+// Signing is enabled only when a GPG key is actually configured (normally in
+// ~/.gradle/gradle.properties as `signing.gnupg.keyName`). This keeps ordinary development and
+// CI snapshot publishing to maven.waltid.dev working on machines without a signing key, while
+// Maven Central releases are signed. The release script fails closed if the key is missing.
+val gpgKeyName = providers.gradleProperty("signing.gnupg.keyName")
+val signingEnabled = isCentralArtifact && gpgKeyName.isPresent
 
 publishing {
     repositories {
@@ -28,6 +41,16 @@ publishing {
 
 mavenPublishing {
 
+    if (isCentralArtifact) {
+        // Manual review in https://central.sonatype.com/publishing/deployments is required.
+        // Do not switch this to automatic release without an explicit decision.
+        publishToMavenCentral(automaticRelease = false)
+    }
+
+    if (signingEnabled) {
+        signAllPublications()
+    }
+
     @Suppress("UnstableApiUsage")
     configureBasedOnAppliedPlugins()
 
@@ -48,8 +71,20 @@ mavenPublishing {
             }
         }
         scm {
-            connection.set("scm:git:git://github.com/walt-id/waltid-identity.git")
-            developerConnection.set("scm:git:ssh://github.com/walt-id/waltid-identity.git")
+            // Maven Central requires an SCM url in addition to the connection entries.
+            url.set("https://github.com/walt-id/waltid-identity")
+            connection.set("scm:git:https://github.com/walt-id/waltid-identity.git")
+            developerConnection.set("scm:git:ssh://git@github.com/walt-id/waltid-identity.git")
+        }
+    }
+}
+
+// Use the developer's existing GnuPG keyring / gpg-agent rather than an exported key in the
+// repository. The signing plugin is applied by the Maven publish plugin, so react to it.
+if (signingEnabled) {
+    plugins.withId("signing") {
+        extensions.configure<SigningExtension>("signing") {
+            useGpgCmd()
         }
     }
 }

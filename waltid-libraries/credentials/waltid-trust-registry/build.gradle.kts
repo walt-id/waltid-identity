@@ -52,3 +52,10 @@ kotlin {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+mavenPublishing {
+    pom {
+        name.set("walt.id Trust Registry")
+        description.set("walt.id Kotlin/Java library for ETSI trust lists and trust registry resolution")
+    }
+}
