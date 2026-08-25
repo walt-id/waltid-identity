@@ -5,6 +5,10 @@ import Foundation
 /// Preferences are matched from most specific tag to language-only, then an untagged entry,
 /// then the first entry. Keep this aligned with `id.walt.credentials.display.DisplayLocales`.
 public enum DisplayLocales {
+    /// Normalizes a BCP 47 locale tag for case-insensitive display matching.
+    ///
+    /// - Parameter locale: Locale tag that may use `_` separators or mixed case.
+    /// - Returns: A lowercase hyphenated tag, or `nil` when the input is blank.
     public static func normalize(_ locale: String?) -> String? {
         guard let locale else { return nil }
         let normalized = locale
@@ -14,6 +18,10 @@ public enum DisplayLocales {
         return normalized.isEmpty ? nil : normalized
     }
 
+    /// Builds the most-specific-to-language-only lookup tags for a locale.
+    ///
+    /// - Parameter locale: Already-normalized BCP 47 locale tag.
+    /// - Returns: Tags from the full locale down to the language subtag.
     public static func lookupTags(_ locale: String) -> [String] {
         var subtags = locale.split(separator: "-").map(String.init).filter { !$0.isEmpty }
         var tags: [String] = []
@@ -27,6 +35,16 @@ public enum DisplayLocales {
         return tags
     }
 
+    /// Selects the display entry that best matches the preferred locales.
+    ///
+    /// Matching walks each preference from most specific tag to language-only,
+    /// then an untagged entry, then the first item.
+    ///
+    /// - Parameters:
+    ///   - items: Display metadata entries to choose from.
+    ///   - preferredLocales: Locale tags in preference order.
+    ///   - localeOf: Reads the locale tag from one display entry.
+    /// - Returns: The best matching entry, or `nil` when `items` is empty.
     public static func select<T>(
         _ items: [T],
         preferredLocales: [String],
