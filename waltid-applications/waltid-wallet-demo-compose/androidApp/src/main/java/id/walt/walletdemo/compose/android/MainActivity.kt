@@ -16,7 +16,6 @@ import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
 import id.walt.walletdemo.compose.logic.createAndroidDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
-import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionStore
 import id.walt.walletdemo.compose.ui.WalletDemoApp
 import kotlinx.coroutines.launch
 
@@ -26,7 +25,6 @@ const val WALLET_SIGNING_PROTECTION_MODE_EXTRA =
 class MainActivity : FragmentActivity() {
     private lateinit var controller: WalletDemoController
     private lateinit var walletConfig: DemoWalletConfig
-    private lateinit var signingProtectionStore: WalletDemoSigningProtectionStore
     private val onCredentialStoreChanged: () -> Unit = {
         if (::controller.isInitialized) {
             controller.refreshCredentialsFromStore()
@@ -46,7 +44,6 @@ class MainActivity : FragmentActivity() {
                 signingProtectionMode = WalletDemoSigningProtectionMode.parse(override),
             )
         }
-        signingProtectionStore = walletConfig.signingProtectionStore(applicationContext)
         controller = WalletDemoController(
             wallet = createAndroidDemoWallet(
                 context = applicationContext,
@@ -56,7 +53,7 @@ class MainActivity : FragmentActivity() {
             pinStore = createAndroidDemoPinStore(applicationContext, walletConfig.walletId),
             biometricAuthenticator = createAndroidDemoBiometricAuthenticator { this@MainActivity },
             signingProtectionMode = walletConfig.signingProtectionMode,
-            signingProtectionStore = signingProtectionStore,
+            signingProtectionStore = walletConfig.signingProtectionStore(applicationContext),
         )
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         handleIntent(intent)

@@ -12,7 +12,7 @@ import id.walt.walletdemo.compose.logic.createAndroidDemoSigningProtectionStore
  *
  * The Credential Manager provider activity is launched by the operating system independently of
  * [MainActivity], so both must read the same values or they open different wallet databases and apply
- * different transaction-data policy.
+ * different transaction-data or signing-protection policies.
  */
 internal fun demoWalletConfig(): DemoWalletConfig = DemoWalletConfig(
     attestationBaseUrl = BuildConfig.ATTESTATION_BASE_URL,
