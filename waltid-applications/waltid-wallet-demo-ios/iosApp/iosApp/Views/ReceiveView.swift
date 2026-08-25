@@ -5,6 +5,7 @@ struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
     @Environment(\.openURL) private var openURL
+    @Environment(\.walletDemoBranding) private var branding
 
     private var receivedDetails: [CredentialDetails] {
         viewModel.receivedCredentials.map(CredentialDisplayNormalizer.details(for:))
@@ -29,16 +30,12 @@ struct ReceiveView: View {
                             viewModel.previewOffer()
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.waltBlue)
+                        .tint(branding.primary)
                         .disabled(!viewModel.receiveActionEnabled)
                         .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
                     }
 
-                    StatusBannerView(
-                        message: viewModel.statusMessage(for: .receive),
-                        isLoading: viewModel.statusIsLoading(for: .receive),
-                        isError: viewModel.statusIsError(for: .receive)
-                    )
+                    WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
 
                     if let preview = viewModel.offerPreview {
                         OfferReviewView(
@@ -86,6 +83,7 @@ struct ReceiveView: View {
                 .padding()
             }
             .navigationTitle("Receive")
+            .walletSettingsToolbar(viewModel: viewModel)
             .background(detailsNavigationLink)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
@@ -119,7 +117,9 @@ struct ReceiveView: View {
             if let detailsID = selectedDetailsID {
                 CredentialDetailsDestination(
                     detailsID: detailsID,
-                    details: receivedDetails
+                    details: receivedDetails,
+                    viewModel: viewModel,
+                    selectedDetailsID: $selectedDetailsID
                 )
             } else {
                 EmptyView()

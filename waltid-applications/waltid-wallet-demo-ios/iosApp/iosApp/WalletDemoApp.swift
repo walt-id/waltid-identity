@@ -53,7 +53,8 @@ struct WalletDemoApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(viewModel: viewModel)
-            .tint(.waltBlue)
+            .environment(\.walletDemoBranding, .default)
+            .tint(WalletDemoBranding.default.primary)
             .onOpenURL { url in
                 viewModel.handleDeepLink(url)
             }

@@ -59,7 +59,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             operation: "bootstrap wallet"
         )
 
-        return .init(keyID: value.keyId, did: value.did)
+        return .init(keyID: value.keyId, did: value.did, publicJWK: value.publicJwk)
     }
 
     func keyUseAuthorizationPreflight(
@@ -171,6 +171,18 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
 
         throw WalletError.internalFailure("Unexpected credentials result type: \(type(of: value))")
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
+        let result = try await bridge.deleteCredential(credentialId: id)
+        let value = try Self.successAnyValue(result, operation: "delete credential")
+        if let flag = value as? KotlinBoolean {
+            return flag.boolValue
+        }
+        if let flag = value as? Bool {
+            return flag
+        }
+        throw WalletError.internalFailure("Unexpected delete credential result type: \(type(of: value))")
     }
 
     func deleteLocalData() async throws {

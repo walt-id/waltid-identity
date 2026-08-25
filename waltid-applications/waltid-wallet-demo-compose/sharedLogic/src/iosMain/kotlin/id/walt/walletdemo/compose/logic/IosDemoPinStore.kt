@@ -8,6 +8,7 @@ fun createIosDemoPinStore(walletId: String): DemoPinStore {
     return PersistentDemoPinStore(
         readRecord = { defaults.stringForKey(recordKey) },
         writeRecord = { record -> defaults.setObject(record, forKey = recordKey) },
+        clearRecord = { defaults.removeObjectForKey(recordKey) },
     )
 }
 

@@ -5,6 +5,7 @@ import WalletSDK
 
 struct PresentView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.walletDemoBranding) private var branding
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
 
@@ -30,7 +31,7 @@ struct PresentView: View {
                         viewModel.previewPresentation()
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
+                    .tint(branding.primary)
                     .disabled(!viewModel.presentationPreviewActionEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.presentButton)
 
@@ -40,11 +41,7 @@ struct PresentView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    StatusBannerView(
-                        message: viewModel.statusMessage(for: .present),
-                        isLoading: viewModel.statusIsLoading(for: .present),
-                        isError: viewModel.statusIsError(for: .present)
-                    )
+                    WalletTabStatusBanner(viewModel: viewModel, tab: .present)
 
                     if let warning = viewModel.transactionDataProfilesWarning {
                         WarningBannerView(message: warning)
@@ -86,6 +83,7 @@ struct PresentView: View {
                 .padding()
             }
             .navigationTitle("Present")
+            .walletSettingsToolbar(viewModel: viewModel)
             .background(detailsNavigationLink)
             .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }
@@ -136,7 +134,9 @@ struct PresentView: View {
             if let detailsID = selectedDetailsID {
                 CredentialDetailsDestination(
                     detailsID: detailsID,
-                    details: presentationDetails
+                    details: presentationDetails,
+                    viewModel: viewModel,
+                    selectedDetailsID: $selectedDetailsID
                 )
             } else {
                 EmptyView()
@@ -146,6 +146,7 @@ struct PresentView: View {
 }
 
 private struct PresentationErrorView: View {
+    @Environment(\.walletDemoBranding) private var branding
     let error: PresentationPreviewError
     let isEnabled: Bool
     let onNotifyVerifier: () -> Void
@@ -167,7 +168,7 @@ private struct PresentationErrorView: View {
             HStack {
                 Button("Notify verifier", action: onNotifyVerifier)
                     .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
+                    .tint(branding.primary)
                     .disabled(!isEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.presentationErrorNotifyButton)
 

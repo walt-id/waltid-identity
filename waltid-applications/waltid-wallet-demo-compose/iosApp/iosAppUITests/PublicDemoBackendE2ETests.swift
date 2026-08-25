@@ -42,7 +42,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
-        let didLabel = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "did:")).firstMatch
+        ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        let didLabel = app.staticTexts["wallet.settingsDid"]
         XCTAssertTrue(didLabel.waitForExistence(timeout: 10), "Bootstrapped DID label was not exposed")
         XCTAssertTrue(didLabel.label.starts(with: "did:"), "DID should start with 'did:', got: \(didLabel.label)")
     }

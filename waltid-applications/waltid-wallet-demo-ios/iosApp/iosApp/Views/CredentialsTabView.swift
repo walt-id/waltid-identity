@@ -5,6 +5,7 @@ import WalletSDK
 struct CredentialsTabView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
+    @Environment(\.walletDemoBranding) private var branding
 
     private var details: [CredentialDetails] {
         viewModel.credentials.map(CredentialDisplayNormalizer.details(for:))
@@ -14,11 +15,7 @@ struct CredentialsTabView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    StatusBannerView(
-                        message: viewModel.statusMessage(for: .credentials),
-                        isLoading: viewModel.statusIsLoading(for: .credentials),
-                        isError: viewModel.statusIsError(for: .credentials)
-                    )
+                    WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
 
                     if let warning = viewModel.transactionDataProfilesWarning {
                         WarningBannerView(message: warning)
@@ -36,7 +33,9 @@ struct CredentialsTabView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Credentials")
+            .navigationTitle(branding.appTitle)
+            .accessibilityIdentifier(WalletAccessibilityID.appTitle)
+            .walletSettingsToolbar(viewModel: viewModel)
             .background(detailsNavigationLink)
             .accessibilityIdentifier(WalletAccessibilityID.credentialsTabContent)
         }
@@ -65,7 +64,9 @@ struct CredentialsTabView: View {
             if let detailsID = selectedDetailsID {
                 CredentialDetailsDestination(
                     detailsID: detailsID,
-                    details: details
+                    details: details,
+                    viewModel: viewModel,
+                    selectedDetailsID: $selectedDetailsID
                 )
             } else {
                 EmptyView()

@@ -9,6 +9,21 @@ enum WalletTab: Hashable {
     case present
 }
 
+enum WalletStatusKind: Hashable {
+    case busy
+    case info
+    case success
+    case error
+}
+
+private struct WalletStatusBannerModel {
+    let message: String
+    let kind: WalletStatusKind
+    let occurrenceId: UInt64
+
+    var key: String { "\(kind):\(message):\(occurrenceId)" }
+}
+
 private enum WalletDeepLinkScheme: String {
     case credentialOffer = "openid-credential-offer"
     case presentationRequest = "openid4vp"
@@ -40,6 +55,8 @@ private enum WalletStatusText {
     static let rejectFailed = "Reject failed"
     static let presentationContinuationFailed = "Could not deliver the verifier response"
     static let bootstrapFailed = "Bootstrap failed"
+    static let resetWalletFailed = "Reset wallet failed"
+    static let deleteCredentialFailed = "Delete credential failed"
     static let invalidOfferURL = "invalid offer URL"
     static let invalidRequestURL = "invalid request URL"
     static let selectCredentialForEveryRequest = "select a credential for every requested credential"
@@ -63,6 +80,8 @@ private enum WalletStatusText {
 class WalletViewModel: ObservableObject {
     @Published var isReady = false
     @Published var did = ""
+    @Published var keyID = ""
+    @Published var publicJWK = ""
     @Published var credentials: [Credential] = []
     @Published var statusMessage = WalletStatusText.startingWallet
     @Published var isLoading = false
@@ -92,9 +111,13 @@ class WalletViewModel: ObservableObject {
     @Published var presentationNavigationResetKey = 0
     @Published var inputFocusResetKey = 0
     @Published var transactionDataProfilesWarning: String?
+    @Published var statusExpanded = false
     @Published private(set) var pendingPresentationContinuationURL: URL?
     @Published private(set) var pendingPresentationFormPostHTML: String?
     private var statusTab: WalletTab?
+    private var statusOccurrenceId: UInt64 = 0
+    private var statusDismissedKey: String?
+    private var statusHideTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
     private var issuanceSession: IssuanceSession?
     private var pendingPresentationSuccessMessage: String?
@@ -187,7 +210,91 @@ class WalletViewModel: ObservableObject {
         isError && statusApplies(to: tab)
     }
 
+    func isStatusVisible(for tab: WalletTab) -> Bool {
+        guard let banner = statusBanner(for: tab) else { return false }
+        return statusDismissedKey != banner.key
+    }
+
+    func statusKind(for tab: WalletTab) -> WalletStatusKind? {
+        statusBanner(for: tab)?.kind
+    }
+
+    func dismissStatus() {
+        guard let banner = statusBanner(for: selectedTab) else { return }
+        guard banner.kind == .success || banner.kind == .error else { return }
+        statusHideTask?.cancel()
+        statusDismissedKey = banner.key
+        statusExpanded = false
+    }
+
+    func toggleStatusExpanded() {
+        guard statusBanner(for: selectedTab)?.kind == .error, isStatusVisible(for: selectedTab) else { return }
+        statusExpanded.toggle()
+    }
+
+    func deleteCredential(id: String) {
+        Task {
+            do {
+                let removed = try await walletClient.deleteCredential(id: id)
+                guard removed else { return }
+                credentials = try await walletClient.credentials()
+                try await reconcileIdentityDocumentRegistrations()
+                if presentationReview != nil {
+                    discardPresentationPreviewIfPresent()
+                    presentationReview = nil
+                    selectedPresentationCredentialOptions = []
+                    selectedPresentationDisclosureOptions = []
+                    presentationCompleted = false
+                    presentationNavigationResetKey += 1
+                }
+            } catch {
+                setError(WalletStatusText.failure(WalletStatusText.deleteCredentialFailed, error), tab: selectedTab)
+            }
+        }
+    }
+
+    func resetWallet() {
+        receiveTask?.cancel()
+        presentationTask?.cancel()
+        cancelIssuanceIfPresent()
+        discardPresentationPreviewIfPresent()
+        Task {
+            do {
+                try await walletClient.deleteLocalData()
+                did = ""
+                keyID = ""
+                publicJWK = ""
+                credentials = []
+                isReady = false
+                offerUrl = ""
+                txCode = ""
+                offerPreview = nil
+                presentationRequestUrl = ""
+                presentationReview = nil
+                selectedPresentationCredentialOptions = []
+                selectedPresentationDisclosureOptions = []
+                deferredCredentials = []
+                lastReceivedCredentialIDs = []
+                receiveCompleted = false
+                presentationCompleted = false
+                pendingPresentationContinuationURL = nil
+                pendingPresentationFormPostHTML = nil
+                statusExpanded = false
+                statusDismissedKey = nil
+                do {
+                    try await reconcileIdentityDocumentRegistrations()
+                } catch {
+                    setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
+                }
+                bootstrap()
+            } catch {
+                setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
+            }
+        }
+    }
+
     private let walletClient: any WalletClient
+    private let identityDocumentRegistrationUpdate: @Sendable () async throws -> Void
 
     init(
         walletID: String = "default",
@@ -197,7 +304,8 @@ class WalletViewModel: ObservableObject {
         attestationHostHeader: String? = nil,
         transactionDataProfilesUrl: String? = nil,
         biometricEnabled: Bool = true,
-        walletClient: (any WalletClient)? = nil
+        walletClient: (any WalletClient)? = nil,
+        identityDocumentRegistrationUpdate: (@Sendable () async throws -> Void)? = nil
     ) {
         let transactionDataProfiles: TransactionDataProfilesConfiguration
         if walletClient == nil {
@@ -222,6 +330,9 @@ class WalletViewModel: ObservableObject {
             )
         )
         self.walletClient = walletClient ?? SDKWalletClient(configuration: configuration)
+        self.identityDocumentRegistrationUpdate = identityDocumentRegistrationUpdate ?? {
+            try await Self.defaultIdentityDocumentRegistrationUpdate()
+        }
         transactionDataProfilesWarning = transactionDataProfiles.warning
         bootstrap()
     }
@@ -598,9 +709,7 @@ class WalletViewModel: ObservableObject {
         }
 
         credentials = refreshedCredentials
-        if #available(iOS 26.0, *) {
-            try await DemoIdentityDocumentRegistration.update()
-        }
+        try await reconcileIdentityDocumentRegistrations()
         issuanceSession = nil
         offerPreview = nil
         authorizationRequestURL = nil
@@ -624,9 +733,7 @@ class WalletViewModel: ObservableObject {
                 case let .stored(_, credentialIDs):
                     let refreshedCredentials = try await walletClient.credentials()
                     credentials = refreshedCredentials
-                    if #available(iOS 26.0, *) {
-                        try await DemoIdentityDocumentRegistration.update()
-                    }
+                    try await reconcileIdentityDocumentRegistrations()
                     deferredCredentials.removeAll { $0.id == credential.id }
                     lastReceivedCredentialIDs = credentialIDs
                     receiveCompleted = !credentialIDs.isEmpty
@@ -934,6 +1041,16 @@ class WalletViewModel: ObservableObject {
         Task { try? await walletClient.discardPresentationPreview(previewHandle) }
     }
 
+    private func reconcileIdentityDocumentRegistrations() async throws {
+        try await identityDocumentRegistrationUpdate()
+    }
+
+    private static func defaultIdentityDocumentRegistrationUpdate() async throws {
+        if #available(iOS 26.0, *) {
+            try await DemoIdentityDocumentRegistration.update()
+        }
+    }
+
     private func bootstrap() {
         setLoading(WalletStatusText.bootstrappingWallet)
         logE2E("Bootstrap started")
@@ -948,10 +1065,10 @@ class WalletViewModel: ObservableObject {
                 logE2E("Bootstrap: listCredentials returned \(list.count) credentials")
 
                 did = result.did
+                keyID = result.keyID
+                publicJWK = result.publicJWK
                 credentials = list
-                if #available(iOS 26.0, *) {
-                    try await DemoIdentityDocumentRegistration.update()
-                }
+                try await reconcileIdentityDocumentRegistrations()
                 isReady = true
                 setSuccess(WalletStatusText.walletReady)
                 logE2E("Bootstrap: completed successfully, wallet is ready")
@@ -1007,6 +1124,8 @@ class WalletViewModel: ObservableObject {
         isError = false
         statusTab = tab
         statusMessage = message
+        statusExpanded = false
+        statusHideTask?.cancel()
         logE2E("STATUS \(message)")
     }
 
@@ -1015,7 +1134,10 @@ class WalletViewModel: ObservableObject {
         isError = false
         statusTab = tab
         statusMessage = message
+        statusExpanded = false
+        statusOccurrenceId += 1
         logE2E("STATUS \(message)")
+        scheduleSuccessAutoHide()
     }
 
     private static func resolvedReceivedCredentialIDs(
@@ -1041,6 +1163,9 @@ class WalletViewModel: ObservableObject {
         isError = true
         statusTab = tab
         statusMessage = message
+        statusExpanded = false
+        statusOccurrenceId += 1
+        statusHideTask?.cancel()
         logE2E("STATUS \(message)")
     }
 
@@ -1049,7 +1174,11 @@ class WalletViewModel: ObservableObject {
         isError = false
         statusTab = nil
         statusMessage = isReady ? WalletStatusText.walletReady : WalletStatusText.startingWallet
+        statusExpanded = false
         logE2E("STATUS \(statusMessage)")
+        if isReady && !isLoading {
+            scheduleSuccessAutoHide()
+        }
     }
 
     private func resetInputFocus() {
@@ -1062,29 +1191,54 @@ class WalletViewModel: ObservableObject {
 
     private func fallbackStatusMessage(for tab: WalletTab) -> String {
         switch tab {
-        case .credentials:
-            return baseStatusMessage
-        case .receive:
-            if receiveCompleted && !lastReceivedCredentialIDs.isEmpty {
-                return WalletStatusText.receivedCredentials(lastReceivedCredentialIDs.count)
-            }
-            return baseStatusMessage
+        case .credentials, .receive:
+            return ""
         case .present:
-            if presentationCompleted {
-                return WalletStatusText.presentationSent
-            }
             if presentationPreview != nil {
                 return WalletStatusText.reviewPresentationRequest
             }
             if presentationError != nil {
                 return WalletStatusText.reviewPresentationError
             }
-            return baseStatusMessage
+            return ""
         }
     }
 
-    private var baseStatusMessage: String {
-        isReady ? WalletStatusText.walletReady : WalletStatusText.startingWallet
+    private func statusBanner(for tab: WalletTab) -> WalletStatusBannerModel? {
+        let message = statusMessage(for: tab)
+        guard !message.isEmpty else { return nil }
+        let kind: WalletStatusKind
+        if statusIsError(for: tab) {
+            kind = .error
+        } else if statusIsLoading(for: tab) {
+            kind = .busy
+        } else if isInfoStatus(message) {
+            kind = .info
+        } else {
+            kind = .success
+        }
+        return WalletStatusBannerModel(message: message, kind: kind, occurrenceId: statusOccurrenceId)
+    }
+
+    private func isInfoStatus(_ message: String) -> Bool {
+        message == WalletStatusText.reviewCredentialOffer ||
+            message == WalletStatusText.reviewPresentationRequest ||
+            message == WalletStatusText.reviewPresentationError
+    }
+
+    private func scheduleSuccessAutoHide() {
+        statusHideTask?.cancel()
+        let tab = statusTab ?? selectedTab
+        guard let banner = statusBanner(for: tab), banner.kind == .success else { return }
+        let key = banner.key
+        statusHideTask = Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard !Task.isCancelled else { return }
+            if statusBanner(for: tab)?.key == key {
+                statusDismissedKey = key
+                statusExpanded = false
+            }
+        }
     }
 
     private func logE2E(_ message: String) {

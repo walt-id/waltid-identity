@@ -56,4 +56,14 @@ internal class LazyDemoWallet(
 
     override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) =
         wallet().discardPresentationPreview(previewHandle)
+
+    override suspend fun deleteCredential(credentialId: String): Boolean =
+        wallet().deleteCredential(credentialId)
+
+    override suspend fun deleteWallet() {
+        mutex.withLock {
+            wallet?.deleteWallet()
+            wallet = null
+        }
+    }
 }

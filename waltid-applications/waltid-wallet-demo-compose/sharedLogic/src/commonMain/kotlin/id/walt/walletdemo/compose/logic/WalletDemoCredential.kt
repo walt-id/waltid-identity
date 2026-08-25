@@ -9,6 +9,8 @@ data class CredentialSummary(
     val addedAt: String? = null,
     val credentialDataJson: String? = null,
     val metadataJson: String? = null,
+    /** Wallet-local store identifier used for deletion. Differs from [id] for presentation options. */
+    val credentialId: String = id,
 )
 
 typealias WalletDemoCredential = CredentialSummary

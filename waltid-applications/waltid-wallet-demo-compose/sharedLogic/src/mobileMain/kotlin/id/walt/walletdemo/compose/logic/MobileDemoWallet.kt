@@ -25,6 +25,7 @@ internal class MobileDemoWallet(
             WalletDemoBootstrapResult(
                 keyId = result.keyId,
                 did = result.did,
+                publicJwk = result.publicJwk,
                 warning = warning,
             )
         }
@@ -146,6 +147,12 @@ internal class MobileDemoWallet(
             failureMessage = WalletDisplayText.RejectionFinishedWithoutVerifierConfirmation,
         )
 
+    override suspend fun deleteCredential(credentialId: String): Boolean =
+        mobileWallet.deleteCredential(credentialId)
+
+    override suspend fun deleteWallet() {
+        mobileWallet.deleteWallet()
+    }
 }
 
 private fun MobileWalletPresentationResult.toDemoOperationResult(

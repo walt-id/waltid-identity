@@ -20,6 +20,9 @@ data class WalletDemoUiState(
     val presentationNavigationResetKey: Int = 0,
     val warning: String? = null,
     val pendingPresentationContinuation: WalletDemoPendingPresentationContinuation? = null,
+    val statusDismissedKey: String? = null,
+    val statusExpanded: Boolean = false,
+    val statusOccurrenceId: Long = 0,
 ) {
     val presentationPreview: WalletDemoPresentationPreview?
         get() = (presentationReview as? WalletDemoPresentationPreviewResult.Ready)?.preview

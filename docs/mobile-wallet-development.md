@@ -21,6 +21,62 @@ Use Xcode for the iOS app and simulator work. Use the command line for CI-like c
 
 The Compose demo app's Android and iOS targets are the supported mobile demo targets. Its Web/Wasm module is a mock UI preview only; it does not run the mobile wallet SDK, platform-backed keys, persistence, EUDI flows, or Enterprise flows.
 
+## Whitelabel branding
+
+Both demo apps keep in-app title and brand colours in one demo-scoped object. This is not a Wallet SDK API. Edit the defaults, rebuild, and the header, PIN screens, tint, buttons, and success banners pick up the new brand.
+
+Shared tokens:
+
+| Token | Used for |
+|-------|----------|
+| `appTitle` | In-app wallet name (Compose header and PIN screens; native Credentials title and Settings) |
+| `primary` / `onPrimary` | Accent, buttons, selected nav, and text on that colour |
+| `secondary` / `onSecondary` | Secondary accent |
+| `primaryContainer` / `onPrimaryContainer` | Success status banners |
+
+### Compose demo
+
+Edit the defaults on `WalletDemoBranding` in:
+
+```text
+waltid-applications/waltid-wallet-demo-compose/sharedUI/src/commonMain/kotlin/id/walt/walletdemo/compose/ui/WalletDemoTheme.kt
+```
+
+Hosts can also pass a custom instance into `WalletDemoApp` or `WalletDemoTheme` without changing the defaults.
+
+Launcher names stay in platform manifests:
+
+```text
+waltid-applications/waltid-wallet-demo-compose/androidApp/src/main/res/values/strings.xml   # app_name
+waltid-applications/waltid-wallet-demo-compose/iosApp/iosApp/Info.plist                    # CFBundleDisplayName
+waltid-applications/waltid-wallet-demo-compose/iosApp/IdentityDocumentProvider/Info.plist  # CFBundleDisplayName
+```
+
+### Native iOS demo
+
+Edit `WalletDemoBranding.default` in:
+
+```text
+waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/WalletDemoBranding.swift
+```
+
+Views read colours from `@Environment(\.walletDemoBranding)`. The app root can also inject a custom value:
+
+```swift
+ContentView(viewModel: viewModel)
+    .environment(\.walletDemoBranding, customBranding)
+    .tint(customBranding.primary)
+```
+
+Launcher names stay in `CFBundleDisplayName`:
+
+```text
+waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Info.plist
+waltid-applications/waltid-wallet-demo-ios/iosApp/IdentityDocumentProvider/Info.plist
+```
+
+See the Compose and native demo READMEs for the shorter per-app notes.
+
 ## Local setup
 
 Start from the repository root:

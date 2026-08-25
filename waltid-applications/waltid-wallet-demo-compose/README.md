@@ -34,6 +34,12 @@ The demo unlock PIN is stored separately as a salted PBKDF2-SHA256 verifier in a
 
 The UI stays focused on the production default. Non-default persistence options, including provided database keys and custom stores, are documented and tested at the SDK layer.
 
+## Whitelabel branding
+
+Edit `WalletDemoBranding` in `sharedUI` to change the in-app wallet title and Material3 colours (`primary`, `secondary`, `primaryContainer`, and their on-colours). Hosts can also pass a custom instance into `WalletDemoApp`.
+
+Launcher names stay in platform manifests: Android `app_name` in `androidApp/src/main/res/values/strings.xml`, and iOS `CFBundleDisplayName` in the app and document-provider `Info.plist` files.
+
 ## Public demo backend defaults
 
 Clean demo installs use the public walt.id demo profile endpoint for OpenID4VP transaction-data support:

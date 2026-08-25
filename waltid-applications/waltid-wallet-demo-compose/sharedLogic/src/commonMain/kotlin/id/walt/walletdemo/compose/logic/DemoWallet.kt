@@ -25,4 +25,6 @@ interface DemoWallet {
     ): WalletDemoOperationResult
     suspend fun rejectPresentation(previewHandle: WalletDemoPresentationPreviewHandle): WalletDemoOperationResult
     suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle)
+    suspend fun deleteCredential(credentialId: String): Boolean
+    suspend fun deleteWallet()
 }

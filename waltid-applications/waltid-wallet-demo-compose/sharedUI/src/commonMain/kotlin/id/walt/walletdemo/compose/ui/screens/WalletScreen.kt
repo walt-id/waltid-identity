@@ -4,8 +4,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -25,6 +28,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
     val receiveBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
     val presentBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
     val uriHandler = LocalUriHandler.current
+    var showingSettings by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.authorizationRequestUrl) {
         state.authorizationRequestUrl?.let { authorizationUrl ->
@@ -40,12 +44,23 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
         presentBackStack.resetToRoot()
     }
 
+    if (showingSettings) {
+        SettingsScreen(
+            ready = ready,
+            onBack = { showingSettings = false },
+            onLock = controller::lock,
+            onResetWallet = controller::resetWallet,
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             WalletHeader(
-                did = ready?.did,
                 state = state,
-                onLock = controller::lock,
+                onSettings = { showingSettings = true },
+                onDismissStatus = controller::dismissStatus,
+                onToggleStatusExpanded = controller::toggleStatusExpanded,
             )
         },
         bottomBar = {
@@ -70,6 +85,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                         onCredentialClick = { detailsId -> credentialsBackStack.pushDetails(detailsId) },
                     )
                 },
+                onDeleteCredential = controller::deleteCredential,
             )
             WalletDemoTab.Receive -> {
                 val receivedDetails = state.receivedCredentials()
@@ -93,6 +109,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                             onCredentialClick = { detailsId -> receiveBackStack.pushDetails(detailsId) },
                         )
                     },
+                    onDeleteCredential = controller::deleteCredential,
                 )
             }
             WalletDemoTab.Present -> {
@@ -120,6 +137,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                             onCancel = controller::cancelPresentationReview,
                         )
                     },
+                    onDeleteCredential = controller::deleteCredential,
                 )
             }
         }

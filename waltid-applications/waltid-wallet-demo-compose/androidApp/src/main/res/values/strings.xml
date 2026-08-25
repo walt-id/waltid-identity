@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Keep in sync with WalletDemoBranding.appTitle. -->
     <string name="app_name">walt.id Wallet</string>
     <string name="wallet_hce_service_description">walt.id Wallet</string>
     <string name="wallet_hce_aid_group_description">walt.id digital wallet</string>

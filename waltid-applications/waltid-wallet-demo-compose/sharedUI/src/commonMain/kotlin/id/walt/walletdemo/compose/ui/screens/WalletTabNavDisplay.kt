@@ -13,6 +13,7 @@ internal fun WalletTabNavDisplay(
     backStack: SnapshotStateList<WalletRoute>,
     details: List<CredentialDetails>,
     modifier: Modifier,
+    onDeleteCredential: (String) -> Unit,
     root: @Composable () -> Unit,
 ) {
     NavDisplay(
@@ -30,6 +31,10 @@ internal fun WalletTabNavDisplay(
                     CredentialDetailsScreen(
                         details = selectedDetails,
                         onBack = { backStack.removeLastOrNull() },
+                        onDelete = {
+                            onDeleteCredential(selectedDetails.summary.credentialId)
+                            backStack.removeLastOrNull()
+                        },
                     )
                 }
             }

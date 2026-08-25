@@ -1,4 +1,5 @@
 import Foundation
+import WalletDemoSharingUI
 import WalletSDK
 import XCTest
 @testable import iosApp
@@ -94,8 +95,8 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertFalse(viewModel.presentationCompleted)
         XCTAssertTrue(viewModel.statusIsLoading(for: .present))
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Declining presentation...")
-        XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Wallet ready")
-        XCTAssertEqual(viewModel.statusMessage(for: .receive), "Wallet ready")
+        XCTAssertEqual(viewModel.statusMessage(for: .credentials), "")
+        XCTAssertEqual(viewModel.statusMessage(for: .receive), "")
         XCTAssertEqual(viewModel.pendingPresentationContinuationURL, continuationURL)
 
         viewModel.completePresentationContinuation()
@@ -136,6 +137,190 @@ final class WalletViewModelPresentationTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testDidAndKeyAreCapturedAndStatusCanBeDismissed() async throws {
+        let viewModel = WalletViewModel(
+            walletID: "settings-\(UUID().uuidString)",
+            walletClient: MockWalletClient()
+        )
+        try await waitUntil { viewModel.isReady }
+
+        XCTAssertEqual(viewModel.did, "did:key:mock")
+        XCTAssertEqual(viewModel.keyID, "mock-key-1")
+        XCTAssertFalse(viewModel.publicJWK.isEmpty)
+        XCTAssertFalse(viewModel.publicJWK.contains("\"d\""))
+        XCTAssertTrue(viewModel.isStatusVisible(for: .credentials))
+        XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Wallet ready")
+
+        viewModel.dismissStatus()
+        XCTAssertFalse(viewModel.isStatusVisible(for: .credentials))
+
+        viewModel.resetWallet()
+        try await waitUntil { viewModel.isReady && viewModel.isStatusVisible(for: .credentials) }
+        XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Wallet ready")
+    }
+
+    @MainActor
+    func testResetWalletRebootstrapsAFreshSession() async throws {
+        let viewModel = WalletViewModel(
+            walletID: "reset-\(UUID().uuidString)",
+            walletClient: MockWalletClient(
+                storedCredentials: [
+                    Credential(
+                        id: "cred-1",
+                        format: "jwt_vc_json",
+                        issuer: "Example Issuer",
+                        subject: nil,
+                        label: "Example Credential",
+                        addedAt: nil,
+                        credentialDataJSON: "{}"
+                    )
+                ]
+            )
+        )
+        try await waitUntil { viewModel.isReady }
+        XCTAssertEqual(viewModel.credentials.map(\.id), ["cred-1"])
+
+        viewModel.resetWallet()
+        try await waitUntil { viewModel.isReady && viewModel.credentials.isEmpty }
+        XCTAssertEqual(viewModel.did, "did:key:mock")
+        XCTAssertEqual(viewModel.keyID, "mock-key-1")
+    }
+
+    @MainActor
+    func testDeleteCredentialRemovesItFromTheWallet() async throws {
+        let viewModel = WalletViewModel(
+            walletID: "delete-\(UUID().uuidString)",
+            walletClient: MockWalletClient(
+                storedCredentials: [
+                    Credential(
+                        id: "cred-1",
+                        format: "jwt_vc_json",
+                        issuer: "Example Issuer",
+                        subject: nil,
+                        label: "Example Credential",
+                        addedAt: nil,
+                        credentialDataJSON: "{}"
+                    )
+                ]
+            )
+        )
+        try await waitUntil { viewModel.isReady }
+        viewModel.deleteCredential(id: "cred-1")
+        try await waitUntil { viewModel.credentials.isEmpty }
+    }
+
+    @MainActor
+    func testDeleteCredentialDiscardsAnActivePresentationReview() async throws {
+        let walletClient = MockWalletClient(
+            storedCredentials: [
+                Credential(
+                    id: "cred-1",
+                    format: "jwt_vc_json",
+                    issuer: "Example Issuer",
+                    subject: nil,
+                    label: "Example Credential",
+                    addedAt: nil,
+                    credentialDataJSON: "{}"
+                )
+            ]
+        )
+        let viewModel = WalletViewModel(
+            walletID: "delete-review-\(UUID().uuidString)",
+            walletClient: walletClient
+        )
+        try await waitUntil { viewModel.isReady }
+        viewModel.presentationRequestUrl = "openid4vp://mock"
+        viewModel.previewPresentation()
+        try await waitUntil { viewModel.presentationReviewEnabled }
+
+        viewModel.deleteCredential(id: "cred-1")
+        try await waitUntil { viewModel.credentials.isEmpty && viewModel.presentationReview == nil }
+
+        XCTAssertFalse(viewModel.presentationReviewEnabled)
+        XCTAssertEqual(viewModel.selectedPresentationCredentialOptions, [])
+        let discarded = await walletClient.discardedPresentationPreviewHandles
+        XCTAssertEqual(discarded.count, 1)
+    }
+
+    @MainActor
+    func testPresentationDetailsDeleteUsesStoreCredentialId() async throws {
+        let walletClient = MockWalletClient(
+            storedCredentials: [
+                Credential(
+                    id: "cred-1",
+                    format: "jwt_vc_json",
+                    issuer: "Example Issuer",
+                    subject: nil,
+                    label: "Example Credential",
+                    addedAt: nil,
+                    credentialDataJSON: "{}"
+                )
+            ]
+        )
+        let viewModel = WalletViewModel(
+            walletID: "delete-details-\(UUID().uuidString)",
+            walletClient: walletClient
+        )
+        try await waitUntil { viewModel.isReady }
+        viewModel.presentationRequestUrl = "openid4vp://mock"
+        viewModel.previewPresentation()
+        try await waitUntil { viewModel.presentationReviewEnabled }
+
+        guard case .ready(let preview) = viewModel.presentationReview else {
+            return XCTFail("Expected a ready presentation preview")
+        }
+        let option = try XCTUnwrap(preview.credentialOptions.first)
+        let details = CredentialDisplayNormalizer.details(for: option)
+        XCTAssertEqual(details.id, option.selection.id)
+        XCTAssertEqual(details.credentialId, option.credentialID)
+        XCTAssertNotEqual(details.id, details.credentialId)
+
+        viewModel.deleteCredential(id: details.credentialId)
+        try await waitUntil { viewModel.credentials.isEmpty && viewModel.presentationReview == nil }
+        XCTAssertFalse(viewModel.presentationReviewEnabled)
+    }
+
+    @MainActor
+    func testDeleteAndResetReconcileIdentityDocumentRegistrations() async throws {
+        let counter = RegistrationUpdateCounter()
+        let viewModel = WalletViewModel(
+            walletID: "registration-\(UUID().uuidString)",
+            walletClient: MockWalletClient(
+                storedCredentials: [
+                    Credential(
+                        id: "cred-1",
+                        format: "jwt_vc_json",
+                        issuer: "Example Issuer",
+                        subject: nil,
+                        label: "Example Credential",
+                        addedAt: nil,
+                        credentialDataJSON: "{}"
+                    )
+                ]
+            ),
+            identityDocumentRegistrationUpdate: { await counter.increment() }
+        )
+        try await waitUntil { viewModel.isReady }
+        try await waitUntilAsync { await counter.count >= 1 }
+        let afterBootstrap = await counter.count
+
+        viewModel.deleteCredential(id: "cred-1")
+        try await waitUntil { viewModel.credentials.isEmpty }
+        try await waitUntilAsync { await counter.count >= afterBootstrap + 1 }
+        let afterDelete = await counter.count
+        XCTAssertEqual(afterDelete, afterBootstrap + 1)
+
+        // After delete the wallet is already ready and empty, so waiting only on
+        // those flags returns before reset's wipe reconcile and bootstrap run.
+        // Reset publishes one update after deleteLocalData and another after bootstrap.
+        viewModel.resetWallet()
+        try await waitUntilAsync { await counter.count >= afterDelete + 2 }
+        try await waitUntil { viewModel.isReady && viewModel.credentials.isEmpty }
+        let afterReset = await counter.count
+        XCTAssertGreaterThanOrEqual(afterReset, afterDelete + 2)
+    }
+
     /// Waits for `predicate`, bounded by elapsed time rather than by a yield count.
     ///
     /// Yielding alone bounds nothing: opening a wallet does real keychain and file work off this
@@ -169,5 +354,13 @@ final class WalletViewModelPresentationTests: XCTestCase {
             }
             try await Task.sleep(nanoseconds: 10_000_000)
         }
+    }
+}
+
+private actor RegistrationUpdateCounter {
+    private(set) var count = 0
+
+    func increment() {
+        count += 1
     }
 }

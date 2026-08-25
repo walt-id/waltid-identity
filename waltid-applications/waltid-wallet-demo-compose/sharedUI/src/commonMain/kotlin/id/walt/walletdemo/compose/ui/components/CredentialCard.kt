@@ -31,8 +31,8 @@ internal fun CredentialCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .testTag(WalletUiTestTags.credentialCard(display.id))
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .testTag(WalletUiTestTags.credentialCard(display.id)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(

@@ -9,6 +9,7 @@ private class MockDemoWallet : DemoWallet {
         WalletDemoBootstrapResult(
             keyId = "mock-key",
             did = "did:key:mock-wallet-demo",
+            publicJwk = """{"kty":"OKP","crv":"Ed25519","x":"test"}""",
         )
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
@@ -116,4 +117,15 @@ private class MockDemoWallet : DemoWallet {
     ): WalletDemoOperationResult = WalletDemoOperationResult.Success("Mock presentation rejected")
 
     override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) = Unit
+
+    override suspend fun deleteCredential(credentialId: String): Boolean {
+        val remaining = credentials.filterNot { it.id == credentialId }
+        val removed = remaining.size != credentials.size
+        credentials = remaining
+        return removed
+    }
+
+    override suspend fun deleteWallet() {
+        credentials = emptyList()
+    }
 }

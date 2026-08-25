@@ -274,11 +274,14 @@ class MobileWalletTest {
 
     @Test
     fun persistedManagedKeyIsRestoredWithoutLegacyKeyAfterRestart() = runTest {
-        val managedKey = object : ManagedKeyMaterial {
-            override val id = KeyId("managed-key")
-            override val spec = KeySpec.Ec(EcCurve.P256)
-            override val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
-        }
+        val runtime = CryptoRuntime(softwareProviders = defaultSoftwareKeyProviders())
+        val managedKey = runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("managed-key"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            ),
+        )
         val keyStore = PreloadedKeyStore(
             keyInfo = WalletKeyInfo(keyId = managedKey.id.value, keyType = "secp256r1"),
             managedKey = managedKey,
@@ -296,7 +299,8 @@ class MobileWalletTest {
 
         assertEquals(managedKey.id.value, bootstrap.keyId)
         assertEquals("did:key:managed", bootstrap.did)
-        assertEquals(1, keyStore.managedKeyLookupCalls)
+        assertTrue(bootstrap.publicJwk.contains("\"kty\""), bootstrap.publicJwk)
+        assertEquals(2, keyStore.managedKeyLookupCalls)
     }
 
     @Test

@@ -45,7 +45,11 @@ actor MockWalletClient: WalletClient {
     }
 
     func bootstrap() async throws -> WalletBootstrapResult {
-        WalletBootstrapResult(keyID: "mock-key-1", did: "did:key:mock")
+        WalletBootstrapResult(
+            keyID: "mock-key-1",
+            did: "did:key:mock",
+            publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#
+        )
     }
 
     func credentials() async throws -> [Credential] {
@@ -147,6 +151,17 @@ actor MockWalletClient: WalletClient {
 
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         discardedPresentationPreviewHandles.append(previewHandle)
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
+        let remaining = storedCredentials.filter { $0.id != id }
+        let removed = remaining.count != storedCredentials.count
+        storedCredentials = remaining
+        return removed
+    }
+
+    func deleteLocalData() async throws {
+        storedCredentials = []
     }
 
     private func delayOperation() async throws {
