@@ -110,6 +110,10 @@ class WalletDemoAppIosTest {
         scenarios.credentialDetailsCanCopyAndDelete()
 
     @Test
+    fun presentationDetailsDeleteUsesStoreCredentialId() =
+        scenarios.presentationDetailsDeleteUsesStoreCredentialId()
+
+    @Test
     fun successStatusCanBeDismissedFromTheHeader() =
         scenarios.successStatusCanBeDismissedFromTheHeader()
 }

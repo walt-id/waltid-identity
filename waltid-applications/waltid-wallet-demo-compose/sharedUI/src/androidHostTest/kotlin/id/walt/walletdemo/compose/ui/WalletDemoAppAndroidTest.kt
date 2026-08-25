@@ -115,6 +115,10 @@ class WalletDemoAppAndroidTest {
         scenarios.credentialDetailsCanCopyAndDelete()
 
     @Test
+    fun presentationDetailsDeleteUsesStoreCredentialId() =
+        scenarios.presentationDetailsDeleteUsesStoreCredentialId()
+
+    @Test
     fun successStatusCanBeDismissedFromTheHeader() =
         scenarios.successStatusCanBeDismissedFromTheHeader()
 }

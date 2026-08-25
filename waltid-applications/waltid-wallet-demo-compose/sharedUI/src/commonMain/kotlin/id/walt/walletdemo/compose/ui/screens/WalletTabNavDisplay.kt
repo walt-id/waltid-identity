@@ -32,7 +32,7 @@ internal fun WalletTabNavDisplay(
                         details = selectedDetails,
                         onBack = { backStack.removeLastOrNull() },
                         onDelete = {
-                            onDeleteCredential(selectedDetails.summary.id)
+                            onDeleteCredential(selectedDetails.summary.credentialId)
                             backStack.removeLastOrNull()
                         },
                     )

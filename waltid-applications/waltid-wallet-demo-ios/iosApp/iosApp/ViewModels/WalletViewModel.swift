@@ -238,6 +238,7 @@ class WalletViewModel: ObservableObject {
                 let removed = try await walletClient.deleteCredential(id: id)
                 guard removed else { return }
                 credentials = try await walletClient.credentials()
+                try await reconcileIdentityDocumentRegistrations()
                 if presentationReview != nil {
                     discardPresentationPreviewIfPresent()
                     presentationReview = nil
@@ -280,6 +281,11 @@ class WalletViewModel: ObservableObject {
                 pendingPresentationFormPostHTML = nil
                 statusExpanded = false
                 statusDismissedKey = nil
+                do {
+                    try await reconcileIdentityDocumentRegistrations()
+                } catch {
+                    setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
+                }
                 bootstrap()
             } catch {
                 setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
@@ -288,6 +294,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private let walletClient: any WalletClient
+    private let identityDocumentRegistrationUpdate: @Sendable () async throws -> Void
 
     init(
         walletID: String = "default",
@@ -297,7 +304,8 @@ class WalletViewModel: ObservableObject {
         attestationHostHeader: String? = nil,
         transactionDataProfilesUrl: String? = nil,
         biometricEnabled: Bool = true,
-        walletClient: (any WalletClient)? = nil
+        walletClient: (any WalletClient)? = nil,
+        identityDocumentRegistrationUpdate: (@Sendable () async throws -> Void)? = nil
     ) {
         let transactionDataProfiles: TransactionDataProfilesConfiguration
         if walletClient == nil {
@@ -322,6 +330,9 @@ class WalletViewModel: ObservableObject {
             )
         )
         self.walletClient = walletClient ?? SDKWalletClient(configuration: configuration)
+        self.identityDocumentRegistrationUpdate = identityDocumentRegistrationUpdate ?? {
+            try await Self.defaultIdentityDocumentRegistrationUpdate()
+        }
         transactionDataProfilesWarning = transactionDataProfiles.warning
         bootstrap()
     }
@@ -698,9 +709,7 @@ class WalletViewModel: ObservableObject {
         }
 
         credentials = refreshedCredentials
-        if #available(iOS 26.0, *) {
-            try await DemoIdentityDocumentRegistration.update()
-        }
+        try await reconcileIdentityDocumentRegistrations()
         issuanceSession = nil
         offerPreview = nil
         authorizationRequestURL = nil
@@ -724,9 +733,7 @@ class WalletViewModel: ObservableObject {
                 case let .stored(_, credentialIDs):
                     let refreshedCredentials = try await walletClient.credentials()
                     credentials = refreshedCredentials
-                    if #available(iOS 26.0, *) {
-                        try await DemoIdentityDocumentRegistration.update()
-                    }
+                    try await reconcileIdentityDocumentRegistrations()
                     deferredCredentials.removeAll { $0.id == credential.id }
                     lastReceivedCredentialIDs = credentialIDs
                     receiveCompleted = !credentialIDs.isEmpty
@@ -1034,6 +1041,16 @@ class WalletViewModel: ObservableObject {
         Task { try? await walletClient.discardPresentationPreview(previewHandle) }
     }
 
+    private func reconcileIdentityDocumentRegistrations() async throws {
+        try await identityDocumentRegistrationUpdate()
+    }
+
+    private static func defaultIdentityDocumentRegistrationUpdate() async throws {
+        if #available(iOS 26.0, *) {
+            try await DemoIdentityDocumentRegistration.update()
+        }
+    }
+
     private func bootstrap() {
         setLoading(WalletStatusText.bootstrappingWallet)
         logE2E("Bootstrap started")
@@ -1051,9 +1068,7 @@ class WalletViewModel: ObservableObject {
                 keyID = result.keyID
                 publicJWK = result.publicJWK
                 credentials = list
-                if #available(iOS 26.0, *) {
-                    try await DemoIdentityDocumentRegistration.update()
-                }
+                try await reconcileIdentityDocumentRegistrations()
                 isReady = true
                 setSuccess(WalletStatusText.walletReady)
                 logE2E("Bootstrap: completed successfully, wallet is ready")

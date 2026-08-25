@@ -45,7 +45,11 @@ actor MockWalletClient: WalletClient {
     }
 
     func bootstrap() async throws -> WalletBootstrapResult {
-        WalletBootstrapResult(keyID: "mock-key-1", did: "did:key:mock")
+        WalletBootstrapResult(
+            keyID: "mock-key-1",
+            did: "did:key:mock",
+            publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#
+        )
     }
 
     func credentials() async throws -> [Credential] {

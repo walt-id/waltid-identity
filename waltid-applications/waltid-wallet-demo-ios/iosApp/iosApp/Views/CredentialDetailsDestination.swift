@@ -11,9 +11,9 @@ struct CredentialDetailsDestination: View {
         if let item = details.first(where: { $0.id == detailsID }) {
             CredentialDetailsScreen(
                 details: item,
-                rawCredentialJSON: viewModel.credentials.first(where: { $0.id == detailsID })?.credentialDataJSON,
+                rawCredentialJSON: viewModel.credentials.first(where: { $0.id == item.credentialId })?.credentialDataJSON,
                 onDelete: {
-                    viewModel.deleteCredential(id: detailsID)
+                    viewModel.deleteCredential(id: item.credentialId)
                     selectedDetailsID = nil
                 }
             )

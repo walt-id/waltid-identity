@@ -181,6 +181,32 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun dismissedErrorReappearsOnLaterIdenticalFailure() = runTest {
+        val wallet = FakeDemoWallet(startIssuanceError = IllegalStateException("issuer unavailable"))
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Receive)
+        controller.updateOfferUrl("openid-credential-offer://same")
+        controller.previewOffer()
+        runCurrent()
+
+        val firstBanner = checkNotNull(controller.state.value.statusBanner())
+        assertEquals(WalletStatusKind.Error, firstBanner.kind)
+        assertTrue(firstBanner.message.contains("issuer unavailable"))
+        assertTrue(controller.state.value.isStatusVisible)
+        controller.dismissStatus()
+        assertFalse(controller.state.value.isStatusVisible)
+
+        controller.previewOffer()
+        runCurrent()
+
+        val secondBanner = checkNotNull(controller.state.value.statusBanner())
+        assertEquals(firstBanner.message, secondBanner.message)
+        assertTrue(secondBanner.occurrenceId > firstBanner.occurrenceId)
+        assertTrue(controller.state.value.isStatusVisible)
+    }
+
+    @Test
     fun deleteCredentialRemovesItFromTheReadySession() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val controller = unlockedControllerWith(wallet, this)
@@ -213,6 +239,47 @@ class WalletDemoControllerTest {
         assertFalse(controller.state.value.presentationReviewEnabled)
         assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
         assertEquals(listOf(presentationPreviewHandle), wallet.discardedPresentationPreviewHandles)
+        val session = controller.state.value.session as WalletSessionState.Ready
+        assertEquals(emptyList(), session.credentials)
+    }
+
+    @Test
+    fun presentationDetailsDeleteUsesStoreCredentialId() = runTest {
+        val option = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "cred-1",
+            label = "Example Credential",
+            issuer = "Example Issuer",
+            format = "jwt_vc_json",
+            credentialDataJson = "{}",
+            disclosures = emptyList(),
+        )
+        val preview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = null,
+            clientId = null,
+            credentialOptions = listOf(option),
+        )
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential), presentationPreview = preview)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        val details = option.toCredentialDetails()
+        assertEquals(option.selection.id, details.summary.id)
+        assertEquals("cred-1", details.summary.credentialId)
+        assertTrue(details.summary.id != details.summary.credentialId)
+
+        controller.deleteCredential(details.summary.credentialId)
+        runCurrent()
+
+        assertEquals(listOf("cred-1"), wallet.deletedCredentialIds)
+        assertEquals(null, controller.state.value.presentationReview)
+        assertFalse(controller.state.value.presentationReviewEnabled)
         val session = controller.state.value.session as WalletSessionState.Ready
         assertEquals(emptyList(), session.credentials)
     }
@@ -254,7 +321,11 @@ class WalletDemoControllerTest {
 
         assertEquals(1, wallet.deleteWalletCalls)
         assertTrue(pinStore.hasPin())
-        assertTrue(controller.state.value.auth is WalletAuthState.Setup)
+        val setup = controller.state.value.auth as WalletAuthState.Setup
+        assertEquals(
+            WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, "PIN verifier could not be cleared"),
+            setup.error,
+        )
         assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
     }
 

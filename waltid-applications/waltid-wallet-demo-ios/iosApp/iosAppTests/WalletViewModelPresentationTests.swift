@@ -1,4 +1,5 @@
 import Foundation
+import WalletDemoSharingUI
 import WalletSDK
 import XCTest
 @testable import iosApp
@@ -242,6 +243,79 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertEqual(discarded.count, 1)
     }
 
+    @MainActor
+    func testPresentationDetailsDeleteUsesStoreCredentialId() async throws {
+        let walletClient = MockWalletClient(
+            storedCredentials: [
+                Credential(
+                    id: "cred-1",
+                    format: "jwt_vc_json",
+                    issuer: "Example Issuer",
+                    subject: nil,
+                    label: "Example Credential",
+                    addedAt: nil,
+                    credentialDataJSON: "{}"
+                )
+            ]
+        )
+        let viewModel = WalletViewModel(
+            walletID: "delete-details-\(UUID().uuidString)",
+            walletClient: walletClient
+        )
+        try await waitUntil { viewModel.isReady }
+        viewModel.presentationRequestUrl = "openid4vp://mock"
+        viewModel.previewPresentation()
+        try await waitUntil { viewModel.presentationReviewEnabled }
+
+        guard case .ready(let preview) = viewModel.presentationReview else {
+            return XCTFail("Expected a ready presentation preview")
+        }
+        let option = try XCTUnwrap(preview.credentialOptions.first)
+        let details = CredentialDisplayNormalizer.details(for: option)
+        XCTAssertEqual(details.id, option.selection.id)
+        XCTAssertEqual(details.credentialId, option.credentialID)
+        XCTAssertNotEqual(details.id, details.credentialId)
+
+        viewModel.deleteCredential(id: details.credentialId)
+        try await waitUntil { viewModel.credentials.isEmpty && viewModel.presentationReview == nil }
+        XCTAssertFalse(viewModel.presentationReviewEnabled)
+    }
+
+    @MainActor
+    func testDeleteAndResetReconcileIdentityDocumentRegistrations() async throws {
+        let counter = RegistrationUpdateCounter()
+        let viewModel = WalletViewModel(
+            walletID: "registration-\(UUID().uuidString)",
+            walletClient: MockWalletClient(
+                storedCredentials: [
+                    Credential(
+                        id: "cred-1",
+                        format: "jwt_vc_json",
+                        issuer: "Example Issuer",
+                        subject: nil,
+                        label: "Example Credential",
+                        addedAt: nil,
+                        credentialDataJSON: "{}"
+                    )
+                ]
+            ),
+            identityDocumentRegistrationUpdate: { await counter.increment() }
+        )
+        try await waitUntil { viewModel.isReady }
+        let afterBootstrap = await counter.count
+        XCTAssertGreaterThanOrEqual(afterBootstrap, 1)
+
+        viewModel.deleteCredential(id: "cred-1")
+        try await waitUntil { viewModel.credentials.isEmpty }
+        let afterDelete = await counter.count
+        XCTAssertEqual(afterDelete, afterBootstrap + 1)
+
+        viewModel.resetWallet()
+        try await waitUntil { viewModel.isReady && viewModel.credentials.isEmpty }
+        let afterReset = await counter.count
+        XCTAssertGreaterThan(afterReset, afterDelete)
+    }
+
     /// Waits for `predicate`, bounded by elapsed time rather than by a yield count.
     ///
     /// Yielding alone bounds nothing: opening a wallet does real keychain and file work off this
@@ -275,5 +349,13 @@ final class WalletViewModelPresentationTests: XCTestCase {
             }
             try await Task.sleep(nanoseconds: 10_000_000)
         }
+    }
+}
+
+private actor RegistrationUpdateCounter {
+    private(set) var count = 0
+
+    func increment() {
+        count += 1
     }
 }

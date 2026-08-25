@@ -906,6 +906,35 @@ class WalletDemoAppTestScenarios {
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
     }
 
+    fun presentationDetailsDeleteUsesStoreCredentialId() = runComposeUiTest {
+        val wallet = FakeDemoWallet(
+            credentials = listOf(sampleCredential),
+            presentationPreview = samplePresentationPreview,
+        )
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag("wallet.tab.present").performClick()
+        onNodeWithTag("wallet.presentationInput").performTextInput("openid4vp://example")
+        onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+
+        val selectionId = samplePresentationCredentialOption.selection.id
+        assertTrue(selectionId != "cred-1")
+        onNodeWithTag(WalletUiTestTags.credentialCard(selectionId)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.DeleteCredential).performClick()
+        onNodeWithTag(WalletUiTestTags.DeleteCredentialConfirm).performClick()
+        waitUntil(timeoutMillis = 5_000) {
+            (controller.state.value.session as? WalletSessionState.Ready)?.credentials.orEmpty().isEmpty()
+        }
+        assertEquals(listOf("cred-1"), wallet.deletedCredentialIds)
+        assertEquals(null, controller.state.value.presentationReview)
+        onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
+    }
+
     fun successStatusCanBeDismissedFromTheHeader() = runComposeUiTest {
         val wallet = FakeDemoWallet()
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())

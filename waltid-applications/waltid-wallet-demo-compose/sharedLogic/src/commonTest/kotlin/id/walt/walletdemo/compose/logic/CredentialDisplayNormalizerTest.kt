@@ -846,6 +846,7 @@ class CredentialDisplayNormalizerTest {
         val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
         assertEquals(listOf("Given name", "Family name"), personal.items.map { it.label })
         assertEquals(option.selection.id, details.summary.id)
+        assertEquals(option.credentialId, details.summary.credentialId)
     }
 
     @Test

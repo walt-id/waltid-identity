@@ -192,7 +192,13 @@ class WalletDemoController(
             statusHideJob?.cancel()
             _state.value = WalletDemoUiState(auth = WalletAuthState.Setup())
             pinCleared.exceptionOrNull()?.let { error ->
-                setOperationError(WalletDisplayText.ResetWalletFailed, error, WalletDemoTab.Credentials)
+                val message = WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, error)
+                _state.update {
+                    it.copy(
+                        auth = WalletAuthState.Setup(error = message),
+                        operation = WalletOperationState.Failed(message, WalletDemoTab.Credentials),
+                    ).withPublishedStatus()
+                }
             }
         }
     }
@@ -430,11 +436,9 @@ class WalletDemoController(
                     withContext(NonCancellable) { runCatching { wallet.cancelIssuance(session.id) } }
                 }
                 updateIfCurrent(request, WalletOperationState.ResolvingOffer) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            message = WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
-                            tab = WalletDemoTab.Receive,
-                        )
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
+                        WalletDemoTab.Receive,
                     )
                 }
             }
@@ -472,11 +476,9 @@ class WalletDemoController(
                 throw cancellation
             } catch (error: Throwable) {
                 updateIfCurrent(request, WalletOperationState.Receiving) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            message = WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
-                            tab = WalletDemoTab.Receive,
-                        )
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
+                        WalletDemoTab.Receive,
                     )
                 }
             }
@@ -654,11 +656,9 @@ class WalletDemoController(
                 throw cancellation
             } catch (error: Throwable) {
                 updateIfCurrent(request, WalletOperationState.Receiving) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
-                            WalletDemoTab.Receive,
-                        ),
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
+                        WalletDemoTab.Receive,
                     )
                 }
             }
@@ -768,11 +768,9 @@ class WalletDemoController(
                     }
                 }
                 updatePresentationIfCurrent(request, WalletOperationState.ResolvingPresentation) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            message = WalletDisplayText.failure(WalletDisplayText.PreviewFailed, error),
-                            tab = WalletDemoTab.Present,
-                        )
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.PreviewFailed, error),
+                        WalletDemoTab.Present,
                     )
                 }
             }
@@ -862,14 +860,12 @@ class WalletDemoController(
         if (!current.presentationCredentialSelectionComplete()) {
             _state.compareAndSet(
                 current,
-                current.copy(
-                    operation = WalletOperationState.Failed(
-                        WalletDisplayText.failure(
-                            WalletDisplayText.PresentFailed,
-                            WalletDisplayText.SelectCredentialForEveryRequest,
-                        ),
-                        WalletDemoTab.Present,
-                    )
+                current.withFailedOperation(
+                    WalletDisplayText.failure(
+                        WalletDisplayText.PresentFailed,
+                        WalletDisplayText.SelectCredentialForEveryRequest,
+                    ),
+                    WalletDemoTab.Present,
                 ),
             )
             return
@@ -897,11 +893,10 @@ class WalletDemoController(
                 throw cancellation
             } catch (error: Throwable) {
                 updatePresentationIfCurrent(request, WalletOperationState.Presenting) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            message = WalletDisplayText.failure(WalletDisplayText.PresentFailed, error),
-                            tab = WalletDemoTab.Present,
-                        ),
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.PresentFailed, error),
+                        WalletDemoTab.Present,
+                    ).copy(
                         presentationReview = null,
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
@@ -1009,11 +1004,10 @@ class WalletDemoController(
                 throw cancellation
             } catch (error: Throwable) {
                 updatePresentationIfCurrent(request, WalletOperationState.DecliningPresentation) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            message = WalletDisplayText.failure(WalletDisplayText.RejectFailed, error),
-                            tab = WalletDemoTab.Present,
-                        ),
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.RejectFailed, error),
+                        WalletDemoTab.Present,
+                    ).copy(
                         presentationReview = null,
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
@@ -1181,14 +1175,12 @@ class WalletDemoController(
 
     private fun setOperationError(prefix: String, error: Throwable, tab: WalletDemoTab) {
         _state.update {
-            it.copy(
-                operation = WalletOperationState.Failed(
-                    message = WalletDisplayText.failure(prefix, error),
-                    tab = tab,
-                ),
-            ).withPublishedStatus()
+            it.withFailedOperation(WalletDisplayText.failure(prefix, error), tab)
         }
     }
+
+    private fun WalletDemoUiState.withFailedOperation(message: String, tab: WalletDemoTab): WalletDemoUiState =
+        withPublishedStatus().copy(operation = WalletOperationState.Failed(message = message, tab = tab))
 
     private fun WalletDemoUiState.withPublishedStatus(): WalletDemoUiState =
         copy(statusOccurrenceId = statusOccurrenceId + 1)

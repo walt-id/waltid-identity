@@ -273,7 +273,11 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func bootstrap() async throws -> WalletBootstrapResult {
-        WalletBootstrapResult(keyID: "key-1", did: "did:key:test")
+        WalletBootstrapResult(
+            keyID: "key-1",
+            did: "did:key:test",
+            publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#
+        )
     }
 
     func credentials() async throws -> [Credential] {

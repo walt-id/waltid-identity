@@ -861,7 +861,11 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
-    var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
+    var bootstrapResult = WalletBootstrapResult(
+        keyID: "key",
+        did: "did:key:wallet",
+        publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#
+    )
     var keyUseAuthorizationPreflightResult: WalletKeyUseAuthorizationPreflight?
     var issuanceSessionResult = IssuanceSession(
         id: "issuance-session-1",

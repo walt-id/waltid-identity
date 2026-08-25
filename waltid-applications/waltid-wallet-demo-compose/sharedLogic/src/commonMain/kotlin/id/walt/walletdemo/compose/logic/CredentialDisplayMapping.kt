@@ -12,6 +12,7 @@ fun WalletDemoPresentationCredentialOption.toCredentialDetails(): CredentialDeta
         label = label,
         addedAt = null,
         credentialDataJson = credentialDataJson,
+        credentialId = credentialId,
     )
     val parsed = summary.toCredentialDetails()
     val requestedGroup = toRequestedDisclosureGroup()
