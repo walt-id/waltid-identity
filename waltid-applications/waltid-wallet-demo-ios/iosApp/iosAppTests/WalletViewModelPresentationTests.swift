@@ -302,18 +302,23 @@ final class WalletViewModelPresentationTests: XCTestCase {
             identityDocumentRegistrationUpdate: { await counter.increment() }
         )
         try await waitUntil { viewModel.isReady }
+        try await waitUntilAsync { await counter.count >= 1 }
         let afterBootstrap = await counter.count
-        XCTAssertGreaterThanOrEqual(afterBootstrap, 1)
 
         viewModel.deleteCredential(id: "cred-1")
         try await waitUntil { viewModel.credentials.isEmpty }
+        try await waitUntilAsync { await counter.count >= afterBootstrap + 1 }
         let afterDelete = await counter.count
         XCTAssertEqual(afterDelete, afterBootstrap + 1)
 
+        // After delete the wallet is already ready and empty, so waiting only on
+        // those flags returns before reset's wipe reconcile and bootstrap run.
+        // Reset publishes one update after deleteLocalData and another after bootstrap.
         viewModel.resetWallet()
+        try await waitUntilAsync { await counter.count >= afterDelete + 2 }
         try await waitUntil { viewModel.isReady && viewModel.credentials.isEmpty }
         let afterReset = await counter.count
-        XCTAssertGreaterThan(afterReset, afterDelete)
+        XCTAssertGreaterThanOrEqual(afterReset, afterDelete + 2)
     }
 
     /// Waits for `predicate`, bounded by elapsed time rather than by a yield count.
