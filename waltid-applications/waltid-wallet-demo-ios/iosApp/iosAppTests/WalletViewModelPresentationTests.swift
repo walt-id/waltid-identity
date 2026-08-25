@@ -402,6 +402,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
             walletID: "delete-details-\(UUID().uuidString)",
             walletClient: walletClient
         )
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
         viewModel.presentationRequestUrl = "openid4vp://mock"
         viewModel.previewPresentation()
@@ -441,6 +442,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
             ),
             identityDocumentRegistrationUpdate: { await counter.increment() }
         )
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
         try await waitUntilAsync { await counter.count >= 1 }
         let afterBootstrap = await counter.count
@@ -451,12 +453,14 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let afterDelete = await counter.count
         XCTAssertEqual(afterDelete, afterBootstrap + 1)
 
-        // After delete the wallet is already ready and empty, so waiting only on
-        // those flags returns before reset's wipe reconcile and bootstrap run.
-        // Reset publishes one update after deleteLocalData and another after bootstrap.
+        // Reset returns to PIN setup and reconciles after the wipe. Bootstrap, and
+        // its second registration update, wait until the wallet is unlocked again.
         viewModel.resetWallet()
-        try await waitUntilAsync { await counter.count >= afterDelete + 2 }
+        try await waitUntil { viewModel.auth == .setup && !viewModel.isReady }
+        try await waitUntilAsync { await counter.count >= afterDelete + 1 }
+        viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady && viewModel.credentials.isEmpty }
+        try await waitUntilAsync { await counter.count >= afterDelete + 2 }
         let afterReset = await counter.count
         XCTAssertGreaterThanOrEqual(afterReset, afterDelete + 2)
     }
