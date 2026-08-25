@@ -7,6 +7,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createIosDemoWallet
 import id.walt.walletdemo.compose.logic.createIosDemoPinStore
 import id.walt.walletdemo.compose.logic.createIosDemoBiometricAuthenticator
+import id.walt.walletdemo.compose.logic.createIosDemoSigningProtectionStore
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import platform.UIKit.UIViewController
 
 private var iosController: WalletDemoController? = null
@@ -44,8 +46,9 @@ fun walletDemoViewController(
     attestationBearerToken: String = "",
     attestationHostHeader: String = "",
     transactionDataProfilesUrl: String = "",
-    biometricEnabled: Boolean = true,
+    signingProtectionMode: String = "optional",
 ): UIViewController {
+    val parsedSigningProtectionMode = WalletDemoSigningProtectionMode.parse(signingProtectionMode)
     val config = DemoWalletConfig(
         walletId = walletId,
         attestationBaseUrl = attestationBaseUrl,
@@ -53,7 +56,7 @@ fun walletDemoViewController(
         attestationBearerToken = attestationBearerToken,
         attestationHostHeader = attestationHostHeader,
         transactionDataProfilesUrl = transactionDataProfilesUrl,
-        biometricEnabled = biometricEnabled,
+        signingProtectionMode = parsedSigningProtectionMode,
     )
     require(appGroupIdentifier.isNotEmpty()) {
         "This demo ships a document-provider extension and requires an App Group"
@@ -73,6 +76,8 @@ fun walletDemoViewController(
         ),
         pinStore = createIosDemoPinStore(config.walletId),
         biometricAuthenticator = createIosDemoBiometricAuthenticator(),
+        signingProtectionMode = parsedSigningProtectionMode,
+        signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
     )
     iosController = controller
     pendingDeepLink?.let(controller::handleDeepLink)
@@ -89,4 +94,8 @@ fun handleWalletDemoDeepLink(url: String) {
     } else {
         controller.handleDeepLink(url)
     }
+}
+
+fun handleWalletDemoApplicationForegrounded() {
+    iosController?.handleApplicationForegrounded()
 }

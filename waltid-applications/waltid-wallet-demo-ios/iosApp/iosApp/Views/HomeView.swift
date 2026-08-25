@@ -8,6 +8,10 @@ struct HomeView: View {
     @State private var selectedPresentationDetailsID: String?
 
     var body: some View {
+        walletTabs
+    }
+
+    private var walletTabs: some View {
         TabView(selection: $viewModel.selectedTab) {
             CredentialsTabView(
                 viewModel: viewModel,

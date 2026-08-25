@@ -46,10 +46,13 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
 
     if (showingSettings) {
         SettingsScreen(
-            ready = ready,
+            state = state,
             onBack = { showingSettings = false },
             onLock = controller::lock,
             onResetWallet = controller::resetWallet,
+            onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
+            onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
+            onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
         )
         return
     }

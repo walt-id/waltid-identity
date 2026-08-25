@@ -7,9 +7,10 @@ plugins {
 
 val javaVersion = identityLibs.versions.java.library.get().toInt()
 val publicDemoTransactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
-val walletBiometricEnabled = when ((findProperty("walletBiometricEnabled") as String?)?.trim()?.lowercase()) {
-    "0", "false", "no", "off" -> false
-    else -> true
+val walletSigningProtectionMode =
+    ((findProperty("walletSigningProtectionMode") as String?) ?: "optional").trim().lowercase()
+require(walletSigningProtectionMode in setOf("required", "optional", "disabled")) {
+    "walletSigningProtectionMode must be required, optional, or disabled"
 }
 
 val appVersionName: String = (findProperty("appVersionName") as String?)?.takeIf { it.isNotBlank() } ?: "0.1.0"
@@ -37,7 +38,7 @@ android {
         buildConfigField("String", "ATTESTATION_BEARER_TOKEN", "\"${findProperty("attestation.bearerToken") ?: ""}\"")
         buildConfigField("String", "ATTESTATION_HOST_HEADER", "\"${findProperty("attestation.hostHeader") ?: ""}\"")
         buildConfigField("String", "TRANSACTION_DATA_PROFILES_URL", "\"${findProperty("transactionDataProfiles.url") ?: publicDemoTransactionDataProfilesUrl}\"")
-        buildConfigField("boolean", "WALLET_BIOMETRIC_ENABLED", walletBiometricEnabled.toString())
+        buildConfigField("String", "WALLET_SIGNING_PROTECTION_MODE", "\"$walletSigningProtectionMode\"")
     }
 
     buildFeatures {

@@ -59,7 +59,12 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             operation: "bootstrap wallet"
         )
 
-        return .init(keyID: value.keyId, did: value.did, publicJWK: value.publicJwk)
+        return .init(
+            keyID: value.keyId,
+            did: value.did,
+            publicJWK: value.publicJwk,
+            keyUseAuthorizationPolicy: toSwiftAuthorizationPolicy(value.keyUseAuthorizationPolicy)
+        )
     }
 
     func keyUseAuthorizationPreflight(
@@ -829,6 +834,19 @@ private extension WalletBridgeKeyUseAuthorizationPolicy {
             }
             return .biometricTimedReuse(timeoutSeconds: Int(timeoutSeconds.intValue))
         }
+    }
+}
+
+private func toSwiftAuthorizationPolicy(
+    _ policy: any Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicy
+) -> WalletKeyUseAuthorizationPolicy {
+    switch onEnum(of: policy) {
+    case .none:
+        return .none
+    case .biometricCurrentSet:
+        return .biometricCurrentSet
+    case .biometricTimedReuse(let timedReuse):
+        return .biometricTimedReuse(timeoutSeconds: Int(timedReuse.timeoutSeconds))
     }
 }
 

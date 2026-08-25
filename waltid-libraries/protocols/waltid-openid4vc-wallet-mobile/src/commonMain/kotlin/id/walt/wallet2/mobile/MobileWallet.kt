@@ -17,7 +17,7 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
@@ -97,6 +97,7 @@ private object MobileDidSupport {
  *
  * @property keyId Identifier of the persisted signing key used by the wallet.
  * @property did Decentralized identifier registered for the persisted key.
+ * @property keyUseAuthorizationPolicy Immutable authorization policy of the persisted signing key.
  */
 public data class MobileWalletBootstrapResult(
     public val keyId: String,
@@ -105,6 +106,7 @@ public data class MobileWalletBootstrapResult(
      * Public JWK of [keyId] as a JSON object string. Private material is never included.
      */
     public val publicJwk: String,
+    public val keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
 )
 
 /**
@@ -202,7 +204,7 @@ public data class WalletAttestationConfig(
  */
 public class MobileWallet internal constructor(
     walletId: String,
-    private val keyStore: WalletKeyStore,
+    private val keyStore: MobileWalletKeyStore,
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
@@ -298,6 +300,9 @@ public class MobileWallet internal constructor(
                 keyId = existingKey.keyId,
                 did = existingDids.first().did,
                 publicJwk = publicJwkJson(existingKey.keyId),
+                keyUseAuthorizationPolicy = requireNotNull(
+                    keyStore.keyUseAuthorizationPolicy(existingKey.keyId),
+                ) { "Wallet '${wallet.id}' persisted key '${existingKey.keyId}' has no authorization policy" },
             )
         }
 
@@ -337,6 +342,7 @@ public class MobileWallet internal constructor(
                 keyId = key.id.value,
                 did = didResult.did,
                 publicJwk = publicJwkJson(key),
+                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
             )
         } catch (cause: Throwable) {
             try {

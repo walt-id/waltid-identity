@@ -75,6 +75,7 @@ class MobileWalletFactoryTest {
                 val wallet = wallet(config, database, provider)
 
                 val bootstrap = wallet.bootstrap(didMethod = case.didMethod)
+                assertEquals(config.defaultKeyUseAuthorizationPolicy, bootstrap.keyUseAuthorizationPolicy)
                 val row = database.queries.selectByKeyId(bootstrap.keyId).executeAsOne()
                 val stored = assertIs<StoredKey.Managed>(
                     StoredKeyCodec.decodeFromString(assertNotNull(row.stored_key))
@@ -210,15 +211,24 @@ class MobileWalletFactoryTest {
 
             database().use { database ->
                 val provider = FakePlatformManagedKeyProvider()
-                wallet(
+                val bootstrap = wallet(
                     config = MobileWalletConfig(defaultKeyUseAuthorizationPolicy = case.configured),
                     database = database,
                     provider = provider,
                 ).bootstrap(keyUseAuthorizationPolicy = case.requested)
 
                 val expectedManagedCalls = listOf(case.expected)
+                assertEquals(case.expected, bootstrap.keyUseAuthorizationPolicy)
                 assertEquals(expectedManagedCalls, provider.generatedPolicies)
                 assertEquals(listOf(case.expected), provider.preflightPolicies)
+
+                val reopened = wallet(
+                    config = MobileWalletConfig(defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None),
+                    database = database,
+                    provider = provider,
+                ).bootstrap(keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+                assertEquals(case.expected, reopened.keyUseAuthorizationPolicy)
+                assertEquals(1, provider.generateCount)
             }
         }
     }
@@ -349,6 +359,7 @@ class MobileWalletFactoryTest {
     private class FakePlatformManagedKeyProvider : PlatformManagedKeyProvider {
         private val softwareProvider = CryptographySoftwareKeyProvider()
         private val keys = mutableMapOf<KeyId, SoftwareKey>()
+        private val policies = mutableMapOf<KeyId, KeyUseAuthorizationPolicy>()
         var generateCount = 0
         var deleteCount = 0
         var generateFailure: Throwable? = null
@@ -369,6 +380,7 @@ class MobileWalletFactoryTest {
                 GenerateSoftwareKeyRequest(request.id, request.requirements.spec, request.requirements.usages)
             )
             keys[request.id] = software
+            policies[request.id] = request.requirements.authorizationPolicy
             val publicKey = assertNotNull(software.capabilities.publicKeyExporter)
                 .exportPublicKey().toPublicJwk(request.requirements.spec)
             return managedKey(
@@ -386,19 +398,23 @@ class MobileWalletFactoryTest {
             )
         }
 
+        override fun keyUseAuthorizationPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy =
+            requireNotNull(policies[stored.id]) { "Missing authorization policy for ${stored.id.value}" }
+
         override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
             require(stored.provider == PROVIDER_ID)
             return keys[stored.id]?.let {
                 PlatformManagedKeyRestoration.Restored(
                     key = managedKey(stored, it),
-                    authorizationPolicy = KeyUseAuthorizationPolicy.None,
+                    authorizationPolicy = keyUseAuthorizationPolicy(stored),
                 )
-            } ?: PlatformManagedKeyRestoration.Missing(KeyUseAuthorizationPolicy.None)
+            } ?: PlatformManagedKeyRestoration.Missing(keyUseAuthorizationPolicy(stored))
         }
 
         override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
             deleteCount++
             keys.remove(stored.id)
+            policies.remove(stored.id)
         }
 
         private fun managedKey(stored: StoredKey.Managed, software: SoftwareKey): ManagedKey = object : ManagedKey {

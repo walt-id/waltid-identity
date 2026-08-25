@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.screens
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,9 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -19,18 +22,35 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
+import id.walt.walletdemo.compose.logic.displayMessage
 import id.walt.walletdemo.compose.ui.LocalWalletDemoBranding
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.components.SigningProtectionChoice
 
 @Composable
 internal fun PinScreen(
@@ -38,6 +58,9 @@ internal fun PinScreen(
     auth: WalletAuthState.PinEntry,
     isBusy: Boolean,
     biometricAvailable: Boolean,
+    signingProtectionMode: WalletDemoSigningProtectionMode,
+    selectedSigningProtection: WalletDemoSigningProtection,
+    biometricSigningAvailability: WalletDemoSigningProtectionAvailability?,
 ) {
     val setup = auth as? WalletAuthState.Setup
     val login = auth as? WalletAuthState.Login
@@ -50,11 +73,26 @@ internal fun PinScreen(
         is WalletAuthState.Login -> auth.error
     }
     val biometricUnlockEnabled = controller.isBiometricUnlockEnabled()
-    val windowInfo = LocalWindowInfo.current
+    val biometricSigningAvailable =
+        biometricSigningAvailability == WalletDemoSigningProtectionAvailability.Available
+    val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var hasInputFocus by remember { mutableStateOf(false) }
 
-    LaunchedEffect(windowInfo.isWindowFocused) {
-        if (windowInfo.isWindowFocused) {
-            controller.refreshBiometricUnlockAvailability()
+    fun dismissKeyboard() {
+        hasInputFocus = false
+        focusManager.clearFocus()
+        keyboardController?.hide()
+    }
+    val dismissKeyboardOnScroll = remember(focusManager, keyboardController) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y != 0f && hasInputFocus) {
+                    dismissKeyboard()
+                }
+                return Offset.Zero
+            }
         }
     }
     LaunchedEffect(login != null, biometricUnlockEnabled, biometricAvailable) {
@@ -66,7 +104,13 @@ internal fun PinScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .imePadding()
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { dismissKeyboard() })
+            }
+            .nestedScroll(dismissKeyboardOnScroll)
+            .verticalScroll(scrollState)
+            .testTag(WalletUiTestTags.PinScreen)
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -95,10 +139,15 @@ internal fun PinScreen(
             onValueChange = controller::updatePin,
             label = { Text("PIN") },
             visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.NumberPassword,
+                imeAction = if (setup != null) ImeAction.Next else ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(onDone = { dismissKeyboard() }),
             isError = error != null,
             modifier = Modifier
                 .fillMaxWidth()
+                .onFocusChanged { hasInputFocus = it.isFocused }
                 .testTag(WalletUiTestTags.PinInput),
             singleLine = true,
         )
@@ -109,10 +158,15 @@ internal fun PinScreen(
                 onValueChange = controller::updatePinConfirmation,
                 label = { Text("Confirm PIN") },
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.NumberPassword,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { dismissKeyboard() }),
                 isError = error != null,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .onFocusChanged { hasInputFocus = it.isFocused }
                     .testTag(WalletUiTestTags.PinConfirmationInput),
                 singleLine = true,
             )
@@ -141,6 +195,66 @@ internal fun PinScreen(
                     enabled = biometricAvailable && !isBusy,
                 )
             }
+
+            Text(
+                "Signing protection",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Choose how wallet signing is protected. Changing it later creates a new wallet key and DID.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (signingProtectionMode == WalletDemoSigningProtectionMode.Optional) {
+                SigningProtectionChoice(
+                    protection = WalletDemoSigningProtection.Biometric,
+                    selected = selectedSigningProtection == WalletDemoSigningProtection.Biometric,
+                    enabled = biometricSigningAvailable && !isBusy,
+                    testTag = WalletUiTestTags.SigningProtectionBiometric,
+                    onSelect = { controller.selectSigningProtection(WalletDemoSigningProtection.Biometric) },
+                )
+                SigningProtectionChoice(
+                    protection = WalletDemoSigningProtection.None,
+                    selected = selectedSigningProtection == WalletDemoSigningProtection.None,
+                    enabled = !isBusy,
+                    testTag = WalletUiTestTags.SigningProtectionNone,
+                    onSelect = { controller.selectSigningProtection(WalletDemoSigningProtection.None) },
+                )
+            } else {
+                val managedProtection = signingProtectionMode.defaultSelection
+                SigningProtectionChoice(
+                    protection = managedProtection,
+                    selected = true,
+                    enabled = false,
+                    testTag = if (managedProtection == WalletDemoSigningProtection.Biometric) {
+                        WalletUiTestTags.SigningProtectionBiometric
+                    } else {
+                        WalletUiTestTags.SigningProtectionNone
+                    },
+                    onSelect = {},
+                )
+                Text(
+                    "Managed by app configuration.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (selectedSigningProtection == WalletDemoSigningProtection.Biometric &&
+                !biometricSigningAvailable
+            ) {
+                Text(
+                    biometricSigningAvailability?.displayMessage()
+                        ?: "Checking strong biometric availability...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (biometricSigningAvailability == null) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                    modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionAvailability),
+                )
+            }
         }
 
         error?.let { error ->
@@ -149,7 +263,11 @@ internal fun PinScreen(
 
         Button(
             onClick = controller::submitPin,
-            enabled = !isBusy,
+            enabled = !isBusy && (
+                setup == null ||
+                    selectedSigningProtection != WalletDemoSigningProtection.Biometric ||
+                    biometricSigningAvailable
+                ),
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(WalletUiTestTags.PinSubmitButton),

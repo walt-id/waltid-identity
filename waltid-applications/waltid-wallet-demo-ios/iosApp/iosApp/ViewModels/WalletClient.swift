@@ -2,7 +2,10 @@ import Foundation
 import WalletSDK
 
 protocol WalletClient {
-    func bootstrap() async throws -> WalletBootstrapResult
+    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletBootstrapResult
+    func signingProtectionAvailability(
+        _ signingProtection: WalletDemoSigningProtection
+    ) async throws -> WalletDemoSigningProtectionAvailability
     func credentials() async throws -> [Credential]
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession
     func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization
@@ -32,8 +35,19 @@ final class SDKWalletClient: WalletClient {
         self.configuration = configuration
     }
 
-    func bootstrap() async throws -> WalletBootstrapResult {
-        try await wallet().bootstrap()
+    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletBootstrapResult {
+        try await wallet().bootstrap(keyUseAuthorizationPolicy: signingProtection.authorizationPolicy)
+    }
+
+    func signingProtectionAvailability(
+        _ signingProtection: WalletDemoSigningProtection
+    ) async throws -> WalletDemoSigningProtectionAvailability {
+        switch try await wallet().keyUseAuthorizationPreflight(policy: signingProtection.authorizationPolicy) {
+        case .supported: .available
+        case .unsupported(.biometricNotEnrolled): .biometricNotEnrolled
+        case .unsupported(.biometricUnavailable): .biometricUnavailable
+        case .unsupported(.unsupportedCombination): .unsupported
+        }
     }
 
     func credentials() async throws -> [Credential] {

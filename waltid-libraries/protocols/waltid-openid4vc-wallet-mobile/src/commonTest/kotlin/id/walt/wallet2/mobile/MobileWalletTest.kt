@@ -53,7 +53,7 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
-import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
@@ -65,7 +65,6 @@ import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.RequestObjectAuthentication
@@ -896,7 +895,7 @@ class MobileWalletTest {
         val credentialStore = InMemoryCredentialStore()
         val wallet = MobileWallet(
             walletId = "issuance-registry-failure-wallet",
-            keyStore = InMemoryKeyStore().also { it.addCrypto2Key(holderKey) },
+            keyStore = InMemoryMobileWalletKeyStore().also { it.addCrypto2Key(holderKey) },
             didStore = InMemoryDidStore().also {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },
@@ -934,7 +933,7 @@ class MobileWalletTest {
         )
         val wallet = MobileWallet(
             walletId = "offer-json-wallet",
-            keyStore = InMemoryKeyStore().also { it.addCrypto2Key(holderKey) },
+            keyStore = InMemoryMobileWalletKeyStore().also { it.addCrypto2Key(holderKey) },
             didStore = InMemoryDidStore().also {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },
@@ -1992,7 +1991,8 @@ class MobileWalletTest {
         private val key: Key? = null,
         private val managedKey: ManagedKeyMaterial? = null,
         private val failIfLegacyKeyRequested: Boolean = false,
-    ) : WalletKeyStore {
+        private val authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+    ) : MobileWalletKeyStore {
         var listKeysCalls = 0
         var managedKeyLookupCalls = 0
         val removedKeyIds = mutableListOf<String>()
@@ -2011,6 +2011,9 @@ class MobileWalletTest {
             listKeysCalls++
             return listOf(keyInfo).asFlow()
         }
+
+        override suspend fun keyUseAuthorizationPolicy(keyId: String): KeyUseAuthorizationPolicy? =
+            authorizationPolicy.takeIf { keyId == keyInfo.keyId }
 
         override suspend fun addKey(key: Key): String =
             error("Preloaded test key store should not add keys")

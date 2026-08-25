@@ -84,14 +84,15 @@ class DigitalCredentialCreateActivity : FragmentActivity() {
                 val allowlist = assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
                 val input = AndroidDigitalCredentialCreateProvider.extract(intent, allowlist)
                 requestProtocol = input.request.protocol
+                val config = demoWalletConfig()
                 val created = createAndroidDemoMobileWallet(
                     context = applicationContext,
-                    config = demoWalletConfig(),
+                    config = config,
                     interactionContextProvider = { this@DigitalCredentialCreateActivity },
                 )
                 val mobileWallet = created.wallet
                 wallet = mobileWallet
-                mobileWallet.bootstrap()
+                created.bootstrap(config.selectedSigningProtection(applicationContext))
                 val started = mobileWallet.startIssuance(
                     MobileWalletIssuanceRequest(
                         offer = MobileWalletCredentialOffer.InlineJson(input.request.offerJson),

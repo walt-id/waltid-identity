@@ -75,12 +75,14 @@ public class AndroidPlatformKeyProvider(
         ) ?: cause
     }
 
+    override fun keyUseAuthorizationPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy = try {
+        signumProvider.storedPolicy(stored).toWalletPolicy(stored)
+    } catch (cause: Throwable) {
+        throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
+    }
+
     override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
-        val policy = try {
-            signumProvider.storedPolicy(stored).toWalletPolicy(stored)
-        } catch (cause: Throwable) {
-            throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
-        }
+        val policy = keyUseAuthorizationPolicy(stored)
         return try {
             PlatformManagedKeyRestoration.Restored(
                 signumProvider.restore(stored).withWalletAuthorizationMapping(policy),

@@ -38,6 +38,8 @@ import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
@@ -1123,13 +1125,17 @@ class DigitalCredentialSharingE2ETest {
                 hasGooglePlayServices(context),
             )
 
-            wallet = createAndroidDemoMobileWallet(
+            val created = createAndroidDemoMobileWallet(
                 context = context,
                 // This Play Store emulator cannot enforce protected signing keys; production
                 // defaults remain covered by the app, while this fixture needs ordinary keys.
-                config = demoWalletConfig().copy(biometricEnabled = false),
-            ).wallet
-            wallet.bootstrap()
+                config = demoWalletConfig().copy(
+                    signingProtectionMode = WalletDemoSigningProtectionMode.Disabled,
+                ),
+            )
+            wallet = created.wallet
+            created.bootstrap(WalletDemoSigningProtection.None)
+            demoWalletConfig().signingProtectionStore(context).save(WalletDemoSigningProtection.None)
 
             wallet.credentials().forEach { credential ->
                 check(wallet.deleteCredential(credential.id)) {

@@ -5,13 +5,34 @@ struct ContentView: View {
     @ObservedObject var viewModel: WalletViewModel
 
     var body: some View {
-        switch viewModel.auth {
-        case .setup, .login:
-            PinView(viewModel: viewModel)
-        case .storageUnavailable(let message):
-            pinStorageUnavailable(message)
-        case .unlocked:
-            HomeView(viewModel: viewModel)
+        Group {
+            switch viewModel.auth {
+            case .setup, .login:
+                PinView(viewModel: viewModel)
+            case .storageUnavailable(let message):
+                pinStorageUnavailable(message)
+            case .unlocked:
+                HomeView(viewModel: viewModel)
+            }
+        }
+        .alert(
+            "Biometric signing unavailable",
+            isPresented: Binding(
+                get: { viewModel.signingProtectionWarning != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        viewModel.dismissSigningProtectionWarning()
+                    }
+                }
+            )
+        ) {
+            Button("OK") {
+                viewModel.dismissSigningProtectionWarning()
+            }
+            .accessibilityIdentifier(WalletAccessibilityID.signingProtectionWarningDismiss)
+        } message: {
+            Text(viewModel.signingProtectionWarning ?? "")
+                .accessibilityIdentifier(WalletAccessibilityID.signingProtectionWarning)
         }
     }
 

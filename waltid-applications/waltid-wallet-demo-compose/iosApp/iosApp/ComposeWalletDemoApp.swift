@@ -12,7 +12,7 @@ struct ComposeWalletDemoApp: App {
     private let attestationBearerToken: String
     private let attestationHostHeader: String
     private let transactionDataProfilesUrl: String
-    private let biometricEnabled: Bool
+    private let signingProtectionMode: String
 
     init() {
         let env = ProcessInfo.processInfo.environment
@@ -23,7 +23,7 @@ struct ComposeWalletDemoApp: App {
         attestationBearerToken = env["ATTESTATION_BEARER_TOKEN"] ?? defaults.string(forKey: "ATTESTATION_BEARER_TOKEN") ?? DemoBackendDefaults.attestationBearerToken
         attestationHostHeader = env["ATTESTATION_HOST_HEADER"] ?? defaults.string(forKey: "ATTESTATION_HOST_HEADER") ?? DemoBackendDefaults.attestationHostHeader
         transactionDataProfilesUrl = env["TRANSACTION_DATA_PROFILES_URL"] ?? defaults.string(forKey: "TRANSACTION_DATA_PROFILES_URL") ?? DemoBackendDefaults.transactionDataProfilesURL
-        biometricEnabled = walletBiometricEnabled(environment: env, defaults: defaults)
+        signingProtectionMode = walletSigningProtectionMode(environment: env, defaults: defaults)
     }
 
     var body: some Scene {
@@ -42,13 +42,14 @@ struct ComposeWalletDemoApp: App {
                 onDigitalCredentialRegistryChanged: {
                     Task { await Self.reconcileRegistrations() }
                 },
-                biometricEnabled: biometricEnabled
+                signingProtectionMode: signingProtectionMode
             )
             .ignoresSafeArea()
             .onOpenURL { url in
                 sharedUI.WalletDemoIosKt.handleWalletDemoDeepLink(url: url.absoluteString)
             }
             .task {
+                sharedUI.WalletDemoIosKt.handleWalletDemoApplicationForegrounded()
                 await Self.reconcileRegistrations()
             }
             .onChange(of: scenePhase) { phase in
@@ -56,6 +57,7 @@ struct ComposeWalletDemoApp: App {
                 // the user changed in Settings - neither carries a notification, so becoming active
                 // is the first moment this app can act on it.
                 guard phase == .active else { return }
+                sharedUI.WalletDemoIosKt.handleWalletDemoApplicationForegrounded()
                 Task { await Self.reconcileRegistrations() }
             }
         }
@@ -85,14 +87,13 @@ struct ComposeWalletDemoApp: App {
     }
 }
 
-private func walletBiometricEnabled(environment: [String: String], defaults: UserDefaults) -> Bool {
-    let rawValue = environment["WALLET_BIOMETRIC_ENABLED"] ?? defaults.string(forKey: "WALLET_BIOMETRIC_ENABLED")
-    guard let rawValue else { return true }
-    switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-    case "0", "false", "no", "off": return false
-    case "1", "true", "yes", "on": return true
-    default: return true
-    }
+private func walletSigningProtectionMode(environment: [String: String], defaults: UserDefaults) -> String {
+    let mode = environment["WALLET_SIGNING_PROTECTION_MODE"]
+        ?? defaults.string(forKey: "WALLET_SIGNING_PROTECTION_MODE")
+        ?? "optional"
+    let normalized = mode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    precondition(["required", "optional", "disabled"].contains(normalized))
+    return normalized
 }
 
 private enum DemoBackendDefaults {
