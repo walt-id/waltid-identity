@@ -67,7 +67,7 @@ url-encoder = "1.6.0"
 java-json-canonicalization = "1.1"
 
 # JVM-only: crypto providers
-java-cose = "1.1.1-WALT-SNAPSHOT"
+java-cose = "1.1.1"
 aws-kms = "1.6.97"
 azure-identity = "1.18.4"
 azure-keyvault-keys = "4.11.0"
@@ -353,7 +353,7 @@ url-encoder = { module = "net.thauvin.erik.urlencoder:urlencoder-lib", version.r
 java-json-canonicalization = { module = "io.github.erdtman:java-json-canonicalization", version.ref = "java-json-canonicalization" }
 
 ## JVM-only: crypto providers
-java-cose = { module = "org.cose:cose-java", version.ref = "java-cose" }
+java-cose = { module = "id.walt.thirdparty:cose-java", version.ref = "java-cose" }
 aws-kms = { module = "aws.sdk.kotlin:kms-jvm", version.ref = "aws-kms" }
 azure-identity = { module = "com.azure:azure-identity", version.ref = "azure-identity" }
 azure-keyvault-keys = { module = "com.azure:azure-security-keyvault-keys", version.ref = "azure-keyvault-keys" }

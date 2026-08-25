@@ -20,7 +20,10 @@ kotlin {
             implementation(kotlin("test"))
         }
         jvmMain.dependencies {
-            implementation(identityLibs.java.cose)
+            // `api`, not `implementation`: COSE types (e.g. AlgorithmID in
+            // COSECryptoProviderKeyInfo) are part of this module's public API, so consumers
+            // must be able to compile against them.
+            api(identityLibs.java.cose)
         }
         jvmTest.dependencies {
             implementation(identityLibs.bouncycastle.prov)
