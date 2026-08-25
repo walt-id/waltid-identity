@@ -63,7 +63,7 @@ struct PresentView: View {
                     viewModel.previewPresentation()
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.waltBlue)
+                .tint(branding.primary)
                 .disabled(!viewModel.presentationPreviewActionEnabled)
                 .accessibilityIdentifier(WalletAccessibilityID.presentButton)
 

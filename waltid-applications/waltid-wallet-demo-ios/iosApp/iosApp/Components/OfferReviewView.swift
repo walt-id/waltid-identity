@@ -129,6 +129,7 @@ struct OfferReviewView: View {
 }
 
 struct OfferReviewActions: View {
+    @Environment(\.walletDemoBranding) private var branding
     let requiresIssuerAuthentication: Bool
     let isAcceptEnabled: Bool
     let isReviewEnabled: Bool
@@ -139,7 +140,7 @@ struct OfferReviewActions: View {
         HStack(spacing: 8) {
             Button(requiresIssuerAuthentication ? "Continue to sign in" : "Accept", action: onAccept)
                 .buttonStyle(.borderedProminent)
-                .tint(.waltBlue)
+                .tint(branding.primary)
                 .disabled(!isAcceptEnabled)
                 .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
 

@@ -45,7 +45,7 @@ struct ReceiveView: View {
                     viewModel.previewOffer()
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.waltBlue)
+                .tint(branding.primary)
                 .disabled(!viewModel.receiveActionEnabled)
                 .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
 
