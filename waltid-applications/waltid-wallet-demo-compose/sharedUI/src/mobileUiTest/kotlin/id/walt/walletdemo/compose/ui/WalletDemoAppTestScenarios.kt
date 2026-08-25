@@ -827,7 +827,10 @@ class WalletDemoAppTestScenarios {
         previewGate.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
         onAllNodesWithTag("wallet.presentationInput").assertCountEquals(0)
-        onNodeWithTag("wallet.presentationSubmitButton").assertIsDisplayed()
+        awaitTaggedNode(WalletUiTestTags.PresentationActions)
+        onNodeWithTag(WalletUiTestTags.PresentationActions).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton, useUnmergedTree = true)
+            .assertIsDisplayed()
     }
 
     fun deepLinksRouteToReceiveAndPresentTabs() = runComposeUiTest {
@@ -1093,7 +1096,18 @@ class WalletDemoAppTestScenarios {
 
         val selectionId = samplePresentationCredentialOption.selection.id
         assertTrue(selectionId != "cred-1")
-        onNodeWithTag(WalletUiTestTags.credentialCard(selectionId)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(selectionId)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.CredentialDetailsScreen).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+
+        onNodeWithTag(WalletUiTestTags.CredentialsTab).performClick()
+        onNodeWithTag(WalletUiTestTags.credentialCard("cred-1")).performClick()
+        awaitTaggedNode(WalletUiTestTags.DetailsMenu)
+        onNodeWithTag(WalletUiTestTags.DetailsMenu).performClick()
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(WalletUiTestTags.DeleteCredential).fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithTag(WalletUiTestTags.DeleteCredential).performClick()
         onNodeWithTag(WalletUiTestTags.DeleteCredentialConfirm).performClick()
         waitUntil(timeoutMillis = 5_000) {

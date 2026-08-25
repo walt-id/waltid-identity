@@ -119,6 +119,7 @@ public data class MobileWalletCredentialRegistryRecord(
     public val iconMetadataJson: String? = null,
     public val iconCredentialDataJson: String? = null,
 ) {
+    /** Compares registry identity, display fields, and thumbnail bytes. */
     public override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
@@ -135,6 +136,7 @@ public data class MobileWalletCredentialRegistryRecord(
             iconCredentialDataJson == other.iconCredentialDataJson
     }
 
+    /** Hash of registry identity, display fields, and thumbnail bytes. */
     public override fun hashCode(): Int {
         var result = registryEntryId.hashCode()
         result = 31 * result + credentialId.hashCode()
