@@ -143,7 +143,7 @@ suspend fun Wallet.resolveHolderKey(
         "Credential '${credential.id}' has no holder-key binding",
     )
     validateBindingContract(credential, existing, credentialThumbprint)
-    val candidate = resolveReferencedCandidate(credential, existing.keyReference)
+    val candidate = resolveReferencedCandidate(credential, existing.keyReference, requiredUsages)
     if (candidate.thumbprint != existing.publicKeyThumbprint) {
         throw bindingError(
             credential,
@@ -208,7 +208,7 @@ suspend fun Wallet.withVerifiedHolderKeyBinding(
         )
     }
     val candidate = keyMaterial.keyReference?.let { reference ->
-        val resolved = resolveReferencedCandidate(credential, reference)
+        val resolved = resolveReferencedCandidate(credential, reference, setOf(KeyUsage.SIGN))
         if (resolved.thumbprint != suppliedThumbprint) {
             throw bindingError(
                 credential,
@@ -217,7 +217,7 @@ suspend fun Wallet.withVerifiedHolderKeyBinding(
             )
         }
         resolved
-    } ?: allKeyCandidates(credential)
+    } ?: allKeyCandidates(credential, setOf(KeyUsage.SIGN))
         .filter { it.material.keyId == keyMaterial.keyId && it.thumbprint == suppliedThumbprint }
         .let { matching ->
             when (matching.size) {
@@ -269,7 +269,7 @@ suspend fun Wallet.withRequiredUniqueHolderKeyBinding(
             cause,
         )
     }
-    val matching = allKeyCandidates(credential).filter { it.thumbprint == thumbprint }
+    val matching = allKeyCandidates(credential, setOf(KeyUsage.SIGN)).filter { it.thumbprint == thumbprint }
     val candidate = when (matching.size) {
         0 -> throw bindingError(
             credential,
@@ -322,6 +322,7 @@ private fun validateBindingContract(
 private suspend fun Wallet.resolveReferencedCandidate(
     credential: StoredCredential,
     reference: String,
+    requiredUsages: Set<KeyUsage>,
 ): WalletKeyCandidate {
     val location = reference.decodeWalletKeyReference()
         ?: throw bindingError(
@@ -332,7 +333,7 @@ private suspend fun Wallet.resolveReferencedCandidate(
     val material = try {
         when (location) {
             is WalletKeyLocation.Store -> keyStores.getOrNull(location.index)
-                ?.getKeyMaterial(location.keyId)
+                ?.getKeyMaterial(location.keyId, requiredUsages)
                 ?.copy(keyReference = reference)
 
             is WalletKeyLocation.Static -> attachedStaticCrypto2Key()
@@ -348,6 +349,13 @@ private suspend fun Wallet.resolveReferencedCandidate(
         }
     } catch (cause: CancellationException) {
         throw cause
+    } catch (cause: IllegalArgumentException) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
+            "The holder key for credential '${credential.id}' does not permit $requiredUsages",
+            cause,
+        )
     } catch (cause: Exception) {
         throw bindingError(
             credential,
@@ -363,7 +371,10 @@ private suspend fun Wallet.resolveReferencedCandidate(
     return candidate(credential, material)
 }
 
-private suspend fun Wallet.allKeyCandidates(credential: StoredCredential): List<WalletKeyCandidate> = buildList {
+private suspend fun Wallet.allKeyCandidates(
+    credential: StoredCredential,
+    requiredUsages: Set<KeyUsage>,
+): List<WalletKeyCandidate> = buildList {
     keyStores.forEachIndexed { index, store ->
         val ids = try {
             store.listKeys().toList().map { it.keyId }
@@ -379,9 +390,16 @@ private suspend fun Wallet.allKeyCandidates(credential: StoredCredential): List<
         }
         ids.forEach { keyId ->
             val material = try {
-                store.getKeyMaterial(keyId)
+                store.getKeyMaterial(keyId, requiredUsages)
             } catch (cause: CancellationException) {
                 throw cause
+            } catch (cause: IllegalArgumentException) {
+                throw bindingError(
+                    credential,
+                    HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
+                    "Wallet key '$keyId' does not permit $requiredUsages for credential '${credential.id}'",
+                    cause,
+                )
             } catch (cause: Exception) {
                 throw bindingError(
                     credential,

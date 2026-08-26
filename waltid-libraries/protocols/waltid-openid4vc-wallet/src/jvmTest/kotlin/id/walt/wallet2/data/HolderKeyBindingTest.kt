@@ -74,6 +74,24 @@ class HolderKeyBindingTest {
     }
 
     @Test
+    fun `holder binding resolves providers with the requested signing usage`() = runTest {
+        val holderKey = signingKey("holder")
+        val keyStore = UsageRequiringKeyStore(holderKey)
+        val wallet = Wallet(id = "wallet", keyStores = listOf(keyStore))
+        val credential = mdocCredential(holderKey)
+
+        val bound = wallet.withVerifiedHolderKeyBinding(
+            credential = credential,
+            keyMaterial = wallet.resolveKeyMaterial(holderKey.id.value, setOf(KeyUsage.SIGN))!!,
+            origin = HolderKeyBindingOrigin.ISSUANCE,
+        )
+        val resolved = wallet.resolveHolderKey(bound, setOf(KeyUsage.SIGN))
+
+        assertSame(holderKey, resolved.keyMaterial.crypto2Key)
+        assertEquals(List(3) { setOf(KeyUsage.SIGN) }, keyStore.requestedUsages)
+    }
+
+    @Test
     fun `unbound mdoc is not migrated implicitly`() = runTest {
         val holderKey = signingKey("holder")
         val keyStore = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
@@ -415,6 +433,27 @@ class HolderKeyBindingTest {
             error("provider unavailable")
 
         override suspend fun listKeys(): Flow<WalletKeyInfo> = emptyFlow()
+        override suspend fun addKey(key: id.walt.crypto.keys.Key): String = error("not used")
+        override suspend fun removeKey(keyId: String): Boolean = false
+    }
+
+    private class UsageRequiringKeyStore(
+        private val key: id.walt.crypto2.keys.Key,
+    ) : WalletKeyStore {
+        val requestedUsages = mutableListOf<Set<KeyUsage>>()
+
+        override suspend fun getKey(keyId: String) = null
+
+        override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): id.walt.crypto2.keys.Key? {
+            requestedUsages += usages
+            require(usages.isNotEmpty()) { "key usages must not be empty" }
+            return key.takeIf { keyId == key.id.value && usages.all(key.usages::contains) }
+        }
+
+        override suspend fun listKeys(): Flow<WalletKeyInfo> = kotlinx.coroutines.flow.flowOf(
+            WalletKeyInfo(key.id.value, key.spec.toString()),
+        )
+
         override suspend fun addKey(key: id.walt.crypto.keys.Key): String = error("not used")
         override suspend fun removeKey(keyId: String): Boolean = false
     }
