@@ -36,6 +36,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.resolvedCardTitle
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
+import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 /**
@@ -76,6 +77,9 @@ internal fun SharingReviewSection(
         if (compact) {
             var claimsOptionId by rememberSaveable { mutableStateOf<String?>(null) }
             val claimsOption = review.credentialOptions.firstOrNull { it.selection.id == claimsOptionId }
+            SystemBackHandler(enabled = claimsOption != null) {
+                claimsOptionId = null
+            }
             CredentialCardStack(
                 details = review.credentialOptions.map { it.toCredentialDetails() },
                 onOpenDetails = { detailsId ->

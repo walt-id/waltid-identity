@@ -248,10 +248,11 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
                 label = resolveCardTitle(
                     format = option.format,
                     credentialDataJson = option.credentialDataJson,
-                    displayName = StoredCredentialMetadataParser.credentialDisplay(
-                        option.metadataJson,
-                        platformPreferredLocales(),
-                    )?.name,
+                    displayName = presentationDisplayName(
+                        format = option.format,
+                        metadataJson = option.metadataJson,
+                        storedLabel = option.label,
+                    ),
                     fallback = option.format,
                 ),
                 issuer = option.issuer,

@@ -110,10 +110,11 @@ private fun MobileWalletPresentationCredentialOption.toDemoCredentialOption(): W
         label = resolveCardTitle(
             format = format,
             credentialDataJson = credentialDataJson,
-            displayName = StoredCredentialMetadataParser.credentialDisplay(
-                metadataJson,
-                platformPreferredLocales(),
-            )?.name,
+            displayName = presentationDisplayName(
+                format = format,
+                metadataJson = metadataJson,
+                storedLabel = label,
+            ),
             fallback = format,
         ),
         issuer = issuer,
