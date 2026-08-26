@@ -38,13 +38,60 @@ import io.ktor.util.toMap
 import kotlinx.serialization.json.JsonObject
 import kotlin.coroutines.cancellation.CancellationException
 
+/**
+ * Groups of OpenID4VCI routes that can be registered independently.
+ *
+ * A deployment that only issues through the pre-authorized code flow has no use for the
+ * authorization code endpoints or the external login redirect, and one that always embeds offers by
+ * value has no use for offer retrieval. Registering only the groups a deployment actually uses keeps
+ * the unused ones out of the routing tree entirely, so they answer 404 rather than depending on a
+ * guard or a gateway rule.
+ */
+enum class Issuer2RouteSurface {
+    /** The `.well-known` metadata routes and `openid4vci/jwks` - discovery, needed by every flow. */
+    METADATA,
+
+    /** `openid4vci/token`, `nonce` and `credential` - the legs that actually issue. */
+    ISSUANCE,
+
+    /** `GET openid4vci/credential-offer` - only reachable when offers are created BY_REFERENCE. */
+    CREDENTIAL_OFFER_BY_REFERENCE,
+
+    /** `openid4vci/par` and `authorize` - the authorization code flow. */
+    AUTHORIZATION_CODE,
+
+    /**
+     * `openid4vci/external_login/{...}` and `external/oauth/callback`.
+     *
+     * These sit inside `authenticate("auth-oauth")`, so excluding this group also removes the only
+     * reason a deployment needs that authentication provider installed.
+     */
+    EXTERNAL_LOGIN,
+    ;
+
+    companion object {
+        /** Everything, as a full issuer service exposes it. */
+        val all: Set<Issuer2RouteSurface> = entries.toSet()
+
+        /** Metadata plus issuance: enough to redeem a pre-authorized, by-value credential offer. */
+        val preAuthorizedCodeOnly: Set<Issuer2RouteSurface> = setOf(METADATA, ISSUANCE)
+    }
+}
+
 class OpenId4VciController(
     private val metadataService: MetadataService,
     private val protocolService: OpenId4VciProtocolService,
     private val offerService: CredentialOfferService,
     private val notificationService: IssuanceNotificationService,
 ) {
-    fun register(route: Route) {
+    /**
+     * Registers the OpenID4VCI routes for the [surfaces] this deployment needs.
+     *
+     * Defaults to [Issuer2RouteSurface.all] so a full issuer service is unchanged.
+     */
+    fun register(route: Route, surfaces: Set<Issuer2RouteSurface> = Issuer2RouteSurface.all) {
+        require(surfaces.isNotEmpty()) { "At least one issuer route surface must be registered" }
+        if (Issuer2RouteSurface.METADATA in surfaces) {
         route.get(".well-known/openid-credential-issuer/openid4vci", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
             call.response.headers.append(HttpHeaders.Vary, HttpHeaders.Accept)
             val signedContentType = call.requestedSignedCredentialIssuerMetadataContentType()
@@ -70,13 +117,15 @@ class OpenId4VciController(
             val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
             call.respond(metadataService.getVctTypeMetadata(credentialType))
         }
+        }
 
         route.route("openid4vci", { tags = listOf(OpenId4VciRoutesDocs.OPENID4VCI_TAG) }) {
-            get("jwks", OpenId4VciRoutesDocs.jwks()) {
+            if (Issuer2RouteSurface.METADATA in surfaces) get("jwks", OpenId4VciRoutesDocs.jwks()) {
                 call.respond(metadataService.listJwks())
             }
 
-            get("credential-offer", OpenId4VciRoutesDocs.credentialOffer()) {
+            if (Issuer2RouteSurface.CREDENTIAL_OFFER_BY_REFERENCE in surfaces)
+                get("credential-offer", OpenId4VciRoutesDocs.credentialOffer()) {
                 val requestId = requireNotNull(call.callId) { "Missing call ID" }
                 val sessionId = requireNotNull(call.parameters["id"]) { "Missing credential offer id" }
                 call.respond(
@@ -85,6 +134,7 @@ class OpenId4VciController(
                 )
             }
 
+            if (Issuer2RouteSurface.AUTHORIZATION_CODE in surfaces) {
             post("par", OpenId4VciRoutesDocs.pushedAuthorizationRequest()) {
                 val requestId = requireNotNull(call.callId) { "Missing call ID" }
                 val parameters = try {
@@ -117,6 +167,9 @@ class OpenId4VciController(
                 }
             }
 
+            }
+
+            if (Issuer2RouteSurface.EXTERNAL_LOGIN in surfaces) {
             val authOAuthInterceptor = createRouteScopedPlugin("issuer2AuthOAuthInterceptor") {
                 onCallRespond { call ->
                     val authorizationRequestEnvelope = call.parameters["internalAuthReq"]
@@ -159,6 +212,9 @@ class OpenId4VciController(
                 }
             }
 
+            }
+
+            if (Issuer2RouteSurface.ISSUANCE in surfaces) {
             post("token", OpenId4VciRoutesDocs.token()) {
                 val requestId = requireNotNull(call.callId) { "Missing call ID" }
                 val parameters = try {
@@ -217,6 +273,7 @@ class OpenId4VciController(
                         )
                     }
                 call.respondCredentialResponse(response)
+            }
             }
         }
     }
