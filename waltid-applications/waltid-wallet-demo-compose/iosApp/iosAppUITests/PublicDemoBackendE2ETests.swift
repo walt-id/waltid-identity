@@ -7,11 +7,6 @@ import XCTest
 @MainActor
 final class PublicDemoBackendE2ETests: XCTestCase {
 
-    override func setUp() {
-        super.setUp()
-        continueAfterFailure = false
-    }
-
     private let backend = DemoBackend.shared
 
     // Timeouts (aligned with Android for cross-platform consistency)
@@ -26,10 +21,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let environment = isolatedWalletEnvironment()
 
         ui.launch(environment: environment)
-        let readyStatus = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
+        let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         app.terminate()
@@ -41,10 +33,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: isolatedWalletEnvironment())
 
-        let readyStatus = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
+        let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
@@ -61,10 +50,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: isolatedWalletEnvironment())
 
-        let readyStatus = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
+        let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.openDeepLink(offer.offerUrl)
@@ -163,10 +149,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: isolatedWalletEnvironment())
 
-        let readyStatus = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
+        let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.openDeepLink(offer.offerUrl)
@@ -228,10 +211,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: isolatedWalletEnvironment())
 
-        let readyStatus = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
+        let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.openDeepLink(offer.offerUrl)
@@ -292,10 +272,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let environment = isolatedWalletEnvironment()
 
         ui.launch(environment: environment)
-        let readyStatus = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
+        let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.openDeepLink(offer.offerUrl)

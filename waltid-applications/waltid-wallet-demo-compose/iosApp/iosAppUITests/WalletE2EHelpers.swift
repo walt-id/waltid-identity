@@ -126,7 +126,11 @@ final class WalletE2EUI {
         }
         for prefix in prefixes {
             let predicate = NSPredicate(format: "label BEGINSWITH %@", prefix)
-            let match = app.staticTexts.matching(predicate).firstMatch
+            let query = app.staticTexts.matching(predicate)
+            // Avoid firstMatch.exists: on Xcode 26 a missing snapshot can fail the test
+            // instead of returning false, which aborted waitForStatus on a hidden banner.
+            guard query.count > 0 else { continue }
+            let match = query.element(boundBy: 0)
             if match.exists {
                 return match.label
             }
@@ -146,7 +150,7 @@ final class WalletE2EUI {
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         if pinInput.waitForExistence(timeout: 2) {
             unlockWallet()
-            _ = waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 60)
+            _ = waitUntilWalletReady(timeout: 60)
         }
     }
 
