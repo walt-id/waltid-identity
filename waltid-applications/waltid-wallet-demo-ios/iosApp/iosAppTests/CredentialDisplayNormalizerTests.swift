@@ -778,6 +778,21 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.cardSummary.title, "Personal ID")
     }
 
+    func testPresentationOptionUsesStoredLabelWhenMetadataAndPayloadHaveNoTitle() {
+        let option = PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: "credential-1",
+            format: "mso_mdoc",
+            issuer: nil,
+            subject: nil,
+            label: "Personal ID",
+            credentialDataJSON: #"{"given_name":"Ada"}"#
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: option)
+        XCTAssertEqual(details.cardSummary.title, "Personal ID")
+    }
+
     func testBuildsCredentialInfoGroupFromWalletSummaryFields() throws {
         let addedAt = try XCTUnwrap(Self.isoDateFormatter.date(from: "2026-07-09T12:00:00Z"))
         let details = CredentialDisplayNormalizer.details(

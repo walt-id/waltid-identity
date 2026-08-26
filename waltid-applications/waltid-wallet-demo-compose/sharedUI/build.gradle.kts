@@ -1,5 +1,6 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
+import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -114,5 +115,15 @@ compose {
 tasks.withType<Test>().configureEach {
     if (name == "testAndroidHostTest") {
         useJUnit()
+    }
+}
+
+// Asset processing is off by default for Android KMP libraries. Compose Multiplatform resources
+// copy into those assets; without this the generated waltid_logo never reaches the APK.
+if (enableAndroidBuild) {
+    extensions.configure<KotlinMultiplatformAndroidComponentsExtension>("androidComponents") {
+        finalizeDsl { android ->
+            android.androidResources.enable = true
+        }
     }
 }

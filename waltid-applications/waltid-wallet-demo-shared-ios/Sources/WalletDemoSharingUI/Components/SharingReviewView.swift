@@ -14,7 +14,6 @@ public struct SharingReviewView: View {
     private let isReadOnly: Bool
     private let onToggleCredential: (PresentationCredentialSelection) -> Void
     private let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    private let onCredentialSelected: ((String) -> Void)?
     private let onSubmit: () -> Void
     private let onReject: (() -> Void)?
     private let onCancel: () -> Void
@@ -30,8 +29,6 @@ public struct SharingReviewView: View {
     ///   - selectionComplete: Whether the request is satisfied, which is what enables Share.
     ///   - isLoading: Whether an operation is in flight, which disables every action.
     ///   - isReadOnly: Whether the review is a record of a finished presentation rather than a prompt.
-    ///   - onCredentialSelected: Opens a credential's full details, when the host has somewhere to
-    ///     open them.
     ///   - onReject: Sends a protocol-level refusal to the requester. Pass `nil` for transports with
     ///     no such message - the platform Digital Credentials APIs return a cancellation instead, and
     ///     offering both Reject and Cancel there would promise the requester gets told two different
@@ -44,7 +41,6 @@ public struct SharingReviewView: View {
         isReadOnly: Bool = false,
         onToggleCredential: @escaping (PresentationCredentialSelection) -> Void,
         onToggleDisclosure: @escaping (PresentationDisclosureSelection) -> Void,
-        onCredentialSelected: ((String) -> Void)? = nil,
         onSubmit: @escaping () -> Void,
         onReject: (() -> Void)? = nil,
         onCancel: @escaping () -> Void,
@@ -58,7 +54,6 @@ public struct SharingReviewView: View {
         self.isReadOnly = isReadOnly
         self.onToggleCredential = onToggleCredential
         self.onToggleDisclosure = onToggleDisclosure
-        self.onCredentialSelected = onCredentialSelected
         self.onSubmit = onSubmit
         self.onReject = onReject
         self.onCancel = onCancel

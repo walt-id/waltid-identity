@@ -57,7 +57,6 @@ internal fun SharingReviewSection(
     enabled: Boolean,
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
-    onCredentialClick: (String) -> Unit,
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
     onReject: (() -> Unit)? = null,
@@ -84,7 +83,6 @@ internal fun SharingReviewSection(
                 details = review.credentialOptions.map { it.toCredentialDetails() },
                 onOpenDetails = { detailsId ->
                     claimsOptionId = detailsId
-                    onCredentialClick(detailsId)
                 },
             )
             claimsOption?.let { option ->

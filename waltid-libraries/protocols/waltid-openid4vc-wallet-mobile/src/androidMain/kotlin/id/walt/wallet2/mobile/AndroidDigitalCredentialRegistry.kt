@@ -171,7 +171,11 @@ public class AndroidDigitalCredentialRegistry(
             !refreshed[index].iconPng.contentEquals(immediate[index].iconPng)
         }
         if (changed) {
-            registerRecords(registryId, refreshed)
+            val refreshResult = registerRecords(registryId, refreshed)
+            registrationAvailable = registrationAvailableAfterRefresh(
+                initialSucceeded = result.available,
+                refreshSucceeded = refreshResult.available,
+            )
         }
         return result
     }
@@ -526,6 +530,12 @@ public class AndroidDigitalCredentialRegistry(
                 "and does not support JWS JSON Serialization request objects"
     }
 }
+
+/** A failed best-effort art refresh must not clear a successful local registration. */
+internal fun registrationAvailableAfterRefresh(
+    initialSucceeded: Boolean,
+    refreshSucceeded: Boolean,
+): Boolean = initialSucceeded || refreshSucceeded
 
 /** Raw registry request because AndroidX does not yet ship an Annex C registry builder. */
 private class AndroidAnnexCRegistry(

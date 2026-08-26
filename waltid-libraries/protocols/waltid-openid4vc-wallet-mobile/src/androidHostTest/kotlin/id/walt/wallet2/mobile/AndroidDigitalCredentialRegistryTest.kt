@@ -236,4 +236,12 @@ class AndroidDigitalCredentialRegistryTest {
 
         assertEquals(customIcon.toList(), database.credentials.single().bitmap.toList())
     }
+
+    @Test
+    fun bestEffortRefreshDoesNotClearSuccessfulInitialRegistration() {
+        assertTrue(registrationAvailableAfterRefresh(initialSucceeded = true, refreshSucceeded = true))
+        assertTrue(registrationAvailableAfterRefresh(initialSucceeded = true, refreshSucceeded = false))
+        assertTrue(registrationAvailableAfterRefresh(initialSucceeded = false, refreshSucceeded = true))
+        assertFalse(registrationAvailableAfterRefresh(initialSucceeded = false, refreshSucceeded = false))
+    }
 }

@@ -132,6 +132,22 @@ class MobileWalletRegistryIconsTest {
         assertEquals(0xFF0080, parseCssRgb("rgb(255, 0, 128)"))
         assertEquals(0x00FF00, parseCssRgb("hsl(120, 100%, 50%)"))
         assertEquals(null, parseCssRgb("#11223344"))
+        assertEquals(null, parseCssRgb("12107c"))
+    }
+
+    @Test
+    fun rejectsOversizedBase64PortraitBeforeDecoding() = runTest {
+        val oversized = "A".repeat(MaxRegistryIconBase64Chars + 4)
+        val icon = MobileWalletRegistryIcons.resolveIconPng(
+            metadata = null,
+            credentialData = buildJsonObject {
+                put("portrait", JsonPrimitive(oversized))
+            },
+            displayName = "PID",
+            fetchHttps = { error("no remote art should be fetched") },
+        )
+
+        assertContentEquals(solidColorPng(MobileWalletRegistryIcons.DefaultCardBlueRgb), icon)
     }
 
     private fun displayMetadata(

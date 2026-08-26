@@ -39,17 +39,18 @@ public object CssColors {
         val raw = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         return when {
             raw.equals("transparent", ignoreCase = true) -> CssColor(0, 0, 0, alpha = 0)
-            raw.startsWith("#") || raw.all { it.isHexDigit() } -> parseHex(raw)
-            raw.startsWith("rgba", ignoreCase = true) -> parseRgbFunction(raw, alpha = true)
-            raw.startsWith("rgb", ignoreCase = true) -> parseRgbFunction(raw, alpha = false)
-            raw.startsWith("hsla", ignoreCase = true) -> parseHslFunction(raw, alpha = true)
-            raw.startsWith("hsl", ignoreCase = true) -> parseHslFunction(raw, alpha = false)
+            raw.startsWith("#") -> parseHex(raw)
+            functionNameEquals(raw, "rgba") -> parseRgbFunction(raw, alpha = true)
+            functionNameEquals(raw, "rgb") -> parseRgbFunction(raw, alpha = false)
+            functionNameEquals(raw, "hsla") -> parseHslFunction(raw, alpha = true)
+            functionNameEquals(raw, "hsl") -> parseHslFunction(raw, alpha = false)
             else -> null
         }
     }
 
     private fun parseHex(value: String): CssColor? {
-        val hex = value.removePrefix("#")
+        if (!value.startsWith("#")) return null
+        val hex = value.drop(1)
         val normalized = when (hex.length) {
             3 -> hex.map { "$it$it" }.joinToString("")
             6 -> hex
@@ -85,10 +86,18 @@ public object CssColors {
         return CssColor(red, green, blue, parsedAlpha)
     }
 
+    private fun functionNameEquals(value: String, name: String): Boolean {
+        val open = value.indexOf('(')
+        if (open <= 0) return false
+        return value.substring(0, open).trim().equals(name, ignoreCase = true)
+    }
+
     private fun functionArguments(value: String): List<String>? {
         val open = value.indexOf('(')
-        val close = value.lastIndexOf(')')
-        if (open < 0 || close <= open) return null
+        if (open <= 0) return null
+        val close = value.indexOf(')', startIndex = open + 1)
+        if (close < 0) return null
+        if (value.substring(close + 1).isNotBlank()) return null
         return value.substring(open + 1, close).split(',').map { it.trim() }
     }
 

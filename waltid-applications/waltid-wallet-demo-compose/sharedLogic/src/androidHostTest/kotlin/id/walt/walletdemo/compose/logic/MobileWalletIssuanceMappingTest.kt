@@ -77,4 +77,18 @@ class MobileWalletIssuanceMappingTest {
         )
         assertEquals("Mobile Driving Licence", option.resolvedCardTitle())
     }
+
+    @Test
+    fun presentationOptionUsesStoredLabelWhenMetadataAndPayloadHaveNoTitle() {
+        val option = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "cred-1",
+            label = "Personal ID",
+            issuer = null,
+            format = "mso_mdoc",
+            credentialDataJson = """{"given_name":"Ada"}""",
+            disclosures = emptyList(),
+        )
+        assertEquals("Personal ID", option.resolvedCardTitle())
+    }
 }

@@ -72,6 +72,9 @@ internal data class MobileWalletCardArt(
 
 internal const val MaxRegistryIconBytes = 2_000_000
 
+/** Largest Base64 character count that can decode to [MaxRegistryIconBytes]. */
+internal val MaxRegistryIconBase64Chars: Int = ((MaxRegistryIconBytes + 2) / 3) * 4
+
 internal const val RegistryIconFetchTimeoutMs = 5_000L
 
 internal fun isHttpsUrl(value: String): Boolean =
@@ -143,8 +146,12 @@ private fun JsonElement.imageBytes(): ByteArray? = when (this) {
             null
         } else {
             val encoded = raw.substringAfter("base64,", raw)
-            runCatching { Base64.decode(encoded) }.getOrNull()
-                ?: runCatching { Base64.UrlSafe.decode(encoded) }.getOrNull()
+            if (encoded.length > MaxRegistryIconBase64Chars) {
+                null
+            } else {
+                runCatching { Base64.decode(encoded) }.getOrNull()
+                    ?: runCatching { Base64.UrlSafe.decode(encoded) }.getOrNull()
+            }
         }
     }
     is JsonObject -> this["elementValue"]?.imageBytes() ?: this["value"]?.imageBytes()

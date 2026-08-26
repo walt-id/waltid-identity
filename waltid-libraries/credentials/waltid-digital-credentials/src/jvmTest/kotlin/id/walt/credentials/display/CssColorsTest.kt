@@ -8,7 +8,6 @@ class CssColorsTest {
     @Test
     fun parsesCssColorLevel3Forms() {
         assertEquals(CssColor(18, 16, 124), CssColors.parse("#12107c"))
-        assertEquals(CssColor(18, 16, 124), CssColors.parse("12107c"))
         assertEquals(CssColor(17, 34, 51), CssColors.parse("#123"))
         assertEquals(CssColor(255, 0, 128), CssColors.parse("rgb(255, 0, 128)"))
         assertEquals(CssColor(255, 0, 0), CssColors.parse("rgb(100%, 0%, 0%)"))
@@ -19,8 +18,11 @@ class CssColorsTest {
     }
 
     @Test
-    fun rejectsNonCss3HexAndUnknownTokens() {
+    fun rejectsNonCss3Tokens() {
         assertNull(CssColors.parse("#11223344"))
+        assertNull(CssColors.parse("12107c"))
+        assertNull(CssColors.parse("rgbfoo(255, 0, 0)"))
+        assertNull(CssColors.parse("rgb(255, 0, 0) extra"))
         assertNull(CssColors.parse("blue"))
         assertNull(CssColors.parse("not-a-color"))
         assertNull(CssColors.parse(""))

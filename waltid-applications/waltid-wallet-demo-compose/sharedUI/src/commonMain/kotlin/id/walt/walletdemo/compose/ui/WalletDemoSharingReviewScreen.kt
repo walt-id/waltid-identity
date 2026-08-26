@@ -113,7 +113,6 @@ fun WalletDemoSharingReviewScreen(
                             )
                         },
                         onToggleDisclosure = { disclosure -> selection = selection.toggleDisclosure(disclosure) },
-                        onCredentialClick = {},
                         onSubmit = { onSubmit(selection) },
                         onCancel = onCancel,
                         onReject = onReject,
@@ -198,7 +197,6 @@ fun WalletDemoSharingReviewSheet(
                             onToggleDisclosure = { disclosure ->
                                 selection = selection.toggleDisclosure(disclosure)
                             },
-                            onCredentialClick = {},
                             onSubmit = { onSubmit(selection) },
                             onCancel = onCancel,
                         )

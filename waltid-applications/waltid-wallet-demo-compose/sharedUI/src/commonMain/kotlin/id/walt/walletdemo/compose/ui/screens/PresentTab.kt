@@ -68,7 +68,6 @@ internal fun PresentTab(
                 readOnly = false,
                 onToggleCredential = onToggleCredential,
                 onToggleDisclosure = onToggleDisclosure,
-                onCredentialClick = {},
                 onSubmit = onSubmit,
                 onReject = onReject,
                 onCancel = onCancel,

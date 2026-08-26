@@ -99,10 +99,6 @@ public enum WalletAccessibilityID {
         identifier("credentialCard", id)
     }
 
-    public static func credentialDetails(_ id: String) -> String {
-        identifier("credentialDetails", id)
-    }
-
     public static func credentialOverview(_ id: String) -> String {
         identifier("credentialOverview", id)
     }
