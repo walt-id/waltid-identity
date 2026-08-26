@@ -1,24 +1,43 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.cose.Cose
+import id.walt.cose.CoseCertificate
+import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseKey
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.crypto.utils.Base64Utils.base64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
+import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.mdoc.issuance.MdocIssuer
+import id.walt.mdoc.objects.document.Document
+import id.walt.wallet2.data.HolderKeyBindingErrorCode
+import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -77,7 +96,12 @@ class MobileWalletDigitalCredentialPresentationTest {
 
     @Test
     fun previewsAndSubmitsAnMdocRequestThroughTheDigitalCredentialsApi() = runTest {
-        val fixture = walletFixture(mdocCredential())
+        val holderKey = signingKey("mdoc-holder-key")
+        val unrelatedDefaultKey = signingKey("unrelated-wallet-default")
+        val fixture = walletFixtureWithKeys(
+            keys = listOf(unrelatedDefaultKey, holderKey),
+            credentials = arrayOf(mdocCredential(holderKey = holderKey)),
+        )
 
         val preview = fixture.wallet.previewDigitalCredentialPresentation(
             dcApiRequest(
@@ -99,6 +123,27 @@ class MobileWalletDigitalCredentialPresentationTest {
             fixture.presentationFor("mdl", data).isNotBlank(),
             "mdoc DeviceResponse missing from the vp_token: $data",
         )
+    }
+
+    @Test
+    fun anUnboundMdocIsRejectedDuringPreview() = runTest {
+        val holderKey = signingKey("mdoc-holder-key")
+        val fixture = walletFixtureWithKeys(
+            keys = listOf(holderKey),
+            credentials = arrayOf(mdocCredential(holderKey = holderKey)),
+            bindMdocs = false,
+        )
+
+        val failure = assertFailsWith<HolderKeyBindingException> {
+            fixture.wallet.previewDigitalCredentialPresentation(
+                dcApiRequest(
+                    data = mdocQuery(),
+                    selectedRegistryEntryIds = listOf(fixture.registryEntryId("mdl-1")),
+                )
+            )
+        }
+
+        assertEquals(HolderKeyBindingErrorCode.BINDING_MISSING, failure.code)
     }
 
     /**
@@ -424,20 +469,34 @@ class MobileWalletDigitalCredentialPresentationTest {
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     ): Fixture {
         // The DC API is a crypto2-only surface, so the wallet holds nothing but a managed key.
-        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
-            GenerateSoftwareKeyRequest(
-                id = KeyId("dc-api-holder-key"),
-                spec = KeySpec.Ec(EcCurve.P256),
-                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-            )
+        return walletFixtureWithKeys(
+            keys = listOf(signingKey("dc-api-holder-key")),
+            credentials = credentials,
+            transactionDataProfiles = transactionDataProfiles,
         )
+    }
+
+    private suspend fun walletFixtureWithKeys(
+        keys: List<Crypto2Key>,
+        credentials: Array<out StoredCredential>,
+        transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+        bindMdocs: Boolean = true,
+    ): Fixture {
         val registry = CapturingRegistry()
+        val keyStore = InMemoryMobileWalletKeyStore().also { store ->
+            keys.forEach { store.addCrypto2Key(it) }
+        }
+        val bindingWallet = Wallet(id = "dc-api-presentation-wallet", keyStores = listOf(keyStore))
         val credentialStore = RecordingCredentialStore().also { store ->
-            credentials.forEach { store.addCredential(it) }
+            credentials.forEach { credential ->
+                store.addCredential(
+                    if (bindMdocs) bindingWallet.withImportedHolderKeyBinding(credential) else credential
+                )
+            }
         }
         val wallet = MobileWallet(
             walletId = "dc-api-presentation-wallet",
-            keyStore = InMemoryMobileWalletKeyStore().also { it.addCrypto2Key(holderKey) },
+            keyStore = keyStore,
             didStore = InMemoryDidStore().also {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },
@@ -448,6 +507,15 @@ class MobileWalletDigitalCredentialPresentationTest {
         )
         return Fixture(wallet, registry, credentialStore)
     }
+
+    private suspend fun signingKey(id: String): Crypto2Key =
+        CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId(id),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
 
     private fun dcApiRequest(
         data: String,
@@ -523,11 +591,48 @@ class MobileWalletDigitalCredentialPresentationTest {
      * the only key DCQL's `doctype_value` constraint reads. A fixture omitting it matches nothing, which
      * would be indistinguishable here from a routing bug.
      */
-    private suspend fun mdocCredential(id: String = "mdl-1"): StoredCredential = StoredCredential(
-        id = id,
-        credential = CredentialParser.detectAndParse(MdocsExamples.mdocsExampleBase64Url).second,
-        label = "mDL",
-    )
+    private suspend fun mdocCredential(
+        id: String = "mdl-1",
+        holderKey: Crypto2Key? = null,
+    ): StoredCredential {
+        if (holderKey == null) {
+            return StoredCredential(
+                id = id,
+                credential = CredentialParser.detectAndParse(MdocsExamples.mdocsExampleBase64Url).second,
+                label = "mDL",
+            )
+        }
+        val issuerKey = signingKey("mdoc-issuer-key")
+        val signatureAlgorithm = SignatureAlgorithm.Ecdsa(
+            DigestAlgorithm.SHA_256,
+            EcdsaSignatureEncoding.DER,
+        )
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(issuerKey, signatureAlgorithm) {
+            subjectDn = "CN=Mobile wallet mdoc test issuer"
+        }
+        val holderPublicJwk = holderKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
+        val issuerSigned = MdocIssuer.issueUniversal(
+            issuerKey = issuerKey,
+            signatureAlgorithm = Cose.Algorithm.ES256,
+            issuerCertificate = listOf(CoseCertificate(certificate.encodedDer.toByteArray())),
+            holderKey = holderPublicJwk.toCoseKey(),
+            docType = MDOC_DOCTYPE,
+            data = MdocIssuer.MdocUniversalIssuanceData(
+                namespaces = mapOf(
+                    MDOC_NAMESPACE to JsonObject(mapOf("given_name" to kotlinx.serialization.json.JsonPrimitive("Inga")))
+                )
+            ),
+        )
+        val raw = coseCompliantCbor.encodeToByteArray(
+            Document.serializer(),
+            Document(docType = MDOC_DOCTYPE, issuerSigned = issuerSigned),
+        ).encodeToBase64Url()
+        return StoredCredential(
+            id = id,
+            credential = CredentialParser.detectAndParse(raw).second,
+            label = "mDL",
+        )
+    }
 
     private fun List<MobileWalletPresentationCredentialOption>.selections() =
         map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) }

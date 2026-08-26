@@ -10,6 +10,11 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.credentials.formats.MdocsCredential
+import id.walt.wallet2.data.HolderKeyBinding
+import id.walt.wallet2.data.HolderKeyBindingOrigin
+import id.walt.wallet2.data.PublicKeyThumbprint
+import id.walt.wallet2.data.StoredCredential
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -17,6 +22,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 import java.sql.Connection
 import java.sql.DriverManager
+import kotlinx.serialization.json.buildJsonObject
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -24,6 +31,83 @@ import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 class Wallet2DatabaseMigrationTest {
+    @Test
+    fun `legacy credential table gains nullable holder key binding column`() = runTest {
+        val jdbcUrl = sharedMemoryUrl("credential-binding-upgrade")
+        DriverManager.getConnection(jdbcUrl).use { anchor ->
+            anchor.createStatement().use { statement ->
+                statement.execute("CREATE TABLE wallet2_credential_stores (id VARCHAR(128) PRIMARY KEY)")
+                statement.execute(
+                    """CREATE TABLE wallet2_credentials (
+                        store_id VARCHAR(128) NOT NULL,
+                        id VARCHAR(256) NOT NULL,
+                        serialized_credential TEXT NOT NULL,
+                        label VARCHAR(512),
+                        added_at TIMESTAMP NOT NULL,
+                        metadata TEXT,
+                        PRIMARY KEY (store_id, id),
+                        FOREIGN KEY (store_id) REFERENCES wallet2_credential_stores(id)
+                    )""".trimIndent()
+                )
+                statement.execute("INSERT INTO wallet2_credential_stores(id) VALUES ('legacy')")
+                statement.execute(
+                    """INSERT INTO wallet2_credentials(
+                        store_id, id, serialized_credential, label, added_at, metadata
+                    ) VALUES ('legacy', 'mdoc-1', '{}', NULL, '2026-01-01T00:00:00Z', NULL)""".trimIndent()
+                )
+            }
+
+            initWallet2Database(config(jdbcUrl))
+
+            anchor.createStatement().use { statement ->
+                statement.executeQuery("PRAGMA table_info(wallet2_credentials)").use { columns ->
+                    val names = buildList {
+                        while (columns.next()) add(columns.getString("name"))
+                    }
+                    assertTrue("holder_key_binding" in names)
+                }
+                statement.executeQuery(
+                    "SELECT holder_key_binding FROM wallet2_credentials WHERE id = 'mdoc-1'"
+                ).use { result ->
+                    assertTrue(result.next())
+                    assertEquals(null, result.getString(1))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `server credential store round trips holder key binding`() = runTest {
+        val jdbcUrl = sharedMemoryUrl("credential-binding-roundtrip")
+        DriverManager.getConnection(jdbcUrl).use { anchor ->
+            val db = initWallet2Database(config(jdbcUrl))
+            anchor.createStatement().use {
+                it.execute("INSERT INTO wallet2_credential_stores(id) VALUES ('credentials')")
+            }
+            val binding = HolderKeyBinding(
+                keyReference = "urn:waltid:wallet-key:v1:store:0:aG9sZGVy",
+                publicKeyThumbprint = PublicKeyThumbprint(value = "thumbprint"),
+                origin = HolderKeyBindingOrigin.ISSUANCE,
+                createdAt = Instant.fromEpochMilliseconds(1_725_000_000_000),
+            )
+            val store = ExposedCredentialStore("credentials", db)
+
+            store.addCredential(
+                StoredCredential(
+                    id = "mdoc-1",
+                    credential = MdocsCredential(
+                        credentialData = buildJsonObject { },
+                        signed = null,
+                        docType = "org.iso.18013.5.1.mDL",
+                    ),
+                    holderKeyBinding = binding,
+                )
+            )
+
+            assertEquals(binding, store.getCredential("mdoc-1")?.holderKeyBinding)
+        }
+    }
+
     @Test
     fun `legacy key table gains crypto2 column and backfills`() = runTest {
         val jdbcUrl = sharedMemoryUrl("upgrade")

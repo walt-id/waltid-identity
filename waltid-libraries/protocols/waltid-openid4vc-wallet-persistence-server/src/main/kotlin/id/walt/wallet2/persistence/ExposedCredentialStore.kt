@@ -1,6 +1,7 @@
 package id.walt.wallet2.persistence
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.wallet2.data.HolderKeyBinding
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import kotlinx.coroutines.flow.Flow
@@ -59,6 +60,9 @@ class ExposedCredentialStore(
                     (entry.addedAt ?: Clock.System.now()).toJavaInstant()
                 it[Wallet2Tables.Credentials.metadata] =
                     entry.metadata?.let { meta -> json.encodeToString(JsonObject.serializer(), meta) }
+                it[Wallet2Tables.Credentials.holderKeyBinding] = entry.holderKeyBinding?.let { binding ->
+                    json.encodeToString(HolderKeyBinding.serializer(), binding)
+                }
             }
         }
     }
@@ -82,6 +86,9 @@ class ExposedCredentialStore(
                 addedAt = row[Wallet2Tables.Credentials.addedAt].toKotlinInstant(),
                 metadata = row[Wallet2Tables.Credentials.metadata]?.let {
                     json.decodeFromString(JsonObject.serializer(), it)
+                },
+                holderKeyBinding = row[Wallet2Tables.Credentials.holderKeyBinding]?.let {
+                    json.decodeFromString(HolderKeyBinding.serializer(), it)
                 },
             )
         }.getOrNull()

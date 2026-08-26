@@ -3,10 +3,11 @@ package id.walt.wallet2.persistence.stores
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
-import id.walt.wallet2.persistence.db.Credentials
-import id.walt.wallet2.persistence.db.WalletPersistenceQueries
+import id.walt.wallet2.data.HolderKeyBinding
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.persistence.db.Credentials
+import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
@@ -54,6 +55,9 @@ public class SqlDelightCredentialStore(
             label = entry.label,
             added_at = entry.addedAt?.toEpochMilliseconds() ?: Clock.System.now().toEpochMilliseconds(),
             metadata = entry.metadata?.let { json.encodeToString(JsonObject.serializer(), it) },
+            holder_key_binding = entry.holderKeyBinding?.let {
+                json.encodeToString(HolderKeyBinding.serializer(), it)
+            },
         )
     }
 
@@ -74,6 +78,9 @@ public class SqlDelightCredentialStore(
             label = label,
             addedAt = Instant.fromEpochMilliseconds(added_at),
             metadata = metadata?.let { json.decodeFromString(JsonObject.serializer(), it) },
+            holderKeyBinding = holder_key_binding?.let {
+                json.decodeFromString(HolderKeyBinding.serializer(), it)
+            },
         )
     }
 }

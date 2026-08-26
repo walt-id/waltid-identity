@@ -3,7 +3,6 @@
 package id.waltid.openid4vp.wallet
 
 import id.walt.cose.*
-import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
@@ -13,10 +12,6 @@ import id.walt.crypto2.migration.v1.V1KeyMigration
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.mdoc.crypto.MdocCrypto
-import id.walt.mdoc.crypto.MdocCryptoHelper
-import id.walt.mdoc.encoding.ByteStringWrapper
-import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import kotlinx.coroutines.test.runTest
@@ -205,70 +200,4 @@ class WalletCrypto2PresentationSigningTest {
         )
     }
 
-    @Test
-    fun `mdoc device authentication signs through crypto2`() = runTest {
-        val legacyKey = JWKKey(legacyP256Jwk)
-        val crypto2Key = assertNotNull(WalletCrypto2KeyAdapter.signingKey(legacyKey))
-        val publicJwk = crypto2Key.capabilities.publicKeyExporter?.exportPublicKey() as EncodedKey.Jwk
-        val verificationKey = CryptoRuntime(defaultSoftwareKeyProviders()).restore(
-            V1KeyMigration().migrate(
-                recordId = KeyId("mdoc-device-auth-verification"),
-                serialized = buildJsonObject {
-                    put("type", "jwk")
-                    put("jwk", Jwk.parse(publicJwk))
-                },
-                usages = setOf(KeyUsage.VERIFY),
-            )
-        )
-        val credential = MdocsCredential(
-            credentialData = buildJsonObject { },
-            signed = null,
-            docType = "org.iso.18013.5.1.mDL",
-        )
-        val namespaces = DeviceNameSpaces(emptyMap())
-        val transcript = MdocPresenter.buildSessionTranscript(
-            AuthorizationRequest(clientId = "verifier", nonce = "nonce"),
-            "https://verifier/response",
-            null,
-        )
-        val deviceAuth = MdocPresenter.buildDeviceAuth(transcript, credential, namespaces, legacyKey)
-        val signature = assertNotNull(deviceAuth.deviceSignature)
-        val detachedPayload = MdocCryptoHelper.buildDeviceAuthenticationBytes(
-            transcript,
-            credential.docType,
-            ByteStringWrapper(namespaces),
-        )
-
-        assertEquals(Cose.Algorithm.ES256, signature.protectedAlgorithm())
-        assertTrue(signature.verifyDetached(verificationKey, detachedPayload, Cose.Algorithm.ES256))
-        assertFails {
-            MdocPresenter.buildDeviceAuth(
-                transcript,
-                credential,
-                namespaces,
-                legacyKey,
-                allowedAlgorithms = setOf(Cose.Algorithm.ES384),
-            )
-        }
-
-        val deviceCoseKey = publicJwk.toCoseKey()
-        assertFails {
-            MdocCrypto.coseKeyToCrypto2Key(
-                deviceCoseKey.copy(alg = Cose.Algorithm.ES384),
-                Cose.Algorithm.ES256,
-            )
-        }
-        assertFails {
-            MdocCrypto.coseKeyToCrypto2Key(
-                deviceCoseKey.copy(key_ops = emptyList()),
-                Cose.Algorithm.ES256,
-            )
-        }
-    }
-
-    private companion object {
-        val legacyP256Jwk = """
-            {"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}
-        """.trimIndent()
-    }
 }

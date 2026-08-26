@@ -216,21 +216,21 @@ internal suspend fun Wallet.resolveKeyMaterial(
 ): WalletKeyStoreEntry? {
     val preferredKeyId = keyId ?: defaultKeyId
     if (preferredKeyId != null) {
-        keyStores.forEach { store ->
+        keyStores.forEachIndexed { index, store ->
             store.getKeyMaterial(preferredKeyId, crypto2Usages)?.let { material ->
                 requireMatchingKeyMaterial(material.legacyKey, material.crypto2Key)
-                return material
+                return material.copy(keyReference = walletStoreKeyReference(index, material.keyId))
             }
         }
         staticKey?.takeIf { it.getKeyId() == preferredKeyId }
             ?.let { return staticKeyMaterial(crypto2Usages) }
         if (keyId != null) return null
     }
-    keyStores.forEach { store ->
-        val defaultKeyId = store.listKeys().firstOrNull()?.keyId ?: return@forEach
+    keyStores.forEachIndexed { index, store ->
+        val defaultKeyId = store.listKeys().firstOrNull()?.keyId ?: return@forEachIndexed
         store.getKeyMaterial(defaultKeyId, crypto2Usages)?.let { material ->
             requireMatchingKeyMaterial(material.legacyKey, material.crypto2Key)
-            return material
+            return material.copy(keyReference = walletStoreKeyReference(index, material.keyId))
         }
     }
     return staticKeyMaterial(crypto2Usages)
@@ -240,7 +240,8 @@ private suspend fun Wallet.staticKeyMaterial(usages: Set<KeyUsage>): WalletKeySt
     val crypto2Key = attachedStaticCrypto2Key()?.also { key ->
         require(usages.all(key.usages::contains)) { "Wallet crypto2 static key does not permit requested usages" }
     }
-    WalletKeyStoreEntry(legacyKey.getKeyId(), legacyKey, crypto2Key)
+    val keyId = legacyKey.getKeyId()
+    WalletKeyStoreEntry(keyId, legacyKey, crypto2Key, staticWalletKeyReference(keyId))
 }
 
 private suspend fun requireMatchingKeyMaterial(legacyKey: Key?, crypto2Key: Crypto2Key?) {

@@ -14,7 +14,6 @@ import id.walt.crypto2.keys.HpkeCiphertext
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.crypto2.keys.KeyUsage
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.sha256
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
@@ -23,8 +22,10 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.handover.AnnexCDcapiHandoverInfo
+import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.resolveHolderKey
 import id.walt.wallet2.handlers.PreviewSessionStore
 import id.waltid.openid4vp.wallet.DcApiWallet
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
@@ -222,9 +223,20 @@ internal class MobileWalletAnnexCEngine(
         }.toSet()
         val storedCredentials = wallet.streamAllCredentials().toList()
         val options = request.parsedRequest.documents.flatMapIndexed { index, documentRequest ->
-            storedCredentials.mapNotNull { stored ->
-                stored.toAnnexCOption(index, documentRequest, selectedCredentialIds)
+            val bindingFailures = mutableListOf<HolderKeyBindingException>()
+            val documentOptions = storedCredentials.mapNotNull { stored ->
+                val option = stored.toAnnexCOption(index, documentRequest, selectedCredentialIds)
+                    ?: return@mapNotNull null
+                try {
+                    wallet.resolveHolderKey(stored)
+                    option
+                } catch (failure: HolderKeyBindingException) {
+                    bindingFailures += failure
+                    null
+                }
             }
+            if (documentOptions.isEmpty() && bindingFailures.isNotEmpty()) throw bindingFailures.first()
+            documentOptions
         }
         request.parsedRequest.documents.forEachIndexed { index, documentRequest ->
             require(options.any { it.queryId == annexCQueryId(index, documentRequest.docType) }) {
@@ -299,10 +311,6 @@ internal class MobileWalletAnnexCEngine(
         require(selectionsByQuery.values.all { it.credentialId in retained.allowedCredentialIds }) {
             "An Annex C credential selection was not offered by the consent preview"
         }
-        // Mobile keys are always platform-managed, so this path is crypto2-only and carries no
-        // fallback for exportable JWK material.
-        val holderKey = wallet.resolveCrypto2Key(usages = setOf(KeyUsage.SIGN))
-            ?: throw IllegalStateException("No crypto2 wallet signing key is available")
         return retained.parsedRequest.documents.mapIndexed { index, requested ->
             val queryId = annexCQueryId(index, requested.docType)
             val selection = selectionsByQuery[queryId]
@@ -314,6 +322,8 @@ internal class MobileWalletAnnexCEngine(
             require((stored.credential as? MdocsCredential)?.docType == requested.docType) {
                 "Selected credential no longer matches the Annex C document request"
             }
+            // Resolve the exact credential-bound key. A wallet default is never an mdoc fallback.
+            val holderKey = wallet.resolveHolderKey(stored).keyMaterial.requireCrypto2Key()
             MdocPresenter.buildAnnexCDocument(
                 digitalCredential = stored.credential,
                 requestedElements = requested.namespaces,

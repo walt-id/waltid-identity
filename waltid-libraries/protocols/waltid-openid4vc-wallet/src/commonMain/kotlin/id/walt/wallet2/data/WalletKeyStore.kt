@@ -54,6 +54,8 @@ data class WalletKeyStoreEntry(
     val keyId: String,
     val legacyKey: Key?,
     val crypto2Key: Crypto2Key?,
+    /** Opaque resolver-owned reference when this entry came from a configured wallet key provider. */
+    val keyReference: String? = null,
 ) {
     fun requireCrypto2Key(): Crypto2Key =
         requireNotNull(crypto2Key) { "Key '$keyId' is not available through crypto2" }
