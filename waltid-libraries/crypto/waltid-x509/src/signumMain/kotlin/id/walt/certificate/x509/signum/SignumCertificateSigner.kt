@@ -1,6 +1,7 @@
 package id.walt.certificate.x509.signum
 
 
+import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.asn1.Asn1Element
 import at.asitplus.signum.indispensable.asn1.Asn1Time
 import at.asitplus.signum.indispensable.asn1.encoding.parse
@@ -67,8 +68,7 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
         builder: X509CertificateDataBuilder,
         signRaw: suspend (rawData: ByteArray) -> ByteArray
     ): X509Certificate {
-        val subjectDn: List<RelativeDistinguishedName> =
-            DistinguishedName.ofString(builder.subjectDn).toSignumDn()
+        val subjectDn: List<RelativeDistinguishedName> = builder.signumSubjectDn
         var issuerDn: List<RelativeDistinguishedName> = subjectDn
 
         val subjectPublicKeyInfo =
@@ -84,10 +84,14 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
                         }
                     if (it.crypto1key != null) {
                         require(it.key == null) { "Subject key must be of one type, crypto1key and key cannot be set together." }
+                        require(it.spki == null) { "Subject key must be of one type, crypto1key and spki cannot be set together." }
                         convertKeyToPublicKeyInfo(it.crypto1key) as SignumPublicKeyInfo
-                    } else {
-                        requireNotNull(it.key) { "Subject key must be provided for non-self-signed certificates." }
+                    } else if (it.key != null) {
+                        require(it.spki == null) { "Subject key must be of one type, key and spki cannot be set together." }
                         convertKeyToPublicKeyInfo(it.key) as SignumPublicKeyInfo
+                    } else {
+                        requireNotNull(it.spki) { "Subject key must be provided for non-self-signed certificates." }
+                        SignumPublicKeyInfo.ofDerEncoded(it.spki.encodedDer.toByteArray())
                     }
                 }
             }
@@ -166,20 +170,45 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
     }
 
     override suspend fun signCsr(
+        holderKey: Key,
+        signatureAlgorithm: SignatureAlgorithm,
+        csrBuilder: Pkcs10CertificateSigningRequestBuilder
+    ): Pkcs10CertificateSigningRequest {
+        val publicKey = (convertKeyToPublicKeyInfo(holderKey) as SignumPublicKeyInfo).keyInfo
+        val tbsCsr = buildTbsCsr(csrBuilder, publicKey)
+
+        // 1. Convert the TBS data class to its canonical ASN.1 DER byte structure
+        val tbsDerBytes: ByteArray = tbsCsr.encodeToDer()
+
+        // 2. Compute the cryptographic signature
+        val rawSignatureBytes: ByteArray = holderKey.capabilities
+            .signer
+            ?.sign(tbsDerBytes, signatureAlgorithm)
+            ?: error("Signer not found for key")
+
+        // 3. Instantiate the appropriate CryptoSignature variant manually.
+        // For EC keys (e.g., P-256), use EC.fromRawBytes. For RSA, use CryptoSignature.RSA.
+        val sigAlgorithm = X509SigningAlgorithmInfo.ofKey(holderKey, signatureAlgorithm)
+        val algorithm = sigAlgorithm.toSignatureAlgorithm()
+        val signature = SignumSignatureAlgorithmUtil.evaluateSignature(sigAlgorithm, rawSignatureBytes)
+
+        // 4. Directly construct the finished PKCS#10 Certificate Request
+        val encodedSignedCsr = Pkcs10CertificationRequest(
+            tbsCsr = tbsCsr,
+            signatureAlgorithm = algorithm.toX509SignatureAlgorithm().getOrThrow(),
+            signature = signature
+        )
+
+        return SignumCsr(encodedSignedCsr)
+    }
+
+    override suspend fun signCsr(
         holderKey: Crypto1Key,
         csrBuilder: Pkcs10CertificateSigningRequestBuilder
     ): Pkcs10CertificateSigningRequest {
 
-        val subjectDn = DistinguishedName.ofString(csrBuilder.requestedCertificate.subjectDn)
-        val extensions = csrBuilder.requestedCertificate.extensions.values.map { value ->
-            SignumExtensionFactory.createExtension(value)
-        }
-
-        val tbsCsr = TbsCertificationRequest(
-            subjectName = subjectDn.toSignumDn(),
-            publicKey = (convertKeyToPublicKeyInfo(holderKey) as SignumPublicKeyInfo).keyInfo,
-            extensions = extensions,
-        )
+        val publicKey = (convertKeyToPublicKeyInfo(holderKey) as SignumPublicKeyInfo).keyInfo
+        val tbsCsr = buildTbsCsr(csrBuilder, publicKey)
 
         // 1. Convert the TBS data class to its canonical ASN.1 DER byte structure
         val tbsDerBytes: ByteArray = tbsCsr.encodeToDer()
@@ -202,4 +231,31 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
 
         return SignumCsr(encodedSignedCsr)
     }
+
+    private fun buildTbsCsr(
+        csrBuilder: Pkcs10CertificateSigningRequestBuilder,
+        publicKeyInfo: CryptoPublicKey
+    ): TbsCertificationRequest {
+        val subjectDn = DistinguishedName.ofString(csrBuilder.requestedCertificate.subjectDn)
+        val extensions = csrBuilder.requestedCertificate.extensions.values.map { value ->
+            SignumExtensionFactory.createExtension(value)
+        }
+
+        return TbsCertificationRequest(
+            subjectName = subjectDn.toSignumDn(),
+            publicKey = publicKeyInfo,
+            extensions = extensions,
+        )
+    }
+
+    private val X509CertificateDataBuilder.signumSubjectDn: List<RelativeDistinguishedName>
+        get() = if (subjectDnRaw.isNotEmpty()) {
+            check(subjectDn.isEmpty()) { "Subject DN can be either set as string or raw, not both: '$subjectDn', '$subjectDnRaw'"}
+            Asn1Element.parse(subjectDnRaw.toByteArray())
+                .asSequence()
+                .children
+                .map { RelativeDistinguishedName.decodeFromTlv(it.asSet())}
+        } else {
+            DistinguishedName.ofString(subjectDn).toSignumDn()
+        }
 }

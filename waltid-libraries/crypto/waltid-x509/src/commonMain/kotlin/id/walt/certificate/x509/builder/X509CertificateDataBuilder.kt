@@ -11,24 +11,71 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import id.walt.crypto.keys.Key as Crypto1Key
 
-open class X509CertificateDataBuilder(
+open class X509CertificateDataBuilder private constructor(
     private val serialNumberGenerator: X509CertificateSerialNumberGenerator,
     override val version: Int = 3,
     override var serialNumberRaw: ByteString = serialNumberGenerator.next(),
     override var issuerDnRaw: ByteString,
-    override var subjectDn: String,
-    override var validity: X509Certificate.Validity = X509Certificate.Validity(
-        notBefore = Clock.System.now(),
-        notAfter = Clock.System.now() + 30.days,
-    ),
+    var _subjectDn: String,
+    var _subjectDnRaw: ByteString,
+    override var validity: X509Certificate.Validity,
     override var subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder()
 ) : X509Certificate.CertificateData, MutableExtensionContainer {
 
+    constructor(
+        serialNumberGenerator: X509CertificateSerialNumberGenerator,
+        version: Int = 3,
+        serialNumberRaw: ByteString = serialNumberGenerator.next(),
+        issuerDnRaw: ByteString,
+        subjectDn: String,
+        validity: X509Certificate.Validity = defaultValidity(),
+        subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder()
+    ) : this(
+        serialNumberGenerator,
+        version,
+        serialNumberRaw,
+        issuerDnRaw,
+        subjectDn,
+        ByteString(),
+        validity,
+        subjectPublicKeyInfo
+    )
+
+    constructor(
+        serialNumberGenerator: X509CertificateSerialNumberGenerator,
+        version: Int = 3,
+        serialNumberRaw: ByteString = serialNumberGenerator.next(),
+        issuerDnRaw: ByteString,
+        subjectDnRaw: ByteString,
+        validity: X509Certificate.Validity = defaultValidity(),
+        subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder()
+    ) : this(
+        serialNumberGenerator,
+        version,
+        serialNumberRaw,
+        issuerDnRaw,
+        "",
+        subjectDnRaw,
+        validity,
+        subjectPublicKeyInfo
+    )
+
+    override var subjectDn: String
+        get() = _subjectDn
+        set(value) {
+            _subjectDn = value
+            _subjectDnRaw = ByteString()
+        }
+
+    override var subjectDnRaw: ByteString
+        get() = _subjectDnRaw
+        set(value) {
+            _subjectDn = ""
+            _subjectDnRaw = value
+        }
+
     override val issuerDn: String
         get() = error("Not allowed, raw value must be provided")
-
-    override val subjectDnRaw: ByteString
-        get() = error("Not available in builder")
 
     override val extensions: MutableMap<String, Extension> = mutableMapOf()
 
@@ -44,15 +91,21 @@ open class X509CertificateDataBuilder(
         subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder(key)
     }
 
+    fun subjectPublicKey(spki: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo): Unit {
+        subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder(spki)
+    }
+
     class WaltIdKeySubjectPublicKeyInfoBuilder private constructor(
         val selfSigned: Boolean,
         val crypto1key: Crypto1Key?,
-        val key: Key?
+        val key: Key?,
+        val spki: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo?
     ) : X509Certificate.SubjectPublicKeyInfo {
 
-        constructor(crypto1key: Crypto1Key) : this(false, crypto1key, null)
-        constructor(key: Key) : this(false, null, key)
-        constructor() : this(true, null, null)
+        constructor(spki: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo) : this(false, null, null, spki)
+        constructor(crypto1key: Crypto1Key) : this(false, crypto1key, null, null)
+        constructor(key: Key) : this(false, null, key, null)
+        constructor() : this(true, null, null, null)
 
         override val algorithmName: String
             get() = error("needs to be taken from issuer key")
@@ -66,5 +119,12 @@ open class X509CertificateDataBuilder(
             get() = error("needs to be taken from issuer key")
         override val encodedDer: ByteString
             get() = error("needs to be taken from issuer key")
+    }
+
+    companion object {
+        fun defaultValidity(): X509Certificate.Validity = X509Certificate.Validity(
+            notBefore = Clock.System.now(),
+            notAfter = Clock.System.now() + 30.days,
+        )
     }
 }
