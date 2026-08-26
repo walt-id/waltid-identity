@@ -29,13 +29,6 @@ internal actual fun DefaultWaltLogo(modifier: Modifier) {
 }
 
 private fun loadWaltLogoBitmap(context: Context): Bitmap? {
-    val resourceId = listOf(context.packageName, "id.walt.walletdemo.compose.ui")
-        .firstNotNullOfOrNull { packageName ->
-            context.resources.getIdentifier("waltid_logo", "drawable", packageName).takeIf { it != 0 }
-        }
-    if (resourceId != null) {
-        BitmapFactory.decodeResource(context.resources, resourceId)?.let { return it }
-    }
     runCatching {
         context.assets.open(ComposeResourceAssetPath).use(BitmapFactory::decodeStream)
     }.getOrNull()?.let { return it }

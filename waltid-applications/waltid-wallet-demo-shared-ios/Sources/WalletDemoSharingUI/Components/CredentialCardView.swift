@@ -159,14 +159,13 @@ public struct CredentialCardStackView: View {
             }
         )
         .onPreferenceChange(CredentialCardStackWidthKey.self) { stackWidth = $0 }
-        .clipped()
         .animation(.spring(response: 0.42, dampingFraction: 0.86), value: selectedAtTop)
         .animation(.easeInOut(duration: 0.22), value: othersHidden)
     }
 
     private func displayedHeight(forWidth width: CGFloat) -> CGFloat {
         let cardHeight = width / id1AspectRatio
-        if selectedAtTop {
+        if selectedAtTop && othersHidden {
             return cardHeight
         }
         let offsets = cardOffsets(
@@ -235,11 +234,33 @@ public func prefetchCredentialCardArt(uris: [String?]) async {
     }
 }
 
+private let maxCredentialCardArtBytes = 2_000_000
+private let maxCredentialCardArtPixels: CGFloat = 2_048 * 2_048
+private let credentialCardArtTimeout: TimeInterval = 5
+
 private func loadMetadataArt(from value: String?) async -> UIImage? {
     guard let url = httpsURL(value) else { return nil }
+    var request = URLRequest(url: url)
+    request.timeoutInterval = credentialCardArtTimeout
     do {
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            return nil
+        }
+        if http.expectedContentLength > maxCredentialCardArtBytes {
+            return nil
+        }
+        var data = Data()
+        data.reserveCapacity(min(Int(max(http.expectedContentLength, 0)), maxCredentialCardArtBytes))
+        for try await byte in bytes {
+            data.append(byte)
+            if data.count > maxCredentialCardArtBytes {
+                return nil
+            }
+        }
         guard let image = UIImage(data: data), image.size.height > 0 else { return nil }
+        let pixelCount = image.size.width * image.size.height * image.scale * image.scale
+        guard pixelCount <= maxCredentialCardArtPixels else { return nil }
         let aspect = image.size.width / image.size.height
         return (1.2...2.0).contains(aspect) ? image : nil
     } catch {
@@ -258,28 +279,126 @@ private func httpsURL(_ value: String?) -> URL? {
 
 private extension Color {
     init?(css value: String?) {
-        guard let hex = value?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "#", with: ""),
-              !hex.isEmpty else {
-            return nil
-        }
-        let normalized: String
-        switch hex.count {
-        case 3:
-            normalized = hex.map { "\($0)\($0)" }.joined()
-        case 6:
-            normalized = hex
-        case 8:
-            normalized = String(hex.suffix(6))
-        default:
-            return nil
-        }
-        guard let rgb = UInt32(normalized, radix: 16) else { return nil }
+        guard let parsed = parseCssColor(value) else { return nil }
         self.init(
-            red: Double((rgb >> 16) & 0xFF) / 255,
-            green: Double((rgb >> 8) & 0xFF) / 255,
-            blue: Double(rgb & 0xFF) / 255
+            red: parsed.red,
+            green: parsed.green,
+            blue: parsed.blue,
+            opacity: parsed.alpha
         )
     }
+}
+
+private struct CssColorChannels {
+    let red: Double
+    let green: Double
+    let blue: Double
+    let alpha: Double
+}
+
+private func parseCssColor(_ value: String?) -> CssColorChannels? {
+    let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard !raw.isEmpty else { return nil }
+    if raw.caseInsensitiveCompare("transparent") == .orderedSame {
+        return CssColorChannels(red: 0, green: 0, blue: 0, alpha: 0)
+    }
+    if raw.hasPrefix("#") || raw.allSatisfy(\.isHexDigit) {
+        return parseCssHex(raw)
+    }
+    if raw.lowercased().hasPrefix("rgba") { return parseCssRgbFunction(raw, alpha: true) }
+    if raw.lowercased().hasPrefix("rgb") { return parseCssRgbFunction(raw, alpha: false) }
+    if raw.lowercased().hasPrefix("hsla") { return parseCssHslFunction(raw, alpha: true) }
+    if raw.lowercased().hasPrefix("hsl") { return parseCssHslFunction(raw, alpha: false) }
+    return nil
+}
+
+private func parseCssHex(_ value: String) -> CssColorChannels? {
+    let hex = value.hasPrefix("#") ? String(value.dropFirst()) : value
+    let normalized: String
+    switch hex.count {
+    case 3:
+        normalized = hex.map { "\($0)\($0)" }.joined()
+    case 6:
+        normalized = hex
+    default:
+        return nil
+    }
+    guard let rgb = UInt32(normalized, radix: 16) else { return nil }
+    return CssColorChannels(
+        red: Double((rgb >> 16) & 0xFF) / 255,
+        green: Double((rgb >> 8) & 0xFF) / 255,
+        blue: Double(rgb & 0xFF) / 255,
+        alpha: 1
+    )
+}
+
+private func parseCssRgbFunction(_ value: String, alpha: Bool) -> CssColorChannels? {
+    guard let parts = cssFunctionArguments(value), parts.count == (alpha ? 4 : 3) else { return nil }
+    guard let red = cssRgbChannel(parts[0]),
+          let green = cssRgbChannel(parts[1]),
+          let blue = cssRgbChannel(parts[2]) else { return nil }
+    let parsedAlpha = alpha ? cssAlpha(parts[3]) : 1
+    guard let parsedAlpha else { return nil }
+    return CssColorChannels(red: red, green: green, blue: blue, alpha: parsedAlpha)
+}
+
+private func parseCssHslFunction(_ value: String, alpha: Bool) -> CssColorChannels? {
+    guard let parts = cssFunctionArguments(value), parts.count == (alpha ? 4 : 3) else { return nil }
+    guard let hue = Double(parts[0].replacingOccurrences(of: "deg", with: "")),
+          let saturation = cssPercent(parts[1]),
+          let lightness = cssPercent(parts[2]) else { return nil }
+    let parsedAlpha = alpha ? cssAlpha(parts[3]) : 1
+    guard let parsedAlpha else { return nil }
+    let rgb = cssHslToRgb(hue: hue, saturation: saturation, lightness: lightness)
+    return CssColorChannels(red: rgb.0, green: rgb.1, blue: rgb.2, alpha: parsedAlpha)
+}
+
+private func cssFunctionArguments(_ value: String) -> [String]? {
+    guard let open = value.firstIndex(of: "("),
+          let close = value.lastIndex(of: ")"),
+          open < close else { return nil }
+    return value[value.index(after: open)..<close]
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+}
+
+private func cssRgbChannel(_ value: String) -> Double? {
+    if value.hasSuffix("%") {
+        guard let percent = Double(value.dropLast()) else { return nil }
+        return min(max(percent / 100, 0), 1)
+    }
+    guard let channel = Double(value) else { return nil }
+    return min(max(channel / 255, 0), 1)
+}
+
+private func cssPercent(_ value: String) -> Double? {
+    guard value.hasSuffix("%"), let percent = Double(value.dropLast()) else { return nil }
+    return min(max(percent / 100, 0), 1)
+}
+
+private func cssAlpha(_ value: String) -> Double? {
+    if value.hasSuffix("%") {
+        guard let percent = Double(value.dropLast()) else { return nil }
+        return min(max(percent / 100, 0), 1)
+    }
+    guard let alpha = Double(value) else { return nil }
+    return min(max(alpha, 0), 1)
+}
+
+private func cssHslToRgb(hue: Double, saturation: Double, lightness: Double) -> (Double, Double, Double) {
+    let wrappedHue = ((hue.truncatingRemainder(dividingBy: 360)) + 360)
+        .truncatingRemainder(dividingBy: 360)
+    let chroma = (1 - abs(2 * lightness - 1)) * saturation
+    let x = chroma * (1 - abs((wrappedHue / 60).truncatingRemainder(dividingBy: 2) - 1))
+    let match = lightness - chroma / 2
+    let primary: (Double, Double, Double)
+    switch wrappedHue {
+    case ..<60: primary = (chroma, x, 0)
+    case ..<120: primary = (x, chroma, 0)
+    case ..<180: primary = (0, chroma, x)
+    case ..<240: primary = (0, x, chroma)
+    case ..<300: primary = (x, 0, chroma)
+    default: primary = (chroma, 0, x)
+    }
+    return (primary.0 + match, primary.1 + match, primary.2 + match)
 }

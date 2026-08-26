@@ -107,7 +107,15 @@ private fun MobileWalletPresentationCredentialOption.toDemoCredentialOption(): W
         queryId = queryId,
         credentialId = credentialId,
         multiple = multiple,
-        label = label ?: format,
+        label = resolveCardTitle(
+            format = format,
+            credentialDataJson = credentialDataJson,
+            displayName = StoredCredentialMetadataParser.credentialDisplay(
+                metadataJson,
+                platformPreferredLocales(),
+            )?.name,
+            fallback = format,
+        ),
         issuer = issuer,
         subject = subject,
         format = format,

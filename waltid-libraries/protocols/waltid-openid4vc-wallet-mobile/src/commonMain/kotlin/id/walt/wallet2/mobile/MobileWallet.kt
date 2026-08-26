@@ -940,6 +940,10 @@ public class MobileWallet internal constructor(
                         credentialData = credential.credentialData,
                         storedLabel = metadata.label,
                     )
+                    val cardArt = MobileWalletRegistryIcons.extractCardArt(
+                        metadata = stored.metadata,
+                        credentialData = credential.credentialData,
+                    )
                     MobileWalletCredentialRegistryRecord(
                         registryEntryId = registryEntryId,
                         credentialId = stored.id,
@@ -958,8 +962,9 @@ public class MobileWallet internal constructor(
                             },
                         displayName = display.title,
                         subtitle = display.subtitle,
-                        iconMetadataJson = stored.metadata?.encodeJsonObject(),
-                        iconCredentialDataJson = credential.credentialData.encodeJsonObject(),
+                        cardArtImageUris = cardArt.imageUris,
+                        cardArtBackgroundColor = cardArt.backgroundColor,
+                        cardArtFallbackPng = cardArt.fallbackPng,
                     )
                 }
                 else -> if (metadata.format in setOf("vc+sd-jwt", "dc+sd-jwt", "sd-jwt-vc")) {
@@ -976,6 +981,10 @@ public class MobileWallet internal constructor(
                         credentialData = data,
                         storedLabel = metadata.label,
                     )
+                    val cardArt = MobileWalletRegistryIcons.extractCardArt(
+                        metadata = stored.metadata,
+                        credentialData = data,
+                    )
                     MobileWalletCredentialRegistryRecord(
                         registryEntryId = registryEntryId,
                         credentialId = stored.id,
@@ -991,8 +1000,9 @@ public class MobileWallet internal constructor(
                             },
                         displayName = display.title,
                         subtitle = display.subtitle,
-                        iconMetadataJson = stored.metadata?.encodeJsonObject(),
-                        iconCredentialDataJson = data.encodeJsonObject(),
+                        cardArtImageUris = cardArt.imageUris,
+                        cardArtBackgroundColor = cardArt.backgroundColor,
+                        cardArtFallbackPng = cardArt.fallbackPng,
                     )
                 } else null
             }

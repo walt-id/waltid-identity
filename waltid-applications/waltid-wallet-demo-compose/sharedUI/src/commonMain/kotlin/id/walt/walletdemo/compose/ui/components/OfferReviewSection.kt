@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
+import id.walt.walletdemo.compose.logic.resolvedCardTitle
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -102,15 +103,15 @@ internal fun OfferReviewSection(
                 modifier = Modifier.testTag(WalletUiTestTags.OfferCredentialsSection),
             ) {
                 preview.offeredCredentials.forEach { credential ->
-                    val id = credential.configurationId
+                    val title = credential.resolvedCardTitle()
                     CredentialCardArt(
                         art = (credential.display ?: WalletDemoMetadataDisplay(
-                            name = credential.vct ?: credential.doctype ?: id,
+                            name = title,
                             logoUri = null,
                             logoAltText = null,
                         )).toCardArt(
-                            id = id,
-                            fallbackName = credential.vct ?: credential.doctype ?: id,
+                            id = credential.configurationId,
+                            fallbackName = title,
                         ),
                     )
                 }

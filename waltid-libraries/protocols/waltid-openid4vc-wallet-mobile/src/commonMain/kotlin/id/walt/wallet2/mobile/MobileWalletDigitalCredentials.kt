@@ -99,13 +99,15 @@ public data class MobileWalletDigitalCredentialCapabilities(
  * @property displayName Human-readable entry title shown in the platform picker.
  * @property subtitle Secondary picker line. Never the raw docType or vct when a mapping or
  * humanized type is available.
- * @property iconPng Optional card-art thumbnail for platform pickers. Android Credential Manager
- * rescales this to a 32x32 entry icon; iOS Identity Document Services ignores it. Presentation
- * preview leaves this empty so remote artwork stays off the consent path.
- * @property iconMetadataJson Sidecar OpenID4VCI display JSON for Android thumbnail resolution.
+ * @property iconPng Optional already-resolved card-art thumbnail for platform pickers. Android
+ * Credential Manager rescales this to a 32x32 entry icon; iOS Identity Document Services ignores it.
+ * Presentation preview leaves this empty so remote artwork stays off the consent path.
+ * @property cardArtImageUris HTTPS card-art URIs in preference order, for Android thumbnail refresh.
  * Not registered with the platform matcher.
- * @property iconCredentialDataJson Credential payload JSON for Android portrait fallback.
+ * @property cardArtBackgroundColor CSS Color Level 3 background used when no image is available.
  * Not registered with the platform matcher.
+ * @property cardArtFallbackPng Optional decoded portrait or other local image used when remote art
+ * is missing. Not registered with the platform matcher.
  */
 public data class MobileWalletCredentialRegistryRecord(
     public val registryEntryId: String,
@@ -116,8 +118,9 @@ public data class MobileWalletCredentialRegistryRecord(
     public val displayName: String,
     public val subtitle: String = "",
     public val iconPng: ByteArray? = null,
-    public val iconMetadataJson: String? = null,
-    public val iconCredentialDataJson: String? = null,
+    public val cardArtImageUris: List<String> = emptyList(),
+    public val cardArtBackgroundColor: String? = null,
+    public val cardArtFallbackPng: ByteArray? = null,
 ) {
     /** Compares registry identity, display fields, and thumbnail bytes. */
     public override fun equals(other: Any?): Boolean {
@@ -132,8 +135,9 @@ public data class MobileWalletCredentialRegistryRecord(
             displayName == other.displayName &&
             subtitle == other.subtitle &&
             iconPng.contentEquals(other.iconPng) &&
-            iconMetadataJson == other.iconMetadataJson &&
-            iconCredentialDataJson == other.iconCredentialDataJson
+            cardArtImageUris == other.cardArtImageUris &&
+            cardArtBackgroundColor == other.cardArtBackgroundColor &&
+            cardArtFallbackPng.contentEquals(other.cardArtFallbackPng)
     }
 
     /** Hash of registry identity, display fields, and thumbnail bytes. */
@@ -146,8 +150,9 @@ public data class MobileWalletCredentialRegistryRecord(
         result = 31 * result + displayName.hashCode()
         result = 31 * result + subtitle.hashCode()
         result = 31 * result + (iconPng?.contentHashCode() ?: 0)
-        result = 31 * result + (iconMetadataJson?.hashCode() ?: 0)
-        result = 31 * result + (iconCredentialDataJson?.hashCode() ?: 0)
+        result = 31 * result + cardArtImageUris.hashCode()
+        result = 31 * result + (cardArtBackgroundColor?.hashCode() ?: 0)
+        result = 31 * result + (cardArtFallbackPng?.contentHashCode() ?: 0)
         return result
     }
 }

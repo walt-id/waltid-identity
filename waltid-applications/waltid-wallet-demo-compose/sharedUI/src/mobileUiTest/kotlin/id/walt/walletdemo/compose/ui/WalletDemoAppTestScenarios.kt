@@ -1078,7 +1078,7 @@ class WalletDemoAppTestScenarios {
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
     }
 
-    fun presentationDetailsDeleteUsesStoreCredentialId() = runComposeUiTest {
+    fun deleteFromCredentialsWhileAReviewIsActive() = runComposeUiTest {
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
             presentationPreview = samplePresentationPreview,

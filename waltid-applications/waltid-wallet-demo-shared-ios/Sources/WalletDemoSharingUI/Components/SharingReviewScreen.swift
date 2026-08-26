@@ -4,8 +4,8 @@ import WalletSDK
 /// A compact sharing review, for hosts the operating system launched with no app chrome around
 /// them. It sizes to the heading, credential, and actions rather than filling the display.
 ///
-/// It adds only what a standalone surface needs - a heading naming the request, a preparing state, a
-/// failure state and a way to inspect a credential in full - on top of ``SharingReviewView``. The
+/// It adds only what a standalone surface needs - a heading naming the request, a preparing state and
+/// a failure state - on top of ``SharingReviewView``. The
 /// review content itself is the same one the in-app flow renders, so a request cannot be described
 /// one way inside the app and another way in a provider extension.
 ///
@@ -25,8 +25,6 @@ public struct SharingReviewScreen: View {
     private let onSubmit: () -> Void
     private let onReject: (() -> Void)?
     private let onCancel: () -> Void
-
-    @State private var openCredentialDetails: CredentialDetails?
 
     /// Renders a standalone sharing review.
     ///
@@ -86,16 +84,6 @@ public struct SharingReviewScreen: View {
         }
         .frame(maxWidth: .infinity)
         .background(Color(.systemBackground))
-        .sheet(item: $openCredentialDetails) { details in
-            ZStack(alignment: .top) {
-                ScrollView {
-                    CredentialDetailsView(details: details, onCardTap: { openCredentialDetails = nil })
-                        .padding()
-                }
-                CredentialDetailsChromeOverlay(onClose: { openCredentialDetails = nil })
-            }
-            .accessibilityIdentifier(WalletAccessibilityID.credentialDetailsScreen)
-        }
     }
 
     @ViewBuilder
@@ -110,11 +98,6 @@ public struct SharingReviewScreen: View {
                 isLoading: isSubmitting,
                 onToggleCredential: onToggleCredential,
                 onToggleDisclosure: onToggleDisclosure,
-                onCredentialSelected: { detailsID in
-                    openCredentialDetails = review.credentialOptions
-                        .map(CredentialDisplayNormalizer.details(for:))
-                        .first { $0.id == detailsID }
-                },
                 onSubmit: onSubmit,
                 onReject: onReject,
                 onCancel: onCancel,

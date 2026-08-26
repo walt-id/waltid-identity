@@ -1,5 +1,16 @@
 package id.walt.walletdemo.compose.logic
 
+fun WalletDemoPresentationCredentialOption.resolvedCardTitle(): String =
+    resolveCardTitle(
+        format = format,
+        credentialDataJson = credentialDataJson,
+        displayName = StoredCredentialMetadataParser.credentialDisplay(
+            metadataJson,
+            platformPreferredLocales(),
+        )?.name,
+        fallback = format,
+    )
+
 fun CredentialSummary.toCredentialDetails(): CredentialDetails =
     CredentialDisplayNormalizer.toDetails(this, platformPreferredLocales())
 

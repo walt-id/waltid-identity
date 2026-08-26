@@ -245,7 +245,15 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
                 queryId = option.queryId,
                 credentialId = option.credentialId,
                 multiple = option.multiple,
-                label = option.label ?: option.format,
+                label = resolveCardTitle(
+                    format = option.format,
+                    credentialDataJson = option.credentialDataJson,
+                    displayName = StoredCredentialMetadataParser.credentialDisplay(
+                        option.metadataJson,
+                        platformPreferredLocales(),
+                    )?.name,
+                    fallback = option.format,
+                ),
                 issuer = option.issuer,
                 subject = option.subject,
                 format = option.format,

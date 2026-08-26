@@ -835,12 +835,14 @@ class WalletViewModel: ObservableObject {
                     return
                 }
                 issuanceSession = session
-                await prefetchCredentialCardArt(
-                    uris: session.offer.credentials.map { $0.backgroundImageURI?.absoluteString }
-                )
                 offerPreview = session.offer
                 newSession = nil
                 setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
+                Task {
+                    await prefetchCredentialCardArt(
+                        uris: session.offer.credentials.map { $0.backgroundImageURI?.absoluteString }
+                    )
+                }
             } catch is CancellationError {
                 if let newSession {
                     _ = try? await walletClient.cancelIssuance(sessionID: newSession.id)

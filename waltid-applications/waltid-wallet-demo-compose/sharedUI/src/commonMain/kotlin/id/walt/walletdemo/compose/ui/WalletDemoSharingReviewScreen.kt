@@ -1,14 +1,8 @@
 package id.walt.walletdemo.compose.ui
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -22,18 +16,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.logic.defaultCredentialSelection
 import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
-import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toggleCredential
 import id.walt.walletdemo.compose.logic.toggleDisclosure
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
-import id.walt.walletdemo.compose.ui.screens.CredentialDetailsScreen
 
 /**
  * Standalone presentation-review screen for a platform-invoked sharing flow.
@@ -43,10 +34,9 @@ import id.walt.walletdemo.compose.ui.screens.CredentialDetailsScreen
  * [WalletDemoSharingSelection] to [onSubmit], so a host launched by the OS does not have to reproduce
  * the selection rules the in-app flow already implements.
  *
- * A platform back gesture is handled here only as far as this screen's own navigation goes: while
- * credential details are open it closes them. At the review root there is nothing left for the screen
- * to undo, so the gesture is passed to [onBackAtRoot] - the host, not the review, decides what leaving
- * an OS-invoked surface means, and that is deliberately not assumed to equal [onCancel].
+ * At the review root a platform back gesture is passed to [onBackAtRoot] - the host, not the review,
+ * decides what leaving an OS-invoked surface means, and that is deliberately not assumed to equal
+ * [onCancel]. Claims review is a dialog on this surface, not a pushed destination.
  *
  * @param title Heading naming the kind of request, since a provider screen has no surrounding app chrome.
  * @param enabled Whether the user can still act; pass false while a submission is in flight.
@@ -69,21 +59,14 @@ fun WalletDemoSharingReviewScreen(
     var selection by remember(review) {
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
-    var openCredentialDetailsId by remember(review) { mutableStateOf<String?>(null) }
-    val openDetails = openCredentialDetailsId?.let { detailsId ->
-        review.credentialOptions
-            .map { it.toCredentialDetails() }
-            .firstOrNull { it.summary.id == detailsId }
-    }
 
     // Called unconditionally, as the platform handlers require. A submission already in flight
     // consumes the gesture and does nothing: the response is on its way, so neither closing this
     // screen nor abandoning it is an outcome the user can still choose.
     SystemBackHandler(
-        enabled = openDetails != null || !enabled || onBackAtRoot != null,
+        enabled = !enabled || onBackAtRoot != null,
     ) {
         when {
-            openDetails != null -> openCredentialDetailsId = null
             !enabled -> Unit
             else -> onBackAtRoot?.invoke()
         }
@@ -96,13 +79,7 @@ fun WalletDemoSharingReviewScreen(
                 .exportTestTagsForPlatformAutomation(),
             color = MaterialTheme.colorScheme.background,
         ) {
-            if (openDetails != null) {
-                CredentialDetailsScreen(
-                    details = openDetails,
-                    onBack = { openCredentialDetailsId = null },
-                )
-            } else {
-                ReviewScaffold(
+            ReviewScaffold(
                     modifier = Modifier
                         .fillMaxSize()
                         .safeDrawingPadding(),
@@ -136,13 +113,12 @@ fun WalletDemoSharingReviewScreen(
                             )
                         },
                         onToggleDisclosure = { disclosure -> selection = selection.toggleDisclosure(disclosure) },
-                        onCredentialClick = { detailsId -> openCredentialDetailsId = detailsId },
+                        onCredentialClick = {},
                         onSubmit = { onSubmit(selection) },
                         onCancel = onCancel,
                         onReject = onReject,
                     )
                 }
-            }
         }
     }
 }
@@ -166,23 +142,16 @@ fun WalletDemoSharingReviewSheet(
     var selection by remember(review) {
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
-    var openCredentialDetailsId by remember(review) { mutableStateOf<String?>(null) }
-    val openDetails = openCredentialDetailsId?.let { detailsId ->
-        review.credentialOptions
-            .map { it.toCredentialDetails() }
-            .firstOrNull { it.summary.id == detailsId }
-    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     SystemBackHandler(enabled = true) {
         when {
-            openDetails != null -> openCredentialDetailsId = null
             !enabled -> Unit
             else -> onBackAtRoot()
         }
     }
 
-    MaterialTheme {
+    WalletDemoTheme {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -195,51 +164,44 @@ fun WalletDemoSharingReviewSheet(
                 sheetState = sheetState,
             ) {
                 Box(modifier = Modifier.exportTestTagsForPlatformAutomation()) {
-                    if (openDetails != null) {
-                        CredentialDetailsScreen(
-                            details = openDetails,
-                            onBack = { openCredentialDetailsId = null },
-                        )
-                    } else {
-                        ReviewScaffold(
-                            fillViewport = false,
-                            actions = {
-                                SharingActionsRow(
-                                    enabled = enabled,
-                                    selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
-                                    onSubmit = { onSubmit(selection) },
-                                    onCancel = onCancel,
-                                    onReject = null,
-                                )
-                            },
-                        ) {
-                            Text(
-                                title,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            SharingReviewSection(
-                                review = review,
-                                selectedCredentialOptions = selection.credentials,
-                                selectedDisclosureOptions = selection.disclosures,
-                                selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
+                    ReviewScaffold(
+                        fillViewport = false,
+                        actions = {
+                            SharingActionsRow(
                                 enabled = enabled,
-                                compact = true,
-                                showActions = false,
-                                onToggleCredential = { credential ->
-                                    selection = selection.toggleCredential(
-                                        selection = credential,
-                                        option = review.credentialOptions.firstOrNull { it.selection == credential },
-                                    )
-                                },
-                                onToggleDisclosure = { disclosure ->
-                                    selection = selection.toggleDisclosure(disclosure)
-                                },
-                                onCredentialClick = { detailsId -> openCredentialDetailsId = detailsId },
+                                selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
                                 onSubmit = { onSubmit(selection) },
                                 onCancel = onCancel,
+                                onReject = null,
                             )
-                        }
+                        },
+                    ) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        SharingReviewSection(
+                            review = review,
+                            selectedCredentialOptions = selection.credentials,
+                            selectedDisclosureOptions = selection.disclosures,
+                            selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
+                            enabled = enabled,
+                            compact = true,
+                            showActions = false,
+                            onToggleCredential = { credential ->
+                                selection = selection.toggleCredential(
+                                    selection = credential,
+                                    option = review.credentialOptions.firstOrNull { it.selection == credential },
+                                )
+                            },
+                            onToggleDisclosure = { disclosure ->
+                                selection = selection.toggleDisclosure(disclosure)
+                            },
+                            onCredentialClick = {},
+                            onSubmit = { onSubmit(selection) },
+                            onCancel = onCancel,
+                        )
                     }
                 }
             }

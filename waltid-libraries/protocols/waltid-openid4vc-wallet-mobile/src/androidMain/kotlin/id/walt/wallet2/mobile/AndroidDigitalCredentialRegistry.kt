@@ -2,7 +2,6 @@ package id.walt.wallet2.mobile
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.os.LocaleList
 import android.graphics.Bitmap.CompressFormat
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -33,7 +32,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
@@ -44,6 +42,10 @@ import kotlinx.serialization.json.putJsonObject
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Android Credential Manager metadata registry adapter.
@@ -155,8 +157,30 @@ public class AndroidDigitalCredentialRegistry(
             creationRegistrationAvailable = false
             return MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
         }
-        val enriched = records.map { it.withResolvedThumbnail() }
-        val entries = enriched.map { it.toAndroidEntry() }
+        val immediate = records.map { it.withLocalThumbnail() }
+        val result = registerRecords(registryId, immediate)
+        if (!result.available || records.none { it.iconPng == null && it.cardArtImageUris.isNotEmpty() }) {
+            return result
+        }
+        val refreshed = withTimeoutOrNull(RegistryIconFetchTimeoutMs) {
+            coroutineScope {
+                records.map { record -> async { record.withResolvedThumbnail() } }.awaitAll()
+            }
+        } ?: return result
+        val changed = refreshed.indices.any { index ->
+            !refreshed[index].iconPng.contentEquals(immediate[index].iconPng)
+        }
+        if (changed) {
+            registerRecords(registryId, refreshed)
+        }
+        return result
+    }
+
+    private suspend fun registerRecords(
+        registryId: String,
+        records: List<MobileWalletCredentialRegistryRecord>,
+    ): MobileWalletCredentialRegistrationResult {
+        val entries = records.map { it.toAndroidEntry() }
         return runCatching {
             // Registering only the unsigned protocol makes Credential Manager ignore signed and
             // multisigned requests rather than route them here to be rejected.
@@ -177,7 +201,7 @@ public class AndroidDigitalCredentialRegistry(
             registryManager.registerCredentials(
                 AndroidAnnexCRegistry(
                     id = "$registryId-annex-c",
-                    credentials = encodeAnnexCCredentialDatabase(enriched),
+                    credentials = encodeAnnexCCredentialDatabase(records),
                     matcher = applicationContext.assets.open(ANNEX_C_MATCHER_ASSET).use { it.readBytes() },
                 )
             )
@@ -296,33 +320,24 @@ public class AndroidDigitalCredentialRegistry(
         }
     }
 
-    private suspend fun MobileWalletCredentialRegistryRecord.withResolvedThumbnail(): MobileWalletCredentialRegistryRecord {
+    private fun MobileWalletCredentialRegistryRecord.withLocalThumbnail(): MobileWalletCredentialRegistryRecord {
         if (iconPng != null) return this
-        val metadata = iconMetadataJson.toJsonObject()
-        val credentialData = iconCredentialDataJson.toJsonObject() ?: JsonObject(emptyMap())
-        val png = MobileWalletRegistryIcons.resolveIconPng(
-            metadata = metadata,
-            credentialData = credentialData,
-            displayName = displayName,
-            preferredLocales = platformPreferredLocales(),
-            fetchHttps = ::fetchRegistryIconBytes,
-        )
+        val png = cardArtFallbackPng?.takeIf(::isImageBytes)
+            ?: solidColorPng(parseCssRgb(cardArtBackgroundColor) ?: MobileWalletRegistryIcons.DefaultCardBlueRgb)
         return copy(iconPng = png)
     }
 
-    private fun String?.toJsonObject(): JsonObject? =
-        this?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
-            runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()
-        }
-
-    private fun platformPreferredLocales(): List<String> {
-        val fromList = runCatching {
-            LocaleList.getDefault().let { locales ->
-                List(locales.size()) { index -> locales[index].toLanguageTag() }
-            }
-        }.getOrDefault(emptyList())
-        if (fromList.isNotEmpty()) return fromList
-        return listOfNotNull(java.util.Locale.getDefault().toLanguageTag().takeIf { it.isNotBlank() })
+    private suspend fun MobileWalletCredentialRegistryRecord.withResolvedThumbnail(): MobileWalletCredentialRegistryRecord {
+        if (cardArtImageUris.isEmpty()) return withLocalThumbnail()
+        val png = MobileWalletRegistryIcons.resolveIconPng(
+            art = MobileWalletCardArt(
+                imageUris = cardArtImageUris,
+                backgroundColor = cardArtBackgroundColor,
+                fallbackPng = cardArtFallbackPng,
+            ),
+            fetchHttps = ::fetchRegistryIconBytes,
+        )
+        return copy(iconPng = png)
     }
 
     private fun MobileWalletCredentialRegistryRecord.entryIconBitmap(): Bitmap =

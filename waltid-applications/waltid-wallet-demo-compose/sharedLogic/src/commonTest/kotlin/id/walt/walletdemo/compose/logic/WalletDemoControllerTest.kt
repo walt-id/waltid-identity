@@ -682,7 +682,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun presentationDetailsDeleteUsesStoreCredentialId() = runTest {
+    fun deleteFromCredentialsWhileAReviewIsActive() = runTest {
         val option = WalletDemoPresentationCredentialOption(
             queryId = "pid",
             credentialId = "cred-1",

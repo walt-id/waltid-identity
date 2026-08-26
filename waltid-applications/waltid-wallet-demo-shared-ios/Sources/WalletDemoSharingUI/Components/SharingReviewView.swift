@@ -20,6 +20,7 @@ public struct SharingReviewView: View {
     private let onCancel: () -> Void
     private let compact: Bool
     private let showActions: Bool
+    @State private var compactClaimsOption: PresentationCredentialOption?
 
     /// Renders one sharing review.
     ///
@@ -73,7 +74,30 @@ public struct SharingReviewView: View {
                 CredentialCardStackView(
                     details: review.credentialOptions.map(CredentialDisplayNormalizer.details(for:))
                 ) { id in
-                    onCredentialSelected?(id)
+                    compactClaimsOption = review.credentialOptions.first {
+                        CredentialDisplayNormalizer.details(for: $0).id == id
+                    }
+                }
+                .sheet(isPresented: Binding(
+                    get: { compactClaimsOption != nil },
+                    set: { if !$0 { compactClaimsOption = nil } }
+                )) {
+                    if let option = compactClaimsOption {
+                        let details = CredentialDisplayNormalizer.details(for: option)
+                        SharingClaimsSheet(
+                            option: option,
+                            details: details,
+                            credentialSelected: selection.credentials.contains(option.selection),
+                            selectedDisclosureOptions: selection.disclosures,
+                            requestedDisclosureItems: details.groups
+                                .first { $0.title == CredentialDisplayVocabulary.requestedDisclosuresTitle }?
+                                .items ?? [],
+                            isLoading: isLoading,
+                            isReadOnly: isReadOnly,
+                            onToggleDisclosure: onToggleDisclosure,
+                            onDismiss: { compactClaimsOption = nil }
+                        )
+                    }
                 }
             } else {
                 Text("Select credentials to share")
@@ -180,7 +204,7 @@ private struct SharingClaimsSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 8) {
-                Text(option.label ?? option.format)
+                Text(details.cardSummary.title)
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Button("Close", action: onDismiss)

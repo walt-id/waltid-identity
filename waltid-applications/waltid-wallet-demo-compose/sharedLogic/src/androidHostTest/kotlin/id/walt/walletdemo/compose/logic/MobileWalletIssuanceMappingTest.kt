@@ -63,4 +63,18 @@ class MobileWalletIssuanceMappingTest {
         )
         assertEquals("Mobile Driving Licence", offered.resolvedCardTitle())
     }
+
+    @Test
+    fun presentationOptionUsesResolvedCardTitleNotRawFormat() {
+        val option = WalletDemoPresentationCredentialOption(
+            queryId = "mdl",
+            credentialId = "cred-1",
+            label = "mso_mdoc",
+            issuer = null,
+            format = "mso_mdoc",
+            credentialDataJson = """{"docType":"org.iso.18013.5.1.mDL"}""",
+            disclosures = emptyList(),
+        )
+        assertEquals("Mobile Driving Licence", option.resolvedCardTitle())
+    }
 }

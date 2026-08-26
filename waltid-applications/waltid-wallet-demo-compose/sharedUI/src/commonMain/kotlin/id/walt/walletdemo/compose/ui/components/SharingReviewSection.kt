@@ -33,6 +33,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
+import id.walt.walletdemo.compose.logic.resolvedCardTitle
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
@@ -73,10 +74,28 @@ internal fun SharingReviewSection(
         SharingRequestSections(review.request)
 
         if (compact) {
+            var claimsOptionId by rememberSaveable { mutableStateOf<String?>(null) }
+            val claimsOption = review.credentialOptions.firstOrNull { it.selection.id == claimsOptionId }
             CredentialCardStack(
                 details = review.credentialOptions.map { it.toCredentialDetails() },
-                onOpenDetails = onCredentialClick,
+                onOpenDetails = { detailsId ->
+                    claimsOptionId = detailsId
+                    onCredentialClick(detailsId)
+                },
             )
+            claimsOption?.let { option ->
+                SharingClaimsDialog(
+                    option = option,
+                    details = option.toCredentialDetails(),
+                    credentialSelected = option.selection in selectedCredentialOptions,
+                    selectedDisclosureOptions = selectedDisclosureOptions,
+                    requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty(),
+                    enabled = enabled,
+                    readOnly = readOnly,
+                    onToggleDisclosure = onToggleDisclosure,
+                    onDismiss = { claimsOptionId = null },
+                )
+            }
         } else {
             Text(
                 "Select credentials to share",
@@ -205,7 +224,7 @@ private fun SharingClaimsDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        option.label,
+                        option.resolvedCardTitle(),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),

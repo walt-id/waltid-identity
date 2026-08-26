@@ -676,7 +676,8 @@ class MobileWalletTest {
         assertFalse(record.fields.any { it.path.singleOrNull() == "iss" })
         assertFalse(record.fields.single().selectivelyDisclosable)
         assertNull(record.iconPng)
-        assertNotNull(record.iconCredentialDataJson)
+        assertTrue(record.cardArtImageUris.isEmpty())
+        assertNull(record.cardArtBackgroundColor)
     }
 
     @Test

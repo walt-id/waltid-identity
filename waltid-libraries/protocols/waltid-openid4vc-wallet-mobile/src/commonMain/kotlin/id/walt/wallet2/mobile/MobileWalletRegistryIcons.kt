@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import id.walt.credentials.display.CssColors
 import id.walt.credentials.display.DisplayLocales
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -22,22 +23,52 @@ internal object MobileWalletRegistryIcons {
         displayName: String,
         preferredLocales: List<String> = emptyList(),
         fetchHttps: suspend (String) -> ByteArray?,
+    ): ByteArray = resolveIconPng(
+        art = extractCardArt(metadata, credentialData, preferredLocales),
+        fetchHttps = fetchHttps,
+    )
+
+    suspend fun resolveIconPng(
+        art: MobileWalletCardArt,
+        fetchHttps: suspend (String) -> ByteArray?,
     ): ByteArray {
-        val credentialDisplay = metadata.selectDisplay(key = "credentialDisplay", preferredLocales)
-        val issuerDisplay = metadata.selectDisplay(key = "issuerDisplay", preferredLocales)
-        val remoteUris = listOfNotNull(
+        art.imageUris.forEach { uri ->
+            fetchHttps(uri)?.takeIf(::isImageBytes)?.let { return it }
+        }
+        art.fallbackPng?.takeIf(::isImageBytes)?.let { return it }
+        return solidColorPng(rgb = parseCssRgb(art.backgroundColor) ?: DefaultCardBlueRgb)
+    }
+
+    fun extractCardArt(
+        metadata: JsonObject?,
+        credentialData: JsonObject,
+        preferredLocales: List<String> = emptyList(),
+    ): MobileWalletCardArt {
+        val credentialDisplays = metadata.displayObjects("credentialDisplay")
+        val issuerDisplays = metadata.displayObjects("issuerDisplay")
+        val credentialDisplay = DisplayLocales.select(credentialDisplays, preferredLocales) { it.locale() }
+        val issuerDisplay = DisplayLocales.select(issuerDisplays, preferredLocales) { it.locale() }
+        val preferredUris = listOfNotNull(
             credentialDisplay.backgroundImageUri(),
             credentialDisplay.logoUri(),
             issuerDisplay.logoUri(),
         )
-        remoteUris.forEach { uri ->
-            fetchHttps(uri)?.takeIf(::isImageBytes)?.let { return it }
+        val otherUris = (credentialDisplays + issuerDisplays).flatMap { display ->
+            listOfNotNull(display.backgroundImageUri(), display.logoUri())
         }
-        credentialData.portraitBytes()?.takeIf(::isImageBytes)?.let { return it }
-        val color = parseCssRgb(credentialDisplay?.backgroundColor()) ?: DefaultCardBlueRgb
-        return solidColorPng(rgb = color)
+        return MobileWalletCardArt(
+            imageUris = (preferredUris + otherUris).distinct(),
+            backgroundColor = credentialDisplay.backgroundColor(),
+            fallbackPng = credentialData.portraitBytes()?.takeIf(::isImageBytes),
+        )
     }
 }
+
+internal data class MobileWalletCardArt(
+    val imageUris: List<String>,
+    val backgroundColor: String?,
+    val fallbackPng: ByteArray?,
+)
 
 internal const val MaxRegistryIconBytes = 2_000_000
 
@@ -49,14 +80,14 @@ internal fun isHttpsUrl(value: String): Boolean =
 internal fun JsonObject?.selectDisplay(
     key: String,
     preferredLocales: List<String>,
-): JsonObject? {
-    val displays = when (val element = this?.get(key)) {
+): JsonObject? = DisplayLocales.select(displayObjects(key), preferredLocales) { it.locale() }
+
+private fun JsonObject?.displayObjects(key: String): List<JsonObject> =
+    when (val element = this?.get(key)) {
         is JsonArray -> element.mapNotNull { it as? JsonObject }
         is JsonObject -> listOf(element)
         else -> emptyList()
     }
-    return DisplayLocales.select(displays, preferredLocales) { it.locale() }
-}
 
 private fun JsonObject.locale(): String? =
     this["locale"]?.jsonPrimitive?.contentOrNull
@@ -138,16 +169,7 @@ private fun ByteArray.isJpeg(): Boolean =
         this[1] == 0xD8.toByte() &&
         this[2] == 0xFF.toByte()
 
-internal fun parseCssRgb(value: String?): Int? {
-    val hex = value?.trim()?.removePrefix("#").orEmpty()
-    val normalized = when (hex.length) {
-        3 -> hex.map { "$it$it" }.joinToString("")
-        6 -> hex
-        8 -> hex.takeLast(6)
-        else -> return null
-    }
-    return normalized.toIntOrNull(16)
-}
+internal fun parseCssRgb(value: String?): Int? = CssColors.parse(value)?.rgb24
 
 internal fun solidColorPng(rgb: Int, size: Int = 32): ByteArray {
     val red = (rgb shr 16) and 0xFF
