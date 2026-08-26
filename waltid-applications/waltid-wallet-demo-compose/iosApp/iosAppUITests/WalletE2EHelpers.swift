@@ -196,7 +196,7 @@ final class WalletE2EUI {
         dismissKeyboard(focusedElement: element)
     }
 
-    private func focusTextInput(_ element: XCUIElement, timeout: TimeInterval = 8) -> Bool {
+    private func focusTextInput(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         var useCoordinateTap = false
 
@@ -214,7 +214,13 @@ final class WalletE2EUI {
                 useCoordinateTap = true
             }
 
-            if waitForKeyboardFocus(in: element, timeout: 1) {
+            if waitForKeyboardFocus(in: element, timeout: 1.5) {
+                return true
+            }
+
+            // Compose iOS exposes OutlinedTextField as a TextView that often never sets
+            // hasKeyboardFocus, especially on the first cold-start PIN screen.
+            if app.keyboards.firstMatch.waitForExistence(timeout: 1) {
                 return true
             }
 
@@ -241,6 +247,9 @@ final class WalletE2EUI {
 
     private func hasKeyboardFocus(in element: XCUIElement) -> Bool {
         let predicate = NSPredicate(format: "hasKeyboardFocus == true")
+        if predicate.evaluate(with: element) {
+            return true
+        }
         if element.descendants(matching: .any).matching(predicate).firstMatch.exists {
             return true
         }
@@ -286,6 +295,12 @@ final class WalletE2EUI {
         // Setup now includes a biometric toggle; wait for the full form before the first tap.
         _ = button(identifier: "wallet.pinSubmitButton", fallbackLabel: "Set PIN")
             .waitForExistence(timeout: 5)
+
+        let settleDeadline = Date().addingTimeInterval(2)
+        while Date() < settleDeadline && !pinInput.isHittable {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
 
         replaceText(in: pinInput, value: pin)
 

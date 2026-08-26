@@ -7,6 +7,11 @@ import XCTest
 @MainActor
 final class PublicDemoBackendE2ETests: XCTestCase {
 
+    override func setUp() {
+        super.setUp()
+        continueAfterFailure = false
+    }
+
     private let backend = DemoBackend.shared
 
     // Timeouts (aligned with Android for cross-platform consistency)
