@@ -38,9 +38,14 @@ import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -50,6 +55,32 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class HolderKeyBindingTest {
+
+    @Test
+    fun `binding serialization persists version and algorithm discriminators`() = runTest {
+        val holderKey = signingKey("holder")
+        val store = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
+        val binding = Wallet(id = "wallet", keyStores = listOf(store))
+            .withImportedHolderKeyBinding(mdocCredential(holderKey))
+            .holderKeyBinding!!
+
+        val encoded = Json.encodeToString(binding)
+        val json = Json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            HolderKeyBinding.CURRENT_SCHEMA_VERSION,
+            json["schemaVersion"]?.jsonPrimitive?.content?.toInt(),
+        )
+        assertEquals(
+            HolderKeyBinding.CURRENT_EXTRACTOR_VERSION,
+            json["extractorVersion"]?.jsonPrimitive?.content?.toInt(),
+        )
+        assertEquals(
+            PublicKeyThumbprint.RFC7638_SHA256,
+            json["publicKeyThumbprint"]?.jsonObject?.get("algorithm")?.jsonPrimitive?.content,
+        )
+        assertEquals(binding, Json.decodeFromString<HolderKeyBinding>(encoded))
+    }
 
     @Test
     fun `issuance binding resolves the exact key after unrelated key rotation`() = runTest {
@@ -134,6 +165,21 @@ class HolderKeyBindingTest {
         assertEquals(HolderKeyBindingOrigin.IMPORT, assertNotNull(bound.holderKeyBinding).origin)
         assertNull(missing.holderKeyBinding)
         assertNull(duplicate.holderKeyBinding)
+    }
+
+    @Test
+    fun `import ignores unrelated keys that cannot sign`() = runTest {
+        val verifyOnly = verifyOnlyKey("verify-only")
+        val holderKey = signingKey("holder")
+        val store = InMemoryKeyStore().apply {
+            addCrypto2Key(verifyOnly)
+            addCrypto2Key(holderKey)
+        }
+        val wallet = Wallet(id = "wallet", keyStores = listOf(store))
+
+        val bound = wallet.withImportedHolderKeyBinding(mdocCredential(holderKey))
+
+        assertEquals(holderKey.id.value, wallet.resolveHolderKey(bound).keyMaterial.keyId)
     }
 
     @Test
@@ -345,17 +391,7 @@ class HolderKeyBindingTest {
 
     @Test
     fun `unsupported usage and provider failure retain precise errors`() = runTest {
-        val signingMaterial = signingKey("verify-only")
-        val verifyOnlyKey = object : id.walt.crypto2.keys.Key {
-            override val id = signingMaterial.id
-            override val spec = signingMaterial.spec
-            override val usages = setOf(KeyUsage.VERIFY)
-            override val capabilities = signingMaterial.capabilities.copy(
-                signer = null,
-                digestSigner = null,
-                privateKeyExporter = null,
-            )
-        }
+        val verifyOnlyKey = verifyOnlyKey("verify-only")
         val verifyOnlyStore = InMemoryKeyStore().apply { addCrypto2Key(verifyOnlyKey) }
         val verifyOnlyWallet = Wallet(id = "verify", keyStores = listOf(verifyOnlyStore))
         val verifyOnlyCredential = mdocCredential(verifyOnlyKey)
@@ -384,6 +420,20 @@ class HolderKeyBindingTest {
     }
 
     private suspend fun signingKey(id: String) = key(id, setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+
+    private suspend fun verifyOnlyKey(id: String): id.walt.crypto2.keys.Key {
+        val material = signingKey(id)
+        return object : id.walt.crypto2.keys.Key {
+            override val id = material.id
+            override val spec = material.spec
+            override val usages = setOf(KeyUsage.VERIFY)
+            override val capabilities = material.capabilities.copy(
+                signer = null,
+                digestSigner = null,
+                privateKeyExporter = null,
+            )
+        }
+    }
 
     private suspend fun key(id: String, usages: Set<KeyUsage>) =
         CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(

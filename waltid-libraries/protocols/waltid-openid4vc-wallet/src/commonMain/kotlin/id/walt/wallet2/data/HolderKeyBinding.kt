@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.data
 
 import id.walt.credentials.formats.MdocsCredential
@@ -8,6 +10,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
@@ -16,6 +19,7 @@ import kotlin.time.Instant
 /** Versioned record connecting a stored credential to the key that can present it. */
 @Serializable
 data class HolderKeyBinding(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     /**
      * Provider-qualified opaque reference interpreted only by the wallet key resolver.
@@ -27,6 +31,7 @@ data class HolderKeyBinding(
     val publicKeyThumbprint: PublicKeyThumbprint,
     val origin: HolderKeyBindingOrigin,
     val createdAt: Instant,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val extractorVersion: Int = CURRENT_EXTRACTOR_VERSION,
 ) {
     init {
@@ -44,6 +49,7 @@ data class HolderKeyBinding(
 /** Algorithm-qualified public-key identity. */
 @Serializable
 data class PublicKeyThumbprint(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val algorithm: String = RFC7638_SHA256,
     val value: String,
 ) {
@@ -217,8 +223,9 @@ suspend fun Wallet.withVerifiedHolderKeyBinding(
             )
         }
         resolved
-    } ?: allKeyCandidates(credential, setOf(KeyUsage.SIGN))
+    } ?: allKeyCandidates(credential)
         .filter { it.material.keyId == keyMaterial.keyId && it.thumbprint == suppliedThumbprint }
+        .requiringUsages(credential, setOf(KeyUsage.SIGN))
         .let { matching ->
             when (matching.size) {
                 0 -> throw bindingError(
@@ -269,7 +276,9 @@ suspend fun Wallet.withRequiredUniqueHolderKeyBinding(
             cause,
         )
     }
-    val matching = allKeyCandidates(credential, setOf(KeyUsage.SIGN)).filter { it.thumbprint == thumbprint }
+    val matching = allKeyCandidates(credential)
+        .filter { it.thumbprint == thumbprint }
+        .requiringUsages(credential, setOf(KeyUsage.SIGN))
     val candidate = when (matching.size) {
         0 -> throw bindingError(
             credential,
@@ -373,7 +382,6 @@ private suspend fun Wallet.resolveReferencedCandidate(
 
 private suspend fun Wallet.allKeyCandidates(
     credential: StoredCredential,
-    requiredUsages: Set<KeyUsage>,
 ): List<WalletKeyCandidate> = buildList {
     keyStores.forEachIndexed { index, store ->
         val ids = try {
@@ -390,16 +398,11 @@ private suspend fun Wallet.allKeyCandidates(
         }
         ids.forEach { keyId ->
             val material = try {
-                store.getKeyMaterial(keyId, requiredUsages)
+                // Enumerate first, then filter by the key's declared usages. Asking each provider for
+                // SIGN here would let one unrelated verify-only key abort discovery of a valid match.
+                store.getKeyMaterial(keyId, emptySet())
             } catch (cause: CancellationException) {
                 throw cause
-            } catch (cause: IllegalArgumentException) {
-                throw bindingError(
-                    credential,
-                    HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
-                    "Wallet key '$keyId' does not permit $requiredUsages for credential '${credential.id}'",
-                    cause,
-                )
             } catch (cause: Exception) {
                 throw bindingError(
                     credential,
@@ -431,6 +434,23 @@ private suspend fun Wallet.allKeyCandidates(
             )
         )
     }
+}
+
+private fun List<WalletKeyCandidate>.requiringUsages(
+    credential: StoredCredential,
+    requiredUsages: Set<KeyUsage>,
+): List<WalletKeyCandidate> {
+    val eligible = filter { candidate ->
+        candidate.material.crypto2Key?.let { key -> requiredUsages.all(key.usages::contains) } == true
+    }
+    if (isNotEmpty() && eligible.isEmpty()) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
+            "The local key matching credential '${credential.id}' does not permit $requiredUsages",
+        )
+    }
+    return eligible
 }
 
 private suspend fun candidate(
