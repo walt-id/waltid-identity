@@ -401,11 +401,9 @@ object Verifier2VPDirectPostHandler {
             // random response_code to the redirect URI. The wallet redirects the user browser to
             // this URI. The frontend then presents response_code + transaction-id to the Response
             // Endpoint to fetch the VP Token — only the browser that received the redirect can do this.
-            val responseCode = generateResponseCode()
-
-            // Store response_code on session so the frontend can validate it
-            updateSessionCallback(session, SessionEvent.credential_policy_results_available) {
-                this.responseCode = responseCode
+            // Assigned during credential_policy_results_available so this persist does not notify again.
+            val responseCode = requireNotNull(session.responseCode) {
+                "Success redirect is configured but response_code was not assigned"
             }
 
             val redirectUriWithCode = URLBuilder(optionalSuccessRedirectUrl)
@@ -427,7 +425,7 @@ object Verifier2VPDirectPostHandler {
      * Generates a fresh response_code per OID4VP 1.0 §1758.
      * Uses multiplatform UUID (backed by SecureRandom on JVM) for cryptographic randomness.
      */
-        private fun generateResponseCode(): String = Uuid.random().toHexString()
+    internal fun generateResponseCode(): String = Uuid.random().toHexString()
 
     fun parseVpToken(vpTokenString: String): ParsedVpToken = try {
         Json.Default.decodeFromString(vpTokenString)
