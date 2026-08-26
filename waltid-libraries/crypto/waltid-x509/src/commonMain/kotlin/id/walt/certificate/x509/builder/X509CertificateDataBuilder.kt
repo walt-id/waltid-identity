@@ -16,8 +16,8 @@ open class X509CertificateDataBuilder private constructor(
     override val version: Int = 3,
     override var serialNumberRaw: ByteString = serialNumberGenerator.next(),
     override var issuerDnRaw: ByteString,
-    var _subjectDn: String,
-    var _subjectDnRaw: ByteString,
+    private var _subjectDn: String,
+    private var _subjectDnRaw: ByteString,
     override var validity: X509Certificate.Validity,
     override var subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder()
 ) : X509Certificate.CertificateData, MutableExtensionContainer {
