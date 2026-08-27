@@ -6,7 +6,6 @@
 package id.walt.mdoc.proximity
 
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
-import id.walt.mdoc.objects.engagement.NfcRetrievalOptions
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.CoroutineScope
@@ -23,7 +22,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
 class TransportCoordinatorTest {
-    private val method = DeviceRetrievalMethod(1u, 1u, NfcRetrievalOptions(256u, 256u))
+    private val method = DeviceRetrievalMethod.Nfc(256u, 256u)
 
     @Test
     fun `first successful transport wins and the loser is closed once`() = runTest {
@@ -74,7 +73,7 @@ class TransportCoordinatorTest {
         val preparation = async {
             TransportCoordinator().prepare(
                 listOf(firstProvider, blockingProvider),
-                EngagementContext("test", 1024, EngagementType.QR),
+                EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1024, MdocEngagementMode.Qr),
                 this,
             )
         }
@@ -128,7 +127,7 @@ class TransportCoordinatorTest {
                     TrackingPrepared(ProximityTransportKind.NFC, waitForever = true)
                 },
             ),
-            EngagementContext("test", 1024, EngagementType.QR),
+            EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1024, MdocEngagementMode.Qr),
             this,
         )
 

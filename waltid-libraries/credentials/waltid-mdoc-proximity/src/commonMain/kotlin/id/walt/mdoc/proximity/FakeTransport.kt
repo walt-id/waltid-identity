@@ -6,7 +6,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Deterministic full-duplex message pair used by common holder/reader contract tests and UI fixtures. */
+/** Deterministic full-duplex message pair used by common holder/reader contract tests. */
 class FakeProximityLoopback private constructor(
     val holder: FakeProximityConnection,
     val reader: FakeProximityConnection,

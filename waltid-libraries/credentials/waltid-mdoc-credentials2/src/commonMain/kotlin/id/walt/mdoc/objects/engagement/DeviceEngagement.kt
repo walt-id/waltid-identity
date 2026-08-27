@@ -19,7 +19,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-/** ISO/IEC 18013-5 DeviceEngagement with exact, typed retrieval methods and permitted extensions. */
+/** ISO/IEC 18013-5 DeviceEngagement with typed retrieval methods and preserved extension fields. */
 @kotlinx.serialization.Serializable(with = DeviceEngagementSerializer::class)
 data class DeviceEngagement(
     val version: String,
@@ -87,113 +87,108 @@ enum class DeviceRetrievalMethodType(val code: UInt) {
     WIFI_AWARE(3u),
 }
 
-data class DeviceRetrievalMethod(
-    val type: UInt,
-    val version: UInt,
-    val options: RetrievalOptions,
+sealed interface DeviceRetrievalMethod {
+    val type: UInt
+    val version: UInt
+
+    data class Nfc(
+        val maximumCommandDataLength: UInt,
+        val maximumResponseDataLength: UInt,
+        val extensions: Map<UInt, CborElement> = emptyMap(),
+    ) : DeviceRetrievalMethod {
+        override val type: UInt = DeviceRetrievalMethodType.NFC.code
+        override val version: UInt = 1u
+
+        init {
+            require(maximumCommandDataLength > 0u && maximumResponseDataLength > 0u) {
+                "NFC command and response limits must be positive"
+            }
+            require(extensions.keys.none { it in setOf(0u, 1u) }) {
+                "NFC option extension collides with a standard field"
+            }
+        }
+    }
+
+    data class Ble(
+        val peripheralMode: BlePeripheralMode? = null,
+        val centralMode: BleCentralMode? = null,
+        val extensions: Map<UInt, CborElement> = emptyMap(),
+    ) : DeviceRetrievalMethod {
+        override val type: UInt = DeviceRetrievalMethodType.BLE.code
+        override val version: UInt = 1u
+
+        init {
+            require(peripheralMode != null || centralMode != null) { "BLE must advertise at least one role" }
+            require(extensions.keys.none { it in setOf(0u, 1u, 10u, 11u, 20u, 21u) }) {
+                "BLE option extension collides with a standard field"
+            }
+        }
+    }
+
+    class WifiAware(
+        val passphraseInfo: String? = null,
+        val operatingClass: UInt? = null,
+        val channelNumber: UInt? = null,
+        val supportedBands: ByteArray,
+        val extensions: Map<UInt, CborElement> = emptyMap(),
+    ) : DeviceRetrievalMethod {
+        override val type: UInt = DeviceRetrievalMethodType.WIFI_AWARE.code
+        override val version: UInt = 1u
+
+        init {
+            require(supportedBands.isNotEmpty()) { "Wi-Fi Aware supported bands must not be empty" }
+            require(extensions.keys.none { it in setOf(0u, 1u, 2u, 3u) }) {
+                "Wi-Fi Aware option extension collides with a standard field"
+            }
+        }
+
+        override fun equals(other: Any?): Boolean = other is WifiAware &&
+            passphraseInfo == other.passphraseInfo && operatingClass == other.operatingClass &&
+            channelNumber == other.channelNumber && supportedBands.contentEquals(other.supportedBands) &&
+            extensions == other.extensions
+        override fun hashCode(): Int = listOf(
+            passphraseInfo, operatingClass, channelNumber, supportedBands.contentHashCode(), extensions,
+        ).hashCode()
+    }
+
+    data class Unknown(
+        override val type: UInt,
+        override val version: UInt,
+        val encodedOptions: CborElement,
+    ) : DeviceRetrievalMethod {
+        init {
+            require(version > 0u) { "DeviceRetrievalMethod version must be positive" }
+            require(type !in DeviceRetrievalMethodType.entries.map { it.code } || version != 1u) {
+                "A supported type/version pair must use its typed retrieval method"
+            }
+        }
+    }
+}
+
+class BlePeripheralMode(
+    val uuid: ByteArray,
+    val deviceAddress: ByteArray? = null,
+    val psm: UInt? = null,
 ) {
     init {
-        require(version > 0u) { "DeviceRetrievalMethod version must be positive" }
-        when (options) {
-            is NfcRetrievalOptions -> require(type == DeviceRetrievalMethodType.NFC.code && version == 1u)
-            is BleRetrievalOptions -> require(type == DeviceRetrievalMethodType.BLE.code && version == 1u)
-            is WifiAwareRetrievalOptions -> require(type == DeviceRetrievalMethodType.WIFI_AWARE.code && version == 1u)
-            is UnknownRetrievalOptions -> require(
-                type !in DeviceRetrievalMethodType.entries.map { it.code } || version != 1u
-            ) { "A supported type/version pair must use its typed retrieval options" }
-        }
+        require(uuid.size == 16) { "BLE UUID must be 16 bytes" }
+        require(deviceAddress == null || deviceAddress.size == 6) { "BLE device address must be 6 bytes" }
+        require(psm == null || psm > 0u) { "BLE L2CAP PSM must be positive" }
     }
+
+    override fun equals(other: Any?): Boolean = other is BlePeripheralMode &&
+        uuid.contentEquals(other.uuid) && deviceAddress.contentEquals(other.deviceAddress) && psm == other.psm
+    override fun hashCode(): Int = listOf(uuid.contentHashCode(), deviceAddress?.contentHashCode(), psm).hashCode()
 }
 
-sealed interface RetrievalOptions
-
-data class BleRetrievalOptions(
-    val peripheralServerModeSupported: Boolean,
-    val centralClientModeSupported: Boolean,
-    val peripheralServerModeUuid: ByteArray? = null,
-    val centralClientModeUuid: ByteArray? = null,
-    val peripheralServerModeDeviceAddress: ByteArray? = null,
-    val peripheralServerModePsm: UInt? = null,
-    val extensions: Map<UInt, CborElement> = emptyMap(),
-) : RetrievalOptions {
+class BleCentralMode(val uuid: ByteArray) {
     init {
-        require(peripheralServerModeSupported || centralClientModeSupported) { "BLE must advertise at least one role" }
-        require(peripheralServerModeUuid == null || peripheralServerModeUuid.size == 16) { "BLE UUID must be 16 bytes" }
-        require(centralClientModeUuid == null || centralClientModeUuid.size == 16) { "BLE UUID must be 16 bytes" }
-        require(peripheralServerModeDeviceAddress == null || peripheralServerModeDeviceAddress.size == 6) {
-            "BLE device address must be 6 bytes"
-        }
-        require(peripheralServerModePsm == null || peripheralServerModeSupported) {
-            "BLE L2CAP PSM requires peripheral mode"
-        }
-        require(extensions.keys.none { it in setOf(0u, 1u, 10u, 11u, 20u, 21u) }) {
-            "BLE option extension collides with a standard field"
-        }
+        require(uuid.size == 16) { "BLE UUID must be 16 bytes" }
     }
 
-    override fun equals(other: Any?): Boolean = other is BleRetrievalOptions &&
-        peripheralServerModeSupported == other.peripheralServerModeSupported &&
-        centralClientModeSupported == other.centralClientModeSupported &&
-        peripheralServerModeUuid.contentEquals(other.peripheralServerModeUuid) &&
-        centralClientModeUuid.contentEquals(other.centralClientModeUuid) &&
-        peripheralServerModeDeviceAddress.contentEquals(other.peripheralServerModeDeviceAddress) &&
-        peripheralServerModePsm == other.peripheralServerModePsm && extensions == other.extensions
-
-    override fun hashCode(): Int = listOf(
-        peripheralServerModeSupported,
-        centralClientModeSupported,
-        peripheralServerModeUuid?.contentHashCode(),
-        centralClientModeUuid?.contentHashCode(),
-        peripheralServerModeDeviceAddress?.contentHashCode(),
-        peripheralServerModePsm,
-        extensions,
-    ).hashCode()
+    override fun equals(other: Any?): Boolean = other is BleCentralMode && uuid.contentEquals(other.uuid)
+    override fun hashCode(): Int = uuid.contentHashCode()
 }
-
-data class NfcRetrievalOptions(
-    val maximumCommandDataLength: UInt,
-    val maximumResponseDataLength: UInt,
-    val extensions: Map<UInt, CborElement> = emptyMap(),
-) : RetrievalOptions {
-    init {
-        require(maximumCommandDataLength > 0u && maximumResponseDataLength > 0u) {
-            "NFC command and response limits must be positive"
-        }
-        require(extensions.keys.none { it in setOf(0u, 1u) }) {
-            "NFC option extension collides with a standard field"
-        }
-    }
-}
-
-data class WifiAwareRetrievalOptions(
-    val passphraseInfo: String? = null,
-    val operatingClass: UInt? = null,
-    val channelNumber: UInt? = null,
-    val supportedBands: ByteArray,
-    val extensions: Map<UInt, CborElement> = emptyMap(),
-) : RetrievalOptions {
-    init {
-        require(supportedBands.isNotEmpty()) { "Wi-Fi Aware supported bands must not be empty" }
-        require(extensions.keys.none { it in setOf(0u, 1u, 2u, 3u) }) {
-            "Wi-Fi Aware option extension collides with a standard field"
-        }
-    }
-
-    override fun equals(other: Any?): Boolean = other is WifiAwareRetrievalOptions &&
-        passphraseInfo == other.passphraseInfo && operatingClass == other.operatingClass &&
-        channelNumber == other.channelNumber && supportedBands.contentEquals(other.supportedBands) &&
-        extensions == other.extensions
-
-    override fun hashCode(): Int = listOf(
-        passphraseInfo,
-        operatingClass,
-        channelNumber,
-        supportedBands.contentHashCode(),
-        extensions,
-    ).hashCode()
-}
-
-data class UnknownRetrievalOptions(val encoded: CborElement) : RetrievalOptions
 
 object DeviceEngagementSerializer : KSerializer<DeviceEngagement> {
     override val descriptor: SerialDescriptor = CborElement.serializer().descriptor
@@ -276,32 +271,32 @@ private fun CborElement.toCapabilities(): DeviceEngagementCapabilities {
 }
 
 private fun DeviceRetrievalMethod.toElement(): CborElement = CborArray(
-    listOf(CborInteger(type.toULong()), CborInteger(version.toULong()), options.toElement())
+    listOf(CborInteger(type.toULong()), CborInteger(version.toULong()), optionsElement())
 )
 
-private fun RetrievalOptions.toElement(): CborElement = when (this) {
-    is BleRetrievalOptions -> CborMap(buildMap<CborElement, CborElement> {
-        put(CborInteger(0), CborBoolean(peripheralServerModeSupported))
-        put(CborInteger(1), CborBoolean(centralClientModeSupported))
-        peripheralServerModeUuid?.let { put(CborInteger(10), CborByteString(it)) }
-        centralClientModeUuid?.let { put(CborInteger(11), CborByteString(it)) }
-        peripheralServerModeDeviceAddress?.let { put(CborInteger(20), CborByteString(it)) }
-        peripheralServerModePsm?.let { put(CborInteger(21), CborInteger(it.toULong())) }
+private fun DeviceRetrievalMethod.optionsElement(): CborElement = when (this) {
+    is DeviceRetrievalMethod.Ble -> CborMap(buildMap<CborElement, CborElement> {
+        put(CborInteger(0), CborBoolean(peripheralMode != null))
+        put(CborInteger(1), CborBoolean(centralMode != null))
+        peripheralMode?.uuid?.let { put(CborInteger(10), CborByteString(it)) }
+        centralMode?.uuid?.let { put(CborInteger(11), CborByteString(it)) }
+        peripheralMode?.deviceAddress?.let { put(CborInteger(20), CborByteString(it)) }
+        peripheralMode?.psm?.let { put(CborInteger(21), CborInteger(it.toULong())) }
         extensions.forEach { (key, value) -> put(CborInteger(key.toULong()), value) }
     })
-    is NfcRetrievalOptions -> CborMap(buildMap<CborElement, CborElement> {
+    is DeviceRetrievalMethod.Nfc -> CborMap(buildMap<CborElement, CborElement> {
         put(CborInteger(0), CborInteger(maximumCommandDataLength.toULong()))
         put(CborInteger(1), CborInteger(maximumResponseDataLength.toULong()))
         extensions.forEach { (key, value) -> put(CborInteger(key.toULong()), value) }
     })
-    is WifiAwareRetrievalOptions -> CborMap(buildMap<CborElement, CborElement> {
+    is DeviceRetrievalMethod.WifiAware -> CborMap(buildMap<CborElement, CborElement> {
         passphraseInfo?.let { put(CborInteger(0), CborString(it)) }
         operatingClass?.let { put(CborInteger(1), CborInteger(it.toULong())) }
         channelNumber?.let { put(CborInteger(2), CborInteger(it.toULong())) }
         put(CborInteger(3), CborByteString(supportedBands))
         extensions.forEach { (key, value) -> put(CborInteger(key.toULong()), value) }
     })
-    is UnknownRetrievalOptions -> encoded
+    is DeviceRetrievalMethod.Unknown -> encodedOptions
 }
 
 private fun CborElement.toRetrievalMethod(): DeviceRetrievalMethod {
@@ -309,41 +304,51 @@ private fun CborElement.toRetrievalMethod(): DeviceRetrievalMethod {
     if (array.size != 3) throw SerializationException("DeviceRetrievalMethod must contain three items")
     val type = array[0].requiredUInt()
     val version = array[1].requiredUInt()
-    val options = when {
-        version != 1u -> UnknownRetrievalOptions(array[2])
-        type == DeviceRetrievalMethodType.NFC.code -> array[2].toNfcOptions()
-        type == DeviceRetrievalMethodType.BLE.code -> array[2].toBleOptions()
-        type == DeviceRetrievalMethodType.WIFI_AWARE.code -> array[2].toWifiOptions()
-        else -> UnknownRetrievalOptions(array[2])
+    return when {
+        version != 1u -> DeviceRetrievalMethod.Unknown(type, version, array[2])
+        type == DeviceRetrievalMethodType.NFC.code -> array[2].toNfcMethod()
+        type == DeviceRetrievalMethodType.BLE.code -> array[2].toBleMethod()
+        type == DeviceRetrievalMethodType.WIFI_AWARE.code -> array[2].toWifiMethod()
+        else -> DeviceRetrievalMethod.Unknown(type, version, array[2])
     }
-    return DeviceRetrievalMethod(type, version, options)
 }
 
-private fun CborElement.toBleOptions(): BleRetrievalOptions {
+private fun CborElement.toBleMethod(): DeviceRetrievalMethod.Ble {
     val map = this as? CborMap ?: throw SerializationException("BLE options must be a map")
-    return BleRetrievalOptions(
-        peripheralServerModeSupported = map.requiredBoolean(0),
-        centralClientModeSupported = map.requiredBoolean(1),
-        peripheralServerModeUuid = map[10]?.requiredBytes(),
-        centralClientModeUuid = map[11]?.requiredBytes(),
-        peripheralServerModeDeviceAddress = map[20]?.requiredBytes(),
-        peripheralServerModePsm = map[21]?.requiredUInt(),
+    val peripheralSupported = map.requiredBoolean(0)
+    val centralSupported = map.requiredBoolean(1)
+    val peripheralUuid = map[10]?.requiredBytes()
+    val centralUuid = map[11]?.requiredBytes()
+    if (peripheralSupported != (peripheralUuid != null)) {
+        throw SerializationException("BLE peripheral UUID must be present exactly when peripheral mode is supported")
+    }
+    if (centralSupported != (centralUuid != null)) {
+        throw SerializationException("BLE central UUID must be present exactly when central mode is supported")
+    }
+    if (!peripheralSupported && (map[20] != null || map[21] != null)) {
+        throw SerializationException("BLE address and PSM require peripheral mode")
+    }
+    return DeviceRetrievalMethod.Ble(
+        peripheralMode = peripheralUuid?.let {
+            BlePeripheralMode(it, map[20]?.requiredBytes(), map[21]?.requiredUInt())
+        },
+        centralMode = centralUuid?.let(::BleCentralMode),
         extensions = map.unsignedExtensions(setOf(0u, 1u, 10u, 11u, 20u, 21u)),
     )
 }
 
-private fun CborElement.toNfcOptions(): NfcRetrievalOptions {
+private fun CborElement.toNfcMethod(): DeviceRetrievalMethod.Nfc {
     val map = this as? CborMap ?: throw SerializationException("NFC options must be a map")
-    return NfcRetrievalOptions(
+    return DeviceRetrievalMethod.Nfc(
         maximumCommandDataLength = map.required(0).requiredUInt(),
         maximumResponseDataLength = map.required(1).requiredUInt(),
         extensions = map.unsignedExtensions(setOf(0u, 1u)),
     )
 }
 
-private fun CborElement.toWifiOptions(): WifiAwareRetrievalOptions {
+private fun CborElement.toWifiMethod(): DeviceRetrievalMethod.WifiAware {
     val map = this as? CborMap ?: throw SerializationException("Wi-Fi Aware options must be a map")
-    return WifiAwareRetrievalOptions(
+    return DeviceRetrievalMethod.WifiAware(
         passphraseInfo = map[0]?.let { (it as? CborString)?.value ?: throw SerializationException("Passphrase info must be text") },
         operatingClass = map[1]?.requiredUInt(),
         channelNumber = map[2]?.requiredUInt(),

@@ -4,7 +4,14 @@ import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import kotlinx.coroutines.CoroutineScope
 
 enum class ProximityTransportKind { BLE, NFC, WIFI_AWARE, FAKE }
-enum class EngagementType { QR, NFC }
+
+sealed interface MdocEngagementMode {
+    data object Qr : MdocEngagementMode
+    data class Nfc(
+        /** Exact SessionEstablishment received during negotiated handover, when that path was used. */
+        val negotiatedSessionEstablishment: ImmutableBytes? = null,
+    ) : MdocEngagementMode
+}
 
 /** Four independent support dimensions; callers must not collapse these to one optimistic Boolean. */
 data class ProximityCapability(
@@ -27,19 +34,26 @@ data class ProximityCapability(
 }
 
 data class EngagementContext(
-    val profileId: String,
+    val profile: MdocProximityProfile,
     val maximumMessageBytes: Int,
-    val engagementType: EngagementType,
+    val engagementMode: MdocEngagementMode,
 ) {
     init {
-        require(profileId.isNotBlank())
         require(maximumMessageBytes > 0)
     }
 }
 
 interface ProximityTransportProvider {
     val kind: ProximityTransportKind
+
+    /** Reports this provider's support dimensions without preparing radio resources. */
     suspend fun capability(context: EngagementContext): ProximityCapability
+
+    /**
+     * Prepares one session-scoped listener. Cancelling [sessionScope] must make every pending
+     * provider operation complete and release resources; [PreparedTransport.close] remains the
+     * authoritative idempotent cleanup operation.
+     */
     suspend fun prepare(context: EngagementContext, sessionScope: CoroutineScope): PreparedTransport
 }
 
@@ -47,6 +61,8 @@ interface PreparedTransport {
     val kind: ProximityTransportKind
     val connectionMethod: DeviceRetrievalMethod
     val sessionTranscriptFactory: SessionTranscriptFactory
+
+    /** Awaits one connection. Cancellation must not leak a subsequently delivered connection. */
     suspend fun awaitConnection(): ProximityConnection
     /** Idempotently closes the listener and any connection returned by [awaitConnection]. */
     suspend fun close(reason: ProximityCloseReason)
@@ -54,8 +70,14 @@ interface PreparedTransport {
 
 interface ProximityConnection {
     val kind: ProximityTransportKind
+
+    /** Receives one complete protocol message, or `null` after an orderly peer disconnect. */
     suspend fun receive(): ImmutableBytes?
+
+    /** Sends one complete protocol message; ownership of [message] remains with the caller. */
     suspend fun send(message: ImmutableBytes)
+
+    /** Idempotently closes this connection and releases its platform resources. */
     suspend fun close(reason: ProximityCloseReason)
 }
 

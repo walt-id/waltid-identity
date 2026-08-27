@@ -58,6 +58,56 @@ data class DeviceRequestReaderAuthentication(
     val wholeRequest: List<ReaderAuthenticationResult>,
 )
 
+enum class ReaderAuthenticationDisplayValidity { ABSENT, MALFORMED, INVALID, VALID }
+
+/** Display-safe projection; it intentionally contains no signatures, certificates, or raw evidence. */
+data class ReaderAuthenticationDisplayEntry(
+    val scope: ReaderAuthenticationScope,
+    val documentRequestIndex: Int?,
+    val validity: ReaderAuthenticationDisplayValidity,
+    val trust: ReaderTrustState,
+    val displayName: String? = null,
+    val reason: String? = null,
+) {
+    init {
+        require(documentRequestIndex == null || documentRequestIndex >= 0)
+        require(displayName == null || displayName.isNotBlank())
+        require(reason == null || reason.isNotBlank())
+    }
+}
+
+data class DeviceRequestReaderAuthenticationDisplay(
+    val documents: List<ReaderAuthenticationDisplayEntry>,
+    val wholeRequest: List<ReaderAuthenticationDisplayEntry>,
+)
+
+fun DeviceRequestReaderAuthentication.toDisplaySafe(): DeviceRequestReaderAuthenticationDisplay =
+    DeviceRequestReaderAuthenticationDisplay(
+        documents = documents.mapIndexed { index, result -> result.toDisplayEntry(ReaderAuthenticationScope.DOCUMENT, index) },
+        wholeRequest = wholeRequest.map { it.toDisplayEntry(ReaderAuthenticationScope.WHOLE_REQUEST, null) },
+    )
+
+private fun ReaderAuthenticationResult.toDisplayEntry(
+    scope: ReaderAuthenticationScope,
+    documentRequestIndex: Int?,
+): ReaderAuthenticationDisplayEntry = ReaderAuthenticationDisplayEntry(
+    scope = scope,
+    documentRequestIndex = documentRequestIndex,
+    validity = when (validity) {
+        ReaderAuthenticationValidity.Absent -> ReaderAuthenticationDisplayValidity.ABSENT
+        is ReaderAuthenticationValidity.Malformed -> ReaderAuthenticationDisplayValidity.MALFORMED
+        is ReaderAuthenticationValidity.Invalid -> ReaderAuthenticationDisplayValidity.INVALID
+        is ReaderAuthenticationValidity.Valid -> ReaderAuthenticationDisplayValidity.VALID
+    },
+    trust = trust.state,
+    displayName = trust.displayName,
+    reason = when (val value = validity) {
+        is ReaderAuthenticationValidity.Malformed -> value.reason
+        is ReaderAuthenticationValidity.Invalid -> value.reason
+        ReaderAuthenticationValidity.Absent, is ReaderAuthenticationValidity.Valid -> trust.reason
+    },
+)
+
 class ReaderAuthenticationVerifier(
     private val trustEvaluator: ReaderTrustEvaluator,
     private val allowedAlgorithms: Set<Int>,

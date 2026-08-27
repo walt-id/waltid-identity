@@ -12,9 +12,9 @@ import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
-import id.walt.mdoc.objects.engagement.BleRetrievalOptions
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceEngagementCapabilities
 import id.walt.mdoc.objects.engagement.DeviceEngagementSecurity
@@ -35,6 +35,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.cbor.CborElement
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
@@ -56,64 +57,47 @@ object QrSessionTranscriptFactory : SessionTranscriptFactory {
 }
 
 data class MdocEngagement(
-    val deviceEngagement: DeviceEngagement,
-    val exactBytes: ImmutableBytes,
+    val engagement: ExactCbor<DeviceEngagement>,
     val qrPayload: String?,
 )
-
-/** Capabilities are explicit so DeviceEngagement never promises an unavailable parser or verifier path. */
-data class MdocHolderProtocolCapabilities(
-    val handoverSessionEstablishment: Boolean,
-    val readerAuthAll: Boolean,
-    val extendedRequests: Boolean,
-) {
-    internal fun toDeviceEngagementCapabilities() = DeviceEngagementCapabilities(
-        handoverSessionEstablishment = handoverSessionEstablishment,
-        readerAuthAll = readerAuthAll,
-        extendedRequests = extendedRequests,
-    )
-}
 
 class MdocDeviceEngagementFactory {
     suspend fun create(
         eDeviceKey: Key,
         methods: List<DeviceRetrievalMethod>,
         context: EngagementContext,
-        capabilities: MdocHolderProtocolCapabilities,
+        capabilities: MdocSessionCapabilities,
     ): MdocEngagement {
         require(methods.isNotEmpty()) { "At least one retrieval method is required" }
+        require(capabilities.profile == context.profile) { "Capability profile must match the engagement profile" }
         MdocSessionKeyValidator.requireSupportedLocalKey(eDeviceKey)
-        if (context.engagementType == EngagementType.QR) validateQrMethods(methods)
+        require(eDeviceKey.spec.toMdocSessionCurve() == capabilities.selectedCurve) {
+            "Selected session curve does not match the ephemeral device key"
+        }
         val publicJwk = eDeviceKey.capabilities.publicKeyExporter?.exportPublicKey() as? EncodedKey.Jwk
             ?: throw IllegalArgumentException("Ephemeral device key cannot export a public JWK")
         val publicCose = publicJwk.toCoseKey()
         val encodedCose = coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicCose)
+        val engagementCapabilities = capabilities.toDeviceEngagementCapabilities()
         val engagement = DeviceEngagement(
-            version = DeviceEngagement.VERSION_1_1,
+            version = if (engagementCapabilities == null) {
+                DeviceEngagement.VERSION_1_0
+            } else {
+                DeviceEngagement.VERSION_1_1
+            },
             security = DeviceEngagementSecurity(1u, ByteStringWrapper(publicCose, encodedCose)),
-            deviceRetrievalMethods = methods.toList().takeIf { context.engagementType == EngagementType.QR },
-            originInfos = emptyList(),
-            capabilities = capabilities.toDeviceEngagementCapabilities(),
+            deviceRetrievalMethods = methods.toList().takeIf { context.engagementMode is MdocEngagementMode.Qr },
+            originInfos = emptyList<CborElement>().takeIf { engagementCapabilities != null },
+            capabilities = engagementCapabilities,
         )
-        val exact = ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(DeviceEngagement.serializer(), engagement))
-        val qrPayload = if (context.engagementType == EngagementType.QR) {
-            "mdoc:" + Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(exact.copy())
+        val exact = ExactCbor.of(
+            engagement,
+            coseCompliantCbor.encodeToByteArray(DeviceEngagement.serializer(), engagement),
+        )
+        val qrPayload = if (context.engagementMode is MdocEngagementMode.Qr) {
+            "mdoc:" + Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(exact.encodedCopy())
         } else null
-        return MdocEngagement(engagement, exact, qrPayload)
-    }
-
-    private fun validateQrMethods(methods: List<DeviceRetrievalMethod>) {
-        methods.map { it.options }.filterIsInstance<BleRetrievalOptions>().forEach { ble ->
-            require(ble.peripheralServerModeSupported == (ble.peripheralServerModeUuid != null)) {
-                "QR engagement requires a BLE peripheral UUID exactly when peripheral mode is supported"
-            }
-            require(ble.centralClientModeSupported == (ble.centralClientModeUuid != null)) {
-                "QR engagement requires a BLE central UUID exactly when central mode is supported"
-            }
-            require(ble.peripheralServerModeDeviceAddress == null || ble.peripheralServerModeSupported) {
-                "QR engagement cannot advertise a BLE device address without peripheral mode"
-            }
-        }
+        return MdocEngagement(exact, qrPayload)
     }
 }
 
@@ -121,7 +105,11 @@ data class PreviewElement(
     val namespace: String,
     val elementIdentifier: String,
     val intentToRetain: Boolean,
-)
+) {
+    init {
+        require(namespace.isNotBlank() && elementIdentifier.isNotBlank())
+    }
+}
 
 class PreviewDocument(
     val docType: String,
@@ -133,13 +121,15 @@ class PreviewDocument(
 
     init {
         require(docType.isNotBlank() && this.credentialIds.isNotEmpty() && this.elements.isNotEmpty())
+        require(this.credentialIds.none(String::isBlank) && this.credentialIds.distinct().size == this.credentialIds.size)
+        require(this.elements.distinctBy { it.namespace to it.elementIdentifier }.size == this.elements.size)
     }
 }
 
 class MdocRequestPreview(
     documents: List<PreviewDocument>,
     purposeHints: Map<String, Int> = emptyMap(),
-    val readerAuthentication: DeviceRequestReaderAuthentication? = null,
+    val readerAuthentication: DeviceRequestReaderAuthenticationDisplay? = null,
     /**
      * SHA-256 digest over the wallet-owned trust snapshot, eligible credentials, selected use-case/elements,
      * retention flags, authentication method, and holder-key reference.
@@ -158,19 +148,31 @@ class MdocRequestPreview(
 }
 
 data class MdocHolderRequestContext(
-    val request: DeviceRequest,
-    val exactRequest: ImmutableBytes,
-    val transcript: SessionTranscript,
-    val exactTranscript: ImmutableBytes,
+    val request: ExactCbor<DeviceRequest>,
+    val transcript: ExactCbor<SessionTranscript>,
     val exchange: Int,
-)
+) {
+    init {
+        require(exchange > 0)
+    }
+}
 
-data class MdocResponseResolution(
-    val exactResponse: ImmutableBytes?,
-    val continueSession: Boolean,
+enum class MdocSessionContinuation { CONTINUE, TERMINATE }
+
+sealed interface MdocResponseResolution {
     /** Freshly recomputed wallet-owned binding; must still equal the preview binding before submission. */
-    val submissionBindingDigest: ImmutableBytes,
-)
+    val submissionBindingDigest: ImmutableBytes
+
+    data class Send(
+        val exactResponse: ImmutableBytes,
+        val continuation: MdocSessionContinuation,
+        override val submissionBindingDigest: ImmutableBytes,
+    ) : MdocResponseResolution
+
+    data class TerminateWithoutResponse(
+        override val submissionBindingDigest: ImmutableBytes,
+    ) : MdocResponseResolution
+}
 
 interface MdocHolderRequestProcessor {
     suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview
@@ -184,7 +186,12 @@ data class MdocConsentPrompt(
     val bindingToken: ImmutableBytes,
     val exchange: Int,
     val preview: MdocRequestPreview,
-)
+) {
+    init {
+        require(bindingToken.size == 32) { "Consent binding must be a SHA-256 digest" }
+        require(exchange > 0)
+    }
+}
 
 sealed interface MdocConsentDecision {
     val bindingToken: ImmutableBytes
@@ -209,14 +216,44 @@ sealed interface MdocHolderSessionState {
         val availableTransports: Set<ProximityTransportKind>,
         val unavailableTransports: Map<ProximityTransportKind, ProximityError>,
     ) : MdocHolderSessionState
-    data class AwaitingRequest(val exchange: Int) : MdocHolderSessionState
+    data class AwaitingRequest(val exchange: Int) : MdocHolderSessionState {
+        init { require(exchange > 0) }
+    }
     data class ReviewRequired(val prompt: MdocConsentPrompt) : MdocHolderSessionState
-    data class SendingResponse(val exchange: Int) : MdocHolderSessionState
-    data class Declined(val exchange: Int) : MdocHolderSessionState
-    data class Completed(val exchanges: Int) : MdocHolderSessionState
+    data class SendingResponse(val exchange: Int) : MdocHolderSessionState {
+        init { require(exchange > 0) }
+    }
+    data class Declined(val exchange: Int) : MdocHolderSessionState {
+        init { require(exchange > 0) }
+    }
+    data class Completed(val exchanges: Int) : MdocHolderSessionState {
+        init { require(exchanges > 0) }
+    }
     data class Failed(val error: ProximityError) : MdocHolderSessionState
     data object Cancelled : MdocHolderSessionState
 }
+
+enum class MdocHolderAction { CANCEL, APPROVE, DENY }
+
+/** Legal user actions for a display-safe session state. */
+val MdocHolderSessionState.legalActions: Set<MdocHolderAction>
+    get() = when (this) {
+        MdocHolderSessionState.Idle,
+        is MdocHolderSessionState.Declined,
+        is MdocHolderSessionState.Completed,
+        is MdocHolderSessionState.Failed,
+        MdocHolderSessionState.Cancelled -> emptySet()
+        is MdocHolderSessionState.ReviewRequired -> setOf(
+            MdocHolderAction.APPROVE,
+            MdocHolderAction.DENY,
+            MdocHolderAction.CANCEL,
+        )
+        is MdocHolderSessionState.Preparing,
+        is MdocHolderSessionState.EngagementReady,
+        is MdocHolderSessionState.Connecting,
+        is MdocHolderSessionState.AwaitingRequest,
+        is MdocHolderSessionState.SendingResponse -> setOf(MdocHolderAction.CANCEL)
+    }
 
 sealed interface MdocHolderSessionResult {
     data class Declined(val exchange: Int) : MdocHolderSessionResult
@@ -233,7 +270,7 @@ class MdocHolderProtocolEngine(
     private val requestProcessor: MdocHolderRequestProcessor,
     private val consentHandler: MdocConsentHandler,
     private val engagementContext: EngagementContext,
-    private val capabilities: MdocHolderProtocolCapabilities,
+    private val capabilities: MdocSessionCapabilities,
     private val limits: MdocProximityLimits = MdocProximityLimits(),
     private val timeouts: MdocProximityTimeouts = MdocProximityTimeouts(),
     private val transportCoordinator: TransportCoordinator = TransportCoordinator(),
@@ -244,6 +281,27 @@ class MdocHolderProtocolEngine(
     private val startMutex = Mutex()
     private var started = false
 
+    init {
+        require(capabilities.profile == engagementContext.profile) {
+            "Capability profile must match the engagement profile"
+        }
+        val negotiatedEstablishment = (engagementContext.engagementMode as? MdocEngagementMode.Nfc)
+            ?.negotiatedSessionEstablishment
+        require(
+            capabilities.selected(MdocProtocolFeature.NEGOTIATED_HANDOVER_SESSION_ESTABLISHMENT) ==
+                (negotiatedEstablishment != null)
+        ) {
+            "Negotiated handover capability requires exact handover SessionEstablishment bytes"
+        }
+        negotiatedEstablishment?.let(limits::requireEngagementOrHandover)
+    }
+
+    /**
+     * Runs this single-use session until completion, decline, or failure.
+     *
+     * Caller cancellation is rethrown after the state becomes [MdocHolderSessionState.Cancelled];
+     * prepared transports, the active connection, and session keys are then closed before return.
+     */
     suspend fun run(): MdocHolderSessionResult {
         startMutex.withLock {
             check(!started) { "An mdoc holder protocol engine is single-use" }
@@ -270,7 +328,9 @@ class MdocHolderProtocolEngine(
     ) { coroutineScope { runSession(this) } }
 
     private suspend fun runSession(scope: CoroutineScope): MdocHolderSessionResult {
-        mutableState.value = MdocHolderSessionState.Preparing(engagementContext.profileId)
+        val negotiatedEstablishment = (engagementContext.engagementMode as? MdocEngagementMode.Nfc)
+            ?.negotiatedSessionEstablishment
+        mutableState.value = MdocHolderSessionState.Preparing(engagementContext.profile.id)
         var prepared: PreparedTransports? = null
         var winningPrepared: PreparedTransport? = null
         var cipher: MdocSessionCipher? = null
@@ -284,7 +344,8 @@ class MdocHolderProtocolEngine(
                 engagementContext,
                 capabilities,
             )
-            limits.requireEngagementOrHandover(engagement.exactBytes)
+            val engagementBytes = ImmutableBytes.of(engagement.engagement.encodedCopy())
+            limits.requireEngagementOrHandover(engagementBytes)
             val kinds = prepared.transports.map { it.kind }.toSet()
             mutableState.value = MdocHolderSessionState.EngagementReady(
                 engagement.qrPayload,
@@ -297,7 +358,7 @@ class MdocHolderProtocolEngine(
                 prepared.unavailable,
             )
 
-            val (winner, firstBytes) = if (engagementContext.engagementType == EngagementType.QR) {
+            val (winner, firstBytes) = if (engagementContext.engagementMode is MdocEngagementMode.Qr) {
                 phase(
                     timeouts.qrEngagementLifetime,
                     ProximityError.Protocol("engagement_timeout", "The QR engagement expired before session establishment"),
@@ -307,9 +368,17 @@ class MdocHolderProtocolEngine(
             }
             winningPrepared = winner.prepared
             val connection = winner.connection
+            if (negotiatedEstablishment != null && firstBytes != negotiatedEstablishment) {
+                throw ProximityException(
+                    ProximityError.Security(
+                        "negotiated_establishment_mismatch",
+                        "SessionEstablishment differs from the negotiated handover copy",
+                    )
+                )
+            }
             val establishment = decodeOrReport<SessionEstablishment>(connection, firstBytes)
             val transcript = winner.prepared.sessionTranscriptFactory.create(
-                engagement.exactBytes,
+                engagementBytes,
                 ImmutableBytes.of(establishment.eReaderKey.serialized),
                 winner.prepared.connectionMethod,
             )
@@ -336,7 +405,11 @@ class MdocHolderProtocolEngine(
                 val request = decodeOrReport<DeviceRequest>(connection, incoming)
                 validateRequestLimits(request)
                 validateAdvertisedFeatures(request)
-                val context = MdocHolderRequestContext(request, incoming, transcript, exactTranscript, exchange)
+                val context = MdocHolderRequestContext(
+                    request = ExactCbor.of(request, incoming.copy()),
+                    transcript = ExactCbor.of(transcript, exactTranscript.copy()),
+                    exchange = exchange,
+                )
                 val preview = phase(
                     timeouts.request,
                     ProximityError.Protocol("request_processing_timeout", "Request preview processing timed out"),
@@ -367,17 +440,17 @@ class MdocHolderProtocolEngine(
                 if (resolution.submissionBindingDigest != preview.submissionBindingDigest) throw ProximityException(
                     ProximityError.Security("changed_submission", "The approved request state changed before submission")
                 )
-                if (resolution.exactResponse == null && resolution.continueSession) throw ProximityException(
-                    ProximityError.Protocol("missing_response", "A continuing exchange must send a response")
-                )
-                resolution.exactResponse?.let { response ->
-                    limits.requireResponse(response)
-                    requireWithinReaderLimit(request, response)
+                if (resolution is MdocResponseResolution.Send) {
+                    limits.requireResponse(resolution.exactResponse)
+                    requireWithinReaderLimit(request, resolution.exactResponse)
                     mutableState.value = MdocHolderSessionState.SendingResponse(exchange)
-                    val encrypted = cipher.encrypt(response.copy())
+                    val encrypted = cipher.encrypt(resolution.exactResponse.copy())
                     send(connection, SessionData(data = encrypted), budget)
                 }
-                if (!resolution.continueSession || terminateAfterResponse) {
+                val terminate = resolution is MdocResponseResolution.TerminateWithoutResponse ||
+                    resolution is MdocResponseResolution.Send &&
+                    resolution.continuation == MdocSessionContinuation.TERMINATE
+                if (terminate || terminateAfterResponse) {
                     phase(
                         timeouts.gracefulTermination,
                         ProximityError.Transport("termination_timeout", "Session termination timed out"),
@@ -388,7 +461,7 @@ class MdocHolderProtocolEngine(
                 }
 
                 val nextBytes = phase(
-                    minOf(timeouts.inactivity, timeouts.request),
+                    timeouts.request,
                     ProximityError.Transport("inactivity_timeout", "The reader did not send another request in time"),
                 ) { receive(connection, budget) } ?: throw ProximityException(
                     ProximityError.Transport("peer_disconnected", "Reader disconnected before the next request")
@@ -452,7 +525,7 @@ class MdocHolderProtocolEngine(
             ProximityError.Transport("connection_timeout", "No reader connected in time"),
         ) { transportCoordinator.awaitWinner(prepared) }
         val firstBytes = phase(
-            establishmentTimeout(winner.prepared.kind),
+            establishmentTimeout(),
             ProximityError.Transport("establishment_timeout", "Session establishment timed out"),
         ) { receive(winner.connection, budget) } ?: throw ProximityException(
             ProximityError.Transport("peer_disconnected", "Reader disconnected before session establishment")
@@ -541,13 +614,13 @@ class MdocHolderProtocolEngine(
     }
 
     private fun validateAdvertisedFeatures(request: DeviceRequest) {
-        if (request.readerAuthAll != null && !capabilities.readerAuthAll) throw ProximityException(
+        if (request.readerAuthAll != null && !capabilities.selected(MdocProtocolFeature.READER_AUTH_ALL)) throw ProximityException(
             ProximityError.Protocol("reader_auth_all_not_advertised", "ReaderAuthAll was not advertised for this session")
         )
         val extended = request.deviceRequestInfo != null || request.docRequests.any {
             it.itemsRequest.value.requestInfo != null
         }
-        if (extended && !capabilities.extendedRequests) throw ProximityException(
+        if (extended && !capabilities.selected(MdocProtocolFeature.EXTENDED_REQUESTS)) throw ProximityException(
             ProximityError.Protocol("extended_request_not_advertised", "Extended request processing was not advertised")
         )
     }
@@ -571,8 +644,10 @@ class MdocHolderProtocolEngine(
 
     private fun limit(code: String, message: String) = ProximityException(ProximityError.Protocol(code, message))
 
-    private fun establishmentTimeout(kind: ProximityTransportKind): Duration =
-        if (kind == ProximityTransportKind.NFC) timeouts.nfcSessionEstablishment else timeouts.qrSessionEstablishment
+    private fun establishmentTimeout(): Duration = when (engagementContext.engagementMode) {
+        is MdocEngagementMode.Qr -> timeouts.qrSessionEstablishment
+        is MdocEngagementMode.Nfc -> timeouts.nfcSessionEstablishment
+    }
 
     private fun consentBinding(
         request: ImmutableBytes,

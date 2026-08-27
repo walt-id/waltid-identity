@@ -116,6 +116,15 @@ class RequestMatchingTest {
             )
         )
         assertEquals(listOf("first"), unique.selection.documents.map { it.credentialId })
+
+        val undefinedItems = items.copy(requestInfo = items.requestInfo!!.copy(uniqueDocSetRequired = null))
+        val undefined = assertIs<MdocRequestMatchResult.Matched>(
+            MdocRequestMatcher().match(
+                DeviceRequest(DeviceRequest.VERSION, listOf(DocRequest(ByteStringWrapper(undefinedItems)))),
+                candidates,
+            )
+        )
+        assertEquals(listOf("first"), undefined.selection.documents.map { it.credentialId })
     }
 
     @Test
