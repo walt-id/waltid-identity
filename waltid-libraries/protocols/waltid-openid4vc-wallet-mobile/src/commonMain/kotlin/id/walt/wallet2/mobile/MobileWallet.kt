@@ -3,6 +3,7 @@
 package id.walt.wallet2.mobile
 
 import id.walt.credentials.formats.MdocsCredential
+import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.utils.ShaUtils
 import id.walt.crypto2.keys.Key
@@ -224,6 +225,7 @@ public class MobileWallet internal constructor(
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
+    private val proximityTransportFactory: BleProximityTransportFactory? = null,
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
 ) {
@@ -257,6 +259,28 @@ public class MobileWallet internal constructor(
         readerTrustEvaluator = readerTrustEvaluator,
         registryRecords = ::registryRecords,
     )
+    private val proximityCoordinator = MobileWalletProximityCoordinator(
+        wallet = wallet,
+        transportFactory = proximityTransportFactory,
+    )
+
+    /**
+     * Checks the exact BLE roles selected by [configuration] without creating keys, UUIDs, listeners,
+     * scanners, or advertisers.
+     */
+    public suspend fun proximityPresentationCapabilities(
+        configuration: MobileWalletProximityConfiguration = MobileWalletProximityConfiguration(),
+    ): MobileWalletProximityCapabilities = proximityCoordinator.capabilities(configuration)
+
+    /**
+     * Starts one single-use in-person presentation session.
+     *
+     * Only one proximity session may be active for this wallet. A second start fails before any
+     * transaction material or radio resource is created.
+     */
+    public suspend fun startProximityPresentation(
+        configuration: MobileWalletProximityConfiguration = MobileWalletProximityConfiguration(),
+    ): MobileWalletProximitySession = proximityCoordinator.start(configuration)
 
     private val issuanceSessions = WalletIssuanceSessionService(
         wallet = wallet,

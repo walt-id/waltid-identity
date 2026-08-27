@@ -21,6 +21,7 @@ import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -154,6 +155,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
     clientIdTrustConfiguration: ClientIdTrustConfiguration,
     managedDatabaseKeyProvider: DatabaseEncryptionKeyProvider,
     platformKeyProvider: PlatformManagedKeyProvider,
+    proximityTransportFactory: BleProximityTransportFactory,
     openEncryptedDriver: (
         databaseName: String,
         encryptionKey: DatabaseEncryptionKey,
@@ -180,6 +182,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         db = db,
         keyProvider = platformKeyProvider,
+        proximityTransportFactory = proximityTransportFactory,
         deleteLocalPersistence = {
             runCatching { driver.close() }
             deleteDatabase(databaseName)
@@ -193,6 +196,7 @@ internal fun createSqlDelightMobileWallet(
     clientIdTrustConfiguration: ClientIdTrustConfiguration,
     db: WalletPersistenceDatabase,
     keyProvider: PlatformManagedKeyProvider,
+    proximityTransportFactory: BleProximityTransportFactory? = null,
     didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
 ): MobileWallet {
@@ -241,6 +245,7 @@ internal fun createSqlDelightMobileWallet(
         credentialRegistry = config.credentialRegistry,
         onDigitalCredentialRegistryChanged = config.onDigitalCredentialRegistryChanged,
         readerTrustEvaluator = config.readerTrustEvaluator,
+        proximityTransportFactory = proximityTransportFactory,
         deleteLocalPersistence = deleteLocalPersistence,
     )
 }
