@@ -3,7 +3,6 @@
 package id.walt.mdoc.crypto
 
 import id.walt.cose.*
-import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
@@ -14,7 +13,6 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.encoding.MdocCbor
 import id.walt.mdoc.encoding.startsWith
 import id.walt.mdoc.objects.SessionTranscript
-import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
@@ -22,7 +20,6 @@ import kotlinx.serialization.encodeToByteArray
 import org.kotlincrypto.hash.sha2.SHA256
 import org.kotlincrypto.hash.sha2.SHA384
 import org.kotlincrypto.hash.sha2.SHA512
-import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
 import id.walt.crypto2.keys.Key as Crypto2Key
 
 /**
@@ -30,7 +27,6 @@ import id.walt.crypto2.keys.Key as Crypto2Key
  */
 object MdocCrypto {
 
-    private val log = KotlinLogging.logger { }
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     val mdocDigests = listOf(
@@ -59,23 +55,6 @@ object MdocCrypto {
      * @param sDevicePublicKey The public key from the MSO to verify the signature.
      * @return True if the signature is valid, false otherwise.
      */
-    @Deprecated("Use the crypto2 Key overload with an explicit algorithm allowlist")
-    suspend fun verifyDeviceSignature(
-        payloadToVerify: ByteArray,
-        deviceSignature: CoseSign1,
-        sDevicePublicKey: Key
-    ): Boolean {
-        log.trace { "-- Verifying device signature --" }
-        log.trace { "> Payload to verify (hex): ${payloadToVerify.toHexString()}" }
-        log.trace { "> Device signature: $deviceSignature" }
-        val tmpJwk = sDevicePublicKey.exportJWK()
-        log.trace { "> sDevicePublicKey: $sDevicePublicKey: $tmpJwk" }
-        return deviceSignature.verifyDetached(
-            verifier = sDevicePublicKey.toCoseVerifier(),
-            detachedPayload = payloadToVerify
-        )
-    }
-
     suspend fun verifyDeviceSignature(
         payloadToVerify: ByteArray,
         deviceSignature: CoseSign1,
@@ -101,70 +80,6 @@ object MdocCrypto {
         return agreement.generateSharedSecret(other, algorithm).toByteArray()
     }
 
-    // stub as waltid-crypto does not yet do ECDH
-    @Deprecated("Use the crypto2 Key.getSharedSecret overload")
-    fun Key.getSharedSecret(other: Key): ByteArray {
-        TODO("")
-        /*
-        Java impl:
-
-        val keyAgreement = KeyAgreement.getInstance("ECDH")
-        keyAgreement.init(eReaderPrivateKey.toJavaPrivateKey()) // Your private key
-        keyAgreement.doPhase(sDevicePublicKey.toJavaPublicKey(), true) // Their public key
-        val sharedSecret: ByteArray = keyAgreement.generateSecret()
-
-        JavaScript:
-
-        const sharedSecret = await crypto.subtle.deriveBits(
-          { name: "ECDH", public: theirPublicKey },
-          yourPrivateKey,
-          256 // The number of bits to derive
-        );
-        // Result is an ArrayBuffer, which is converted to ByteArray
-
-        Swift/CryptoKit:
-        // Example in Swift
-        let sharedSecret = try yourPrivateKey.sharedSecretFromKeyAgreement(
-            with: theirPublicKey
-        )
-        // The result is a SharedSecret object -> get raw bytes from that
-        */
-    }
-
-    /**
-     * Verifies the device's MAC (`COSE_Mac0`).
-     * This involves deriving the shared key and then verifying the HMAC tag.
-     *
-     * @param deviceAuthBytes The data that was MAC'd.
-     * @param deviceMac The COSE_Mac0 object containing the tag.
-     * @param sessionTranscript The session transcript.
-     * @param eReaderPrivateKey The ephemeral private key of the verifier.
-     * @param sDevicePublicKey The public key of the device from the MSO.
-     * @return True if the MAC is valid, false otherwise.
-     */
-    @Deprecated("Use the crypto2 Key overload")
-    suspend fun verifyDeviceMac(
-        deviceAuthBytes: ByteArray,
-        deviceMac: CoseMac0,
-        sessionTranscript: ByteArray,
-        eReaderPrivateKey: Key,
-        sDevicePublicKey: Key
-    ): Boolean {
-        // 1. Perform ECDH to get shared secret
-        val sharedSecret = eReaderPrivateKey.getSharedSecret(sDevicePublicKey)
-
-        // 2. Perform HKDF to derive EMacKey
-        val salt = SHA256().digest(sessionTranscript)
-        val info = "EMacKey".encodeToByteArray()
-        val eMacKey = performHkdf(sharedSecret, salt, info, 32)
-
-        // 3. Compute HMAC and verify
-        val hmac = HmacSHA256(eMacKey)
-        val computedTag = hmac.doFinal(deviceAuthBytes)
-
-        return computedTag.contentEquals(deviceMac.tag)
-    }
-
     suspend fun verifyDeviceMac(
         deviceAuthBytes: ByteArray,
         deviceMac: CoseMac0,
@@ -172,10 +87,26 @@ object MdocCrypto {
         eReaderPrivateKey: Crypto2Key,
         devicePublicKey: EncodedKey,
     ): Boolean {
+        require(deviceMac.protected.isNotEmpty()) { "DeviceMac algorithm must be protected" }
+        val protectedHeaders = coseCompliantCbor.decodeFromByteArray<CoseHeaders>(deviceMac.protected)
+        require(protectedHeaders.algorithm == Cose.Algorithm.HMAC_256) { "DeviceMac must use HMAC 256/256" }
+        require(deviceMac.unprotected.algorithm == null) { "DeviceMac algorithm cannot be unprotected" }
         val sharedSecret = eReaderPrivateKey.getSharedSecret(devicePublicKey)
         val salt = SHA256().digest(sessionTranscript)
-        val eMacKey = performHkdf(sharedSecret, salt, "EMacKey".encodeToByteArray(), 32)
-        return HmacSHA256(eMacKey).doFinal(deviceAuthBytes).contentEquals(deviceMac.tag)
+        val eMacKey = try {
+            MdocKdf.deriveSha256(sharedSecret, salt, "EMacKey".encodeToByteArray(), 32)
+        } finally {
+            sharedSecret.fill(0)
+            salt.fill(0)
+        }
+        return try {
+            deviceMac.verifyDetached(
+                CoseHmacKey(eMacKey).toCoseMacVerifier(Cose.Algorithm.HMAC_256),
+                deviceAuthBytes,
+            )
+        } finally {
+            eMacKey.fill(0)
+        }
     }
 
     suspend fun verifyDeviceMac(
@@ -193,20 +124,6 @@ object MdocCrypto {
     )
 
     // --- Helper Functions ---
-
-    /**
-     * A simplified HKDF-SHA256 implementation based on RFC 5869.
-     * This is a stub for what would ideally be a full-featured KMP crypto library function.
-     */
-    private fun performHkdf(ikm: ByteArray, salt: ByteArray, info: ByteArray, length: Int): ByteArray {
-        val hmac = HmacSHA256(salt)
-        val prk = hmac.doFinal(ikm) // Extract
-
-        val hmacPrk = HmacSHA256(prk)
-        val t = hmacPrk.doFinal(info + 0x01.toByte()) // Expand
-        return t.take(length).toByteArray()
-    }
-
 
     /**
      * Wraps a ByteArray in a CBOR tag and bytestring structure (`#6.24(bstr)`).
