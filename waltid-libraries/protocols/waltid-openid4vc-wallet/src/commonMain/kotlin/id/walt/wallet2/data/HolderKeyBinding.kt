@@ -125,6 +125,7 @@ suspend fun Wallet.resolveHolderKey(
     credential: StoredCredential,
     requiredUsages: Set<KeyUsage> = setOf(KeyUsage.SIGN),
 ): ResolvedHolderKey {
+    require(requiredUsages.isNotEmpty()) { "At least one holder-key usage is required" }
     val mdoc = credential.credential as? MdocsCredential
         ?: throw bindingError(
             credential,
@@ -371,7 +372,7 @@ private suspend fun Wallet.resolveReferencedCandidate(
         }
     } catch (cause: CancellationException) {
         throw cause
-    } catch (cause: IllegalArgumentException) {
+    } catch (cause: WalletKeyUsageUnsupportedException) {
         throw bindingError(
             credential,
             HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,

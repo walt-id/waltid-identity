@@ -36,6 +36,7 @@ import io.ktor.http.Url
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.single
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encodeToString
@@ -44,6 +45,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class WalletIssuanceHandlerHolderKeyBindingTest {
 
@@ -85,6 +88,27 @@ class WalletIssuanceHandlerHolderKeyBindingTest {
         ).single()
 
         assertEquals(HolderKeyBindingOrigin.ISSUANCE, stored.holderKeyBinding?.origin)
+    }
+
+    @Test
+    fun `isolated mdoc storage rejects a missing proof key relationship`() = runTest {
+        val fixture = fixture()
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            WalletIssuanceHandler.fetchCredential(
+                wallet = fixture.wallet,
+                request = FetchCredentialRequest(
+                    credentialEndpoint = Url("https://issuer.example/credential"),
+                    accessToken = "access-token",
+                    credentialConfigurationId = "mdl",
+                    storeInWallet = true,
+                ),
+                httpClient = credentialClient(fixture.mdoc),
+            )
+        }
+
+        assertTrue(failure.message.orEmpty().contains("Exact issuance holder-key material"))
+        assertTrue(fixture.credentialStore.listCredentials().toList().isEmpty())
     }
 
     private suspend fun fixture(): Fixture {

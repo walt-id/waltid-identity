@@ -17,6 +17,7 @@ import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletKeyStoreEntry
+import id.walt.wallet2.data.WalletKeyUsageUnsupportedException
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
@@ -56,7 +57,9 @@ public class SqlDelightKeyStore(
         queries.selectByKeyId(keyId).executeAsOneOrNull()?.let { ref ->
             restoreStoredKey(decodeStoredKey(ref.key_id, ref.stored_key)).also { key ->
                 key?.let { restored ->
-                    require(usages.all(restored.usages::contains)) { "Mobile key does not permit requested usages" }
+                    if (!usages.all(restored.usages::contains)) {
+                        throw WalletKeyUsageUnsupportedException("Mobile key does not permit requested usages")
+                    }
                 }
             }
         }

@@ -1,6 +1,7 @@
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.selectJwsAlgorithm
@@ -1485,9 +1486,17 @@ object WalletIssuanceHandler {
             addedAt = Clock.System.now(),
             metadata = metadata,
         )
-        val bound = keyMaterial?.let {
-            withVerifiedHolderKeyBinding(stored, it, HolderKeyBindingOrigin.ISSUANCE)
-        } ?: withRequiredUniqueHolderKeyBinding(stored, HolderKeyBindingOrigin.ISSUANCE)
+        val bound = if (stored.credential is MdocsCredential) {
+            withVerifiedHolderKeyBinding(
+                credential = stored,
+                keyMaterial = requireNotNull(keyMaterial) {
+                    "Exact issuance holder-key material is required when storing an mdoc"
+                },
+                origin = HolderKeyBindingOrigin.ISSUANCE,
+            )
+        } else {
+            stored
+        }
         return bound.also { addCredential(it) }
     }
 

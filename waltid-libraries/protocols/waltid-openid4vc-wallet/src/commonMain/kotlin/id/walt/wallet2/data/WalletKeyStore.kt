@@ -7,6 +7,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
 
+/** A provider understood the key reference but cannot grant the requested operation. */
+class WalletKeyUsageUnsupportedException(message: String) : IllegalArgumentException(message)
+
 /**
  * Storage contract for cryptographic keys held by a wallet.
  */
@@ -14,6 +17,11 @@ interface WalletKeyStore {
 
     suspend fun getKey(keyId: String): Key?
 
+    /**
+     * Resolves operational key material with all [usages]. Implementations report a known usage
+     * rejection with [WalletKeyUsageUnsupportedException]; provider/configuration failures remain
+     * distinct exceptions.
+     */
     suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage> = emptySet()): Crypto2Key? = null
 
     /**

@@ -5,6 +5,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.data.WalletKeyUsageUnsupportedException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 
@@ -23,7 +24,9 @@ class InMemoryKeyStore : WalletKeyStore {
 
     override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): Crypto2Key? =
         crypto2Keys[keyId]?.also { key ->
-            require(usages.all(key.usages::contains)) { "Wallet crypto2 key does not permit requested usages" }
+            if (!usages.all(key.usages::contains)) {
+                throw WalletKeyUsageUnsupportedException("Wallet crypto2 key does not permit requested usages")
+            }
         }
 
     override suspend fun listKeys(): Flow<WalletKeyInfo> =

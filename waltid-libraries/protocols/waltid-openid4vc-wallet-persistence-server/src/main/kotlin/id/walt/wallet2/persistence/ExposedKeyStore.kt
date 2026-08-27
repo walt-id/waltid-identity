@@ -14,6 +14,7 @@ import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletKeyStoreEntry
+import id.walt.wallet2.data.WalletKeyUsageUnsupportedException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -59,7 +60,9 @@ class ExposedKeyStore(
         suspendTransaction(db) {
             val row = selectKey(keyId) ?: return@suspendTransaction null
             val crypto2Key = resolveCrypto2Key(row)?.also { key ->
-                require(usages.all(key.usages::contains)) { "Wallet crypto2 key does not permit requested usages" }
+                if (!usages.all(key.usages::contains)) {
+                    throw WalletKeyUsageUnsupportedException("Wallet crypto2 key does not permit requested usages")
+                }
             }
             val legacyKey = resolveLegacyKey(row)
             if (legacyKey != null || crypto2Key != null) WalletKeyStoreEntry(keyId, legacyKey, crypto2Key) else null

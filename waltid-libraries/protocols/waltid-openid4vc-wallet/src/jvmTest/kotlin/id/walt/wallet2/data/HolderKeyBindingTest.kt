@@ -447,6 +447,24 @@ class HolderKeyBindingTest {
         assertEquals(HolderKeyBindingErrorCode.KEY_PROVIDER_UNAVAILABLE, providerFailure.code)
     }
 
+    @Test
+    fun `provider argument failures are not mislabeled as unsupported usage`() = runTest {
+        val holderKey = signingKey("holder")
+        val healthyStore = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
+        val bound = Wallet(id = "healthy", keyStores = listOf(healthyStore))
+            .withRequiredUniqueHolderKeyBinding(
+                mdocCredential(holderKey),
+                HolderKeyBindingOrigin.IMPORT,
+            )
+
+        val failure = assertFailsWith<HolderKeyBindingException> {
+            Wallet(id = "corrupt", keyStores = listOf(CorruptOperationalKeyStore()))
+                .resolveHolderKey(bound)
+        }
+
+        assertEquals(HolderKeyBindingErrorCode.KEY_PROVIDER_UNAVAILABLE, failure.code)
+    }
+
     private suspend fun signingKey(id: String) = key(id, setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
 
     private suspend fun verifyOnlyKey(id: String): id.walt.crypto2.keys.Key {
@@ -531,6 +549,16 @@ class HolderKeyBindingTest {
         override suspend fun removeKey(keyId: String): Boolean = false
     }
 
+    private class CorruptOperationalKeyStore : WalletKeyStore {
+        override suspend fun getKey(keyId: String) = null
+        override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): id.walt.crypto2.keys.Key =
+            throw IllegalArgumentException("stored provider descriptor is corrupt")
+
+        override suspend fun listKeys(): Flow<WalletKeyInfo> = emptyFlow()
+        override suspend fun addKey(key: id.walt.crypto.keys.Key): String = error("not used")
+        override suspend fun removeKey(keyId: String): Boolean = false
+    }
+
     private class UsageRequiringKeyStore(
         private val key: id.walt.crypto2.keys.Key,
     ) : WalletKeyStore {
@@ -541,8 +569,12 @@ class HolderKeyBindingTest {
 
         override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): id.walt.crypto2.keys.Key? {
             requestedUsages += usages
-            require(usages.isNotEmpty()) { "key usages must not be empty" }
-            return key.takeIf { keyId == key.id.value && usages.all(key.usages::contains) }
+            if (usages.isEmpty()) throw WalletKeyUsageUnsupportedException("key usages must not be empty")
+            if (keyId != key.id.value) return null
+            if (!usages.all(key.usages::contains)) {
+                throw WalletKeyUsageUnsupportedException("key does not permit requested usages")
+            }
+            return key
         }
 
         override suspend fun getPublicCrypto2Key(keyId: String): id.walt.crypto2.keys.Key? {
