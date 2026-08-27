@@ -166,6 +166,38 @@ final class WalletE2EUI {
         return false
     }
 
+    /// Compose iOS can swallow the first Preview activation after a deep-linked URL field.
+    /// Retry once with a coordinate tap, and treat the review surface as success even if the
+    /// status banner has already dismissed.
+    func previewPresentation(timeout: TimeInterval) -> String? {
+        let prefixes = [
+            "Review presentation request",
+            "Preview failed",
+            "Present failed",
+            "Receive failed",
+            "Bootstrap failed",
+        ]
+        tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
+        if presentationReviewVisible() {
+            return latestStatus(prefixes: prefixes) ?? "Review presentation request"
+        }
+        if let status = waitForStatus(prefixes: prefixes, timeout: min(timeout, 8)) {
+            return status
+        }
+        tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview", useCoordinateTap: true)
+        if let status = waitForStatus(prefixes: prefixes, timeout: timeout) {
+            return status
+        }
+        if presentationReviewVisible() {
+            return "Review presentation request"
+        }
+        return nil
+    }
+
+    func presentationReviewVisible() -> Bool {
+        app.descendants(matching: .any)["wallet.presentationReview"].exists
+    }
+
     func tapButton(identifier: String, fallbackLabel: String, useCoordinateTap: Bool = false) {
         let targetButton = button(identifier: identifier, fallbackLabel: fallbackLabel)
         XCTAssertTrue(targetButton.waitForExistence(timeout: 20), "Button not found: \(identifier)")

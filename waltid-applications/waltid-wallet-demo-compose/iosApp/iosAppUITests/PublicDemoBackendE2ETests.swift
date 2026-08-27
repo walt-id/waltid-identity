@@ -84,12 +84,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             timeout: 10
         )
         XCTAssertTrue(presentationURLApplied, "Presentation request URL did not appear in UI after deep link")
-        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
-
-        let previewStatus = ui.waitForStatus(
-            prefixes: ["Review presentation request", "Preview failed", "Present failed", "Receive failed", "Bootstrap failed"],
-            timeout: credentialOperationTimeout
-        )
+        let previewStatus = ui.previewPresentation(timeout: credentialOperationTimeout)
         XCTAssertEqual(previewStatus, "Review presentation request", "Presentation preview did not load, status: \(previewStatus ?? "nil")")
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share", useCoordinateTap: true)
@@ -245,12 +240,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             timeout: 10
         )
         XCTAssertTrue(presentationURLApplied, "Presentation request URL did not appear in UI after deep link")
-        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
-
-        let previewStatus = ui.waitForStatus(
-            prefixes: ["Review presentation request", "Preview failed", "Present failed", "Receive failed", "Bootstrap failed"],
-            timeout: credentialOperationTimeout
-        )
+        let previewStatus = ui.previewPresentation(timeout: credentialOperationTimeout)
         XCTAssertEqual(previewStatus, "Review presentation request", "Presentation preview did not load, status: \(previewStatus ?? "nil")")
 
         XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
