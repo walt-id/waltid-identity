@@ -1459,6 +1459,7 @@ class MobileWalletTest {
         // request keeps the original reader's valid signature while changing what was requested.
         assertRejected(
             signedRequest.copy(
+                version = DeviceRequest.VERSION_WITH_SIGNING,
                 deviceRequestInfo = ByteStringWrapper(
                     DeviceRequestInfo(
                         useCases = listOf(UseCase(mandatory = true, documentSets = listOf(listOf(0u)))),
