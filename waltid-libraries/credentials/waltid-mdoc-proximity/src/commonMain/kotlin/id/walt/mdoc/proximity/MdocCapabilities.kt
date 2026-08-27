@@ -9,7 +9,10 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.MontgomeryCurve
 import id.walt.mdoc.objects.engagement.DeviceEngagementCapabilities
 
-/** Versioned interoperability profiles whose rules are modeled by the proximity capability registry. */
+/**
+ * Versioned interoperability profile boundaries known to the proximity capability registry.
+ * Support for a profile does not by itself constitute release qualification or a conformance claim.
+ */
 enum class MdocProximityProfile(val id: String) {
     ISO_18013_5_2021("iso-18013-5:2021"),
     ISO_18013_5_ED2_DIS_2026("iso-18013-5:ed2-dis-2026"),
@@ -63,13 +66,16 @@ class MdocSessionCapabilities private constructor(
 
     fun selected(feature: MdocProtocolFeature): Boolean = features.getValue(feature).sessionSelected
 
-    internal fun toDeviceEngagementCapabilities(): DeviceEngagementCapabilities? =
-        if (profile == MdocProximityProfile.ISO_18013_5_2021) null
-        else DeviceEngagementCapabilities(
-            handoverSessionEstablishment = selected(MdocProtocolFeature.NEGOTIATED_HANDOVER_SESSION_ESTABLISHMENT),
+    internal fun toDeviceEngagementCapabilities(): DeviceEngagementCapabilities? {
+        if (features.values.none { it.sessionSelected }) return null
+        return DeviceEngagementCapabilities(
+            handoverSessionEstablishment = selected(
+                MdocProtocolFeature.NEGOTIATED_HANDOVER_SESSION_ESTABLISHMENT
+            ),
             readerAuthAll = selected(MdocProtocolFeature.READER_AUTH_ALL),
             extendedRequests = selected(MdocProtocolFeature.EXTENDED_REQUESTS),
         )
+    }
 
     companion object {
         private val implementedFeatures = MdocProtocolFeature.entries.toSet()
