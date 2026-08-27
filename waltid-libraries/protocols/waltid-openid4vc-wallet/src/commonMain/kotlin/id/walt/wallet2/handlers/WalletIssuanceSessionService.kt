@@ -1343,10 +1343,9 @@ class WalletIssuanceSessionService(
             addedAt = Clock.System.now(),
             metadata = metadata,
         )
-        return withVerifiedHolderKeyBinding(
+        return withVerifiedIssuanceHolderKeyBinding(
             credential = stored,
             keyMaterial = keyMaterial,
-            origin = HolderKeyBindingOrigin.ISSUANCE,
         ).also { addCredential(it) }
     }
 

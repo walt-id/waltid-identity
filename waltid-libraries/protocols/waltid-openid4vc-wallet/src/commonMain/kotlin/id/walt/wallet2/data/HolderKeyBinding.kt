@@ -176,13 +176,13 @@ suspend fun Wallet.resolveHolderKey(
 )
 
 /** Adds a verified issuance binding when [keyMaterial] is durably resolvable by this wallet. */
-suspend fun Wallet.withVerifiedHolderKeyBinding(
+suspend fun Wallet.withVerifiedIssuanceHolderKeyBinding(
     credential: StoredCredential,
     keyMaterial: WalletKeyStoreEntry,
-    origin: HolderKeyBindingOrigin,
     createdAt: Instant = Clock.System.now(),
 ): StoredCredential {
-    val mdoc = credential.credential as? MdocsCredential ?: return credential
+    val mdoc = credential.credential as? MdocsCredential
+        ?: return credential.copy(holderKeyBinding = null)
     val credentialThumbprint = try {
         mdoc.holderKeyThumbprint()
     } catch (cause: CancellationException) {
@@ -247,14 +247,20 @@ suspend fun Wallet.withVerifiedHolderKeyBinding(
             }
         }
     candidate.material.requireUsages(credential, setOf(KeyUsage.SIGN))
-    return credential.copy(holderKeyBinding = candidate.binding(origin, createdAt))
+    return credential.copy(holderKeyBinding = candidate.binding(HolderKeyBindingOrigin.ISSUANCE, createdAt))
 }
 
-/** Binds an imported mdoc only when one unambiguous matching local signing key exists. */
+/**
+ * Binds an imported mdoc only when one unambiguous matching local signing key exists.
+ *
+ * Any incoming holder-key binding is discarded first because bindings belong to the importing
+ * wallet's provider namespace. An mdoc with no unique usable local key remains explicitly unbound.
+ */
 suspend fun Wallet.withImportedHolderKeyBinding(credential: StoredCredential): StoredCredential {
-    if (credential.credential !is MdocsCredential) return credential
+    val unbound = credential.copy(holderKeyBinding = null)
+    if (unbound.credential !is MdocsCredential) return unbound
     return try {
-        withRequiredUniqueHolderKeyBinding(credential, HolderKeyBindingOrigin.IMPORT)
+        withRequiredImportedHolderKeyBinding(unbound)
     } catch (cause: CancellationException) {
         throw cause
     } catch (cause: HolderKeyBindingException) {
@@ -262,18 +268,15 @@ suspend fun Wallet.withImportedHolderKeyBinding(credential: StoredCredential): S
             HolderKeyBindingErrorCode.NO_MATCHING_LOCAL_KEY,
             HolderKeyBindingErrorCode.MULTIPLE_MATCHING_LOCAL_KEYS,
             HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
-            -> credential
+            -> unbound
 
             else -> throw cause
         }
     }
 }
 
-/** Adds a binding only when one unambiguous matching local signing key exists. */
-suspend fun Wallet.withRequiredUniqueHolderKeyBinding(
-    credential: StoredCredential,
-    origin: HolderKeyBindingOrigin,
-): StoredCredential {
+/** Adds an import binding or throws unless exactly one usable local signing key matches. */
+internal suspend fun Wallet.withRequiredImportedHolderKeyBinding(credential: StoredCredential): StoredCredential {
     val mdoc = credential.credential as? MdocsCredential ?: return credential
     val thumbprint = try {
         mdoc.holderKeyThumbprint()
@@ -308,7 +311,7 @@ suspend fun Wallet.withRequiredUniqueHolderKeyBinding(
         )
     }
     candidate.material.requireUsages(credential, setOf(KeyUsage.SIGN))
-    return credential.copy(holderKeyBinding = candidate.binding(origin))
+    return credential.copy(holderKeyBinding = candidate.binding(HolderKeyBindingOrigin.IMPORT))
 }
 
 private fun validateBindingContract(

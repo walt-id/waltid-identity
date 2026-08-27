@@ -55,7 +55,6 @@ import id.walt.x509.GenericX509CertificateBuilder
 import id.walt.x509.GenericX509CertificateProfileData
 import id.walt.x509.X509DistinguishedName
 import id.walt.x509.X509KeyUsage
-import id.walt.wallet2.data.HolderKeyBindingOrigin
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
@@ -63,7 +62,7 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletSessionEvent
-import id.walt.wallet2.data.withRequiredUniqueHolderKeyBinding
+import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
@@ -1925,7 +1924,7 @@ class MobileWalletTest {
             label = "mDL",
         )
         return Wallet(id = "annex-c-binding", keyStores = listOf(keyStore))
-            .withRequiredUniqueHolderKeyBinding(credential, HolderKeyBindingOrigin.IMPORT)
+            .withImportedHolderKeyBinding(credential)
     }
 
     /**

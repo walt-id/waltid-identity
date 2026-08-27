@@ -1487,12 +1487,11 @@ object WalletIssuanceHandler {
             metadata = metadata,
         )
         val bound = if (stored.credential is MdocsCredential) {
-            withVerifiedHolderKeyBinding(
+            withVerifiedIssuanceHolderKeyBinding(
                 credential = stored,
                 keyMaterial = requireNotNull(keyMaterial) {
                     "Exact issuance holder-key material is required when storing an mdoc"
                 },
-                origin = HolderKeyBindingOrigin.ISSUANCE,
             )
         } else {
             stored
