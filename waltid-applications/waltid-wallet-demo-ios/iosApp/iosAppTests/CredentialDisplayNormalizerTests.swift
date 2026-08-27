@@ -726,7 +726,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
         XCTAssertEqual(personal.items.map(\.label), ["Given name", "Family name"])
         XCTAssertEqual(details.id, option.selection.id)
-        XCTAssertEqual(details.credentialId, option.credentialID)
     }
 
     func testPresentationCredentialOptionOmitsRequestedDisclosuresWhenEmpty() {

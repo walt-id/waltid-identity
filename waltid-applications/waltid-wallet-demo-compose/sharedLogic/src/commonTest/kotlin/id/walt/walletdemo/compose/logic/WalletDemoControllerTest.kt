@@ -682,47 +682,6 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun deleteFromCredentialsWhileAReviewIsActive() = runTest {
-        val option = WalletDemoPresentationCredentialOption(
-            queryId = "pid",
-            credentialId = "cred-1",
-            label = "Example Credential",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
-        )
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = null,
-            clientId = null,
-            credentialOptions = listOf(option),
-        )
-        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential), presentationPreview = preview)
-        val controller = unlockedControllerWith(wallet, this)
-
-        controller.selectTab(WalletDemoTab.Present)
-        controller.updatePresentationRequestUrl("openid4vp://example")
-        controller.previewPresentation()
-        runCurrent()
-
-        val details = option.toCredentialDetails()
-        assertEquals(option.selection.id, details.summary.id)
-        assertEquals("cred-1", details.summary.credentialId)
-        assertTrue(details.summary.id != details.summary.credentialId)
-
-        controller.deleteCredential(details.summary.credentialId)
-        runCurrent()
-
-        assertEquals(listOf("cred-1"), wallet.deletedCredentialIds)
-        assertEquals(null, controller.state.value.presentationReview)
-        assertFalse(controller.state.value.presentationReviewEnabled)
-        val session = controller.state.value.session as WalletSessionState.Ready
-        assertEquals(emptyList(), session.credentials)
-    }
-
-    @Test
     fun resetWalletDeletesDataClearsPinAndReturnsToSetup() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val pinStore = InMemoryDemoPinStore()

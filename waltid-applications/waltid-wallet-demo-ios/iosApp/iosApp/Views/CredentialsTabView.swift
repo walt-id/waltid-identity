@@ -55,11 +55,7 @@ struct CredentialsTabView: View {
                         }
 
                         if showDetailsBody, let expanded {
-                            CredentialDetailsView(
-                                details: expanded,
-                                onCardTap: { closeDetails() },
-                                showCard: false
-                            )
+                            CredentialDetailsView(details: expanded)
                             .transition(.opacity)
                         }
                     }

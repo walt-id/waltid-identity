@@ -143,8 +143,6 @@ internal fun CredentialsTab(
                     expanded?.let { selected ->
                         CredentialDetailsContent(
                             details = selected,
-                            showCard = false,
-                            onCardClick = { requestClose() },
                         )
                     }
                 }
