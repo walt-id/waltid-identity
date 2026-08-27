@@ -19,13 +19,17 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.mso.KeyAuthorization
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 internal suspend fun CryptoRuntime.generateMdocTestKey(id: String, usages: Set<KeyUsage>): Key =
     generateSoftwareKey(GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), usages))
 
-internal suspend fun CryptoRuntime.issueMdocTestDocument(holderKey: Key): Document {
+internal suspend fun CryptoRuntime.issueMdocTestDocument(
+    holderKey: Key,
+    keyAuthorizations: KeyAuthorization? = null,
+): Document {
     val issuerKey = generateMdocTestKey(
         "issuer-${holderKey.id.value}",
         setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
@@ -46,6 +50,7 @@ internal suspend fun CryptoRuntime.issueMdocTestDocument(holderKey: Key): Docume
                 "org.example" to JsonObject(mapOf("given_name" to JsonPrimitive("Jane")))
             )
         ),
+        keyAuthorizations = keyAuthorizations,
     )
     return Document("org.example.mdoc", issuerSigned)
 }
