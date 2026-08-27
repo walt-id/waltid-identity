@@ -62,6 +62,15 @@ data class MdocEngagement(
 )
 
 class MdocDeviceEngagementFactory {
+    /**
+     * Encodes the exact public COSE_Key bytes embedded in Device Engagement as EDeviceKeyBytes.
+     *
+     * Transport bindings such as BLE Ident derivation must use this same encoding instead of
+     * independently exporting or re-encoding the ephemeral session key.
+     */
+    suspend fun encodeEDeviceKeyBytes(eDeviceKey: Key): ImmutableBytes =
+        ImmutableBytes.of(encodePublicDeviceKey(eDeviceKey).encoded)
+
     suspend fun create(
         eDeviceKey: Key,
         methods: List<DeviceRetrievalMethod>,
@@ -70,14 +79,10 @@ class MdocDeviceEngagementFactory {
     ): MdocEngagement {
         require(methods.isNotEmpty()) { "At least one retrieval method is required" }
         require(capabilities.profile == context.profile) { "Capability profile must match the engagement profile" }
-        MdocSessionKeyValidator.requireSupportedLocalKey(eDeviceKey)
         require(eDeviceKey.spec.toMdocSessionCurve() == capabilities.selectedCurve) {
             "Selected session curve does not match the ephemeral device key"
         }
-        val publicJwk = eDeviceKey.capabilities.publicKeyExporter?.exportPublicKey() as? EncodedKey.Jwk
-            ?: throw IllegalArgumentException("Ephemeral device key cannot export a public JWK")
-        val publicCose = publicJwk.toCoseKey()
-        val encodedCose = coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicCose)
+        val (publicCose, encodedCose) = encodePublicDeviceKey(eDeviceKey)
         val engagementCapabilities = capabilities.toDeviceEngagementCapabilities()
         val usesEdition2Fields = engagementCapabilities != null
         val engagement = DeviceEngagement(
@@ -96,6 +101,19 @@ class MdocDeviceEngagementFactory {
         } else null
         return MdocEngagement(exact, qrPayload)
     }
+
+    private suspend fun encodePublicDeviceKey(eDeviceKey: Key): EncodedDeviceKey {
+        MdocSessionKeyValidator.requireSupportedLocalKey(eDeviceKey)
+        val publicJwk = eDeviceKey.capabilities.publicKeyExporter?.exportPublicKey() as? EncodedKey.Jwk
+            ?: throw IllegalArgumentException("Ephemeral device key cannot export a public JWK")
+        val publicCose = publicJwk.toCoseKey()
+        return EncodedDeviceKey(
+            publicCose,
+            coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicCose),
+        )
+    }
+
+    private data class EncodedDeviceKey(val coseKey: CoseKey, val encoded: ByteArray)
 }
 
 data class PreviewElement(
@@ -224,6 +242,12 @@ sealed interface MdocHolderSessionState {
     data class SendingResponse(val exchange: Int) : MdocHolderSessionState {
         init { require(exchange > 0) }
     }
+    data class AwaitingNextRequest(val completedExchanges: Int) : MdocHolderSessionState {
+        init { require(completedExchanges > 0) }
+    }
+    data class Terminating(val exchange: Int) : MdocHolderSessionState {
+        init { require(exchange > 0) }
+    }
     data class Declined(val exchange: Int) : MdocHolderSessionState {
         init { require(exchange > 0) }
     }
@@ -243,6 +267,7 @@ val MdocHolderSessionState.legalActions: Set<MdocHolderAction>
         is MdocHolderSessionState.Declined,
         is MdocHolderSessionState.Completed,
         is MdocHolderSessionState.Failed,
+        is MdocHolderSessionState.Terminating,
         MdocHolderSessionState.Cancelled -> emptySet()
         is MdocHolderSessionState.ReviewRequired -> setOf(
             MdocHolderAction.APPROVE,
@@ -253,6 +278,7 @@ val MdocHolderSessionState.legalActions: Set<MdocHolderAction>
         is MdocHolderSessionState.EngagementReady,
         is MdocHolderSessionState.Connecting,
         is MdocHolderSessionState.AwaitingRequest,
+        is MdocHolderSessionState.AwaitingNextRequest,
         is MdocHolderSessionState.SendingResponse -> setOf(MdocHolderAction.CANCEL)
     }
 
@@ -353,19 +379,27 @@ class MdocHolderProtocolEngine(
                 kinds,
                 prepared.unavailable,
             )
-            mutableState.value = MdocHolderSessionState.Connecting(
-                engagement.qrPayload,
-                kinds,
-                prepared.unavailable,
-            )
-
             val (winner, firstBytes) = if (engagementContext.engagementMode is MdocEngagementMode.Qr) {
                 phase(
                     timeouts.qrEngagementLifetime,
                     ProximityError.Protocol("engagement_timeout", "The QR engagement expired before session establishment"),
-                ) { connectAndReceiveEstablishment(prepared, budget) }
+                ) {
+                    connectAndReceiveEstablishment(prepared, budget) {
+                        mutableState.value = MdocHolderSessionState.Connecting(
+                            engagement.qrPayload,
+                            kinds,
+                            prepared.unavailable,
+                        )
+                    }
+                }
             } else {
-                connectAndReceiveEstablishment(prepared, budget)
+                connectAndReceiveEstablishment(prepared, budget) {
+                    mutableState.value = MdocHolderSessionState.Connecting(
+                        engagement.qrPayload,
+                        kinds,
+                        prepared.unavailable,
+                    )
+                }
             }
             winningPrepared = winner.prepared
             val connection = winner.connection
@@ -426,6 +460,7 @@ class MdocHolderProtocolEngine(
                     ProximityError.Security("stale_consent", "Consent does not belong to the active request preview")
                 )
                 if (decision is MdocConsentDecision.Deny) {
+                    mutableState.value = MdocHolderSessionState.Terminating(exchange)
                     phase(
                         timeouts.gracefulTermination,
                         ProximityError.Transport("termination_timeout", "Session termination timed out"),
@@ -452,6 +487,7 @@ class MdocHolderProtocolEngine(
                     resolution is MdocResponseResolution.Send &&
                     resolution.continuation == MdocSessionContinuation.TERMINATE
                 if (terminate || terminateAfterResponse) {
+                    mutableState.value = MdocHolderSessionState.Terminating(exchange)
                     phase(
                         timeouts.gracefulTermination,
                         ProximityError.Transport("termination_timeout", "Session termination timed out"),
@@ -460,7 +496,7 @@ class MdocHolderProtocolEngine(
                     mutableState.value = MdocHolderSessionState.Completed(exchange)
                     return MdocHolderSessionResult.Completed(exchange)
                 }
-
+                mutableState.value = MdocHolderSessionState.AwaitingNextRequest(exchange)
                 val nextBytes = phase(
                     timeouts.request,
                     ProximityError.Transport("inactivity_timeout", "The reader did not send another request in time"),
@@ -520,11 +556,13 @@ class MdocHolderProtocolEngine(
     private suspend fun connectAndReceiveEstablishment(
         prepared: PreparedTransports,
         budget: MdocSessionBudget,
+        onConnected: () -> Unit,
     ): Pair<WinningConnection, ImmutableBytes> {
         val winner = phase(
             timeouts.transportConnection,
             ProximityError.Transport("connection_timeout", "No reader connected in time"),
         ) { transportCoordinator.awaitWinner(prepared) }
+        onConnected()
         val firstBytes = phase(
             establishmentTimeout(),
             ProximityError.Transport("establishment_timeout", "Session establishment timed out"),
