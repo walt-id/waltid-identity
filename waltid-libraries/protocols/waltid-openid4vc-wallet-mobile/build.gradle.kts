@@ -55,10 +55,13 @@ kotlin {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile"))
             api(project(":waltid-libraries:waltid-did"))
+            implementation(project(":waltid-libraries:credentials:waltid-mdoc-proximity"))
+            implementation(project(":waltid-libraries:credentials:waltid-mdoc-proximity-mobile"))
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)
+            implementation(identityLibs.kotlincrypto.hash.sha2)
             implementation(identityLibs.ktor.client.core)
         }
         commonTest.dependencies {
