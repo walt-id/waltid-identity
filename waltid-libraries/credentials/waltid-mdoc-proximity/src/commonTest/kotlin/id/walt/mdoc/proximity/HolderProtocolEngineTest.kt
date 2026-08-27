@@ -386,13 +386,13 @@ class HolderProtocolEngineTest {
 
     @Test
     fun `stale consent and changed submission bindings fail closed before response`() = realDispatcherTest {
-        val stale = runRejectedSession(
+        val stale = runSingleRequestSession(
             consent = { MdocConsentDecision.Approve(ImmutableBytes.of(ByteArray(32))) },
         )
         assertEquals("stale_consent", stale.error.code)
         assertEquals(0, stale.resolveCalls)
 
-        val changed = runRejectedSession(
+        val changed = runSingleRequestSession(
             resolutionBinding = ImmutableBytes.of(ByteArray(32) { 0x7f }),
         )
         assertEquals("changed_submission", changed.error.code)
@@ -402,7 +402,7 @@ class HolderProtocolEngineTest {
     @Test
     fun `altered application profile result fails closed before response`() = realDispatcherTest {
         val previewAuthorization = applicationAuthorization("approved-application-result")
-        val changed = runRejectedSession(
+        val changed = runSingleRequestSession(
             applicationAuthorization = previewAuthorization,
             resolvedApplicationAuthorization = applicationAuthorization("changed-application-result"),
         )
@@ -413,7 +413,7 @@ class HolderProtocolEngineTest {
 
     @Test
     fun `plaintext request limit is independent from the larger session-message limit`() = realDispatcherTest {
-        val rejected = runRejectedSession(
+        val rejected = runSingleRequestSession(
             limits = MdocProximityLimits(maximumRequestBytes = 32),
         )
         assertEquals("request_too_large", rejected.error.code)
@@ -422,11 +422,11 @@ class HolderProtocolEngineTest {
 
     @Test
     fun `peer disconnects and cumulative byte exhaustion fail before response authorization`() = realDispatcherTest {
-        val disconnected = runRejectedSession(disconnectBeforeEstablishment = true)
+        val disconnected = runSingleRequestSession(disconnectBeforeEstablishment = true)
         assertEquals("peer_disconnected", disconnected.error.code)
         assertEquals(0, disconnected.resolveCalls)
 
-        val exhausted = runRejectedSession(
+        val exhausted = runSingleRequestSession(
             limits = MdocProximityLimits(maximumCumulativeSessionBytes = 1),
         )
         assertEquals("session_byte_limit", exhausted.error.code)
@@ -435,7 +435,7 @@ class HolderProtocolEngineTest {
 
     @Test
     fun `a denied consent decision cannot produce response data`() = realDispatcherTest {
-        val denied = runRejectedSession(
+        val denied = runSingleRequestSession(
             consent = { MdocConsentDecision.Deny(it.bindingToken) },
         )
 
@@ -445,21 +445,21 @@ class HolderProtocolEngineTest {
 
     @Test
     fun `consent timeout and transport profile size limits fail with stable errors`() = realDispatcherTest {
-        val timedOut = runRejectedSession(
+        val timedOut = runSingleRequestSession(
             consent = { awaitCancellation() },
             timeouts = MdocProximityTimeouts(consent = 1.seconds),
         )
         assertEquals("consent_timeout", timedOut.error.code)
         assertEquals(0, timedOut.resolveCalls)
 
-        val tooLarge = runRejectedSession(maximumTransportMessageBytes = 32)
+        val tooLarge = runSingleRequestSession(maximumTransportMessageBytes = 32)
         assertEquals("transport_message_limit", tooLarge.error.code)
         assertEquals(0, tooLarge.resolveCalls)
     }
 
     @Test
     fun `total session timeout is not misreported as the active phase timeout`() = realDispatcherTest {
-        val timedOut = runRejectedSession(
+        val timedOut = runSingleRequestSession(
             consent = { awaitCancellation() },
             timeouts = MdocProximityTimeouts(
                 consent = 5.seconds,
@@ -469,6 +469,21 @@ class HolderProtocolEngineTest {
 
         assertEquals("session_timeout", timedOut.error.code)
         assertEquals(0, timedOut.resolveCalls)
+    }
+
+    @Test
+    fun `different per-document response limits use the strictest value`() = realDispatcherTest {
+        val accepted = runSingleRequestSession(
+            encodedRequest = encodeRequestWithResponseLimits(listOf(1_024u, 2_048u)),
+        )
+        assertEquals(1, assertIs<MdocHolderSessionResult.Completed>(accepted.result).exchanges)
+        assertEquals(1, accepted.resolveCalls)
+
+        val rejected = runSingleRequestSession(
+            encodedRequest = encodeRequestWithResponseLimits(listOf(8u, 2_048u)),
+        )
+        assertEquals("reader_response_limit", rejected.error.code)
+        assertEquals(1, rejected.resolveCalls)
     }
 
     /** WebCrypto promises must use real scheduling instead of test-scheduler virtual time. */
@@ -489,7 +504,7 @@ class HolderProtocolEngineTest {
         return response
     }
 
-    private data class RejectedSession(val result: MdocHolderSessionResult, val resolveCalls: Int) {
+    private data class SessionRun(val result: MdocHolderSessionResult, val resolveCalls: Int) {
         val error: ProximityError get() = assertIs<MdocHolderSessionResult.Failed>(result).error
     }
 
@@ -560,7 +575,7 @@ class HolderProtocolEngineTest {
         return result
     }
 
-    private suspend fun CoroutineScope.runRejectedSession(
+    private suspend fun CoroutineScope.runSingleRequestSession(
         consent: suspend (MdocConsentPrompt) -> MdocConsentDecision = { MdocConsentDecision.Approve(it.bindingToken) },
         applicationAuthorization: MdocApplicationAuthorization? = null,
         resolvedApplicationAuthorization: MdocApplicationAuthorization? = null,
@@ -569,7 +584,8 @@ class HolderProtocolEngineTest {
         timeouts: MdocProximityTimeouts = MdocProximityTimeouts(),
         maximumTransportMessageBytes: Int = 8 * 1024 * 1024,
         disconnectBeforeEstablishment: Boolean = false,
-    ): RejectedSession {
+        encodedRequest: ByteArray = encodeRequest("org.example.rejected"),
+    ): SessionRun {
         val deviceKey = agreementKey("rejected-device-${deviceKeyCounter++}")
         val readerKey = agreementKey("rejected-reader-${deviceKeyCounter++}")
         val loopback = FakeProximityLoopback.create()
@@ -589,7 +605,7 @@ class HolderProtocolEngineTest {
             coseCompliantCbor.encodeToByteArray(
                 SessionEstablishment(
                     ByteStringWrapper(readerSession.readerCose, readerSession.readerCoseBytes),
-                    readerSession.cipher.encrypt(encodeRequest("org.example.rejected")),
+                    readerSession.cipher.encrypt(encodedRequest),
                 )
             )
         )
@@ -638,7 +654,7 @@ class HolderProtocolEngineTest {
 
         val result = engine.run()
         reader.await()
-        return RejectedSession(result, resolveCalls)
+        return SessionRun(result, resolveCalls)
     }
 
     private fun encodeRequest(docType: String): ByteArray = encodeRequest(listOf(docType))
@@ -668,6 +684,32 @@ class HolderProtocolEngineTest {
                         coseCompliantCbor.encodeToByteArray(DeviceRequestInfo.serializer(), it),
                     )
                 },
+            )
+        )
+    }
+
+    private fun encodeRequestWithResponseLimits(responseLimits: List<UInt>): ByteArray {
+        require(responseLimits.isNotEmpty())
+        val docRequests = responseLimits.mapIndexed { index, maximumResponseSize ->
+            val request = DocRequest.fromValues(
+                docType = "org.example.response-limit-$index",
+                requestedElements = mapOf("org.example" to listOf("name")),
+                intentToRetain = false,
+            )
+            val itemsRequest = request.itemsRequest.value.copy(
+                requestInfo = DocRequestInfo(maximumResponseSize = maximumResponseSize),
+            )
+            request.copy(
+                itemsRequest = ByteStringWrapper(
+                    itemsRequest,
+                    coseCompliantCbor.encodeToByteArray(ItemsRequest.serializer(), itemsRequest),
+                ),
+            )
+        }
+        return coseCompliantCbor.encodeToByteArray(
+            DeviceRequest(
+                version = DeviceRequest.VERSION,
+                docRequests = docRequests,
             )
         )
     }
