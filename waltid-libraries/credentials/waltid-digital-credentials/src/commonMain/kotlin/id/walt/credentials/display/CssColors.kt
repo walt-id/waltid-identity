@@ -78,7 +78,7 @@ public object CssColors {
     private fun parseHslFunction(value: String, alpha: Boolean): CssColor? {
         val parts = functionArguments(value) ?: return null
         if (parts.size != if (alpha) 4 else 3) return null
-        val hue = parts[0].trim().removeSuffix("deg").toDoubleOrNull() ?: return null
+        val hue = parts[0].trim().removeSuffix("deg").toFiniteDoubleOrNull() ?: return null
         val saturation = parsePercentUnit(parts[1]) ?: return null
         val lightness = parsePercentUnit(parts[2]) ?: return null
         val parsedAlpha = if (alpha) parseAlpha(parts[3]) ?: return null else 255
@@ -104,25 +104,25 @@ public object CssColors {
     private fun parseRgbChannel(value: String): Int? {
         val raw = value.trim()
         return if (raw.endsWith("%")) {
-            val percent = raw.dropLast(1).trim().toDoubleOrNull() ?: return null
+            val percent = raw.dropLast(1).trim().toFiniteDoubleOrNull() ?: return null
             ((percent / 100.0) * 255.0).roundToInt().coerceIn(0, 255)
         } else {
-            raw.toDoubleOrNull()?.roundToInt()?.coerceIn(0, 255)
+            raw.toFiniteDoubleOrNull()?.roundToInt()?.coerceIn(0, 255)
         }
     }
 
     private fun parsePercentUnit(value: String): Double? {
         val raw = value.trim()
         if (!raw.endsWith("%")) return null
-        return (raw.dropLast(1).trim().toDoubleOrNull() ?: return null).coerceIn(0.0, 100.0) / 100.0
+        return (raw.dropLast(1).trim().toFiniteDoubleOrNull() ?: return null).coerceIn(0.0, 100.0) / 100.0
     }
 
     private fun parseAlpha(value: String): Int? {
         val raw = value.trim()
         val unit = if (raw.endsWith("%")) {
-            (raw.dropLast(1).trim().toDoubleOrNull() ?: return null) / 100.0
+            (raw.dropLast(1).trim().toFiniteDoubleOrNull() ?: return null) / 100.0
         } else {
-            raw.toDoubleOrNull() ?: return null
+            raw.toFiniteDoubleOrNull() ?: return null
         }
         return (unit.coerceIn(0.0, 1.0) * 255.0).roundToInt()
     }
@@ -149,4 +149,7 @@ public object CssColors {
 
     private fun Char.isHexDigit(): Boolean =
         this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
+
+    private fun String.toFiniteDoubleOrNull(): Double? =
+        toDoubleOrNull()?.takeIf { it.isFinite() }
 }
