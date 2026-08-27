@@ -24,7 +24,7 @@ import kotlinx.serialization.encoding.Encoder
  * ISO/IEC 18013-5 requires exactly one authentication method. The sealed variants make that
  * requirement structural: an application cannot construct both a signature and a MAC, or neither.
  *
- * @see ISO/IEC 18013-5, 10.3.2.1.2.3 and 12.4.4
+ * @see ISO/IEC 18013-5, 10.3.3 and 12.4.4
  */
 @Serializable(with = DeviceAuthSerializer::class)
 sealed interface DeviceAuth {
