@@ -229,8 +229,19 @@ data class CoseMac0(
      * Verifies the MAC tag of this COSE_Mac0 object.
      */
     suspend fun verify(verifier: CoseMacVerifier, externalAad: ByteArray = byteArrayOf()): Boolean {
+        require(payload != null) { "Attached COSE_Mac0 verification requires an attached payload" }
         val dataToVerify = buildMacStructure(protected, payload, externalAad)
         return verifier.verify(dataToVerify, tag)
+    }
+
+    /** Verifies a COSE_Mac0 whose payload is transported separately. */
+    suspend fun verifyDetached(
+        verifier: CoseMacVerifier,
+        detachedPayload: ByteArray,
+        externalAad: ByteArray = byteArrayOf(),
+    ): Boolean {
+        require(payload == null) { "Detached COSE_Mac0 verification requires a detached payload" }
+        return verifier.verify(buildMacStructure(protected, detachedPayload, externalAad), tag)
     }
 
     /**
@@ -291,6 +302,22 @@ data class CoseMac0(
                 payload = payload,
                 tag = tag
             )
+        }
+
+        /** Creates a COSE_Mac0 whose authenticated payload is not embedded in the message. */
+        suspend fun createAndMacDetached(
+            protectedHeaders: CoseHeaders,
+            unprotectedHeaders: CoseHeaders = CoseHeaders(),
+            detachedPayload: ByteArray,
+            creator: CoseMacCreator,
+            externalAad: ByteArray = byteArrayOf(),
+        ): CoseMac0 {
+            validateCoseHeaderSeparation(protectedHeaders, unprotectedHeaders)
+            requireNotNull(protectedHeaders.algorithm) { "COSE MAC algorithm must be protected" }
+            val protectedBytes = if (protectedHeaders == CoseHeaders()) byteArrayOf()
+            else coseCompliantCbor.encodeToByteArray(protectedHeaders)
+            val tag = creator.mac(buildMacStructure(protectedBytes, detachedPayload, externalAad))
+            return CoseMac0(protectedBytes, unprotectedHeaders, null, tag)
         }
     }
 
