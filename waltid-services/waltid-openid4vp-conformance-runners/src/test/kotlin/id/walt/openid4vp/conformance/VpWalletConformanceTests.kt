@@ -12,12 +12,13 @@ import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.Oid4vpWalletVaria
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletCredentialFixture
 import id.walt.openid4vp.conformance.testplans.runner.WalletTestPlanRunner
 import id.walt.openid4vp.conformance.wallet.WalletCredentialIssuer
-import id.walt.wallet2.OSSWallet2FeatureCatalog
 import id.walt.wallet2.ClientIdTrustConfig
+import id.walt.wallet2.OSSWallet2FeatureCatalog
+import id.walt.wallet2.OSSWallet2Service
 import id.walt.wallet2.OSSWallet2ServiceConfig
+import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.handlers.ImportCredentialRequest
 import id.walt.wallet2.server.handlers.CreateWalletRequest
-import id.walt.wallet2.server.handlers.ImportKeyRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.wallet2Module
 import io.ktor.client.*
@@ -80,7 +81,7 @@ class VpWalletConformanceTests {
          * Optional comma-separated substrings selecting which matrix points to run, e.g.
          * `-Dconformance.wallet.variants=x509sandns,x509hash`.
          *
-         * The full matrix is 18 plans and a few hundred modules, which is far too slow a loop when
+         * The full matrix is 22 plans and a few hundred modules, which is far too slow a loop when
          * investigating one variant. Unset - the default, and what CI uses - runs everything.
          */
         private val selectedVariants: List<String> =
@@ -109,9 +110,9 @@ class VpWalletConformanceTests {
     @EnabledIf("isConformanceAvailable")
     fun runWallet2ConformanceTests() {
         E2ETest(WALLET_HOST, WALLET_PORT, failEarly = true).testBlock(
-            // 18 matrix points, and any module the suite cannot complete costs a 60 s poll budget
-            // before it is recorded. A full run measured ~43 min, so 30 min truncated it and reported
-            // an UncompletedCoroutinesError instead of the results that had already been collected.
+            // 22 matrix points, and any module the suite cannot complete costs a 60 s poll budget
+            // before it is recorded. Full runs can exceed 30 min; a shorter timeout reports an
+            // UncompletedCoroutinesError instead of the results that had already been collected.
             timeout = 90.minutes,
 
             features = listOf(OSSWallet2FeatureCatalog),
@@ -183,11 +184,11 @@ class VpWalletConformanceTests {
                 .body<WalletCreatedResponse>().walletId
         }
 
-        test("Import holder key") {
-            wallet.post("/wallet/$walletId/keys/import") {
-                contentType(ContentType.Application.Json)
-                setBody(ImportKeyRequest(key = issuer.holderSerializedKey()))
-            }.also { assertEquals(HttpStatusCode.Created, it.status) }
+        test("Add holder key to the wallet's Crypto2 key store") {
+            val provisionedWallet = assertNotNull(OSSWallet2Service.resolver.resolveWallet(walletId))
+            val keyStore = provisionedWallet.keyStores.single()
+            val holderKey = issuer.holderCrypto2Key()
+            assertEquals(holderKey.id.value, keyStore.addCrypto2Key(holderKey))
         }
 
         test("Import SD-JWT VC bound to the holder key") {
@@ -202,10 +203,12 @@ class VpWalletConformanceTests {
         test("Import mDL bound to the same holder key as device key") {
             val mdl = issuer.issueMdl()
             println("Provisioned mDL (docType=${WalletCredentialFixture.MDOC_DOCTYPE}): ${mdl.take(60)}...")
-            wallet.post("/wallet/$walletId/credentials/import") {
+            val imported = wallet.post("/wallet/$walletId/credentials/import") {
                 contentType(ContentType.Application.Json)
                 setBody(ImportCredentialRequest(rawCredential = mdl, label = "conformance-mdl"))
             }.also { assertEquals(HttpStatusCode.Created, it.status) }
+                .body<StoredCredential>()
+            assertNotNull(imported.holderKeyBinding, "the imported mDL must retain its holder-key binding")
         }
 
         test("Wallet holds both provisioned credentials") {
