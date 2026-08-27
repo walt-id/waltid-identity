@@ -10,6 +10,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -80,6 +81,7 @@ open class DeviceSignedItemListSerializer(private val namespace: String) :
             is Instant -> encodeSerializableElement(descriptor, index, MdocTDateInstantSerializer, it)
             is Boolean -> encodeBooleanElement(descriptor, index, it)
             is ByteArray -> encodeSerializableElement(descriptor, index, ByteArraySerializer(), it)
+            is CborElement -> encodeSerializableElement(descriptor, index, CborElement.serializer(), it)
             else -> MdocsCborSerializer.encode(namespace, value.key, descriptor, index, this, it)
         }
     }
@@ -96,6 +98,7 @@ open class DeviceSignedItemListSerializer(private val namespace: String) :
         is Instant -> MdocTDateInstantSerializer
         is Boolean -> Boolean.serializer()
         is ByteArray -> ByteArraySerializer()
+        is CborElement -> CborElement.serializer()
         is Any -> MdocsCborSerializer.lookupSerializer(namespace, elementIdentifier)
             ?: error("DeviceSignedItemListSerializer: Custom serializer not found for $elementIdentifier, with value $elementValue")
 

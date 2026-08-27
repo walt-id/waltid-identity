@@ -45,10 +45,19 @@ data class SelectedUseCase(
 data class MdocRequestSelection(
     val documents: List<SelectedDocument>,
     val useCases: List<SelectedUseCase>,
+    /** Every credential choice that can satisfy one of the selected document requests. */
+    val eligibleDocuments: List<SelectedDocument> = documents,
 ) {
     init {
         require(documents.isNotEmpty()) { "A successful selection must contain at least one document" }
         require(documents.map { it.credentialId to it.requestIndex }.distinct().size == documents.size)
+        require(eligibleDocuments.isNotEmpty()) { "A successful selection must retain eligible document choices" }
+        require(eligibleDocuments.map { it.credentialId to it.requestIndex }.distinct().size == eligibleDocuments.size)
+        require(documents.all { selected ->
+            eligibleDocuments.any {
+                it.requestIndex == selected.requestIndex && it.credentialId == selected.credentialId
+            }
+        }) { "Every selected document must be one of the eligible choices" }
     }
 }
 
@@ -68,9 +77,9 @@ class MdocRequestMatcher(
         require(candidates.map { it.id }.distinct().size == candidates.size) { "Credential candidate IDs must be unique" }
         validateRequestReferences(request)
 
-        val matches = request.docRequests.mapIndexed { index, docRequest ->
+        val eligible = request.docRequests.mapIndexed { index, docRequest ->
             val items = docRequest.itemsRequest.value
-            val suitable = candidates.filter { candidate ->
+            candidates.filter { candidate ->
                 candidate.docType == items.docType && issuerAccepted(items, candidate)
             }.mapNotNull { candidate ->
                 selectElements(items, candidate)?.let { elements ->
@@ -79,6 +88,10 @@ class MdocRequestMatcher(
                     else SelectedDocument(index, candidate.id, elements, zkp)
                 }
             }
+        }
+        val matches = request.docRequests.mapIndexed { index, docRequest ->
+            val suitable = eligible[index]
+            val items = docRequest.itemsRequest.value
             when (items.requestInfo?.uniqueDocSetRequired) {
                 false -> suitable
                 true -> suitable.take(1)
@@ -93,7 +106,13 @@ class MdocRequestMatcher(
             return if (selected.isEmpty()) MdocRequestMatchResult.Unsatisfied(
                 "None of the requested documents can be satisfied",
                 matches.indices.toSet(),
-            ) else MdocRequestMatchResult.Matched(MdocRequestSelection(selected, emptyList()))
+            ) else MdocRequestMatchResult.Matched(
+                MdocRequestSelection(
+                    documents = selected,
+                    useCases = emptyList(),
+                    eligibleDocuments = eligible.flatten(),
+                )
+            )
         }
 
         val satisfiable = useCases.mapIndexedNotNull { index, useCase ->
@@ -117,7 +136,14 @@ class MdocRequestMatcher(
             .distinct()
             .flatMap { matches[it] }
             .distinctBy { it.requestIndex to it.credentialId }
-        return MdocRequestMatchResult.Matched(MdocRequestSelection(selectedDocuments, selectedUseCases))
+        val selectedRequestIndices = selectedUseCases.flatMap(SelectedUseCase::documentSet).toSet()
+        return MdocRequestMatchResult.Matched(
+            MdocRequestSelection(
+                documents = selectedDocuments,
+                useCases = selectedUseCases,
+                eligibleDocuments = selectedRequestIndices.flatMap(eligible::get),
+            )
+        )
     }
 
     private fun firstSatisfiableSet(useCase: UseCase, matches: List<List<SelectedDocument>>): List<Int>? =
