@@ -41,15 +41,15 @@ internal class DefaultBleProximityTransportProvider(
 
     override suspend fun capability(context: EngagementContext): ProximityCapability {
         val platformCapability = platform.capability()
-        val unavailable = if (platformCapability.available) null else ProximityError.Capability(
-            platformCapability.code,
-            platformCapability.message,
-        )
+        val unavailable = (platformCapability as? BleProximityAvailability.Unavailable)?.let {
+            ProximityError.Capability(it.code, it.message)
+        }
+        val available = platformCapability is BleProximityAvailability.Available
         return ProximityCapability(
             implemented = true,
             profilePermitted = true,
-            runtimeAvailable = platformCapability.available,
-            sessionSelected = platformCapability.available,
+            runtimeAvailable = available,
+            sessionSelected = available,
             unavailableReason = unavailable,
         )
     }
