@@ -341,7 +341,7 @@ internal class MobileWalletAnnexCEngine(
     ): MobileWalletDigitalCredentialResponse {
         val plaintext = coseCompliantCbor.encodeToByteArray(
             DeviceResponse.serializer(),
-            DeviceResponse(version = "1.0", documents = documents.toTypedArray(), status = 0u),
+            DeviceResponse(version = "1.0", documents = documents, status = 0u),
         )
         val ciphertext = encryptAnnexCHpke(
             recipientPublicKey = confirmed.encryptionInfo.encryptionParameters.recipientPublicKey,

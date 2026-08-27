@@ -216,7 +216,7 @@ class Verifier2Crypto2EncryptedResponseTest {
         suspend fun encryptedDeviceResponse(version: String, status: UInt): String {
             val encoded = coseCompliantCbor.encodeToByteArray(
                 DeviceResponse.serializer(),
-                DeviceResponse(version = version, documents = emptyArray(), status = status),
+                DeviceResponse(version = version, documents = null, status = status),
             )
             val encrypted = Hpke.sealBase(
                 publicJwk,
