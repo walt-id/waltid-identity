@@ -22,6 +22,27 @@ internal const val BLE_STATE_START: Byte = 0x01
 internal const val BLE_STATE_END: Byte = 0x02
 internal const val BLE_MAX_GATT_PACKET_BYTES: Int = 512
 
+internal enum class BlePeripheralStateCommandResult {
+    REJECTED,
+    STARTED,
+    TERMINATE;
+
+    val accepted: Boolean get() = this != REJECTED
+}
+
+internal fun evaluateBlePeripheralStateCommand(
+    value: ByteArray,
+    notificationsReady: Boolean,
+    start: () -> Boolean,
+): BlePeripheralStateCommandResult = when {
+    value.contentEquals(byteArrayOf(BLE_STATE_START)) ->
+        if (notificationsReady && start()) BlePeripheralStateCommandResult.STARTED
+        else BlePeripheralStateCommandResult.REJECTED
+    value.contentEquals(byteArrayOf(BLE_STATE_END)) ->
+        BlePeripheralStateCommandResult.TERMINATE
+    else -> BlePeripheralStateCommandResult.REJECTED
+}
+
 internal object BleIdent {
     private val INFO = "BLEIdent".encodeToByteArray()
     // RFC 5869 represents an omitted salt as HashLen zero octets. MdocKdf's HMAC
