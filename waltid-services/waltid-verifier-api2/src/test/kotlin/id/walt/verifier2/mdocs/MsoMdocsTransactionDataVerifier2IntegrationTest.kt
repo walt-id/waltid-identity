@@ -167,7 +167,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
             issuerSigned = issuerSigned,
             deviceSigned = DeviceSigned(
                 ByteStringWrapper(DeviceNameSpaces(emptyMap())),
-                DeviceAuth(deviceMac = CoseMac0(ByteArray(0), CoseHeaders(), ByteArray(0), ByteArray(0)))
+                DeviceAuth.Mac(CoseMac0(ByteArray(0), CoseHeaders(), ByteArray(0), ByteArray(0)))
             )
         )
 

@@ -12,7 +12,7 @@ import kotlinx.serialization.cbor.CborObjectAsArray
  * This structure captures the essential messages from the NFC Forum Connection Handover protocol,
  * which are cryptographically bound to the session to prevent attacks. It is serialized as a CBOR array.
  *
- * @see ISO/IEC 18013-5:xxxx(E), 9.1.5.1 (Session transcript)
+ * @see ISO/IEC 18013-5, NFC handover session transcript construction
  *
  * @property handoverSelect The binary value of the Handover Select Message retrieved by the mdoc reader from the mdoc. This field is mandatory.
  * @property handoverRequest The binary value of the Handover Request Message sent by the mdoc reader to the mdoc. This field is only present during an NFC Negotiated Handover and **must be null** if NFC Static Handover was used.

@@ -81,7 +81,9 @@ class MdocRequestMatcher(
             }
             when (items.requestInfo?.uniqueDocSetRequired) {
                 false -> suitable
-                true, null -> suitable.take(1)
+                true -> suitable.take(1)
+                // Reader support for multiple responses is undefined when the field is absent.
+                null -> suitable.take(1)
             }
         }
 
