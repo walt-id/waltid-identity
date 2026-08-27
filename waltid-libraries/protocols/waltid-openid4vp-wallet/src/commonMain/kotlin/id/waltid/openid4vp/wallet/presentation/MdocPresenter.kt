@@ -452,7 +452,7 @@ object MdocPresenter {
         // 5. Assemble the final DeviceResponse
         val deviceResponse = DeviceResponse(
             version = "1.0",
-            documents = arrayOf(
+            documents = listOf(
                 Document(
                     docType = mdocsCredential.docType,
                     issuerSigned = issuerSignedWithSelectedNamespaceItems,

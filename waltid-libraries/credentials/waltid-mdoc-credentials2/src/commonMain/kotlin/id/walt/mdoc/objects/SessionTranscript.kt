@@ -123,6 +123,20 @@ data class SessionTranscript private constructor(
         )
     }
 
+    /**
+     * Replaces the second device-retrieval transcript element with exact EncryptionParameters bytes.
+     * ISO document-response encryption uses this transcript for both HPKE info and mdoc authentication.
+     */
+    fun withDocumentEncryptionParameters(encryptionParametersBytes: ByteArray): SessionTranscript {
+        require(encryptionParametersBytes.isNotEmpty()) { "EncryptionParameters bytes must not be empty" }
+        val engagement = requireNotNull(deviceEngagementBytes) {
+            "Document response encryption requires a device-retrieval session transcript"
+        }
+        return nfcHandover?.let {
+            forNfc(engagement.copyOf(), encryptionParametersBytes.copyOf(), it)
+        } ?: forQr(engagement.copyOf(), encryptionParametersBytes.copyOf())
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is SessionTranscript) return false

@@ -185,7 +185,7 @@ private fun CoseSign1.validatedProtectedAlgorithm(): Int {
     }
 }
 
-private fun validateCoseHeaderSeparation(protected: CoseHeaders, unprotected: CoseHeaders) {
+internal fun validateCoseHeaderSeparation(protected: CoseHeaders, unprotected: CoseHeaders) {
     require(unprotected.criticalHeaders == null) { "COSE critical headers must be protected" }
     val protectedLabels = protected.presentLabels()
     val duplicateLabels = protectedLabels intersect unprotected.presentLabels()

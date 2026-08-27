@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.objects.deviceretrieval
 
@@ -7,8 +7,24 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.encoding.decodeTextMap
+import id.walt.mdoc.encoding.encodeTextMap
+import id.walt.mdoc.encoding.extensionsExcluding
+import id.walt.mdoc.encoding.fromCborElement
+import id.walt.mdoc.encoding.fromTaggedByteString
+import id.walt.mdoc.encoding.requireNoExtensionCollisions
+import id.walt.mdoc.encoding.toCborElement
+import id.walt.mdoc.encoding.toTaggedByteString
+import id.walt.mdoc.objects.MdocVersion
 import kotlinx.serialization.*
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.cbor.ValueTags
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * Represents the top-level request from a mdoc reader to a mdoc.
@@ -21,7 +37,7 @@ import kotlinx.serialization.cbor.ValueTags
  * @property readerAuthAll Optional structure for mdoc reader authentication for all documents in the request.
  * @property deviceRequestInfo Optional additional information about the overall request.
  */
-@Serializable
+@Serializable(with = DeviceRequestSerializer::class)
 data class DeviceRequest(
     @SerialName("version")
     val version: String,
@@ -33,8 +49,22 @@ data class DeviceRequest(
 
     @SerialName("deviceRequestInfo")
     @ValueTags(24u)
-    val deviceRequestInfo: ByteStringWrapper<DeviceRequestInfo>? = null
+    val deviceRequestInfo: ByteStringWrapper<DeviceRequestInfo>? = null,
+    val extensions: Map<String, CborElement> = emptyMap(),
 ) {
+    init {
+        require(docRequests.isNotEmpty()) { "DeviceRequest must contain at least one document request" }
+        val parsedVersion = MdocVersion.parse(version)
+        require(parsedVersion.major == 1u) { "Unsupported DeviceRequest major version" }
+        if (parsedVersion.minor <= 1u) {
+            require(version == if (readerAuthAll != null || deviceRequestInfo != null) VERSION_WITH_SIGNING else VERSION) {
+                "DeviceRequest version does not match its edition-2 fields"
+            }
+        }
+        require(readerAuthAll == null || readerAuthAll.isNotEmpty())
+        requireNoExtensionCollisions(extensions, DEVICE_REQUEST_FIELDS, "DeviceRequest")
+    }
+
     companion object {
         const val VERSION = "1.0"
         const val VERSION_WITH_SIGNING = "1.1"
@@ -86,6 +116,42 @@ data class DeviceRequest(
     )
 
 }
+
+object DeviceRequestSerializer : KSerializer<DeviceRequest> {
+    override val descriptor: SerialDescriptor = CborElement.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: DeviceRequest) {
+        val fields = linkedMapOf<String, CborElement>()
+        fields["version"] = CborString(value.version)
+        fields["docRequests"] = value.docRequests.toCborElement(ListSerializer(DocRequest.serializer()))
+        value.deviceRequestInfo?.let {
+            fields["deviceRequestInfo"] = it.toTaggedByteString(DeviceRequestInfo.serializer())
+        }
+        value.readerAuthAll?.let {
+            fields["readerAuthAll"] = it.toCborElement(ListSerializer(CoseSign1.serializer()))
+        }
+        fields.putAll(value.extensions)
+        encoder.encodeTextMap(fields)
+    }
+
+    override fun deserialize(decoder: Decoder): DeviceRequest {
+        val fields = decoder.decodeTextMap("DeviceRequest")
+        return DeviceRequest(
+            version = (fields["version"] as? CborString)?.value
+                ?: throw SerializationException("DeviceRequest version is required and must be text"),
+            docRequests = fields["docRequests"]?.fromCborElement(ListSerializer(DocRequest.serializer()))
+                ?: throw SerializationException("DeviceRequest docRequests is required"),
+            deviceRequestInfo = fields["deviceRequestInfo"]?.fromTaggedByteString(
+                DeviceRequestInfo.serializer(),
+                "DeviceRequestInfoBytes",
+            ),
+            readerAuthAll = fields["readerAuthAll"]?.fromCborElement(ListSerializer(CoseSign1.serializer())),
+            extensions = fields.extensionsExcluding(DEVICE_REQUEST_FIELDS),
+        )
+    }
+}
+
+private val DEVICE_REQUEST_FIELDS = setOf("version", "docRequests", "deviceRequestInfo", "readerAuthAll")
 
 /*
 fun main() {
