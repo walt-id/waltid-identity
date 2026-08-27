@@ -26,7 +26,7 @@ import kotlinx.serialization.encoding.Encoder
 /**
  * Represents a request for a single document, specifying the data elements needed.
  *
- * @see ISO/IEC 18013-5:2021, 8.3.2.1.2.1
+ * @see ISO/IEC DIS 18013-5:2026, DeviceRequest and DocRequest structures in 10.2
  *
  * @property itemsRequest A CBOR-tagged bytestring containing the detailed request for items within a document.
  * @property readerAuth Optional reader authentication signature specific to this document request.

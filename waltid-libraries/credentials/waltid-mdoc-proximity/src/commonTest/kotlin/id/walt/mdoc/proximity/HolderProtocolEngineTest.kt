@@ -1,4 +1,7 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(
+    kotlinx.serialization.ExperimentalSerializationApi::class,
+    kotlin.ExperimentalUnsignedTypes::class,
+)
 
 package id.walt.mdoc.proximity
 
@@ -16,11 +19,17 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.DocRequest
+import id.walt.mdoc.objects.deviceretrieval.DocRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.ElementReference
+import id.walt.mdoc.objects.deviceretrieval.ItemsRequest
 import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.mdoc.objects.document.DeviceAuth
+import id.walt.mdoc.objects.elements.DeviceNameSpaces
+import id.walt.mdoc.objects.elements.DeviceSignedItem
+import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
+import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.session.SessionData
 import id.walt.mdoc.objects.session.SessionEstablishment
 import id.walt.mdoc.objects.session.SessionStatusCode
@@ -35,6 +44,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.cbor.CborString
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -179,6 +189,140 @@ class HolderProtocolEngineTest {
     }
 
     @Test
+    fun `application extensions display summary and authorized device data stay bound through consent`() =
+        realDispatcherTest {
+            val deviceKey = agreementKey("application-device")
+            val readerKey = agreementKey("application-reader")
+            val holderKey = runtime.generateMdocTestKey(
+                "application-holder",
+                setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+            val sourceDocument = runtime.issueMdocTestDocument(
+                holderKey,
+                KeyAuthorization(
+                    dataElements = mapOf(
+                        APPLICATION_NAMESPACE to listOf(APPLICATION_ELEMENT),
+                    )
+                ),
+            )
+            val loopback = FakeProximityLoopback.create()
+            val method = DeviceRetrievalMethod.Nfc(1_024u, 1_024u)
+            val engagementContext = EngagementContext(
+                MdocProximityProfile.ISO_18013_5_ED2_DIS_2026,
+                1_048_576,
+                MdocEngagementMode.Qr,
+            )
+            val capabilities = MdocSessionCapabilities.forSession(
+                engagementContext.profile,
+                deviceKey,
+                setOf(MdocProtocolFeature.EXTENDED_REQUESTS),
+            )
+            val readerSession = readerSession(deviceKey, readerKey, method, engagementContext, capabilities)
+            val encodedRequest = encodeApplicationRequest(sourceDocument.docType)
+            val establishment = ImmutableBytes.of(
+                coseCompliantCbor.encodeToByteArray(
+                    SessionEstablishment(
+                        ByteStringWrapper(readerSession.readerCose, readerSession.readerCoseBytes),
+                        readerSession.cipher.encrypt(encodedRequest),
+                    )
+                )
+            )
+            val profileResultDigest = digest("validated-profile-result")
+            val submissionDigest = digest("application-submission")
+            val applicationAuthorization = MdocApplicationAuthorization(
+                profileId = "org.example.application:v1",
+                displayTitle = "Confirm example authorization",
+                details = listOf(
+                    MdocApplicationAuthorizationDetail("amount", "Amount", "EUR 42.00"),
+                    MdocApplicationAuthorizationDetail("recipient", "Recipient", "Example Shop"),
+                ),
+                resultBindingDigest = profileResultDigest,
+            )
+            var consentedAuthorization: MdocApplicationAuthorization? = null
+            val engine = MdocHolderProtocolEngine(
+                eDeviceKey = deviceKey,
+                transportProviders = listOf(FakeTransportProvider(method, loopback.holder)),
+                requestProcessor = object : MdocHolderRequestProcessor {
+                    override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview {
+                        assertContentEquals(encodedRequest, context.request.encodedCopy())
+                        val request = context.request.value
+                        assertEquals(
+                            CborString("checkout"),
+                            request.deviceRequestInfo!!.value.extensions[APPLICATION_CONTEXT_EXTENSION],
+                        )
+                        assertEquals(
+                            CborString("authorization-request"),
+                            request.docRequests.single().itemsRequest.value.requestInfo!!
+                                .extensions[APPLICATION_REQUEST_EXTENSION],
+                        )
+                        return preview(
+                            request,
+                            applicationAuthorizations = listOf(applicationAuthorization),
+                            submissionBindingDigest = submissionDigest,
+                        )
+                    }
+
+                    override suspend fun resolve(
+                        context: MdocHolderRequestContext,
+                        preview: MdocRequestPreview,
+                    ): MdocResponseResolution {
+                        assertEquals(
+                            profileResultDigest,
+                            preview.applicationAuthorizations.single().resultBindingDigest,
+                        )
+                        val response = MdocResponseBuilder().buildResponse(
+                            presentations = listOf(
+                                MdocDocumentPresentation(
+                                    source = sourceDocument,
+                                    holderKey = holderKey,
+                                    selectedIssuerElements = setOf(ElementReference("org.example", "given_name")),
+                                    deviceNameSpaces = DeviceNameSpaces(
+                                        mapOf(
+                                            APPLICATION_NAMESPACE to DeviceSignedItemList(
+                                                listOf(DeviceSignedItem(APPLICATION_ELEMENT, "approved"))
+                                            )
+                                        )
+                                    ),
+                                    authentication = MdocAuthenticationMethod.Signature(),
+                                )
+                            ),
+                            transcript = context.transcript.value,
+                        )
+                        return MdocResponseResolution.Send(
+                            exactResponse = ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(response)),
+                            continuation = MdocSessionContinuation.TERMINATE,
+                            submissionBindingDigest = preview.submissionBindingDigest,
+                        )
+                    }
+                },
+                consentHandler = MdocConsentHandler { prompt ->
+                    consentedAuthorization = prompt.preview.applicationAuthorizations.single()
+                    MdocConsentDecision.Approve(prompt.bindingToken)
+                },
+                engagementContext = engagementContext,
+                capabilities = capabilities,
+            )
+            val reader = async {
+                engine.state.filterIsInstance<MdocHolderSessionState.Connecting>().first()
+                loopback.reader.send(establishment)
+                val response = assertResponse(loopback.reader, readerSession.cipher, engine)
+                val deviceItem = response.documents!!.single().deviceSigned!!.namespaces.value
+                    .entries.getValue(APPLICATION_NAMESPACE).entries.single()
+                assertEquals(APPLICATION_ELEMENT, deviceItem.key)
+                assertEquals("approved", deviceItem.value)
+                readerSession.cipher.close()
+            }
+
+            val result = engine.run()
+            reader.await()
+
+            assertEquals(1, assertIs<MdocHolderSessionResult.Completed>(result).exchanges)
+            val authorization = assertNotNull(consentedAuthorization)
+            assertEquals("EUR 42.00", authorization.details.first().value)
+            assertEquals(profileResultDigest, authorization.resultBindingDigest)
+        }
+
+    @Test
     fun `negotiated handover accepts only the exact SessionEstablishment copy`() = realDispatcherTest {
         val accepted = runNegotiatedHandover(mutateEstablishment = false)
         assertEquals(1, assertIs<MdocHolderSessionResult.Completed>(accepted).exchanges)
@@ -251,6 +395,18 @@ class HolderProtocolEngineTest {
         val changed = runRejectedSession(
             resolutionBinding = ImmutableBytes.of(ByteArray(32) { 0x7f }),
         )
+        assertEquals("changed_submission", changed.error.code)
+        assertEquals(1, changed.resolveCalls)
+    }
+
+    @Test
+    fun `altered application profile result fails closed before response`() = realDispatcherTest {
+        val previewAuthorization = applicationAuthorization("approved-application-result")
+        val changed = runRejectedSession(
+            applicationAuthorization = previewAuthorization,
+            resolvedApplicationAuthorization = applicationAuthorization("changed-application-result"),
+        )
+
         assertEquals("changed_submission", changed.error.code)
         assertEquals(1, changed.resolveCalls)
     }
@@ -406,6 +562,8 @@ class HolderProtocolEngineTest {
 
     private suspend fun CoroutineScope.runRejectedSession(
         consent: suspend (MdocConsentPrompt) -> MdocConsentDecision = { MdocConsentDecision.Approve(it.bindingToken) },
+        applicationAuthorization: MdocApplicationAuthorization? = null,
+        resolvedApplicationAuthorization: MdocApplicationAuthorization? = null,
         resolutionBinding: ImmutableBytes? = null,
         limits: MdocProximityLimits = MdocProximityLimits(),
         timeouts: MdocProximityTimeouts = MdocProximityTimeouts(),
@@ -440,7 +598,11 @@ class HolderProtocolEngineTest {
             eDeviceKey = deviceKey,
             transportProviders = listOf(FakeTransportProvider(method, loopback.holder)),
             requestProcessor = object : MdocHolderRequestProcessor {
-                override suspend fun preview(context: MdocHolderRequestContext) = preview(context.request.value)
+                override suspend fun preview(context: MdocHolderRequestContext) = preview(
+                    context.request.value,
+                    applicationAuthorizations = listOfNotNull(applicationAuthorization),
+                    submissionBindingDigest = applicationAuthorization?.consentBindingDigest() ?: digest("preview"),
+                )
                 override suspend fun resolve(
                     context: MdocHolderRequestContext,
                     preview: MdocRequestPreview,
@@ -449,7 +611,9 @@ class HolderProtocolEngineTest {
                     return MdocResponseResolution.Send(
                         ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(DeviceResponse("1.0", status = 10u))),
                         continuation = MdocSessionContinuation.TERMINATE,
-                        submissionBindingDigest = resolutionBinding ?: preview.submissionBindingDigest,
+                        submissionBindingDigest = resolutionBinding
+                            ?: resolvedApplicationAuthorization?.consentBindingDigest()
+                            ?: preview.submissionBindingDigest,
                     )
                 }
             },
@@ -508,7 +672,11 @@ class HolderProtocolEngineTest {
         )
     }
 
-    private fun preview(request: DeviceRequest): MdocRequestPreview {
+    private fun preview(
+        request: DeviceRequest,
+        applicationAuthorizations: List<MdocApplicationAuthorization> = emptyList(),
+        submissionBindingDigest: ImmutableBytes = digest("preview"),
+    ): MdocRequestPreview {
         return MdocRequestPreview(
             request.docRequests.map { docRequest ->
                 val items = docRequest.itemsRequest.value
@@ -523,9 +691,55 @@ class HolderProtocolEngineTest {
             purposeHints = request.deviceRequestInfo?.value?.useCases.orEmpty()
                 .flatMap { it.purposeHints.orEmpty().entries }
                 .associate { it.toPair() },
-            submissionBindingDigest = ImmutableBytes.of(org.kotlincrypto.hash.sha2.SHA256().digest("preview".encodeToByteArray())),
+            applicationAuthorizations = applicationAuthorizations,
+            submissionBindingDigest = submissionBindingDigest,
         )
     }
+
+    private fun encodeApplicationRequest(docType: String): ByteArray {
+        val request = DocRequest.fromValues(
+            docType,
+            mapOf("org.example" to listOf("given_name")),
+            intentToRetain = false,
+        )
+        val itemsRequest = request.itemsRequest.value.copy(
+            requestInfo = DocRequestInfo(
+                extensions = mapOf(APPLICATION_REQUEST_EXTENSION to CborString("authorization-request")),
+            )
+        )
+        val docRequest = request.copy(
+            itemsRequest = ByteStringWrapper(
+                itemsRequest,
+                coseCompliantCbor.encodeToByteArray(ItemsRequest.serializer(), itemsRequest),
+            )
+        )
+        val requestInfo = DeviceRequestInfo(
+            extensions = mapOf(APPLICATION_CONTEXT_EXTENSION to CborString("checkout")),
+        )
+        return coseCompliantCbor.encodeToByteArray(
+            DeviceRequest(
+                version = DeviceRequest.VERSION_WITH_SIGNING,
+                docRequests = listOf(docRequest),
+                deviceRequestInfo = ByteStringWrapper(
+                    requestInfo,
+                    coseCompliantCbor.encodeToByteArray(DeviceRequestInfo.serializer(), requestInfo),
+                ),
+            )
+        )
+    }
+
+    private fun digest(value: String): ImmutableBytes = ImmutableBytes.of(
+        org.kotlincrypto.hash.sha2.SHA256().digest(value.encodeToByteArray())
+    )
+
+    private fun applicationAuthorization(result: String) = MdocApplicationAuthorization(
+        profileId = "org.example.application:v1",
+        displayTitle = "Confirm example authorization",
+        details = listOf(
+            MdocApplicationAuthorizationDetail("amount", "Amount", "EUR 42.00"),
+        ),
+        resultBindingDigest = digest(result),
+    )
 
     private data class ReaderSession(
         val engagementBytes: ByteArray,
@@ -566,5 +780,11 @@ class HolderProtocolEngineTest {
     private suspend fun agreementKey(id: String) =
         runtime.generateMdocTestKey(id, setOf(KeyUsage.KEY_AGREEMENT))
 
-    private companion object { var deviceKeyCounter = 0 }
+    private companion object {
+        const val APPLICATION_CONTEXT_EXTENSION = "org.example.applicationContext"
+        const val APPLICATION_REQUEST_EXTENSION = "org.example.applicationRequest"
+        const val APPLICATION_NAMESPACE = "org.example.application"
+        const val APPLICATION_ELEMENT = "authorization_code"
+        var deviceKeyCounter = 0
+    }
 }
