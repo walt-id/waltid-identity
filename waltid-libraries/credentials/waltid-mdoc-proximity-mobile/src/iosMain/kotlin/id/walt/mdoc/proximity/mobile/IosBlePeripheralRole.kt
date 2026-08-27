@@ -259,18 +259,25 @@ internal class IosBlePeripheralRole private constructor(
         val bytes = request.value?.toByteArray() ?: ByteArray(0)
         val central = activeCentral.value
         val sameCentral = central == null || central.identifier == request.central.identifier
+        var terminate = false
         val accepted = sameCentral && request.offset.toInt() == 0 && when (request.characteristic) {
-            stateCharacteristic -> handleState(request.central, bytes)
+            stateCharacteristic -> handleState(request.central, bytes).let { result ->
+                terminate = result == BlePeripheralStateCommandResult.TERMINATE
+                result.accepted
+            }
             clientToServerCharacteristic -> activeConnection.value?.bearer == BleRawBearer.GATT &&
                 incomingGatt.trySend(bytes).isSuccess
             else -> false
         }
         manager.respondToRequest(request, if (accepted) CBATTErrorSuccess else CBATTErrorRequestNotSupported)
+        if (accepted && terminate) close(ProximityCloseReason.PEER_DISCONNECTED)
     }
 
-    private fun handleState(central: CBCentral, bytes: ByteArray): Boolean = when {
-        bytes.contentEquals(byteArrayOf(BLE_STATE_START)) -> {
-            if (!stateNotificationsEnabled.value || !dataNotificationsEnabled.value) return false
+    private fun handleState(central: CBCentral, bytes: ByteArray): BlePeripheralStateCommandResult =
+        evaluateBlePeripheralStateCommand(
+            value = bytes,
+            notificationsReady = stateNotificationsEnabled.value && dataNotificationsEnabled.value,
+        ) {
             if (!activeCentral.compareAndSet(null, central) && activeCentral.value?.identifier != central.identifier) {
                 false
             } else {
@@ -289,12 +296,6 @@ internal class IosBlePeripheralRole private constructor(
                 }
             }
         }
-        bytes.contentEquals(byteArrayOf(BLE_STATE_END)) -> {
-            incomingGatt.close()
-            true
-        }
-        else -> false
-    }
 
     override suspend fun awaitConnection(): BleRawConnection {
         check(startedAwait.compareAndSet(false, true)) { "A prepared BLE peripheral-server role can be awaited only once" }
