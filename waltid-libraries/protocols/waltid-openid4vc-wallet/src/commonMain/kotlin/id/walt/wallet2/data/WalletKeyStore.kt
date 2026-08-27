@@ -16,6 +16,13 @@ interface WalletKeyStore {
 
     suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage> = emptySet()): Crypto2Key? = null
 
+    /**
+     * Resolves public Crypto2 material for identity matching without authorizing a private-key
+     * operation. Providers whose operational lookup requires a non-empty usage set should override
+     * this method with a public-only lookup.
+     */
+    suspend fun getPublicCrypto2Key(keyId: String): Crypto2Key? = getCrypto2Key(keyId)
+
     suspend fun getKeyMaterial(keyId: String, usages: Set<KeyUsage> = emptySet()): WalletKeyStoreEntry? {
         val crypto2Key = getCrypto2Key(keyId, usages)
         val legacyKey = getKey(keyId)

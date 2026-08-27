@@ -223,9 +223,12 @@ suspend fun Wallet.withVerifiedHolderKeyBinding(
             )
         }
         resolved
-    } ?: allKeyCandidates(credential)
-        .filter { it.material.keyId == keyMaterial.keyId && it.thumbprint == suppliedThumbprint }
-        .requiringUsages(credential, setOf(KeyUsage.SIGN))
+    } ?: requiringUsages(
+        candidates = allKeyCandidates(credential)
+            .filter { it.material.keyId == keyMaterial.keyId && it.thumbprint == suppliedThumbprint },
+        credential = credential,
+        requiredUsages = setOf(KeyUsage.SIGN),
+    )
         .let { matching ->
             when (matching.size) {
                 0 -> throw bindingError(
@@ -253,8 +256,15 @@ suspend fun Wallet.withImportedHolderKeyBinding(credential: StoredCredential): S
         withRequiredUniqueHolderKeyBinding(credential, HolderKeyBindingOrigin.IMPORT)
     } catch (cause: CancellationException) {
         throw cause
-    } catch (_: HolderKeyBindingException) {
-        credential
+    } catch (cause: HolderKeyBindingException) {
+        when (cause.code) {
+            HolderKeyBindingErrorCode.NO_MATCHING_LOCAL_KEY,
+            HolderKeyBindingErrorCode.MULTIPLE_MATCHING_LOCAL_KEYS,
+            HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
+            -> credential
+
+            else -> throw cause
+        }
     }
 }
 
@@ -276,9 +286,12 @@ suspend fun Wallet.withRequiredUniqueHolderKeyBinding(
             cause,
         )
     }
-    val matching = allKeyCandidates(credential)
-        .filter { it.thumbprint == thumbprint }
-        .requiringUsages(credential, setOf(KeyUsage.SIGN))
+    val matching = requiringUsages(
+        candidates = allKeyCandidates(credential)
+            .filter { it.thumbprint == thumbprint },
+        credential = credential,
+        requiredUsages = setOf(KeyUsage.SIGN),
+    )
     val candidate = when (matching.size) {
         0 -> throw bindingError(
             credential,
@@ -397,10 +410,10 @@ private suspend fun Wallet.allKeyCandidates(
             )
         }
         ids.forEach { keyId ->
-            val material = try {
-                // Enumerate first, then filter by the key's declared usages. Asking each provider for
-                // SIGN here would let one unrelated verify-only key abort discovery of a valid match.
-                store.getKeyMaterial(keyId, emptySet())
+            val publicKey = try {
+                // Public identity discovery is deliberately separate from operational lookup. This
+                // neither requests SIGN from unrelated keys nor asks strict providers for empty usages.
+                store.getPublicCrypto2Key(keyId)
             } catch (cause: CancellationException) {
                 throw cause
             } catch (cause: Exception) {
@@ -410,14 +423,18 @@ private suspend fun Wallet.allKeyCandidates(
                     "A wallet key provider is unavailable while resolving credential '${credential.id}'",
                     cause,
                 )
-            } ?: throw bindingError(
-                credential,
-                HolderKeyBindingErrorCode.KEY_PROVIDER_UNAVAILABLE,
-                "Wallet key '$keyId' is listed but unavailable while resolving credential '${credential.id}'",
+            } ?: return@forEach
+            add(
+                candidate(
+                    credential,
+                    WalletKeyStoreEntry(
+                        keyId = keyId,
+                        legacyKey = null,
+                        crypto2Key = publicKey,
+                        keyReference = walletStoreKeyReference(index, keyId),
+                    ),
+                )
             )
-            if (material.crypto2Key != null) {
-                add(candidate(credential, material.copy(legacyKey = null, keyReference = walletStoreKeyReference(index, keyId))))
-            }
         }
     }
     attachedStaticCrypto2Key()?.let { crypto2Key ->
@@ -436,14 +453,34 @@ private suspend fun Wallet.allKeyCandidates(
     }
 }
 
-private fun List<WalletKeyCandidate>.requiringUsages(
+private suspend fun Wallet.requiringUsages(
+    candidates: List<WalletKeyCandidate>,
     credential: StoredCredential,
     requiredUsages: Set<KeyUsage>,
 ): List<WalletKeyCandidate> {
-    val eligible = filter { candidate ->
-        candidate.material.crypto2Key?.let { key -> requiredUsages.all(key.usages::contains) } == true
+    val eligible = candidates.mapNotNull { publicCandidate ->
+        val reference = requireNotNull(publicCandidate.material.keyReference)
+        val operationalCandidate = try {
+            resolveReferencedCandidate(credential, reference, requiredUsages)
+        } catch (cause: HolderKeyBindingException) {
+            if (cause.code == HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED) return@mapNotNull null
+            throw cause
+        }
+        if (operationalCandidate.thumbprint != publicCandidate.thumbprint) {
+            throw bindingError(
+                credential,
+                HolderKeyBindingErrorCode.KEY_DOES_NOT_MATCH_BINDING,
+                "Wallet key '${publicCandidate.material.keyId}' changed during holder-key discovery",
+            )
+        }
+        try {
+            operationalCandidate.material.requireUsages(credential, requiredUsages)
+            operationalCandidate
+        } catch (cause: HolderKeyBindingException) {
+            if (cause.code == HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED) null else throw cause
+        }
     }
-    if (isNotEmpty() && eligible.isEmpty()) {
+    if (candidates.isNotEmpty() && eligible.isEmpty()) {
         throw bindingError(
             credential,
             HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,

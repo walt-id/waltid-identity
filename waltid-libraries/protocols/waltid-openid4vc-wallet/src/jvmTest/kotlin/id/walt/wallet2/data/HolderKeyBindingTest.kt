@@ -168,6 +168,34 @@ class HolderKeyBindingTest {
     }
 
     @Test
+    fun `import separates public identity discovery from signing lookup`() = runTest {
+        val holderKey = signingKey("holder")
+        val keyStore = UsageRequiringKeyStore(holderKey)
+        val wallet = Wallet(id = "wallet", keyStores = listOf(keyStore))
+
+        val bound = wallet.withImportedHolderKeyBinding(mdocCredential(holderKey))
+
+        assertEquals(HolderKeyBindingOrigin.IMPORT, assertNotNull(bound.holderKeyBinding).origin)
+        assertEquals(1, keyStore.publicKeyLookups)
+        assertEquals(listOf(setOf(KeyUsage.SIGN)), keyStore.requestedUsages)
+    }
+
+    @Test
+    fun `import does not hide key provider failures as an unbound credential`() = runTest {
+        val holderKey = signingKey("holder")
+        val wallet = Wallet(
+            id = "wallet",
+            keyStores = listOf(FailingDiscoveryKeyStore(holderKey.id.value)),
+        )
+
+        val failure = assertFailsWith<HolderKeyBindingException> {
+            wallet.withImportedHolderKeyBinding(mdocCredential(holderKey))
+        }
+
+        assertEquals(HolderKeyBindingErrorCode.KEY_PROVIDER_UNAVAILABLE, failure.code)
+    }
+
+    @Test
     fun `import ignores unrelated keys that cannot sign`() = runTest {
         val verifyOnly = verifyOnlyKey("verify-only")
         val holderKey = signingKey("holder")
@@ -487,10 +515,27 @@ class HolderKeyBindingTest {
         override suspend fun removeKey(keyId: String): Boolean = false
     }
 
+    private class FailingDiscoveryKeyStore(
+        private val keyId: String,
+    ) : WalletKeyStore {
+        override suspend fun getKey(keyId: String) = null
+        override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>) = null
+        override suspend fun getPublicCrypto2Key(keyId: String): id.walt.crypto2.keys.Key =
+            error("provider unavailable")
+
+        override suspend fun listKeys(): Flow<WalletKeyInfo> = kotlinx.coroutines.flow.flowOf(
+            WalletKeyInfo(keyId, "test"),
+        )
+
+        override suspend fun addKey(key: id.walt.crypto.keys.Key): String = error("not used")
+        override suspend fun removeKey(keyId: String): Boolean = false
+    }
+
     private class UsageRequiringKeyStore(
         private val key: id.walt.crypto2.keys.Key,
     ) : WalletKeyStore {
         val requestedUsages = mutableListOf<Set<KeyUsage>>()
+        var publicKeyLookups = 0
 
         override suspend fun getKey(keyId: String) = null
 
@@ -498,6 +543,11 @@ class HolderKeyBindingTest {
             requestedUsages += usages
             require(usages.isNotEmpty()) { "key usages must not be empty" }
             return key.takeIf { keyId == key.id.value && usages.all(key.usages::contains) }
+        }
+
+        override suspend fun getPublicCrypto2Key(keyId: String): id.walt.crypto2.keys.Key? {
+            publicKeyLookups++
+            return key.takeIf { keyId == key.id.value }
         }
 
         override suspend fun listKeys(): Flow<WalletKeyInfo> = kotlinx.coroutines.flow.flowOf(
