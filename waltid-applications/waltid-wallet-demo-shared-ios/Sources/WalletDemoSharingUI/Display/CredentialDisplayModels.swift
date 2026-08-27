@@ -9,10 +9,9 @@ public struct CredentialDetails: Equatable, Identifiable {
     public let format: String
     public let addedAt: Date?
     public let groups: [ClaimGroup]
-    public let metadataJSON: String?
     public let issuerDisplay: MetadataDisplay?
-    /// Wallet-local store identifier used for deletion. Differs from ``id`` for presentation options.
-    public let credentialId: String
+    public let credentialDisplay: MetadataDisplay?
+    public let credentialDataJSON: String?
 
     public init(
         id: String,
@@ -24,7 +23,8 @@ public struct CredentialDetails: Equatable, Identifiable {
         groups: [ClaimGroup],
         metadataJSON: String? = nil,
         issuerDisplay: MetadataDisplay? = nil,
-        credentialId: String? = nil
+        credentialDisplay: MetadataDisplay? = nil,
+        credentialDataJSON: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -33,10 +33,17 @@ public struct CredentialDetails: Equatable, Identifiable {
         self.format = format
         self.addedAt = addedAt
         self.groups = groups
-        self.metadataJSON = metadataJSON
         self.issuerDisplay = issuerDisplay
-            ?? StoredCredentialMetadataParser.issuerDisplay(from: metadataJSON)
-        self.credentialId = credentialId ?? id
+            ?? StoredCredentialMetadataParser.issuerDisplay(
+                from: metadataJSON,
+                preferredLocales: Locale.preferredLanguages
+            )
+        self.credentialDisplay = credentialDisplay
+            ?? StoredCredentialMetadataParser.credentialDisplay(
+                from: metadataJSON,
+                preferredLocales: Locale.preferredLanguages
+            )
+        self.credentialDataJSON = credentialDataJSON
     }
 }
 

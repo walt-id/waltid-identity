@@ -846,7 +846,6 @@ class CredentialDisplayNormalizerTest {
         val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
         assertEquals(listOf("Given name", "Family name"), personal.items.map { it.label })
         assertEquals(option.selection.id, details.summary.id)
-        assertEquals(option.credentialId, details.summary.credentialId)
     }
 
     @Test
@@ -870,6 +869,35 @@ class CredentialDisplayNormalizerTest {
 
         assertFalse(details.groups.any { it.title == "Requested disclosures" })
         assertEquals("Personal details", details.groups.firstOrNull()?.title)
+    }
+
+    @Test
+    fun presentationCredentialOptionSurfacesStoredCardArt() {
+        val option = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "credential-1",
+            label = "PID",
+            issuer = "https://issuer.example",
+            subject = "did:key:holder",
+            format = "dc+sd-jwt",
+            credentialDataJson = """{"given_name":"Ada"}""",
+            disclosures = emptyList(),
+            metadataJson = """
+                {
+                  "credentialDisplay": [
+                    {
+                      "name": "Personal ID",
+                      "background_image": { "uri": "https://issuer.example/pid-bg.png" }
+                    }
+                  ]
+                }
+            """.trimIndent(),
+        )
+
+        val card = option.toCredentialDetails().toCardDisplayData()
+
+        assertEquals("https://issuer.example/pid-bg.png", card.backgroundImageUri)
+        assertEquals("Personal ID", card.title)
     }
 
     @Test
@@ -909,7 +937,7 @@ class CredentialDisplayNormalizerTest {
         ).toCardDisplayData()
 
         assertEquals("cred-1", details.id)
-        assertEquals("PID", details.title)
+        assertEquals("Mobile Driving Licence", details.title)
         assertEquals("Mobile driving licence", details.credentialType)
         assertEquals("Ada Lovelace", details.holderName)
         assertEquals("Expires 2026-06-17", details.validity)

@@ -6,6 +6,7 @@ import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createIosDemoWallet
 import id.walt.walletdemo.compose.logic.createIosDemoPinStore
+import id.walt.walletdemo.compose.logic.createIosDemoSharingSettingsStore
 import id.walt.walletdemo.compose.logic.createIosDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.createIosDemoSigningProtectionStore
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
@@ -78,6 +79,7 @@ fun walletDemoViewController(
         biometricAuthenticator = createIosDemoBiometricAuthenticator(),
         signingProtectionMode = parsedSigningProtectionMode,
         signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
+        sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier),
     )
     iosController = controller
     pendingDeepLink?.let(controller::handleDeepLink)

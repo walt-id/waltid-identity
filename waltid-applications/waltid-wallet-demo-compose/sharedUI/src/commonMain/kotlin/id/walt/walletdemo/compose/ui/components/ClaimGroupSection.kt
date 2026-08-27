@@ -7,22 +7,35 @@ import id.walt.walletdemo.compose.logic.ClaimGroup
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
-internal fun ClaimGroupSection(group: ClaimGroup, modifier: Modifier = Modifier) {
+internal fun ClaimGroupSection(
+    group: ClaimGroup,
+    modifier: Modifier = Modifier,
+    collapsible: Boolean = true,
+) {
     if (group.items.isEmpty()) return
 
     ReviewMetadataSection(
         title = group.title,
         modifier = modifier,
     ) {
-        MetadataDisclosure(
-            title = "${group.items.size} ${if (group.items.size == 1) "entry" else "entries"}",
-            initiallyExpanded = group.initiallyExpanded,
-            modifier = Modifier.testTag(WalletUiTestTags.claimGroup(group.title)),
-        ) {
-            group.items.forEachIndexed { index, item ->
-                if (index > 0) MetadataRowDivider()
-                ClaimValueRow(item = item)
+        if (collapsible) {
+            MetadataDisclosure(
+                title = "${group.items.size} ${if (group.items.size == 1) "entry" else "entries"}",
+                initiallyExpanded = group.initiallyExpanded,
+                modifier = Modifier.testTag(WalletUiTestTags.claimGroup(group.title)),
+            ) {
+                ClaimGroupItems(group)
             }
+        } else {
+            ClaimGroupItems(group)
         }
+    }
+}
+
+@Composable
+private fun ClaimGroupItems(group: ClaimGroup) {
+    group.items.forEachIndexed { index, item ->
+        if (index > 0) MetadataRowDivider()
+        ClaimValueRow(item = item)
     }
 }

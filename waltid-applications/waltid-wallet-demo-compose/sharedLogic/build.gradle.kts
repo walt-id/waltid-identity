@@ -35,6 +35,7 @@ kotlin {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
+                    implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
                     implementation(identityLibs.ktor.client.core)
                     implementation(identityLibs.ktor.client.content.negotiation)
                     implementation(identityLibs.ktor.serialization.kotlinx.json)

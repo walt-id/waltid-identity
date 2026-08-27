@@ -17,7 +17,12 @@ struct ComposeIdentityDocumentProvider: IdentityDocumentProvider {
 
     var body: some IdentityDocumentRequestScene {
         ISO18013MobileDocumentRequestScene { context in
-            AnnexCReviewView(context: context) {
+            AnnexCReviewView(
+                context: context,
+                showDcApiPresentationPreview: DemoSharingSettings.showDcApiPresentationPreview(
+                    appGroupIdentifier: Self.namespace.appGroupIdentifier
+                )
+            ) {
                 try await Self.namespace.providerWallet()
             }
         }

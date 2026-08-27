@@ -14,6 +14,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
+import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.logic.createAndroidDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.ui.WalletDemoApp
@@ -54,6 +55,7 @@ class MainActivity : FragmentActivity() {
             biometricAuthenticator = createAndroidDemoBiometricAuthenticator { this@MainActivity },
             signingProtectionMode = walletConfig.signingProtectionMode,
             signingProtectionStore = walletConfig.signingProtectionStore(applicationContext),
+            sharingSettings = createAndroidDemoSharingSettingsStore(applicationContext),
         )
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         handleIntent(intent)

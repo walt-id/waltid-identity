@@ -1,90 +1,23 @@
 import SwiftUI
 import WalletDemoSharingUI
+import WalletSDK
 
 struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
-    @Binding var selectedDetailsID: String?
     @Environment(\.openURL) private var openURL
     @Environment(\.walletDemoBranding) private var branding
 
-    private var receivedDetails: [CredentialDetails] {
-        viewModel.receivedCredentials.map(CredentialDisplayNormalizer.details(for:))
-    }
-
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if viewModel.offerPreview == nil {
-                        ScannableUrlEditor(
-                            title: "Receive",
-                            label: "Credential offer URL",
-                            text: $viewModel.offerUrl,
-                            inputIdentifier: WalletAccessibilityID.offerInput,
-                            scanButtonIdentifier: WalletAccessibilityID.offerScanButton,
-                            isEnabled: viewModel.receiveUrlEntryEnabled,
-                            focusResetKey: viewModel.inputFocusResetKey
-                        )
-
-                        Button("Receive") {
-                            viewModel.previewOffer()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(branding.primary)
-                        .disabled(!viewModel.receiveActionEnabled)
-                        .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
-                    }
-
-                    WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
-
-                    if let preview = viewModel.offerPreview {
-                        OfferReviewView(
-                            preview: preview,
-                            isAcceptEnabled: viewModel.acceptOfferEnabled,
-                            isReviewEnabled: viewModel.offerReviewEnabled,
-                            txCode: viewModel.txCode,
-                            onTxCodeChange: viewModel.updateTxCode,
-                            onAccept: viewModel.acceptOffer,
-                            onDecline: viewModel.declineOffer
-                        )
-                    }
-
-                    if let warning = viewModel.transactionDataProfilesWarning {
-                        WarningBannerView(message: warning)
-                    }
-
-                    if !viewModel.deferredCredentials.isEmpty {
-                        Text("Pending credentials")
-                            .font(.subheadline.weight(.semibold))
-                        ForEach(viewModel.deferredCredentials, id: \.id) { credential in
-                            Button("Check \(credential.credentialConfigurationID)") {
-                                viewModel.resumeDeferredCredential(credential)
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(viewModel.isLoading)
-                        }
-                    }
-
-                    if viewModel.receiveCompleted {
-                        Button("New receive", action: viewModel.startNewReceiveFlow)
-                            .buttonStyle(.bordered)
-                            .accessibilityIdentifier(WalletAccessibilityID.receiveNewButton)
-
-                        Text("Received credentials")
-                            .font(.subheadline.weight(.semibold))
-
-                        ForEach(receivedDetails) { item in
-                            CredentialCardButton(details: item) {
-                                selectedDetailsID = item.id
-                            }
-                        }
-                    }
+            Group {
+                if let preview = viewModel.offerPreview {
+                    reviewContent(preview: preview)
+                } else {
+                    entryContent
                 }
-                .padding()
             }
             .navigationTitle("Receive")
             .walletSettingsToolbar(viewModel: viewModel)
-            .background(detailsNavigationLink)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
         .navigationViewStyle(.stack)
@@ -95,34 +28,84 @@ struct ReceiveView: View {
         }
     }
 
-    private var detailsNavigationLink: some View {
-        NavigationLink(
-            destination: detailsDestination,
-            isActive: Binding(
-                get: { selectedDetailsID != nil },
-                set: { isActive in
-                    if !isActive {
-                        selectedDetailsID = nil
-                    }
+    private var entryContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                ScannableUrlEditor(
+                    title: "Receive",
+                    label: "Credential offer URL",
+                    text: $viewModel.offerUrl,
+                    inputIdentifier: WalletAccessibilityID.offerInput,
+                    scanButtonIdentifier: WalletAccessibilityID.offerScanButton,
+                    isEnabled: viewModel.receiveUrlEntryEnabled,
+                    focusResetKey: viewModel.inputFocusResetKey
+                )
+
+                Button("Receive") {
+                    viewModel.previewOffer()
                 }
-            )
-        ) {
-            EmptyView()
+                .buttonStyle(.borderedProminent)
+                .tint(branding.primary)
+                .disabled(!viewModel.receiveActionEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
+
+                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+
+                deferredCredentials
+            }
+            .padding()
         }
-        .hidden()
     }
 
-    private var detailsDestination: some View {
-        Group {
-            if let detailsID = selectedDetailsID {
-                CredentialDetailsDestination(
-                    detailsID: detailsID,
-                    details: receivedDetails,
-                    viewModel: viewModel,
-                    selectedDetailsID: $selectedDetailsID
+    private func reviewContent(preview: IssuanceOfferPreview) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+
+                OfferReviewView(
+                    preview: preview,
+                    isAcceptEnabled: viewModel.acceptOfferEnabled,
+                    isReviewEnabled: viewModel.offerReviewEnabled,
+                    txCode: viewModel.txCode,
+                    onTxCodeChange: viewModel.updateTxCode,
+                    onAccept: viewModel.acceptOffer,
+                    onDecline: viewModel.declineOffer,
+                    showActions: false
                 )
-            } else {
-                EmptyView()
+
+                if let warning = viewModel.transactionDataProfilesWarning {
+                    WarningBannerView(message: warning)
+                }
+
+                deferredCredentials
+            }
+            .padding()
+        }
+        .safeAreaInset(edge: .bottom) {
+            OfferReviewActions(
+                requiresIssuerAuthentication: preview.grant == .authorizationCode,
+                isAcceptEnabled: viewModel.acceptOfferEnabled,
+                isReviewEnabled: viewModel.offerReviewEnabled,
+                onAccept: viewModel.acceptOffer,
+                onDecline: viewModel.declineOffer
+            )
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.bar)
+        }
+    }
+
+    @ViewBuilder
+    private var deferredCredentials: some View {
+        if !viewModel.deferredCredentials.isEmpty {
+            Text("Pending credentials")
+                .font(.subheadline.weight(.semibold))
+            ForEach(viewModel.deferredCredentials, id: \.id) { credential in
+                Button("Check \(credential.credentialConfigurationID)") {
+                    viewModel.resumeDeferredCredential(credential)
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.isLoading)
             }
         }
     }

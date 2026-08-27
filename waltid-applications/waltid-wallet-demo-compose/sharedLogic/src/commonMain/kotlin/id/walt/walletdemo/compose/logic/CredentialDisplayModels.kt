@@ -5,6 +5,8 @@ data class CredentialDetails(
     val groups: List<ClaimGroup>,
     /** Issuer display from stored sidecar metadata (`issuerDisplay`), when available. */
     val issuerDisplay: WalletDemoMetadataDisplay? = null,
+    /** Credential configuration display from stored sidecar metadata (`credentialDisplay`), when available. */
+    val credentialDisplay: WalletDemoMetadataDisplay? = null,
 )
 
 data class ClaimGroup(

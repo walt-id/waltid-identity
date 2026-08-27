@@ -261,6 +261,7 @@ data class PresentationCredentialOption(
     val label: String?,
     val credentialData: JsonObject,
     val disclosures: List<PresentationDisclosure>,
+    val metadata: JsonObject? = null,
 )
 
 data class PresentationDisclosure(
@@ -673,6 +674,7 @@ object WalletPresentationHandler {
                     label = stored.label,
                     credentialData = credential.credentialData,
                     disclosures = result.toPresentationDisclosures(),
+                    metadata = stored.metadata,
                 )
             }
         }
@@ -763,6 +765,7 @@ object WalletPresentationHandler {
                     label = stored.label,
                     credentialData = credential.credentialData,
                     disclosures = result.toPresentationDisclosures(),
+                    metadata = stored.metadata,
                 )
             }
         }
@@ -837,6 +840,7 @@ object WalletPresentationHandler {
                     label = stored.label,
                     credentialData = stored.credential.credentialData,
                     disclosures = result.toPresentationDisclosures(),
+                    metadata = stored.metadata,
                 )
             }
         }.filter { option ->

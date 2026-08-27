@@ -126,7 +126,11 @@ final class WalletE2EUI {
         }
         for prefix in prefixes {
             let predicate = NSPredicate(format: "label BEGINSWITH %@", prefix)
-            let match = app.staticTexts.matching(predicate).firstMatch
+            let query = app.staticTexts.matching(predicate)
+            // Avoid firstMatch.exists: on Xcode 26 a missing snapshot can fail the test
+            // instead of returning false, which aborted waitForStatus on a hidden banner.
+            guard query.count > 0 else { continue }
+            let match = query.element(boundBy: 0)
             if match.exists {
                 return match.label
             }
@@ -146,7 +150,7 @@ final class WalletE2EUI {
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         if pinInput.waitForExistence(timeout: 2) {
             unlockWallet()
-            _ = waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 60)
+            _ = waitUntilWalletReady(timeout: 60)
         }
     }
 
@@ -160,6 +164,38 @@ final class WalletE2EUI {
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         }
         return false
+    }
+
+    /// Compose iOS can swallow the first Preview activation after a deep-linked URL field.
+    /// Retry once with a coordinate tap, and treat the review surface as success even if the
+    /// status banner has already dismissed.
+    func previewPresentation(timeout: TimeInterval) -> String? {
+        let prefixes = [
+            "Review presentation request",
+            "Preview failed",
+            "Present failed",
+            "Receive failed",
+            "Bootstrap failed",
+        ]
+        tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
+        if presentationReviewVisible() {
+            return latestStatus(prefixes: prefixes) ?? "Review presentation request"
+        }
+        if let status = waitForStatus(prefixes: prefixes, timeout: min(timeout, 8)) {
+            return status
+        }
+        tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview", useCoordinateTap: true)
+        if let status = waitForStatus(prefixes: prefixes, timeout: timeout) {
+            return status
+        }
+        if presentationReviewVisible() {
+            return "Review presentation request"
+        }
+        return nil
+    }
+
+    func presentationReviewVisible() -> Bool {
+        app.descendants(matching: .any)["wallet.presentationReview"].exists
     }
 
     func tapButton(identifier: String, fallbackLabel: String, useCoordinateTap: Bool = false) {
@@ -196,7 +232,7 @@ final class WalletE2EUI {
         dismissKeyboard(focusedElement: element)
     }
 
-    private func focusTextInput(_ element: XCUIElement, timeout: TimeInterval = 8) -> Bool {
+    private func focusTextInput(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         var useCoordinateTap = false
 
@@ -214,7 +250,13 @@ final class WalletE2EUI {
                 useCoordinateTap = true
             }
 
-            if waitForKeyboardFocus(in: element, timeout: 1) {
+            if waitForKeyboardFocus(in: element, timeout: 1.5) {
+                return true
+            }
+
+            // Compose iOS exposes OutlinedTextField as a TextView that often never sets
+            // hasKeyboardFocus, especially on the first cold-start PIN screen.
+            if app.keyboards.firstMatch.waitForExistence(timeout: 1) {
                 return true
             }
 
@@ -241,6 +283,9 @@ final class WalletE2EUI {
 
     private func hasKeyboardFocus(in element: XCUIElement) -> Bool {
         let predicate = NSPredicate(format: "hasKeyboardFocus == true")
+        if predicate.evaluate(with: element) {
+            return true
+        }
         if element.descendants(matching: .any).matching(predicate).firstMatch.exists {
             return true
         }
@@ -286,6 +331,12 @@ final class WalletE2EUI {
         // Setup now includes a biometric toggle; wait for the full form before the first tap.
         _ = button(identifier: "wallet.pinSubmitButton", fallbackLabel: "Set PIN")
             .waitForExistence(timeout: 5)
+
+        let settleDeadline = Date().addingTimeInterval(2)
+        while Date() < settleDeadline && !pinInput.isHittable {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
 
         replaceText(in: pinInput, value: pin)
 
