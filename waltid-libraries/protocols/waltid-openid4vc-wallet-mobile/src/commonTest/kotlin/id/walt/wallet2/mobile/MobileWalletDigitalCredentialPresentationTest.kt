@@ -418,7 +418,11 @@ class MobileWalletDigitalCredentialPresentationTest {
     /** Annex C requests use the dedicated facade, so the OpenID4VP entry point must turn them away. */
     @Test
     fun annexCRequestsAreNotAcceptedByTheOpenId4VpEntryPoint() = runTest {
-        val fixture = walletFixture(mdocCredential())
+        val holderKey = signingKey("annex-c-entrypoint-holder-key")
+        val fixture = walletFixtureWithKeys(
+            keys = listOf(holderKey),
+            credentials = arrayOf(mdocCredential(holderKey = holderKey)),
+        )
 
         assertFailsWith<IllegalArgumentException> {
             fixture.wallet.previewDigitalCredentialPresentation(
