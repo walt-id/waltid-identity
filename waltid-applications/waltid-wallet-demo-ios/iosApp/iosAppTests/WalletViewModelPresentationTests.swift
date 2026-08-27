@@ -389,45 +389,6 @@ final class WalletViewModelPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testPresentationDetailsDeleteUsesStoreCredentialId() async throws {
-        let walletClient = MockWalletClient(
-            storedCredentials: [
-                Credential(
-                    id: "cred-1",
-                    format: "jwt_vc_json",
-                    issuer: "Example Issuer",
-                    subject: nil,
-                    label: "Example Credential",
-                    addedAt: nil,
-                    credentialDataJSON: "{}"
-                )
-            ]
-        )
-        let viewModel = WalletViewModel(
-            walletID: "delete-details-\(UUID().uuidString)",
-            walletClient: walletClient
-        )
-        viewModel.unlockForTests()
-        try await waitUntil { viewModel.isReady }
-        viewModel.presentationRequestUrl = "openid4vp://mock"
-        viewModel.previewPresentation()
-        try await waitUntil { viewModel.presentationReviewEnabled }
-
-        guard case .ready(let preview) = viewModel.presentationReview else {
-            return XCTFail("Expected a ready presentation preview")
-        }
-        let option = try XCTUnwrap(preview.credentialOptions.first)
-        let details = CredentialDisplayNormalizer.details(for: option)
-        XCTAssertEqual(details.id, option.selection.id)
-        XCTAssertEqual(details.credentialId, option.credentialID)
-        XCTAssertNotEqual(details.id, details.credentialId)
-
-        viewModel.deleteCredential(id: details.credentialId)
-        try await waitUntil { viewModel.credentials.isEmpty && viewModel.presentationReview == nil }
-        XCTAssertFalse(viewModel.presentationReviewEnabled)
-    }
-
-    @MainActor
     func testDeleteAndResetReconcileIdentityDocumentRegistrations() async throws {
         let counter = RegistrationUpdateCounter()
         let viewModel = WalletViewModel(

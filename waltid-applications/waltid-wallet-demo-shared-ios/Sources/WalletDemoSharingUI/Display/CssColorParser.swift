@@ -78,7 +78,7 @@ private func parseCssRgbFunction(_ value: String, alpha: Bool) -> CssColorChanne
 
 private func parseCssHslFunction(_ value: String, alpha: Bool) -> CssColorChannels? {
     guard let parts = cssFunctionArguments(value), parts.count == (alpha ? 4 : 3) else { return nil }
-    guard let hue = Double(parts[0].replacingOccurrences(of: "deg", with: "")),
+    guard let hue = finiteDouble(parts[0].replacingOccurrences(of: "deg", with: "")),
           let saturation = cssPercent(parts[1]),
           let lightness = cssPercent(parts[2]) else { return nil }
     let parsedAlpha = alpha ? cssAlpha(parts[3]) : 1
@@ -101,25 +101,30 @@ private func cssFunctionArguments(_ value: String) -> [String]? {
 
 private func cssRgbChannel(_ value: String) -> Double? {
     if value.hasSuffix("%") {
-        guard let percent = Double(value.dropLast()) else { return nil }
+        guard let percent = finiteDouble(value.dropLast()) else { return nil }
         return min(max(percent / 100, 0), 1)
     }
-    guard let channel = Double(value) else { return nil }
+    guard let channel = finiteDouble(value) else { return nil }
     return min(max(channel / 255, 0), 1)
 }
 
 private func cssPercent(_ value: String) -> Double? {
-    guard value.hasSuffix("%"), let percent = Double(value.dropLast()) else { return nil }
+    guard value.hasSuffix("%"), let percent = finiteDouble(value.dropLast()) else { return nil }
     return min(max(percent / 100, 0), 1)
 }
 
 private func cssAlpha(_ value: String) -> Double? {
     if value.hasSuffix("%") {
-        guard let percent = Double(value.dropLast()) else { return nil }
+        guard let percent = finiteDouble(value.dropLast()) else { return nil }
         return min(max(percent / 100, 0), 1)
     }
-    guard let alpha = Double(value) else { return nil }
+    guard let alpha = finiteDouble(value) else { return nil }
     return min(max(alpha, 0), 1)
+}
+
+private func finiteDouble<S: StringProtocol>(_ value: S) -> Double? {
+    guard let parsed = Double(value), parsed.isFinite else { return nil }
+    return parsed
 }
 
 private func cssHslToRgb(hue: Double, saturation: Double, lightness: Double) -> (Double, Double, Double) {

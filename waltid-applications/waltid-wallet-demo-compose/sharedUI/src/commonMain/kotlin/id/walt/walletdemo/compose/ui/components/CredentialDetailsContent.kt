@@ -34,8 +34,6 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 internal fun CredentialDetailsContent(
     details: CredentialDetails,
     modifier: Modifier = Modifier,
-    onCardClick: (() -> Unit)? = null,
-    showCard: Boolean = true,
 ) {
     Column(
         modifier = modifier
@@ -43,7 +41,7 @@ internal fun CredentialDetailsContent(
             .testTag(WalletUiTestTags.credentialDetails(details.summary.id)),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        CredentialOverviewSection(details, onCardClick = onCardClick, showCard = showCard)
+        CredentialOverviewSection(details)
         val systemInfoGroup = details.toSystemInfoGroup()
         if (details.groups.isEmpty() && systemInfoGroup == null) {
             Text(

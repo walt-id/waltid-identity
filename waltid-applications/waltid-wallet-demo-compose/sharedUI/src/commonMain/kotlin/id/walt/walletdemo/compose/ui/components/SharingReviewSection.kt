@@ -245,7 +245,7 @@ private fun SharingClaimsDialog(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    CredentialOverviewSection(details, showCard = false)
+                    CredentialOverviewSection(details)
                     if (option.disclosures.isEmpty()) {
                         Text(
                             "No additional claims to review",
