@@ -11,10 +11,12 @@ Applications must declare and request the platform Bluetooth permissions describ
 Android and Apple provider KDoc. Bluetooth availability is reported through the proximity
 capability contract rather than prompting from inside this library.
 
-Create a validated `BleProximityTransportConfiguration` for one transaction, then instantiate the
-platform provider: `AndroidBleProximityTransportProvider` or `IosBleProximityTransportProvider`.
-The provider prepares only methods that can actually be advertised and exposes them through the
-shared `ProximityTransportProvider` contract.
+Use `AndroidBleProximityTransportFactory` or `IosBleProximityTransportFactory` to check the exact
+role selection before generating session keys or transaction UUIDs. The probe does not prepare
+radio resources. After prerequisites pass, create a validated `BleProximityTransportConfiguration`
+for one transaction and ask the same factory for its provider. The provider prepares only methods
+that can actually be advertised and exposes them through the shared `ProximityTransportProvider`
+contract.
 
 Android applications need the merged manifest permissions plus runtime grants for the selected
 role. Apple applications need `NSBluetoothAlwaysUsageDescription`; the provider uses CoreBluetooth
