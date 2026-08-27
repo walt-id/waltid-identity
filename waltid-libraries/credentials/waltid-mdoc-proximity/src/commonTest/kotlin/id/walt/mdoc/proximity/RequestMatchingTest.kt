@@ -125,6 +125,10 @@ class RequestMatchingTest {
             )
         )
         assertEquals(listOf("first"), undefined.selection.documents.map { it.credentialId })
+        assertEquals(
+            listOf("first", "second"),
+            undefined.selection.eligibleDocuments.map { it.credentialId },
+        )
     }
 
     @Test

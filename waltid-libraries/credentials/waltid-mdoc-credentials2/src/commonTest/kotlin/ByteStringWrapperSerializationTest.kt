@@ -3,10 +3,15 @@
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
+import id.walt.mdoc.objects.elements.DeviceSignedItem
+import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.elements.IssuerSignedListSerializer
 import kotlinx.serialization.cbor.CborString
+import kotlinx.serialization.cbor.CborInteger
+import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlin.test.Test
@@ -35,5 +40,22 @@ class ByteStringWrapperSerializationTest {
 
         assertContentEquals(transmittedBytes, decoded.entries.single().serialized)
         assertEquals("transmitted", decoded.entries.single().value.elementIdentifier)
+    }
+
+    @Test
+    fun `device namespaces preserve profile-neutral CBOR values`() {
+        val namespaces = DeviceNameSpaces(
+            mapOf(
+                "org.example.application" to DeviceSignedItemList(
+                    listOf(DeviceSignedItem("authorization_code", CborInteger(7))),
+                )
+            )
+        )
+
+        val encoded = coseCompliantCbor.encodeToByteArray(DeviceNameSpaces.serializer(), namespaces)
+        val decoded = coseCompliantCbor.decodeFromByteArray(CborElement.serializer(), encoded) as CborMap
+        val application = decoded[CborString("org.example.application")] as CborMap
+
+        assertEquals(CborInteger(7), application[CborString("authorization_code")])
     }
 }
