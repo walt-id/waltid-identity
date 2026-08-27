@@ -79,15 +79,12 @@ class MdocDeviceEngagementFactory {
         val publicCose = publicJwk.toCoseKey()
         val encodedCose = coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicCose)
         val engagementCapabilities = capabilities.toDeviceEngagementCapabilities()
+        val usesEdition2Fields = engagementCapabilities != null
         val engagement = DeviceEngagement(
-            version = if (engagementCapabilities == null) {
-                DeviceEngagement.VERSION_1_0
-            } else {
-                DeviceEngagement.VERSION_1_1
-            },
+            version = if (usesEdition2Fields) DeviceEngagement.VERSION_1_1 else DeviceEngagement.VERSION_1_0,
             security = DeviceEngagementSecurity(1u, ByteStringWrapper(publicCose, encodedCose)),
             deviceRetrievalMethods = methods.toList().takeIf { context.engagementMode is MdocEngagementMode.Qr },
-            originInfos = emptyList<CborElement>().takeIf { engagementCapabilities != null },
+            originInfos = emptyList<CborElement>().takeIf { usesEdition2Fields },
             capabilities = engagementCapabilities,
         )
         val exact = ExactCbor.of(
@@ -132,12 +129,16 @@ class MdocRequestPreview(
     val readerAuthentication: DeviceRequestReaderAuthenticationDisplay? = null,
     /**
      * SHA-256 digest over the wallet-owned trust snapshot, eligible credentials, selected use-case/elements,
-     * retention flags, authentication method, and holder-key reference.
+     * retention flags, authentication method, holder-key reference, validated application-profile results,
+     * and selected device-signed response mappings.
      */
     val submissionBindingDigest: ImmutableBytes,
+    applicationAuthorizations: List<MdocApplicationAuthorization> = emptyList(),
 ) {
     val documents: List<PreviewDocument> = documents.toList()
     val purposeHints: Map<String, Int> = purposeHints.toMap()
+    /** Wallet-profile results already validated and normalized for display during holder consent. */
+    val applicationAuthorizations: List<MdocApplicationAuthorization> = applicationAuthorizations.toList()
 
     init {
         require(this.documents.isNotEmpty()) { "A request preview must contain at least one document" }
@@ -414,7 +415,7 @@ class MdocHolderProtocolEngine(
                     timeouts.request,
                     ProximityError.Protocol("request_processing_timeout", "Request preview processing timed out"),
                 ) { requestProcessor.preview(context) }
-                val token = consentBinding(incoming, exactTranscript, exchange, preview.submissionBindingDigest)
+                val token = consentBinding(incoming, exactTranscript, exchange, preview)
                 val prompt = MdocConsentPrompt(token, exchange, preview)
                 mutableState.value = MdocHolderSessionState.ReviewRequired(prompt)
                 val decision = phase(
@@ -653,7 +654,7 @@ class MdocHolderProtocolEngine(
         request: ImmutableBytes,
         transcript: ImmutableBytes,
         exchange: Int,
-        submissionBinding: ImmutableBytes,
+        preview: MdocRequestPreview,
     ): ImmutableBytes {
         val exchangeBytes = byteArrayOf(
             (exchange ushr 24).toByte(),
@@ -663,21 +664,21 @@ class MdocHolderProtocolEngine(
         )
         return ImmutableBytes.of(
             SHA256().digest(
-                "walt.id/mdoc-consent/v1".encodeToByteArray() +
-                    lengthPrefixed(request.copy()) +
-                    lengthPrefixed(transcript.copy()) +
+                "walt.id/mdoc-consent/v2".encodeToByteArray() +
+                    bindingLengthPrefixed(request.copy()) +
+                    bindingLengthPrefixed(transcript.copy()) +
                     exchangeBytes +
-                    submissionBinding.copy()
+                    preview.submissionBindingDigest.copy() +
+                    applicationAuthorizationBindings(preview.applicationAuthorizations)
             )
         )
     }
 
-    private fun lengthPrefixed(value: ByteArray): ByteArray = byteArrayOf(
-        (value.size ushr 24).toByte(),
-        (value.size ushr 16).toByte(),
-        (value.size ushr 8).toByte(),
-        value.size.toByte(),
-    ) + value
+    private fun applicationAuthorizationBindings(
+        authorizations: List<MdocApplicationAuthorization>,
+    ): ByteArray = authorizations.fold(bindingIntBytes(authorizations.size)) { bytes, authorization ->
+        bytes + authorization.consentBindingDigest().copy()
+    }
 
     private suspend fun <T> phase(duration: Duration, error: ProximityError, block: suspend () -> T): T {
         val completed = withTimeoutOrNull(duration) { CompletedPhase(block()) }
