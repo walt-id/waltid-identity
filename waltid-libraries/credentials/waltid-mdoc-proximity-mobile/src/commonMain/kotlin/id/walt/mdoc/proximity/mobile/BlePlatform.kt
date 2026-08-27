@@ -4,17 +4,11 @@ import id.walt.mdoc.proximity.ProximityCloseReason
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.ReceiveChannel
 
-internal data class BlePlatformCapability(
-    val available: Boolean,
-    val code: String,
-    val message: String,
-)
-
 internal enum class BlePlatformRole { CENTRAL_CLIENT, PERIPHERAL_SERVER }
 internal enum class BleRawBearer { GATT, L2CAP }
 
 internal interface BlePlatformAdapter {
-    suspend fun capability(): BlePlatformCapability
+    suspend fun capability(): BleProximityAvailability
 
     suspend fun prepareCentralClient(
         serviceUuid: BleServiceUuid,

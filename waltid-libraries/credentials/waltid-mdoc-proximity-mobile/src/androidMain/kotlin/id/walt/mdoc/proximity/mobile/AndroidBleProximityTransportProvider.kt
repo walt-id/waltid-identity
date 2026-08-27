@@ -23,18 +23,31 @@ public class AndroidBleProximityTransportProvider(
     configuration: BleProximityTransportConfiguration,
 ) : ProximityTransportProvider by DefaultBleProximityTransportProvider(
     configuration,
-    AndroidBlePlatformAdapter(context.applicationContext, configuration.roles),
+    AndroidBlePlatformAdapter(context.applicationContext, configuration.roles.selection),
 )
+
+/** Android BLE preflight and provider factory. */
+public class AndroidBleProximityTransportFactory(context: Context) : BleProximityTransportFactory {
+    private val applicationContext: Context = context.applicationContext
+
+    /** Checks the permissions and platform facilities required by [roles] without preparing BLE. */
+    override suspend fun capability(roles: BleMdocRoleSelection): BleProximityAvailability =
+        AndroidBlePlatformAdapter(applicationContext, roles).capability()
+
+    /** Creates a session-configured provider without starting BLE operations. */
+    override fun create(configuration: BleProximityTransportConfiguration): ProximityTransportProvider =
+        AndroidBleProximityTransportProvider(applicationContext, configuration)
+}
 
 internal class AndroidBlePlatformAdapter(
     private val context: Context,
-    private val roles: BleMdocRoles,
+    private val roles: BleMdocRoleSelection,
 ) : BlePlatformAdapter {
     private val manager: BluetoothManager? = context.getSystemService(BluetoothManager::class.java)
     internal val adapter: BluetoothAdapter? get() = manager?.adapter
 
     @SuppressLint("MissingPermission")
-    override suspend fun capability(): BlePlatformCapability {
+    override suspend fun capability(): BleProximityAvailability {
         if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             return unavailable("ble_unsupported", "This Android device does not support Bluetooth LE")
         }
@@ -49,7 +62,7 @@ internal class AndroidBlePlatformAdapter(
         if (needsPeripheral() && bluetooth.bluetoothLeAdvertiser == null) {
             return unavailable("ble_advertiser_unavailable", "The Android BLE advertiser is unavailable")
         }
-        return BlePlatformCapability(true, "available", "Bluetooth LE is available")
+        return BleProximityAvailability.Available
     }
 
     override suspend fun prepareCentralClient(
@@ -79,8 +92,11 @@ internal class AndroidBlePlatformAdapter(
         sessionScope,
     )
 
-    private fun needsCentral(): Boolean = roles is BleMdocRoles.CentralClient || roles is BleMdocRoles.Dual
-    private fun needsPeripheral(): Boolean = roles is BleMdocRoles.PeripheralServer || roles is BleMdocRoles.Dual
+    private fun needsCentral(): Boolean =
+        roles == BleMdocRoleSelection.CENTRAL_CLIENT || roles == BleMdocRoleSelection.DUAL
+
+    private fun needsPeripheral(): Boolean =
+        roles == BleMdocRoleSelection.PERIPHERAL_SERVER || roles == BleMdocRoleSelection.DUAL
 
     private fun hasRequiredPermissions(): Boolean {
         fun granted(permission: String) = context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
@@ -93,5 +109,5 @@ internal class AndroidBlePlatformAdapter(
         }
     }
 
-    private fun unavailable(code: String, message: String) = BlePlatformCapability(false, code, message)
+    private fun unavailable(code: String, message: String) = BleProximityAvailability.Unavailable(code, message)
 }

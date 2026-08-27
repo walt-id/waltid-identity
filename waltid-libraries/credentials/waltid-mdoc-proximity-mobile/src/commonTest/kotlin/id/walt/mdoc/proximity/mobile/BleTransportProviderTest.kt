@@ -38,7 +38,9 @@ class BleTransportProviderTest {
 
     @Test
     fun `capability keeps runtime failure separate from implemented profile support`() = runTest {
-        val platform = FakePlatform(BlePlatformCapability(false, "permission_missing", "Bluetooth permission is missing"))
+        val platform = FakePlatform(
+            BleProximityAvailability.Unavailable("permission_missing", "Bluetooth permission is missing")
+        )
         val provider = provider(BleMdocRoles.CentralClient(centralUuid), platform)
 
         val capability = provider.capability(context)
@@ -48,6 +50,15 @@ class BleTransportProviderTest {
         assertFalse(capability.runtimeAvailable)
         assertFalse(capability.sessionSelected)
         assertEquals("permission_missing", capability.unavailableReason?.code)
+    }
+
+    @Test
+    fun `role selection and availability reject ambiguous preflight states`() {
+        assertEquals(BleMdocRoleSelection.CENTRAL_CLIENT, BleMdocRoles.CentralClient(centralUuid).selection)
+        assertEquals(BleMdocRoleSelection.PERIPHERAL_SERVER, BleMdocRoles.PeripheralServer(peripheralUuid).selection)
+        assertEquals(BleMdocRoleSelection.DUAL, BleMdocRoles.Dual(centralUuid, peripheralUuid).selection)
+        assertFailsWith<IllegalArgumentException> { BleProximityAvailability.Unavailable("", "Unavailable") }
+        assertFailsWith<IllegalArgumentException> { BleProximityAvailability.Unavailable("unavailable", "") }
     }
 
     @Test
@@ -224,7 +235,7 @@ class BleTransportProviderTest {
 }
 
 private class FakePlatform(
-    var platformCapability: BlePlatformCapability = BlePlatformCapability(true, "available", "BLE is available"),
+    var platformCapability: BleProximityAvailability = BleProximityAvailability.Available,
 ) : BlePlatformAdapter {
     val central = FakePreparedRole(BlePlatformRole.CENTRAL_CLIENT)
     val peripheral = FakePreparedRole(BlePlatformRole.PERIPHERAL_SERVER, 0x80u)
@@ -233,7 +244,7 @@ private class FakePlatform(
     var centralPreparationGate: CompletableDeferred<Unit>? = null
     var centralIdent: ByteArray? = null
 
-    override suspend fun capability(): BlePlatformCapability = platformCapability
+    override suspend fun capability(): BleProximityAvailability = platformCapability
 
     override suspend fun prepareCentralClient(
         serviceUuid: BleServiceUuid,
