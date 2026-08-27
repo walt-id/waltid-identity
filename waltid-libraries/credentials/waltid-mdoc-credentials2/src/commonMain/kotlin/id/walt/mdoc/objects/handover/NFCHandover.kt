@@ -23,12 +23,18 @@ import kotlinx.serialization.cbor.CborObjectAsArray
 data class NFCHandover(
     /** Handover Select Message (binary) */
     @ByteString
-    val handoverSelect: ByteArray?,
+    val handoverSelect: ByteArray,
 
     /** Handover Request Message (binary) - null if NFC Static Handover was used */
     @ByteString
     val handoverRequest: ByteArray?
 ) : BaseHandoverInfo {
+    init {
+        require(handoverSelect.isNotEmpty()) { "NFC Handover Select message must not be empty" }
+        require(handoverRequest == null || handoverRequest.isNotEmpty()) {
+            "NFC Handover Request message must not be empty when present"
+        }
+    }
     /**
      * Note: `equals` and `hashCode` are manually overridden because the default implementation for a
      * `data class` uses reference equality for `ByteArray` properties. This override ensures
@@ -45,7 +51,7 @@ data class NFCHandover(
     }
 
     override fun hashCode(): Int {
-        var result = handoverSelect?.contentHashCode() ?: 0
+        var result = handoverSelect.contentHashCode()
         result = 31 * result + (handoverRequest?.contentHashCode() ?: 0)
         return result
     }
