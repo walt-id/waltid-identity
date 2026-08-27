@@ -144,8 +144,12 @@ internal class AndroidBlePeripheralRole private constructor(
             value: ByteArray,
         ) {
             val validPeer = activeDevice.get()?.address == device.address
+            var terminate = false
             val accepted = validPeer && !preparedWrite && offset == 0 && when (characteristic.uuid) {
-                stateCharacteristic.uuid -> handleState(value)
+                stateCharacteristic.uuid -> handleState(value).let { result ->
+                    terminate = result == BlePeripheralStateCommandResult.TERMINATE
+                    result.accepted
+                }
                 clientToServerCharacteristic.uuid -> handleIncomingGatt(value)
                 else -> false
             }
@@ -156,6 +160,7 @@ internal class AndroidBlePeripheralRole private constructor(
                 offset,
                 null,
             )
+            if (accepted && terminate) close(ProximityCloseReason.PEER_DISCONNECTED)
         }
 
         override fun onDescriptorReadRequest(
@@ -285,9 +290,11 @@ internal class AndroidBlePeripheralRole private constructor(
         )
     }
 
-    private fun handleState(value: ByteArray): Boolean = when {
-        value.contentEquals(byteArrayOf(BLE_STATE_START)) -> {
-            if (!stateNotificationsEnabled.get() || !dataNotificationsEnabled.get()) return false
+    private fun handleState(value: ByteArray): BlePeripheralStateCommandResult =
+        evaluateBlePeripheralStateCommand(
+            value = value,
+            notificationsReady = stateNotificationsEnabled.get() && dataNotificationsEnabled.get(),
+        ) {
             val raw = AndroidPeripheralGattConnection(this, incomingGatt)
             if (activeConnection.compareAndSet(null, raw) && connection.complete(raw)) {
                 stopAdvertising()
@@ -298,12 +305,6 @@ internal class AndroidBlePeripheralRole private constructor(
                 false
             }
         }
-        value.contentEquals(byteArrayOf(BLE_STATE_END)) -> {
-            incomingGatt.close()
-            true
-        }
-        else -> false
-    }
 
     private fun handleIncomingGatt(value: ByteArray): Boolean {
         if (activeConnection.get()?.bearer != BleRawBearer.GATT) return false
