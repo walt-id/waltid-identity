@@ -173,7 +173,7 @@ class MdocIssuanceTest {
                 issuerSigned = issuerSigned,
                 deviceSigned = DeviceSigned(
                     ByteStringWrapper(DeviceNameSpaces(mapOf())),
-                    DeviceAuth(deviceMac = CoseMac0(ByteArray(0), CoseHeaders(), ByteArray(0), ByteArray(0)))
+                    DeviceAuth.Mac(CoseMac0(ByteArray(0), CoseHeaders(), ByteArray(0), ByteArray(0)))
                 )
             )
             println("Document: $document")
@@ -333,4 +333,3 @@ class MdocIssuanceTest {
         )
     }
 }
-

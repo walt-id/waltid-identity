@@ -33,7 +33,13 @@ import id.walt.mdoc.objects.elements.IssuerSignedList
 import org.kotlincrypto.hash.sha2.SHA256
 
 sealed interface MdocAuthenticationMethod {
-    data class Signature(val acceptedAlgorithms: Set<Int>? = null) : MdocAuthenticationMethod
+    data class Signature(val acceptedAlgorithms: Set<Int>? = null) : MdocAuthenticationMethod {
+        init {
+            require(acceptedAlgorithms == null || acceptedAlgorithms.isNotEmpty()) {
+                "Accepted signature algorithms must be omitted or non-empty"
+            }
+        }
+    }
     data class Mac(val eReaderKey: id.walt.cose.CoseKey) : MdocAuthenticationMethod
 }
 
@@ -57,7 +63,7 @@ data class MdocDocumentError(val docType: String, val code: Long) {
     init { require(docType.isNotBlank()) }
 }
 
-/** Builds exact selectively-disclosed documents while keeping key access in the caller-provided handle. */
+/** Builds selectively disclosed documents while keeping key access in the caller-provided handle. */
 class MdocResponseBuilder {
     suspend fun buildDocument(
         presentation: MdocDocumentPresentation,
@@ -82,16 +88,16 @@ class MdocResponseBuilder {
         val auth = when (val method = presentation.authentication) {
             is MdocAuthenticationMethod.Signature -> {
                 val algorithm = presentation.holderKey.selectCoseSignatureAlgorithm(method.acceptedAlgorithms)
-                DeviceAuth(
-                    deviceSignature = CoseSign1.createAndSignDetached(
+                DeviceAuth.Signature(
+                    signature = CoseSign1.createAndSignDetached(
                         protectedHeaders = CoseHeaders(algorithm = algorithm),
                         detachedPayload = deviceAuthentication,
                         key = presentation.holderKey,
                     )
                 )
             }
-            is MdocAuthenticationMethod.Mac -> DeviceAuth(
-                deviceMac = createMac(presentation.holderKey, method.eReaderKey, transcript, deviceAuthentication)
+            is MdocAuthenticationMethod.Mac -> DeviceAuth.Mac(
+                mac = createMac(presentation.holderKey, method.eReaderKey, transcript, deviceAuthentication)
             )
         }
         return Document(
@@ -121,7 +127,7 @@ class MdocResponseBuilder {
         )
     }
 
-    /** Builds and HPKE-seals the response to one DocRequest using the exact requested parameters. */
+    /** Builds and HPKE-seals one DocRequest response, preserving supplied encoded encryption parameters. */
     suspend fun buildEncryptedDocuments(
         docRequestId: UInt,
         presentations: List<MdocDocumentPresentation> = emptyList(),

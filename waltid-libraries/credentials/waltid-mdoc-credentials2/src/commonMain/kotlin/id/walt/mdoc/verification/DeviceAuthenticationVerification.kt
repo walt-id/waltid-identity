@@ -6,6 +6,7 @@ import id.walt.crypto2.keys.Key
 import id.walt.mdoc.crypto.MdocCrypto
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.objects.SessionTranscript
+import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 
@@ -30,14 +31,11 @@ suspend fun verifyDeviceAuthentication(
 ): DeviceAuthenticationVerification {
     val deviceSigned = document.deviceSigned
         ?: throw IllegalArgumentException("DeviceSigned structure is missing")
-    val deviceSignature = deviceSigned.deviceAuth.deviceSignature
-    if (deviceSignature == null) {
-        if (deviceSigned.deviceAuth.deviceMac != null) {
-            throw UnsupportedOperationException(
-                "Device MAC authentication is not yet supported. Only DeviceSignature is currently validated."
-            )
-        }
-        throw IllegalArgumentException("No device authentication provided")
+    val deviceSignature = when (val authentication = deviceSigned.deviceAuth) {
+        is DeviceAuth.Signature -> authentication.signature
+        is DeviceAuth.Mac -> throw UnsupportedOperationException(
+            "Device MAC authentication is not yet supported. Only DeviceSignature is currently validated."
+        )
     }
     val deviceAuthenticationBytes = MdocCryptoHelper.buildDeviceAuthenticationBytes(
         transcript = sessionTranscript,

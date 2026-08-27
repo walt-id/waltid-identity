@@ -106,6 +106,38 @@ class ByteStringWrapper<T>(
     }
 }
 
+/**
+ * Pairs a decoded value with an immutable snapshot of the exact top-level CBOR bytes it came from.
+ *
+ * Exact bytes participate in equality because protocol transcripts and signatures can distinguish
+ * semantically equivalent CBOR encodings. The byte array is never exposed without a defensive copy.
+ */
+class ExactCbor<T> private constructor(
+    val value: T,
+    bytes: ByteArray,
+) {
+    private val encodedBytes = bytes.copyOf()
+
+    val size: Int
+        get() = encodedBytes.size
+
+    fun encodedCopy(): ByteArray = encodedBytes.copyOf()
+
+    override fun equals(other: Any?): Boolean =
+        other is ExactCbor<*> && value == other.value && encodedBytes.contentEquals(other.encodedBytes)
+
+    override fun hashCode(): Int = 31 * (value?.hashCode() ?: 0) + encodedBytes.contentHashCode()
+
+    override fun toString(): String = "ExactCbor(value=$value, encodedSize=${encodedBytes.size})"
+
+    companion object {
+        fun <T> of(value: T, bytes: ByteArray): ExactCbor<T> {
+            require(bytes.isNotEmpty()) { "Exact CBOR bytes must not be empty" }
+            return ExactCbor(value, bytes)
+        }
+    }
+}
+
 @OptIn(ExperimentalSerializationApi::class)
 class ByteStringWrapperSerializer<T>(private val dataSerializer: KSerializer<T>) :
     KSerializer<ByteStringWrapper<T>> {

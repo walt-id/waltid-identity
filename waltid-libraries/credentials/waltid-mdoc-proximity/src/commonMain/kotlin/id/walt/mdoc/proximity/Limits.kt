@@ -57,7 +57,6 @@ data class MdocProximityTimeouts(
     val request: Duration = 60.seconds,
     val consent: Duration = 120.seconds,
     val keyAuthorization: Duration = 60.seconds,
-    val inactivity: Duration = 30.seconds,
     val gracefulTermination: Duration = 5.seconds,
     val totalSession: Duration = 5.minutes,
 ) {
@@ -71,7 +70,6 @@ data class MdocProximityTimeouts(
                 request,
                 consent,
                 keyAuthorization,
-                inactivity,
                 gracefulTermination,
                 totalSession,
             ).all { it.isPositive() }
