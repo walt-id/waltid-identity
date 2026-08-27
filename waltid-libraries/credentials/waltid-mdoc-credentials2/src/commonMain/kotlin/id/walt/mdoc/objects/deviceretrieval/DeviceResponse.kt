@@ -26,12 +26,15 @@ import kotlinx.serialization.encoding.Encoder
 /**
  * Represents the top-level response from an mdoc to an mdoc reader.
  *
- * @see ISO/IEC 18013-5:2021, 8.3.2.1.2.3
+ * @see ISO/IEC 18013-5, DeviceResponse CDDL
  *
  * @property version The version of the DeviceResponse structure.
- * @property documents An optional list of returned documents. This is absent if the status is not OK.
- * @property documentErrors An optional map of document types to error codes for documents that were not returned.
+ * @property documents Optional conventionally authenticated documents.
+ * @property zkDocuments Optional zero-knowledge-proof documents defined by edition 2.
+ * @property encryptedDocuments Optional per-DocRequest encrypted document responses defined by edition 2.
+ * @property documentErrors Optional list whose entries each map one document type to one error code.
  * @property status The overall status code of the response (0 indicates success).
+ * @property extensions Unrecognized DeviceResponse fields retained for forward-compatible wire round trips.
  */
 @Serializable(with = DeviceResponseSerializer::class)
 data class DeviceResponse(

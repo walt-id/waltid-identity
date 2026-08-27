@@ -30,12 +30,13 @@ import kotlinx.serialization.encoding.Encoder
  * Represents the top-level request from a mdoc reader to a mdoc.
  * It encapsulates one or more specific document requests.
  *
- * @see ISO/IEC 18013-5:2021, 8.3.2.1.2.1
+ * @see ISO/IEC 18013-5, DeviceRequest CDDL
  *
  * @property version The version of the DeviceRequest structure.
  * @property docRequests A list of one or more document requests.
  * @property readerAuthAll Optional structure for mdoc reader authentication for all documents in the request.
  * @property deviceRequestInfo Optional additional information about the overall request.
+ * @property extensions Unrecognized DeviceRequest fields retained for wire round trips.
  */
 @Serializable(with = DeviceRequestSerializer::class)
 data class DeviceRequest(
@@ -62,6 +63,9 @@ data class DeviceRequest(
             }
         }
         require(readerAuthAll == null || readerAuthAll.isNotEmpty())
+        require(deviceRequestInfo?.value?.useCases.orEmpty().flatMap { it.documentSets }.flatten().all {
+            it < docRequests.size.toUInt()
+        }) { "UseCase DocRequest identifiers must index this DeviceRequest's docRequests" }
         requireNoExtensionCollisions(extensions, DEVICE_REQUEST_FIELDS, "DeviceRequest")
     }
 
@@ -73,9 +77,12 @@ data class DeviceRequest(
             return coseCompliantCbor.decodeFromByteArray<DeviceRequest>(base64Url.decodeFromBase64Url())
         }
 
-        fun convertMappingToDocRequests(docTypeRequestedElements: Map<String, Map<String, List<String>>>) =
+        fun convertMappingToDocRequests(
+            docTypeRequestedElements: Map<String, Map<String, List<String>>>,
+            intentToRetain: Boolean = false,
+        ) =
             docTypeRequestedElements.map { (docType, requestedElements) ->
-                DocRequest.fromValues(docType, requestedElements)
+                DocRequest.fromValues(docType, requestedElements, intentToRetain)
             }
     }
 
@@ -104,7 +111,7 @@ data class DeviceRequest(
      */
     constructor(docTypeRequestedElements: Map<String, Map<String, List<String>>>, intentToRetain: Boolean = false) : this(
         version = VERSION,
-        docRequests = convertMappingToDocRequests(docTypeRequestedElements)
+        docRequests = convertMappingToDocRequests(docTypeRequestedElements, intentToRetain)
     )
 
     /** Request individual credential */

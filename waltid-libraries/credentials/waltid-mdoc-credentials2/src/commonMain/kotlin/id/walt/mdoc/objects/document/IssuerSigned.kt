@@ -45,13 +45,14 @@ import id.walt.crypto2.keys.Key as Crypto2Key
  * It holds the namespaces with the signed data items and the `issuerAuth` COSE structure,
  * which contains the Mobile Security Object (MSO) and the issuer's signature over it.
  *
- * @see ISO/IEC 18013-5:xxxx(E), 8.3.2.1.2.3 (Device retrieval mdoc response)
+ * @see ISO/IEC 18013-5, IssuerSigned CDDL
  *
  * @property namespaces A map where the key is a namespace identifier (e.g., "org.iso.18013.5.1") and
  * the value is a list of all issuer-signed items for that namespace. This field is optional.
  * @property issuerAuth The `COSE_Sign1` structure that contains the MSO as its payload. The MSO holds the
  * digests of all data elements, validity information, and the device's public key. The COSE signature
  * on the MSO is the root of trust for all issuer-signed data.
+ * @property extensions Unrecognized IssuerSigned fields retained for wire round trips.
  */
 @ConsistentCopyVisibility
 @Serializable(with = IssuerSignedSerializer::class)
