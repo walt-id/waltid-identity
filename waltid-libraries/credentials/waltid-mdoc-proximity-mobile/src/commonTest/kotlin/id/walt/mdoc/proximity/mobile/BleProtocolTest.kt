@@ -59,6 +59,44 @@ class BleProtocolTest {
     }
 
     @Test
+    fun `peripheral state commands enforce Start readiness and terminal End`() {
+        var starts = 0
+
+        val end = evaluateBlePeripheralStateCommand(
+            value = byteArrayOf(BLE_STATE_END),
+            notificationsReady = false,
+            start = {
+                starts += 1
+                true
+            },
+        )
+        val startWithoutSubscriptions = evaluateBlePeripheralStateCommand(
+            value = byteArrayOf(BLE_STATE_START),
+            notificationsReady = false,
+            start = {
+                starts += 1
+                true
+            },
+        )
+        val readyStart = evaluateBlePeripheralStateCommand(
+            value = byteArrayOf(BLE_STATE_START),
+            notificationsReady = true,
+            start = {
+                starts += 1
+                true
+            },
+        )
+
+        assertEquals(BlePeripheralStateCommandResult.TERMINATE, end)
+        assertTrue(end.accepted)
+        assertEquals(BlePeripheralStateCommandResult.REJECTED, startWithoutSubscriptions)
+        assertFalse(startWithoutSubscriptions.accepted)
+        assertEquals(BlePeripheralStateCommandResult.STARTED, readyStart)
+        assertTrue(readyStart.accepted)
+        assertEquals(1, starts)
+    }
+
+    @Test
     fun `GATT codec frames at negotiated packet boundary and reassembles`() {
         val codec = BleGattMessageCodec(maximumMessageBytes = 32)
         val message = ByteArray(13) { it.toByte() }
