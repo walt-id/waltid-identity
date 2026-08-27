@@ -34,6 +34,7 @@ import id.walt.mdoc.objects.session.SessionData
 import id.walt.mdoc.objects.session.SessionEstablishment
 import id.walt.mdoc.objects.session.SessionStatusCode
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.async
@@ -72,8 +73,9 @@ class HolderProtocolEngineTest {
         )
         val signatureSourceDocument = runtime.issueMdocTestDocument(signatureHolderKey)
         val macSourceDocument = runtime.issueMdocTestDocument(macHolderKey)
-        val loopback = FakeProximityLoopback.create()
         val method = DeviceRetrievalMethod.Nfc(1_024u, 1_024u)
+        val loopback = FakeProximityLoopback.create(capacity = 0)
+        val transport = GatedFakeTransportProvider(method, loopback.holder)
         val engagementContext = EngagementContext(
             MdocProximityProfile.ISO_18013_5_ED2_DIS_2026,
             1_048_576,
@@ -103,15 +105,10 @@ class HolderProtocolEngineTest {
                 SessionData(data = readerSession.cipher.encrypt(encodeRequest(macSourceDocument.docType)))
             )
         )
-        val termination = ImmutableBytes.of(
-            coseCompliantCbor.encodeToByteArray(
-                SessionData(status = SessionStatusCode.SESSION_TERMINATION.code)
-            )
-        )
         var resolved = 0
         val engine = MdocHolderProtocolEngine(
             eDeviceKey = deviceKey,
-            transportProviders = listOf(FakeTransportProvider(method, loopback.holder)),
+            transportProviders = listOf(transport),
             requestProcessor = object : MdocHolderRequestProcessor {
                 override suspend fun preview(context: MdocHolderRequestContext) = preview(context.request.value)
                 override suspend fun resolve(
@@ -145,7 +142,11 @@ class HolderProtocolEngineTest {
                     )
                     return MdocResponseResolution.Send(
                         ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(response)),
-                        continuation = MdocSessionContinuation.CONTINUE,
+                        continuation = if (firstExchange) {
+                            MdocSessionContinuation.CONTINUE
+                        } else {
+                            MdocSessionContinuation.TERMINATE
+                        },
                         submissionBindingDigest = preview.submissionBindingDigest,
                     )
                 }
@@ -155,22 +156,37 @@ class HolderProtocolEngineTest {
             capabilities = capabilities,
         )
         val reader = async {
-            val qrPayload = requireNotNull(
-                engine.state.filterIsInstance<MdocHolderSessionState.Connecting>().first().qrPayload
-            )
+            val engagement = engine.state.filterIsInstance<MdocHolderSessionState.EngagementReady>().first()
+            val qrPayload = requireNotNull(engagement.qrPayload)
             val engagementBytes = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
                 .decode(qrPayload.removePrefix("mdoc:"))
             assertContentEquals(readerSession.engagementBytes, engagementBytes)
-            val engagement = coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(engagementBytes)
-            assertEquals(emptyList(), engagement.originInfos)
-            assertEquals(true, engagement.capabilities?.extendedRequests)
-            assertFalse(engagement.capabilities!!.readerAuthAll)
+            val decodedEngagement = coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(engagementBytes)
+            assertEquals(emptyList(), decodedEngagement.originInfos)
+            assertEquals(true, decodedEngagement.capabilities?.extendedRequests)
+            assertFalse(decodedEngagement.capabilities!!.readerAuthAll)
 
+            transport.connect()
+            engine.state.filterIsInstance<MdocHolderSessionState.Connecting>().first()
             loopback.reader.send(firstEstablishment)
-            loopback.reader.send(secondRequest)
-            loopback.reader.send(termination)
             val signatureResponse = assertResponse(loopback.reader, readerSession.cipher, engine)
+            assertEquals(
+                1,
+                engine.state.filterIsInstance<MdocHolderSessionState.AwaitingNextRequest>()
+                    .first().completedExchanges,
+            )
+            loopback.reader.send(secondRequest)
             val macResponse = assertResponse(loopback.reader, readerSession.cipher, engine)
+            assertEquals(
+                2,
+                engine.state.filterIsInstance<MdocHolderSessionState.Terminating>().first().exchange,
+            )
+            val termination = withTimeoutOrNull(5.seconds) { loopback.reader.receive() }
+                ?: error("No session termination from holder")
+            assertEquals(
+                SessionStatusCode.SESSION_TERMINATION,
+                coseCompliantCbor.decodeFromByteArray<SessionData>(termination.copy()).statusCode,
+            )
             val signatureDocuments = requireNotNull(signatureResponse.documents)
             assertEquals(2, signatureDocuments.size)
             signatureDocuments.forEach {
@@ -803,6 +819,10 @@ class HolderProtocolEngineTest {
             context = context,
             capabilities = capabilities,
         )
+        assertContentEquals(
+            MdocDeviceEngagementFactory().encodeEDeviceKeyBytes(deviceKey).copy(),
+            engagement.engagement.value.security.eDeviceKey.serialized,
+        )
         val readerCose =
             (readerKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey()
         val readerCoseBytes = coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), readerCose)
@@ -821,6 +841,40 @@ class HolderProtocolEngineTest {
 
     private suspend fun agreementKey(id: String) =
         runtime.generateMdocTestKey(id, setOf(KeyUsage.KEY_AGREEMENT))
+
+    private class GatedFakeTransportProvider(
+        private val method: DeviceRetrievalMethod,
+        private val connection: ProximityConnection,
+    ) : ProximityTransportProvider {
+        private val connected = CompletableDeferred<Unit>()
+
+        override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+
+        fun connect() {
+            connected.complete(Unit)
+        }
+
+        override suspend fun capability(context: EngagementContext): ProximityCapability =
+            ProximityCapability(true, true, true, sessionSelected = true)
+
+        override suspend fun prepare(
+            context: EngagementContext,
+            sessionScope: CoroutineScope,
+        ): PreparedTransport = object : PreparedTransport {
+            override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+            override val connectionMethod: DeviceRetrievalMethod = method
+            override val sessionTranscriptFactory: SessionTranscriptFactory = QrSessionTranscriptFactory
+
+            override suspend fun awaitConnection(): ProximityConnection {
+                connected.await()
+                return connection
+            }
+
+            override suspend fun close(reason: ProximityCloseReason) {
+                connection.close(reason)
+            }
+        }
+    }
 
     private companion object {
         const val APPLICATION_CONTEXT_EXTENSION = "org.example.applicationContext"

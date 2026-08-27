@@ -28,10 +28,15 @@ class HolderSessionStateTest {
             MdocHolderSessionState.AwaitingRequest(2).legalActions,
         )
         assertEquals(
+            setOf(MdocHolderAction.CANCEL),
+            MdocHolderSessionState.AwaitingNextRequest(1).legalActions,
+        )
+        assertEquals(
             setOf(MdocHolderAction.APPROVE, MdocHolderAction.DENY, MdocHolderAction.CANCEL),
             MdocHolderSessionState.ReviewRequired(prompt).legalActions,
         )
         assertEquals(emptySet(), MdocHolderSessionState.Completed(2).legalActions)
+        assertEquals(emptySet(), MdocHolderSessionState.Terminating(2).legalActions)
         assertEquals(
             emptySet(),
             MdocHolderSessionState.Failed(ProximityError.Protocol("invalid_request", "Invalid request")).legalActions,
@@ -41,6 +46,8 @@ class HolderSessionStateTest {
     @Test
     fun `display state identifiers and consent bindings reject impossible values`() {
         assertFailsWith<IllegalArgumentException> { MdocHolderSessionState.AwaitingRequest(0) }
+        assertFailsWith<IllegalArgumentException> { MdocHolderSessionState.AwaitingNextRequest(0) }
+        assertFailsWith<IllegalArgumentException> { MdocHolderSessionState.Terminating(0) }
         assertFailsWith<IllegalArgumentException> { MdocHolderSessionState.Completed(0) }
         assertFailsWith<IllegalArgumentException> {
             MdocConsentPrompt(ImmutableBytes.of(ByteArray(31)), 1, preview)
