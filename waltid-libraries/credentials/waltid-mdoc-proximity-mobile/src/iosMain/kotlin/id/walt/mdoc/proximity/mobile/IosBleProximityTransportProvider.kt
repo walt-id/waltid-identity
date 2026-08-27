@@ -33,38 +33,51 @@ public class IosBleProximityTransportProvider(
     IosBlePlatformAdapter(),
 )
 
+/** iOS BLE preflight and provider factory. */
+public class IosBleProximityTransportFactory : BleProximityTransportFactory {
+    /** Checks CoreBluetooth authorization and runtime state without preparing BLE roles. */
+    override suspend fun capability(roles: BleMdocRoleSelection): BleProximityAvailability =
+        IosBlePlatformAdapter().capability()
+
+    /** Creates a session-configured provider without starting BLE operations. */
+    override fun create(configuration: BleProximityTransportConfiguration): ProximityTransportProvider =
+        IosBleProximityTransportProvider(configuration)
+}
+
 internal class IosBlePlatformAdapter : BlePlatformAdapter {
-    override suspend fun capability(): BlePlatformCapability = withContext(Dispatchers.Main) {
+    override suspend fun capability(): BleProximityAvailability = withContext(Dispatchers.Main) {
         when (CBCentralManager.authorization) {
             CBManagerAuthorizationAllowedAlways -> {
                 val state = withTimeoutOrNull(2.seconds) { IosBluetoothStateProbe().state() }
-                    ?: return@withContext BlePlatformCapability(
-                        false,
+                    ?: return@withContext BleProximityAvailability.Unavailable(
                         "ble_state_unknown",
                         "CoreBluetooth did not report its state",
                     )
                 if (state == CBCentralManagerStatePoweredOn) {
-                    BlePlatformCapability(true, "available", "Bluetooth is powered on")
+                    BleProximityAvailability.Available
                 } else {
-                    BlePlatformCapability(false, "ble_powered_off", "CoreBluetooth is unavailable in state $state")
+                    BleProximityAvailability.Unavailable(
+                        "ble_powered_off",
+                        "CoreBluetooth is unavailable in state $state",
+                    )
                 }
             }
-            CBManagerAuthorizationNotDetermined -> BlePlatformCapability(
-                false,
+            CBManagerAuthorizationNotDetermined -> BleProximityAvailability.Unavailable(
                 "ble_permission_not_determined",
                 "Bluetooth authorization has not been requested by the application",
             )
-            CBManagerAuthorizationDenied -> BlePlatformCapability(
-                false,
+            CBManagerAuthorizationDenied -> BleProximityAvailability.Unavailable(
                 "ble_permission_denied",
                 "Bluetooth access is denied",
             )
-            CBManagerAuthorizationRestricted -> BlePlatformCapability(
-                false,
+            CBManagerAuthorizationRestricted -> BleProximityAvailability.Unavailable(
                 "ble_permission_restricted",
                 "Bluetooth access is restricted",
             )
-            else -> BlePlatformCapability(false, "ble_permission_unknown", "Bluetooth authorization is unavailable")
+            else -> BleProximityAvailability.Unavailable(
+                "ble_permission_unknown",
+                "Bluetooth authorization is unavailable",
+            )
         }
     }
 
