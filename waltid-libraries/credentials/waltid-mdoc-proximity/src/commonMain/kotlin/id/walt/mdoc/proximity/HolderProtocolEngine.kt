@@ -598,13 +598,6 @@ class MdocHolderProtocolEngine(
 
     private fun validateRequestLimits(request: DeviceRequest) {
         if (request.docRequests.size > limits.maximumDocuments) throw limit("document_count", "Too many document requests")
-        val responseLimits = request.docRequests.mapNotNull {
-            it.itemsRequest.value.requestInfo?.maximumResponseSize
-        }.distinct()
-        if (responseLimits.size > 1) throw limit(
-            "ambiguous_response_limit",
-            "The request declares conflicting maximum response sizes",
-        )
         request.docRequests.forEach { docRequest ->
             val namespaces = docRequest.itemsRequest.value.namespaces
             if (namespaces.size > limits.maximumNamespacesPerDocument) throw limit("namespace_count", "Too many namespaces")
