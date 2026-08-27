@@ -13,4 +13,17 @@ data class DefaultNotificationRequest(
 
     @SerialName("event_description")
     override val eventDescription: String? = null,
-) : NotificationRequest
+) : NotificationRequest {
+    init {
+        require(notificationId.isNotBlank()) {
+            "notification_id must not be blank"
+        }
+
+        require(eventDescription == null || eventDescription.isValidEventDescription()) {
+            "event_description contains unsupported characters"
+        }
+    }
+}
+
+private fun String.isValidEventDescription(): Boolean =
+    all { it in ' '..'!' || it in '#'..'[' || it in ']'..'~' }

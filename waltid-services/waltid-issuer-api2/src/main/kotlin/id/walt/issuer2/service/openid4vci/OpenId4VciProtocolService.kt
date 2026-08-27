@@ -23,12 +23,15 @@ import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.errors.NotificationError
+import id.walt.openid4vci.errors.NotificationErrorCodes
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestTargetResolution
 import id.walt.openid4vci.requests.credential.resolveCredentialConfigurationId
+import id.walt.openid4vci.requests.notification.NotificationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -40,10 +43,12 @@ import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.proofs.IssuedCredentialNonce
+import id.walt.openid4vci.requests.notification.NotificationRequest
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.openid4vci.responses.notification.NotificationResponseHttp
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseHttp
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
@@ -75,6 +80,7 @@ import kotlin.time.Duration.Companion.minutes
 private const val INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER = "_issuer2_session_id"
 private const val TOKEN_ENDPOINT_PATH = "token"
 private const val CREDENTIAL_ENDPOINT_PATH = "credential"
+private const val NOTIFICATION_ENDPOINT_PATH = "notification"
 private val AUTHORIZATION_CODE_SESSION_LIFETIME = 5.minutes
 
 internal suspend fun restoreSessionIssuerCrypto2Key(
@@ -338,6 +344,66 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             )
         }
     }
+
+    suspend fun processNotificationRequest(
+        authorizationHeaders: List<String>,
+        dpopProofHeaderValues: List<String>,
+        request: NotificationRequest,
+    ): NotificationResponseHttp {
+        val authorization = parseCredentialAuthorization(authorizationHeaders) ?: return oauth2Provider.writeNotificationError(
+            OAuthError(
+                OAuthErrorCodes.INVALID_TOKEN,
+                "Invalid Auth Token"
+            )
+        )
+
+        when (
+            val result = oauth2Provider.createNotificationRequest(
+                request,
+                accessTokenContext = CredentialAccessTokenContext(
+                    authorization = authorization,
+                    expectedIssuer = metadataService.issuerBaseUrl(),
+                    dpopProofHeaderValues = dpopProofHeaderValues,
+                    credentialEndpointUri = endpointUri(NOTIFICATION_ENDPOINT_PATH),
+                ),
+            )
+        ) {
+            is NotificationRequestResult.Success -> Unit
+            is NotificationRequestResult.Failure -> return oauth2Provider.writeNotificationError(result.error)
+            is NotificationRequestResult.OAuthFailure -> return oauth2Provider.writeNotificationError(result.error)
+        }
+
+        val tokenClaims = try {
+            authorization.token.decodeJws().payload
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return oauth2Provider.writeNotificationError(
+                OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Invalid access token")
+            )
+        }
+
+        val sessionId = tokenClaims.stringClaim("sub")
+            ?: return oauth2Provider.writeNotificationError(
+                OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Access token has no session id"),
+            )
+
+        sessionService.updateWalletNotificationEvent(
+            sessionId = sessionId,
+            notificationId = request.notificationId,
+            event = request.event,
+            eventDescription = request.eventDescription,
+        ) ?: return oauth2Provider.writeNotificationError(
+            NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID)
+        )
+
+        return oauth2Provider.writeNotificationResponse()
+    }
+
+    fun invalidNotificationRequest(): NotificationResponseHttp =
+        oauth2Provider.writeNotificationError(
+            NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_REQUEST)
+        )
 
     private fun parseCredentialAuthorization(authorizationHeaders: List<String>) =
         runCatching { parseAccessTokenAuthorization(authorizationHeaders) }.getOrNull()
@@ -637,6 +703,14 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 committedProofKeyJwk = proofPublicKeyJwk
             }
 
+            val walletNotificationId = if (
+                metadataService.walletNotificationEndpointEnabled() && credentialResponse.credentials != null
+            ) {
+                UUID.randomUUID().toString()
+            } else {
+                null
+            }
+            val updatedCredentialResponse = credentialResponse.copy(notificationId = walletNotificationId)
             val updatedSession = try {
                 withContext(NonCancellable) {
                     sessionService.saveSession(
@@ -645,6 +719,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                             statusReason = "Credential issued successfully",
                             issuedCredentialFormat = configuration.format.value,
                             isClosed = true,
+                            walletNotificationId = walletNotificationId,
                         )
                     )
                 }
@@ -679,7 +754,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             }
             notificationService.emitIssuanceStatus(updatedSession)
 
-            return oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
+            return oauth2Provider.writeCredentialResponse(requestWithSession, updatedCredentialResponse)
         } catch (e: CancellationException) {
             if (!claimFinalized) {
                 restoreClaimedSession(

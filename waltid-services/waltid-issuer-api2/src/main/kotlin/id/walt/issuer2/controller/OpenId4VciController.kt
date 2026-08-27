@@ -7,8 +7,10 @@ import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.openid4vci.dpop.DPoPConstants
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseBody
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
+import id.walt.openid4vci.responses.notification.NotificationResponseHttp
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -29,15 +31,22 @@ import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.util.toMap
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlin.coroutines.cancellation.CancellationException
 
 class OpenId4VciController(
     private val metadataService: MetadataService,
     private val protocolService: OpenId4VciProtocolService,
     private val offerService: CredentialOfferService,
 ) {
+    private val notificationRequestJson = Json {
+        ignoreUnknownKeys = true
+        explicitNulls = false
+    }
+
     fun register(route: Route) {
         route.get(".well-known/openid-credential-issuer/openid4vci", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
             call.response.headers.append(HttpHeaders.Vary, HttpHeaders.Accept)
@@ -176,6 +185,34 @@ class OpenId4VciController(
                     }
                 call.respondCredentialResponse(response)
             }
+
+
+            if (metadataService.walletNotificationEndpointEnabled()) {
+                post("notification", OpenId4VciRoutesDocs.notification()) {
+                    val request = try {
+                        notificationRequestJson.decodeFromJsonElement(
+                            DefaultNotificationRequest.serializer(),
+                            call.receive<JsonObject>(),
+                        )
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        call.respondNotificationResponse(
+                            protocolService.invalidNotificationRequest()
+                        )
+                        return@post
+                    }
+
+                    val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
+                    val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
+                    val response = protocolService.processNotificationRequest(
+                        authorizationHeaders = authorizationHeaders,
+                        dpopProofHeaderValues = dpopProofHeaderValues,
+                        request = request,
+                    )
+                    call.respondNotificationResponse(response)
+                }
+            }
         }
     }
 
@@ -218,6 +255,18 @@ class OpenId4VciController(
                     contentType = ContentType.parse(body.contentType),
                     status = status,
                 )
+        }
+    }
+
+    private suspend fun ApplicationCall.respondNotificationResponse(response: NotificationResponseHttp) {
+        response.headers.forEach { (name, value) -> this.response.headers.append(name, value) }
+        val status = HttpStatusCode.fromValue(response.status)
+        val payload = response.payload
+
+        if (payload == null) {
+            respond(status)
+        } else {
+            respond(status, payload)
         }
     }
 }

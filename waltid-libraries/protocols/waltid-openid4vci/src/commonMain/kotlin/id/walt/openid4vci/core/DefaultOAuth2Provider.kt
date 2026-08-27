@@ -49,6 +49,11 @@ import id.walt.crypto.keys.Key
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.mdoc.objects.mso.Status
+import id.walt.openid4vci.errors.NotificationError
+import id.walt.openid4vci.requests.notification.NotificationRequest
+import id.walt.openid4vci.requests.notification.NotificationRequestResult
+import id.walt.openid4vci.responses.notification.NotificationResponse
+import id.walt.openid4vci.responses.notification.NotificationResponseHttp
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.tokens.access.dpopJwkThumbprint
@@ -736,6 +741,41 @@ class DefaultOAuth2Provider(
             body = CredentialResponseBody.EncryptedJwt(encrypted),
         )
     }
+    override suspend fun createNotificationRequest(
+        request: NotificationRequest,
+        accessTokenContext: CredentialAccessTokenContext?,
+    ): NotificationRequestResult {
+        when (val tokenResult = verifyCredentialAccessToken(accessTokenContext)) {
+            is CredentialAccessTokenVerification.Success -> Unit
+            is CredentialAccessTokenVerification.Failure -> return when (val result = tokenResult.result) {
+                is CredentialRequestResult.OAuthFailure -> NotificationRequestResult.OAuthFailure(result.error)
+                is CredentialRequestResult.Failure -> NotificationRequestResult.OAuthFailure(
+                    OAuthError(OAuthErrorCodes.INVALID_TOKEN, result.error.description)
+                )
+                is CredentialRequestResult.Success -> error("Unexpected access-token verification success result")
+            }
+        }
+
+        return NotificationRequestResult.Success(request = request)
+    }
+
+    override fun writeNotificationError(error: NotificationError): NotificationResponseHttp =
+        NotificationResponseHttp(
+            status = 400,
+            payload = mapOf("error" to JsonPrimitive(error.error)),
+        )
+
+    override fun writeNotificationError(error: OAuthError): NotificationResponseHttp =
+        NotificationResponseHttp(
+            status = credentialOAuthJsonErrorStatus(error),
+            payload = oauthErrorPayload(error),
+            headers = credentialOAuthErrorHeaders(error),
+        )
+
+    override fun writeNotificationResponse(response: NotificationResponse): NotificationResponseHttp =
+        NotificationResponseHttp(
+            status = 204,
+        )
 
     private suspend fun verifyCredentialAccessToken(
         accessTokenContext: CredentialAccessTokenContext?,

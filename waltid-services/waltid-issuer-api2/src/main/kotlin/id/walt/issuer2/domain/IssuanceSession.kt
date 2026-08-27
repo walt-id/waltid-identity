@@ -4,6 +4,7 @@ import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -50,4 +51,7 @@ data class IssuanceSession(
     val credentialStatus: JsonElement? = null,
     @Transient
     val crypto2IssuerStoredKey: String? = null,
+    val walletNotificationId: String? = null,
+    val walletNotificationEvent: NotificationEvent? = null,
+    val walletNotificationEventDescription: String? = null,
 )

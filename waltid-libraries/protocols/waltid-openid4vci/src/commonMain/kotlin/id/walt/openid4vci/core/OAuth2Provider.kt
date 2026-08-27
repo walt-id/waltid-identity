@@ -27,9 +27,14 @@ import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
+import id.walt.openid4vci.errors.NotificationError
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
+import id.walt.openid4vci.requests.notification.NotificationRequest
+import id.walt.openid4vci.requests.notification.NotificationRequestResult
+import id.walt.openid4vci.responses.notification.NotificationResponse
+import id.walt.openid4vci.responses.notification.NotificationResponseHttp
 import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
@@ -182,4 +187,15 @@ interface OAuth2Provider {
 
     /** Suspending because response encryption performs key agreement, which is asynchronous on every crypto2 target. */
     suspend fun writeCredentialResponse(request: CredentialRequest, response: CredentialResponse): CredentialResponseHttp
+
+    suspend fun createNotificationRequest(
+        request: NotificationRequest,
+        accessTokenContext: CredentialAccessTokenContext? = null,
+    ): NotificationRequestResult
+
+    fun writeNotificationError(error: NotificationError): NotificationResponseHttp
+
+    fun writeNotificationError(error: OAuthError): NotificationResponseHttp
+
+    fun writeNotificationResponse(response: NotificationResponse = NotificationResponse): NotificationResponseHttp
 }
