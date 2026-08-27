@@ -27,16 +27,16 @@ import kotlinx.serialization.encoding.Encoder
  *
  * It separates data elements into those signed by the issuer and those signed by the mdoc holder's device.
  *
- * @see ISO/IEC 18013-5:xxxx(E), 8.3.2.1.2.3 (Device retrieval mdoc response)
+ * @see ISO/IEC 18013-5, Document CDDL
  *
  * @property docType The document type identifier for the credential being presented (e.g., "org.iso.18013.5.1.mDL").
  * @property issuerSigned A mandatory structure containing data elements signed by the issuing authority and the
  * Mobile Security Object (MSO) for their verification.
- * @property deviceSigned A mandatory structure containing data elements signed by the mdoc's device key and the
- * `DeviceAuth` structure for holder authentication. It must be present even if no data elements are returned
- * within it, as `DeviceAuth` is essential for session integrity.
+ * @property deviceSigned Device-authenticated data. It may be absent in a stored or partially built [Document],
+ * but [id.walt.mdoc.objects.deviceretrieval.DeviceResponse] requires it for every returned conventional document.
  * @property errors An optional map that reports errors for any requested data elements that could not be returned.
  * The map structure is `Namespace -> (DataElementIdentifier -> ErrorCode)`.
+ * @property extensions Unrecognized Document fields retained for a forward-compatible wire round trip.
  */
 @Serializable(with = DocumentSerializer::class)
 data class Document(

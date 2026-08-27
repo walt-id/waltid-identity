@@ -33,6 +33,7 @@ import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -57,6 +58,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -488,7 +490,7 @@ class HolderKeyBindingTest {
         )
 
         val deviceAuth = MdocPresenter.buildDeviceAuth(transcript, credential, namespaces, holderKey)
-        val signature = assertNotNull(deviceAuth.deviceSignature)
+        val signature = assertIs<DeviceAuth.Signature>(deviceAuth).signature
         val detachedPayload = MdocCryptoHelper.buildDeviceAuthenticationBytes(
             transcript,
             credential.docType,

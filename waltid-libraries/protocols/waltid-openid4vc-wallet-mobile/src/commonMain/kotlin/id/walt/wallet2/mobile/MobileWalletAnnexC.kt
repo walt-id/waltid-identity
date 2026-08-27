@@ -543,9 +543,9 @@ internal class MobileWalletAnnexCEngine(
         /**
          * COSE algorithms accepted for ISO 18013-5 reader authentication.
          *
-         * The set is restricted to the ECDSA and EdDSA algorithms §9.1.3.4 permits for reader
-         * authentication, so an unexpected algorithm in an untrusted request is rejected rather
-         * than verified.
+         * The active profile restricts this path to its ECDSA and EdDSA reader-authentication
+         * algorithms, so an unexpected algorithm in an untrusted request is rejected before
+         * verification.
          */
         private val READER_AUTHENTICATION_COSE_ALGORITHMS = setOf(
             Cose.Algorithm.ES256,

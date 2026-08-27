@@ -50,9 +50,10 @@ object MdocCrypto {
     /**
      * Verifies the device's signature (`COSE_Sign1`).
      *
-     * @param payloadToVerify (deviceAuthBytes) The data that was signed.
+     * @param payloadToVerify The detached `DeviceAuthenticationBytes` payload that was signed.
      * @param deviceSignature The COSE_Sign1 signature object.
-     * @param sDevicePublicKey The public key from the MSO to verify the signature.
+     * @param devicePublicKey The device public key from the MSO.
+     * @param allowedAlgorithms The COSE signature algorithms permitted by the active verification policy.
      * @return True if the signature is valid, false otherwise.
      */
     suspend fun verifyDeviceSignature(

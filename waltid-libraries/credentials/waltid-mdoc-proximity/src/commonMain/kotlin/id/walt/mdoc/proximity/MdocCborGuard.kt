@@ -4,7 +4,7 @@ package id.walt.mdoc.proximity
  * A small structural guard run before kotlinx.serialization.
  *
  * It bounds nesting and item count, rejects truncated/trailing data and duplicate map keys, and does not
- * interpret protocol fields. The typed serializers remain the normative field validators.
+ * interpret protocol fields. Typed serializers remain responsible for field-level validation.
  */
 internal object MdocCborGuard {
     fun validate(bytes: ByteArray, maximumDepth: Int, maximumItems: Int) {

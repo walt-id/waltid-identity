@@ -5,9 +5,11 @@ package id.walt.mdoc.proximity
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseKey
+import id.walt.cose.CoseMac0
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.DeviceSigned
 import id.walt.mdoc.objects.deviceretrieval.AlternativeDataElementsSet
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
@@ -32,15 +34,15 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.IssuerSignedItem
-import id.walt.mdoc.objects.engagement.BleRetrievalOptions
+import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceEngagementCapabilities
 import id.walt.mdoc.objects.engagement.DeviceEngagementSecurity
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
-import id.walt.mdoc.objects.engagement.UnknownRetrievalOptions
 import id.walt.mdoc.objects.session.SessionData
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.cbor.CborByteString
+import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborInteger
 import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.cbor.CborString
@@ -62,20 +64,27 @@ class ProtocolModelsTest {
     )
 
     @Test
+    fun `exact CBOR snapshots authenticated bytes on input and output`() {
+        val source = byteArrayOf(0x01, 0x02, 0x03)
+        val exact = ExactCbor.of("decoded", source)
+
+        source[0] = 0x7f
+        assertContentEquals(byteArrayOf(0x01, 0x02, 0x03), exact.encodedCopy())
+
+        val exposed = exact.encodedCopy()
+        exposed[1] = 0x7f
+        assertContentEquals(byteArrayOf(0x01, 0x02, 0x03), exact.encodedCopy())
+    }
+
+    @Test
     fun `device engagement retains exact key bytes and unknown extensions`() {
         val encodedKey = coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicKey)
         val engagement = DeviceEngagement(
             version = "1.1",
             security = DeviceEngagementSecurity(1u, ByteStringWrapper(publicKey, encodedKey)),
             deviceRetrievalMethods = listOf(
-                DeviceRetrievalMethod(
-                    2u,
-                    1u,
-                    BleRetrievalOptions(
-                        peripheralServerModeSupported = true,
-                        centralClientModeSupported = false,
-                        peripheralServerModeUuid = ByteArray(16) { it.toByte() },
-                    ),
+                DeviceRetrievalMethod.Ble(
+                    peripheralMode = BlePeripheralMode(ByteArray(16) { it.toByte() }),
                 )
             ),
             originInfos = emptyList(),
@@ -113,7 +122,7 @@ class ProtocolModelsTest {
         extendedKnownOptions[vector.size + 1] = 0x63
         extendedKnownOptions[vector.size + 2] = 0x00
         val extended = coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(extendedKnownOptions)
-        val ble = assertIs<BleRetrievalOptions>(extended.deviceRetrievalMethods!!.single().options)
+        val ble = assertIs<DeviceRetrievalMethod.Ble>(extended.deviceRetrievalMethods!!.single())
         assertEquals(kotlinx.serialization.cbor.CborInteger(0), ble.extensions[99u])
         assertContentEquals(
             extendedKnownOptions,
@@ -132,7 +141,7 @@ class ProtocolModelsTest {
             )
         }
 
-        val future = DeviceRetrievalMethod(2u, 2u, UnknownRetrievalOptions(CborMap(emptyMap())))
+        val future = DeviceRetrievalMethod.Unknown(2u, 2u, CborMap(emptyMap()))
         val engagement = DeviceEngagement(
             version = "1.0",
             security = DeviceEngagementSecurity(1u, ByteStringWrapper(publicKey, encodedKey)),
@@ -141,7 +150,76 @@ class ProtocolModelsTest {
         val decoded = coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(
             coseCompliantCbor.encodeToByteArray(DeviceEngagement.serializer(), engagement)
         )
-        assertIs<UnknownRetrievalOptions>(decoded.deviceRetrievalMethods!!.single().options)
+        assertIs<DeviceRetrievalMethod.Unknown>(decoded.deviceRetrievalMethods!!.single())
+    }
+
+    @Test
+    fun `authentication retrieval and request contracts reject impossible combinations`() {
+        val signature = CoseSign1(byteArrayOf(), CoseHeaders(), null, byteArrayOf(1))
+        val mac = CoseMac0(byteArrayOf(), CoseHeaders(), byteArrayOf(), byteArrayOf(1))
+        val bothMethods = CborMap(
+            mapOf(
+                CborString("deviceSignature") to coseCompliantCbor.decodeFromByteArray(
+                    CborElement.serializer(),
+                    coseCompliantCbor.encodeToByteArray(CoseSign1.serializer(), signature),
+                ),
+                CborString("deviceMac") to coseCompliantCbor.decodeFromByteArray(
+                    CborElement.serializer(),
+                    coseCompliantCbor.encodeToByteArray(CoseMac0.serializer(), mac),
+                ),
+            )
+        )
+        val bothMethodsBytes = coseCompliantCbor.encodeToByteArray(CborElement.serializer(), bothMethods)
+        val noMethodBytes = coseCompliantCbor.encodeToByteArray(CborElement.serializer(), CborMap(emptyMap()))
+
+        assertFailsWith<kotlinx.serialization.SerializationException> {
+            coseCompliantCbor.decodeFromByteArray<DeviceAuth>(bothMethodsBytes)
+        }
+        assertFailsWith<kotlinx.serialization.SerializationException> {
+            coseCompliantCbor.decodeFromByteArray<DeviceAuth>(noMethodBytes)
+        }
+        assertFailsWith<IllegalArgumentException> { DeviceRetrievalMethod.Ble() }
+        assertFailsWith<IllegalArgumentException> { BlePeripheralMode(ByteArray(16), psm = 0u) }
+        assertFailsWith<IllegalArgumentException> {
+            DeviceRetrievalMethod.Unknown(2u, 1u, CborMap(emptyMap()))
+        }
+
+        val items = ItemsRequest(
+            docType = "org.example.document",
+            namespaces = mapOf("org.example" to ItemsRequestList(listOf(ItemRequest("name", false)))),
+        )
+        val docRequest = DocRequest(ByteStringWrapper(items))
+        val invalidUseCase = DeviceRequestInfo(
+            useCases = listOf(UseCase(mandatory = true, documentSets = listOf(listOf(1u)))),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            DeviceRequest(
+                version = DeviceRequest.VERSION_WITH_SIGNING,
+                docRequests = listOf(docRequest),
+                deviceRequestInfo = ByteStringWrapper(invalidUseCase),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ItemsRequest(
+                docType = items.docType,
+                namespaces = items.namespaces,
+                requestInfo = DocRequestInfo(
+                    alternativeDataElements = listOf(
+                        AlternativeDataElementsSet(
+                            requestedElement = ElementReference("org.example", "not-requested"),
+                            alternativeElementSets = listOf(
+                                listOf(ElementReference("org.example", "full_name"))
+                            ),
+                        )
+                    )
+                ),
+            )
+        }
+        val duplicateSystem = ZkSystemSpec("proof", "example")
+        assertFailsWith<IllegalArgumentException> {
+            ZkRequest(zkRequired = true, systemSpecs = listOf(duplicateSystem, duplicateSystem))
+        }
+        assertFailsWith<IllegalArgumentException> { MdocAuthenticationMethod.Signature(emptySet()) }
     }
 
     @Test
@@ -352,8 +430,8 @@ class ProtocolModelsTest {
             issuerSigned = issuerSigned,
             deviceSigned = DeviceSigned(
                 namespaces = ByteStringWrapper(deviceNameSpaces, exactDeviceNameSpaces),
-                deviceAuth = DeviceAuth(
-                    deviceSignature = dummySignature,
+                deviceAuth = DeviceAuth.Signature(
+                    signature = dummySignature,
                     extensions = mapOf("futureDeviceAuth" to CborString("auth")),
                 ),
                 extensions = mapOf("futureDeviceSigned" to CborString("device")),
@@ -449,7 +527,7 @@ class ProtocolModelsTest {
 
 
     @Test
-    fun `future compatible minor versions are accepted while unknown major versions fail`() {
+    fun `later minor versions of the known major are accepted while unknown majors fail`() {
         val encodedKey = coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicKey)
         DeviceEngagement(
             version = "1.2",

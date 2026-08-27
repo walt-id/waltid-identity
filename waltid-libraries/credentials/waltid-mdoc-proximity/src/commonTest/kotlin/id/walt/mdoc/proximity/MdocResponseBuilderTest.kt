@@ -26,6 +26,7 @@ import id.walt.mdoc.objects.deviceretrieval.ElementReference
 import id.walt.mdoc.objects.deviceretrieval.EncryptedDocumentsPlaintext
 import id.walt.mdoc.objects.deviceretrieval.EncryptionParameters
 import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.DeviceSignedItem
@@ -39,6 +40,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class MdocResponseBuilderTest {
@@ -89,7 +91,7 @@ class MdocResponseBuilderTest {
         assertTrue(
             MdocCrypto.verifyDeviceSignature(
                 signaturePayload,
-                signatureDocument.deviceSigned!!.deviceAuth.deviceSignature!!,
+                assertIs<DeviceAuth.Signature>(signatureDocument.deviceSigned!!.deviceAuth).signature,
                 devicePublic,
                 setOf(Cose.Algorithm.ES256),
             )
@@ -112,13 +114,13 @@ class MdocResponseBuilderTest {
         assertTrue(
             MdocCrypto.verifyDeviceMac(
                 macPayload,
-                macDocument.deviceSigned!!.deviceAuth.deviceMac!!,
+                assertIs<DeviceAuth.Mac>(macDocument.deviceSigned!!.deviceAuth).mac,
                 MdocCryptoHelper.buildSessionTranscriptBytes(transcript),
                 readerKey,
                 macSource.issuerSigned.decodeMobileSecurityObject().deviceKeyInfo.deviceKey,
             )
         )
-        val tamperedMac = macDocument.deviceSigned!!.deviceAuth.deviceMac!!.let { mac ->
+        val tamperedMac = assertIs<DeviceAuth.Mac>(macDocument.deviceSigned!!.deviceAuth).mac.let { mac ->
             mac.copy(tag = mac.tag.copyOf().also { it[it.lastIndex] = (it.last() + 1).toByte() })
         }
         assertFalse(
@@ -170,7 +172,7 @@ class MdocResponseBuilderTest {
             assertTrue(
                 MdocCrypto.verifyDeviceMac(
                     payload,
-                    document.deviceSigned!!.deviceAuth.deviceMac!!,
+                    assertIs<DeviceAuth.Mac>(document.deviceSigned!!.deviceAuth).mac,
                     MdocCryptoHelper.buildSessionTranscriptBytes(transcript),
                     readerKey,
                     source.issuerSigned.decodeMobileSecurityObject().deviceKeyInfo.deviceKey,
@@ -285,7 +287,7 @@ class MdocResponseBuilderTest {
         val document = id.walt.cose.coseCompliantCbor
             .decodeFromByteArray<EncryptedDocumentsPlaintext>(plaintext)
             .documents!!.single()
-        val authentication = document.deviceSigned!!.deviceAuth.deviceSignature!!
+        val authentication = assertIs<DeviceAuth.Signature>(document.deviceSigned!!.deviceAuth).signature
         val devicePublic = MdocCrypto.coseKeyToCrypto2Key(
             source.issuerSigned.decodeMobileSecurityObject().deviceKeyInfo.deviceKey
         )

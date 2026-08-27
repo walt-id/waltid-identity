@@ -23,12 +23,13 @@ import kotlinx.serialization.encoding.*
  * The decoded content of an `itemsRequest`, specifying the document type and the
  * desired namespaces and data elements.
  *
- * @see ISO/IEC 18013-5:2021, 8.3.2.1.2.1
+ * @see ISO/IEC 18013-5, ItemsRequest CDDL
  *
  * @property docType The document type being requested (e.g., "org.iso.18013.5.1.mDL").
  * @property namespaces A map where the key is the namespace identifier (e.g., "org.iso.18013.5.1")
  * and the value is a map of data element identifiers to a boolean `IntentToRetain` flag.
  * @property requestInfo Optional edition-2 constraints for this document request.
+ * @property extensions Unrecognized ItemsRequest fields retained for wire round trips.
  */
 @Serializable(with = ItemsRequestSerializer::class)
 data class ItemsRequest(
@@ -47,10 +48,14 @@ data class ItemsRequest(
         require(docType.isNotBlank()) { "ItemsRequest docType must not be blank" }
         require(namespaces.isNotEmpty()) { "ItemsRequest nameSpaces must not be empty" }
         require(namespaces.values.all { it.entries.isNotEmpty() }) { "Requested namespaces must not be empty" }
+        require(requestInfo?.alternativeDataElements.orEmpty().all { alternative ->
+            namespaces[alternative.requestedElement.namespace]?.entries?.any {
+                it.key == alternative.requestedElement.elementIdentifier
+            } == true
+        }) { "Every alternativeDataElements requestedElement must identify a requested data element" }
         requireNoExtensionCollisions(extensions, ITEMS_REQUEST_FIELDS, "ItemsRequest")
     }
 }
-
 object ItemsRequestSerializer : KSerializer<ItemsRequest> {
     override val descriptor: SerialDescriptor = CborElement.serializer().descriptor
 

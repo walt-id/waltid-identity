@@ -1,6 +1,6 @@
 package id.walt.mdoc.objects
 
-/** Parsed ISO mdoc `major.minor` version used to accept future compatible minor revisions deliberately. */
+/** Parsed ISO mdoc `major.minor` version used by each structure's explicit version policy. */
 class MdocVersion private constructor(val major: UInt, val minor: UInt) : Comparable<MdocVersion> {
     override fun compareTo(other: MdocVersion): Int = compareValuesBy(this, other, MdocVersion::major, MdocVersion::minor)
 
