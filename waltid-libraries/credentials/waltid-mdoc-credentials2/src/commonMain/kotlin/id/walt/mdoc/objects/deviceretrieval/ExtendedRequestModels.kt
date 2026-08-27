@@ -398,6 +398,11 @@ data class ZkDocumentData(
         require(docType.isNotBlank() && zkSystemId.isNotBlank())
         require(issuerSigned == null || issuerSigned.isNotEmpty() && issuerSigned.values.all { it.isNotEmpty() })
         require(deviceSigned == null || deviceSigned.isNotEmpty() && deviceSigned.values.all { it.isNotEmpty() })
+        require(issuerSigned.orEmpty().keys.all { it.isNotBlank() }) { "Issuer ZKP namespaces must not be blank" }
+        require(deviceSigned.orEmpty().keys.all { it.isNotBlank() }) { "Device ZKP namespaces must not be blank" }
+        require((issuerSigned.orEmpty().values + deviceSigned.orEmpty().values).all { items ->
+            items.map { it.elementIdentifier }.distinct().size == items.size
+        }) { "ZKP element identifiers must be unique within each namespace" }
         require(msoX5chain == null || msoX5chain.isNotEmpty() && msoX5chain.all { it.isNotEmpty() })
         requireNoExtensionCollisions(extensions, ZK_DOCUMENT_DATA_FIELDS, "ZkDocumentData")
     }

@@ -25,18 +25,18 @@ import org.kotlincrypto.random.CryptoRand
 /**
  * Represents a single data element attested to by the issuing authority.
  *
- * This structure contains the actual data element (e.g., family name), a random value (salt),
+ * This structure contains the actual data element (e.g., family name), a random byte string,
  * and a digest ID that links it to a specific hash within the Mobile Security Object (MSO).
  * The combination of these elements allows a verifier to confirm that the data has not been
  * tampered with since it was issued.
  *
- * @see ISO/IEC 18013-5:xxxx(E), 8.3.2.1.2.3 (Device retrieval mdoc response)
- * @see ISO/IEC 18013-5:xxxx(E), 9.1.2.5 (Message digest function)
+ * @see ISO/IEC 18013-5, IssuerSignedItem and IssuerSignedItemBytes CDDL
  *
- * @property digestId A unique unsigned integer that maps this item to a specific digest in the MSO's `valueDigests` map for its namespace.
- * @property random A unique, unpredictable random value (salt) of at least 16 bytes. This ensures the final digest does not leak information about the content of `elementValue`.
+ * @property digestId The unsigned identifier used to find this item's digest in the MSO namespace.
+ * @property random The byte string included in the item's digest. [create] generates 24 random bytes; decoded wire values are retained as received.
  * @property elementIdentifier The identifier for the data element (e.g., "family_name").
- * @property elementValue The actual value of the data element. Its type can be any valid CBOR type, represented here as `Any`.
+ * @property elementValue The data-element value represented as a CBOR element.
+ * @property extensions Unrecognized IssuerSignedItem fields retained for a wire round trip.
  */
 @Serializable(with = IssuerSignedItemSerializer::class)
 data class IssuerSignedItem(
