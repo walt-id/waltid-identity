@@ -152,6 +152,12 @@ object MdocCryptoHelper {
         return byteArrayOf(0xd8.toByte(), 24.toByte()) + cborByteString
     }
 
+    /** Exact `SessionTranscriptBytes = #6.24(bstr .cbor SessionTranscript)` cryptographic input. */
+    fun buildSessionTranscriptBytes(transcript: SessionTranscript): ByteArray {
+        val encoded = coseCompliantCbor.encodeToByteArray(transcript)
+        return byteArrayOf(0xd8.toByte(), 0x18) + coseCompliantCbor.encodeToByteArray(encoded)
+    }
+
     /**
      * Calculates the digest of a serialized IssuerSignedItem.
      * As per ISO/IEC 18013-5:2021, 9.1.2.5.

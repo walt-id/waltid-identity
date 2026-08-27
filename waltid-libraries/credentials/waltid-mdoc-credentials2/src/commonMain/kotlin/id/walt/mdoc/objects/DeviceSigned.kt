@@ -1,15 +1,30 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.objects
 
 import id.walt.cose.CoseSign1
 import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.encoding.decodeTextMap
+import id.walt.mdoc.encoding.encodeTextMap
+import id.walt.mdoc.encoding.extensionsExcluding
+import id.walt.mdoc.encoding.fromCborElement
+import id.walt.mdoc.encoding.fromTaggedByteString
+import id.walt.mdoc.encoding.requireNoExtensionCollisions
+import id.walt.mdoc.encoding.toCborElement
+import id.walt.mdoc.encoding.toTaggedByteString
 import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.cbor.ValueTags
+import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * Represents the `DeviceSigned` structure within a `Document`. It contains data elements that are
@@ -25,15 +40,18 @@ import kotlinx.serialization.cbor.ValueTags
  * that authenticates the mdoc and binds the entire transaction to the device's private key.
  */
 @OptIn(ExperimentalUnsignedTypes::class, ExperimentalSerializationApi::class)
-@Serializable
+@Serializable(with = DeviceSignedSerializer::class)
 data class DeviceSigned(
     @SerialName("nameSpaces")
-    @ValueTags(24U)
     val namespaces: ByteStringWrapper<DeviceNameSpaces>,
 
     @SerialName("deviceAuth")
-    val deviceAuth: DeviceAuth
+    val deviceAuth: DeviceAuth,
+    val extensions: Map<String, CborElement> = emptyMap(),
 ) {
+    init {
+        requireNoExtensionCollisions(extensions, DEVICE_SIGNED_FIELDS, "DeviceSigned")
+    }
 
     companion object {
         /**
@@ -52,11 +70,41 @@ data class DeviceSigned(
         fun fromDeviceSignedItems(
             namespacedItems: Map<String, List<DeviceSignedItem>>,
             deviceAuth: CoseSign1, // ByteArray
+            extensions: Map<String, CborElement> = emptyMap(),
         ): DeviceSigned = DeviceSigned(
             namespaces = ByteStringWrapper(DeviceNameSpaces(namespacedItems.map { (namespace, value) ->
                 namespace to DeviceSignedItemList(value)
             }.toMap())),
             deviceAuth = DeviceAuth(deviceAuth),
+            extensions = extensions,
         )
     }
 }
+
+object DeviceSignedSerializer : KSerializer<DeviceSigned> {
+    override val descriptor: SerialDescriptor = CborElement.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: DeviceSigned) {
+        val fields = linkedMapOf(
+            "nameSpaces" to value.namespaces.toTaggedByteString(DeviceNameSpaces.serializer()),
+            "deviceAuth" to value.deviceAuth.toCborElement(DeviceAuth.serializer()),
+        )
+        fields.putAll(value.extensions)
+        encoder.encodeTextMap(fields)
+    }
+
+    override fun deserialize(decoder: Decoder): DeviceSigned {
+        val fields = decoder.decodeTextMap("DeviceSigned")
+        return DeviceSigned(
+            namespaces = fields["nameSpaces"]?.fromTaggedByteString(
+                DeviceNameSpaces.serializer(),
+                "DeviceSigned nameSpaces",
+            ) ?: throw SerializationException("DeviceSigned nameSpaces is required"),
+            deviceAuth = fields["deviceAuth"]?.fromCborElement(DeviceAuth.serializer())
+                ?: throw SerializationException("DeviceSigned deviceAuth is required"),
+            extensions = fields.extensionsExcluding(DEVICE_SIGNED_FIELDS),
+        )
+    }
+}
+
+private val DEVICE_SIGNED_FIELDS = setOf("nameSpaces", "deviceAuth")
