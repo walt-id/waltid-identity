@@ -24,6 +24,10 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.dcql.models.CredentialFormat
+import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.DcqlQuery
+import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
@@ -32,8 +36,10 @@ import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.wallet2.handlers.MatchCredentialsFromStoreRequest
 import id.walt.wallet2.handlers.ImportCredentialRequest
 import id.walt.wallet2.handlers.WalletCredentialHandler
+import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -133,6 +139,49 @@ class HolderKeyBindingTest {
         }
 
         assertEquals(HolderKeyBindingErrorCode.BINDING_MISSING, failure.code)
+    }
+
+    @Test
+    fun `store matching does not offer an unbound mdoc for presentation`() = runTest {
+        val holderKey = signingKey("holder")
+        val unbound = mdocCredential(holderKey)
+        val credentialStore = InMemoryCredentialStore().apply {
+            addCredential(unbound)
+        }
+        val wallet = Wallet(
+            id = "wallet",
+            keyStores = listOf(InMemoryKeyStore().apply { addCrypto2Key(holderKey) }),
+            credentialStores = listOf(credentialStore),
+        )
+        val request = MatchCredentialsFromStoreRequest(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "mdl",
+                        format = CredentialFormat.MSO_MDOC,
+                        meta = MsoMdocMeta(doctypeValue = MDOC_DOCTYPE),
+                    )
+                )
+            )
+        )
+
+        val failure = assertFailsWith<HolderKeyBindingException> {
+            WalletPresentationHandler.matchCredentialsFromStore(
+                wallet = wallet,
+                request = request,
+            )
+        }
+
+        assertEquals(HolderKeyBindingErrorCode.BINDING_MISSING, failure.code)
+
+        credentialStore.addCredential(
+            wallet.withRequiredUniqueHolderKeyBinding(unbound, HolderKeyBindingOrigin.IMPORT)
+        )
+        val result = WalletPresentationHandler.matchCredentialsFromStore(wallet, request)
+
+        assertEquals(listOf("mdl"), result.matchedQueryIds)
+        assertEquals(1, result.matchCount)
+        assertEquals(mapOf("mdl" to listOf(unbound.id)), result.matchedCredentialIds)
     }
 
     @Test

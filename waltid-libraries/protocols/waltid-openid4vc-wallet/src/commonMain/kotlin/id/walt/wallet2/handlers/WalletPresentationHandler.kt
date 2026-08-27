@@ -649,7 +649,12 @@ object WalletPresentationHandler {
         val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val matched = wallet.onlyHolderKeyEligibleMdocs(
-            matched = selectFromStores(wallet, query, useWalletCredentialIds = true),
+            matched = selectFromSnapshot(
+                wallet = wallet,
+                query = query,
+                storedCredentials = storedById.values.toList(),
+                useWalletCredentialIds = true,
+            ),
             storedById = storedById,
         )
         val availableCredentialQueryIds = matched.filterValues { it.isNotEmpty() }.keys
@@ -739,7 +744,12 @@ object WalletPresentationHandler {
         val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val matched = wallet.onlyHolderKeyEligibleMdocs(
-            matched = selectFromStores(wallet, query, useWalletCredentialIds = true),
+            matched = selectFromSnapshot(
+                wallet = wallet,
+                query = query,
+                storedCredentials = storedById.values.toList(),
+                useWalletCredentialIds = true,
+            ),
             storedById = storedById,
         )
         val availableCredentialQueryIds = matched.filterValues { it.isNotEmpty() }.keys
@@ -837,7 +847,12 @@ object WalletPresentationHandler {
         }
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val matched = wallet.onlyHolderKeyEligibleMdocs(
-            matched = selectFromStores(wallet, query, useWalletCredentialIds = true),
+            matched = selectFromSnapshot(
+                wallet = wallet,
+                query = query,
+                storedCredentials = storedById.values.toList(),
+                useWalletCredentialIds = true,
+            ),
             storedById = storedById,
             allowedCredentialIds = request.eligibleCredentialIds,
         )
@@ -1201,21 +1216,19 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: MatchCredentialsFromStoreRequest
     ): MatchCredentialsResult {
-        // Build idByIndex and rawCredentials in a single streaming pass over the credential stores.
-        // selectFromStores uses integer indices as DCQL credential IDs internally; we need the
-        // idx -> wallet-assigned-id map to translate them back before returning to the caller.
-        val idByIndex = mutableMapOf<String, String>()
-        val rawCredentials = mutableListOf<RawDcqlCredential>()
-        var idx = 0
-        wallet.streamAllCredentials().collect { stored ->
-            val key = idx.toString()
-            idByIndex[key] = stored.id
-            rawCredentials += stored.credential.toRawDcqlCredential(key)
-            idx++
-        }
-        if (rawCredentials.isEmpty()) return MatchCredentialsResult(emptyList(), 0, emptyMap())
-        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
-        return buildMatchResult(matched, idByIndex)
+        val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
+        if (storedById.isEmpty()) return MatchCredentialsResult(emptyList(), 0, emptyMap())
+
+        val matched = wallet.onlyHolderKeyEligibleMdocs(
+            matched = selectFromSnapshot(
+                wallet = wallet,
+                query = request.dcqlQuery,
+                storedCredentials = storedById.values.toList(),
+                useWalletCredentialIds = true,
+            ),
+            storedById = storedById,
+        )
+        return buildMatchResult(matched, emptyMap())
     }
 
     /**
@@ -1356,22 +1369,35 @@ object WalletPresentationHandler {
         wallet: Wallet,
         query: DcqlQuery,
         useWalletCredentialIds: Boolean = false,
+    ): Map<String, List<DcqlMatcher.DcqlMatchResult>> = selectFromSnapshot(
+        wallet = wallet,
+        query = query,
+        storedCredentials = wallet.streamAllCredentials().toList(),
+        useWalletCredentialIds = useWalletCredentialIds,
+    )
+
+    /**
+     * Matches one immutable credential-store snapshot so eligibility checks and consent options are
+     * derived from the same stored records instead of independently re-reading mutable stores.
+     */
+    private fun selectFromSnapshot(
+        wallet: Wallet,
+        query: DcqlQuery,
+        storedCredentials: List<StoredCredential>,
+        useWalletCredentialIds: Boolean,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
         if (wallet.credentialStores.isEmpty()) {
             error("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
         }
 
-        val rawCredentials = mutableListOf<RawDcqlCredential>()
-        var idx = 0
-        wallet.streamAllCredentials().collect { stored ->
+        val rawCredentials = storedCredentials.mapIndexed { idx, stored ->
             log.trace { "  credential[$idx]: id=${stored.id}, format=${stored.credential.format}, issuer=${stored.credential.issuer}" }
-            rawCredentials += stored.credential.toRawDcqlCredential(
+            stored.credential.toRawDcqlCredential(
                 id = if (useWalletCredentialIds) stored.id else idx.toString(),
             )
-            idx++
         }
 
-        log.debug { "DCQL matching against $idx stored credential(s), queries=${query.credentials.map { it.id }}" }
+        log.debug { "DCQL matching against ${storedCredentials.size} stored credential(s), queries=${query.credentials.map { it.id }}" }
         val matched = DcqlMatcher.match(query.copy(credentialSets = null), rawCredentials).getOrThrow()
         log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
         return matched
