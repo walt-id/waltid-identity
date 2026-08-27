@@ -206,6 +206,36 @@ class HolderKeyBindingTest {
     }
 
     @Test
+    fun `automatic selection chooses a bound mdoc when an unbound match is stored first`() = runTest {
+        val unboundKey = signingKey("unbound-holder")
+        val boundKey = signingKey("bound-holder")
+        val credentialStore = InMemoryCredentialStore()
+        val wallet = Wallet(
+            id = "matching-wallet",
+            keyStores = listOf(InMemoryKeyStore().apply {
+                addCrypto2Key(unboundKey)
+                addCrypto2Key(boundKey)
+            }),
+            credentialStores = listOf(credentialStore),
+        )
+        credentialStore.addCredential(mdocCredential(unboundKey, id = "unbound-mdl"))
+        val boundCredential = wallet.withImportedHolderKeyBinding(
+            mdocCredential(boundKey, id = "bound-mdl"),
+        ).also { credentialStore.addCredential(it) }
+        val query = DcqlQuery(credentials = listOf(mdocQuery("mdl", MDOC_DOCTYPE)))
+
+        val selected = WalletPresentationHandler.selectPresentableFromStores(
+            wallet = wallet,
+            query = query,
+        )
+
+        assertEquals(
+            listOf(boundCredential.id),
+            selected.getValue("mdl").map { it.credential.id },
+        )
+    }
+
+    @Test
     fun `store matching ignores an unavailable optional mdoc set`() = runTest {
         val fixture = mdocMatchingFixture()
         val request = MatchCredentialsFromStoreRequest(

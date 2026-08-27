@@ -453,7 +453,7 @@ object WalletPresentationHandler {
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
                 log.trace { "Selecting credentials for DCQL query: ${query.credentials.map { it.id }}" }
-                selectFromStores(wallet, query, useWalletCredentialIds = true)
+                selectPresentableFromStores(wallet, query)
                     .also { matched ->
                         log.trace { "DCQL matched queryIds: ${matched.keys}" }
                         onEvent(WalletSessionEvent.presentation_credentials_selected)
@@ -648,13 +648,9 @@ object WalletPresentationHandler {
         }
         val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
-        val holderKeyEligibility = wallet.holderKeyEligibleMatches(
-            matched = selectFromSnapshot(
-                wallet = wallet,
-                query = query,
-                storedCredentials = storedById.values.toList(),
-                useWalletCredentialIds = true,
-            ),
+        val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
+            wallet = wallet,
+            query = query,
             storedById = storedById,
         )
         val matched = holderKeyEligibility.matched
@@ -749,13 +745,9 @@ object WalletPresentationHandler {
         }
         val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
-        val holderKeyEligibility = wallet.holderKeyEligibleMatches(
-            matched = selectFromSnapshot(
-                wallet = wallet,
-                query = query,
-                storedCredentials = storedById.values.toList(),
-                useWalletCredentialIds = true,
-            ),
+        val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
+            wallet = wallet,
+            query = query,
             storedById = storedById,
         )
         val matched = holderKeyEligibility.matched
@@ -858,13 +850,9 @@ object WalletPresentationHandler {
             encryption.thumbprint()
         }
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
-        val holderKeyEligibility = wallet.holderKeyEligibleMatches(
-            matched = selectFromSnapshot(
-                wallet = wallet,
-                query = query,
-                storedCredentials = storedById.values.toList(),
-                useWalletCredentialIds = true,
-            ),
+        val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
+            wallet = wallet,
+            query = query,
             storedById = storedById,
             allowedCredentialIds = request.eligibleCredentialIds,
         )
@@ -1252,13 +1240,9 @@ object WalletPresentationHandler {
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         if (storedById.isEmpty()) return MatchCredentialsResult(emptyList(), 0, emptyMap())
 
-        val holderKeyEligibility = wallet.holderKeyEligibleMatches(
-            matched = selectFromSnapshot(
-                wallet = wallet,
-                query = request.dcqlQuery,
-                storedCredentials = storedById.values.toList(),
-                useWalletCredentialIds = true,
-            ),
+        val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
+            wallet = wallet,
+            query = request.dcqlQuery,
             storedById = storedById,
         )
         val matched = holderKeyEligibility.matched
@@ -1419,6 +1403,33 @@ object WalletPresentationHandler {
     )
 
     /**
+     * Selects credentials for automatic presentation after excluding stored mdocs that cannot
+     * resolve their certified holder key. Eligibility is evaluated before a query that disallows
+     * multiple credentials chooses its single result, so an unusable earlier match cannot hide a
+     * later presentable credential.
+     */
+    internal suspend fun selectPresentableFromStores(
+        wallet: Wallet,
+        query: DcqlQuery,
+    ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
+        val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
+        val eligibility = selectHolderKeyEligibleFromSnapshot(
+            wallet = wallet,
+            query = query,
+            storedById = storedById,
+        )
+        val availableQueryIds = eligibility.matched.filterValues { it.isNotEmpty() }.keys
+        val requirements = query.requiredCredentialRequirements()
+        if (!requirements.satisfiedBy(availableQueryIds)) {
+            eligibility.bindingFailureForUnsatisfiedRequirements(
+                requirements,
+                availableQueryIds,
+            )?.let { throw it }
+        }
+        return eligibility.matched
+    }
+
+    /**
      * Matches one immutable credential-store snapshot so eligibility checks and consent options are
      * derived from the same stored records instead of independently re-reading mutable stores.
      */
@@ -1443,6 +1454,38 @@ object WalletPresentationHandler {
         val matched = DcqlMatcher.match(query.copy(credentialSets = null), rawCredentials).getOrThrow()
         log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
         return matched
+    }
+
+    private suspend fun selectHolderKeyEligibleFromSnapshot(
+        wallet: Wallet,
+        query: DcqlQuery,
+        storedById: Map<String, StoredCredential>,
+        allowedCredentialIds: Set<String>? = null,
+    ): HolderKeyEligibleMatches {
+        val originalQueries = query.credentials.associateBy { it.id }
+        val candidateQuery = query.copy(
+            credentials = query.credentials.map { it.copy(multiple = true) },
+            credentialSets = null,
+        )
+        val structuralMatches = selectFromSnapshot(
+            wallet = wallet,
+            query = candidateQuery,
+            storedCredentials = storedById.values.toList(),
+            useWalletCredentialIds = true,
+        ).mapValues { (queryId, results) ->
+            val originalQuery = originalQueries.getValue(queryId)
+            results.map { it.copy(originalQuery = originalQuery) }
+        }
+        val eligibility = wallet.holderKeyEligibleMatches(
+            matched = structuralMatches,
+            storedById = storedById,
+            allowedCredentialIds = allowedCredentialIds,
+        )
+        return eligibility.copy(
+            matched = eligibility.matched.mapValues { (queryId, results) ->
+                if (originalQueries.getValue(queryId).multiple) results else results.take(1)
+            },
+        )
     }
 
     private data class HolderKeyEligibleMatches(
