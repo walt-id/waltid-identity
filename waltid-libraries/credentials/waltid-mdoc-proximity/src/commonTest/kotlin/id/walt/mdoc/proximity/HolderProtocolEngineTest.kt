@@ -115,6 +115,8 @@ class HolderProtocolEngineTest {
                     context: MdocHolderRequestContext,
                     preview: MdocRequestPreview,
                 ): MdocResponseResolution {
+                    assertEquals(readerSession.readerCose, context.readerEphemeralKey.value)
+                    assertContentEquals(readerSession.readerCoseBytes, context.readerEphemeralKey.encodedCopy())
                     val firstExchange = resolved++ == 0
                     val (source, holderKey, authentication) = if (firstExchange) {
                         Triple(
@@ -126,7 +128,7 @@ class HolderProtocolEngineTest {
                         Triple(
                             macSourceDocument,
                             macHolderKey,
-                            MdocAuthenticationMethod.Mac(readerSession.readerCose),
+                            MdocAuthenticationMethod.Mac(context.readerEphemeralKey.value),
                         )
                     }
                     val presentation =
