@@ -506,7 +506,7 @@ public enum ProximityPresentationErrorCategory: Sendable, Equatable {
     case trust
     /// No acceptable credential can satisfy the request.
     case credential
-    /// Holder-key authorization or signing failed.
+    /// Holder-key resolution or use failed.
     case holderKey
     /// Application-profile processing rejected or failed.
     case applicationProfile
