@@ -17,4 +17,8 @@ class WalletDemoProximityAndroidTest {
     @Test
     fun reviewSeparatesReaderTrustAndSendsOnlyExplicitHolderActions() =
         scenarios.reviewSeparatesReaderTrustAndSendsOnlyExplicitHolderActions()
+
+    @Test
+    fun reviewDoesNotInventAnIdentityForAnUnsignedReader() =
+        scenarios.reviewDoesNotInventAnIdentityForAnUnsignedReader()
 }

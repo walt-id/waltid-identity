@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,9 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -24,20 +21,21 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
@@ -63,12 +61,28 @@ import id.walt.wallet2.mobile.MobileWalletProximityReview
 import id.walt.wallet2.mobile.MobileWalletProximityRicalState
 import id.walt.wallet2.mobile.MobileWalletProximityState
 import id.walt.wallet2.mobile.legalActions
+import id.walt.walletdemo.compose.logic.ClaimItem
+import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityDocumentSelection
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.logic.WalletAuthState
+import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.WalletDemoTab
+import id.walt.walletdemo.compose.logic.toCardDisplayData
+import id.walt.walletdemo.compose.logic.toCredentialDetails
+import id.walt.walletdemo.compose.ui.components.ClaimValueRow
+import id.walt.walletdemo.compose.ui.components.CredentialCard
+import id.walt.walletdemo.compose.ui.components.ExpandableMetadataCard
+import id.walt.walletdemo.compose.ui.components.MetadataDetailItem
+import id.walt.walletdemo.compose.ui.components.MetadataDetailList
+import id.walt.walletdemo.compose.ui.components.MetadataDisclosure
+import id.walt.walletdemo.compose.ui.components.ReviewMetadataSection
+import id.walt.walletdemo.compose.ui.components.ReviewActionPresentation
+import id.walt.walletdemo.compose.ui.components.ReviewScaffold
+import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.resources.*
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import org.jetbrains.compose.resources.stringResource
@@ -83,7 +97,14 @@ fun MobileWalletDemoApp(
     val walletState by controller.state.collectAsState()
     val proximity by proximityController.state.collectAsState()
     val hostActions = rememberProximityHostActionExecutor()
-    val qrVisible = proximity.sessionState.engagements().any { it is MobileWalletProximityEngagement.Qr }
+    val credentials = (walletState.session as? WalletSessionState.Ready)
+        ?.credentials
+        .orEmpty()
+    val credentialDetailsById = remember(credentials) {
+        credentials.associate { credential -> credential.id to credential.toCredentialDetails() }
+    }
+    val qrVisible = walletState.selectedTab == WalletDemoTab.Present &&
+        proximity.sessionState.engagements().any { it is MobileWalletProximityEngagement.Qr }
 
     ProximityPlatformSessionEffect(
         active = proximity.active && !proximity.isTerminal,
@@ -93,14 +114,18 @@ fun MobileWalletDemoApp(
     LaunchedEffect(walletState.auth, proximity.active) {
         if (proximity.active && walletState.auth !is WalletAuthState.Unlocked) proximityController.dismiss()
     }
-    WalletDemoApp(
+    LaunchedEffect(walletState.selectedTab, proximity.active) {
+        if (proximity.active && walletState.selectedTab != WalletDemoTab.Present) proximityController.cancel()
+    }
+    WalletDemoAppHost(
         controller = controller,
         branding = branding,
         onStartProximityPresentation = proximityController::start,
-        overlayContent = {
-            if (proximity.active) {
+        presentationContent = if (proximity.active) {
+            {
                 WalletDemoProximityScreen(
                     state = proximity,
+                    credentialDetailsById = credentialDetailsById,
                     hostActions = hostActions,
                     onSelectCredential = proximityController::selectCredential,
                     onToggleElement = proximityController::toggleElement,
@@ -114,13 +139,14 @@ fun MobileWalletDemoApp(
                     onRestart = proximityController::restart,
                 )
             }
-        },
+        } else null,
     )
 }
 
 @Composable
 internal fun WalletDemoProximityScreen(
     state: WalletDemoProximityUiState,
+    credentialDetailsById: Map<String, CredentialDetails>,
     hostActions: WalletDemoProximityHostActionExecutor,
     onSelectCredential: (Int, String) -> Unit,
     onToggleElement: (Int, MobileWalletProximityElementReference) -> Unit,
@@ -139,112 +165,139 @@ internal fun WalletDemoProximityScreen(
         sessionState == null || MobileWalletProximityActionType.Cancel in sessionState.legalActions
     )
     val screenTitle = stringResource(Res.string.proximity_in_person_title)
-    SystemBackHandler(enabled = true) {
+    SystemBackHandler(
+        enabled = sessionState !is MobileWalletProximityState.ReviewRequired && (terminal || canCancel),
+    ) {
         if (terminal) onDismiss() else onCancel()
     }
 
-    Scaffold(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .testTag(WalletUiTestTags.ProximityScreen)
             .semantics { paneTitle = screenTitle },
-        topBar = {
-            Surface(shadowElevation = 2.dp) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            screenTitle,
-                            modifier = Modifier.semantics { heading() },
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                        Text(stringResource(Res.string.proximity_iso_subtitle), style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (canCancel) {
-                        TextButton(
+    ) {
+        if (sessionState is MobileWalletProximityState.ReviewRequired) {
+            WalletDemoProximityReview(
+                state = state,
+                review = sessionState.review,
+                credentialDetailsById = credentialDetailsById,
+                onSelectCredential = onSelectCredential,
+                onToggleElement = onToggleElement,
+                onContinueAfterResponseChange = onContinueAfterResponseChange,
+                onApprove = onApprove,
+                onDecline = onDecline,
+                onCancel = onCancel,
+            )
+        } else {
+            ReviewScaffold(
+                actions = if (canCancel) {
+                    {
+                        OutlinedButton(
                             onClick = onCancel,
-                            modifier = Modifier.testTag(WalletUiTestTags.ProximityCancel),
-                        ) { Text(stringResource(Res.string.proximity_cancel)) }
+                            modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityCancel),
+                        ) {
+                            Text(stringResource(Res.string.proximity_cancel))
+                        }
                     }
+                } else null,
+            ) {
+                state.actionError?.let { ProximityErrorCard(it) }
+                when (sessionState) {
+                    null -> ProgressContent(stringResource(Res.string.proximity_checking_device))
+                    is MobileWalletProximityState.CheckingPrerequisites -> PrerequisiteContent(
+                        capabilities = sessionState.capabilities,
+                        hostActionInProgress = state.hostActionInProgress,
+                        onRetry = onRetry,
+                        onRemediate = { onRemediate(it, hostActions) },
+                    )
+                    is MobileWalletProximityState.Preparing ->
+                        ProgressContent(stringResource(Res.string.proximity_preparing))
+                    is MobileWalletProximityState.EngagementReady -> EngagementContent(
+                        engagements = sessionState.engagements,
+                        connecting = false,
+                    )
+                    is MobileWalletProximityState.Connecting -> EngagementContent(
+                        engagements = sessionState.engagements,
+                        connecting = true,
+                    )
+                    is MobileWalletProximityState.AwaitingRequest ->
+                        ProgressContent(stringResource(Res.string.proximity_awaiting_request))
+                    is MobileWalletProximityState.ReviewRequired -> Unit
+                    is MobileWalletProximityState.AuthorizingHolderKey ->
+                        ProgressContent(stringResource(Res.string.proximity_authenticating))
+                    is MobileWalletProximityState.SendingResponse ->
+                        ProgressContent(stringResource(Res.string.proximity_send_response))
+                    is MobileWalletProximityState.AwaitingNextRequest ->
+                        ProgressContent(stringResource(Res.string.proximity_awaiting_next_request))
+                    is MobileWalletProximityState.Terminating ->
+                        ProgressContent(stringResource(Res.string.proximity_terminating))
+                    is MobileWalletProximityState.Completed -> TerminalContent(
+                        title = if (sessionState.declined) {
+                            stringResource(Res.string.proximity_declined_title)
+                        } else {
+                            stringResource(Res.string.proximity_presentation_complete)
+                        },
+                        message = if (sessionState.declined) {
+                            stringResource(Res.string.proximity_declined_message)
+                        } else {
+                            stringResource(Res.string.proximity_presentation_complete_message)
+                        },
+                        onDismiss = onDismiss,
+                    )
+                    MobileWalletProximityState.Cancelled -> TerminalContent(
+                        title = stringResource(Res.string.proximity_cancelled_title),
+                        message = stringResource(Res.string.proximity_cancelled_message),
+                        onDismiss = onDismiss,
+                    )
+                    is MobileWalletProximityState.Failed -> FailedContent(
+                        error = sessionState.error,
+                        onDismiss = onDismiss,
+                        onRetry = if (sessionState.error.recoverable) onRestart else null,
+                    )
                 }
             }
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            state.actionError?.let { ProximityErrorCard(it) }
-            when (sessionState) {
-                null -> ProgressContent(stringResource(Res.string.proximity_checking_device))
-                is MobileWalletProximityState.CheckingPrerequisites -> PrerequisiteContent(
-                    capabilities = sessionState.capabilities,
-                    hostActionInProgress = state.hostActionInProgress,
-                    onRetry = onRetry,
-                    onRemediate = { onRemediate(it, hostActions) },
-                )
-                is MobileWalletProximityState.Preparing -> ProgressContent(stringResource(Res.string.proximity_preparing))
-                is MobileWalletProximityState.EngagementReady -> EngagementContent(
-                    engagements = sessionState.engagements,
-                    connecting = false,
-                )
-                is MobileWalletProximityState.Connecting -> EngagementContent(
-                    engagements = sessionState.engagements,
-                    connecting = true,
-                )
-                is MobileWalletProximityState.AwaitingRequest ->
-                    ProgressContent(stringResource(Res.string.proximity_awaiting_request))
-                is MobileWalletProximityState.ReviewRequired -> ReviewContent(
-                    review = sessionState.review,
-                    selections = state.selections,
-                    canApprove = state.canApprove,
-                    continueAfterResponse = state.continueAfterResponse,
-                    onSelectCredential = onSelectCredential,
-                    onToggleElement = onToggleElement,
-                    onContinueAfterResponseChange = onContinueAfterResponseChange,
-                    onApprove = onApprove,
-                    onDecline = onDecline,
-                )
-                is MobileWalletProximityState.AuthorizingHolderKey ->
-                    ProgressContent(stringResource(Res.string.proximity_authenticating))
-                is MobileWalletProximityState.SendingResponse ->
-                    ProgressContent(stringResource(Res.string.proximity_send_response))
-                is MobileWalletProximityState.AwaitingNextRequest ->
-                    ProgressContent(stringResource(Res.string.proximity_awaiting_next_request))
-                is MobileWalletProximityState.Terminating ->
-                    ProgressContent(stringResource(Res.string.proximity_terminating))
-                is MobileWalletProximityState.Completed -> TerminalContent(
-                    title = if (sessionState.declined) {
-                        stringResource(Res.string.proximity_declined_title)
-                    } else {
-                        stringResource(Res.string.proximity_presentation_complete)
-                    },
-                    message = if (sessionState.declined) {
-                        stringResource(Res.string.proximity_declined_message)
-                    } else {
-                        stringResource(Res.string.proximity_presentation_complete_message)
-                    },
-                    onDismiss = onDismiss,
-                )
-                MobileWalletProximityState.Cancelled -> TerminalContent(
-                    title = stringResource(Res.string.proximity_cancelled_title),
-                    message = stringResource(Res.string.proximity_cancelled_message),
-                    onDismiss = onDismiss,
-                )
-                is MobileWalletProximityState.Failed -> FailedContent(
-                    error = sessionState.error,
-                    onDismiss = onDismiss,
-                    onRetry = if (sessionState.error.recoverable) onRestart else null,
-                )
-            }
         }
+    }
+}
+
+@Composable
+private fun WalletDemoProximityReview(
+    state: WalletDemoProximityUiState,
+    review: MobileWalletProximityReview,
+    credentialDetailsById: Map<String, CredentialDetails>,
+    onSelectCredential: (Int, String) -> Unit,
+    onToggleElement: (Int, MobileWalletProximityElementReference) -> Unit,
+    onContinueAfterResponseChange: (Boolean) -> Unit,
+    onApprove: () -> Unit,
+    onDecline: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SystemBackHandler(enabled = true, onBack = onCancel)
+    ReviewScaffold(
+        modifier = modifier,
+        actions = {
+            SharingActionsRow(
+                enabled = true,
+                selectionComplete = state.canApprove,
+                onSubmit = onApprove,
+                onCancel = onCancel,
+                onReject = onDecline,
+                presentation = ReviewActionPresentation.Proximity,
+            )
+        },
+    ) {
+        state.actionError?.let { ProximityErrorCard(it) }
+        ReviewContent(
+            review = review,
+            selections = state.selections,
+            credentialDetailsById = credentialDetailsById,
+            continueAfterResponse = state.continueAfterResponse,
+            onSelectCredential = onSelectCredential,
+            onToggleElement = onToggleElement,
+            onContinueAfterResponseChange = onContinueAfterResponseChange,
+        )
     }
 }
 
@@ -255,7 +308,7 @@ private fun PrerequisiteContent(
     onRetry: () -> Unit,
     onRemediate: (MobileWalletProximityRemediationAction) -> Unit,
 ) {
-    SectionCard(
+    ReviewMetadataSection(
         title = stringResource(
             if (capabilities.mayStart) Res.string.proximity_device_ready else Res.string.proximity_action_needed
         )
@@ -341,38 +394,19 @@ private fun EngagementContent(
 private fun ReviewContent(
     review: MobileWalletProximityReview,
     selections: List<WalletDemoProximityDocumentSelection>,
-    canApprove: Boolean,
+    credentialDetailsById: Map<String, CredentialDetails>,
     continueAfterResponse: Boolean,
     onSelectCredential: (Int, String) -> Unit,
     onToggleElement: (Int, MobileWalletProximityElementReference) -> Unit,
     onContinueAfterResponseChange: (Boolean) -> Unit,
-    onApprove: () -> Unit,
-    onDecline: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityReview),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            stringResource(Res.string.proximity_review_title),
-            modifier = Modifier.semantics { heading() },
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Text(stringResource(Res.string.proximity_request_review_description))
-        if (review.readerAuthentication.isEmpty()) {
-            SectionCard(stringResource(Res.string.proximity_reader)) {
-                Text(stringResource(Res.string.proximity_no_authenticated_reader))
-            }
-        } else {
-            SectionCard(stringResource(Res.string.proximity_reader_authentication)) {
-                review.readerAuthentication.forEachIndexed { index, authentication ->
-                    if (index > 0) HorizontalDivider()
-                    ReaderAuthenticationContent(authentication, review.documents)
-                }
-            }
-        }
+        ReaderMetadataCard(review, credentialDetailsById)
         review.useCases.forEach { useCase ->
-            SectionCard(stringResource(Res.string.proximity_reader_purpose)) {
+            ReviewMetadataSection(stringResource(Res.string.proximity_reader_purpose)) {
                 Text(
                     stringResource(
                         Res.string.proximity_use_case,
@@ -391,20 +425,21 @@ private fun ReviewContent(
             }
         }
         review.applicationAuthorizations.forEach { authorization ->
-            SectionCard(authorization.displayTitle) {
+            ReviewMetadataSection(authorization.displayTitle) {
                 Text(
                     stringResource(Res.string.proximity_validated_application_request),
                     style = MaterialTheme.typography.labelLarge,
                 )
-                authorization.details.forEach { detail ->
-                    LabelValue(detail.label, detail.value)
-                }
+                MetadataDetailList(
+                    authorization.details.map { detail -> MetadataDetailItem(detail.label, detail.value) }
+                )
             }
         }
         review.documents.forEach { document ->
             DocumentReviewContent(
                 document = document,
                 selection = selections.singleOrNull { it.requestIndex == document.requestIndex },
+                credentialDetailsById = credentialDetailsById,
                 onSelectCredential = onSelectCredential,
                 onToggleElement = onToggleElement,
             )
@@ -426,65 +461,163 @@ private fun ReviewContent(
                 )
             }
         }
-        Button(
-            onClick = onApprove,
-            enabled = canApprove,
-            modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityApprove),
-        ) { Text(stringResource(Res.string.proximity_approve)) }
-        OutlinedButton(
-            onClick = onDecline,
-            modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityDecline),
-        ) { Text(stringResource(Res.string.proximity_decline)) }
     }
+}
+
+@Composable
+private fun ReaderMetadataCard(
+    review: MobileWalletProximityReview,
+    credentialDetailsById: Map<String, CredentialDetails>,
+) {
+    val suppliedAuthentications = review.readerAuthentication.filterNot {
+        it.validity == MobileWalletProximityReaderAuthenticationValidity.Absent
+    }
+    if (suppliedAuthentications.isEmpty()) {
+        ReviewMetadataSection(
+            title = "Verifier",
+            modifier = Modifier.testTag(WalletUiTestTags.ProximityReaderSection),
+        ) {
+            Text(
+                stringResource(Res.string.proximity_reader_identity_not_provided),
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                stringResource(Res.string.proximity_reader_not_authenticated),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val mostSevereAuthentication = review.readerAuthentication.maxByOrNull { it.summarySeverity() }
+    val hasMissingAuthentication = review.readerAuthentication.any {
+        it.validity == MobileWalletProximityReaderAuthenticationValidity.Absent
+    }
+    val displayNames = suppliedAuthentications.mapNotNull { authentication ->
+        authentication.displayName?.trim()?.takeIf(String::isNotEmpty)
+    }.distinct()
+    val displayName = when (displayNames.size) {
+        0 -> stringResource(Res.string.proximity_reader_identity_unavailable)
+        1 -> displayNames.single()
+        else -> stringResource(Res.string.proximity_multiple_reader_identities)
+    }
+    val supportingText = mostSevereAuthentication?.let { authentication ->
+        when {
+            authentication.validity == MobileWalletProximityReaderAuthenticationValidity.Malformed ||
+                authentication.validity == MobileWalletProximityReaderAuthenticationValidity.Invalid ->
+                authentication.validity.displayName()
+            authentication.trust == MobileWalletProximityReaderTrustState.Revoked ->
+                authentication.trust.displayName()
+            hasMissingAuthentication -> stringResource(Res.string.proximity_reader_authentication_partial)
+            authentication.validity != MobileWalletProximityReaderAuthenticationValidity.Valid ->
+                authentication.validity.displayName()
+            else -> authentication.trust.displayName()
+        }
+    }
+
+    ExpandableMetadataCard(
+        title = "Verifier",
+        expanded = expanded,
+        onToggle = { expanded = !expanded },
+        modifier = Modifier.testTag(WalletUiTestTags.ProximityReaderSection),
+        toggleTestTag = WalletUiTestTags.ProximityReaderDetailsToggle,
+        summary = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(displayName, fontWeight = FontWeight.SemiBold)
+                supportingText?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        details = {
+            Column(
+                modifier = Modifier.testTag(WalletUiTestTags.ProximityReaderDetails),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                review.readerAuthentication.forEachIndexed { index, readerAuthentication ->
+                    if (index > 0) HorizontalDivider()
+                    ReaderAuthenticationContent(
+                        readerAuthentication,
+                        review.documents,
+                        credentialDetailsById,
+                    )
+                }
+            }
+        },
+    )
+}
+
+private fun MobileWalletProximityReaderAuthentication.summarySeverity(): Int = when {
+    validity == MobileWalletProximityReaderAuthenticationValidity.Malformed -> 7
+    validity == MobileWalletProximityReaderAuthenticationValidity.Invalid -> 6
+    trust == MobileWalletProximityReaderTrustState.Revoked -> 5
+    validity == MobileWalletProximityReaderAuthenticationValidity.Absent -> 4
+    trust == MobileWalletProximityReaderTrustState.ValidButUntrusted -> 3
+    trust == MobileWalletProximityReaderTrustState.NotEvaluated -> 2
+    else -> 1
 }
 
 @Composable
 private fun ReaderAuthenticationContent(
     authentication: MobileWalletProximityReaderAuthentication,
     documents: List<MobileWalletProximityDocumentReview>,
+    credentialDetailsById: Map<String, CredentialDetails>,
 ) {
     val trusted = authentication.trust == MobileWalletProximityReaderTrustState.Trusted
     Text(
-        authentication.displayName ?: stringResource(Res.string.proximity_unavailable_reader),
+        authentication.displayName ?: stringResource(Res.string.proximity_reader_identity_unavailable),
         fontWeight = FontWeight.SemiBold,
     )
-    LabelValue(
-        stringResource(Res.string.proximity_applies_to),
-        when (authentication.scope) {
-            MobileWalletProximityReaderAuthenticationScope.WholeRequest ->
-                stringResource(Res.string.proximity_whole_request)
-            MobileWalletProximityReaderAuthenticationScope.Document -> {
-                val document = documents.singleOrNull {
-                    it.requestIndex == authentication.documentRequestIndex
-                }
-                document?.let {
-                    stringResource(Res.string.proximity_document_scope, it.docType)
-                } ?: stringResource(
-                    Res.string.proximity_document_request,
-                    authentication.documentRequestIndex?.plus(1) ?: 0,
-                )
-            }
-        },
-    )
-    LabelValue(
-        stringResource(Res.string.proximity_signature),
-        authentication.validity.displayName(),
-    )
-    LabelValue(
-        stringResource(Res.string.proximity_certificate_path),
-        authentication.certificatePath.displayName(),
-    )
-    LabelValue(
-        stringResource(Res.string.proximity_revocation),
-        authentication.revocation.displayName(),
-    )
-    LabelValue(
-        stringResource(Res.string.proximity_rical_evidence),
-        authentication.rical.displayName(),
-    )
-    LabelValue(
-        stringResource(Res.string.proximity_trust),
-        authentication.trust.displayName(),
+    MetadataDetailList(
+        listOf(
+            MetadataDetailItem(
+                stringResource(Res.string.proximity_applies_to),
+                when (authentication.scope) {
+                    MobileWalletProximityReaderAuthenticationScope.WholeRequest ->
+                        stringResource(Res.string.proximity_whole_request)
+                    MobileWalletProximityReaderAuthenticationScope.Document -> {
+                        val document = documents.singleOrNull {
+                            it.requestIndex == authentication.documentRequestIndex
+                        }
+                        document?.let {
+                            val displayName = it.credentialOptions.firstNotNullOfOrNull { option ->
+                                credentialDetailsById[option.credentialId]?.toCardDisplayData()?.title
+                            } ?: it.docType
+                            stringResource(Res.string.proximity_document_scope, displayName)
+                        } ?: stringResource(
+                            Res.string.proximity_document_request,
+                            authentication.documentRequestIndex?.plus(1) ?: 0,
+                        )
+                    }
+                },
+            ),
+            MetadataDetailItem(
+                stringResource(Res.string.proximity_signature),
+                authentication.validity.displayName(),
+            ),
+            MetadataDetailItem(
+                stringResource(Res.string.proximity_certificate_path),
+                authentication.certificatePath.displayName(),
+            ),
+            MetadataDetailItem(
+                stringResource(Res.string.proximity_revocation),
+                authentication.revocation.displayName(),
+            ),
+            MetadataDetailItem(
+                stringResource(Res.string.proximity_rical_evidence),
+                authentication.rical.displayName(),
+            ),
+            MetadataDetailItem(
+                stringResource(Res.string.proximity_trust),
+                authentication.trust.displayName(),
+            ),
+        )
     )
     authentication.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     if (!trusted && authentication.validity == MobileWalletProximityReaderAuthenticationValidity.Valid) {
@@ -500,11 +633,11 @@ private fun ReaderAuthenticationContent(
 private fun DocumentReviewContent(
     document: MobileWalletProximityDocumentReview,
     selection: WalletDemoProximityDocumentSelection?,
+    credentialDetailsById: Map<String, CredentialDetails>,
     onSelectCredential: (Int, String) -> Unit,
     onToggleElement: (Int, MobileWalletProximityElementReference) -> Unit,
 ) {
-    SectionCard(stringResource(Res.string.proximity_requested_document)) {
-        LabelValue(stringResource(Res.string.proximity_document_type), document.docType)
+    ReviewMetadataSection(stringResource(Res.string.proximity_credential_to_share)) {
         if (document.credentialOptions.size > 1) {
             Text(stringResource(Res.string.proximity_choose_credential), style = MaterialTheme.typography.labelLarge)
         }
@@ -512,6 +645,8 @@ private fun DocumentReviewContent(
             CredentialOption(
                 requestIndex = document.requestIndex,
                 credential = credential,
+                details = credentialDetailsById[credential.credentialId],
+                showSelectionControl = document.credentialOptions.size > 1,
                 selected = selection?.credentialId == credential.credentialId,
                 onSelect = onSelectCredential,
             )
@@ -520,6 +655,7 @@ private fun DocumentReviewContent(
             it.credentialId == selection?.credentialId
         }
         selectedCredential?.let { credential ->
+            val details = credentialDetailsById[credential.credentialId]
             HorizontalDivider()
             Text(stringResource(Res.string.proximity_data_to_share), style = MaterialTheme.typography.labelLarge)
             credential.requestedElements.forEach { element ->
@@ -542,9 +678,25 @@ private fun DocumentReviewContent(
                             )
                         ),
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(element.elementIdentifier)
-                        Text(element.namespace, style = MaterialTheme.typography.bodySmall)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        val claims = details?.mdocClaims(element.namespace, element.elementIdentifier).orEmpty()
+                        if (claims.isNotEmpty()) {
+                            claims.forEach { claim -> ClaimValueRow(claim) }
+                        } else {
+                            Text(
+                                humanizedElementIdentifier(element.elementIdentifier),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                stringResource(Res.string.proximity_value_preview_unavailable),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                         if (element.intentToRetain) {
                             Text(
                                 stringResource(Res.string.proximity_reader_retention),
@@ -555,10 +707,35 @@ private fun DocumentReviewContent(
                     }
                 }
             }
-            LabelValue(
-                stringResource(Res.string.proximity_device_authentication),
-                credential.deviceAuthentication.displayName(),
-            )
+            MetadataDisclosure(
+                title = stringResource(Res.string.proximity_technical_details),
+                initiallyExpanded = false,
+            ) {
+                MetadataDetailList(
+                    buildList {
+                        add(
+                            MetadataDetailItem(
+                                stringResource(Res.string.proximity_document_type),
+                                document.docType,
+                            )
+                        )
+                        add(
+                            MetadataDetailItem(
+                                stringResource(Res.string.proximity_device_authentication),
+                                credential.deviceAuthentication.displayName(),
+                            )
+                        )
+                        credential.requestedElements.forEach { element ->
+                            add(
+                                MetadataDetailItem(
+                                    stringResource(Res.string.proximity_requested_element),
+                                    "${element.namespace} / ${element.elementIdentifier}",
+                                )
+                            )
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -567,30 +744,58 @@ private fun DocumentReviewContent(
 private fun CredentialOption(
     requestIndex: Int,
     credential: MobileWalletProximityCredentialOption,
+    details: CredentialDetails?,
+    showSelectionControl: Boolean,
     selected: Boolean,
     onSelect: (Int, String) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(WalletUiTestTags.proximityCredential(requestIndex, credential.credentialId)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(
-            selected = selected,
-            onClick = { onSelect(requestIndex, credential.credentialId) },
-            modifier = Modifier.testTag(
-                WalletUiTestTags.proximityCredential(requestIndex, credential.credentialId)
-            ),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(credential.label ?: stringResource(Res.string.proximity_generic_credential))
-            credential.issuer?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            Text(
-                stringResource(Res.string.proximity_valid_until, credential.validUntil.toString()),
-                style = MaterialTheme.typography.bodySmall,
+        if (showSelectionControl) {
+            RadioButton(
+                selected = selected,
+                onClick = { onSelect(requestIndex, credential.credentialId) },
             )
+        }
+        if (details != null) {
+            CredentialCard(
+                details = details,
+                compact = true,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelect(requestIndex, credential.credentialId) },
+            )
+        } else {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(credential.label ?: stringResource(Res.string.proximity_generic_credential))
+                credential.issuer?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                Text(
+                    stringResource(Res.string.proximity_valid_until, credential.validUntil.toString()),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
     }
 }
+
+private fun CredentialDetails.mdocClaims(namespace: String, elementIdentifier: String): List<ClaimItem> =
+    groups.asSequence()
+        .flatMap { group -> group.items.asSequence() }
+        .filter { claim ->
+            claim.pathComponents.getOrNull(0) == namespace &&
+                claim.pathComponents.getOrNull(1) == elementIdentifier
+        }
+        .toList()
+
+private fun humanizedElementIdentifier(identifier: String): String =
+    identifier
+        .replace('_', ' ')
+        .replace('-', ' ')
+        .trim()
+        .replaceFirstChar { character -> character.uppercase() }
 
 @Composable
 private fun ProgressContent(message: String) {
@@ -610,7 +815,7 @@ private fun ProgressContent(message: String) {
 
 @Composable
 private fun TerminalContent(title: String, message: String, onDismiss: () -> Unit) {
-    SectionCard(title) {
+    ReviewMetadataSection(title) {
         Text(message)
         Button(
             onClick = onDismiss,
@@ -625,7 +830,7 @@ private fun FailedContent(
     onDismiss: () -> Unit,
     onRetry: (() -> Unit)?,
 ) {
-    SectionCard(stringResource(Res.string.proximity_failed_title)) {
+    ReviewMetadataSection(stringResource(Res.string.proximity_failed_title)) {
         Text(error.message, modifier = Modifier.testTag(WalletUiTestTags.ProximityError))
         if (onRetry != null) {
             Button(
@@ -655,31 +860,6 @@ private fun ProximityErrorCard(error: MobileWalletProximityError) {
             Text(stringResource(Res.string.proximity_action_failed), fontWeight = FontWeight.SemiBold)
             Text(error.message)
         }
-    }
-}
-
-@Composable
-private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                title,
-                modifier = Modifier.semantics { heading() },
-                style = MaterialTheme.typography.titleMedium,
-            )
-            content()
-        }
-    }
-}
-
-@Composable
-private fun LabelValue(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium)
-        Text(value)
     }
 }
 

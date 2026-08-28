@@ -31,6 +31,8 @@ struct ReceiveView: View {
     private var entryContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+
                 ScannableUrlEditor(
                     title: "Receive",
                     label: "Credential offer URL",
@@ -48,8 +50,6 @@ struct ReceiveView: View {
                 .tint(branding.primary)
                 .disabled(!viewModel.receiveActionEnabled)
                 .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
-
-                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
 
                 deferredCredentials
             }

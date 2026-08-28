@@ -31,7 +31,19 @@ fun WalletDemoApp(
     controller: WalletDemoController,
     branding: WalletDemoBranding = WalletDemoBranding(),
     onStartProximityPresentation: (() -> Unit)? = null,
-    overlayContent: @Composable () -> Unit = {},
+) = WalletDemoAppHost(
+    controller = controller,
+    branding = branding,
+    onStartProximityPresentation = onStartProximityPresentation,
+)
+
+/** Wallet shell with an internal slot for transport-specific presentation journey content. */
+@Composable
+internal fun WalletDemoAppHost(
+    controller: WalletDemoController,
+    branding: WalletDemoBranding = WalletDemoBranding(),
+    onStartProximityPresentation: (() -> Unit)? = null,
+    presentationContent: (@Composable () -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
@@ -84,9 +96,9 @@ fun WalletDemoApp(
                         controller = controller,
                         state = state,
                         onStartProximityPresentation = onStartProximityPresentation,
+                        presentationContent = presentationContent,
                     )
                 }
-                if (state.auth is WalletAuthState.Unlocked) overlayContent()
             }
         }
         state.signingProtectionWarning?.let { warning ->

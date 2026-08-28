@@ -21,6 +21,7 @@ internal fun WalletScreen(
     controller: WalletDemoController,
     state: WalletDemoUiState,
     onStartProximityPresentation: (() -> Unit)? = null,
+    presentationContent: (@Composable () -> Unit)? = null,
 ) {
     val ready = state.session as? WalletSessionState.Ready
     val credentials = ready?.credentials.orEmpty()
@@ -106,6 +107,7 @@ internal fun WalletScreen(
                     onReject = controller::rejectPresentation,
                     onCancel = controller::cancelPresentationReview,
                     onStartProximityPresentation = onStartProximityPresentation,
+                    presentationContent = presentationContent,
                     modifier = modifier,
                 )
             }
