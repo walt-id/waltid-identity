@@ -104,6 +104,22 @@ class BleTransportProviderTest {
     }
 
     @Test
+    fun `prepared transport forwards completion to its selected connection exactly once`() = runTest {
+        val platform = FakePlatform()
+        val prepared = provider(BleMdocRoles.CentralClient(centralUuid), platform).prepare(context, this)
+        val raw = FakeRawConnection(BleRawBearer.GATT, 23)
+        platform.central.connection.complete(raw)
+        prepared.awaitConnection()
+
+        prepared.close(ProximityCloseReason.COMPLETED)
+        prepared.close(ProximityCloseReason.COMPLETED)
+
+        assertEquals(1, raw.finishCount)
+        assertEquals(listOf(ProximityCloseReason.COMPLETED), raw.closeReasons)
+        assertEquals(listOf(ProximityCloseReason.COMPLETED), platform.central.closeReasons)
+    }
+
+    @Test
     fun `prepared listener times out once and cannot be awaited again`() = runTest {
         val platform = FakePlatform()
         val prepared = provider(BleMdocRoles.CentralClient(centralUuid), platform).prepare(context, this)

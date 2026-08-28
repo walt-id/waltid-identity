@@ -144,6 +144,7 @@ private class PreparedBleTransport(
     private val closeMutex = Mutex()
     private var awaitStarted = false
     private var closed = false
+    private var activeConnection: BleMessageConnection? = null
     private val sessionCompletion = sessionJob?.invokeOnCompletion {
         roles.forEach { role -> role.close(ProximityCloseReason.CANCELLED) }
     }
@@ -210,7 +211,20 @@ private class PreparedBleTransport(
                 causes.firstOrNull(),
             )
             roles.filterNot { it === selected.first }.forEach { it.close(ProximityCloseReason.LOST_RACE) }
-            BleMessageConnection(selected.second, maximumMessageBytes)
+            val connection = BleMessageConnection(selected.second, maximumMessageBytes)
+            val accepted = closeMutex.withLock {
+                if (closed) false else {
+                    activeConnection = connection
+                    true
+                }
+            }
+            if (!accepted) {
+                connection.close(ProximityCloseReason.CANCELLED)
+                throw ProximityException(
+                    ProximityError.Transport("ble_listener_unavailable", "The prepared BLE transport is closed")
+                )
+            }
+            connection
         } catch (failure: Throwable) {
             withContext(NonCancellable) {
                 jobs.forEach { if (it.isActive) it.cancelAndJoin() }
@@ -227,12 +241,20 @@ private class PreparedBleTransport(
 
     override suspend fun close(reason: ProximityCloseReason) {
         withContext(NonCancellable) {
-            closeMutex.withLock {
-                if (!closed) {
+            var shouldClose = false
+            val connection = closeMutex.withLock {
+                if (closed) null else {
                     closed = true
+                    shouldClose = true
                     sessionCompletion?.dispose()
-                    roles.forEach { it.close(reason) }
+                    activeConnection.also { activeConnection = null }
                 }
+            }
+            if (!shouldClose) return@withContext
+            try {
+                connection?.close(reason)
+            } finally {
+                roles.forEach { it.close(reason) }
             }
         }
     }
