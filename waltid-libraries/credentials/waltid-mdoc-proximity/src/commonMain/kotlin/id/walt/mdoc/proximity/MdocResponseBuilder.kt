@@ -30,6 +30,7 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.IssuerSignedList
+import kotlinx.coroutines.CancellationException
 import org.kotlincrypto.hash.sha2.SHA256
 
 sealed interface MdocAuthenticationMethod {
@@ -41,6 +42,20 @@ sealed interface MdocAuthenticationMethod {
         }
     }
     data class Mac(val eReaderKey: id.walt.cose.CoseKey) : MdocAuthenticationMethod
+}
+
+/** Whether this live holder key can create an ISO device MAC with the established reader key. */
+suspend fun Key.supportsMdocDeviceMac(eReaderKey: id.walt.cose.CoseKey): Boolean = try {
+    MdocSessionKeyValidator.requireCompatiblePeerKey(
+        localKey = this,
+        peerKey = eReaderKey.toEncodedJwk(),
+        provider = dev.whyoleg.cryptography.CryptographyProvider.Default,
+    )
+    true
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) {
+    false
 }
 
 data class MdocDocumentPresentation(

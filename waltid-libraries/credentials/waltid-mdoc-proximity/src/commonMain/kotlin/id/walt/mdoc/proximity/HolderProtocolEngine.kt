@@ -169,6 +169,8 @@ class MdocRequestPreview(
 data class MdocHolderRequestContext(
     val request: ExactCbor<DeviceRequest>,
     val transcript: ExactCbor<SessionTranscript>,
+    /** Exact reader ephemeral COSE_Key from SessionEstablishment, available for device-MAC selection. */
+    val readerEphemeralKey: ExactCbor<CoseKey>,
     val exchange: Int,
 ) {
     init {
@@ -443,6 +445,10 @@ class MdocHolderProtocolEngine(
                 val context = MdocHolderRequestContext(
                     request = ExactCbor.of(request, incoming.copy()),
                     transcript = ExactCbor.of(transcript, exactTranscript.copy()),
+                    readerEphemeralKey = ExactCbor.of(
+                        establishment.eReaderKey.value,
+                        establishment.eReaderKey.serialized,
+                    ),
                     exchange = exchange,
                 )
                 val preview = phase(
