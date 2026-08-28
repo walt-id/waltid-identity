@@ -76,6 +76,10 @@ class WalletDemoAppIosTest {
         scenarios.receiveAndPresentTabsExposeQrScanActions()
 
     @Test
+    fun embeddedPresentationJourneyKeepsWalletChrome() =
+        scenarios.embeddedPresentationJourneyKeepsWalletChrome()
+
+    @Test
     fun presentTabAllowsPreviewAndDeclineWithoutCredentials() =
         scenarios.presentTabAllowsPreviewAndDeclineWithoutCredentials()
 
