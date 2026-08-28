@@ -167,6 +167,10 @@ class MobileWalletProximityModelsTest {
             ProximityError.Policy("application_profile_invalid", "Invalid profile").toWalletError().category,
         )
         assertEquals(
+            MobileWalletProximityErrorCategory.HolderKey,
+            ProximityError.Policy("holder_key_unavailable", "Holder key unavailable").toWalletError().category,
+        )
+        assertEquals(
             MobileWalletProximityErrorCategory.Protocol,
             ProximityError.Security("session_authentication_failed", "Session authentication failed")
                 .toWalletError().category,
