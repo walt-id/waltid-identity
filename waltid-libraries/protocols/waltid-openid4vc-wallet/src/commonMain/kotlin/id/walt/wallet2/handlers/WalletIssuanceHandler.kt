@@ -25,6 +25,8 @@ import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.WalletIssuanceHandler.exchangeCode
@@ -37,6 +39,8 @@ import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
+import id.waltid.openid4vci.wallet.notification.NotificationDeliveryResult
+import id.waltid.openid4vci.wallet.notification.NotificationRequestBuilder
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
@@ -49,6 +53,7 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.serialization.Serializable
@@ -708,16 +713,37 @@ object WalletIssuanceHandler {
                 continue
             }
 
-            if (rawCredentials.isNotEmpty()) beforeCredentialsStored(rawCredentials.size)
-            for (issuedCredential in rawCredentials) {
-                val entry = wallet.parseAndStore(
-                    issuedCredential,
-                    label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name,
-                    metadata = metadata,
+            try {
+                if (rawCredentials.isNotEmpty()) beforeCredentialsStored(rawCredentials.size)
+                for (issuedCredential in rawCredentials) {
+                    val entry = wallet.parseAndStore(
+                        issuedCredential,
+                        label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name,
+                        metadata = metadata,
+                    )
+                    onCredentialStored(entry)
+                    onEvent(WalletSessionEvent.issuance_credential_stored)
+                    send(entry)
+                }
+                notifyIssuer(
+                    issuerMetadata = issuerMetadata,
+                    credentialResponse = credentialResponse,
+                    accessToken = tokenResponse.access_token,
+                    event = NotificationEvent.CREDENTIAL_ACCEPTED,
+                    httpClient = httpClient,
                 )
-                onCredentialStored(entry)
-                onEvent(WalletSessionEvent.issuance_credential_stored)
-                send(entry)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                notifyIssuer(
+                    issuerMetadata = issuerMetadata,
+                    credentialResponse = credentialResponse,
+                    accessToken = tokenResponse.access_token,
+                    event = NotificationEvent.CREDENTIAL_FAILURE,
+                    description = "Credential storage failed",
+                    httpClient = httpClient,
+                )
+                throw error
             }
         }
 
@@ -1143,6 +1169,48 @@ object WalletIssuanceHandler {
      */
     private fun clientConfig(clientId: String, redirectUri: Url) =
         ClientConfiguration(clientId = clientId, redirectUris = listOf(redirectUri.toString()))
+
+    private suspend fun notifyIssuer(
+        issuerMetadata: CredentialIssuerMetadata,
+        credentialResponse: CredentialResponse,
+        accessToken: String,
+        event: NotificationEvent,
+        description: String? = null,
+        httpClient: HttpClient = defaultHttpClient(),
+    ) {
+        val endpoint = issuerMetadata.notificationEndpoint ?: return
+        val notificationId = credentialResponse.notificationId ?: return
+
+        try {
+            val result = NotificationRequestBuilder(httpClient).send(
+                notificationEndpoint = endpoint,
+                accessToken = accessToken,
+                request = DefaultNotificationRequest(
+                    notificationId = notificationId,
+                    event = event,
+                    eventDescription = description,
+                ),
+            )
+            when (result) {
+                is NotificationDeliveryResult.Success -> Unit
+                is NotificationDeliveryResult.Failure ->
+                    log.warn {
+                        "Issuer notification was rejected: status=${result.statusCode}, " +
+                            "error=${result.error?.error}, event=$event"
+                    }
+
+                is NotificationDeliveryResult.OAuthFailure ->
+                    log.warn {
+                        "Issuer notification authorization failed: status=${result.statusCode}, " +
+                            "error=${result.error?.error}, event=$event"
+                    }
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            log.warn(error) { "Issuer notification delivery failed for event=$event" }
+        }
+    }
 
     /**
      * Parses a raw issued credential JSON element, creates a [StoredCredential], stores it in
