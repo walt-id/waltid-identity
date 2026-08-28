@@ -1,6 +1,7 @@
 package id.walt.wallet2.data
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.keys.KeyUsage
 import kotlinx.coroutines.flow.Flow
@@ -25,11 +26,10 @@ interface WalletKeyStore {
     suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage> = emptySet()): Crypto2Key? = null
 
     /**
-     * Resolves public Crypto2 material for identity matching without authorizing a private-key
-     * operation. Providers whose operational lookup requires a non-empty usage set should override
-     * this method with a public-only lookup.
+     * Resolves immutable public material for identity matching without returning or authorizing an
+     * operational private-key handle. Stores that cannot provide a public-only view fail closed.
      */
-    suspend fun getPublicCrypto2Key(keyId: String): Crypto2Key? = getCrypto2Key(keyId)
+    suspend fun getPublicKeyMaterial(keyId: String): WalletPublicKeyMaterial? = null
 
     suspend fun getKeyMaterial(keyId: String, usages: Set<KeyUsage> = emptySet()): WalletKeyStoreEntry? {
         val crypto2Key = getCrypto2Key(keyId, usages)
@@ -63,6 +63,13 @@ interface WalletKeyStore {
     /** Convenience: collect all keys as a list. */
     suspend fun listKeysAsList(): List<WalletKeyInfo> =
         listKeys().toList()
+}
+
+/** Public-only wallet key material. This type cannot expose a signing or key-agreement capability. */
+data class WalletPublicKeyMaterial(val publicJwk: EncodedKey.Jwk) {
+    init {
+        require(!publicJwk.privateMaterial) { "Wallet public-key material must not contain private key data" }
+    }
 }
 
 data class WalletKeyStoreEntry(

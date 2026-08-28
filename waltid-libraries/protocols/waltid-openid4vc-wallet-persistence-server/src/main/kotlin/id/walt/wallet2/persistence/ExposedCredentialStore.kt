@@ -2,6 +2,8 @@ package id.walt.wallet2.persistence
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.wallet2.data.HolderKeyBinding
+import id.walt.wallet2.data.HolderKeyBindingErrorCode
+import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import kotlinx.coroutines.flow.Flow
@@ -74,10 +76,23 @@ class ExposedCredentialStore(
             } > 0
         }
 
-    private fun rowToStoredCredential(row: ResultRow): StoredCredential? =
-        runCatching {
+    private fun rowToStoredCredential(row: ResultRow): StoredCredential? {
+        val credentialId = row[Wallet2Tables.Credentials.id]
+        val holderKeyBinding = row[Wallet2Tables.Credentials.holderKeyBinding]?.let { serialized ->
+            try {
+                json.decodeFromString(HolderKeyBinding.serializer(), serialized)
+            } catch (cause: Exception) {
+                throw HolderKeyBindingException(
+                    code = HolderKeyBindingErrorCode.BINDING_INVALID,
+                    credentialId = credentialId,
+                    message = "Credential '$credentialId' has an invalid persisted holder-key binding",
+                    cause = cause,
+                )
+            }
+        }
+        return runCatching {
             StoredCredential(
-                id = row[Wallet2Tables.Credentials.id],
+                id = credentialId,
                 credential = json.decodeFromString(
                     DigitalCredential.serializer(),
                     row[Wallet2Tables.Credentials.serializedCredential]
@@ -87,9 +102,8 @@ class ExposedCredentialStore(
                 metadata = row[Wallet2Tables.Credentials.metadata]?.let {
                     json.decodeFromString(JsonObject.serializer(), it)
                 },
-                holderKeyBinding = row[Wallet2Tables.Credentials.holderKeyBinding]?.let {
-                    json.decodeFromString(HolderKeyBinding.serializer(), it)
-                },
+                holderKeyBinding = holderKeyBinding,
             )
         }.getOrNull()
+    }
 }

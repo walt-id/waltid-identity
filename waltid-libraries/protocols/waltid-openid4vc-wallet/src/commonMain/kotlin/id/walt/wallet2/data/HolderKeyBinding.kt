@@ -81,6 +81,7 @@ enum class HolderKeyBindingErrorCode {
     CREDENTIAL_KEY_EXTRACTION_FAILED,
     CREDENTIAL_NOT_FOUND,
     BINDING_MISSING,
+    BINDING_INVALID,
     BINDING_DOES_NOT_MATCH_CREDENTIAL,
     KEY_REFERENCE_INVALID,
     KEY_NOT_FOUND,
@@ -125,7 +126,7 @@ private data class WalletKeyCandidate(
  */
 suspend fun Wallet.resolveHolderKey(
     credential: StoredCredential,
-    requiredUsages: Set<KeyUsage> = setOf(KeyUsage.SIGN),
+    requiredUsages: Set<KeyUsage>,
 ): ResolvedHolderKey {
     require(requiredUsages.isNotEmpty()) { "At least one holder-key usage is required" }
     val mdoc = credential.credential as? MdocsCredential
@@ -166,7 +167,7 @@ suspend fun Wallet.resolveHolderKey(
 
 suspend fun Wallet.resolveHolderKey(
     credentialId: String,
-    requiredUsages: Set<KeyUsage> = setOf(KeyUsage.SIGN),
+    requiredUsages: Set<KeyUsage>,
 ): ResolvedHolderKey = resolveHolderKey(
     credential = findCredential(credentialId)
         ?: throw HolderKeyBindingException(
@@ -420,8 +421,8 @@ private suspend fun Wallet.allKeyCandidates(
         ids.forEach { keyId ->
             val publicKey = try {
                 // Public identity discovery is deliberately separate from operational lookup. This
-                // neither requests SIGN from unrelated keys nor asks strict providers for empty usages.
-                store.getPublicCrypto2Key(keyId)
+                // returns immutable JWK material rather than an operational private-key handle.
+                store.getPublicKeyMaterial(keyId)
             } catch (cause: CancellationException) {
                 throw cause
             } catch (cause: Exception) {
@@ -433,14 +434,14 @@ private suspend fun Wallet.allKeyCandidates(
                 )
             } ?: return@forEach
             add(
-                candidate(
-                    credential,
+                WalletKeyCandidate(
                     WalletKeyStoreEntry(
                         keyId = keyId,
                         legacyKey = null,
-                        crypto2Key = publicKey,
+                        crypto2Key = null,
                         keyReference = walletStoreKeyReference(index, keyId),
                     ),
+                    publicKey.publicKeyThumbprint(),
                 )
             )
         }
@@ -564,6 +565,9 @@ private suspend fun id.walt.crypto2.keys.Key.publicKeyThumbprint(): PublicKeyThu
     }.exportPublicKey().toPublicJwk(spec)
     return PublicKeyThumbprint(value = Jwk.sha256Thumbprint(exported))
 }
+
+private suspend fun WalletPublicKeyMaterial.publicKeyThumbprint(): PublicKeyThumbprint =
+    PublicKeyThumbprint(value = Jwk.sha256Thumbprint(publicJwk))
 
 internal fun walletStoreKeyReference(storeIndex: Int, keyId: String): String =
     "$WALLET_KEY_REFERENCE_PREFIX" + "store:$storeIndex:${keyId.encodeToByteArray().encodeToBase64Url()}"

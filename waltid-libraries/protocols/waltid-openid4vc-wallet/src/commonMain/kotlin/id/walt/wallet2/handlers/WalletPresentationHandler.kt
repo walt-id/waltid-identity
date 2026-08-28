@@ -1093,9 +1093,9 @@ object WalletPresentationHandler {
     ): suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key = { credentialId, _ ->
         val isolated = isolatedCredentialsById[credentialId]
         val resolved = if (isolated != null) {
-            resolveHolderKey(isolated)
+            resolveHolderKey(isolated, setOf(KeyUsage.SIGN))
         } else {
-            resolveHolderKey(credentialId)
+            resolveHolderKey(credentialId, setOf(KeyUsage.SIGN))
         }
         resolved.keyMaterial.requireCrypto2Key()
     }
@@ -1564,7 +1564,7 @@ object WalletPresentationHandler {
                     true
                 } else {
                     try {
-                        resolveHolderKey(stored)
+                        resolveHolderKey(stored, setOf(KeyUsage.SIGN))
                         true
                     } catch (failure: HolderKeyBindingException) {
                         bindingFailuresByQueryId.getOrPut(queryId, ::mutableListOf) += failure

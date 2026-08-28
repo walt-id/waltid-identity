@@ -395,7 +395,10 @@ data class FetchCredentialRequest(
     val metadata: JsonObject? = null,
     /** Optional credential label override; otherwise derived from credential configuration display. */
     val label: String? = null,
-    /** Wallet key used for the proof that the issuer binds into an mdoc MSO DeviceKey. */
+    /**
+     * Wallet key used for the proof that the issuer binds into an mdoc MSO DeviceKey. Required when
+     * [storeInWallet] stores an mdoc; it must identify the exact key used to create [proofJwt].
+     */
     val keyId: String? = null,
 )
 
@@ -497,7 +500,10 @@ data class PollDeferredRequest(
     val metadata: JsonObject? = null,
     /** Optional credential label override; otherwise derived from credential configuration display. */
     val label: String? = null,
-    /** Wallet key used for the original proof of possession. */
+    /**
+     * Wallet key used for the original proof of possession. Required when the deferred response
+     * stores an mdoc; it must identify the exact key used for the original credential request.
+     */
     val keyId: String? = null,
 )
 

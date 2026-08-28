@@ -71,7 +71,7 @@ object WalletPresentFunctionality2 {
         holderCrypto2Key: Crypto2Key?,
         /** The platform-asserted DC API origin; null for redirect/direct-post flows. */
         dcApiOrigin: String? = null,
-        /** Resolves the credential-bound MSO DeviceKey instead of reusing a wallet default. */
+        /** Required for mdocs; resolves the exact credential-bound MSO DeviceKey. */
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
     ): String {
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
@@ -125,27 +125,16 @@ object WalletPresentFunctionality2 {
                             )
 
                         resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC -> {
-                            val mdocHolderKey = mdocHolderKeyResolver
-                                ?.invoke(matchResult.credential.id, digitalCredential)
-                                ?: holderCrypto2Key
-                            mdocHolderKey?.let {
-                                MdocPresenter.presentMdoc(
-                                    digitalCredential,
-                                    matchResult,
-                                    authorizationRequest,
-                                    it,
-                                    typeRegistry,
-                                    verifierJwkThumbprint,
-                                    dcApiOrigin,
-                                )
-                            } ?: MdocPresenter.presentMdoc(
+                            val mdocHolderKey = requireNotNull(mdocHolderKeyResolver) {
+                                "A credential-bound holder-key resolver is required for mdoc presentation"
+                            }.invoke(matchResult.credential.id, digitalCredential)
+                            MdocPresenter.presentMdoc(
                                 digitalCredential,
                                 matchResult,
                                 authorizationRequest,
-                                requireNotNull(holderKey),
+                                mdocHolderKey,
                                 typeRegistry,
                                 verifierJwkThumbprint,
-                                null,
                                 dcApiOrigin,
                             )
                         }

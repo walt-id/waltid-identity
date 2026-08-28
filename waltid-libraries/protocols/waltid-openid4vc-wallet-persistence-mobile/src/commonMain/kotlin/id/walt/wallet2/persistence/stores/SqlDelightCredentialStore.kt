@@ -4,6 +4,8 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.wallet2.data.HolderKeyBinding
+import id.walt.wallet2.data.HolderKeyBindingErrorCode
+import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.persistence.db.Credentials
@@ -78,9 +80,18 @@ public class SqlDelightCredentialStore(
             label = label,
             addedAt = Instant.fromEpochMilliseconds(added_at),
             metadata = metadata?.let { json.decodeFromString(JsonObject.serializer(), it) },
-            holderKeyBinding = holder_key_binding?.let {
-                json.decodeFromString(HolderKeyBinding.serializer(), it)
-            },
+            holderKeyBinding = holder_key_binding?.let { decodeHolderKeyBinding(it) },
+        )
+    }
+
+    private fun Credentials.decodeHolderKeyBinding(serialized: String): HolderKeyBinding = try {
+        json.decodeFromString(HolderKeyBinding.serializer(), serialized)
+    } catch (cause: Exception) {
+        throw HolderKeyBindingException(
+            code = HolderKeyBindingErrorCode.BINDING_INVALID,
+            credentialId = id,
+            message = "Credential '$id' has an invalid persisted holder-key binding",
+            cause = cause,
         )
     }
 }

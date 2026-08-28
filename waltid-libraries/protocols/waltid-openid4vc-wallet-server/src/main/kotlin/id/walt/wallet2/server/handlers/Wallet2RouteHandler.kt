@@ -679,6 +679,8 @@ object Wallet2RouteHandler {
                                 "stored in the wallet, removing the need to call the import endpoint afterwards. " +
                                 "Pass credentialIssuerBaseUrl when storing so issuer display metadata and labels " +
                                 "are persisted like the full receive path. " +
+                                "When the response can contain an mdoc, keyId must identify the exact wallet key " +
+                                "used to create proofJwt. " +
                                 "If the issuer returns invalid_nonce, request a fresh nonce, sign a new proof, " +
                                 "and repeat this isolated fetch step."
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
@@ -751,7 +753,9 @@ object Wallet2RouteHandler {
                             "Polls the issuer's deferred credential endpoint for a previously " +
                                     "deferred credential. Returns immediately with empty list if still pending. " +
                                     "Pass credentialIssuerBaseUrl (and optionally credentialConfigurationId) so " +
-                                    "issuer display metadata and labels are stored like the full receive path."
+                                    "issuer display metadata and labels are stored like the full receive path. " +
+                                    "When the response can contain an mdoc, keyId must identify the exact wallet " +
+                                    "key used for the original credential request."
                         request { pathParameter<String>("walletId"); body<PollDeferredRequest>() }
                         response { HttpStatusCode.OK to { body<ReceiveCredentialResult>() } }
                     }) {

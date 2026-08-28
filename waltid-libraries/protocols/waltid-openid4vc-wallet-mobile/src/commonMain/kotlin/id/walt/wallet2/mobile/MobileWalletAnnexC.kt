@@ -11,6 +11,7 @@ import id.walt.cose.toEncodedJwk
 import id.walt.cose.verifyDetached
 import id.walt.crypto2.hpke.Hpke
 import id.walt.crypto2.keys.HpkeCiphertext
+import id.walt.crypto2.keys.KeyUsage
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -228,7 +229,7 @@ internal class MobileWalletAnnexCEngine(
                 val option = stored.toAnnexCOption(index, documentRequest, selectedCredentialIds)
                     ?: return@mapNotNull null
                 try {
-                    wallet.resolveHolderKey(stored)
+                    wallet.resolveHolderKey(stored, setOf(KeyUsage.SIGN))
                     option
                 } catch (failure: HolderKeyBindingException) {
                     bindingFailures += failure
@@ -323,7 +324,7 @@ internal class MobileWalletAnnexCEngine(
                 "Selected credential no longer matches the Annex C document request"
             }
             // Resolve the exact credential-bound key. A wallet default is never an mdoc fallback.
-            val holderKey = wallet.resolveHolderKey(stored).keyMaterial.requireCrypto2Key()
+            val holderKey = wallet.resolveHolderKey(stored, setOf(KeyUsage.SIGN)).keyMaterial.requireCrypto2Key()
             MdocPresenter.buildAnnexCDocument(
                 digitalCredential = stored.credential,
                 requestedElements = requested.namespaces,
