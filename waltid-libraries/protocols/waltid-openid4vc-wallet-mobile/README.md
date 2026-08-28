@@ -32,6 +32,7 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 - Start and continue OpenID4VCI issuance sessions.
 - List credentials stored in mobile persistence.
 - Present credentials using OpenID4VP.
+- Present mdocs in person through a stateful ISO/IEC 18013-5 proximity session.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
 
 ## Key-use authorization
@@ -122,6 +123,60 @@ when (val encryption = preview.request.responseEncryption) {
 
 Response-encryption metadata describes protection of the authorization response. It
 does not establish verifier trust and does not expose verifier key material.
+
+## In-person proximity presentation
+
+Proximity presentation is a distinct session API rather than an OpenID4VP URL
+flow. Query capabilities without creating ephemeral keys or radio resources,
+then create one single-use session and render its authoritative state:
+
+```kotlin
+val configuration = MobileWalletProximityConfiguration()
+val capabilities = wallet.proximityPresentationCapabilities(configuration)
+val session = wallet.startProximityPresentation(configuration)
+
+session.state.collect { state ->
+    when (state) {
+        is MobileWalletProximityState.CheckingPrerequisites -> {
+            showUnavailableMethods(state.capabilities)
+        }
+        is MobileWalletProximityState.EngagementReady -> {
+            val qr = state.engagements.filterIsInstance<MobileWalletProximityEngagement.Qr>().single()
+            showEngagementQr(qr.payload)
+        }
+        is MobileWalletProximityState.ReviewRequired -> showProximityReview(state.review)
+        is MobileWalletProximityState.Completed -> showCompletion(state.exchanges)
+        is MobileWalletProximityState.Failed -> showProximityError(state.error)
+        else -> showProximityProgress(state)
+    }
+}
+```
+
+The default configuration selects QR engagement and BLE retrieval. NFC and
+Wi-Fi Aware are represented in the capability contract but currently report
+precise unavailable results until their platform adapters are installed. A
+selected unavailable method prevents session preparation; it is never silently
+dropped.
+
+Device signature is the default holder-authentication policy. Applications may
+require MAC or choose an explicit pre-review preference with
+`deviceAuthenticationPolicy`; the selected method is shown on each credential
+option, bound into the immutable review, and never changed after consent. The
+pinned EUDI profile currently requires device signature.
+
+Host applications perform permission or settings effects named by
+`capabilities.remediationActions`, report the privacy-safe outcome with
+`MobileWalletProximityAction.ReportRemediation`, and let the SDK re-check the
+platform. Review approval uses only the credential and element choices in the
+current immutable review. The SDK revalidates credential, holder key, reader
+trust, status, disclosure, and application-profile state before sending.
+Multiple reader-authentication statements retain their independent
+`authenticationIndex`, and holder-key authorization is reported per document
+request so mixed signature/MAC responses cannot be collapsed into one prompt.
+
+Only one proximity session may be active per wallet. Always call `close()` when
+the journey leaves the screen; closing and cancellation are idempotent and every
+new session creates fresh engagement identifiers and ephemeral key material.
 
 ## Persistence and encryption
 

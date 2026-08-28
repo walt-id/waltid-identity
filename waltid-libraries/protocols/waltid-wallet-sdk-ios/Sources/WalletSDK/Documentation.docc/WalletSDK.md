@@ -6,7 +6,7 @@ Swift-friendly iOS facade for the walt.id mobile wallet SDK.
 
 `WalletSDK` gives iOS apps a native Swift entry point for wallet setup,
 OpenID4VCI credential issuance, local credential listing, OpenID4VP
-presentation, and progress events.
+presentation, in-person mdoc proximity presentation, and progress events.
 
 Create a ``Wallet`` in an app process, bootstrap wallet key material, and
 then call the async wallet operations with Foundation-native `URL` values:
@@ -109,6 +109,7 @@ reset; plaintext-to-encrypted migration is not performed.
 - <doc:GettingStarted>
 - <doc:IssuingCredentials>
 - <doc:PresentingCredentials>
+- <doc:ProximityPresentation>
 - <doc:ObservingEventsAndErrors>
 
 ### Wallet
