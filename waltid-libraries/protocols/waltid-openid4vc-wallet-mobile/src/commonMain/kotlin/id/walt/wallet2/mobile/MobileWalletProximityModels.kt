@@ -1,6 +1,8 @@
 package id.walt.wallet2.mobile
 
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
 
 /** Versioned mdoc interoperability boundary selected for one proximity session. */
@@ -28,6 +30,52 @@ public enum class MobileWalletProximityBleBearerPolicy {
     PreferL2cap,
 }
 
+/** Holder-to-reader engagement methods selected for a session. */
+public enum class MobileWalletProximityEngagementMethod {
+    Qr,
+    Nfc,
+}
+
+/** Device-retrieval transports selected for a session. */
+public enum class MobileWalletProximityRetrievalMethod {
+    BluetoothLowEnergy,
+    Nfc,
+    WifiAware,
+}
+
+/** Holder authentication frozen for a reviewed document response. */
+public enum class MobileWalletProximityDeviceAuthenticationMethod {
+    Signature,
+    Mac,
+}
+
+/** Explicit allowlist and preference applied before an immutable review is constructed. */
+public enum class MobileWalletProximityDeviceAuthenticationPolicy(
+    internal val preferenceOrder: List<MobileWalletProximityDeviceAuthenticationMethod>,
+) {
+    /** Require device signature; credentials whose keys cannot sign are unavailable. */
+    SignatureOnly(listOf(MobileWalletProximityDeviceAuthenticationMethod.Signature)),
+
+    /** Require device MAC; credentials whose keys cannot agree a MAC key are unavailable. */
+    MacOnly(listOf(MobileWalletProximityDeviceAuthenticationMethod.Mac)),
+
+    /** Prefer signature and fall back to MAC only before constructing the immutable review. */
+    PreferSignature(
+        listOf(
+            MobileWalletProximityDeviceAuthenticationMethod.Signature,
+            MobileWalletProximityDeviceAuthenticationMethod.Mac,
+        ),
+    ),
+
+    /** Prefer MAC and fall back to signature only before constructing the immutable review. */
+    PreferMac(
+        listOf(
+            MobileWalletProximityDeviceAuthenticationMethod.Mac,
+            MobileWalletProximityDeviceAuthenticationMethod.Signature,
+        ),
+    ),
+}
+
 /** Policy applied after reader authentication and trust facts have been evaluated. */
 public enum class MobileWalletProximityReaderPolicy {
     /** Anonymous or cryptographically valid but untrusted readers may reach explicit holder consent. */
@@ -44,8 +92,14 @@ public data class MobileWalletProximityConfiguration(
     public val bleRoles: MobileWalletProximityBleRoles = MobileWalletProximityBleRoles.Dual,
     public val bearerPolicy: MobileWalletProximityBleBearerPolicy =
         MobileWalletProximityBleBearerPolicy.PreferL2cap,
+    public val engagementMethods: Set<MobileWalletProximityEngagementMethod> =
+        setOf(MobileWalletProximityEngagementMethod.Qr),
+    public val retrievalMethods: Set<MobileWalletProximityRetrievalMethod> =
+        setOf(MobileWalletProximityRetrievalMethod.BluetoothLowEnergy),
     public val readerPolicy: MobileWalletProximityReaderPolicy =
         MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
+    public val deviceAuthenticationPolicy: MobileWalletProximityDeviceAuthenticationPolicy =
+        MobileWalletProximityDeviceAuthenticationPolicy.SignatureOnly,
     public val readerTrustEvaluator: MobileWalletProximityReaderTrustEvaluator =
         UnconfiguredMobileWalletProximityReaderTrustEvaluator,
     public val credentialStatusEvaluator: MobileWalletProximityCredentialStatusEvaluator =
@@ -55,6 +109,8 @@ public data class MobileWalletProximityConfiguration(
     public val maximumMessageBytes: Int = 1_048_576,
 ) {
     init {
+        require(engagementMethods.isNotEmpty()) { "At least one engagement method must be selected" }
+        require(retrievalMethods.isNotEmpty()) { "At least one retrieval method must be selected" }
         require(maximumMessageBytes in 1..16_777_216) {
             "Maximum proximity message size must be between 1 byte and 16 MiB"
         }
@@ -62,6 +118,10 @@ public data class MobileWalletProximityConfiguration(
             profile != MobileWalletProximityProfile.EudiArf3Fcaf202608 ||
                 readerPolicy == MobileWalletProximityReaderPolicy.RequireTrusted
         ) { "The selected EUDI profile requires an authenticated and trusted reader" }
+        require(
+            profile != MobileWalletProximityProfile.EudiArf3Fcaf202608 ||
+                deviceAuthenticationPolicy == MobileWalletProximityDeviceAuthenticationPolicy.SignatureOnly
+        ) { "The selected EUDI profile requires device-signature authentication" }
     }
 }
 
@@ -94,6 +154,15 @@ public enum class MobileWalletProximityErrorCategory {
     Internal,
 }
 
+/** Normalized host remediation suggested by a side-effect-free prerequisite check. */
+public enum class MobileWalletProximityRemediationAction {
+    RequestBluetoothPermission,
+    OpenApplicationSettings,
+    EnableBluetooth,
+    UseSupportedDevice,
+    Retry,
+}
+
 /** One transport's four independent support dimensions. */
 public data class MobileWalletProximityTransportCapability(
     public val implemented: Boolean,
@@ -101,14 +170,19 @@ public data class MobileWalletProximityTransportCapability(
     public val runtimeAvailable: Boolean,
     public val selected: Boolean,
     public val unavailable: MobileWalletProximityError? = null,
+    public val remediationActions: List<MobileWalletProximityRemediationAction> = emptyList(),
 ) {
     init {
-        require(!selected || implemented && profilePermitted) {
-            "A selected transport must be implemented and profile-permitted"
-        }
         require(unavailable == null || !runtimeAvailable) {
             "A runtime-available transport cannot carry an unavailable reason"
         }
+        require(runtimeAvailable || unavailable != null) {
+            "A runtime-unavailable transport requires a stable unavailable reason"
+        }
+        require(!runtimeAvailable || remediationActions.isEmpty()) {
+            "A runtime-available transport cannot require remediation"
+        }
+        require(remediationActions.distinct().size == remediationActions.size)
     }
 
     /** Whether a session may prepare this selected transport now. */
@@ -119,11 +193,35 @@ public data class MobileWalletProximityTransportCapability(
 /** Side-effect-free prerequisite snapshot. No radio resource or session material has been created. */
 public data class MobileWalletProximityCapabilities(
     public val profile: MobileWalletProximityProfile,
+    public val qrEngagement: MobileWalletProximityTransportCapability,
+    public val nfcEngagement: MobileWalletProximityTransportCapability,
     public val bluetoothLowEnergy: MobileWalletProximityTransportCapability,
+    public val nfcRetrieval: MobileWalletProximityTransportCapability,
+    public val wifiAwareRetrieval: MobileWalletProximityTransportCapability,
 ) {
-    /** Whether all selected prerequisites currently allow a session to start. */
+    init {
+        require(qrEngagement.selected || nfcEngagement.selected) {
+            "At least one engagement capability must be selected"
+        }
+        require(bluetoothLowEnergy.selected || nfcRetrieval.selected || wifiAwareRetrieval.selected) {
+            "At least one retrieval capability must be selected"
+        }
+    }
+
+    /** Whether at least one selected engagement and one selected retrieval method can start. */
     public val mayStart: Boolean
-        get() = bluetoothLowEnergy.mayStart
+        get() = listOf(qrEngagement, nfcEngagement).any { it.mayStart } &&
+            listOf(bluetoothLowEnergy, nfcRetrieval, wifiAwareRetrieval).any { it.mayStart }
+
+    /** Distinct host remediations for selected unavailable methods. */
+    public val remediationActions: List<MobileWalletProximityRemediationAction>
+        get() = listOf(
+            qrEngagement,
+            nfcEngagement,
+            bluetoothLowEnergy,
+            nfcRetrieval,
+            wifiAwareRetrieval,
+        ).filter { it.selected }.flatMap { it.remediationActions }.distinct()
 }
 
 /** Scope covered by one reader-authentication statement. */
@@ -148,25 +246,63 @@ public enum class MobileWalletProximityReaderTrustState {
     Trusted,
 }
 
+/** Result of validating the reader certificate path against explicitly configured trust material. */
+public enum class MobileWalletProximityReaderCertificatePathState {
+    NotEvaluated,
+    Invalid,
+    Valid,
+}
+
+/** Reader-certificate revocation fact, kept independent from path validity and product trust. */
+public enum class MobileWalletProximityReaderRevocationState {
+    NotChecked,
+    Good,
+    Revoked,
+    Indeterminate,
+}
+
+/** Optional RICAL evidence fact. A match never establishes product trust by itself. */
+public enum class MobileWalletProximityRicalState {
+    NotEvaluated,
+    Unavailable,
+    Invalid,
+    NoMatchingAuthority,
+    Matched,
+}
+
 /** Exact verified reader evidence supplied to an application-owned trust policy. */
 public data class MobileWalletProximityReaderEvidence(
     public val scope: MobileWalletProximityReaderAuthenticationScope,
     public val documentRequestIndex: Int? = null,
+    /** Zero-based statement index within the authentication scope. */
+    public val authenticationIndex: Int = 0,
     /** DER certificates in leaf-first order, encoded as unpadded Base64URL. */
     public val certificateChainDerBase64Url: List<String>,
 ) {
     init {
+        require(
+            (scope == MobileWalletProximityReaderAuthenticationScope.Document) ==
+                (documentRequestIndex != null)
+        ) { "Document-scoped evidence requires exactly one document request index" }
         require(documentRequestIndex == null || documentRequestIndex >= 0)
+        require(authenticationIndex >= 0)
         require(certificateChainDerBase64Url.isNotEmpty()) {
             "Verified reader evidence requires a certificate chain"
         }
-        require(certificateChainDerBase64Url.none(String::isBlank))
+        require(certificateChainDerBase64Url.all(String::isNonEmptyBase64Url)) {
+            "Reader certificates must be non-empty unpadded Base64URL values"
+        }
     }
 }
 
 /** Trust decision supplied by the hosting wallet application. */
 public data class MobileWalletProximityReaderTrustDecision(
     public val state: MobileWalletProximityReaderTrustState,
+    public val certificatePath: MobileWalletProximityReaderCertificatePathState =
+        MobileWalletProximityReaderCertificatePathState.NotEvaluated,
+    public val revocation: MobileWalletProximityReaderRevocationState =
+        MobileWalletProximityReaderRevocationState.NotChecked,
+    public val rical: MobileWalletProximityRicalState = MobileWalletProximityRicalState.NotEvaluated,
     public val displayName: String? = null,
     public val reason: String? = null,
 ) {
@@ -176,6 +312,22 @@ public data class MobileWalletProximityReaderTrustDecision(
         }
         require(displayName == null || displayName.isNotBlank())
         require(reason == null || reason.isNotBlank())
+        require(state != MobileWalletProximityReaderTrustState.Revoked ||
+            revocation == MobileWalletProximityReaderRevocationState.Revoked) {
+            "A revoked trust decision requires a revoked certificate result"
+        }
+        require(revocation != MobileWalletProximityReaderRevocationState.Revoked ||
+            state == MobileWalletProximityReaderTrustState.Revoked) {
+            "A revoked certificate result requires a revoked trust decision"
+        }
+        require(state != MobileWalletProximityReaderTrustState.Trusted ||
+            certificatePath == MobileWalletProximityReaderCertificatePathState.Valid) {
+            "A trusted reader requires a valid certificate path"
+        }
+        require(state != MobileWalletProximityReaderTrustState.Trusted ||
+            revocation != MobileWalletProximityReaderRevocationState.Indeterminate) {
+            "A reader with indeterminate revocation status cannot be trusted"
+        }
     }
 }
 
@@ -201,17 +353,53 @@ public object UnconfiguredMobileWalletProximityReaderTrustEvaluator :
 public data class MobileWalletProximityReaderAuthentication(
     public val scope: MobileWalletProximityReaderAuthenticationScope,
     public val documentRequestIndex: Int?,
+    /** Zero-based statement index within the authentication scope. */
+    public val authenticationIndex: Int = 0,
     public val validity: MobileWalletProximityReaderAuthenticationValidity,
     public val trust: MobileWalletProximityReaderTrustState,
+    public val certificatePath: MobileWalletProximityReaderCertificatePathState =
+        MobileWalletProximityReaderCertificatePathState.NotEvaluated,
+    public val revocation: MobileWalletProximityReaderRevocationState =
+        MobileWalletProximityReaderRevocationState.NotChecked,
+    public val rical: MobileWalletProximityRicalState = MobileWalletProximityRicalState.NotEvaluated,
     public val displayName: String? = null,
     public val reason: String? = null,
 ) {
     init {
+        require(
+            (scope == MobileWalletProximityReaderAuthenticationScope.Document) ==
+                (documentRequestIndex != null)
+        ) { "Document-scoped authentication requires exactly one document request index" }
         require(documentRequestIndex == null || documentRequestIndex >= 0)
+        require(authenticationIndex >= 0)
         require(
             validity == MobileWalletProximityReaderAuthenticationValidity.Valid ||
                 trust == MobileWalletProximityReaderTrustState.NotEvaluated
         ) { "Trust cannot be evaluated before reader authentication is valid" }
+        require(validity == MobileWalletProximityReaderAuthenticationValidity.Valid ||
+            certificatePath == MobileWalletProximityReaderCertificatePathState.NotEvaluated) {
+            "A certificate path cannot be evaluated before reader authentication is valid"
+        }
+        require(validity == MobileWalletProximityReaderAuthenticationValidity.Valid ||
+            revocation == MobileWalletProximityReaderRevocationState.NotChecked) {
+            "Revocation cannot be evaluated before reader authentication is valid"
+        }
+        require(validity == MobileWalletProximityReaderAuthenticationValidity.Valid ||
+            rical == MobileWalletProximityRicalState.NotEvaluated) {
+            "RICAL cannot be evaluated before reader authentication is valid"
+        }
+        require(
+            trust != MobileWalletProximityReaderTrustState.Revoked ||
+                revocation == MobileWalletProximityReaderRevocationState.Revoked
+        )
+        require(
+            revocation != MobileWalletProximityReaderRevocationState.Revoked ||
+                trust == MobileWalletProximityReaderTrustState.Revoked
+        )
+        require(
+            trust != MobileWalletProximityReaderTrustState.Trusted ||
+                certificatePath == MobileWalletProximityReaderCertificatePathState.Valid
+        )
     }
 }
 
@@ -267,10 +455,32 @@ public data class MobileWalletProximityApplicationProfileInput(
     /** Exact DeviceRequest bytes, encoded as unpadded Base64URL. */
     public val deviceRequestBase64Url: String,
     public val credentials: List<MobileWalletProximityApplicationCredential>,
+    public val requestedDocuments: List<MobileWalletProximityApplicationDocumentRequest>,
+    public val readerAuthentication: List<MobileWalletProximityReaderAuthentication>,
 ) {
     init {
         require(deviceRequestBase64Url.isNotBlank())
         require(credentials.distinctBy(MobileWalletProximityApplicationCredential::credentialId).size == credentials.size)
+        require(requestedDocuments.isNotEmpty())
+        require(requestedDocuments.distinctBy { it.requestIndex }.size == requestedDocuments.size)
+        val requestIndices = requestedDocuments.map { it.requestIndex }.toSet()
+        require(readerAuthentication.all { authentication ->
+            authentication.documentRequestIndex == null || authentication.documentRequestIndex in requestIndices
+        }) { "Reader authentication refers to a document outside this request" }
+        require(readerAuthentication.distinctBy { Triple(it.scope, it.documentRequestIndex, it.authenticationIndex) }.size ==
+            readerAuthentication.size) { "Reader-authentication scopes must be unique" }
+    }
+}
+
+/** Dependency-free parsed request facts supplied to application-profile adapters. */
+public data class MobileWalletProximityApplicationDocumentRequest(
+    public val requestIndex: Int,
+    public val docType: String,
+    public val requestedElements: List<MobileWalletProximityRequestedElement>,
+) {
+    init {
+        require(requestIndex >= 0 && docType.isNotBlank() && requestedElements.isNotEmpty())
+        require(requestedElements.distinctBy { it.namespace to it.elementIdentifier }.size == requestedElements.size)
     }
 }
 
@@ -296,7 +506,9 @@ public data class MobileWalletProximityDeviceSignedElement(
     init {
         require(credentialId.isNotBlank())
         require(namespace.isNotBlank() && elementIdentifier.isNotBlank())
-        require(valueCborBase64Url.isNotBlank())
+        require(valueCborBase64Url.isNonEmptyBase64Url()) {
+            "A device-signed value must be non-empty unpadded Base64URL"
+        }
     }
 }
 
@@ -314,7 +526,9 @@ public data class MobileWalletProximityApplicationAuthorization(
         require(profileId.isNotBlank() && displayTitle.isNotBlank())
         require(details.isNotEmpty() && details.distinctBy { it.id }.size == details.size)
         require(compatibleCredentialIds.isNotEmpty() && compatibleCredentialIds.none(String::isBlank))
-        require(resultBindingDigestBase64Url.isNotBlank())
+        require(resultBindingDigestBase64Url.isSha256Base64Url()) {
+            "Application-profile binding must be an unpadded Base64URL SHA-256 digest"
+        }
         require(deviceSignedElements.all { it.credentialId in compatibleCredentialIds })
         require(
             deviceSignedElements.distinctBy { Triple(it.credentialId, it.namespace, it.elementIdentifier) }.size ==
@@ -322,6 +536,18 @@ public data class MobileWalletProximityApplicationAuthorization(
         )
     }
 }
+
+@OptIn(ExperimentalEncodingApi::class)
+private fun String.isSha256Base64Url(): Boolean =
+    isNotBlank() && !contains('=') && runCatching {
+        Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).decode(this).size == 32
+    }.getOrDefault(false)
+
+@OptIn(ExperimentalEncodingApi::class)
+private fun String.isNonEmptyBase64Url(): Boolean =
+    isNotBlank() && !contains('=') && runCatching {
+        Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).decode(this).isNotEmpty()
+    }.getOrDefault(false)
 
 /** Result of asking one application profile to recognize and validate the exact request. */
 public sealed interface MobileWalletProximityApplicationProfileResult {
@@ -333,7 +559,10 @@ public sealed interface MobileWalletProximityApplicationProfileResult {
         public val authorization: MobileWalletProximityApplicationAuthorization,
     ) : MobileWalletProximityApplicationProfileResult
 
-    /** This profile recognized the request but rejected invalid or unsupported application data. */
+    /**
+     * This profile recognized the request but rejected invalid or unsupported application data.
+     * [reason] must be safe to expose to the wallet UI.
+     */
     public data class Rejected(public val reason: String) : MobileWalletProximityApplicationProfileResult {
         init { require(reason.isNotBlank()) }
     }
@@ -395,6 +624,7 @@ public data class MobileWalletProximityCredentialOption(
     public val label: String?,
     public val issuer: String?,
     public val validUntil: Instant,
+    public val deviceAuthentication: MobileWalletProximityDeviceAuthenticationMethod,
     /** Exact requested or alternative elements this credential would disclose. */
     public val requestedElements: List<MobileWalletProximityRequestedElement>,
 ) {
@@ -452,7 +682,22 @@ public data class MobileWalletProximityReview(
     init {
         require(exchange > 0 && documents.isNotEmpty())
         require(documents.distinctBy { it.requestIndex }.size == documents.size)
+        val requestIndices = documents.map { it.requestIndex }.toSet()
+        require(readerAuthentication.all { authentication ->
+            authentication.documentRequestIndex == null || authentication.documentRequestIndex in requestIndices
+        }) { "Reader authentication refers to a document outside this review" }
+        require(readerAuthentication.distinctBy {
+            Triple(it.scope, it.documentRequestIndex, it.authenticationIndex)
+        }.size == readerAuthentication.size) { "Reader-authentication statements must be unique" }
+        require(useCases.distinctBy { it.index }.size == useCases.size)
+        require(useCases.all { useCase -> useCase.documentRequestIndices.all { it in requestIndices } }) {
+            "A selected use case refers to a document outside this review"
+        }
         require(applicationAuthorizations.distinctBy { it.profileId }.size == applicationAuthorizations.size)
+        val credentialIds = documents.flatMap { it.credentialOptions }.map { it.credentialId }.toSet()
+        require(applicationAuthorizations.all { it.compatibleCredentialIds.all(credentialIds::contains) }) {
+            "An application authorization refers to a credential outside this review"
+        }
     }
 }
 
@@ -486,6 +731,49 @@ public sealed interface MobileWalletProximityAction {
 
     public data object Decline : MobileWalletProximityAction
     public data object Cancel : MobileWalletProximityAction
+    public data object RetryPrerequisites : MobileWalletProximityAction
+    public data class ReportRemediation(
+        public val action: MobileWalletProximityRemediationAction,
+        public val result: MobileWalletProximityHostActionResult,
+    ) : MobileWalletProximityAction
+}
+
+/** Privacy-safe outcome of a system surface performed by the host application. */
+public enum class MobileWalletProximityHostActionResult {
+    Completed,
+    Cancelled,
+    Failed,
+}
+
+/** Prepared engagement presented by the host UI. */
+public sealed interface MobileWalletProximityEngagement {
+    public data class Qr(public val payload: String) : MobileWalletProximityEngagement {
+        init { require(payload.startsWith("mdoc:")) }
+    }
+
+    public data object Nfc : MobileWalletProximityEngagement
+}
+
+/** One protected-key operation required by a frozen approved document response. */
+public data class MobileWalletProximityHolderAuthorizationRequest(
+    public val requestIndex: Int,
+    public val credentialId: String,
+    public val deviceAuthentication: MobileWalletProximityDeviceAuthenticationMethod,
+) {
+    init {
+        require(requestIndex >= 0 && credentialId.isNotBlank())
+    }
+}
+
+/** Exact holder-key authorization context for a frozen approved submission. */
+public data class MobileWalletProximityHolderAuthorization(
+    public val exchange: Int,
+    public val requests: List<MobileWalletProximityHolderAuthorizationRequest>,
+) {
+    init {
+        require(exchange > 0 && requests.isNotEmpty())
+        require(requests.distinctBy { it.requestIndex }.size == requests.size)
+    }
 }
 
 /** Deterministic result of dispatching an action. */
@@ -497,22 +785,28 @@ public sealed interface MobileWalletProximityActionResult {
 
 /** Public Wallet SDK session state; each variant carries only data valid for that phase. */
 public sealed interface MobileWalletProximityState {
-    public data object CheckingPrerequisites : MobileWalletProximityState
+    public data class CheckingPrerequisites(
+        public val capabilities: MobileWalletProximityCapabilities,
+    ) : MobileWalletProximityState
     public data class Preparing(public val profile: MobileWalletProximityProfile) : MobileWalletProximityState
-    public data class EngagementReady(public val qrPayload: String) : MobileWalletProximityState {
-        init { require(qrPayload.startsWith("mdoc:")) }
+    public data class EngagementReady(
+        public val engagements: List<MobileWalletProximityEngagement>,
+    ) : MobileWalletProximityState {
+        init { require(engagements.isNotEmpty() && engagements.distinctBy { it::class }.size == engagements.size) }
     }
-    public data class Connecting(public val qrPayload: String) : MobileWalletProximityState {
-        init { require(qrPayload.startsWith("mdoc:")) }
+    public data class Connecting(
+        public val engagements: List<MobileWalletProximityEngagement>,
+    ) : MobileWalletProximityState {
+        init { require(engagements.isNotEmpty() && engagements.distinctBy { it::class }.size == engagements.size) }
     }
     public data class AwaitingRequest(public val exchange: Int) : MobileWalletProximityState {
         init { require(exchange > 0) }
     }
     public data class ReviewRequired(public val review: MobileWalletProximityReview) :
         MobileWalletProximityState
-    public data class AuthorizingHolderKey(public val exchange: Int) : MobileWalletProximityState {
-        init { require(exchange > 0) }
-    }
+    public data class AuthorizingHolderKey(
+        public val authorization: MobileWalletProximityHolderAuthorization,
+    ) : MobileWalletProximityState
     public data class SendingResponse(public val exchange: Int) : MobileWalletProximityState {
         init { require(exchange > 0) }
     }
@@ -533,12 +827,16 @@ public sealed interface MobileWalletProximityState {
 /** Legal host actions derived exclusively from the current session state. */
 public val MobileWalletProximityState.legalActions: Set<MobileWalletProximityActionType>
     get() = when (this) {
+        is MobileWalletProximityState.CheckingPrerequisites -> setOf(
+            MobileWalletProximityActionType.RetryPrerequisites,
+            MobileWalletProximityActionType.ReportRemediation,
+            MobileWalletProximityActionType.Cancel,
+        )
         is MobileWalletProximityState.ReviewRequired -> setOf(
             MobileWalletProximityActionType.Approve,
             MobileWalletProximityActionType.Decline,
             MobileWalletProximityActionType.Cancel,
         )
-        MobileWalletProximityState.CheckingPrerequisites,
         is MobileWalletProximityState.Preparing,
         is MobileWalletProximityState.EngagementReady,
         is MobileWalletProximityState.Connecting,
@@ -557,6 +855,8 @@ public enum class MobileWalletProximityActionType {
     Approve,
     Decline,
     Cancel,
+    RetryPrerequisites,
+    ReportRemediation,
 }
 
 /** Single-use, wallet-owned proximity presentation session. */

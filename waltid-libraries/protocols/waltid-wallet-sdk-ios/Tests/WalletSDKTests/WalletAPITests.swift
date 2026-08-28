@@ -283,6 +283,109 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNotNil(wallet)
     }
 
+    func testProximityConfigurationUsesStableNativeDefaults() {
+        let configuration = ProximityPresentationConfiguration()
+
+        acceptsSendable(configuration)
+        XCTAssertEqual(configuration.profile, .iso180135Edition2DIS2026)
+        XCTAssertEqual(configuration.readerPolicy, .allowAnonymousOrUntrusted)
+        XCTAssertEqual(configuration.deviceAuthenticationPolicy, .signatureOnly)
+        XCTAssertEqual(configuration.engagementMethods, [.qr])
+        XCTAssertEqual(configuration.retrievalMethods, [.bluetoothLowEnergy])
+        XCTAssertEqual(configuration.maximumMessageBytes, 1_048_576)
+        XCTAssertTrue(configuration.applicationProfiles.isEmpty)
+    }
+
+    func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() {
+        let evidence = ProximityReaderEvidence(
+            scope: .wholeRequest,
+            authenticationIndex: 1,
+            certificateChainDER: [Data([0x30, 0x00])]
+        )
+
+        XCTAssertEqual(evidence.authenticationIndex, 1)
+        XCTAssertNil(evidence.documentRequestIndex)
+    }
+
+    func testProximityHolderAuthorizationKeepsPerDocumentMethods() {
+        let authorization = ProximityHolderAuthorization(
+            exchange: 2,
+            requests: [
+                ProximityHolderAuthorizationRequest(
+                    requestIndex: 0,
+                    credentialID: "signature-credential",
+                    deviceAuthentication: .signature
+                ),
+                ProximityHolderAuthorizationRequest(
+                    requestIndex: 1,
+                    credentialID: "mac-credential",
+                    deviceAuthentication: .mac
+                )
+            ]
+        )
+
+        XCTAssertEqual(authorization.requests.map(\.requestIndex), [0, 1])
+        XCTAssertEqual(authorization.requests.map(\.deviceAuthentication), [.signature, .mac])
+    }
+
+    func testProximityFacadeForwardsCapabilitiesAndOwnsSessionLifecycle() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+
+        let capabilities = try await wallet.proximityPresentationCapabilities()
+        XCTAssertTrue(capabilities.mayStart)
+
+        let session = try await wallet.startProximityPresentation()
+        var states = session.states.makeAsyncIterator()
+        let firstState = await states.next()
+        XCTAssertEqual(firstState, .checkingPrerequisites(capabilities))
+        let actionResult = try await session.dispatch(.cancel)
+        XCTAssertEqual(actionResult, .accepted)
+        await session.close()
+        await session.close()
+
+        XCTAssertEqual(bridge.proximityCapabilityCalls, 1)
+        XCTAssertEqual(bridge.proximitySessionStarts, 1)
+        XCTAssertEqual(bridge.proximitySession.dispatches, [.cancel])
+        XCTAssertEqual(bridge.proximitySession.closeCalls, 1)
+    }
+
+    func testProximityCapabilitiesAllowUnavailableSelectedAlternatives() {
+        let available = ProximityPresentationTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtimeAvailable: true,
+            selected: true,
+            unavailable: nil,
+            remediationActions: []
+        )
+        let unavailable = ProximityPresentationTransportCapability(
+            implemented: false,
+            profilePermitted: true,
+            runtimeAvailable: false,
+            selected: true,
+            unavailable: ProximityPresentationError(
+                category: .capability,
+                code: "not_implemented",
+                message: "The selected alternative is not implemented",
+                recoverable: false
+            ),
+            remediationActions: []
+        )
+        let capabilities = ProximityPresentationCapabilities(
+            profile: .iso180135Edition2DIS2026,
+            qrEngagement: available,
+            nfcEngagement: unavailable,
+            bluetoothLowEnergy: available,
+            nfcRetrieval: unavailable,
+            wifiAwareRetrieval: unavailable
+        )
+
+        XCTAssertTrue(capabilities.mayStart)
+        XCTAssertTrue(capabilities.nfcEngagement.selected)
+        XCTAssertFalse(capabilities.nfcEngagement.mayStart)
+    }
+
     func testBootstrapForwardsDefaultKeyTypeAndDidMethod() async throws {
         let bridge = FakeWalletCoreBridge()
         bridge.bootstrapResult = .init(
@@ -849,6 +952,44 @@ private extension Array {
     }
 }
 
+private func makeTestProximityCapabilities() -> ProximityPresentationCapabilities {
+    let unavailable = ProximityPresentationTransportCapability(
+        implemented: false,
+        profilePermitted: true,
+        runtimeAvailable: false,
+        selected: false,
+        unavailable: ProximityPresentationError(
+            category: .capability,
+            code: "not_implemented",
+            message: "This method is not implemented",
+            recoverable: false
+        ),
+        remediationActions: []
+    )
+    return ProximityPresentationCapabilities(
+        profile: .iso180135Edition2DIS2026,
+        qrEngagement: ProximityPresentationTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtimeAvailable: true,
+            selected: true,
+            unavailable: nil,
+            remediationActions: []
+        ),
+        nfcEngagement: unavailable,
+        bluetoothLowEnergy: ProximityPresentationTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtimeAvailable: true,
+            selected: true,
+            unavailable: nil,
+            remediationActions: []
+        ),
+        nfcRetrieval: unavailable,
+        wifiAwareRetrieval: unavailable
+    )
+}
+
 private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     struct BootstrapCall {
         let keyType: WalletKeyType
@@ -947,6 +1088,10 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         readerTrust: .untrusted(reason: "not configured")
     )
     var digitalCredentialResponseResult = DigitalCredentialResponse(protocolIdentifier: "org-iso-mdoc", dataJSON: "{}")
+    var proximityCapabilitiesResult = makeTestProximityCapabilities()
+    let proximitySession = FakeProximityPresentationSessionBridge()
+    private(set) var proximityCapabilityCalls = 0
+    private(set) var proximitySessionStarts = 0
     private(set) var bootstrapCalls: [BootstrapCall] = []
     private(set) var issuanceRequests: [IssuanceRequest] = []
     private(set) var authorizationStartSessionIDs: [String] = []
@@ -1147,6 +1292,22 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         if let error { throw error }
     }
 
+    func proximityPresentationCapabilities(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> ProximityPresentationCapabilities {
+        if let error { throw error }
+        proximityCapabilityCalls += 1
+        return proximityCapabilitiesResult
+    }
+
+    func startProximityPresentation(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> any ProximityPresentationSessionBridge {
+        if let error { throw error }
+        proximitySessionStarts += 1
+        return proximitySession
+    }
+
     func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
         digitalCredentialCapabilitiesResult
     }
@@ -1181,6 +1342,25 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             selectedCredentialOptions: selectedCredentialOptions
         ))
         return digitalCredentialResponseResult
+    }
+}
+
+private final class FakeProximityPresentationSessionBridge: ProximityPresentationSessionBridge, @unchecked Sendable {
+    lazy var states = AsyncStream<ProximityPresentationState> { [unowned self] continuation in
+        continuation.yield(.checkingPrerequisites(capabilities))
+        continuation.finish()
+    }
+    var capabilities = makeTestProximityCapabilities()
+    private(set) var dispatches: [ProximityPresentationAction] = []
+    private(set) var closeCalls = 0
+
+    func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult {
+        dispatches.append(action)
+        return .accepted
+    }
+
+    func close() async {
+        closeCalls += 1
     }
 }
 
