@@ -59,18 +59,20 @@ class Verifier2WebhookRecorder : AutoCloseable {
     }
 
     fun assertReceivedInOrder(sessionId: String, expected: List<SessionEvent>, timeoutMillis: Long = 8_000) {
+        val expectedNames = expected.map { it.name }
         val deadline = System.currentTimeMillis() + timeoutMillis
-        var events = emptyList<KtorSessionUpdate>()
+        var events = emptyList<String>()
         while (System.currentTimeMillis() < deadline) {
-            events = receivedUpdates.filter { it.target == sessionId }
-            if (containsInOrder(events.map { it.event }, expected.map { it.name })) {
-                return
+            events = receivedUpdates.filter { it.target == sessionId }.map { it.event }
+            when {
+                events == expectedNames -> return
+                events.size > expectedNames.size -> break
+                events != expectedNames.take(events.size) -> break
             }
             Thread.sleep(50)
         }
         throw AssertionError(
-            "Session '$sessionId' did not emit expected callback events $expected. Received: " +
-                events.map { it.event }
+            "Session '$sessionId' did not emit exact callback events $expectedNames. Received: $events"
         )
     }
 
@@ -121,14 +123,5 @@ class Verifier2WebhookRecorder : AutoCloseable {
             SessionEvent.wallet_error_response_received,
         )
 
-        private fun containsInOrder(actual: List<String>, expected: List<String>): Boolean {
-            var index = 0
-            for (event in actual) {
-                if (index < expected.size && event == expected[index]) {
-                    index++
-                }
-            }
-            return index == expected.size
-        }
     }
 }
