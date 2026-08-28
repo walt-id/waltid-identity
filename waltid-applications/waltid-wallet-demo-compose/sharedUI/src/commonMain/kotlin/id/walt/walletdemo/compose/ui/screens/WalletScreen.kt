@@ -17,7 +17,11 @@ import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
 
 @Composable
-internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
+internal fun WalletScreen(
+    controller: WalletDemoController,
+    state: WalletDemoUiState,
+    onStartProximityPresentation: (() -> Unit)? = null,
+) {
     val ready = state.session as? WalletSessionState.Ready
     val credentials = ready?.credentials.orEmpty()
     val uriHandler = LocalUriHandler.current
@@ -101,6 +105,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                     onSubmit = controller::submitPresentation,
                     onReject = controller::rejectPresentation,
                     onCancel = controller::cancelPresentationReview,
+                    onStartProximityPresentation = onStartProximityPresentation,
                     modifier = modifier,
                 )
             }

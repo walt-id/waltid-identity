@@ -78,6 +78,18 @@ public enum WalletAccessibilityID {
     public static let presentationTechnicalDetailsSection = identifier("presentationTechnicalDetailsSection")
     public static let verifierTechnicalDetailsToggle = identifier("verifierTechnicalDetailsToggle")
     public static let verifierTechnicalDetails = identifier("verifierTechnicalDetails")
+    public static let proximityStartButton = identifier("proximityStartButton")
+    public static let proximityScreen = identifier("proximityScreen")
+    public static let proximityStatus = identifier("proximityStatus")
+    public static let proximityQRCode = identifier("proximityQRCode")
+    public static let proximityReview = identifier("proximityReview")
+    public static let proximityContinueAfterResponse = identifier("proximityContinueAfterResponse")
+    public static let proximityApproveButton = identifier("proximityApproveButton")
+    public static let proximityDeclineButton = identifier("proximityDeclineButton")
+    public static let proximityCancelButton = identifier("proximityCancelButton")
+    public static let proximityDoneButton = identifier("proximityDoneButton")
+    public static let proximityRetryButton = identifier("proximityRetryButton")
+    public static let proximityError = identifier("proximityError")
 
     public static func claim(_ path: String) -> String {
         dynamicIdentifier("claim", path)
@@ -117,6 +129,22 @@ public enum WalletAccessibilityID {
 
     public static func presentationDisclosureToggle(_ id: String) -> String {
         identifier("presentationDisclosureToggle", id)
+    }
+
+    public static func proximityCredential(requestIndex: Int, credentialID: String) -> String {
+        identifier("proximityCredential", String(requestIndex), credentialID.identifierSegment)
+    }
+
+    public static func proximityElement(
+        requestIndex: Int,
+        namespace: String,
+        elementIdentifier: String
+    ) -> String {
+        identifier(
+            "proximityElement",
+            String(requestIndex),
+            "\(namespace).\(elementIdentifier)".identifierSegment
+        )
     }
 
     private static func identifier(_ segments: String...) -> String {
