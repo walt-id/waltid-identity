@@ -63,8 +63,8 @@ class HolderProtocolEngineTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
-    fun `EDeviceKeyBytes encoder retains the complete tagged engagement value`() = runTest {
-        val deviceKey = agreementKey("edevice-key-bytes")
+    fun `EDeviceKeyBytes encoder accepts SPKI public keys and retains the complete tagged value`() = runTest {
+        val deviceKey = agreementKey("edevice-key-bytes").withSpkiPublicExport()
         val context = EngagementContext(
             MdocProximityProfile.ISO_18013_5_ED2_DIS_2026,
             1_048_576,

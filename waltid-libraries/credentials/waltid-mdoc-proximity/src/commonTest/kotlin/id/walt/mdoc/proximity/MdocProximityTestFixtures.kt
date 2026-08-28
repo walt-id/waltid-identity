@@ -13,9 +13,12 @@ import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.PublicKeyExporter
+import id.walt.crypto2.keys.toSpkiDer
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
@@ -25,6 +28,22 @@ import kotlinx.serialization.json.JsonPrimitive
 
 internal suspend fun CryptoRuntime.generateMdocTestKey(id: String, usages: Set<KeyUsage>): Key =
     generateSoftwareKey(GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), usages))
+
+internal fun Key.withSpkiPublicExport(): Key {
+    val delegate = this
+    return object : Key {
+        override val id: KeyId = delegate.id
+        override val spec: KeySpec = delegate.spec
+        override val usages: Set<KeyUsage> = delegate.usages
+        override val capabilities: KeyCapabilities = delegate.capabilities.copy(
+            publicKeyExporter = PublicKeyExporter {
+                requireNotNull(delegate.capabilities.publicKeyExporter)
+                    .exportPublicKey()
+                    .toSpkiDer(delegate.spec)
+            }
+        )
+    }
+}
 
 internal suspend fun CryptoRuntime.issueMdocTestDocument(
     holderKey: Key,
