@@ -23,9 +23,9 @@ fun createIosDemoWallet(
     config: DemoWalletConfig = DemoWalletConfig(),
     crossProcessAccess: MobileWalletCrossProcessAccess,
     onDigitalCredentialRegistryChanged: suspend () -> Unit,
-): DemoWallet {
+): ProximityDemoWallet {
 
-    return LazyDemoWallet {
+    return LazyProximityDemoWallet {
         val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
         MobileDemoWallet(
             MobileWalletFactory().create(

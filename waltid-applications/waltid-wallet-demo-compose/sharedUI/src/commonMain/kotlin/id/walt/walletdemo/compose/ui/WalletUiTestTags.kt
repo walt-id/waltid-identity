@@ -54,6 +54,26 @@ internal object WalletUiTestTags {
     val PresentationInput = tag("presentationInput")
     val PresentationScanButton = tag("presentationScanButton")
     val PresentButton = tag("presentButton")
+    val ProximityStartButton = tag("proximityStartButton")
+    val ProximityScreen = tag("proximityScreen")
+    val ProximityStatus = tag("proximityStatus")
+    val ProximityQr = tag("proximityQRCode")
+    val ProximityReview = tag("proximityReview")
+    val ProximityContinueAfterResponse = tag("proximityContinueAfterResponse")
+    val ProximityApprove = tag("proximityApproveButton")
+    val ProximityDecline = tag("proximityDeclineButton")
+    val ProximityCancel = tag("proximityCancelButton")
+    val ProximityDone = tag("proximityDoneButton")
+    val ProximityRetry = tag("proximityRetryButton")
+    val ProximityError = tag("proximityError")
+    fun proximityCredential(requestIndex: Int, credentialId: String): String =
+        tag("proximityCredential", requestIndex.toString(), credentialId.toTestTagSegment())
+    fun proximityElement(requestIndex: Int, namespace: String, elementIdentifier: String): String =
+        tag(
+            "proximityElement",
+            requestIndex.toString(),
+            "$namespace.$elementIdentifier".toTestTagSegment(),
+        )
     val PresentationNewButton = tag("presentationNewButton")
     val PresentTabContent = tag("presentTabContent")
     val PresentationReview = tag("presentationReview")

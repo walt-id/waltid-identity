@@ -30,6 +30,8 @@ import id.walt.walletdemo.compose.ui.screens.WalletScreen
 fun WalletDemoApp(
     controller: WalletDemoController,
     branding: WalletDemoBranding = WalletDemoBranding(),
+    onStartProximityPresentation: (() -> Unit)? = null,
+    overlayContent: @Composable () -> Unit = {},
 ) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
@@ -78,9 +80,14 @@ fun WalletDemoApp(
                             message = auth.message,
                         )
                     }
-                    WalletAuthState.Unlocked -> WalletScreen(controller, state)
+                    WalletAuthState.Unlocked -> WalletScreen(
+                        controller = controller,
+                        state = state,
+                        onStartProximityPresentation = onStartProximityPresentation,
+                    )
                 }
             }
+            if (state.auth is WalletAuthState.Unlocked) overlayContent()
         }
         state.signingProtectionWarning?.let { warning ->
             AlertDialog(
