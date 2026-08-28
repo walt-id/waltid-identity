@@ -17,6 +17,9 @@ import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
+import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximitySession
 import id.walt.wallet2.mobile.MobileWalletDigitalCredentialCapabilities
 import id.walt.wallet2.mobile.MobileWalletDigitalCredentialResponse
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
@@ -208,6 +211,19 @@ public class WalletSdkBridge private constructor(
         previewHandle: MobileWalletPresentationPreviewHandle,
     ): WalletBridgeResult<Unit> =
         walletBridgeCall { operations.discardPresentationPreview(previewHandle) }
+
+    /** Checks proximity prerequisites without creating session material or preparing a radio. */
+    public suspend fun proximityPresentationCapabilities(
+        configuration: MobileWalletProximityConfiguration,
+    ): WalletBridgeResult<MobileWalletProximityCapabilities> =
+        walletBridgeCall { operations.proximityPresentationCapabilities(configuration) }
+
+    /** Starts one single-use proximity presentation session. */
+    public suspend fun startProximityPresentation(
+        configuration: MobileWalletProximityConfiguration,
+    ): WalletBridgeResult<MobileWalletProximitySession> =
+        walletBridgeCall { operations.startProximityPresentation(configuration) }
+
     /** Returns the current iOS IdentityDocumentServices capability snapshot. */
     public fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
         operations.digitalCredentialCapabilities()
@@ -236,6 +252,14 @@ public class WalletSdkBridge private constructor(
 }
 
 internal interface WalletSdkBridgeOperations {
+    suspend fun proximityPresentationCapabilities(
+        configuration: MobileWalletProximityConfiguration,
+    ): MobileWalletProximityCapabilities = error("Proximity presentation is not implemented by this test bridge")
+
+    suspend fun startProximityPresentation(
+        configuration: MobileWalletProximityConfiguration,
+    ): MobileWalletProximitySession = error("Proximity presentation is not implemented by this test bridge")
+
     fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
         error("Digital Credentials are not implemented by this test bridge")
 
@@ -311,6 +335,14 @@ internal interface WalletSdkBridgeOperations {
 internal class MobileWalletSdkBridgeOperations(
     private val wallet: MobileWallet,
 ) : WalletSdkBridgeOperations {
+    override suspend fun proximityPresentationCapabilities(
+        configuration: MobileWalletProximityConfiguration,
+    ): MobileWalletProximityCapabilities = wallet.proximityPresentationCapabilities(configuration)
+
+    override suspend fun startProximityPresentation(
+        configuration: MobileWalletProximityConfiguration,
+    ): MobileWalletProximitySession = wallet.startProximityPresentation(configuration)
+
     override fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
         wallet.digitalCredentialCapabilities()
 

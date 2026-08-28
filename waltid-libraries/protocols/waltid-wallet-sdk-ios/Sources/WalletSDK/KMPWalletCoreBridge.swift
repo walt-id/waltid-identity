@@ -281,6 +281,33 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         _ = try Self.successAnyValue(result, operation: "discard presentation preview")
     }
 
+    func proximityPresentationCapabilities(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> ProximityPresentationCapabilities {
+        let result = try await bridge.proximityPresentationCapabilities(
+            configuration: configuration.toKMPConfiguration()
+        )
+        return try Self.successValue(
+            result,
+            as: MobileWalletProximityCapabilities.self,
+            operation: "check proximity presentation capabilities"
+        ).toSwiftCapabilities()
+    }
+
+    func startProximityPresentation(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> any ProximityPresentationSessionBridge {
+        let result = try await bridge.startProximityPresentation(
+            configuration: configuration.toKMPConfiguration()
+        )
+        let session = try Self.successValue(
+            result,
+            as: MobileWalletProximitySession.self,
+            operation: "start proximity presentation"
+        )
+        return KMPProximityPresentationSessionBridge(session: session)
+    }
+
     func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
         bridge.digitalCredentialCapabilities().toSwiftCapabilities()
     }
@@ -376,6 +403,215 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
 
         return value
+    }
+}
+
+private extension ProximityPresentationConfiguration {
+    func toKMPConfiguration() -> MobileWalletProximityConfiguration {
+        MobileWalletProximityConfiguration(
+            profile: profile.toKMPProfile(),
+            bleRoles: bleRoles.toKMPRoles(),
+            bearerPolicy: bearerPolicy.toKMPPolicy(),
+            engagementMethods: Set(engagementMethods.map { $0.toKMPMethod() }),
+            retrievalMethods: Set(retrievalMethods.map { $0.toKMPMethod() }),
+            readerPolicy: readerPolicy.toKMPPolicy(),
+            deviceAuthenticationPolicy: deviceAuthenticationPolicy.toKMPPolicy(),
+            readerTrustEvaluator: readerTrustEvaluator.map {
+                KMPProximityReaderTrustEvaluatorAdapter(evaluator: $0)
+            } ?? UnconfiguredMobileWalletProximityReaderTrustEvaluator.shared,
+            credentialStatusEvaluator: credentialStatusEvaluator.map {
+                KMPProximityCredentialStatusEvaluatorAdapter(evaluator: $0)
+            } ?? UnconfiguredMobileWalletProximityCredentialStatusEvaluator.shared,
+            applicationProfiles: MobileWalletProximityApplicationProfileRegistry(
+                profiles: applicationProfiles.map(KMPProximityApplicationProfileAdapter.init)
+            ),
+            maximumMessageBytes: Int32(maximumMessageBytes)
+        )
+    }
+}
+
+private final class KMPProximityReaderTrustEvaluatorAdapter:
+    MobileWalletProximityReaderTrustEvaluator,
+    @unchecked Sendable {
+    private let evaluator: any ProximityReaderTrustEvaluator
+
+    init(evaluator: any ProximityReaderTrustEvaluator) {
+        self.evaluator = evaluator
+    }
+
+    func __evaluate(
+        evidence: MobileWalletProximityReaderEvidence
+    ) async throws -> MobileWalletProximityReaderTrustDecision {
+        let certificateChain = try swiftArray(evidence.certificateChainDerBase64Url, of: String.self).map {
+            guard let data = Data(base64URLEncoded: $0) else {
+                throw WalletError.internalFailure("Wallet core returned invalid reader certificate evidence")
+            }
+            return data
+        }
+        let decision = try await evaluator.evaluate(
+            ProximityReaderEvidence(
+                scope: evidence.scope.toSwiftScope(),
+                documentRequestIndex: evidence.documentRequestIndex.map { Int($0.int32Value) },
+                authenticationIndex: Int(evidence.authenticationIndex),
+                certificateChainDER: certificateChain
+            )
+        )
+        return MobileWalletProximityReaderTrustDecision(
+            state: decision.state.toKMPState(),
+            certificatePath: decision.certificatePath.toKMPState(),
+            revocation: decision.revocation.toKMPState(),
+            rical: decision.rical.toKMPState(),
+            displayName: decision.displayName,
+            reason: decision.reason
+        )
+    }
+}
+
+private final class KMPProximityCredentialStatusEvaluatorAdapter:
+    MobileWalletProximityCredentialStatusEvaluator,
+    @unchecked Sendable {
+    private let evaluator: any ProximityCredentialStatusEvaluator
+
+    init(evaluator: any ProximityCredentialStatusEvaluator) {
+        self.evaluator = evaluator
+    }
+
+    func __evaluate(
+        credential: MobileWalletProximityCredentialStatusInput
+    ) async throws -> MobileWalletProximityCredentialStatus {
+        let status = try await evaluator.evaluate(
+            ProximityCredentialStatusInput(
+                credentialID: credential.credentialId,
+                documentType: credential.docType,
+                issuer: credential.issuer,
+                validFrom: credential.validFrom.toDate(),
+                validUntil: credential.validUntil.toDate()
+            )
+        )
+        switch status {
+        case .valid: return .valid
+        case .revoked: return .revoked
+        case .indeterminate: return .indeterminate
+        }
+    }
+}
+
+private final class KMPProximityApplicationProfileAdapter:
+    MobileWalletProximityApplicationProfile,
+    @unchecked Sendable {
+    private let profile: any ProximityApplicationProfile
+
+    init(_ profile: any ProximityApplicationProfile) {
+        self.profile = profile
+    }
+
+    var id: String { profile.id }
+
+    func __evaluate(
+        input: MobileWalletProximityApplicationProfileInput
+    ) async throws -> any MobileWalletProximityApplicationProfileResult {
+        guard let deviceRequest = Data(base64URLEncoded: input.deviceRequestBase64Url) else {
+            throw WalletError.internalFailure("Wallet core returned an invalid application-profile request")
+        }
+        let result = try await profile.evaluate(
+            ProximityApplicationProfileInput(
+                deviceRequest: deviceRequest,
+                credentials: swiftArray(input.credentials, of: MobileWalletProximityApplicationCredential.self).map {
+                    ProximityApplicationCredential(
+                        credentialID: $0.credentialId,
+                        documentType: $0.docType,
+                        label: $0.label
+                    )
+                },
+                requestedDocuments: swiftArray(
+                    input.requestedDocuments,
+                    of: MobileWalletProximityApplicationDocumentRequest.self
+                ).map { $0.toSwiftRequest() },
+                readerAuthentication: swiftArray(
+                    input.readerAuthentication,
+                    of: MobileWalletProximityReaderAuthentication.self
+                ).map { $0.toSwiftAuthentication() }
+            )
+        )
+        switch result {
+        case .notRecognized:
+            return MobileWalletProximityApplicationProfileResultNotRecognized()
+        case let .rejected(reason):
+            return MobileWalletProximityApplicationProfileResultRejected(reason: reason)
+        case let .recognized(authorization):
+            return MobileWalletProximityApplicationProfileResultRecognized(
+                authorization: MobileWalletProximityApplicationAuthorization(
+                    profileId: authorization.profileID,
+                    displayTitle: authorization.displayTitle,
+                    details: authorization.details.map {
+                        MobileWalletProximityApplicationAuthorizationDetail(
+                            id: $0.id,
+                            label: $0.label,
+                            value: $0.value
+                        )
+                    },
+                    compatibleCredentialIds: authorization.compatibleCredentialIDs,
+                    deviceSignedElements: authorization.deviceSignedElements.map {
+                        MobileWalletProximityDeviceSignedElement(
+                            credentialId: $0.credentialID,
+                            namespace: $0.namespace,
+                            elementIdentifier: $0.elementIdentifier,
+                            valueCborBase64Url: $0.valueCBOR.base64URLEncodedString()
+                        )
+                    },
+                    resultBindingDigestBase64Url: authorization.resultBindingDigest.base64URLEncodedString()
+                )
+            )
+        }
+    }
+}
+
+private final class KMPProximityPresentationSessionBridge:
+    ProximityPresentationSessionBridge,
+    @unchecked Sendable {
+    private let session: any MobileWalletProximitySession
+
+    init(session: any MobileWalletProximitySession) {
+        self.session = session
+    }
+
+    var states: AsyncStream<ProximityPresentationState> {
+        AsyncStream { continuation in
+            let task = Task { [session] in
+                let flow = SkieSwiftFlow<any MobileWalletProximityState>(
+                    SkieKotlinFlow(session.state)
+                )
+                for await state in flow {
+                    do {
+                        continuation.yield(try state.toSwiftState())
+                    } catch {
+                        continuation.yield(
+                            .failed(
+                                ProximityPresentationError(
+                                    category: .internalFailure,
+                                    code: "invalid_sdk_state",
+                                    message: "The wallet returned an invalid proximity session state",
+                                    recoverable: false
+                                )
+                            )
+                        )
+                        break
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func dispatch(
+        _ action: ProximityPresentationAction
+    ) async throws -> ProximityPresentationActionResult {
+        try await session.dispatch(action: action.toKMPAction()).toSwiftResult()
+    }
+
+    func close() async {
+        try? await session.close()
     }
 }
 
@@ -1346,6 +1582,589 @@ private extension WalletBridgeError {
             return .internalFailure(message)
         }
     }
+}
+
+private extension ProximityPresentationProfile {
+    func toKMPProfile() -> MobileWalletProximityProfile {
+        switch self {
+        case .iso1801352021: return .iso1801352021
+        case .iso180135Edition2DIS2026: return .iso180135Edition2Dis2026
+        case .eudiARF3FCAF202608: return .eudiArf3Fcaf202608
+        }
+    }
+}
+
+private extension MobileWalletProximityProfile {
+    func toSwiftProfile() -> ProximityPresentationProfile {
+        switch self {
+        case .iso1801352021: return .iso1801352021
+        case .iso180135Edition2Dis2026: return .iso180135Edition2DIS2026
+        case .eudiArf3Fcaf202608: return .eudiARF3FCAF202608
+        }
+    }
+}
+
+private extension ProximityPresentationBLERoles {
+    func toKMPRoles() -> MobileWalletProximityBleRoles {
+        switch self {
+        case .centralClient: return .centralClient
+        case .peripheralServer: return .peripheralServer
+        case .dual: return .dual
+        }
+    }
+}
+
+private extension ProximityPresentationBLEBearerPolicy {
+    func toKMPPolicy() -> MobileWalletProximityBleBearerPolicy {
+        switch self {
+        case .gattOnly: return .gattOnly
+        case .preferL2CAP: return .preferL2cap
+        }
+    }
+}
+
+private extension ProximityPresentationEngagementMethod {
+    func toKMPMethod() -> MobileWalletProximityEngagementMethod {
+        switch self {
+        case .qr: return .qr
+        case .nfc: return .nfc
+        }
+    }
+}
+
+private extension ProximityPresentationRetrievalMethod {
+    func toKMPMethod() -> MobileWalletProximityRetrievalMethod {
+        switch self {
+        case .bluetoothLowEnergy: return .bluetoothLowEnergy
+        case .nfc: return .nfc
+        case .wifiAware: return .wifiAware
+        }
+    }
+}
+
+private extension ProximityPresentationReaderPolicy {
+    func toKMPPolicy() -> MobileWalletProximityReaderPolicy {
+        switch self {
+        case .allowAnonymousOrUntrusted: return .allowAnonymousOrUntrusted
+        case .requireTrusted: return .requireTrusted
+        }
+    }
+}
+
+private extension ProximityDeviceAuthenticationPolicy {
+    func toKMPPolicy() -> MobileWalletProximityDeviceAuthenticationPolicy {
+        switch self {
+        case .signatureOnly: return .signatureOnly
+        case .macOnly: return .macOnly
+        case .preferSignature: return .preferSignature
+        case .preferMAC: return .preferMac
+        }
+    }
+}
+
+private extension MobileWalletProximityReaderAuthenticationScope {
+    func toSwiftScope() -> ProximityReaderAuthenticationScope {
+        switch self {
+        case .document: return .document
+        case .wholeRequest: return .wholeRequest
+        }
+    }
+}
+
+private extension ProximityReaderTrustState {
+    func toKMPState() -> MobileWalletProximityReaderTrustState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .validButUntrusted: return .validButUntrusted
+        case .revoked: return .revoked
+        case .trusted: return .trusted
+        }
+    }
+}
+
+private extension ProximityReaderCertificatePathState {
+    func toKMPState() -> MobileWalletProximityReaderCertificatePathState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .invalid: return .invalid
+        case .valid: return .valid
+        }
+    }
+}
+
+private extension ProximityReaderRevocationState {
+    func toKMPState() -> MobileWalletProximityReaderRevocationState {
+        switch self {
+        case .notChecked: return .notChecked
+        case .good: return .good
+        case .revoked: return .revoked
+        case .indeterminate: return .indeterminate
+        }
+    }
+}
+
+private extension ProximityRICALState {
+    func toKMPState() -> MobileWalletProximityRicalState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .unavailable: return .unavailable
+        case .invalid: return .invalid
+        case .noMatchingAuthority: return .noMatchingAuthority
+        case .matched: return .matched
+        }
+    }
+}
+
+private extension MobileWalletProximityCapabilities {
+    func toSwiftCapabilities() -> ProximityPresentationCapabilities {
+        ProximityPresentationCapabilities(
+            profile: profile.toSwiftProfile(),
+            qrEngagement: qrEngagement.toSwiftCapability(),
+            nfcEngagement: nfcEngagement.toSwiftCapability(),
+            bluetoothLowEnergy: bluetoothLowEnergy.toSwiftCapability(),
+            nfcRetrieval: nfcRetrieval.toSwiftCapability(),
+            wifiAwareRetrieval: wifiAwareRetrieval.toSwiftCapability()
+        )
+    }
+}
+
+private extension MobileWalletProximityTransportCapability {
+    func toSwiftCapability() -> ProximityPresentationTransportCapability {
+        ProximityPresentationTransportCapability(
+            implemented: implemented,
+            profilePermitted: profilePermitted,
+            runtimeAvailable: runtimeAvailable,
+            selected: selected,
+            unavailable: unavailable?.toSwiftError(),
+            remediationActions: swiftArray(
+                remediationActions,
+                of: MobileWalletProximityRemediationAction.self
+            ).map { $0.toSwiftAction() }
+        )
+    }
+}
+
+private extension MobileWalletProximityRemediationAction {
+    func toSwiftAction() -> ProximityPresentationRemediationAction {
+        switch self {
+        case .requestBluetoothPermission: return .requestBluetoothPermission
+        case .openApplicationSettings: return .openApplicationSettings
+        case .enableBluetooth: return .enableBluetooth
+        case .useSupportedDevice: return .useSupportedDevice
+        case .retry: return .retry
+        }
+    }
+}
+
+private extension MobileWalletProximityError {
+    func toSwiftError() -> ProximityPresentationError {
+        ProximityPresentationError(
+            category: category.toSwiftCategory(),
+            code: code,
+            message: message,
+            recoverable: recoverable
+        )
+    }
+}
+
+private extension MobileWalletProximityErrorCategory {
+    func toSwiftCategory() -> ProximityPresentationErrorCategory {
+        switch self {
+        case .capability: return .capability
+        case .engagement: return .engagement
+        case .transport: return .transport
+        case .protocol: return .protocolFailure
+        case .readerAuthentication: return .readerAuthentication
+        case .trust: return .trust
+        case .credential: return .credential
+        case .holderKey: return .holderKey
+        case .applicationProfile: return .applicationProfile
+        case .staleSubmission: return .staleSubmission
+        case .policy: return .policy
+        case .internal: return .internalFailure
+        }
+    }
+}
+
+private extension ProximityPresentationAction {
+    func toKMPAction() -> any MobileWalletProximityAction {
+        switch self {
+        case .cancel:
+            return MobileWalletProximityActionCancel()
+        case .decline:
+            return MobileWalletProximityActionDecline()
+        case .retryPrerequisites:
+            return MobileWalletProximityActionRetryPrerequisites()
+        case let .reportRemediation(action, result):
+            return MobileWalletProximityActionReportRemediation(
+                action: action.toKMPAction(),
+                result: result.toKMPResult()
+            )
+        case let .approve(submission):
+            return MobileWalletProximityActionApprove(
+                submission: MobileWalletProximitySubmission(
+                    documents: submission.documents.map {
+                        MobileWalletProximityDocumentSubmission(
+                            requestIndex: Int32($0.requestIndex),
+                            credentialId: $0.credentialID,
+                            disclosedElements: Set($0.disclosedElements.map {
+                                MobileWalletProximityElementReference(
+                                    namespace: $0.namespace,
+                                    elementIdentifier: $0.elementIdentifier
+                                )
+                            })
+                        )
+                    },
+                    continueAfterResponse: submission.continueAfterResponse
+                )
+            )
+        }
+    }
+}
+
+private extension ProximityPresentationRemediationAction {
+    func toKMPAction() -> MobileWalletProximityRemediationAction {
+        switch self {
+        case .requestBluetoothPermission: return .requestBluetoothPermission
+        case .openApplicationSettings: return .openApplicationSettings
+        case .enableBluetooth: return .enableBluetooth
+        case .useSupportedDevice: return .useSupportedDevice
+        case .retry: return .retry
+        }
+    }
+}
+
+private extension ProximityPresentationHostActionResult {
+    func toKMPResult() -> MobileWalletProximityHostActionResult {
+        switch self {
+        case .completed: return .completed
+        case .cancelled: return .cancelled
+        case .failed: return .failed
+        }
+    }
+}
+
+private extension MobileWalletProximityActionResult {
+    func toSwiftResult() -> ProximityPresentationActionResult {
+        switch onEnum(of: self) {
+        case .accepted:
+            return .accepted
+        case let .rejected(value):
+            return .rejected(value.error.toSwiftError())
+        }
+    }
+}
+
+private extension MobileWalletProximityState {
+    func toSwiftState() throws -> ProximityPresentationState {
+        switch onEnum(of: self) {
+        case let .checkingPrerequisites(value):
+            return .checkingPrerequisites(value.capabilities.toSwiftCapabilities())
+        case let .preparing(value):
+            return .preparing(profile: value.profile.toSwiftProfile())
+        case let .engagementReady(value):
+            return .engagementReady(
+                swiftArray(value.engagements, of: MobileWalletProximityEngagement.self).map {
+                    $0.toSwiftEngagement()
+                }
+            )
+        case let .connecting(value):
+            return .connecting(
+                swiftArray(value.engagements, of: MobileWalletProximityEngagement.self).map {
+                    $0.toSwiftEngagement()
+                }
+            )
+        case let .awaitingRequest(value):
+            return .awaitingRequest(exchange: Int(value.exchange))
+        case let .reviewRequired(value):
+            return .reviewRequired(try value.review.toSwiftReview())
+        case let .authorizingHolderKey(value):
+            return .authorizingHolderKey(value.authorization.toSwiftAuthorization())
+        case let .sendingResponse(value):
+            return .sendingResponse(exchange: Int(value.exchange))
+        case let .awaitingNextRequest(value):
+            return .awaitingNextRequest(completedExchanges: Int(value.completedExchanges))
+        case let .terminating(value):
+            return .terminating(exchange: Int(value.exchange))
+        case let .completed(value):
+            return .completed(exchanges: Int(value.exchanges), declined: value.declined)
+        case .cancelled:
+            return .cancelled
+        case let .failed(value):
+            return .failed(value.error.toSwiftError())
+        }
+    }
+}
+
+private extension MobileWalletProximityEngagement {
+    func toSwiftEngagement() -> ProximityPresentationEngagement {
+        switch onEnum(of: self) {
+        case let .qr(value): return .qr(payload: value.payload)
+        case .nfc: return .nfc
+        }
+    }
+}
+
+private extension MobileWalletProximityHolderAuthorization {
+    func toSwiftAuthorization() -> ProximityHolderAuthorization {
+        ProximityHolderAuthorization(
+            exchange: Int(exchange),
+            requests: swiftArray(
+                requests,
+                of: MobileWalletProximityHolderAuthorizationRequest.self
+            ).map { request in
+                ProximityHolderAuthorizationRequest(
+                    requestIndex: Int(request.requestIndex),
+                    credentialID: request.credentialId,
+                    deviceAuthentication: request.deviceAuthentication.toSwiftMethod()
+                )
+            }
+        )
+    }
+}
+
+private extension MobileWalletProximityReview {
+    func toSwiftReview() throws -> ProximityPresentationReview {
+        ProximityPresentationReview(
+            exchange: Int(exchange),
+            documents: try swiftArray(documents, of: MobileWalletProximityDocumentReview.self).map {
+                try $0.toSwiftReview()
+            },
+            readerAuthentication: swiftArray(
+                readerAuthentication,
+                of: MobileWalletProximityReaderAuthentication.self
+            ).map { $0.toSwiftAuthentication() },
+            useCases: swiftArray(useCases, of: MobileWalletProximityUseCase.self).map {
+                $0.toSwiftUseCase()
+            },
+            applicationAuthorizations: try swiftArray(
+                applicationAuthorizations,
+                of: MobileWalletProximityApplicationAuthorization.self
+            ).map { try $0.toSwiftAuthorization() }
+        )
+    }
+}
+
+private extension MobileWalletProximityDocumentReview {
+    func toSwiftReview() throws -> ProximityDocumentReview {
+        ProximityDocumentReview(
+            requestIndex: Int(requestIndex),
+            documentType: docType,
+            credentialOptions: try swiftArray(
+                credentialOptions,
+                of: MobileWalletProximityCredentialOption.self
+            ).map { try $0.toSwiftOption() }
+        )
+    }
+}
+
+private extension MobileWalletProximityCredentialOption {
+    func toSwiftOption() throws -> ProximityCredentialOption {
+        ProximityCredentialOption(
+            credentialID: credentialId,
+            label: label,
+            issuer: issuer,
+            validUntil: validUntil.toDate(),
+            deviceAuthentication: deviceAuthentication.toSwiftMethod(),
+            requestedElements: swiftArray(
+                requestedElements,
+                of: MobileWalletProximityRequestedElement.self
+            ).map { $0.toSwiftElement() }
+        )
+    }
+}
+
+private extension MobileWalletProximityDeviceAuthenticationMethod {
+    func toSwiftMethod() -> ProximityDeviceAuthenticationMethod {
+        switch self {
+        case .signature: return .signature
+        case .mac: return .mac
+        }
+    }
+}
+
+private extension MobileWalletProximityApplicationDocumentRequest {
+    func toSwiftRequest() -> ProximityApplicationDocumentRequest {
+        ProximityApplicationDocumentRequest(
+            requestIndex: Int(requestIndex),
+            documentType: docType,
+            requestedElements: swiftArray(
+                requestedElements,
+                of: MobileWalletProximityRequestedElement.self
+            ).map { $0.toSwiftElement() }
+        )
+    }
+}
+
+private extension MobileWalletProximityRequestedElement {
+    func toSwiftElement() -> ProximityRequestedElement {
+        ProximityRequestedElement(
+            namespace: namespace,
+            elementIdentifier: elementIdentifier,
+            intentToRetain: intentToRetain,
+            satisfiesRequestedElements: swiftArray(
+                satisfiesRequestedElements,
+                of: MobileWalletProximityElementReference.self
+            ).map { ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier) }
+        )
+    }
+}
+
+private extension MobileWalletProximityReaderAuthentication {
+    func toSwiftAuthentication() -> ProximityReaderAuthentication {
+        ProximityReaderAuthentication(
+            scope: scope.toSwiftScope(),
+            documentRequestIndex: documentRequestIndex.map { Int($0.int32Value) },
+            authenticationIndex: Int(authenticationIndex),
+            validity: validity.toSwiftValidity(),
+            trust: trust.toSwiftTrust(),
+            certificatePath: certificatePath.toSwiftPath(),
+            revocation: revocation.toSwiftRevocation(),
+            rical: rical.toSwiftRICAL(),
+            displayName: displayName,
+            reason: reason
+        )
+    }
+}
+
+private extension MobileWalletProximityReaderAuthenticationValidity {
+    func toSwiftValidity() -> ProximityReaderAuthenticationValidity {
+        switch self {
+        case .absent: return .absent
+        case .malformed: return .malformed
+        case .invalid: return .invalid
+        case .valid: return .valid
+        }
+    }
+}
+
+private extension MobileWalletProximityReaderTrustState {
+    func toSwiftTrust() -> ProximityReaderTrustState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .validButUntrusted: return .validButUntrusted
+        case .revoked: return .revoked
+        case .trusted: return .trusted
+        }
+    }
+}
+
+private extension MobileWalletProximityReaderCertificatePathState {
+    func toSwiftPath() -> ProximityReaderCertificatePathState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .invalid: return .invalid
+        case .valid: return .valid
+        }
+    }
+}
+
+private extension MobileWalletProximityReaderRevocationState {
+    func toSwiftRevocation() -> ProximityReaderRevocationState {
+        switch self {
+        case .notChecked: return .notChecked
+        case .good: return .good
+        case .revoked: return .revoked
+        case .indeterminate: return .indeterminate
+        }
+    }
+}
+
+private extension MobileWalletProximityRicalState {
+    func toSwiftRICAL() -> ProximityRICALState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .unavailable: return .unavailable
+        case .invalid: return .invalid
+        case .noMatchingAuthority: return .noMatchingAuthority
+        case .matched: return .matched
+        }
+    }
+}
+
+private extension MobileWalletProximityUseCase {
+    func toSwiftUseCase() -> ProximityUseCase {
+        ProximityUseCase(
+            index: Int(index),
+            mandatory: mandatory,
+            documentRequestIndices: swiftArray(documentRequestIndices, of: KotlinInt.self).map {
+                Int($0.int32Value)
+            },
+            purposeHints: swiftArray(purposeHints, of: MobileWalletProximityPurposeHint.self).map {
+                ProximityPurposeHint(
+                    type: $0.type,
+                    code: Int($0.code),
+                    readerAsserted: $0.readerAsserted
+                )
+            }
+        )
+    }
+}
+
+private extension MobileWalletProximityApplicationAuthorization {
+    func toSwiftAuthorization() throws -> ProximityApplicationAuthorization {
+        let digest = try decodedBase64URL(resultBindingDigestBase64Url, context: "application binding digest")
+        return ProximityApplicationAuthorization(
+            profileID: profileId,
+            displayTitle: displayTitle,
+            details: swiftArray(
+                details,
+                of: MobileWalletProximityApplicationAuthorizationDetail.self
+            ).map { ProximityApplicationAuthorizationDetail(id: $0.id, label: $0.label, value: $0.value) },
+            compatibleCredentialIDs: swiftSet(compatibleCredentialIds, of: String.self),
+            deviceSignedElements: try swiftArray(
+                deviceSignedElements,
+                of: MobileWalletProximityDeviceSignedElement.self
+            ).map {
+                ProximityDeviceSignedElement(
+                    credentialID: $0.credentialId,
+                    namespace: $0.namespace,
+                    elementIdentifier: $0.elementIdentifier,
+                    valueCBOR: try decodedBase64URL($0.valueCborBase64Url, context: "device-signed value")
+                )
+            },
+            resultBindingDigest: digest
+        )
+    }
+}
+
+private extension KotlinInstant {
+    func toDate() -> Date {
+        Date(timeIntervalSince1970: TimeInterval(epochSeconds) + TimeInterval(nanosecondsOfSecond) / 1_000_000_000)
+    }
+}
+
+private extension Data {
+    init?(base64URLEncoded value: String) {
+        var base64 = value.replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        base64.append(String(repeating: "=", count: (4 - base64.count % 4) % 4))
+        self.init(base64Encoded: base64)
+    }
+
+    func base64URLEncodedString() -> String {
+        base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+private func decodedBase64URL(_ value: String, context: String) throws -> Data {
+    guard let data = Data(base64URLEncoded: value) else {
+        throw WalletError.internalFailure("Wallet core returned an invalid \(context)")
+    }
+    return data
+}
+
+private func swiftSet<T: Hashable>(_ value: Any, of type: T.Type) -> Set<T> {
+    if let values = value as? Set<T> {
+        return values
+    }
+    if let values = value as? NSSet {
+        return Set(values.compactMap { $0 as? T })
+    }
+    return []
 }
 
 #endif
