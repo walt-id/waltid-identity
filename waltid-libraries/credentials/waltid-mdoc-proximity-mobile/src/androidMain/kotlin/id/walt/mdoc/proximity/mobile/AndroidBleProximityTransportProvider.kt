@@ -18,7 +18,7 @@ import id.walt.mdoc.proximity.ProximityTransportProvider
  * `ACCESS_FINE_LOCATION` for scanning. This provider reports missing grants through [capability]
  * and never launches permission UI.
  */
-public class AndroidBleProximityTransportProvider(
+internal class AndroidBleProximityTransportProvider(
     context: Context,
     configuration: BleProximityTransportConfiguration,
 ) : ProximityTransportProvider by DefaultBleProximityTransportProvider(

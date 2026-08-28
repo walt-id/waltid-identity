@@ -93,8 +93,8 @@ The common protocol and lifecycle behavior can be tested deterministically witho
 platform source sets compile against the same public contract. Direct adapters mean walt owns the
 small platform Bluetooth surface and must track Android and Apple callback/API changes.
 
-This ADR does not claim production or ISO conformance. The PR remains draft until the required
-two-device matrix proves both roles, GATT, supported L2CAP, cancellation, disconnects, radio and
+This ADR does not claim production or ISO conformance. Production qualification requires the
+two-device matrix to prove both roles, GATT, supported L2CAP, cancellation, disconnects, radio and
 permission changes, and repeated exchanges on physical Android and iOS devices. Pinned Multipaz
 Identity Reader, Stelau, EUDI verifier, and independent-reader runs remain external acceptance
 evidence. Any failed matrix cell must be classified as implementation, device/platform limitation,
