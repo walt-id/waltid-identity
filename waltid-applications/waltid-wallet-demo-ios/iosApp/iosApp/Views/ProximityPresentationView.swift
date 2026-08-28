@@ -39,7 +39,6 @@ struct ProximityPresentationView: View {
         .navigationViewStyle(.stack)
         .accessibilityIdentifier(WalletAccessibilityID.proximityScreen)
         .onAppear {
-            viewModel.start()
             screenPolicy.update(active: viewModel.active && !viewModel.isTerminal, qrVisible: viewModel.qrPayload != nil)
         }
         .onDisappear {

@@ -4,6 +4,32 @@ import XCTest
 final class MockWalletUITests: XCTestCase {
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
+    func testProximityPresentationCanBeDismissedAndStartedAgain() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            "Wallet ready"
+        )
+        receiveMockCredential(app: app, ui: ui)
+        ui.tapTab(label: "Present")
+
+        let proximityScreen = app.descendants(matching: .any)["wallet.proximityScreen"]
+        for _ in 0..<2 {
+            ui.tapButton(identifier: "wallet.proximityStartButton", fallbackLabel: "Present to nearby reader")
+            XCTAssertTrue(proximityScreen.waitForExistence(timeout: 10))
+            ui.tapButton(identifier: "wallet.proximityDoneButton", fallbackLabel: "Done")
+
+            let dismissed = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"),
+                object: proximityScreen
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 10), .completed)
+        }
+    }
+
     func testUrlEditorsAreTopControlsInReceiveAndPresentTabs() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
