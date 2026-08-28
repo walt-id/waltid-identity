@@ -3,7 +3,9 @@ package id.walt.walletdemo.compose.ui
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -26,6 +28,12 @@ import id.walt.wallet2.mobile.MobileWalletProximityRequestedElement
 import id.walt.wallet2.mobile.MobileWalletProximityReview
 import id.walt.wallet2.mobile.MobileWalletProximityRicalState
 import id.walt.wallet2.mobile.MobileWalletProximityState
+import id.walt.walletdemo.compose.logic.ClaimGroup
+import id.walt.walletdemo.compose.logic.ClaimItem
+import id.walt.walletdemo.compose.logic.ClaimItemPath
+import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.CredentialSummary
+import id.walt.walletdemo.compose.logic.DisplayValue
 import id.walt.walletdemo.compose.logic.WalletDemoProximityDocumentSelection
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
@@ -44,6 +52,7 @@ class WalletDemoProximityTestScenarios {
                         listOf(MobileWalletProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(120)))
                     ),
                 ),
+                credentialDetailsById = emptyMap(),
                 hostActions = hostActions,
                 onSelectCredential = { _, _ -> },
                 onToggleElement = { _, _ -> },
@@ -68,6 +77,7 @@ class WalletDemoProximityTestScenarios {
         var toggled: MobileWalletProximityElementReference? = null
         var approved = false
         var declined = false
+        var cancelled = false
         var continued = false
         val review = proximityReview()
         val element = MobileWalletProximityElementReference(namespace, "portrait")
@@ -91,6 +101,7 @@ class WalletDemoProximityTestScenarios {
                         ),
                     ),
                 ),
+                credentialDetailsById = proximityCredentialDetails(),
                 hostActions = hostActions,
                 onSelectCredential = { _, _ -> },
                 onToggleElement = { _, selected -> toggled = selected },
@@ -99,24 +110,35 @@ class WalletDemoProximityTestScenarios {
                 onDecline = { declined = true },
                 onRetry = {},
                 onRemediate = { _, _ -> },
-                onCancel = {},
+                onCancel = { cancelled = true },
                 onDismiss = {},
                 onRestart = {},
             )
         }
 
         onNodeWithTag(WalletUiTestTags.ProximityReview).assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.ProximityReaderDetails).assertCountEquals(0)
+        onNodeWithText("Multiple reader identities").assertIsDisplayed()
+        onNodeWithText("Valid but untrusted").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.ProximityReaderDetailsToggle).performClick()
+        onNodeWithTag(WalletUiTestTags.ProximityReaderDetails).assertIsDisplayed()
         onAllNodesWithText("Valid")[0].performScrollTo().assertIsDisplayed()
-        onNodeWithText("Valid but untrusted").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("Valid but untrusted").assertCountEquals(2)
         onNodeWithText("Whole request").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Document: org.iso.18013.5.1.mDL").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Document: Mobile Driving Licence").performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Matched authority")[0].performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Good")[0].performScrollTo().assertIsDisplayed()
         onNodeWithText("A valid signature does not by itself make this reader trusted.")
             .performScrollTo()
             .assertIsDisplayed()
         onNodeWithText("Reader intends to retain this data").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Mobile Driving Licence").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Portrait").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Portrait available").performScrollTo().assertIsDisplayed()
         onNodeWithText("Proof of eligibility").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Share").assertIsDisplayed()
+        onNodeWithText("Cancel").assertIsDisplayed()
+        onNodeWithText("Decline").assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.proximityElement(0, namespace, "portrait"))
             .performScrollTo()
@@ -127,13 +149,59 @@ class WalletDemoProximityTestScenarios {
             .performScrollTo()
             .performClick()
         onNodeWithTag(WalletUiTestTags.ProximityApprove)
-            .performScrollTo()
+            .assertIsDisplayed()
             .assertIsEnabled()
             .performClick()
-        onNodeWithTag(WalletUiTestTags.ProximityDecline).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.ProximityDecline).assertIsDisplayed().performClick()
+        onNodeWithTag(WalletUiTestTags.ProximityCancel).assertIsDisplayed().performClick()
         assertTrue(approved)
         assertTrue(declined)
+        assertTrue(cancelled)
         assertTrue(continued)
+    }
+
+    fun reviewDoesNotInventAnIdentityForAnUnsignedReader() = runComposeUiTest {
+        val review = proximityReview().copy(
+            readerAuthentication = listOf(
+                MobileWalletProximityReaderAuthentication(
+                    scope = MobileWalletProximityReaderAuthenticationScope.Document,
+                    documentRequestIndex = 0,
+                    validity = MobileWalletProximityReaderAuthenticationValidity.Absent,
+                    trust = MobileWalletProximityReaderTrustState.NotEvaluated,
+                    certificatePath = MobileWalletProximityReaderCertificatePathState.NotEvaluated,
+                    revocation = MobileWalletProximityReaderRevocationState.NotChecked,
+                    rical = MobileWalletProximityRicalState.NotEvaluated,
+                )
+            )
+        )
+        setContent {
+            WalletDemoProximityScreen(
+                state = WalletDemoProximityUiState(
+                    active = true,
+                    sessionState = MobileWalletProximityState.ReviewRequired(review),
+                    selections = emptyList(),
+                ),
+                credentialDetailsById = proximityCredentialDetails(),
+                hostActions = hostActions,
+                onSelectCredential = { _, _ -> },
+                onToggleElement = { _, _ -> },
+                onContinueAfterResponseChange = {},
+                onApprove = {},
+                onDecline = {},
+                onRetry = {},
+                onRemediate = { _, _ -> },
+                onCancel = {},
+                onDismiss = {},
+                onRestart = {},
+            )
+        }
+
+        onNodeWithTag(WalletUiTestTags.ProximityReaderSection).assertIsDisplayed()
+        onNodeWithText("Reader identity not provided").assertIsDisplayed()
+        onNodeWithText("This request was not signed by the reader.").assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.ProximityReaderDetailsToggle).assertCountEquals(0)
+        onAllNodesWithText("Unnamed reader").assertCountEquals(0)
+        onAllNodesWithText("Absent").assertCountEquals(0)
     }
 }
 
@@ -143,6 +211,51 @@ private val hostActions = WalletDemoProximityHostActionExecutor {
 
 private const val namespace = "org.iso.18013.5.1"
 private const val proofNamespace = "org.waltid.example.proof"
+
+private fun proximityCredentialDetails(): Map<String, CredentialDetails> = listOf(
+    CredentialDetails(
+        summary = CredentialSummary(
+            id = "credential-1",
+            format = "mso_mdoc",
+            issuer = "Example issuer",
+            label = "Mobile Driving Licence",
+        ),
+        groups = listOf(
+            ClaimGroup(
+                title = "Personal details",
+                items = listOf(
+                    ClaimItem(
+                        path = ClaimItemPath.topLevel("$namespace.portrait"),
+                        pathComponents = listOf(namespace, "portrait"),
+                        label = "Portrait",
+                        value = DisplayValue.DecodedText("Portrait available"),
+                    )
+                ),
+            )
+        ),
+    ),
+    CredentialDetails(
+        summary = CredentialSummary(
+            id = "proof-credential",
+            format = "mso_mdoc",
+            issuer = "Example issuer",
+            label = "Proof of eligibility",
+        ),
+        groups = listOf(
+            ClaimGroup(
+                title = "Credential data",
+                items = listOf(
+                    ClaimItem(
+                        path = ClaimItemPath.topLevel("$proofNamespace.eligible"),
+                        pathComponents = listOf(proofNamespace, "eligible"),
+                        label = "Eligible",
+                        value = DisplayValue.BooleanValue(true),
+                    )
+                ),
+            )
+        ),
+    ),
+).associateBy { details -> details.summary.id }
 
 private fun proximityReview(): MobileWalletProximityReview = MobileWalletProximityReview(
     exchange = 1,

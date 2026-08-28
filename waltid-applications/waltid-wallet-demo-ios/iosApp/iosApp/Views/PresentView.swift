@@ -5,9 +5,11 @@ import WalletSDK
 
 struct PresentView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.walletDemoBranding) private var branding
     @ObservedObject var viewModel: WalletViewModel
     @ObservedObject private var proximityPresentation: ProximityPresentationViewModel
+    @StateObject private var proximityScreenPolicy = ProximityScreenPolicy()
 
     init(viewModel: WalletViewModel) {
         _viewModel = ObservedObject(wrappedValue: viewModel)
@@ -18,7 +20,9 @@ struct PresentView: View {
         NavigationView {
             Group {
                 if let review = viewModel.presentationSharingReview {
-                    reviewContent(review: review)
+                    onlineReviewContent(review: review)
+                } else if proximityPresentation.active {
+                    proximityContent
                 } else {
                     entryContent
                 }
@@ -50,39 +54,49 @@ struct PresentView: View {
                 .accessibilityHidden(true)
             }
         }
-        .fullScreenCover(
-            isPresented: Binding(
-                get: { proximityPresentation.active },
-                set: { if !$0 { proximityPresentation.dismiss() } }
-            )
-        ) {
-            ProximityPresentationView(viewModel: proximityPresentation)
+        .onAppear(perform: updateProximityScreenPolicy)
+        .onChange(of: proximityPresentation.qrPayload != nil) { _ in
+            updateProximityScreenPolicy()
+        }
+        .onChange(of: proximityPresentation.active) { _ in
+            updateProximityScreenPolicy()
+        }
+        .onChange(of: proximityPresentation.isTerminal) { _ in
+            updateProximityScreenPolicy()
+        }
+        .onChange(of: viewModel.selectedTab) { selectedTab in
+            updateProximityScreenPolicy()
+            if selectedTab != .present && proximityPresentation.active {
+                proximityPresentation.cancel()
+            }
+        }
+        .onChange(of: scenePhase) { phase in
+            updateProximityScreenPolicy()
+            if phase != .active { proximityPresentation.handleLifecycleInterruption() }
+        }
+    }
+
+    private func updateProximityScreenPolicy() {
+        let foreground = scenePhase == .active
+        let qrVisible = foreground && viewModel.selectedTab == .present
+            && proximityPresentation.qrPayload != nil
+        proximityScreenPolicy.update(
+            active: foreground && proximityPresentation.active && !proximityPresentation.isTerminal,
+            qrVisible: qrVisible
+        )
+    }
+
+    private var credentialDetailsByID: [String: CredentialDetails] {
+        viewModel.credentials.reduce(into: [:]) { result, credential in
+            let details = CredentialDisplayNormalizer.details(for: credential)
+            result[details.id] = details
         }
     }
 
     private var entryContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("In-person presentation")
-                        .font(.headline)
-                    Text("Show a device engagement QR code and present an mdoc to a nearby reader over Bluetooth.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Button("Present to nearby reader") {
-                        proximityPresentation.start()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(branding.primary)
-                    .disabled(
-                        !viewModel.isReady || viewModel.isLoading || viewModel.credentials.isEmpty
-                            || viewModel.presentationReview != nil
-                    )
-                    .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
 
                 Text("Online presentation")
                     .font(.headline)
@@ -105,13 +119,32 @@ struct PresentView: View {
                 .disabled(!viewModel.presentationPreviewActionEnabled)
                 .accessibilityIdentifier(WalletAccessibilityID.presentButton)
 
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("In-person presentation")
+                        .font(.headline)
+                    Text("Show a device engagement QR code and present an mdoc to a nearby reader over Bluetooth.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button("Present to nearby reader") {
+                        proximityPresentation.start()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(branding.primary)
+                    .disabled(
+                        !viewModel.isReady || viewModel.isLoading || viewModel.credentials.isEmpty
+                            || viewModel.presentationReview != nil
+                    )
+                    .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+
                 if viewModel.credentials.isEmpty {
                     Text("No credentials available")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
-                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
 
                 if let warning = viewModel.transactionDataProfilesWarning {
                     WarningBannerView(message: warning)
@@ -130,33 +163,27 @@ struct PresentView: View {
         }
     }
 
-    private func reviewContent(review: SharingReviewModel) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
-
-                if let warning = viewModel.transactionDataProfilesWarning {
-                    WarningBannerView(message: warning)
-                }
-
-                SharingReviewView(
-                    review: review,
-                    selection: viewModel.presentationSharingSelection,
-                    selectionComplete: viewModel.presentationCredentialSelectionComplete,
-                    isLoading: !viewModel.presentationReviewEnabled,
-                    isReadOnly: false,
-                    onToggleCredential: viewModel.togglePresentationCredential,
-                    onToggleDisclosure: viewModel.togglePresentationDisclosure,
-                    onSubmit: viewModel.submitPresentation,
-                    onReject: viewModel.rejectPresentation,
-                    onCancel: viewModel.cancelPresentationReview,
-                    compact: false,
-                    showActions: false
-                )
+    private func onlineReviewContent(review: SharingReviewModel) -> some View {
+        presentationContent(showsActions: true) {
+            if let warning = viewModel.transactionDataProfilesWarning {
+                WarningBannerView(message: warning)
             }
-            .padding()
-        }
-        .safeAreaInset(edge: .bottom) {
+
+            SharingReviewView(
+                review: review,
+                selection: viewModel.presentationSharingSelection,
+                selectionComplete: viewModel.presentationCredentialSelectionComplete,
+                isLoading: !viewModel.presentationReviewEnabled,
+                isReadOnly: false,
+                onToggleCredential: viewModel.togglePresentationCredential,
+                onToggleDisclosure: viewModel.togglePresentationDisclosure,
+                onSubmit: viewModel.submitPresentation,
+                onReject: viewModel.rejectPresentation,
+                onCancel: viewModel.cancelPresentationReview,
+                compact: false,
+                showActions: false
+            )
+        } actions: {
             ReviewActions(
                 selectionComplete: viewModel.presentationCredentialSelectionComplete,
                 isLoading: !viewModel.presentationReviewEnabled,
@@ -164,9 +191,61 @@ struct PresentView: View {
                 onReject: viewModel.rejectPresentation,
                 onCancel: viewModel.cancelPresentationReview
             )
+        }
+    }
+
+    private var proximityContent: some View {
+        presentationContent(
+            showsActions: proximityPresentation.review != nil || canCancelProximityPresentation
+        ) {
+            ProximityPresentationView(
+                viewModel: proximityPresentation,
+                credentialDetailsByID: credentialDetailsByID
+            )
+        } actions: {
+            if proximityPresentation.review != nil {
+                ReviewActions(
+                    selectionComplete: proximityPresentation.canApprove,
+                    isLoading: false,
+                    onSubmit: { proximityPresentation.approve() },
+                    onReject: proximityPresentation.decline,
+                    onCancel: proximityPresentation.cancel,
+                    presentation: .proximity
+                )
+            } else if canCancelProximityPresentation {
+                Button("Cancel", action: proximityPresentation.cancel)
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier(WalletAccessibilityID.proximityCancelButton)
+            }
+        }
+    }
+
+    private var canCancelProximityPresentation: Bool {
+        guard !proximityPresentation.isTerminal else { return false }
+        return proximityPresentation.sessionState == nil
+            || proximityPresentation.sessionState?.legalActions.contains(.cancel) == true
+    }
+
+    private func presentationContent<Content: View, Actions: View>(
+        showsActions: Bool,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder actions: () -> Actions
+    ) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+                content()
+            }
             .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.bar)
+        }
+        .safeAreaInset(edge: .bottom) {
+            if showsActions {
+                actions()
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.bar)
+            }
         }
     }
 }
