@@ -26,11 +26,13 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../../waltid-libraries/protocols/waltid-wallet-sdk-ios"),
+        .package(url: "https://github.com/zxing-cpp/zxing-cpp.git", exact: "3.1.1"),
     ],
     targets: [
         .target(
             name: "WalletDemoSharingUI",
             dependencies: [
+                "WalletDemoQRCodeCore",
                 .product(name: "WalletSDK", package: "waltid-wallet-sdk-ios"),
             ],
             resources: [
@@ -42,6 +44,18 @@ let package = Package(
             dependencies: [
                 "WalletDemoSharingUI",
                 .product(name: "WalletSDK", package: "waltid-wallet-sdk-ios"),
+            ]
+        ),
+        // Private adapter for the one ZXing-C++ writer mode not exposed by its Swift wrapper:
+        // ASCII QR text without forcing an ECI marker.
+        .target(
+            name: "WalletDemoQRCodeCore",
+            dependencies: [
+                .product(name: "ZXingCpp", package: "zxing-cpp"),
+            ],
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .linkedFramework("CoreGraphics"),
             ]
         ),
     ]
