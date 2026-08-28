@@ -74,9 +74,9 @@ fun createAndroidDemoWallet(
     context: Context,
     config: DemoWalletConfig = DemoWalletConfig(),
     interactionContextProvider: () -> FragmentActivity? = { null },
-): DemoWallet {
+): ProximityDemoWallet {
 
-    return LazyDemoWallet {
+    return LazyProximityDemoWallet {
         createAndroidDemoMobileWallet(context, config, interactionContextProvider).let { created ->
             MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning)
         }

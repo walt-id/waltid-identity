@@ -4,6 +4,7 @@ import androidx.compose.ui.window.ComposeUIViewController
 import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
 import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.createIosDemoWallet
 import id.walt.walletdemo.compose.logic.createIosDemoPinStore
 import id.walt.walletdemo.compose.logic.createIosDemoSharingSettingsStore
@@ -13,6 +14,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import platform.UIKit.UIViewController
 
 private var iosController: WalletDemoController? = null
+private var iosProximityController: WalletDemoProximityController? = null
 private var pendingDeepLink: String? = null
 
 /**
@@ -69,23 +71,27 @@ fun walletDemoViewController(
         appGroupIdentifier = appGroupIdentifier,
         keychainAccessGroup = keychainAccessGroup,
     )
+    val wallet = createIosDemoWallet(
+        config = config,
+        crossProcessAccess = crossProcessAccess,
+        onDigitalCredentialRegistryChanged = { onDigitalCredentialRegistryChanged() },
+    )
     val controller = WalletDemoController(
-        wallet = createIosDemoWallet(
-            config = config,
-            crossProcessAccess = crossProcessAccess,
-            onDigitalCredentialRegistryChanged = { onDigitalCredentialRegistryChanged() },
-        ),
+        wallet = wallet,
         pinStore = createIosDemoPinStore(config.walletId),
         biometricAuthenticator = createIosDemoBiometricAuthenticator(),
         signingProtectionMode = parsedSigningProtectionMode,
         signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
         sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier),
     )
+    val proximityController = WalletDemoProximityController(wallet)
     iosController = controller
+    iosProximityController?.dismiss()
+    iosProximityController = proximityController
     pendingDeepLink?.let(controller::handleDeepLink)
     pendingDeepLink = null
     return ComposeUIViewController {
-        WalletDemoApp(controller)
+        MobileWalletDemoApp(controller, proximityController)
     }
 }
 
