@@ -191,6 +191,15 @@ private class PreparedBleTransport(
                     }
                 }
             } catch (_: TimeoutCancellationException) {
+                val roleFailure = causes.firstOrNull()
+                if (roleFailure is ProximityException) throw roleFailure
+                if (roleFailure != null) throw ProximityException(
+                    ProximityError.Transport(
+                        "ble_connection_failed",
+                        "A prepared BLE role failed before another peer connected",
+                    ),
+                    roleFailure,
+                )
                 throw ProximityException(
                     ProximityError.Transport("ble_connection_timeout", "No BLE peer connected within 30 seconds")
                 )
