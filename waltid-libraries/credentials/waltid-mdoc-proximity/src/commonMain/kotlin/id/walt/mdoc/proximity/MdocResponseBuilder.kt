@@ -15,8 +15,8 @@ import id.walt.cose.selectCoseSignatureAlgorithm
 import id.walt.cose.toEncodedJwk
 import id.walt.cose.toCoseKey
 import id.walt.crypto2.hpke.Hpke
-import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.crypto.MdocKdf
 import id.walt.mdoc.encoding.ByteStringWrapper
@@ -218,8 +218,7 @@ class MdocResponseBuilder {
     private suspend fun requireHolderKeyMatchesMso(holderKey: Key, msoKey: CoseKey) {
         val holderPublic = requireNotNull(holderKey.capabilities.publicKeyExporter) {
             "Selected holder key cannot export public material"
-        }.exportPublicKey() as? EncodedKey.Jwk
-            ?: throw IllegalArgumentException("Selected holder key cannot export a public JWK")
+        }.exportPublicKey().toPublicJwk(holderKey.spec)
         val holderCose = holderPublic.toCoseKey()
         require(
             holderCose.kty == msoKey.kty && holderCose.crv == msoKey.crv &&
