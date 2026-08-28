@@ -8,6 +8,7 @@ import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocEngagementMode
 import id.walt.mdoc.proximity.MdocProximityProfile
 import id.walt.mdoc.proximity.ProximityCloseReason
+import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -113,6 +114,26 @@ class BleTransportProviderTest {
         assertEquals("ble_connection_timeout", timeout.error.code)
         assertEquals("ble_listener_unavailable", secondAwait.error.code)
         assertEquals(listOf(ProximityCloseReason.TIMEOUT), platform.central.closeReasons)
+    }
+
+    @Test
+    fun `dual role timeout preserves a failed role's proximity error`() = runTest {
+        val platform = FakePlatform()
+        val prepared = provider(BleMdocRoles.Dual(centralUuid, peripheralUuid), platform).prepare(context, this)
+        platform.central.connection.completeExceptionally(
+            ProximityException(
+                ProximityError.Security(
+                    "ble_ident_mismatch",
+                    "The reader BLEIdent does not match EDeviceKeyBytes",
+                )
+            )
+        )
+
+        val failure = assertFailsWith<ProximityException> { prepared.awaitConnection() }
+
+        assertEquals("ble_ident_mismatch", failure.error.code)
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), platform.central.closeReasons)
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), platform.peripheral.closeReasons)
     }
 
     @Test
