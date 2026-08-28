@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.seconds
  * not trigger authorization UI from [capability]; authorization and powered-off states are surfaced
  * through the proximity capability or preparation error contracts.
  */
-public class IosBleProximityTransportProvider(
+internal class IosBleProximityTransportProvider(
     configuration: BleProximityTransportConfiguration,
 ) : ProximityTransportProvider by DefaultBleProximityTransportProvider(
     configuration,
