@@ -284,6 +284,25 @@ class MdocResponseBuilderTest {
     }
 
     @Test
+    fun `response builder accepts holder keys whose public exporter defaults to SPKI`() = runTest {
+        val holderKey = key("spki-holder", setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+        val source = issue(holderKey)
+        val spkiHolderKey = holderKey.withSpkiPublicExport()
+
+        val document = MdocResponseBuilder().buildDocument(
+            MdocDocumentPresentation(
+                source = source,
+                holderKey = spkiHolderKey,
+                selectedIssuerElements = setOf(ElementReference("org.example", "given_name")),
+                authentication = MdocAuthenticationMethod.Signature(),
+            ),
+            SessionTranscript.forQr(byteArrayOf(1), byteArrayOf(2)),
+        )
+
+        assertIs<DeviceAuth.Signature>(document.deviceSigned!!.deviceAuth)
+    }
+
+    @Test
     fun `response builder enforces device namespace authorization algorithms and precise errors`() = runTest {
         val holderKey = key("policy-holder", setOf(KeyUsage.SIGN, KeyUsage.VERIFY, KeyUsage.KEY_AGREEMENT))
         val source = issue(holderKey)

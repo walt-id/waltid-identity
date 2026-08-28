@@ -9,8 +9,8 @@ package id.walt.mdoc.proximity
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
-import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.encoding.ExactCbor
@@ -106,8 +106,9 @@ class MdocDeviceEngagementFactory {
 
     private suspend fun encodePublicDeviceKey(eDeviceKey: Key): EncodedDeviceKey {
         MdocSessionKeyValidator.requireSupportedLocalKey(eDeviceKey)
-        val publicJwk = eDeviceKey.capabilities.publicKeyExporter?.exportPublicKey() as? EncodedKey.Jwk
-            ?: throw IllegalArgumentException("Ephemeral device key cannot export a public JWK")
+        val publicJwk = requireNotNull(eDeviceKey.capabilities.publicKeyExporter) {
+            "Ephemeral device key cannot export public material"
+        }.exportPublicKey().toPublicJwk(eDeviceKey.spec)
         val publicCose = publicJwk.toCoseKey()
         return EncodedDeviceKey(
             publicCose,
