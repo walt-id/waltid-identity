@@ -11,8 +11,11 @@ import id.walt.dcql.models.meta.NoMeta
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.wallet2.handlers.WalletIssuanceMetadataProvenance
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
@@ -28,6 +31,9 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
+import id.walt.wallet2.mobile.MobileWalletRequestAuthentication
+import id.walt.wallet2.mobile.MobileWalletClientIdScheme
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -74,6 +80,15 @@ class MobileWalletIntegrationTest {
             paymentAuthorizationFields = listOf("merchant_name", "amount", "currency"),
         )
 
+        @OptIn(ExperimentalSerializationApi::class)
+        private val DEMO_VERIFIER_TRUST = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                DemoTestBackend.PUBLIC_DEMO_VERIFIER_CLIENT_ID to ClientMetadata(
+                    jwks = ClientMetadata.Jwks(listOf(DemoTestBackend.publicDemoVerifierRequestObjectSigningJwk)),
+                ),
+            ),
+        )
+
         private fun demoTransactionDataProfiles(
             paymentAuthorizationFields: Iterable<String>,
         ) = listOf(
@@ -95,7 +110,9 @@ class MobileWalletIntegrationTest {
 
     @Test
     fun bootstrapCreatesKeyAndDid() = runBlocking {
-        val client = MobileWalletFactory(context).create()
+        val client = MobileWalletFactory(context).create(
+            MobileWalletConfig(defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+        )
         val result = client.bootstrap()
         assertNotNull(result.keyId, "bootstrap should create a key")
         assertNotNull(result.did, "bootstrap should create a DID")
@@ -104,7 +121,9 @@ class MobileWalletIntegrationTest {
 
     @Test
     fun receiveEudiPidSdJwtFromEudi() = runBlocking {
-        val client = MobileWalletFactory(context).create()
+        val client = MobileWalletFactory(context).create(
+            MobileWalletConfig(defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+        )
         client.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
@@ -134,6 +153,51 @@ class MobileWalletIntegrationTest {
     @Test
     fun receiveIsoMdlFromDemoIssuer2() = runBlocking {
         receiveCredentialFromDemoIssuer2("iso-mdl")
+    }
+
+    @Test
+    fun receiveAndPresentUsingSignedMetadataAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        val scenario = demoPresentationScenario("eudi-pid-mdoc")
+        val client = MobileWalletFactory(context).create(
+            walletConfig("signed-${scenario.id}").copy(
+                credentialIssuerMetadataTrustResolver = DemoTestBackend.publicDemoIssuerMetadataTrustResolver,
+            ),
+            DEMO_VERIFIER_TRUST,
+        )
+        val bootstrap = client.bootstrap()
+        val offer = DemoTestBackend.createOffer(scenario)
+
+        val issuanceSession = client.startIssuance(
+            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offer.offerUrl)),
+        )
+        val issuerProvenance = assertIs<WalletIssuanceMetadataProvenance.Signed>(
+            issuanceSession.offer.issuer.metadataProvenance,
+        )
+        assertTrue(issuerProvenance.compactJwt.isNotBlank())
+        assertEquals("ES256", issuerProvenance.algorithm)
+        assertEquals(MetadataSignerTrustType.TRUSTED_ISSUER, issuerProvenance.trustType)
+        assertNotNull(issuerProvenance.keyId)
+
+        val credentialIds = client.continuePreAuthorizedIssuance(issuanceSession.id, offer.txCode).storedCredentialIds()
+        assertTrue(credentialIds.isNotEmpty(), "Should receive a credential from reviewed signed metadata")
+
+        val signedSession = DemoTestBackend.createVerifierSession(scenario, signedRequest = true)
+        val preview = client.previewPresentation(signedSession.authorizationRequestUri).requireReadyPreview()
+        val verifierAuthentication = assertIs<MobileWalletRequestAuthentication.Authenticated>(
+            preview.request.requestAuthentication,
+        )
+        assertTrue(verifierAuthentication.compactRequestObject.isNotBlank())
+        assertEquals("ES256", verifierAuthentication.algorithm)
+        assertNotNull(verifierAuthentication.keyId)
+        assertEquals(MobileWalletClientIdScheme.PRE_REGISTERED, verifierAuthentication.clientIdScheme)
+
+        val result = client.submitPresentation(
+            previewHandle = preview.previewHandle,
+            selectedCredentialOptions = preview.credentialOptions.map { it.selection },
+            did = bootstrap.did,
+        )
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(result)
+        DemoTestBackend.waitForVerifierSuccess(signedSession.sessionId)
     }
 
     @Test
@@ -416,6 +480,7 @@ class MobileWalletIntegrationTest {
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
         onEvent = { event -> println("WALLET EVENT: $event") },
         transactionDataProfiles = transactionDataProfiles,
+        defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
     )
 
     private suspend fun MobileWallet.receiveCredential(

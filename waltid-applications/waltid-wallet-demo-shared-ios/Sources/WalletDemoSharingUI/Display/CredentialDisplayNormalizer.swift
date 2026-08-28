@@ -4,7 +4,7 @@ import WalletSDK
 public enum CredentialDisplayNormalizer {
 
     public static func details(for credential: Credential) -> CredentialDetails {
-        var result = details(
+        let result = details(
             id: credential.id,
             title: credential.label ?? credential.format,
             issuer: credential.issuer,
@@ -21,7 +21,8 @@ public enum CredentialDisplayNormalizer {
             format: result.format,
             addedAt: result.addedAt,
             groups: result.groups,
-            metadataJSON: credential.metadataJSON
+            metadataJSON: credential.metadataJSON,
+            credentialDataJSON: credential.credentialDataJSON
         )
     }
 
@@ -60,7 +61,9 @@ public enum CredentialDisplayNormalizer {
             subject: parsed.subject,
             format: parsed.format,
             addedAt: parsed.addedAt,
-            groups: requestedGroups + parsed.groups
+            groups: requestedGroups + parsed.groups,
+            metadataJSON: option.metadataJSON,
+            credentialDataJSON: option.credentialDataJSON
         )
     }
 
@@ -140,7 +143,8 @@ public enum CredentialDisplayNormalizer {
                 subject: subject,
                 format: format,
                 addedAt: addedAt,
-                groups: []
+                groups: [],
+                credentialDataJSON: rawJSON
             )
         }
 
@@ -152,7 +156,8 @@ public enum CredentialDisplayNormalizer {
                 subject: subject,
                 format: format,
                 addedAt: addedAt,
-                groups: []
+                groups: [],
+                credentialDataJSON: rawJSON
             )
         }
 
@@ -187,7 +192,8 @@ public enum CredentialDisplayNormalizer {
             subject: subject,
             format: format,
             addedAt: addedAt,
-            groups: groups
+            groups: groups,
+            credentialDataJSON: rawJSON
         )
     }
 

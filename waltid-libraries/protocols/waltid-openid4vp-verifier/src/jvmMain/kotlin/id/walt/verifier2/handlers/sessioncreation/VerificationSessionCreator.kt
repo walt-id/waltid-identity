@@ -33,6 +33,8 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionDataStructure
 import id.walt.verifier2.data.*
 import id.walt.verifier2.handlers.authrequest.Verifier2RequestObjectKid
@@ -108,6 +110,7 @@ object VerificationSessionCreator {
         urlHost: String,
         key: Key? = null,
         x5c: List<String>? = null,
+        typeRegistry: TransactionDataTypeRegistry? = null,
     ): Verification2Session = createVerificationSessionInternal(
         setup = setup,
         clientId = clientId,
@@ -120,6 +123,7 @@ object VerificationSessionCreator {
         crypto2JwsAlgorithm = null,
         crypto2CoseAlgorithm = null,
         signingKeyReference = null,
+        typeRegistry = typeRegistry,
     )
 
     suspend fun createVerificationSession(
@@ -133,6 +137,7 @@ object VerificationSessionCreator {
         jwsAlgorithm: JwsAlgorithm,
         coseAlgorithm: Int,
         signingKeyReference: String? = null,
+        typeRegistry: TransactionDataTypeRegistry? = null,
     ): Verification2Session = createVerificationSessionInternal(
         setup = setup,
         clientId = clientId,
@@ -145,6 +150,7 @@ object VerificationSessionCreator {
         crypto2JwsAlgorithm = jwsAlgorithm,
         crypto2CoseAlgorithm = coseAlgorithm,
         signingKeyReference = signingKeyReference,
+        typeRegistry = typeRegistry,
     )
 
     private suspend fun createVerificationSessionInternal(
@@ -169,6 +175,7 @@ object VerificationSessionCreator {
         crypto2JwsAlgorithm: JwsAlgorithm?,
         crypto2CoseAlgorithm: Int?,
         signingKeyReference: String?,
+        typeRegistry: TransactionDataTypeRegistry?,
     ): Verification2Session {
         require(key == null || crypto2Key == null) { "Provide either a v1 or crypto2 verifier signing key" }
         val signingKey = crypto2Key?.let {
@@ -371,10 +378,18 @@ object VerificationSessionCreator {
                 .credentials
                 .associateBy { credentialQuery -> credentialQuery.id }
         }
-        val decodedTransactionData = validateRequestTransactionDataStructure(
-            transactionData = transactionData,
-            credentialQueriesById = credentialQueriesById,
-        )
+        val decodedTransactionData = if (typeRegistry != null) {
+            validateRequestTransactionData(
+                transactionData = transactionData,
+                typeRegistry = typeRegistry,
+                credentialQueriesById = credentialQueriesById,
+            )
+        } else {
+            validateRequestTransactionDataStructure(
+                transactionData = transactionData,
+                credentialQueriesById = credentialQueriesById,
+            )
+        }
         val transactionDataFormats = decodedTransactionData
             .flatMap { decodedItem -> decodedItem.transactionData.credentialIds }
             .mapNotNull { credentialId -> credentialQueriesById?.get(credentialId)?.format }

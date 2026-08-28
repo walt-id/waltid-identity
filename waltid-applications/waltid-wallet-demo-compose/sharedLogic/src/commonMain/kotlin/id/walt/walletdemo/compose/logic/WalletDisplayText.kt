@@ -43,12 +43,21 @@ internal object WalletDisplayText {
     const val PresentFailed = "Present failed"
     const val RejectFailed = "Reject failed"
     const val BootstrapFailed = "Bootstrap failed"
+    const val ResetWalletFailed = "Reset wallet failed"
+    const val SigningProtectionChangeFailed = "Signing protection change failed"
+    const val DeleteCredentialFailed = "Delete credential failed"
     const val InvalidOfferUrl = "invalid offer URL"
     const val InvalidRequestUrl = "invalid request URL"
     const val SelectCredentialForEveryRequest = "select a credential for every requested credential"
     const val PinMustContain4To8Digits = "PIN must contain 4 to 8 digits"
     const val PinConfirmationDoesNotMatch = "PIN confirmation does not match"
     const val WrongPin = "Wrong PIN"
+    const val UnlockWithBiometrics = "Unlock the wallet"
+    const val EnableBiometricUnlock = "Enable biometric unlock"
+    const val BiometricUnlockNotAuthorized = "Biometric unlock was not authorized. Use the PIN instead."
+    const val BiometricNotEnrolled = "Set up a strong biometric in device settings, then try again."
+    const val BiometricUnavailable = "Strong biometric authentication is not available on this device."
+    const val SigningProtectionUnsupported = "This signing protection is not supported on this device."
     const val ReceivedCredentialsUnavailable = "received credentials are not available locally"
     const val UnexpectedError = "Unexpected error"
 
@@ -58,4 +67,28 @@ internal object WalletDisplayText {
 
     fun failure(prefix: String, error: Throwable): String =
         failure(prefix, error.message ?: error::class.simpleName ?: UnexpectedError)
+
+    fun biometricSigningUnavailable(
+        availability: WalletDemoSigningProtectionAvailability,
+        canChooseNoBiometricSigning: Boolean,
+    ): String {
+        val (reason, recovery) = when (availability) {
+            WalletDemoSigningProtectionAvailability.Available -> return ""
+            WalletDemoSigningProtectionAvailability.BiometricNotEnrolled ->
+                "no strong biometric is enrolled" to "you enroll a strong biometric"
+            WalletDemoSigningProtectionAvailability.BiometricUnavailable ->
+                "strong biometric authentication is unavailable" to
+                    "strong biometric authentication becomes available"
+            WalletDemoSigningProtectionAvailability.Unsupported ->
+                "the device cannot currently authorize it" to
+                    "this device can authorize biometric signing"
+        }
+        val alternative = if (canChooseNoBiometricSigning) {
+            " or you choose no biometric signing in Settings."
+        } else {
+            ". Biometric signing is required by app configuration."
+        }
+        return "This wallet uses biometric signing, but $reason. " +
+            "Issuance and presentation signing will fail until $recovery$alternative"
+    }
 }

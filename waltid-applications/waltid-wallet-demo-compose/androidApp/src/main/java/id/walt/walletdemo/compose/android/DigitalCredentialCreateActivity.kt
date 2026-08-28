@@ -3,12 +3,12 @@ package id.walt.walletdemo.compose.android
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.credentials.ExperimentalDigitalCredentialApi
+import androidx.fragment.app.FragmentActivity
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.AndroidDigitalCredentialCreateProvider
 import id.walt.wallet2.mobile.MobileWallet
@@ -21,6 +21,7 @@ import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.toDemoIssuanceSession
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateSheet
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateUiState
+import id.walt.walletdemo.compose.ui.prefetchOfferCardArt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,7 +37,7 @@ import kotlinx.coroutines.launch
  * returns the `openid://` callback to this Activity so the CREATE_CREDENTIAL result can finish.
  */
 @OptIn(ExperimentalDigitalCredentialApi::class)
-class DigitalCredentialCreateActivity : ComponentActivity() {
+class DigitalCredentialCreateActivity : FragmentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val resultIntent = Intent()
     private var wallet: MobileWallet? = null
@@ -84,13 +85,15 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                 val allowlist = assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
                 val input = AndroidDigitalCredentialCreateProvider.extract(intent, allowlist)
                 requestProtocol = input.request.protocol
+                val config = demoWalletConfig()
                 val created = createAndroidDemoMobileWallet(
                     context = applicationContext,
-                    config = demoWalletConfig(),
+                    config = config,
+                    interactionContextProvider = { this@DigitalCredentialCreateActivity },
                 )
                 val mobileWallet = created.wallet
                 wallet = mobileWallet
-                mobileWallet.bootstrap()
+                created.bootstrap(config.selectedSigningProtection(applicationContext))
                 val started = mobileWallet.startIssuance(
                     MobileWalletIssuanceRequest(
                         offer = MobileWalletCredentialOffer.InlineJson(input.request.offerJson),
@@ -98,6 +101,7 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                     )
                 ).toDemoIssuanceSession()
                 session = started
+                prefetchOfferCardArt(this@DigitalCredentialCreateActivity, started.preview)
                 uiState = WalletDemoOfferCreateUiState.Review(preview = started.preview)
             }.onFailure {
                 reportFailure(it)

@@ -68,7 +68,10 @@ internal object WalletComposeE2EHelper {
 
     private fun launch(context: Context) {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
+            ?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "disabled")
+            }
             ?: error("Cannot resolve launch intent for ${context.packageName}")
         context.startActivity(launchIntent)
     }
@@ -80,9 +83,7 @@ internal object WalletComposeE2EHelper {
 
         waitForResource(device, "wallet.pinConfirmationInput", 2_000L)?.setText(PIN)
 
-        val submit = waitForResource(device, "wallet.pinSubmitButton", UI_ELEMENT_TIMEOUT)
-        assertNotNull("PIN submit button not found", submit)
-        submit!!.click()
+        clickByTag(device, "wallet.pinSubmitButton")
 
         assertTrue(
             "Wallet did not become ready after unlock. Latest status: ${latestStatus(device)}",
@@ -101,12 +102,13 @@ internal object WalletComposeE2EHelper {
             Uri.parse(url),
             context,
             MainActivity::class.java,
-        ).apply {
+            ).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP
             )
+            putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "disabled")
         }
         context.startActivity(intent)
     }

@@ -1,33 +1,37 @@
 package id.walt.wallet2.persistence.keys
 
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
-import id.walt.crypto2.signum.SignumKeyPolicy
 
 /**
- * Generation, restoration, and deletion support for managed native platform keys.
+ * Platform-managed key provider used by mobile wallet persistence.
+ *
+ * Implementations must expose capability and restoration state through the structured result
+ * types below. Known key-use authorization failures must be surfaced as
+ * [KeyUseAuthorizationException]; callers must not need to understand provider-specific
+ * exceptions.
  */
 public interface PlatformManagedKeyProvider {
-    /**
-     * Generates a managed key in the platform key store.
-     */
-    public suspend fun generateManagedKey(
-        id: KeyId,
-        spec: KeySpec,
-        usages: Set<KeyUsage>,
-        policy: SignumKeyPolicy? = null,
-    ): ManagedKey
+    /** Checks whether the requested requirements are supported without fallback. */
+    public suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport
+
+    /** Generates a managed key in the platform key store. */
+    public suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey
+
+    /** Reads the immutable wallet authorization policy encoded in a managed-key descriptor. */
+    public fun keyUseAuthorizationPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy
 
     /**
      * Restores a platform key from its persisted descriptor.
+     *
+     * Returns a structured restoration result so persisted authorization policy is available
+     * even when the native key is absent.
      */
-    public suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey
+    public suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration
 
     /**
      * Deletes a platform key using its descriptor without restoring the alias first.
      */
     public suspend fun deleteManagedKey(stored: StoredKey.Managed)
+
 }

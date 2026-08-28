@@ -134,6 +134,10 @@ sealed interface id.walt.crypto2.signum/SignumAuthenticationPolicy { // id.walt.
     }
 }
 
+final class id.walt.crypto2.signum/SignumInteractionContextUnavailableException : kotlin/IllegalStateException { // id.walt.crypto2.signum/SignumInteractionContextUnavailableException|null[0]
+    constructor <init>(kotlin/String = ..., kotlin/Throwable? = ...) // id.walt.crypto2.signum/SignumInteractionContextUnavailableException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
+}
+
 final class id.walt.crypto2.signum/SignumKeyAttestation { // id.walt.crypto2.signum/SignumKeyAttestation|null[0]
     constructor <init>(kotlin/String, id.walt.crypto2.serialization/BinaryData, kotlin.collections/List<id.walt.crypto2.serialization/BinaryData> = ...) // id.walt.crypto2.signum/SignumKeyAttestation.<init>|<init>(kotlin.String;id.walt.crypto2.serialization.BinaryData;kotlin.collections.List<id.walt.crypto2.serialization.BinaryData>){}[0]
 
@@ -166,6 +170,20 @@ final class id.walt.crypto2.signum/SignumKeyAttestation { // id.walt.crypto2.sig
 
         final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.signum/SignumKeyAttestation> // id.walt.crypto2.signum/SignumKeyAttestation.Companion.serializer|serializer(){}[0]
     }
+}
+
+final class id.walt.crypto2.signum/SignumKeyInvalidatedException : kotlin/IllegalStateException { // id.walt.crypto2.signum/SignumKeyInvalidatedException|null[0]
+    constructor <init>(kotlin/String, kotlin/Throwable? = ...) // id.walt.crypto2.signum/SignumKeyInvalidatedException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
+
+    final val alias // id.walt.crypto2.signum/SignumKeyInvalidatedException.alias|{}alias[0]
+        final fun <get-alias>(): kotlin/String // id.walt.crypto2.signum/SignumKeyInvalidatedException.alias.<get-alias>|<get-alias>(){}[0]
+}
+
+final class id.walt.crypto2.signum/SignumKeyNotFoundException : kotlin/IllegalStateException { // id.walt.crypto2.signum/SignumKeyNotFoundException|null[0]
+    constructor <init>(kotlin/String, kotlin/Throwable? = ...) // id.walt.crypto2.signum/SignumKeyNotFoundException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
+
+    final val alias // id.walt.crypto2.signum/SignumKeyNotFoundException.alias|{}alias[0]
+        final fun <get-alias>(): kotlin/String // id.walt.crypto2.signum/SignumKeyNotFoundException.alias.<get-alias>|<get-alias>(){}[0]
 }
 
 final class id.walt.crypto2.signum/SignumKeyOptions { // id.walt.crypto2.signum/SignumKeyOptions|null[0]
@@ -235,12 +253,20 @@ final class id.walt.crypto2.signum/SignumKeyPolicy { // id.walt.crypto2.signum/S
     }
 }
 
+final class id.walt.crypto2.signum/SignumKeyPolicyMismatchException : kotlin/IllegalStateException { // id.walt.crypto2.signum/SignumKeyPolicyMismatchException|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/Throwable? = ...) // id.walt.crypto2.signum/SignumKeyPolicyMismatchException.<init>|<init>(kotlin.String;kotlin.String;kotlin.Throwable?){}[0]
+
+    final val alias // id.walt.crypto2.signum/SignumKeyPolicyMismatchException.alias|{}alias[0]
+        final fun <get-alias>(): kotlin/String // id.walt.crypto2.signum/SignumKeyPolicyMismatchException.alias.<get-alias>|<get-alias>(){}[0]
+}
+
 final class id.walt.crypto2.signum/SignumManagedKeyProvider : id.walt.crypto2.providers/ManagedKeyProvider { // id.walt.crypto2.signum/SignumManagedKeyProvider|null[0]
     constructor <init>(id.walt.crypto2.signum/SignumPlatformBackend) // id.walt.crypto2.signum/SignumManagedKeyProvider.<init>|<init>(id.walt.crypto2.signum.SignumPlatformBackend){}[0]
 
     final val id // id.walt.crypto2.signum/SignumManagedKeyProvider.id|{}id[0]
         final fun <get-id>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.signum/SignumManagedKeyProvider.id.<get-id>|<get-id>(){}[0]
 
+    final fun storedPolicy(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.signum/SignumKeyPolicy // id.walt.crypto2.signum/SignumManagedKeyProvider.storedPolicy|storedPolicy(id.walt.crypto2.keys.StoredKey.Managed){}[0]
     final suspend fun delete(id.walt.crypto2.keys/StoredKey.Managed, kotlin/String? = ...): id.walt.crypto2.keys/KeyDeletionResult // id.walt.crypto2.signum/SignumManagedKeyProvider.delete|delete(id.walt.crypto2.keys.StoredKey.Managed;kotlin.String?){}[0]
     final suspend fun generate(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.signum/SignumManagedKeyProvider.generate|generate(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
     final suspend fun generateSignumKey(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.signum/SignumManagedKey // id.walt.crypto2.signum/SignumManagedKeyProvider.generateSignumKey|generateSignumKey(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
@@ -249,6 +275,10 @@ final class id.walt.crypto2.signum/SignumManagedKeyProvider : id.walt.crypto2.pr
     final suspend fun storedKeyForExisting(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, kotlin/String, id.walt.crypto2.signum/SignumKeyPolicy = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ...): id.walt.crypto2.keys/StoredKey.Managed // id.walt.crypto2.signum/SignumManagedKeyProvider.storedKeyForExisting|storedKeyForExisting(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;kotlin.String;id.walt.crypto2.signum.SignumKeyPolicy;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
 
     final object Companion // id.walt.crypto2.signum/SignumManagedKeyProvider.Companion|null[0]
+}
+
+final class id.walt.crypto2.signum/SignumStoredKeyMetadataException : kotlin/IllegalArgumentException { // id.walt.crypto2.signum/SignumStoredKeyMetadataException|null[0]
+    constructor <init>(kotlin/String, kotlin/Throwable? = ...) // id.walt.crypto2.signum/SignumStoredKeyMetadataException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
 }
 
 final class id.walt.crypto2.signum/SignumUserCancelledException : kotlin.coroutines.cancellation/CancellationException { // id.walt.crypto2.signum/SignumUserCancelledException|null[0]

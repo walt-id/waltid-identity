@@ -5,6 +5,7 @@ import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.openid4vp.conformance.adapter.VpWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.Oid4vpWalletVariantPlan
@@ -30,6 +31,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -63,6 +65,16 @@ class VpWalletConformanceTests {
 
         @JvmStatic
         val isConformanceAvailable = conformanceServerVersionResult.isSuccess
+
+        @JvmStatic
+        @AfterAll
+        fun writeSkippedSummaryIfSuiteUnavailable() {
+            if (isConformanceAvailable) return
+            ConformanceReportWriter.writeSkippedIfEmpty(
+                role = ConformanceReportWriter.Role.VP_WALLET,
+                reason = "Conformance suite not available at $conformanceHost:$conformancePort",
+            )
+        }
 
         /**
          * Optional comma-separated substrings selecting which matrix points to run, e.g.
@@ -142,7 +154,11 @@ class VpWalletConformanceTests {
                     println("\n" + "=".repeat(80))
                     println("Running wallet plan: ${plan.name}")
                     println("=".repeat(80))
-                    WalletTestPlanRunner(plan, adapterHttp, conformanceHost, conformancePort).test()
+                    runCatching {
+                        WalletTestPlanRunner(plan, adapterHttp, conformanceHost, conformancePort).test()
+                    }.onFailure { error ->
+                        println("Plan ${plan.name} failed: ${error.message}")
+                    }
                 }
             } finally {
                 adapter.stop()

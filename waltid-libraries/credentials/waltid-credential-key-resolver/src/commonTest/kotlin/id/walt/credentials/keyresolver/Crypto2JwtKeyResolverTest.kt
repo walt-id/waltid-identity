@@ -83,23 +83,32 @@ class Crypto2JwtKeyResolverTest {
     }
 
     @Test
-    fun `did jwk resolution rejects kid that is the DID without fragment`() = runTest {
-        assertNull(
-            resolver("$DID_JWK#0").resolveFromJwt(
-                jwtHeader = buildJsonObject { put("kid", DID_JWK) },
-                jwtPayload = buildJsonObject { put("iss", DID_JWK) },
-            )
+    fun `did jwk resolution accepts kid that is the DID without fragment`() = runTest {
+        val resolved = resolver("$DID_JWK#0").resolveFromJwt(
+            jwtHeader = buildJsonObject { put("kid", DID_JWK) },
+            jwtPayload = buildJsonObject { put("iss", DID_JWK) },
         )
+
+        assertEquals(JwtKeyResolutionSource.DID, resolved?.source)
+        assertEquals(KeyId("$DID_JWK#0"), resolved?.key?.id)
     }
 
     @Test
-    fun `did jwk resolution rejects kid that is not the method verification fragment`() = runTest {
-        assertNull(
-            resolver("$DID_JWK#0").resolveFromJwt(
-                jwtHeader = buildJsonObject { put("kid", "$DID_JWK#org.tenant.kms.key_issuer") },
-                jwtPayload = buildJsonObject { put("iss", DID_JWK) },
-            )
+    fun `did jwk resolution accepts kid that is not the method verification fragment`() = runTest {
+        val resolved = resolver("$DID_JWK#0").resolveFromJwt(
+            jwtHeader = buildJsonObject { put("kid", "$DID_JWK#org.tenant.kms.key_issuer") },
+            jwtPayload = buildJsonObject { put("iss", DID_JWK) },
         )
+
+        assertEquals(JwtKeyResolutionSource.DID, resolved?.source)
+        assertEquals(KeyId("$DID_JWK#0"), resolved?.key?.id)
+    }
+
+    @Test
+    fun `did jwk resolution rejects multiple verification keys`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            resolver("$DID_JWK#0", "$DID_JWK#1").resolveFromDid(DID_JWK, "$DID_JWK#0")
+        }
     }
 
     @Test

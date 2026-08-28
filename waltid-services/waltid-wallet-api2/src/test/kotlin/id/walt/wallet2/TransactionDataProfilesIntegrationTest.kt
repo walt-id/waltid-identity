@@ -45,6 +45,7 @@ class TransactionDataProfilesIntegrationTest {
     private val paymentType = "org.waltid.transaction-data.payment-authorization"
     private val scaType = "urn:eudi:sca:payment:1"
     private val accountType = "org.waltid.transaction-data.account-access"
+    private val paymentCardType = "payment_card"
 
     private val profiles = listOf(
         TransactionDataProfile(
@@ -61,6 +62,11 @@ class TransactionDataProfilesIntegrationTest {
             type = scaType,
             displayName = "SCA Payment",
             fields = listOf("payload"),
+        ),
+        TransactionDataProfile(
+            type = paymentCardType,
+            displayName = "Payment Card",
+            fields = listOf("merchant_name", "amount"),
         ),
     )
 
@@ -100,6 +106,7 @@ class TransactionDataProfilesIntegrationTest {
                     val registry = OSSWallet2Service.configuredTransactionDataTypeRegistry()
                     registry.requireKnown(paymentType)
                     registry.requireKnown(scaType)
+                    registry.requireKnown(paymentCardType)
                     assertFailsWith<IllegalArgumentException> {
                         registry.requireKnown("org.example.unknown-type")
                     }
@@ -140,6 +147,16 @@ class TransactionDataProfilesIntegrationTest {
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
                         .body<PresentationPreviewResponse>()
                     assertTypeAcceptedByRegistry(preview, scaType)
+                    preview
+                }
+
+                testAndReturn("Preview accepts payment_card type") {
+                    val preview = http.post("/wallet/$walletId/credentials/present/preview") {
+                        contentType(ContentType.Application.Json)
+                        setBody(PreviewPresentationRequest(requestUrl = presentationRequestUrl(paymentCardType)))
+                    }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                        .body<PresentationPreviewResponse>()
+                    assertTypeAcceptedByRegistry(preview, paymentCardType)
                     preview
                 }
 

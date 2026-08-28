@@ -1,69 +1,133 @@
-# Vendored OpenID4VCI creation matcher
+# Vendored OpenID4VCI Credential Manager issuance matcher
 
-`src/androidMain/assets/id/walt/wallet2/mobile/provision_hardcoded.wasm` is the Credential
-Manager matcher this wallet registers for OpenID4VCI `CREATE_CREDENTIAL` creation options.
-AndroidX does not yet ship an OpenID4VCI creation registry helper comparable to
-`OpenId4VpRegistry`, so `AndroidDigitalCredentialRegistry.registerCreationOptions` registers
-creation options with a raw `RegisterCreationOptionsRequest` and supplies the binary itself.
+`src/androidMain/assets/id/walt/wallet2/mobile/issuance.wasm` is the WebAssembly issuance matcher
+registered for OpenID4VCI `CREATE_CREDENTIAL` creation options. AndroidX does not yet ship a released
+OpenID4VCI registry helper in the SDK version used here, so `AndroidDigitalCredentialRegistry` still
+uses a raw `RegisterCreationOptionsRequest` and supplies this binary.
 
-## Why it is vendored
-
-It is obtained from the CMWallet sample (`digitalcredentialsdev/CMWallet`) rather than declared
-as a dependency. No CMWallet API is called; only the matcher bytes and the creation-options
-database layout that matcher expects are reused.
+The matcher is Google's Rust implementation from `android/identity-samples`, built from source at a
+pinned commit. It is independent of the platform-neutral OpenID4VCI wallet engine: the matcher only
+decides whether Credential Manager should surface this wallet, while the provider and wallet engine
+parse and fulfil the selected issuance request.
 
 ## Provenance
 
+The committed binary is our build of Google's Rust source tree with one narrow local parser fix;
+Google publishes the Rust source tree, not this binary.
+
 | | |
 | --- | --- |
-| Upstream repository | https://github.com/digitalcredentialsdev/CMWallet |
-| Upstream commit | `6b350ff8cfc9ed49b301603c25eb56fcd2a904b1` |
-| Upstream asset path | `app/src/main/assets/provision_hardcoded.wasm` |
-| Upstream git blob | `262eee146c3763fdad3419305dc91ba8b045fb0d` |
-| Matcher sources | `matcher/issuance/provision.c` (C provision matcher; **not** `matcher-rs/`) |
-| Supporting sources | `matcher/credentialmanager.h`, `matcher/cJSON/` |
-| Size | 56,376 bytes |
-| SHA-256 | `d6b4846072839bb43b98dfa5da5ae9ec83f2c30ce875c1ebd19c5ad2b5344ac1` |
+| Upstream repository | https://github.com/android/identity-samples |
+| Branch | `wasm` |
+| Immutable upstream commit | `d5a8adc1b84061a4e3a9581cdaf867df89fb1f19` |
+| Source path | `CredentialProvider/wasm/matcher-rs` |
+| Binary entry point | `src/bin/issuance.rs` |
+| Source modifications | `openid4vci.rs`: remove the unused string-typed `credential_signing_alg_values_supported` field; the local regression test is kept in `matcher-patches/` |
+| Exact built binary path | `target/wasm32-unknown-unknown/release/issuance.wasm` |
+| Size | 91,976 bytes |
+| SHA-256 | `3a745c778f1881365cced1f4215b5e7e80f673928052f9d3883eb3d596d42c95` |
+| Rust toolchain | `rustc 1.99.0-nightly (12c36e253 2026-08-10)` via the current `nightly-2026-08-11` channel |
+| Target | `wasm32-unknown-unknown` |
+| License | Apache-2.0 |
 
-`NOTICE-provision_hardcoded.txt` ships beside the binary.
+`NOTICE-issuance.txt` ships beside the binary. It records the Apache-2.0 source license and the
+Apache-2.0, MIT, and LLVM-exception notices for the Rust standard library and crates compiled into the
+WASM. The dependency list is generated with the pinned source tree's `generate_license.sh` procedure.
 
-### Build lineage
+## Creation-options contract
 
-CMWallet builds the issuance matcher from `matcher/issuance/provision.c` into the asset named
-`provision_hardcoded.wasm` under `app/src/main/assets/`. The exact CI/toolchain command may change
-upstream; when refreshing, prefer copying the asset produced by that pinned commit rather than
-rebuilding against a moving `main`.
+The byte layout follows AndroidX `OpenId4VciRegistry` on `androidx-main`: a four-byte little-endian
+JSON offset, optional icon bytes, then UTF-8 JSON. The JSON registered by this SDK contains:
 
-## Licensing
-
-As of the pinned commit above, the CMWallet repository does **not** publish a root `LICENSE`.
-Redistribution of this compiled WASM is therefore a **release gate**: before publishing artifacts
-that ship the binary, obtain an explicit upstream license covering the matcher / binary, an
-explicit redistribution grant, or rebuild/replace it from clearly licensed sources.
-
-The C matcher tree vendors cJSON (MIT). A provenance NOTICE alone does not grant redistribution
-rights for the WASM.
-
-## Compatibility contract
-
-- `AndroidDigitalCredentialRegistry.encodeOpenId4VciCreationOptions` writes the binary database
-  the matcher reads: little-endian JSON offset, icon PNG bytes, then a JSON `display` object.
-- Creation registry id is `openid4vci`.
-- The Android create provider accepts only the canonical Digital Credentials issuance protocol
-  `openid4vci-v1`. The upstream C matcher also recognizes the historical alias `openid4vci1.0`
-  for Credential Manager matching; that alias is not part of this SDK's provider API.
-
-## Refreshing
-
-Pin an immutable commit (do not refresh from mutable `main`):
-
-```shell
-COMMIT=6b350ff8cfc9ed49b301603c25eb56fcd2a904b1
-curl -sL \
-  "https://raw.githubusercontent.com/digitalcredentialsdev/CMWallet/${COMMIT}/app/src/main/assets/provision_hardcoded.wasm" \
-  > src/androidMain/assets/id/walt/wallet2/mobile/provision_hardcoded.wasm
-shasum -a 256 src/androidMain/assets/id/walt/wallet2/mobile/provision_hardcoded.wasm
+```json
+{
+  "entry_id": "openid4vci",
+  "entries": [
+    {
+      "subtitle": "Save a credential to this wallet",
+      "explainer": { "default": "Save a credential to this wallet." }
+    }
+  ],
+  "filter": { "Pass": {} },
+  "preferred_protocols": [
+    "openid4vci-v1",
+    "openid4vci1.0",
+    "openid4vci-1.0",
+    "openid4vci1.1",
+    "openid4vci-1.1"
+  ],
+  "package_info": {
+    "name": "<host application label>",
+    "icon": [4, "4 + icon length"]
+  }
+}
 ```
 
-Then update the table above, `NOTICE-provision_hardcoded.txt`, and the pinned hash in
-`AndroidVendoredMatcherTest`.
+`package_info` uses the host application's normal label and icon bytes, with offsets into the same
+packed blob. It follows AndroidX's auto-resolved package metadata; this provider does not use the
+privileged `self_declared_package_info` override.
+
+The non-empty `preferred_protocols` list is load-bearing. The upstream matcher gives exact preferred
+protocols precedence over its historical fallback list, so this registration advertises the canonical
+`openid4vci-v1` identifier first, then the historical aliases still compiled into the matcher
+(`openid4vci1.0`, `openid4vci-1.0`, `openid4vci1.1`, `openid4vci-1.1`). The Android create provider
+accepts the same ordered set and echoes the selected protocol in the create acknowledgement. Bare
+`openid4vci` is not part of this contract.
+
+The `Pass` filter is deliberately broad. It lets this wallet be surfaced as a candidate for supported
+OpenID4VCI Digital Credentials API requests; the platform-neutral issuance engine remains responsible
+for resolving the offer and deciding whether the flow can be fulfilled.
+
+## Wasm/Credential Manager compatibility
+
+The final Wasm import section uses the `credman` module and imports:
+
+- `GetCredentialsSize`, `ReadCredentialsBuffer`, `GetRequestSize`, `GetRequestBuffer`, and
+  `GetWasmVersion` to read the registered options and request;
+- `AddIssuanceEntry` for Credential Manager Wasm ABI version 9 and newer;
+- `AddStringIdEntry` as the match-result fallback for Wasm ABI versions below 9, using the registered
+  `package_info` icon and name; and
+- `SelfDeclarePackageInfo`, which is used only when a registration supplies
+  `self_declared_package_info`.
+
+The matcher retains the upstream `credman` imports and matching logic. The local source change only
+removes an unused metadata field whose upstream `Vec<String>` model rejected numeric COSE algorithm
+identifiers in valid mdoc metadata.
+
+## Rebuilding and updating
+
+Use the immutable upstream commit and apply the checked-in local patch before building:
+
+```shell
+git clone https://github.com/android/identity-samples
+git -C identity-samples checkout d5a8adc1b84061a4e3a9581cdaf867df89fb1f19
+git -C identity-samples apply \
+  <this-module>/matcher-patches/d5a8adc1-local-numeric-mdoc-signing-algorithms.patch
+cd identity-samples/CredentialProvider/wasm/matcher-rs
+rustup toolchain install nightly-2026-08-11 --component rust-src --target wasm32-unknown-unknown
+cargo +nightly-2026-08-11 test --locked
+CARGO_PROFILE_RELEASE_PANIC=immediate-abort \
+CARGO_PROFILE_RELEASE_OPT_LEVEL=z \
+CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
+CARGO_PROFILE_RELEASE_STRIP=true \
+CARGO_PROFILE_RELEASE_LTO=true \
+cargo +nightly-2026-08-11 build \
+  --locked \
+  -Z panic-immediate-abort \
+  -Z build-std \
+  --target wasm32-unknown-unknown \
+  --release
+bash generate_license.sh
+cp target/wasm32-unknown-unknown/release/issuance.wasm \
+  <this-module>/src/androidMain/assets/id/walt/wallet2/mobile/issuance.wasm
+shasum -a 256 <this-module>/src/androidMain/assets/id/walt/wallet2/mobile/issuance.wasm
+```
+
+The patch contains the source-level regression test
+`match_portal_mdoc_metadata_with_numeric_signing_algorithms`. Against the unmodified pinned source it
+fails while deserializing numeric `[-7, -9]`; after removing the unused field it proves the full
+Portal2-shaped request deserializes, regularizes the requested mdoc configuration, applies
+`AllowedMdocDoctypes`, and emits one issuance entry. The committed hash is pinned by
+`AndroidVendoredMatcherTest`, and the AAR check verifies that both the issuance binary and its notice
+are packaged. An intentional matcher update must update the binary, hash, notice, provenance table,
+local patch, and compatibility review together.

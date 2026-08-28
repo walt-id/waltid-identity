@@ -3,6 +3,7 @@ import WalletDemoSharingUI
 import WalletSDK
 
 struct OfferReviewView: View {
+    @Environment(\.walletDemoBranding) private var branding
     let preview: IssuanceOfferPreview
     let isAcceptEnabled: Bool
     let isReviewEnabled: Bool
@@ -10,37 +11,35 @@ struct OfferReviewView: View {
     let onTxCodeChange: (String) -> Void
     let onAccept: () -> Void
     let onDecline: () -> Void
+    var showActions: Bool = true
+    @State private var issuerExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Credential offer")
                 .font(.headline)
 
-            ReviewMetadataSection(
+            ExpandableMetadataCard(
                 title: "Issuer",
-                titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection
+                titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection,
+                toggleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerDetailsToggle,
+                isExpanded: $issuerExpanded
             ) {
                 MetadataIdentityView(
                     display: issuerDisplay,
                     fallbackName: preview.issuer.identifier,
                     supportingText: nil
                 )
+            } details: {
                 if issuerHasFriendlyName {
-                    Divider()
-                    MetadataDisclosure(
-                        title: "Issuer details",
-                        initiallyExpanded: false,
-                        accessibilityIdentifier: WalletAccessibilityID.offerIssuerDetailsToggle
-                    ) {
-                        MetadataDetailList(items: [
-                            MetadataDetailItem(
-                                label: "Credential Issuer",
-                                value: preview.issuer.identifier,
-                                linkURI: preview.issuer.identifier
-                            ),
-                        ])
-                        .accessibilityIdentifier(WalletAccessibilityID.offerIssuerDetails)
-                    }
+                    MetadataDetailList(items: [
+                        MetadataDetailItem(
+                            label: "Credential Issuer",
+                            value: preview.issuer.identifier,
+                            linkURI: preview.issuer.identifier
+                        ),
+                    ])
+                    .accessibilityIdentifier(WalletAccessibilityID.offerIssuerDetails)
                 }
             }
 
@@ -49,11 +48,8 @@ struct OfferReviewView: View {
                     title: "Offered credentials",
                     titleAccessibilityIdentifier: WalletAccessibilityID.offerCredentialsSection
                 ) {
-                    ForEach(Array(preview.credentials.enumerated()), id: \.offset) { index, credential in
-                        if index > 0 {
-                            Divider()
-                        }
-                        OfferedCredentialView(credential: credential)
+                    ForEach(preview.credentials, id: \.configurationID) { credential in
+                        CredentialCardArtView(summary: credential.cardSummary)
                     }
                 }
             }
@@ -103,17 +99,14 @@ struct OfferReviewView: View {
                 }
             }
 
-            HStack(spacing: 8) {
-                Button(preview.grant == .authorizationCode ? "Continue to sign in" : "Accept", action: onAccept)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
-                    .disabled(!isAcceptEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
-
-                Button("Decline", action: onDecline)
-                    .buttonStyle(.bordered)
-                    .disabled(!isReviewEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
+            if showActions {
+                OfferReviewActions(
+                    requiresIssuerAuthentication: preview.grant == .authorizationCode,
+                    isAcceptEnabled: isAcceptEnabled,
+                    isReviewEnabled: isReviewEnabled,
+                    onAccept: onAccept,
+                    onDecline: onDecline
+                )
             }
         }
     }
@@ -135,32 +128,32 @@ struct OfferReviewView: View {
     }
 }
 
-private struct OfferedCredentialView: View {
-    let credential: IssuanceCredentialPreview
-
-    private var title: String {
-        credential.name ?? credential.configurationID
-    }
+struct OfferReviewActions: View {
+    @Environment(\.walletDemoBranding) private var branding
+    let requiresIssuerAuthentication: Bool
+    let isAcceptEnabled: Bool
+    let isReviewEnabled: Bool
+    let onAccept: () -> Void
+    let onDecline: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            MetadataIdentityView(
-                display: MetadataDisplay(
-                    name: credential.name,
-                    locale: nil,
-                    logoURI: credential.logoURI?.absoluteString,
-                    logoAltText: nil
-                ),
-                fallbackName: title,
-                supportingText: credential.descriptionText
-            )
-            let details = [
-                MetadataDetailItem(label: "Format", value: credential.format),
-            ].filter(\.isVisible)
-            if !details.isEmpty {
-                Divider()
-                MetadataDetailList(items: details)
-            }
+        HStack(spacing: 8) {
+            Button(requiresIssuerAuthentication ? "Continue to sign in" : "Accept", action: onAccept)
+                .buttonStyle(.borderedProminent)
+                .tint(branding.primary)
+                .disabled(!isAcceptEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
+
+            Button("Decline", action: onDecline)
+                .buttonStyle(.bordered)
+                .disabled(!isReviewEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
         }
+    }
+}
+
+private extension IssuanceCredentialPreview {
+    var cardSummary: CredentialCardSummary {
+        .offered(from: self)
     }
 }

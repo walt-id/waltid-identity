@@ -2,6 +2,7 @@
 
 import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     id("waltid.full.library")
@@ -11,6 +12,19 @@ plugins {
 group = "id.walt.crypto2"
 
 kotlin {
+    if (enableIosBuild) {
+        listOf("iosArm64", "iosSimulatorArm64").forEach { targetName ->
+            (targets.getByName(targetName) as KotlinNativeTarget)
+                .compilations
+                .getByName("main")
+                .cinterops
+                .create("CoreFoundationEqual") {
+                    defFile(project.file("src/iosMain/cinterop/CoreFoundationEqual.def"))
+                    compilerOpts("-I${project.file("src/iosMain/cinterop").absolutePath}")
+                }
+            }
+    }
+
     abiValidation {
         binariesSource.set(BinariesSource.MAIN_COMPILATION)
     }
@@ -37,6 +51,11 @@ kotlin {
                 }
             }
             if (enableAndroidBuild) {
+                androidMain.dependencies {
+                    api(identityLibs.androidx.fragment)
+                    implementation(identityLibs.androidx.biometric)
+                    implementation(identityLibs.androidx.lifecycle.runtime.ktx)
+                }
                 androidMain.get().dependsOn(mobileMain)
                 named("androidDeviceTest") {
                     dependencies {

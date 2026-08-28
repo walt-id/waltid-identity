@@ -521,6 +521,7 @@ internal class MobileWalletAnnexCEngine(
             label = metadata.label,
             credentialDataJson = Json.encodeToString(JsonObject.serializer(), mdoc.credentialData),
             disclosures = disclosures,
+            metadataJson = this.metadata?.let { Json.encodeToString(JsonObject.serializer(), it) },
         )
     }
 

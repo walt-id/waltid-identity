@@ -60,8 +60,56 @@ class IssuerMetadataResolverTest {
         val resolver = IssuerMetadataResolver(client)
         val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl)
 
-        assertEquals(issuerUrl, metadata.credentialIssuer)
-        assertEquals(1, metadata.credentialConfigurationsSupported.size)
+        assertEquals(issuerUrl, metadata.metadata.credentialIssuer)
+        assertEquals(1, metadata.metadata.credentialConfigurationsSupported.size)
+    }
+
+    @Test
+    fun `credential issuer metadata request sends normalized Accept-Language only when configured`() = runTest {
+        val issuerUrl = "https://example.com"
+        val client = createMockClient { request ->
+            assertEquals("de-AT, en;q=0.9", request.headers[HttpHeaders.AcceptLanguage])
+            respond(
+                content = """
+                    {"credential_issuer":"$issuerUrl","credential_endpoint":"$issuerUrl/credential",
+                    "credential_configurations_supported":{"mdl":{"format":"mso_mdoc",
+                    "doctype":"org.iso.18013.5.1.mDL","credential_metadata":{"display":[
+                    {"name":"Mobile Driving Licence","locale":"en"},
+                    {"name":"Mobiler Fuehrerschein","locale":"de"}]}}}}
+                """.trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+
+        val metadata = IssuerMetadataResolver(client).resolveCredentialIssuerMetadata(
+            credentialIssuerUrl = issuerUrl,
+            preferredLocales = listOf(" de-AT ", "DE-at", "invalid tag", "en"),
+        )
+
+        assertEquals(1, metadata.metadata.credentialConfigurationsSupported.size)
+    }
+
+    @Test
+    fun `credential issuer metadata request omits Accept-Language for unusable preferences`() = runTest {
+        val issuerUrl = "https://example.com"
+        val client = createMockClient { request ->
+            assertEquals(null, request.headers[HttpHeaders.AcceptLanguage])
+            respond(
+                content = """
+                    {"credential_issuer":"$issuerUrl","credential_endpoint":"$issuerUrl/credential",
+                    "credential_configurations_supported":{"test":{"format":"jwt_vc_json",
+                    "credential_definition":{"type":["VerifiableCredential","TestCredential"]}}}}
+                """.trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+
+        IssuerMetadataResolver(client).resolveCredentialIssuerMetadata(
+            credentialIssuerUrl = issuerUrl,
+            preferredLocales = listOf(" ", "invalid tag", "en_US"),
+        )
     }
 
     @Test
@@ -97,8 +145,8 @@ class IssuerMetadataResolverTest {
         val resolver = IssuerMetadataResolver(client)
         val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl)
 
-        assertEquals(issuerUrl, metadata.credentialIssuer)
-        assertEquals("$issuerUrl/credential", metadata.credentialEndpoint)
+        assertEquals(issuerUrl, metadata.metadata.credentialIssuer)
+        assertEquals("$issuerUrl/credential", metadata.metadata.credentialEndpoint)
     }
 
     @Test
