@@ -40,11 +40,16 @@ import id.walt.mdoc.proximity.MdocConsentPrompt
 import id.walt.mdoc.proximity.MdocHolderRequestContext
 import id.walt.mdoc.proximity.MdocResponseResolution
 import id.walt.mdoc.proximity.ProximityException
+import id.walt.wallet2.data.HolderKeyBindingErrorCode
+import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.decodeFromByteArray
@@ -177,6 +182,35 @@ class MobileWalletProximityRequestProcessorTest {
             }
 
             assertEquals("holder_key_unavailable", failure.error.code)
+        }
+    }
+
+    @Test
+    fun `invalid persisted holder key binding uses stable safe error`() = runTest {
+        withFixture { fixture ->
+            val wallet = fixture.wallet.copy(
+                credentialStores = listOf(
+                    FailingCredentialStore(
+                        HolderKeyBindingException(
+                            code = HolderKeyBindingErrorCode.BINDING_INVALID,
+                            credentialId = "corrupt-mdoc",
+                            message = "sensitive persistence diagnostic",
+                        )
+                    )
+                )
+            )
+            val processor = MobileWalletProximityRequestProcessor(
+                wallet = wallet,
+                configuration = MobileWalletProximityConfiguration(),
+                readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
+            )
+
+            val failure = kotlin.test.assertFailsWith<ProximityException> {
+                processor.preview(requestContext(fixture.readerEphemeralKey))
+            }
+
+            assertEquals("holder_key_unavailable", failure.error.code)
+            assertTrue("sensitive persistence diagnostic" !in failure.error.message)
         }
     }
 
@@ -562,6 +596,18 @@ class MobileWalletProximityRequestProcessorTest {
         override suspend fun evaluate(
             input: MobileWalletProximityApplicationProfileInput,
         ): MobileWalletProximityApplicationProfileResult = evaluate()
+    }
+
+    private class FailingCredentialStore(
+        private val failure: HolderKeyBindingException,
+    ) : WalletCredentialStore {
+        override suspend fun getCredential(id: String): StoredCredential? = null
+
+        override suspend fun listCredentials(): Flow<StoredCredential> = flow { throw failure }
+
+        override suspend fun addCredential(entry: StoredCredential) = error("Not supported in this test")
+
+        override suspend fun removeCredential(id: String): Boolean = false
     }
 
     private fun profileAuthorization(profileId: String): MobileWalletProximityApplicationAuthorization =

@@ -218,7 +218,20 @@ internal class MobileWalletProximityRequestProcessor(
     private suspend fun buildSnapshot(context: MdocHolderRequestContext): Snapshot {
         val request = context.request.value
         val requestedDocTypes = request.docRequests.map { it.itemsRequest.value.docType }.toSet()
-        val relevant = wallet.streamAllCredentials().toList().mapNotNull { stored ->
+        val credentials = try {
+            wallet.streamAllCredentials().toList()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: HolderKeyBindingException) {
+            throw ProximityException(
+                ProximityError.Policy(
+                    "holder_key_unavailable",
+                    "The credential-bound holder key is unavailable",
+                ),
+                failure,
+            )
+        }
+        val relevant = credentials.mapNotNull { stored ->
             (stored.credential as? MdocsCredential)
                 ?.takeIf { it.docType in requestedDocTypes }
                 ?.let { stored to it }
