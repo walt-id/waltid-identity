@@ -66,6 +66,7 @@ class ReaderAuthenticationTest {
             val validity = assertIs<ReaderAuthenticationValidity.Valid>(result.validity)
             assertEquals(ReaderAuthenticationScope.DOCUMENT, validity.evidence.scope)
             assertEquals(0, validity.evidence.documentRequestIndex)
+            assertEquals(0, validity.evidence.authenticationIndex)
             assertEquals(trustState, result.trust.state)
         }
     }
@@ -80,6 +81,7 @@ class ReaderAuthenticationTest {
         val whole = assertIs<ReaderAuthenticationValidity.Valid>(verified.wholeRequest.single().validity)
         assertEquals(ReaderAuthenticationScope.WHOLE_REQUEST, whole.evidence.scope)
         assertEquals(null, whole.evidence.documentRequestIndex)
+        assertEquals(0, whole.evidence.authenticationIndex)
 
         val changedItems = DeviceRequest("org.example.mdoc", mapOf("org.example" to listOf("family_name")))
             .docRequests.single().itemsRequest
@@ -89,6 +91,23 @@ class ReaderAuthenticationTest {
         assertIs<ReaderAuthenticationValidity.Invalid>(
             verifier(ReaderTrustState.TRUSTED).verify(changed, transcript).wholeRequest.single().validity
         )
+    }
+
+    @Test
+    fun `multiple whole-request authentications retain distinct statement indices`() = runTest {
+        val unsigned = DeviceRequest("org.example.mdoc", mapOf("org.example" to listOf("given_name")))
+        val signed = signedRequest(unsigned, document = false, whole = true)
+        val authentication = requireNotNull(signed.readerAuthAll).single()
+
+        val verified = verifier(ReaderTrustState.TRUSTED).verify(
+            signed.copy(readerAuthAll = listOf(authentication, authentication)),
+            transcript,
+        )
+
+        assertEquals(listOf(0, 1), verified.wholeRequest.map {
+            assertIs<ReaderAuthenticationValidity.Valid>(it.validity).evidence.authenticationIndex
+        })
+        assertEquals(listOf(0, 1), verified.toDisplaySafe().wholeRequest.map { it.authenticationIndex })
     }
 
     private suspend fun signedRequest(

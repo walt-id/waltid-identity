@@ -20,8 +20,16 @@ enum class ReaderAuthenticationScope { DOCUMENT, WHOLE_REQUEST }
 data class ReaderAuthenticationEvidence(
     val scope: ReaderAuthenticationScope,
     val documentRequestIndex: Int? = null,
+    /** Zero-based statement index within the authentication scope. */
+    val authenticationIndex: Int = 0,
     val certificateChainDer: List<ImmutableBytes> = emptyList(),
-)
+) {
+    init {
+        require((scope == ReaderAuthenticationScope.DOCUMENT) == (documentRequestIndex != null))
+        require(documentRequestIndex == null || documentRequestIndex >= 0)
+        require(authenticationIndex >= 0)
+    }
+}
 
 sealed interface ReaderAuthenticationValidity {
     data object Absent : ReaderAuthenticationValidity
@@ -64,13 +72,16 @@ enum class ReaderAuthenticationDisplayValidity { ABSENT, MALFORMED, INVALID, VAL
 data class ReaderAuthenticationDisplayEntry(
     val scope: ReaderAuthenticationScope,
     val documentRequestIndex: Int?,
+    val authenticationIndex: Int,
     val validity: ReaderAuthenticationDisplayValidity,
     val trust: ReaderTrustState,
     val displayName: String? = null,
     val reason: String? = null,
 ) {
     init {
+        require((scope == ReaderAuthenticationScope.DOCUMENT) == (documentRequestIndex != null))
         require(documentRequestIndex == null || documentRequestIndex >= 0)
+        require(authenticationIndex >= 0)
         require(displayName == null || displayName.isNotBlank())
         require(reason == null || reason.isNotBlank())
     }
@@ -83,16 +94,22 @@ data class DeviceRequestReaderAuthenticationDisplay(
 
 fun DeviceRequestReaderAuthentication.toDisplaySafe(): DeviceRequestReaderAuthenticationDisplay =
     DeviceRequestReaderAuthenticationDisplay(
-        documents = documents.mapIndexed { index, result -> result.toDisplayEntry(ReaderAuthenticationScope.DOCUMENT, index) },
-        wholeRequest = wholeRequest.map { it.toDisplayEntry(ReaderAuthenticationScope.WHOLE_REQUEST, null) },
+        documents = documents.mapIndexed { index, result ->
+            result.toDisplayEntry(ReaderAuthenticationScope.DOCUMENT, index, 0)
+        },
+        wholeRequest = wholeRequest.mapIndexed { index, result ->
+            result.toDisplayEntry(ReaderAuthenticationScope.WHOLE_REQUEST, null, index)
+        },
     )
 
 private fun ReaderAuthenticationResult.toDisplayEntry(
     scope: ReaderAuthenticationScope,
     documentRequestIndex: Int?,
+    authenticationIndex: Int,
 ): ReaderAuthenticationDisplayEntry = ReaderAuthenticationDisplayEntry(
     scope = scope,
     documentRequestIndex = documentRequestIndex,
+    authenticationIndex = authenticationIndex,
     validity = when (validity) {
         ReaderAuthenticationValidity.Absent -> ReaderAuthenticationDisplayValidity.ABSENT
         is ReaderAuthenticationValidity.Malformed -> ReaderAuthenticationDisplayValidity.MALFORMED
@@ -128,11 +145,14 @@ class ReaderAuthenticationVerifier(
                 verifyOne(
                     signature,
                     ReaderAuthenticationPayloads.forDocument(transcript, docRequest.itemsRequest),
-                    ReaderAuthenticationEvidence(ReaderAuthenticationScope.DOCUMENT, index),
+                    ReaderAuthenticationEvidence(
+                        scope = ReaderAuthenticationScope.DOCUMENT,
+                        documentRequestIndex = index,
+                    ),
                 )
             } ?: ReaderAuthenticationResult(ReaderAuthenticationValidity.Absent)
         }
-        val whole = request.readerAuthAll.orEmpty().map { signature ->
+        val whole = request.readerAuthAll.orEmpty().mapIndexed { index, signature ->
             verifyOne(
                 signature,
                 ReaderAuthenticationPayloads.forAllDocuments(
@@ -140,7 +160,10 @@ class ReaderAuthenticationVerifier(
                     request.docRequests.map { it.itemsRequest },
                     request.deviceRequestInfo,
                 ),
-                ReaderAuthenticationEvidence(ReaderAuthenticationScope.WHOLE_REQUEST),
+                ReaderAuthenticationEvidence(
+                    scope = ReaderAuthenticationScope.WHOLE_REQUEST,
+                    authenticationIndex = index,
+                ),
             )
         }
         return DeviceRequestReaderAuthentication(documents, whole)
