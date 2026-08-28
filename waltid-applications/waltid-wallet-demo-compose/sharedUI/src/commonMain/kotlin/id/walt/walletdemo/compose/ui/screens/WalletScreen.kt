@@ -20,6 +20,7 @@ internal fun WalletScreen(
     controller: WalletDemoController,
     state: WalletDemoUiState,
     onStartProximityPresentation: (() -> Unit)? = null,
+    presentationContent: (@Composable () -> Unit)? = null,
 ) {
     val uriHandler = LocalUriHandler.current
     var showingSettings by remember { mutableStateOf(false) }
@@ -103,6 +104,7 @@ internal fun WalletScreen(
                     onReject = controller::rejectPresentation,
                     onCancel = controller::cancelPresentationReview,
                     onStartProximityPresentation = onStartProximityPresentation,
+                    presentationContent = presentationContent,
                     modifier = modifier,
                 )
             }

@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -518,7 +520,7 @@ class WalletDemoAppTestScenarios(
             InMemoryDemoPinStore(),
         )
 
-        setWalletContent { WalletDemoApp(controller) }
+        setWalletContent { WalletDemoApp(controller, onStartProximityPresentation = {}) }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
@@ -527,6 +529,34 @@ class WalletDemoAppTestScenarios(
 
         onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
         onNodeWithTag(WalletUiTestTags.PresentationScanButton).assertIsDisplayed().assertIsEnabled()
+        assertTrue(
+            onNodeWithText("Online request").getUnclippedBoundsInRoot().top <
+                onNodeWithText("In-person presentation").getUnclippedBoundsInRoot().top,
+            "Online presentation should precede in-person presentation",
+        )
+    }
+
+    fun embeddedPresentationJourneyKeepsWalletChrome() = runComposeUiTest {
+        val controller = WalletDemoController(
+            FakeDemoWallet(credentials = listOf(sampleCredential)),
+            InMemoryDemoPinStore(),
+        )
+
+        setContent {
+            WalletDemoAppHost(
+                controller = controller,
+                presentationContent = { Text("Embedded in-person journey") },
+            )
+        }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
+        onNodeWithText("Embedded in-person journey").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.AppTitle).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsButton).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.Status).assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.PresentationInput).assertCountEquals(0)
     }
 
     fun presentTabAllowsPreviewAndDeclineWithoutCredentials() = runComposeUiTest {
