@@ -24,6 +24,22 @@ Native iOS demo app for the mobile wallet SDK. It uses SwiftUI with the `WalletS
 
 For setup, IDE guidance, and mobile integration test commands, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
+## In-person presentation
+
+The Present tab includes a dedicated **Present in person** journey for holder-side ISO mdoc
+proximity presentation. The native SwiftUI view model consumes the Wallet SDK session directly and
+does not reconstruct protocol state, reader trust, request meaning, or disclosure rules.
+
+The journey displays Device Engagement as an accessible QR code, retrieves over the available
+Bluetooth Low Energy method, and presents authentication scope, signature validity, certificate-path,
+revocation, optional RICAL, and product-trust evidence as separate facts. It exposes reader-stated
+purpose and retention intent, supports per-document credential and element selection, and obtains
+fresh consent for repeated exchanges. Bluetooth authorization, app settings, lifecycle, screen-awake,
+and temporary brightness behavior stay in the iOS host and are restored on exit.
+
+This demo proves the wallet-side SDK integration. External reader interoperability, prolonged
+reliability, and release qualification are tracked separately and must not be inferred from the demo.
+
 ## Local wallet data
 
 The demo uses the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in iOS Keychain. During local development, reset wallet state by calling `Wallet.deleteLocalData()` from the SDK facade, deleting the app from the simulator/device, or removing the app's local data.

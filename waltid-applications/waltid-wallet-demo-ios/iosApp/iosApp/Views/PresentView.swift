@@ -44,11 +44,43 @@ struct PresentView: View {
                 .accessibilityHidden(true)
             }
         }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { viewModel.proximityPresentation.active },
+                set: { if !$0 { viewModel.proximityPresentation.dismiss() } }
+            )
+        ) {
+            ProximityPresentationView(viewModel: viewModel.proximityPresentation)
+        }
     }
 
     private var entryContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("In-person presentation")
+                        .font(.headline)
+                    Text("Show a device engagement QR code and present an mdoc to a nearby reader over Bluetooth.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button("Present to nearby reader") {
+                        viewModel.proximityPresentation.start()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(branding.primary)
+                    .disabled(
+                        !viewModel.isReady || viewModel.isLoading || viewModel.credentials.isEmpty
+                            || viewModel.presentationReview != nil
+                    )
+                    .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+
+                Text("Online presentation")
+                    .font(.headline)
+
                 ScannableUrlEditor(
                     title: "Present",
                     label: "OpenID4VP request URL",

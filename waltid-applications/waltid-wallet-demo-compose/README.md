@@ -26,6 +26,23 @@ For setup, IDE guidance, and mobile integration test commands, see the [Mobile W
 
 The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM linkage package for native iOS linkage.
 
+## In-person presentation
+
+The Android and iOS apps expose a dedicated **Present in person** journey for holder-side ISO mdoc
+proximity presentation. The Wallet SDK remains the source of session, request, reader-authentication,
+trust, disclosure, and terminal-state meaning; the shared Compose UI renders those facts and performs
+only platform-owned permission, settings, lifecycle, screen-awake, and brightness actions.
+
+The current journey displays Device Engagement as an accessible QR code and retrieves over the
+available Bluetooth Low Energy method. It supports per-document credential and element selection,
+shows reader-stated purpose and retention intent, and presents authentication scope, signature
+validity, certificate-path, revocation, optional RICAL, and product-trust evidence as separate facts.
+It requests fresh consent for repeated exchanges and restores temporary display changes on every exit
+path. Raw engagement data is never exposed through accessibility labels.
+
+This demo proves the wallet-side SDK integration. External reader interoperability, prolonged
+reliability, and release qualification are tracked separately and must not be inferred from the demo.
+
 ## Local wallet data
 
 Android and iOS demo targets use the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in platform-protected storage. During local development, reset wallet state through `MobileWallet.deleteWallet()`, by uninstalling the app, or by deleting the app's local data.
@@ -54,6 +71,7 @@ Android builds can override it with `-PtransactionDataProfiles.url=...`. Compose
 
 - Android and iOS are the supported mobile demo targets for wallet SDK issuance, presentation, platform-backed keys, and persistence.
 - Web/Wasm is currently a mock UI preview wired to `createMockDemoWallet()`. It does not exercise the mobile wallet SDK, platform key storage, SQLDelight persistence, EUDI flows, or Enterprise flows.
+- Web/Wasm does not expose the in-person proximity journey.
 - Production web wallet support is expected to live outside this mobile demo app. If a shared web UI is needed later, the shared UI module may need to move or split around the final web architecture.
 
 ## Release APK

@@ -53,7 +53,9 @@ kotlin {
             val mobileMain by creating {
                 dependsOn(commonMain.get())
                 dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
                     implementation(identityLibs.easyqrscan)
+                    implementation(identityLibs.qrose)
                 }
             }
 
@@ -63,6 +65,9 @@ kotlin {
                     // The system back gesture is registered against the host Activity's own
                     // dispatcher, so a provider surface can turn it into an Activity result.
                     implementation(identityLibs.androidx.activity.compose)
+                    implementation(identityLibs.androidx.core.ktx)
+                    implementation(identityLibs.androidx.lifecycle.runtime.ktx)
+                    implementation(identityLibs.androidx.lifecycle.runtime.compose)
                 }
             }
 
