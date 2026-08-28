@@ -13,6 +13,8 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.wallet2.data.HolderKeyBinding
 import id.walt.wallet2.data.HolderKeyBindingOrigin
+import id.walt.wallet2.data.HolderKeyBindingErrorCode
+import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.PublicKeyThumbprint
 import id.walt.wallet2.data.StoredCredential
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +28,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
@@ -105,6 +108,41 @@ class Wallet2DatabaseMigrationTest {
             )
 
             assertEquals(binding, store.getCredential("mdoc-1")?.holderKeyBinding)
+        }
+    }
+
+    @Test
+    fun `server credential store reports an invalid persisted holder key binding`() = runTest {
+        val jdbcUrl = sharedMemoryUrl("credential-binding-corrupt")
+        DriverManager.getConnection(jdbcUrl).use { anchor ->
+            val db = initWallet2Database(config(jdbcUrl))
+            anchor.createStatement().use {
+                it.execute("INSERT INTO wallet2_credential_stores(id) VALUES ('credentials')")
+            }
+            val store = ExposedCredentialStore("credentials", db)
+            store.addCredential(
+                StoredCredential(
+                    id = "mdoc-corrupt-binding",
+                    credential = MdocsCredential(
+                        credentialData = buildJsonObject { },
+                        signed = null,
+                        docType = "org.iso.18013.5.1.mDL",
+                    ),
+                )
+            )
+            anchor.createStatement().use {
+                it.execute(
+                    "UPDATE wallet2_credentials SET holder_key_binding = '{' " +
+                            "WHERE id = 'mdoc-corrupt-binding'"
+                )
+            }
+
+            val failure = assertFailsWith<HolderKeyBindingException> {
+                store.getCredential("mdoc-corrupt-binding")
+            }
+
+            assertEquals(HolderKeyBindingErrorCode.BINDING_INVALID, failure.code)
+            assertEquals("mdoc-corrupt-binding", failure.credentialId)
         }
     }
 

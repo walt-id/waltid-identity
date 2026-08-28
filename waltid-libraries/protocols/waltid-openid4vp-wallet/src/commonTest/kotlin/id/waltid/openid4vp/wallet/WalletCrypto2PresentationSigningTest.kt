@@ -3,6 +3,7 @@
 package id.waltid.openid4vp.wallet
 
 import id.walt.cose.*
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
@@ -12,7 +13,13 @@ import id.walt.crypto2.migration.v1.V1KeyMigration
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.dcql.DcqlMatcher
+import id.walt.dcql.RawDcqlCredential
+import id.walt.dcql.models.CredentialFormat
+import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToByteArray
@@ -197,6 +204,58 @@ class WalletCrypto2PresentationSigningTest {
         assertFalse(
             coseCompliantCbor.encodeToByteArray(cleartextTranscript)
                 .contentEquals(coseCompliantCbor.encodeToByteArray(encryptedTranscript))
+        )
+    }
+
+    @Test
+    fun `mdoc presentation requires a credential-bound holder key resolver`() = runTest {
+        val walletDefault = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("wallet-default"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val credential = MdocsCredential(
+            credentialData = buildJsonObject { },
+            signed = null,
+            docType = "org.iso.18013.5.1.mDL",
+        )
+        val query = CredentialQuery(
+            id = "mdl",
+            format = CredentialFormat.MSO_MDOC,
+            meta = MsoMdocMeta(doctypeValue = credential.docType),
+        )
+        val matches = mapOf(
+            query.id to listOf(
+                DcqlMatcher.DcqlMatchResult(
+                    credential = RawDcqlCredential(
+                        id = "mdoc-1",
+                        format = CredentialFormat.MSO_MDOC.id.first(),
+                        data = buildJsonObject { },
+                        originalCredential = credential,
+                    ),
+                    selectedDisclosures = null,
+                    originalQuery = query,
+                )
+            )
+        )
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            WalletPresentFunctionality2.generateVpTokenForRequest(
+                authorizationRequest = AuthorizationRequest(clientId = "verifier", nonce = "nonce"),
+                matchedData = matches,
+                holderKey = null,
+                holderDid = null,
+                typeRegistry = TransactionDataTypeRegistry(),
+                verifierJwkThumbprint = null,
+                holderCrypto2Key = walletDefault,
+            )
+        }
+
+        assertEquals(
+            "A credential-bound holder-key resolver is required for mdoc presentation",
+            failure.message,
         )
     }
 

@@ -1,29 +1,35 @@
 package id.walt.wallet2.persistence.stores
 
-import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.wallet2.data.HolderKeyBinding
 import id.walt.wallet2.data.HolderKeyBindingOrigin
-import id.walt.wallet2.data.HolderKeyBindingErrorCode
-import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.PublicKeyThumbprint
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
+import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class SqlDelightCredentialStoreBindingTest {
-
     @Test
-    fun `fresh schema round trips holder key binding`() = runTest {
-        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+    fun `fresh iOS schema round trips holder key binding`() = runTest {
+        val databaseName = "holder_binding_${Uuid.random()}"
+        val driverFactory = DriverFactory()
+        val driver = driverFactory.createEncryptedDriver(
+            databaseName = databaseName,
+            encryptionKey = DatabaseEncryptionKey(
+                keyId = "$databaseName-key",
+                material = ByteArray(32) { it.toByte() },
+            ),
+            isDeviceLocal = true,
+            walletId = databaseName,
+        )
         try {
-            WalletPersistenceDatabase.Schema.create(driver)
             val database = WalletPersistenceDatabase(driver)
             val store = SqlDelightCredentialStore(database.walletPersistenceQueries)
             val binding = HolderKeyBinding(
@@ -48,37 +54,7 @@ class SqlDelightCredentialStoreBindingTest {
             assertEquals(binding, store.getCredential(credential.id)?.holderKeyBinding)
         } finally {
             driver.close()
-        }
-    }
-
-    @Test
-    fun `invalid persisted binding reports a stable holder key error`() = runTest {
-        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
-        try {
-            WalletPersistenceDatabase.Schema.create(driver)
-            val database = WalletPersistenceDatabase(driver)
-            val store = SqlDelightCredentialStore(database.walletPersistenceQueries)
-            store.addCredential(
-                StoredCredential(
-                    id = "mdoc-corrupt-binding",
-                    credential = CredentialParser.detectAndParse(MdocsExamples.mdocsExampleBase64Url).second,
-                )
-            )
-            driver.execute(
-                identifier = null,
-                sql = "UPDATE credentials SET holder_key_binding = '{' WHERE id = 'mdoc-corrupt-binding'",
-                parameters = 0,
-                binders = null,
-            )
-
-            val failure = assertFailsWith<HolderKeyBindingException> {
-                store.getCredential("mdoc-corrupt-binding")
-            }
-
-            assertEquals(HolderKeyBindingErrorCode.BINDING_INVALID, failure.code)
-            assertEquals("mdoc-corrupt-binding", failure.credentialId)
-        } finally {
-            driver.close()
+            driverFactory.deleteDatabase(databaseName)
         }
     }
 }

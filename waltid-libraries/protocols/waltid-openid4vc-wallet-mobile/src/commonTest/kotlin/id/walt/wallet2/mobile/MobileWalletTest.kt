@@ -61,6 +61,7 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.data.WalletPublicKeyMaterial
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.handlers.WalletIssuanceGrant
@@ -2017,6 +2018,14 @@ class MobileWalletTest {
         override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): ManagedKeyMaterial? {
             managedKeyLookupCalls++
             return managedKey.takeIf { keyId == keyInfo.keyId }
+        }
+
+        override suspend fun getPublicKeyMaterial(keyId: String): WalletPublicKeyMaterial? {
+            val matchingKey = managedKey.takeIf { keyId == keyInfo.keyId } ?: return null
+            val publicJwk = matchingKey.capabilities.publicKeyExporter
+                ?.exportPublicKey() as? EncodedKey.Jwk
+                ?: return null
+            return WalletPublicKeyMaterial(publicJwk)
         }
 
         override suspend fun listKeys(): Flow<WalletKeyInfo> {

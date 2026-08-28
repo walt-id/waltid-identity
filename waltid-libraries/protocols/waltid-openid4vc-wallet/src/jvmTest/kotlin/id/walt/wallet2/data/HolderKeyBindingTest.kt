@@ -13,6 +13,7 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
@@ -103,7 +104,7 @@ class HolderKeyBindingTest {
 
         val unrelated = signingKey("new-default")
         keyStore.addCrypto2Key(unrelated)
-        val resolved = wallet.resolveHolderKey(bound)
+        val resolved = wallet.resolveHolderKey(bound, setOf(KeyUsage.SIGN))
 
         assertSame(holderKey, resolved.keyMaterial.crypto2Key)
         assertEquals(HolderKeyBindingOrigin.ISSUANCE, resolved.binding.origin)
@@ -134,7 +135,7 @@ class HolderKeyBindingTest {
         val wallet = Wallet(id = "wallet", keyStores = listOf(keyStore))
 
         val failure = assertFailsWith<HolderKeyBindingException> {
-            wallet.resolveHolderKey(mdocCredential(holderKey))
+            wallet.resolveHolderKey(mdocCredential(holderKey), setOf(KeyUsage.SIGN))
         }
 
         assertEquals(HolderKeyBindingErrorCode.BINDING_MISSING, failure.code)
@@ -261,7 +262,7 @@ class HolderKeyBindingTest {
     @Test
     fun `removed credential fails distinctly from a removed key`() = runTest {
         val failure = assertFailsWith<HolderKeyBindingException> {
-            Wallet(id = "wallet").resolveHolderKey("missing-credential")
+            Wallet(id = "wallet").resolveHolderKey("missing-credential", setOf(KeyUsage.SIGN))
         }
 
         assertEquals(HolderKeyBindingErrorCode.CREDENTIAL_NOT_FOUND, failure.code)
@@ -330,7 +331,7 @@ class HolderKeyBindingTest {
 
         val bound = wallet.withImportedHolderKeyBinding(mdocCredential(holderKey))
 
-        assertEquals(holderKey.id.value, wallet.resolveHolderKey(bound).keyMaterial.keyId)
+        assertEquals(holderKey.id.value, wallet.resolveHolderKey(bound, setOf(KeyUsage.SIGN)).keyMaterial.keyId)
     }
 
     @Test
@@ -362,11 +363,15 @@ class HolderKeyBindingTest {
         val bound = wallet.withRequiredImportedHolderKeyBinding(mdocCredential(holderKey))
 
         keyStore.removeKey(holderKey.id.value)
-        val missing = assertFailsWith<HolderKeyBindingException> { wallet.resolveHolderKey(bound) }
+        val missing = assertFailsWith<HolderKeyBindingException> {
+            wallet.resolveHolderKey(bound, setOf(KeyUsage.SIGN))
+        }
         assertEquals(HolderKeyBindingErrorCode.KEY_NOT_FOUND, missing.code)
 
         keyStore.addCrypto2Key(signingKey(holderKey.id.value))
-        val replaced = assertFailsWith<HolderKeyBindingException> { wallet.resolveHolderKey(bound) }
+        val replaced = assertFailsWith<HolderKeyBindingException> {
+            wallet.resolveHolderKey(bound, setOf(KeyUsage.SIGN))
+        }
         assertEquals(HolderKeyBindingErrorCode.KEY_DOES_NOT_MATCH_BINDING, replaced.code)
     }
 
@@ -384,7 +389,8 @@ class HolderKeyBindingTest {
             )
 
         val failure = assertFailsWith<HolderKeyBindingException> {
-            Wallet(id = "wallet", keyStores = listOf(unrelatedStore, holderStore)).resolveHolderKey(bound)
+            Wallet(id = "wallet", keyStores = listOf(unrelatedStore, holderStore))
+                .resolveHolderKey(bound, setOf(KeyUsage.SIGN))
         }
 
         assertEquals(HolderKeyBindingErrorCode.KEY_DOES_NOT_MATCH_BINDING, failure.code)
@@ -401,10 +407,16 @@ class HolderKeyBindingTest {
         val binding = assertNotNull(bound.holderKeyBinding)
 
         val schemaFailure = assertFailsWith<HolderKeyBindingException> {
-            wallet.resolveHolderKey(bound.copy(holderKeyBinding = binding.copy(schemaVersion = 2)))
+            wallet.resolveHolderKey(
+                bound.copy(holderKeyBinding = binding.copy(schemaVersion = 2)),
+                setOf(KeyUsage.SIGN),
+            )
         }
         val extractorFailure = assertFailsWith<HolderKeyBindingException> {
-            wallet.resolveHolderKey(bound.copy(holderKeyBinding = binding.copy(extractorVersion = 2)))
+            wallet.resolveHolderKey(
+                bound.copy(holderKeyBinding = binding.copy(extractorVersion = 2)),
+                setOf(KeyUsage.SIGN),
+            )
         }
         val algorithmFailure = assertFailsWith<HolderKeyBindingException> {
             wallet.resolveHolderKey(
@@ -412,11 +424,15 @@ class HolderKeyBindingTest {
                     holderKeyBinding = binding.copy(
                         publicKeyThumbprint = binding.publicKeyThumbprint.copy(algorithm = "sha256"),
                     )
-                )
+                ),
+                setOf(KeyUsage.SIGN),
             )
         }
         val referenceFailure = assertFailsWith<HolderKeyBindingException> {
-            wallet.resolveHolderKey(bound.copy(holderKeyBinding = binding.copy(keyReference = "unsupported")))
+            wallet.resolveHolderKey(
+                bound.copy(holderKeyBinding = binding.copy(keyReference = "unsupported")),
+                setOf(KeyUsage.SIGN),
+            )
         }
 
         assertEquals(HolderKeyBindingErrorCode.UNSUPPORTED_BINDING_VERSION, schemaFailure.code)
@@ -445,7 +461,9 @@ class HolderKeyBindingTest {
                 publicKeyThumbprint = otherBound.holderKeyBinding!!.publicKeyThumbprint,
             )
         )
-        val bindingFailure = assertFailsWith<HolderKeyBindingException> { wallet.resolveHolderKey(tampered) }
+        val bindingFailure = assertFailsWith<HolderKeyBindingException> {
+            wallet.resolveHolderKey(tampered, setOf(KeyUsage.SIGN))
+        }
         assertEquals(HolderKeyBindingErrorCode.BINDING_DOES_NOT_MATCH_CREDENTIAL, bindingFailure.code)
 
         val issuanceFailure = assertFailsWith<HolderKeyBindingException> {
@@ -508,7 +526,7 @@ class HolderKeyBindingTest {
         }
         val wallet = Wallet(id = "wallet", keyStores = listOf(keyStore))
         val bound = wallet.withRequiredImportedHolderKeyBinding(mdocCredential(protectedHolder))
-        val resolved = wallet.resolveHolderKey(bound).keyMaterial.requireCrypto2Key()
+        val resolved = wallet.resolveHolderKey(bound, setOf(KeyUsage.SIGN)).keyMaterial.requireCrypto2Key()
         val transcript = MdocPresenter.buildSessionTranscript(
             AuthorizationRequest(clientId = "verifier", nonce = "nonce"),
             "https://verifier.example/response",
@@ -547,7 +565,7 @@ class HolderKeyBindingTest {
         val failingWallet = Wallet(id = "failing", keyStores = listOf(FailingKeyStore()))
 
         val providerFailure = assertFailsWith<HolderKeyBindingException> {
-            failingWallet.resolveHolderKey(bound)
+            failingWallet.resolveHolderKey(bound, setOf(KeyUsage.SIGN))
         }
         assertEquals(HolderKeyBindingErrorCode.KEY_PROVIDER_UNAVAILABLE, providerFailure.code)
     }
@@ -569,6 +587,31 @@ class HolderKeyBindingTest {
     }
 
     @Test
+    fun `remote presentation matching excludes a MAC-only holder key`() = runTest {
+        val holderKey = keyAgreementKey("mac-holder")
+        val credentialStore = InMemoryCredentialStore()
+        val wallet = Wallet(
+            id = "mac-wallet",
+            keyStores = listOf(InMemoryKeyStore().apply { addCrypto2Key(holderKey) }),
+            credentialStores = listOf(credentialStore),
+        )
+        credentialStore.addCredential(
+            wallet.withRequiredImportedHolderKeyBinding(mdocCredential(holderKey)),
+        )
+
+        val failure = assertFailsWith<HolderKeyBindingException> {
+            WalletPresentationHandler.matchCredentialsFromStore(
+                wallet,
+                MatchCredentialsFromStoreRequest(
+                    DcqlQuery(credentials = listOf(mdocQuery("mdl", MDOC_DOCTYPE))),
+                ),
+            )
+        }
+
+        assertEquals(HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED, failure.code)
+    }
+
+    @Test
     fun `provider argument failures are not mislabeled as unsupported usage`() = runTest {
         val holderKey = signingKey("holder")
         val healthyStore = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
@@ -577,7 +620,7 @@ class HolderKeyBindingTest {
 
         val failure = assertFailsWith<HolderKeyBindingException> {
             Wallet(id = "corrupt", keyStores = listOf(CorruptOperationalKeyStore()))
-                .resolveHolderKey(bound)
+                .resolveHolderKey(bound, setOf(KeyUsage.SIGN))
         }
 
         assertEquals(HolderKeyBindingErrorCode.KEY_PROVIDER_UNAVAILABLE, failure.code)
@@ -684,7 +727,7 @@ class HolderKeyBindingTest {
     ) : WalletKeyStore {
         override suspend fun getKey(keyId: String) = null
         override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>) = null
-        override suspend fun getPublicCrypto2Key(keyId: String): id.walt.crypto2.keys.Key =
+        override suspend fun getPublicKeyMaterial(keyId: String): WalletPublicKeyMaterial =
             error("provider unavailable")
 
         override suspend fun listKeys(): Flow<WalletKeyInfo> = kotlinx.coroutines.flow.flowOf(
@@ -723,9 +766,11 @@ class HolderKeyBindingTest {
             return key
         }
 
-        override suspend fun getPublicCrypto2Key(keyId: String): id.walt.crypto2.keys.Key? {
+        override suspend fun getPublicKeyMaterial(keyId: String): WalletPublicKeyMaterial? {
             publicKeyLookups++
             return key.takeIf { keyId == key.id.value }
+                ?.exportPublicJwk()
+                ?.let(::WalletPublicKeyMaterial)
         }
 
         override suspend fun listKeys(): Flow<WalletKeyInfo> = kotlinx.coroutines.flow.flowOf(
