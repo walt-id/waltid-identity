@@ -141,7 +141,7 @@ data class ReceiveCredentialRequest(
     /** Inline DID to use as the credential subject / holder binding. Defaults to wallet's default DID. */
     val did: String? = null,
 
-    /** Reference to a DID to use as the credential subject / holder binding. Defaults to wallet's default DID. */
+    /** Reference to a DID in the wallet's DID store for holder binding. Ignored when [did] is provided. Defaults to wallet's default DID. */
     val didReference: String? = null,
 
     /** Transaction code (PIN) required by some pre-authorized code flows. */
