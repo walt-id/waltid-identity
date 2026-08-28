@@ -553,6 +553,22 @@ class HolderKeyBindingTest {
     }
 
     @Test
+    fun `MAC-only holder key can be bound and resolved for key agreement`() = runTest {
+        val holderKey = keyAgreementKey("mac-holder")
+        val store = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
+        val wallet = Wallet(id = "mac-wallet", keyStores = listOf(store))
+
+        val bound = wallet.withRequiredImportedHolderKeyBinding(mdocCredential(holderKey))
+        val resolved = wallet.resolveHolderKey(bound, setOf(KeyUsage.KEY_AGREEMENT))
+
+        assertSame(holderKey, resolved.keyMaterial.crypto2Key)
+        val signatureFailure = assertFailsWith<HolderKeyBindingException> {
+            wallet.resolveHolderKey(bound, setOf(KeyUsage.SIGN))
+        }
+        assertEquals(HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED, signatureFailure.code)
+    }
+
+    @Test
     fun `provider argument failures are not mislabeled as unsupported usage`() = runTest {
         val holderKey = signingKey("holder")
         val healthyStore = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
@@ -568,6 +584,8 @@ class HolderKeyBindingTest {
     }
 
     private suspend fun signingKey(id: String) = key(id, setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+
+    private suspend fun keyAgreementKey(id: String) = key(id, setOf(KeyUsage.KEY_AGREEMENT))
 
     private suspend fun verifyOnlyKey(id: String): id.walt.crypto2.keys.Key {
         val material = signingKey(id)

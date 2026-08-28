@@ -119,7 +119,9 @@ private data class WalletKeyCandidate(
 
 /**
  * Resolves the exact Crypto2 key bound to [credential]. Bindings are created during issuance or
- * import; unbound mdocs are never repaired implicitly during presentation.
+ * import; unbound mdocs are never repaired implicitly during presentation. [requiredUsages]
+ * selects the operation being authorized; signature and device-MAC presentations deliberately
+ * resolve the same durable binding with different usage requirements.
  */
 suspend fun Wallet.resolveHolderKey(
     credential: StoredCredential,
@@ -175,7 +177,7 @@ suspend fun Wallet.resolveHolderKey(
     requiredUsages = requiredUsages,
 )
 
-/** Adds a verified issuance binding when [keyMaterial] is durably resolvable by this wallet. */
+/** Adds a verified issuance binding when [keyMaterial] is a durably resolvable mdoc presentation key. */
 suspend fun Wallet.withVerifiedIssuanceHolderKeyBinding(
     credential: StoredCredential,
     keyMaterial: WalletKeyStoreEntry,
@@ -215,7 +217,11 @@ suspend fun Wallet.withVerifiedIssuanceHolderKeyBinding(
         )
     }
     val candidate = keyMaterial.keyReference?.let { reference ->
-        val resolved = resolveReferencedCandidate(credential, reference, setOf(KeyUsage.SIGN))
+        val resolved = resolveReferencedCandidateForAnyUsage(
+            credential,
+            reference,
+            MDOC_PRESENTATION_USAGE_ALTERNATIVES,
+        )
         if (resolved.thumbprint != suppliedThumbprint) {
             throw bindingError(
                 credential,
@@ -224,11 +230,11 @@ suspend fun Wallet.withVerifiedIssuanceHolderKeyBinding(
             )
         }
         resolved
-    } ?: requiringUsages(
+    } ?: requiringAnyUsageSet(
         candidates = allKeyCandidates(credential)
             .filter { it.material.keyId == keyMaterial.keyId && it.thumbprint == suppliedThumbprint },
         credential = credential,
-        requiredUsages = setOf(KeyUsage.SIGN),
+        usageAlternatives = MDOC_PRESENTATION_USAGE_ALTERNATIVES,
     )
         .let { matching ->
             when (matching.size) {
@@ -246,12 +252,11 @@ suspend fun Wallet.withVerifiedIssuanceHolderKeyBinding(
                 )
             }
         }
-    candidate.material.requireUsages(credential, setOf(KeyUsage.SIGN))
     return credential.copy(holderKeyBinding = candidate.binding(HolderKeyBindingOrigin.ISSUANCE, createdAt))
 }
 
 /**
- * Binds an imported mdoc only when one unambiguous matching local signing key exists.
+ * Binds an imported mdoc only when one unambiguous matching local presentation key exists.
  *
  * Any incoming holder-key binding is discarded first because bindings belong to the importing
  * wallet's provider namespace. An mdoc with no unique usable local key remains explicitly unbound.
@@ -275,7 +280,7 @@ suspend fun Wallet.withImportedHolderKeyBinding(credential: StoredCredential): S
     }
 }
 
-/** Adds an import binding or throws unless exactly one usable local signing key matches. */
+/** Adds an import binding or throws unless exactly one usable local presentation key matches. */
 internal suspend fun Wallet.withRequiredImportedHolderKeyBinding(credential: StoredCredential): StoredCredential {
     val mdoc = credential.credential as? MdocsCredential ?: return credential
     val thumbprint = try {
@@ -290,11 +295,11 @@ internal suspend fun Wallet.withRequiredImportedHolderKeyBinding(credential: Sto
             cause,
         )
     }
-    val matching = requiringUsages(
+    val matching = requiringAnyUsageSet(
         candidates = allKeyCandidates(credential)
             .filter { it.thumbprint == thumbprint },
         credential = credential,
-        requiredUsages = setOf(KeyUsage.SIGN),
+        usageAlternatives = MDOC_PRESENTATION_USAGE_ALTERNATIVES,
     )
     val candidate = when (matching.size) {
         0 -> throw bindingError(
@@ -310,7 +315,6 @@ internal suspend fun Wallet.withRequiredImportedHolderKeyBinding(credential: Sto
             "More than one local key matches the MSO DeviceKey for credential '${credential.id}'",
         )
     }
-    candidate.material.requireUsages(credential, setOf(KeyUsage.SIGN))
     return credential.copy(holderKeyBinding = candidate.binding(HolderKeyBindingOrigin.IMPORT))
 }
 
@@ -457,15 +461,16 @@ private suspend fun Wallet.allKeyCandidates(
     }
 }
 
-private suspend fun Wallet.requiringUsages(
+private suspend fun Wallet.requiringAnyUsageSet(
     candidates: List<WalletKeyCandidate>,
     credential: StoredCredential,
-    requiredUsages: Set<KeyUsage>,
+    usageAlternatives: List<Set<KeyUsage>>,
 ): List<WalletKeyCandidate> {
+    require(usageAlternatives.isNotEmpty() && usageAlternatives.none { it.isEmpty() })
     val eligible = candidates.mapNotNull { publicCandidate ->
         val reference = requireNotNull(publicCandidate.material.keyReference)
         val operationalCandidate = try {
-            resolveReferencedCandidate(credential, reference, requiredUsages)
+            resolveReferencedCandidateForAnyUsage(credential, reference, usageAlternatives)
         } catch (cause: HolderKeyBindingException) {
             if (cause.code == HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED) return@mapNotNull null
             throw cause
@@ -477,22 +482,33 @@ private suspend fun Wallet.requiringUsages(
                 "Wallet key '${publicCandidate.material.keyId}' changed during holder-key discovery",
             )
         }
-        try {
-            operationalCandidate.material.requireUsages(credential, requiredUsages)
-            operationalCandidate
-        } catch (cause: HolderKeyBindingException) {
-            if (cause.code == HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED) null else throw cause
-        }
+        operationalCandidate
     }
     if (candidates.isNotEmpty() && eligible.isEmpty()) {
         throw bindingError(
             credential,
             HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
-            "The local key matching credential '${credential.id}' does not permit $requiredUsages",
+            "The local key matching credential '${credential.id}' cannot perform mdoc presentation",
         )
     }
     return eligible
 }
+
+private suspend fun Wallet.resolveReferencedCandidateForAnyUsage(
+    credential: StoredCredential,
+    reference: String,
+    usageAlternatives: List<Set<KeyUsage>>,
+): WalletKeyCandidate = usageAlternatives.firstNotNullOfOrNull { usages ->
+    try {
+        resolveReferencedCandidate(credential, reference, usages)
+    } catch (cause: HolderKeyBindingException) {
+        if (cause.code == HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED) null else throw cause
+    }
+} ?: throw bindingError(
+    credential,
+    HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
+    "The holder key for credential '${credential.id}' cannot perform mdoc presentation",
+)
 
 private suspend fun candidate(
     credential: StoredCredential,
@@ -576,6 +592,11 @@ private fun String.decodeWalletKeyReference(): WalletKeyLocation? = runCatching 
         else -> null
     }
 }.getOrNull()
+
+private val MDOC_PRESENTATION_USAGE_ALTERNATIVES = listOf(
+    setOf(KeyUsage.SIGN),
+    setOf(KeyUsage.KEY_AGREEMENT),
+)
 
 private fun bindingError(
     credential: StoredCredential,
