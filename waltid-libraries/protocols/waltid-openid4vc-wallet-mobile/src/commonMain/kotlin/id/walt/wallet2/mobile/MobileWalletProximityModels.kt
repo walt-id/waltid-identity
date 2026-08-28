@@ -5,7 +5,11 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
 
-/** Versioned mdoc interoperability boundary selected for one proximity session. */
+/**
+ * Versioned mdoc interoperability boundary selected for one proximity session.
+ *
+ * @property id Stable identifier suitable for configuration and diagnostics.
+ */
 public enum class MobileWalletProximityProfile(public val id: String) {
     /** Provisional ISO/IEC 18013-5:2021 compatibility boundary. */
     Iso1801352021("iso-18013-5:2021"),
@@ -85,7 +89,21 @@ public enum class MobileWalletProximityReaderPolicy {
     RequireTrusted,
 }
 
-/** Immutable configuration for one single-use proximity session. */
+/**
+ * Immutable configuration for one single-use proximity session.
+ *
+ * @property profile Protocol and application-profile boundary to enforce.
+ * @property bleRoles BLE holder roles the platform transport may prepare.
+ * @property bearerPolicy Preference between supported BLE bearer modes.
+ * @property engagementMethods Holder-to-reader engagement methods selected for the session.
+ * @property retrievalMethods Device-retrieval transports selected for the session.
+ * @property readerPolicy Trust threshold applied before disclosure review.
+ * @property deviceAuthenticationPolicy Allowed and preferred holder-authentication methods.
+ * @property readerTrustEvaluator Application-owned reader trust boundary.
+ * @property credentialStatusEvaluator Application-owned credential status boundary.
+ * @property applicationProfiles Ordered application-profile registry for request extensions.
+ * @property maximumMessageBytes Maximum accepted encoded proximity message size.
+ */
 public data class MobileWalletProximityConfiguration(
     public val profile: MobileWalletProximityProfile =
         MobileWalletProximityProfile.Iso180135Edition2Dis2026,
@@ -125,7 +143,14 @@ public data class MobileWalletProximityConfiguration(
     }
 }
 
-/** Stable, non-sensitive failure exposed by the Wallet SDK. */
+/**
+ * Stable, non-sensitive failure exposed by the Wallet SDK.
+ *
+ * @property category Layer-stable failure category.
+ * @property code Stable machine-readable error code.
+ * @property message Display-safe diagnostic message.
+ * @property recoverable Whether the host may offer a retry without replacing the session.
+ */
 public data class MobileWalletProximityError(
     public val category: MobileWalletProximityErrorCategory,
     public val code: String,
@@ -163,7 +188,16 @@ public enum class MobileWalletProximityRemediationAction {
     Retry,
 }
 
-/** One transport's four independent support dimensions. */
+/**
+ * One transport's independent support dimensions.
+ *
+ * @property implemented Whether this SDK build implements the method.
+ * @property profilePermitted Whether the selected profile permits the method.
+ * @property runtimeAvailable Whether the current platform state can use the method now.
+ * @property selected Whether the session configuration selected the method.
+ * @property unavailable Stable reason for runtime unavailability, when applicable.
+ * @property remediationActions Host actions that may make the method available.
+ */
 public data class MobileWalletProximityTransportCapability(
     public val implemented: Boolean,
     public val profilePermitted: Boolean,
@@ -190,7 +224,16 @@ public data class MobileWalletProximityTransportCapability(
         get() = implemented && profilePermitted && runtimeAvailable && selected
 }
 
-/** Side-effect-free prerequisite snapshot. No radio resource or session material has been created. */
+/**
+ * Side-effect-free prerequisite snapshot. No radio resource or session material has been created.
+ *
+ * @property profile Profile against which the capabilities were evaluated.
+ * @property qrEngagement QR engagement capability.
+ * @property nfcEngagement NFC engagement capability.
+ * @property bluetoothLowEnergy BLE device-retrieval capability.
+ * @property nfcRetrieval NFC device-retrieval capability.
+ * @property wifiAwareRetrieval Wi-Fi Aware device-retrieval capability.
+ */
 public data class MobileWalletProximityCapabilities(
     public val profile: MobileWalletProximityProfile,
     public val qrEngagement: MobileWalletProximityTransportCapability,
@@ -270,7 +313,12 @@ public enum class MobileWalletProximityRicalState {
     Matched,
 }
 
-/** Exact verified reader evidence supplied to an application-owned trust policy. */
+/**
+ * Exact verified reader evidence supplied to an application-owned trust policy.
+ *
+ * @property scope Request scope covered by the verified statement.
+ * @property documentRequestIndex Zero-based document request index for document-scoped evidence.
+ */
 public data class MobileWalletProximityReaderEvidence(
     public val scope: MobileWalletProximityReaderAuthenticationScope,
     public val documentRequestIndex: Int? = null,
@@ -295,7 +343,16 @@ public data class MobileWalletProximityReaderEvidence(
     }
 }
 
-/** Trust decision supplied by the hosting wallet application. */
+/**
+ * Trust decision supplied by the hosting wallet application.
+ *
+ * @property state Product trust outcome.
+ * @property certificatePath Result of path validation against configured trust material.
+ * @property revocation Independently evaluated certificate revocation fact.
+ * @property rical Optional RICAL evidence fact.
+ * @property displayName Display-safe reader name established by the trust policy.
+ * @property reason Display-safe explanation of the decision.
+ */
 public data class MobileWalletProximityReaderTrustDecision(
     public val state: MobileWalletProximityReaderTrustState,
     public val certificatePath: MobileWalletProximityReaderCertificatePathState =
@@ -333,6 +390,7 @@ public data class MobileWalletProximityReaderTrustDecision(
 
 /** Explicit trust boundary for verified reader certificate evidence. */
 public fun interface MobileWalletProximityReaderTrustEvaluator {
+    /** Evaluates product trust from already verified reader certificate [evidence]. */
     public suspend fun evaluate(
         evidence: MobileWalletProximityReaderEvidence,
     ): MobileWalletProximityReaderTrustDecision
@@ -341,6 +399,7 @@ public fun interface MobileWalletProximityReaderTrustEvaluator {
 /** Default policy: validity is reported, but no reader certificate becomes trusted implicitly. */
 public object UnconfiguredMobileWalletProximityReaderTrustEvaluator :
     MobileWalletProximityReaderTrustEvaluator {
+    /** Returns valid-but-untrusted because no application trust policy is configured. */
     override suspend fun evaluate(
         evidence: MobileWalletProximityReaderEvidence,
     ): MobileWalletProximityReaderTrustDecision = MobileWalletProximityReaderTrustDecision(
@@ -349,7 +408,19 @@ public object UnconfiguredMobileWalletProximityReaderTrustEvaluator :
     )
 }
 
-/** Display-safe reader authentication and trust fact for holder consent. */
+/**
+ * Display-safe reader authentication and trust fact for holder consent.
+ *
+ * @property scope Request scope covered by this authentication statement.
+ * @property documentRequestIndex Zero-based document request index for document-scoped authentication.
+ * @property validity Cryptographic validity, independent of product trust.
+ * @property trust Product trust outcome after valid authentication.
+ * @property certificatePath Certificate-path validation result.
+ * @property revocation Certificate revocation fact.
+ * @property rical Optional RICAL evidence fact.
+ * @property displayName Display-safe authenticated reader name, when established.
+ * @property reason Display-safe explanation of validity or trust.
+ */
 public data class MobileWalletProximityReaderAuthentication(
     public val scope: MobileWalletProximityReaderAuthenticationScope,
     public val documentRequestIndex: Int?,
@@ -410,7 +481,15 @@ public enum class MobileWalletProximityCredentialStatus {
     Indeterminate,
 }
 
-/** Metadata-only status input; raw credential values are not handed to network providers. */
+/**
+ * Metadata-only status input; raw credential values are not handed to network providers.
+ *
+ * @property credentialId Stable wallet-local credential identifier.
+ * @property docType Credential mdoc document type.
+ * @property issuer Display-safe issuer identifier when available.
+ * @property validFrom Start of the locally verified MSO validity interval.
+ * @property validUntil End of the locally verified MSO validity interval.
+ */
 public data class MobileWalletProximityCredentialStatusInput(
     public val credentialId: String,
     public val docType: String,
@@ -426,6 +505,7 @@ public data class MobileWalletProximityCredentialStatusInput(
 
 /** Explicit, optionally network-backed status boundary. The SDK itself performs no hidden lookup. */
 public fun interface MobileWalletProximityCredentialStatusEvaluator {
+    /** Evaluates the current status of [credential] without receiving raw credential values. */
     public suspend fun evaluate(
         credential: MobileWalletProximityCredentialStatusInput,
     ): MobileWalletProximityCredentialStatus
@@ -434,12 +514,19 @@ public fun interface MobileWalletProximityCredentialStatusEvaluator {
 /** Default status policy relies on the locally verified MSO validity interval only. */
 public object UnconfiguredMobileWalletProximityCredentialStatusEvaluator :
     MobileWalletProximityCredentialStatusEvaluator {
+    /** Accepts the credential after the SDK has verified its local MSO validity interval. */
     override suspend fun evaluate(
         credential: MobileWalletProximityCredentialStatusInput,
     ): MobileWalletProximityCredentialStatus = MobileWalletProximityCredentialStatus.Valid
 }
 
-/** One candidate made available to an application-profile adapter. */
+/**
+ * One candidate made available to an application-profile adapter.
+ *
+ * @property credentialId Stable wallet-local credential identifier.
+ * @property docType Credential mdoc document type.
+ * @property label Display-safe credential label when available.
+ */
 public data class MobileWalletProximityApplicationCredential(
     public val credentialId: String,
     public val docType: String,
@@ -450,7 +537,13 @@ public data class MobileWalletProximityApplicationCredential(
     }
 }
 
-/** Exact request and compatible candidates supplied to a versioned application profile. */
+/**
+ * Exact request and compatible candidates supplied to a versioned application profile.
+ *
+ * @property credentials Compatible metadata-only credential candidates.
+ * @property requestedDocuments Dependency-free parsed document request facts.
+ * @property readerAuthentication Display-safe authentication and trust facts for the request.
+ */
 public data class MobileWalletProximityApplicationProfileInput(
     /** Exact DeviceRequest bytes, encoded as unpadded Base64URL. */
     public val deviceRequestBase64Url: String,
@@ -472,7 +565,13 @@ public data class MobileWalletProximityApplicationProfileInput(
     }
 }
 
-/** Dependency-free parsed request facts supplied to application-profile adapters. */
+/**
+ * Dependency-free parsed request facts supplied to application-profile adapters.
+ *
+ * @property requestIndex Zero-based document request index.
+ * @property docType Requested mdoc document type.
+ * @property requestedElements Requested issuer-signed elements and retention intent.
+ */
 public data class MobileWalletProximityApplicationDocumentRequest(
     public val requestIndex: Int,
     public val docType: String,
@@ -484,7 +583,13 @@ public data class MobileWalletProximityApplicationDocumentRequest(
     }
 }
 
-/** One locally validated, display-safe application authorization value. */
+/**
+ * One locally validated, display-safe application authorization value.
+ *
+ * @property id Stable detail identifier within the application profile.
+ * @property label Display-safe detail label.
+ * @property value Display-safe detail value.
+ */
 public data class MobileWalletProximityApplicationAuthorizationDetail(
     public val id: String,
     public val label: String,
@@ -495,7 +600,13 @@ public data class MobileWalletProximityApplicationAuthorizationDetail(
     }
 }
 
-/** Generic device-signed value proposed by a recognized application profile. */
+/**
+ * Generic device-signed value proposed by a recognized application profile.
+ *
+ * @property credentialId Credential to which the device-signed value is bound.
+ * @property namespace Device namespace containing the value.
+ * @property elementIdentifier Element identifier within [namespace].
+ */
 public data class MobileWalletProximityDeviceSignedElement(
     public val credentialId: String,
     public val namespace: String,
@@ -512,7 +623,15 @@ public data class MobileWalletProximityDeviceSignedElement(
     }
 }
 
-/** Validated output of one recognized, versioned wallet application profile. */
+/**
+ * Validated output of one recognized, versioned wallet application profile.
+ *
+ * @property profileId Identifier of the profile that produced the authorization.
+ * @property displayTitle Display-safe title for holder review.
+ * @property details Display-safe authorization details.
+ * @property compatibleCredentialIds Credentials for which this authorization remains valid.
+ * @property deviceSignedElements Profile-proposed device-signed values, bound to compatible credentials.
+ */
 public data class MobileWalletProximityApplicationAuthorization(
     public val profileId: String,
     public val displayTitle: String,
@@ -556,6 +675,7 @@ public sealed interface MobileWalletProximityApplicationProfileResult {
 
     /** This profile recognized the request and produced a locally validated result. */
     public data class Recognized(
+        /** Validated authorization produced by the profile. */
         public val authorization: MobileWalletProximityApplicationAuthorization,
     ) : MobileWalletProximityApplicationProfileResult
 
@@ -563,15 +683,20 @@ public sealed interface MobileWalletProximityApplicationProfileResult {
      * This profile recognized the request but rejected invalid or unsupported application data.
      * [reason] must be safe to expose to the wallet UI.
      */
-    public data class Rejected(public val reason: String) : MobileWalletProximityApplicationProfileResult {
+    public data class Rejected(
+        /** Display-safe rejection reason. */
+        public val reason: String,
+    ) : MobileWalletProximityApplicationProfileResult {
         init { require(reason.isNotBlank()) }
     }
 }
 
 /** Versioned wallet-owned interpreter for application-specific request data. */
 public interface MobileWalletProximityApplicationProfile {
+    /** Stable, versioned profile identifier. */
     public val id: String
 
+    /** Recognizes and validates application semantics in the exact [input]. */
     public suspend fun evaluate(
         input: MobileWalletProximityApplicationProfileInput,
     ): MobileWalletProximityApplicationProfileResult
@@ -590,6 +715,7 @@ public class MobileWalletProximityApplicationProfileRegistry(
         }
     }
 
+    /** Standard registry instances. */
     public companion object {
         /** Registry that recognizes no application-specific request semantics. */
         public val Empty: MobileWalletProximityApplicationProfileRegistry =
@@ -597,7 +723,14 @@ public class MobileWalletProximityApplicationProfileRegistry(
     }
 }
 
-/** One requested or alternative data element shown during consent. */
+/**
+ * One requested or alternative data element shown during consent.
+ *
+ * @property namespace Issuer-signed namespace containing the element.
+ * @property elementIdentifier Element identifier within [namespace].
+ * @property intentToRetain Reader-declared retention intent.
+ * @property satisfiesRequestedElements Requested elements satisfied by this disclosed alternative.
+ */
 public data class MobileWalletProximityRequestedElement(
     public val namespace: String,
     public val elementIdentifier: String,
@@ -610,7 +743,12 @@ public data class MobileWalletProximityRequestedElement(
     }
 }
 
-/** Dependency-free namespace and element identifier. */
+/**
+ * Dependency-free namespace and element identifier.
+ *
+ * @property namespace Namespace containing the element.
+ * @property elementIdentifier Element identifier within [namespace].
+ */
 public data class MobileWalletProximityElementReference(
     public val namespace: String,
     public val elementIdentifier: String,
@@ -618,7 +756,15 @@ public data class MobileWalletProximityElementReference(
     init { require(namespace.isNotBlank() && elementIdentifier.isNotBlank()) }
 }
 
-/** Eligible wallet credential projected without raw credential or key material. */
+/**
+ * Eligible wallet credential projected without raw credential or key material.
+ *
+ * @property credentialId Stable wallet-local credential identifier.
+ * @property label Display-safe credential label when available.
+ * @property issuer Display-safe issuer identifier when available.
+ * @property validUntil End of the locally verified MSO validity interval.
+ * @property deviceAuthentication Holder authentication frozen for this option.
+ */
 public data class MobileWalletProximityCredentialOption(
     public val credentialId: String,
     public val label: String?,
@@ -635,7 +781,13 @@ public data class MobileWalletProximityCredentialOption(
     }
 }
 
-/** One satisfiable document request in an immutable review snapshot. */
+/**
+ * One satisfiable document request in an immutable review snapshot.
+ *
+ * @property requestIndex Zero-based document request index.
+ * @property docType Requested mdoc document type.
+ * @property credentialOptions Eligible credentials and their exact disclosure choices.
+ */
 public data class MobileWalletProximityDocumentReview(
     public val requestIndex: Int,
     public val docType: String,
@@ -648,7 +800,13 @@ public data class MobileWalletProximityDocumentReview(
     }
 }
 
-/** Reader-asserted purpose hint associated with the selected use case. */
+/**
+ * Reader-asserted purpose hint associated with the selected use case.
+ *
+ * @property type Purpose-hint type defined by the selected profile.
+ * @property code Purpose-hint code defined by the selected profile.
+ * @property readerAsserted Whether the value came from the reader request.
+ */
 public data class MobileWalletProximityPurposeHint(
     public val type: String,
     public val code: Int,
@@ -657,7 +815,14 @@ public data class MobileWalletProximityPurposeHint(
     init { require(type.isNotBlank()) }
 }
 
-/** Selected edition-2 use case projected for review. */
+/**
+ * Selected edition-2 use case projected for review.
+ *
+ * @property index Zero-based use-case index in the request.
+ * @property mandatory Whether the reader marked the use case mandatory.
+ * @property documentRequestIndices Document requests governed by the use case.
+ * @property purposeHints Reader-asserted purpose hints associated with the use case.
+ */
 public data class MobileWalletProximityUseCase(
     public val index: Int,
     public val mandatory: Boolean,
@@ -671,7 +836,15 @@ public data class MobileWalletProximityUseCase(
     }
 }
 
-/** Immutable holder-consent snapshot bound to one exchange and exact request. */
+/**
+ * Immutable holder-consent snapshot bound to one exchange and exact request.
+ *
+ * @property exchange One-based request exchange number within the session.
+ * @property documents Satisfiable document requests and eligible credential choices.
+ * @property readerAuthentication Reader authentication, certificate, revocation, RICAL, and trust facts.
+ * @property useCases Edition-2 use cases selected by the request.
+ * @property applicationAuthorizations Validated application-profile authorizations.
+ */
 public data class MobileWalletProximityReview(
     public val exchange: Int,
     public val documents: List<MobileWalletProximityDocumentReview>,
@@ -701,7 +874,13 @@ public data class MobileWalletProximityReview(
     }
 }
 
-/** Credential and disclosure choice for exactly one reviewed document request. */
+/**
+ * Credential and disclosure choice for exactly one reviewed document request.
+ *
+ * @property requestIndex Reviewed document request being answered.
+ * @property credentialId Reviewed credential selected for the response.
+ * @property disclosedElements Non-empty subset of reviewed elements approved for disclosure.
+ */
 public data class MobileWalletProximityDocumentSubmission(
     public val requestIndex: Int,
     public val credentialId: String,
@@ -713,7 +892,12 @@ public data class MobileWalletProximityDocumentSubmission(
     }
 }
 
-/** Complete holder choice for the current review; it is rebound and revalidated before response generation. */
+/**
+ * Complete holder choice for the current review; it is rebound and revalidated before response generation.
+ *
+ * @property documents One credential and disclosure choice per answered document request.
+ * @property continueAfterResponse Whether to remain connected for another request after a successful response.
+ */
 public data class MobileWalletProximitySubmission(
     public val documents: List<MobileWalletProximityDocumentSubmission>,
     public val continueAfterResponse: Boolean = false,
@@ -726,14 +910,27 @@ public data class MobileWalletProximitySubmission(
 
 /** User or host action accepted by a proximity session. */
 public sealed interface MobileWalletProximityAction {
-    public data class Approve(public val submission: MobileWalletProximitySubmission) :
+    /** Approves the current immutable review with the exact [submission]. */
+    public data class Approve(
+        /** Holder-approved credential and disclosure choices. */
+        public val submission: MobileWalletProximitySubmission,
+    ) :
         MobileWalletProximityAction
 
+    /** Declines the current review and terminates the session without disclosure. */
     public data object Decline : MobileWalletProximityAction
+
+    /** Cancels the active session and releases its resources. */
     public data object Cancel : MobileWalletProximityAction
+
+    /** Rechecks side-effect-free prerequisites after host remediation. */
     public data object RetryPrerequisites : MobileWalletProximityAction
+
+    /** Reports the privacy-safe outcome of a requested host remediation. */
     public data class ReportRemediation(
+        /** Remediation action whose outcome is being reported. */
         public val action: MobileWalletProximityRemediationAction,
+        /** Privacy-safe outcome reported by the host. */
         public val result: MobileWalletProximityHostActionResult,
     ) : MobileWalletProximityAction
 }
@@ -747,14 +944,25 @@ public enum class MobileWalletProximityHostActionResult {
 
 /** Prepared engagement presented by the host UI. */
 public sealed interface MobileWalletProximityEngagement {
-    public data class Qr(public val payload: String) : MobileWalletProximityEngagement {
+    /** ISO mdoc device-engagement URI for QR rendering. */
+    public data class Qr(
+        /** Complete `mdoc:` URI that the host must encode without transformation. */
+        public val payload: String,
+    ) : MobileWalletProximityEngagement {
         init { require(payload.startsWith("mdoc:")) }
     }
 
+    /** NFC engagement prepared by the platform transport. */
     public data object Nfc : MobileWalletProximityEngagement
 }
 
-/** One protected-key operation required by a frozen approved document response. */
+/**
+ * One protected-key operation required by a frozen approved document response.
+ *
+ * @property requestIndex Reviewed document request requiring authorization.
+ * @property credentialId Credential whose protected holder key will be used.
+ * @property deviceAuthentication Frozen signature or MAC operation.
+ */
 public data class MobileWalletProximityHolderAuthorizationRequest(
     public val requestIndex: Int,
     public val credentialId: String,
@@ -765,7 +973,12 @@ public data class MobileWalletProximityHolderAuthorizationRequest(
     }
 }
 
-/** Exact holder-key authorization context for a frozen approved submission. */
+/**
+ * Exact holder-key authorization context for a frozen approved submission.
+ *
+ * @property exchange Request exchange whose response is frozen.
+ * @property requests Protected-key operations required by the approved response.
+ */
 public data class MobileWalletProximityHolderAuthorization(
     public val exchange: Int,
     public val requests: List<MobileWalletProximityHolderAuthorizationRequest>,
@@ -778,50 +991,111 @@ public data class MobileWalletProximityHolderAuthorization(
 
 /** Deterministic result of dispatching an action. */
 public sealed interface MobileWalletProximityActionResult {
+    /** The action was legal for the current state and was accepted exactly once. */
     public data object Accepted : MobileWalletProximityActionResult
-    public data class Rejected(public val error: MobileWalletProximityError) :
+
+    /** The action was illegal, stale, or invalid and had no side effects. */
+    public data class Rejected(
+        /** Stable reason the action was rejected. */
+        public val error: MobileWalletProximityError,
+    ) :
         MobileWalletProximityActionResult
 }
 
 /** Public Wallet SDK session state; each variant carries only data valid for that phase. */
 public sealed interface MobileWalletProximityState {
+    /** Prerequisites are being evaluated or require host remediation. */
     public data class CheckingPrerequisites(
+        /** Latest side-effect-free prerequisite snapshot. */
         public val capabilities: MobileWalletProximityCapabilities,
     ) : MobileWalletProximityState
-    public data class Preparing(public val profile: MobileWalletProximityProfile) : MobileWalletProximityState
+
+    /** Session material and selected transports are being prepared. */
+    public data class Preparing(
+        /** Profile frozen for this single-use session. */
+        public val profile: MobileWalletProximityProfile,
+    ) : MobileWalletProximityState
+
+    /** Engagement data is ready for presentation to the reader. */
     public data class EngagementReady(
+        /** Prepared engagement methods the host may present. */
         public val engagements: List<MobileWalletProximityEngagement>,
     ) : MobileWalletProximityState {
         init { require(engagements.isNotEmpty() && engagements.distinctBy { it::class }.size == engagements.size) }
     }
+
+    /** The reader has consumed engagement data and transport connection is in progress. */
     public data class Connecting(
+        /** Engagement methods that initiated the connection attempt. */
         public val engagements: List<MobileWalletProximityEngagement>,
     ) : MobileWalletProximityState {
         init { require(engagements.isNotEmpty() && engagements.distinctBy { it::class }.size == engagements.size) }
     }
-    public data class AwaitingRequest(public val exchange: Int) : MobileWalletProximityState {
+
+    /** Transport is connected and awaiting the next device request. */
+    public data class AwaitingRequest(
+        /** One-based exchange number expected next. */
+        public val exchange: Int,
+    ) : MobileWalletProximityState {
         init { require(exchange > 0) }
     }
-    public data class ReviewRequired(public val review: MobileWalletProximityReview) :
+
+    /** An immutable request snapshot requires explicit holder consent. */
+    public data class ReviewRequired(
+        /** Exact review snapshot to render and approve or decline. */
+        public val review: MobileWalletProximityReview,
+    ) :
         MobileWalletProximityState
+
+    /** The approved response is awaiting protected holder-key authorization. */
     public data class AuthorizingHolderKey(
+        /** Exact protected-key operations frozen by holder consent. */
         public val authorization: MobileWalletProximityHolderAuthorization,
     ) : MobileWalletProximityState
-    public data class SendingResponse(public val exchange: Int) : MobileWalletProximityState {
+
+    /** The approved and authorized response is being sent. */
+    public data class SendingResponse(
+        /** One-based exchange number being answered. */
+        public val exchange: Int,
+    ) : MobileWalletProximityState {
         init { require(exchange > 0) }
     }
-    public data class AwaitingNextRequest(public val completedExchanges: Int) : MobileWalletProximityState {
+
+    /** One response completed and the session remains open for another request. */
+    public data class AwaitingNextRequest(
+        /** Number of exchanges completed successfully. */
+        public val completedExchanges: Int,
+    ) : MobileWalletProximityState {
         init { require(completedExchanges > 0) }
     }
-    public data class Terminating(public val exchange: Int) : MobileWalletProximityState {
+
+    /** Session termination is being sent after the final exchange. */
+    public data class Terminating(
+        /** One-based exchange number after which termination occurs. */
+        public val exchange: Int,
+    ) : MobileWalletProximityState {
         init { require(exchange > 0) }
     }
-    public data class Completed(public val exchanges: Int, public val declined: Boolean) :
+
+    /** Session reached a normal terminal state. */
+    public data class Completed(
+        /** Number of requests handled before termination. */
+        public val exchanges: Int,
+        /** Whether the holder declined the final reviewed request. */
+        public val declined: Boolean,
+    ) :
         MobileWalletProximityState {
         init { require(exchanges > 0) }
     }
+
+    /** Session was cancelled locally and all owned resources were released. */
     public data object Cancelled : MobileWalletProximityState
-    public data class Failed(public val error: MobileWalletProximityError) : MobileWalletProximityState
+
+    /** Session terminated because of a stable Wallet SDK failure. */
+    public data class Failed(
+        /** Display-safe terminal failure. */
+        public val error: MobileWalletProximityError,
+    ) : MobileWalletProximityState
 }
 
 /** Legal host actions derived exclusively from the current session state. */
@@ -861,6 +1135,7 @@ public enum class MobileWalletProximityActionType {
 
 /** Single-use, wallet-owned proximity presentation session. */
 public interface MobileWalletProximitySession {
+    /** Hot state stream whose variants define the only legal phase data and actions. */
     public val state: StateFlow<MobileWalletProximityState>
 
     /** Dispatches one state-bound action. Illegal or stale actions are rejected without side effects. */
