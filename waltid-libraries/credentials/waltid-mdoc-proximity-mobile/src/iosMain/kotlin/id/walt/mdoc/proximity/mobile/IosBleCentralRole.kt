@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import platform.CoreBluetooth.CBCentralManager
 import platform.CoreBluetooth.CBCentralManagerDelegateProtocol
@@ -29,6 +30,7 @@ import platform.Foundation.NSError
 import platform.Foundation.NSNumber
 import platform.darwin.NSObject
 import kotlin.math.min
+import kotlin.time.Duration.Companion.seconds
 
 internal class IosBleCentralRole(
     override val serviceUuid: BleServiceUuid,
@@ -299,6 +301,8 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
         val peer = peripheral ?: throw iosTransportFailure("ble_disconnected", "The BLE reader is unavailable")
         while (!peer.canSendWriteWithoutResponse) awaitEvent<IosCentralEvent.ReadyToWrite>()
         peer.writeValue(bytes.toNSData(), forCharacteristic = characteristic, type = CBCharacteristicWriteWithoutResponse)
+        // Keep close from racing the final State=End write while CoreBluetooth applies backpressure.
+        if (!peer.canSendWriteWithoutResponse) awaitEvent<IosCentralEvent.ReadyToWrite>()
     }
 
     suspend fun openL2cap(psm: UShort): CBL2CAPChannel? {
@@ -365,9 +369,15 @@ private class IosCentralGattConnection(
     }
     override suspend fun finish() = withContext(Dispatchers.Main) {
         session.write(state, byteArrayOf(BLE_STATE_END))
+        // CoreBluetooth has no completion callback for a write without response when its queue
+        // remains writable. Keep the link alive long enough for the final State=End command to
+        // leave that queue before the common transport closes the connection.
+        delay(IOS_GATT_TERMINATION_DRAIN_DELAY)
     }
     override fun close(reason: ProximityCloseReason) = session.close()
 }
+
+private val IOS_GATT_TERMINATION_DRAIN_DELAY = 1.seconds
 
 private fun NSError.asFailure(message: String) = iosTransportFailure(
     "core_bluetooth_error",
