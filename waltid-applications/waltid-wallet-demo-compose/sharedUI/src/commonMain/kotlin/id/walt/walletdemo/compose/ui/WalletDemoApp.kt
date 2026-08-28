@@ -86,8 +86,8 @@ fun WalletDemoApp(
                         onStartProximityPresentation = onStartProximityPresentation,
                     )
                 }
+                if (state.auth is WalletAuthState.Unlocked) overlayContent()
             }
-            if (state.auth is WalletAuthState.Unlocked) overlayContent()
         }
         state.signingProtectionWarning?.let { warning ->
             AlertDialog(
