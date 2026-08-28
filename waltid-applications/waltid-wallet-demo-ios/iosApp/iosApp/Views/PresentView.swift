@@ -7,6 +7,12 @@ struct PresentView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.walletDemoBranding) private var branding
     @ObservedObject var viewModel: WalletViewModel
+    @ObservedObject private var proximityPresentation: ProximityPresentationViewModel
+
+    init(viewModel: WalletViewModel) {
+        _viewModel = ObservedObject(wrappedValue: viewModel)
+        _proximityPresentation = ObservedObject(wrappedValue: viewModel.proximityPresentation)
+    }
 
     var body: some View {
         NavigationView {
@@ -46,11 +52,11 @@ struct PresentView: View {
         }
         .fullScreenCover(
             isPresented: Binding(
-                get: { viewModel.proximityPresentation.active },
-                set: { if !$0 { viewModel.proximityPresentation.dismiss() } }
+                get: { proximityPresentation.active },
+                set: { if !$0 { proximityPresentation.dismiss() } }
             )
         ) {
-            ProximityPresentationView(viewModel: viewModel.proximityPresentation)
+            ProximityPresentationView(viewModel: proximityPresentation)
         }
     }
 
@@ -64,7 +70,7 @@ struct PresentView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button("Present to nearby reader") {
-                        viewModel.proximityPresentation.start()
+                        proximityPresentation.start()
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(branding.primary)
