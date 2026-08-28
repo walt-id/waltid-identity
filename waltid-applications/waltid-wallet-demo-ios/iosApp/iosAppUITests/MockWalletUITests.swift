@@ -20,6 +20,7 @@ final class MockWalletUITests: XCTestCase {
         for _ in 0..<2 {
             ui.tapButton(identifier: "wallet.proximityStartButton", fallbackLabel: "Present to nearby reader")
             XCTAssertTrue(proximityScreen.waitForExistence(timeout: 10))
+            XCTAssertTrue(app.buttons["wallet.settingsButton"].exists)
             ui.tapButton(identifier: "wallet.proximityDoneButton", fallbackLabel: "Done")
 
             let dismissed = XCTNSPredicateExpectation(
@@ -30,7 +31,49 @@ final class MockWalletUITests: XCTestCase {
         }
     }
 
-    func testUrlEditorsAreTopControlsInReceiveAndPresentTabs() {
+    func testStatusBannerPrecedesContentAcrossTabs() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            "Wallet ready"
+        )
+
+        let status = app.descendants(matching: .any)["wallet.status"]
+        let emptyCredentials = app.staticTexts["No credentials yet"]
+        XCTAssertTrue(status.waitForExistence(timeout: 2))
+        XCTAssertTrue(emptyCredentials.waitForExistence(timeout: 10))
+        XCTAssertLessThan(
+            status.frame.minY,
+            emptyCredentials.frame.minY,
+            "Credentials status should precede the tab content"
+        )
+
+        ui.tapTab(label: "Receive")
+        let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
+        ui.replaceText(in: offerInput, value: "https://[")
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Receive failed"], timeout: 10), "Receive failed: invalid offer URL")
+        XCTAssertLessThan(
+            app.descendants(matching: .any)["wallet.status"].frame.minY,
+            offerInput.frame.minY,
+            "Receive status should precede the tab content"
+        )
+
+        ui.tapTab(label: "Present")
+        let presentationInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
+        ui.replaceText(in: presentationInput, value: "https://[")
+        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Preview failed"], timeout: 10), "Preview failed: invalid request URL")
+        XCTAssertLessThan(
+            app.descendants(matching: .any)["wallet.status"].frame.minY,
+            presentationInput.frame.minY,
+            "Present status should precede the tab content"
+        )
+    }
+
+    func testOnlinePresentationPrecedesInPersonPresentation() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
@@ -40,26 +83,15 @@ final class MockWalletUITests: XCTestCase {
             "Wallet ready"
         )
 
-        ui.tapTab(label: "Receive")
-        let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
-        XCTAssertTrue(offerInput.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["wallet.offerScanButton"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["wallet.status"].waitForExistence(timeout: 10))
-        XCTAssertLessThan(
-            offerInput.frame.minY,
-            app.staticTexts["wallet.status"].frame.minY,
-            "Receive URL entry should be the first control in the tab"
-        )
-
         ui.tapTab(label: "Present")
         let presentationInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
+        let proximityStart = app.buttons["wallet.proximityStartButton"]
         XCTAssertTrue(presentationInput.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["wallet.presentationScanButton"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["wallet.status"].waitForExistence(timeout: 10))
+        XCTAssertTrue(proximityStart.waitForExistence(timeout: 10))
         XCTAssertLessThan(
             presentationInput.frame.minY,
-            app.staticTexts["wallet.status"].frame.minY,
-            "Presentation URL entry should be the first control in the tab"
+            proximityStart.frame.minY,
+            "Online presentation should precede in-person presentation"
         )
     }
 

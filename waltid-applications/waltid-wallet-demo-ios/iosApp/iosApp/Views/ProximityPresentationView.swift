@@ -3,64 +3,21 @@ import WalletDemoSharingUI
 import WalletSDK
 
 struct ProximityPresentationView: View {
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.walletDemoBranding) private var branding
     @ObservedObject var viewModel: ProximityPresentationViewModel
-    @StateObject private var screenPolicy = ProximityScreenPolicy()
+    let credentialDetailsByID: [String: CredentialDetails]
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if let message = viewModel.actionErrorMessage {
-                        ProximityMessageCard(
-                            title: String(localized: "Action failed"),
-                            message: message,
-                            isError: true
-                        )
-                    }
-                    content
-                }
-                .padding()
+        VStack(alignment: .leading, spacing: 16) {
+            if let message = viewModel.actionErrorMessage {
+                StatusBannerView(
+                    message: String(localized: "Action failed: \(message)"),
+                    isLoading: false,
+                    isError: true
+                )
             }
-            .navigationTitle("Present in person")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if !viewModel.isTerminal
-                        && (viewModel.sessionState == nil
-                            || viewModel.sessionState?.legalActions.contains(.cancel) == true) {
-                        Button("Cancel", action: viewModel.cancel)
-                            .accessibilityIdentifier(WalletAccessibilityID.proximityCancelButton)
-                    }
-                }
-            }
+            content
         }
-        .navigationViewStyle(.stack)
         .accessibilityIdentifier(WalletAccessibilityID.proximityScreen)
-        .onAppear {
-            screenPolicy.update(active: viewModel.active && !viewModel.isTerminal, qrVisible: viewModel.qrPayload != nil)
-        }
-        .onDisappear {
-            screenPolicy.restore()
-            viewModel.dismiss()
-        }
-        .onChange(of: viewModel.qrPayload != nil) { qrVisible in
-            screenPolicy.update(active: viewModel.active && !viewModel.isTerminal, qrVisible: qrVisible)
-        }
-        .onChange(of: viewModel.active) { active in
-            screenPolicy.update(active: active && !viewModel.isTerminal, qrVisible: viewModel.qrPayload != nil)
-        }
-        .onChange(of: viewModel.isTerminal) { terminal in
-            screenPolicy.update(active: viewModel.active && !terminal, qrVisible: viewModel.qrPayload != nil)
-        }
-        .onChange(of: scenePhase) { phase in
-            let foreground = phase == .active
-            screenPolicy.update(
-                active: foreground && viewModel.active && !viewModel.isTerminal,
-                qrVisible: foreground && viewModel.qrPayload != nil
-            )
-            if !foreground { viewModel.handleLifecycleInterruption() }
-        }
     }
 
     @ViewBuilder
@@ -95,13 +52,11 @@ struct ProximityPresentationView: View {
                 ProximityReviewContent(
                     review: review,
                     selections: viewModel.selections,
-                    canApprove: viewModel.canApprove,
+                    credentialDetailsByID: credentialDetailsByID,
                     onSelectCredential: viewModel.selectCredential,
                     onToggleElement: viewModel.toggleElement,
                     continueAfterResponse: viewModel.continueAfterResponse,
-                    onContinueAfterResponseChange: viewModel.setContinueAfterResponse,
-                    onApprove: { viewModel.approve() },
-                    onDecline: viewModel.decline
+                    onContinueAfterResponseChange: viewModel.setContinueAfterResponse
                 )
             case .authorizingHolderKey:
                 ProximityProgressContent(message: String(localized: "Confirming the selected credentials…"))
@@ -150,7 +105,7 @@ private struct ProximityPrerequisiteContent: View {
     let onRemediate: (ProximityPresentationRemediationAction) -> Void
 
     var body: some View {
-        ProximitySectionCard(
+        ReviewMetadataSection(
             title: capabilities.mayStart
                 ? String(localized: "Device ready")
                 : String(localized: "Action needed")
@@ -226,28 +181,24 @@ private struct ProximityEngagementContent: View {
 }
 
 private struct ProximityReviewContent: View {
-    @Environment(\.walletDemoBranding) private var branding
     let review: ProximityPresentationReview
     let selections: [ProximityDocumentSelection]
-    let canApprove: Bool
+    let credentialDetailsByID: [String: CredentialDetails]
     let onSelectCredential: (Int, String) -> Void
     let onToggleElement: (Int, ProximityElementReference) -> Void
     let continueAfterResponse: Bool
     let onContinueAfterResponseChange: (Bool) -> Void
-    let onApprove: () -> Void
-    let onDecline: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Review the request")
-                .font(.title2.bold())
-                .accessibilityAddTraits(.isHeader)
-            Text("Only the checked data will be shared after you approve.")
-
-            readerContent
+            ProximityReaderMetadataCard(
+                authentications: review.readerAuthentication,
+                documents: review.documents,
+                credentialDetailsByID: credentialDetailsByID
+            )
 
             ForEach(review.useCases) { useCase in
-                ProximitySectionCard(title: String(localized: "Reader-stated purpose")) {
+                ReviewMetadataSection(title: String(localized: "Reader-stated purpose")) {
                     Text("Use case \(useCase.index + 1)\(useCase.mandatory ? " (mandatory)" : "")")
                         .font(.headline)
                     if useCase.purposeHints.isEmpty {
@@ -261,12 +212,14 @@ private struct ProximityReviewContent: View {
             }
 
             ForEach(review.applicationAuthorizations, id: \.profileID) { authorization in
-                ProximitySectionCard(title: authorization.displayTitle) {
+                ReviewMetadataSection(title: authorization.displayTitle) {
                     Text("Validated application request")
                         .font(.headline)
-                    ForEach(authorization.details) { detail in
-                        ProximityLabelValue(label: detail.label, value: detail.value)
-                    }
+                    MetadataDetailList(
+                        items: authorization.details.map {
+                            MetadataDetailItem(label: $0.label, value: $0.value)
+                        }
+                    )
                 }
             }
 
@@ -274,6 +227,7 @@ private struct ProximityReviewContent: View {
                 ProximityDocumentContent(
                     document: document,
                     selection: selections.first(where: { $0.requestIndex == document.requestIndex }),
+                    credentialDetailsByID: credentialDetailsByID,
                     onSelectCredential: onSelectCredential,
                     onToggleElement: onToggleElement
                 )
@@ -293,67 +247,131 @@ private struct ProximityReviewContent: View {
                 }
             }
             .accessibilityIdentifier(WalletAccessibilityID.proximityContinueAfterResponse)
-
-            Button("Approve and share", action: onApprove)
-                .buttonStyle(.borderedProminent)
-                .tint(branding.primary)
-                .disabled(!canApprove)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier(WalletAccessibilityID.proximityApproveButton)
-
-            Button("Decline request", action: onDecline)
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier(WalletAccessibilityID.proximityDeclineButton)
         }
         .accessibilityIdentifier(WalletAccessibilityID.proximityReview)
     }
+}
 
-    @ViewBuilder
-    private var readerContent: some View {
-        if review.readerAuthentication.isEmpty {
-            ProximitySectionCard(title: String(localized: "Reader")) {
-                Text("This reader did not provide authenticated identity information.")
+private struct ProximityReaderMetadataCard: View {
+    let authentications: [ProximityReaderAuthentication]
+    let documents: [ProximityDocumentReview]
+    let credentialDetailsByID: [String: CredentialDetails]
+    @State private var isExpanded = false
+
+    private var suppliedAuthentications: [ProximityReaderAuthentication] {
+        authentications.filter { $0.validity != .absent }
+    }
+
+    private var readerDisplayName: String {
+        let displayNames: Set<String> = Set(suppliedAuthentications.compactMap { authentication -> String? in
+            guard let displayName = authentication.displayName?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                !displayName.isEmpty else {
+                return nil
+            }
+            return displayName
+        })
+        switch displayNames.count {
+        case 0:
+            return String(localized: "Reader identity unavailable")
+        case 1:
+            return displayNames.first!
+        default:
+            return String(localized: "Multiple reader identities")
+        }
+    }
+
+    private var mostSevereAuthentication: ProximityReaderAuthentication? {
+        authentications.max { $0.summarySeverity < $1.summarySeverity }
+    }
+
+    private var authenticationSummary: String? {
+        guard let authentication = mostSevereAuthentication else { return nil }
+        if authentication.validity == .malformed || authentication.validity == .invalid {
+            return authentication.validity.label
+        }
+        if authentication.trust == .revoked {
+            return authentication.trust.label
+        }
+        if authentications.contains(where: { $0.validity == .absent }) {
+            return String(localized: "Authentication missing for part of the request")
+        }
+        return authentication.trust.label
+    }
+
+    var body: some View {
+        if suppliedAuthentications.isEmpty {
+            ReviewMetadataSection(
+                title: "Verifier",
+                titleAccessibilityIdentifier: WalletAccessibilityID.proximityReaderSection
+            ) {
+                Text("Reader identity not provided")
+                    .font(.headline)
+                Text("This request was not signed by the reader.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         } else {
-            ProximitySectionCard(title: String(localized: "Reader authentication")) {
-                ForEach(Array(review.readerAuthentication.enumerated()), id: \.offset) { index, authentication in
-                    if index > 0 { Divider() }
-                    Text(authentication.displayName ?? String(localized: "Unnamed reader"))
+            ExpandableMetadataCard(
+                title: "Verifier",
+                titleAccessibilityIdentifier: WalletAccessibilityID.proximityReaderSection,
+                toggleAccessibilityIdentifier: WalletAccessibilityID.proximityReaderDetailsToggle,
+                isExpanded: $isExpanded
+            ) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(readerDisplayName)
                         .font(.headline)
-                    ProximityLabelValue(
-                        label: String(localized: "Applies to"),
-                        value: scopeDescription(authentication)
-                    )
-                    ProximityLabelValue(
-                        label: String(localized: "Signature"),
-                        value: authentication.validity.label
-                    )
-                    ProximityLabelValue(
-                        label: String(localized: "Certificate path"),
-                        value: authentication.certificatePath.label
-                    )
-                    ProximityLabelValue(
-                        label: String(localized: "Revocation"),
-                        value: authentication.revocation.label
-                    )
-                    ProximityLabelValue(
-                        label: String(localized: "RICAL evidence"),
-                        value: authentication.rical.label
-                    )
-                    ProximityLabelValue(
-                        label: String(localized: "Trust"),
-                        value: authentication.trust.label
-                    )
-                    if let reason = authentication.reason {
-                        Text(reason).font(.caption)
-                    }
-                    if authentication.validity == .valid && authentication.trust != .trusted {
-                        Text("A valid signature does not by itself make this reader trusted.")
+                    if let authenticationSummary {
+                        Text(authenticationSummary)
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.secondary)
                     }
                 }
+            } details: {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(authentications.enumerated()), id: \.offset) { index, authentication in
+                        if index > 0 { Divider() }
+                        Text(authentication.displayName ?? String(localized: "Reader identity unavailable"))
+                            .font(.headline)
+                        MetadataDetailList(
+                            items: [
+                                MetadataDetailItem(
+                                    label: String(localized: "Applies to"),
+                                    value: scopeDescription(authentication)
+                                ),
+                                MetadataDetailItem(
+                                    label: String(localized: "Signature"),
+                                    value: authentication.validity.label
+                                ),
+                                MetadataDetailItem(
+                                    label: String(localized: "Certificate path"),
+                                    value: authentication.certificatePath.label
+                                ),
+                                MetadataDetailItem(
+                                    label: String(localized: "Revocation"),
+                                    value: authentication.revocation.label
+                                ),
+                                MetadataDetailItem(
+                                    label: String(localized: "RICAL evidence"),
+                                    value: authentication.rical.label
+                                ),
+                                MetadataDetailItem(
+                                    label: String(localized: "Trust"),
+                                    value: authentication.trust.label
+                                ),
+                            ]
+                        )
+                        if let reason = authentication.reason {
+                            Text(reason).font(.caption)
+                        }
+                        if authentication.validity == .valid && authentication.trust != .trusted {
+                            Text("A valid signature does not by itself make this reader trusted.")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
+                .accessibilityIdentifier(WalletAccessibilityID.proximityReaderDetails)
             }
         }
     }
@@ -366,10 +384,27 @@ private struct ProximityReviewContent: View {
             guard let requestIndex = authentication.documentRequestIndex else {
                 return String(localized: "Document request")
             }
-            if let documentType = review.documents.first(where: { $0.requestIndex == requestIndex })?.documentType {
-                return String(localized: "Document: \(documentType)")
+            if let document = documents.first(where: { $0.requestIndex == requestIndex }) {
+                let displayName = document.credentialOptions.compactMap { option in
+                    credentialDetailsByID[option.credentialID]?.cardSummary.title
+                }.first ?? document.documentType
+                return String(localized: "Document: \(displayName)")
             }
             return String(localized: "Document request \(requestIndex + 1)")
+        }
+    }
+}
+
+private extension ProximityReaderAuthentication {
+    var summarySeverity: Int {
+        switch (validity, trust) {
+        case (.malformed, _): 7
+        case (.invalid, _): 6
+        case (.valid, .revoked): 5
+        case (.absent, _): 4
+        case (.valid, .validButUntrusted): 3
+        case (.valid, .notEvaluated): 2
+        case (.valid, .trusted): 1
         }
     }
 }
@@ -377,37 +412,40 @@ private struct ProximityReviewContent: View {
 private struct ProximityDocumentContent: View {
     let document: ProximityDocumentReview
     let selection: ProximityDocumentSelection?
+    let credentialDetailsByID: [String: CredentialDetails]
     let onSelectCredential: (Int, String) -> Void
     let onToggleElement: (Int, ProximityElementReference) -> Void
 
     var body: some View {
-        ProximitySectionCard(title: String(localized: "Requested document")) {
-            ProximityLabelValue(
-                label: String(localized: "Document type"),
-                value: document.documentType
-            )
+        ReviewMetadataSection(title: String(localized: "Credential to share")) {
             if document.credentialOptions.count > 1 {
                 Text("Choose a credential").font(.headline)
             }
             ForEach(document.credentialOptions) { credential in
+                let details = credentialDetailsByID[credential.credentialID]
                 Button {
                     onSelectCredential(document.requestIndex, credential.credentialID)
                 } label: {
-                    HStack(alignment: .top) {
-                        Image(
-                            systemName: selection?.credentialID == credential.credentialID
-                                ? "largecircle.fill.circle" : "circle"
-                        )
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(credential.label ?? String(localized: "Wallet credential"))
-                            if let issuer = credential.issuer {
-                                Text(issuer).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Text("Valid until \(credential.validUntil.formatted(date: .abbreviated, time: .omitted))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    HStack(alignment: .center, spacing: 12) {
+                        if document.credentialOptions.count > 1 {
+                            Image(
+                                systemName: selection?.credentialID == credential.credentialID
+                                    ? "largecircle.fill.circle" : "circle"
+                            )
                         }
-                        Spacer()
+                        if let details {
+                            CredentialCardView(details: details, compact: true)
+                        } else {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(credential.label ?? String(localized: "Wallet credential"))
+                                if let issuer = credential.issuer {
+                                    Text(issuer).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Text("Valid until \(credential.validUntil.formatted(date: .abbreviated, time: .omitted))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                     .contentShape(Rectangle())
                 }
@@ -420,6 +458,7 @@ private struct ProximityDocumentContent: View {
                 )
             }
             if let credential = selectedCredential {
+                let details = credentialDetailsByID[credential.credentialID]
                 Divider()
                 Text("Data to share").font(.headline)
                 ForEach(Array(credential.requestedElements.enumerated()), id: \.offset) { _, element in
@@ -429,8 +468,21 @@ private struct ProximityDocumentContent: View {
                     )
                     Toggle(isOn: binding(for: reference)) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(element.elementIdentifier)
-                            Text(element.namespace).font(.caption).foregroundStyle(.secondary)
+                            let claims = details?.mdocClaims(
+                                namespace: element.namespace,
+                                elementIdentifier: element.elementIdentifier
+                            ) ?? []
+                            if !claims.isEmpty {
+                                ForEach(claims) { claim in
+                                    ClaimValueRow(item: claim)
+                                }
+                            } else {
+                                Text(CredentialDisplayVocabulary.humanizedLabel(element.elementIdentifier))
+                                    .font(.caption.weight(.semibold))
+                                Text("Value preview unavailable")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
                             if element.intentToRetain {
                                 Text("Reader intends to retain this data")
                                     .font(.caption)
@@ -438,6 +490,7 @@ private struct ProximityDocumentContent: View {
                             }
                         }
                     }
+                    .toggleStyle(ReviewCheckboxToggleStyle())
                     .accessibilityIdentifier(
                         WalletAccessibilityID.proximityElement(
                             requestIndex: document.requestIndex,
@@ -446,10 +499,9 @@ private struct ProximityDocumentContent: View {
                         )
                     )
                 }
-                ProximityLabelValue(
-                    label: String(localized: "Device authentication"),
-                    value: credential.deviceAuthentication.label
-                )
+                MetadataDisclosure(title: "Technical details", initiallyExpanded: false) {
+                    MetadataDetailList(items: technicalDetails(for: credential))
+                }
             }
         }
     }
@@ -463,6 +515,32 @@ private struct ProximityDocumentContent: View {
             get: { selection?.disclosedElements.contains(element) == true },
             set: { _ in onToggleElement(document.requestIndex, element) }
         )
+    }
+
+    private func technicalDetails(for credential: ProximityCredentialOption) -> [MetadataDetailItem] {
+        [
+            MetadataDetailItem(label: "Document type", value: document.documentType),
+            MetadataDetailItem(
+                label: "Device authentication",
+                value: credential.deviceAuthentication.label
+            ),
+        ] + credential.requestedElements.map { element in
+            MetadataDetailItem(
+                label: "Requested element",
+                value: "\(element.namespace) / \(element.elementIdentifier)"
+            )
+        }
+    }
+}
+
+private extension CredentialDetails {
+    func mdocClaims(namespace: String, elementIdentifier: String) -> [ClaimItem] {
+        groups
+            .flatMap(\.items)
+            .filter { claim in
+                claim.pathComponents.first == namespace
+                    && claim.pathComponents.dropFirst().first == elementIdentifier
+            }
     }
 }
 
@@ -488,7 +566,7 @@ private struct ProximityTerminalContent: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        ProximitySectionCard(title: title) {
+        ReviewMetadataSection(title: title) {
             Text(message)
             Button("Done", action: onDismiss)
                 .buttonStyle(.borderedProminent)
@@ -505,7 +583,7 @@ private struct ProximityFailureContent: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        ProximitySectionCard(title: String(localized: "Presentation failed")) {
+        ReviewMetadataSection(title: String(localized: "Presentation failed")) {
             Text(message)
                 .accessibilityIdentifier(WalletAccessibilityID.proximityError)
             if recoverable {
@@ -518,62 +596,6 @@ private struct ProximityFailureContent: View {
                 .buttonStyle(.bordered)
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier(WalletAccessibilityID.proximityDoneButton)
-        }
-    }
-}
-
-private struct ProximityMessageCard: View {
-    let title: String
-    let message: String
-    let isError: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.headline)
-                .accessibilityAddTraits(.isHeader)
-            Text(message)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            (isError ? Color.red : Color.secondary).opacity(0.1),
-            in: RoundedRectangle(cornerRadius: 12)
-        )
-    }
-}
-
-private struct ProximitySectionCard<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: Content
-
-    init(title: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
-                .accessibilityAddTraits(.isHeader)
-            content
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-private struct ProximityLabelValue: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).multilineTextAlignment(.trailing)
         }
     }
 }
@@ -594,11 +616,10 @@ private struct ProximityQRCode: View {
         .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
         .accessibilityLabel("Device engagement QR code")
     }
-
 }
 
 @MainActor
-private final class ProximityScreenPolicy: ObservableObject {
+final class ProximityScreenPolicy: ObservableObject {
     private var originalIdleTimerDisabled: Bool?
     private var originalBrightness: CGFloat?
 

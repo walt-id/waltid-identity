@@ -12,4 +12,8 @@ class WalletDemoProximityIosTest {
     @Test
     fun reviewSeparatesReaderTrustAndSendsOnlyExplicitHolderActions() =
         scenarios.reviewSeparatesReaderTrustAndSendsOnlyExplicitHolderActions()
+
+    @Test
+    fun reviewDoesNotInventAnIdentityForAnUnsignedReader() =
+        scenarios.reviewDoesNotInventAnIdentityForAnUnsignedReader()
 }
