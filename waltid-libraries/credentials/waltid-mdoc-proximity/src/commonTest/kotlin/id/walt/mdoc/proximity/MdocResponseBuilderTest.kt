@@ -66,6 +66,9 @@ class MdocResponseBuilderTest {
         val selection = setOf(ElementReference("org.example", "given_name"))
         val builder = MdocResponseBuilder()
 
+        assertTrue(macHolderKey.supportsMdocDeviceMac(readerPublic))
+        assertFalse(signatureHolderKey.supportsMdocDeviceMac(readerPublic))
+
         val signatureDocument = builder.buildDocument(
             MdocDocumentPresentation(
                 signatureSource,
