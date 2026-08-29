@@ -112,6 +112,7 @@ fun MobileWalletDemoApp(
     ProximityPlatformSessionEffect(
         active = proximity.active && !proximity.isTerminal,
         qrVisible = qrVisible,
+        nfcReviewVisible = proximity.review != null,
         onInterrupted = proximityController::handleLifecycleInterruption,
     )
     LaunchedEffect(walletState.auth, proximity.active) {

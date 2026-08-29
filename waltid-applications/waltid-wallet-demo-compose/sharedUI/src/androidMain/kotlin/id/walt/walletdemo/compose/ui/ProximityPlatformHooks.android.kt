@@ -2,12 +2,16 @@ package id.walt.walletdemo.compose.ui
 
 import android.Manifest
 import android.app.Activity
+import android.app.PendingIntent
 import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.nfc.NfcAdapter
+import android.nfc.tech.IsoDep
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -157,6 +161,7 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
 internal actual fun ProximityPlatformSessionEffect(
     active: Boolean,
     qrVisible: Boolean,
+    nfcReviewVisible: Boolean,
     onInterrupted: () -> Unit,
 ) {
     val activity = LocalContext.current.findActivity()
@@ -204,7 +209,54 @@ internal actual fun ProximityPlatformSessionEffect(
             setBrightness(previousBrightness)
         }
     }
+
+    DisposableEffect(nfcReviewVisible, activity, lifecycleOwner) {
+        if (!nfcReviewVisible || activity == null) return@DisposableEffect onDispose {}
+        val adapter = NfcAdapter.getDefaultAdapter(activity)
+            ?: return@DisposableEffect onDispose {}
+        val pendingIntent = PendingIntent.getActivity(
+            activity,
+            NFC_REVIEW_PENDING_INTENT_REQUEST_CODE,
+            Intent(activity, activity.javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_MUTABLE
+            } else {
+                0
+            },
+        )
+        val filters = arrayOf(IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED))
+        val technologies = arrayOf(arrayOf(IsoDep::class.java.name))
+        var enabled = false
+
+        fun enable() {
+            if (enabled || !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
+            adapter.enableForegroundDispatch(activity, pendingIntent, filters, technologies)
+            enabled = true
+        }
+
+        fun disable() {
+            if (!enabled) return
+            adapter.disableForegroundDispatch(activity)
+            enabled = false
+        }
+
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> enable()
+                Lifecycle.Event.ON_PAUSE -> disable()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        enable()
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) disable()
+        }
+    }
 }
+
+private const val NFC_REVIEW_PENDING_INTENT_REQUEST_CODE = 0x4D444F43
 
 private fun bluetoothPermissions(): Array<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
     arrayOf(

@@ -21,10 +21,11 @@ internal class WalletDemoProximityHostActions(
 @Composable
 internal expect fun rememberProximityHostActions(): WalletDemoProximityHostActions
 
-/** Owns only app lifecycle, screen-awake, and QR brightness integration. */
+/** Owns only app lifecycle, screen-awake, QR brightness, and platform NFC dispatch integration. */
 @Composable
 internal expect fun ProximityPlatformSessionEffect(
     active: Boolean,
     qrVisible: Boolean,
+    nfcReviewVisible: Boolean,
     onInterrupted: () -> Unit,
 )
