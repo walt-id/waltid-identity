@@ -10,6 +10,7 @@
 		B33B17EA2C2C394F001A32F7 /* ComposeWalletDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* ComposeWalletDemoApp.swift */; };
 		B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17EB2C2C394F001A32F7 /* ContentView.swift */; };
 		B33B17EE2C2C3957001A32F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B33B17ED2C2C3957001A32F7 /* Assets.xcassets */; };
+		C0DE00000000000000001201 /* ComposeNfcHostPlatformAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001202 /* ComposeNfcHostPlatformAdapter.swift */; };
 		C0DE00000000000000000102 /* PublicDemoBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000002 /* PublicDemoBackendE2ETests.swift */; };
 		C0DE00000000000000000103 /* WalletE2EHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000003 /* WalletE2EHelpers.swift */; };
 		C0DE00000000000000000105 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000006 /* TestHelpers.swift */; };
@@ -72,6 +73,7 @@
 		B33B17E92C2C394F001A32F7 /* ComposeWalletDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeWalletDemoApp.swift; sourceTree = "<group>"; };
 		B33B17EB2C2C394F001A32F7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B33B17ED2C2C3957001A32F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C0DE00000000000000001202 /* ComposeNfcHostPlatformAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeNfcHostPlatformAdapter.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000002 /* PublicDemoBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicDemoBackendE2ETests.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000003 /* WalletE2EHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EHelpers.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000004 /* iosAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -156,6 +158,7 @@
 				B30E22802C2D8AD700D4781C /* Info.plist */,
 				B33B17E92C2C394F001A32F7 /* ComposeWalletDemoApp.swift */,
 				B33B17EB2C2C394F001A32F7 /* ContentView.swift */,
+				C0DE00000000000000001202 /* ComposeNfcHostPlatformAdapter.swift */,
 				B33B17ED2C2C3957001A32F7 /* Assets.xcassets */,
 				C0DE00000000000000001031 /* iosApp.entitlements */,
 			);
@@ -385,6 +388,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */,
+				C0DE00000000000000001201 /* ComposeNfcHostPlatformAdapter.swift in Sources */,
 				B33B17EA2C2C394F001A32F7 /* ComposeWalletDemoApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

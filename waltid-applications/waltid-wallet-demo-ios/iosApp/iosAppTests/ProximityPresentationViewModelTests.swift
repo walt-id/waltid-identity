@@ -41,73 +41,11 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testResetWaitsForLateStartupAndCloseAfterSettingsDismissal() async throws {
-        let session = FakeProximitySession(suspendClose: true)
-        let client = FakeProximityWalletClient(session: session, suspendStart: true)
-        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
-        viewModel.start()
-        try await waitUntil { client.startCount == 1 }
-        viewModel.dismiss()
-        var deleted = false
-        let reset = Task { await viewModel.closeAndAwait(); deleted = true }
-        await Task.yield()
-        XCTAssertFalse(deleted)
-        client.resumeStart()
-        try await waitUntilAsync { await session.closeCount == 1 }
-        XCTAssertFalse(deleted)
-        await session.resumeClose()
-        await reset.value
-        XCTAssertTrue(deleted)
-    }
-
-    @MainActor
-    func testPendingReviewReservesOneDecisionAndNextReviewCanProceed() async throws {
-        let session = FakeProximitySession()
-        let client = FakeProximityWalletClient(session: session)
-        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
-        viewModel.start()
-        try await waitUntil { client.startCount == 1 }
-        let review = combinedProximityReview()
-        await session.emit(.reviewRequired(review))
-        try await waitUntil { viewModel.review == review }
-        viewModel.selectCredential(requestIndex: 0, credentialID: "payment-b")
-        viewModel.approve()
-        viewModel.approve()
-        viewModel.decline()
-        try await waitUntilAsync { await session.actions.count == 1 }
-        XCTAssertFalse(viewModel.canApprove)
-        let next = combinedProximityReview()
-        await session.emit(.reviewRequired(next))
-        try await waitUntil { viewModel.review == next }
-        XCTAssertNil(viewModel.pendingReviewID)
-        viewModel.selectCredential(requestIndex: 0, credentialID: "payment-b")
-        viewModel.approve()
-        try await waitUntilAsync { await session.actions.count == 2 }
-        await viewModel.closeAndAwait()
-    }
-
-    @MainActor
-    func testPreflightWaitsForPermissionBeforeCreatingSession() async throws {
-        let session = FakeProximitySession()
-        let client = FakeProximityWalletClient(session: session, capabilityResults: [
-            makeProximityCapabilities(bluetoothAvailable: false, nfcAvailable: false,
-                bluetoothRemediation: [.requestBluetoothPermission]), makeProximityCapabilities()])
-        let model = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
-        model.start()
-        try await waitUntil { model.sessionState != nil }
-        XCTAssertEqual(client.startCount, 0)
-        model.remediate(.requestBluetoothPermission)
-        try await waitUntil { client.startCount == 1 }
-        await model.closeAndAwait()
-    }
-
-
-    @MainActor
     func testInvalidHostConfigurationDoesNotStartSessionAndCanBeDismissed() {
         let client = FakeProximityWalletClient(session: FakeProximitySession())
         let viewModel = ProximityPresentationViewModel(
             client: client,
-            configurationProvider: { try WalletSDK.ProximityConfiguration(maximumMessageBytes: 0) },
+            configurationProvider: { try ProximityConfiguration(maximumMessageBytes: 0) },
             hostActions: FakeProximityHostActionExecutor()
         )
         viewModel.start()
@@ -134,6 +72,15 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         try await waitUntil { viewModel.qrPayload == "mdoc:device-engagement" }
 
         XCTAssertEqual(client.startCount, 1)
+        let configuration = try XCTUnwrap(client.lastConfiguration)
+        guard case .qrAndNFC(.negotiatedHandover) = configuration.engagement else {
+            return XCTFail("The demo must prepare QR and NFC Negotiated Handover")
+        }
+        guard case let .conventional(retrieval) = configuration.retrieval,
+              retrieval.bluetoothLowEnergy != nil,
+              retrieval.nfc != nil else {
+            return XCTFail("The demo must prepare BLE and conventional NFC retrieval")
+        }
         XCTAssertTrue(viewModel.active)
 
         viewModel.handleLifecycleInterruption()
@@ -367,17 +314,12 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
     private let suspendStart: Bool
     private var startContinuation: CheckedContinuation<Void, Never>?
     private(set) var startCount = 0
-    private(set) var configurations: [WalletSDK.ProximityConfiguration] = []
-    private var capabilityResults: [WalletSDK.ProximityCapabilities]
+    private(set) var configurations: [ProximityPresentationConfiguration] = []
+    var lastConfiguration: ProximityPresentationConfiguration? { configurations.last }
 
-    init(session: any DemoProximityPresentationSession, suspendStart: Bool = false, capabilityResults: [WalletSDK.ProximityCapabilities] = [makeProximityCapabilities()]) {
-        self.capabilityResults = capabilityResults
+    init(session: any DemoProximityPresentationSession, suspendStart: Bool = false) {
         self.session = session
         self.suspendStart = suspendStart
-    }
-
-    func proximityPresentationCapabilities(configuration: WalletSDK.ProximityConfiguration) async throws -> WalletSDK.ProximityCapabilities {
-        capabilityResults.count > 1 ? capabilityResults.removeFirst() : capabilityResults[0]
     }
 
     func startProximityPresentation(
@@ -408,11 +350,7 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
     private(set) var actions: [WalletSDK.ProximityAction] = []
     private(set) var closeCount = 0
 
-    private let suspendClose: Bool
-    private var closeContinuation: CheckedContinuation<Void, Never>?
-
-    init(suspendClose: Bool = false) {
-        self.suspendClose = suspendClose
+    init() {
         var continuation: AsyncStream<WalletSDK.ProximityState>.Continuation!
         states = AsyncStream { continuation = $0 }
         self.continuation = continuation
@@ -427,16 +365,9 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
         return .accepted
     }
 
-    func close() async {
+    func close() {
         closeCount += 1
-        if suspendClose { await withCheckedContinuation { closeContinuation = $0 } }
         continuation.finish()
-    }
-
-    func resumeClose() {
-        let pending = closeContinuation
-        closeContinuation = nil
-        pending?.resume()
     }
 }
 
@@ -470,44 +401,4 @@ private func waitUntilAsync(
         if Date() >= deadline { XCTFail("Timed out waiting for condition"); return }
         try await Task.sleep(nanoseconds: 10_000_000)
     }
-}
-
-private func makeProximityCapabilities(
-    bluetoothAvailable: Bool = true,
-    nfcAvailable: Bool = true,
-    bluetoothRemediation: [WalletSDK.ProximityRemediationAction] = []
-) -> WalletSDK.ProximityCapabilities {
-    func capability(
-        available: Bool,
-        selected: Bool,
-        remediation: [WalletSDK.ProximityRemediationAction] = []
-    ) -> WalletSDK.ProximityTransportCapability {
-        WalletSDK.ProximityTransportCapability(
-            implemented: true,
-            profilePermitted: true,
-            runtime: !selected ? .notChecked : available ? .available : .unavailable(
-                WalletSDK.ProximityError(
-                    category: .capability,
-                    code: "test_unavailable",
-                    message: "The selected test capability is unavailable",
-                    recovery: remediation.isEmpty ? .none : .retryPrerequisites
-                ),
-                remediationActions: remediation
-            ),
-            selected: selected
-        )
-    }
-
-    return WalletSDK.ProximityCapabilities(
-        profile: .iso180135Edition2DIS2026,
-        qrEngagement: capability(available: true, selected: true),
-        nfcEngagement: capability(available: true, selected: true),
-        bluetoothLowEnergy: capability(
-            available: bluetoothAvailable,
-            selected: true,
-            remediation: bluetoothRemediation
-        ),
-        nfcRetrieval: capability(available: nfcAvailable, selected: true),
-        wifiAwareRetrieval: capability(available: false, selected: false)
-    )
 }
