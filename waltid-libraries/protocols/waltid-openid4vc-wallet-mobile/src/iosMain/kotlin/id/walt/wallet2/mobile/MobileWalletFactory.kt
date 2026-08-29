@@ -7,13 +7,16 @@ import id.walt.wallet2.persistence.encryption.IosDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.IosPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
 import id.walt.mdoc.proximity.mobile.IosBleProximityTransportFactory
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * iOS [MobileWallet] factory backed by Keychain/Secure Enclave managed keys, the Crypto2 software-key fallback,
  * and a native SQLDelight database.
  */
-public actual class MobileWalletFactory {
+public actual class MobileWalletFactory(
+    private val nfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+) {
     /**
      * Creates an iOS mobile wallet using native SQLDelight storage and the default iOS platform key provider.
      */
@@ -52,6 +55,7 @@ public actual class MobileWalletFactory {
             // Cross-process sharing is configured there, not here; see MobileWalletCrossProcessAccess.
             platformKeyProvider = IosPlatformKeyProvider(),
             proximityTransportFactory = IosBleProximityTransportFactory(),
+            proximityNfcHostPlatformAdapter = nfcHostPlatformAdapter,
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
         )

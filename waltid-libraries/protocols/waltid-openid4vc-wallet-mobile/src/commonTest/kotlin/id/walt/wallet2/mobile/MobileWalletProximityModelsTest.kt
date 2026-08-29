@@ -82,12 +82,152 @@ class MobileWalletProximityModelsTest {
             nfcEngagement = unavailableAlternative,
             bluetoothLowEnergy = available,
             nfcRetrieval = unavailableAlternative,
+            nfcV2Retrieval = unavailableAlternative.copy(selected = false),
             wifiAwareRetrieval = unavailableAlternative.copy(selected = false),
         )
 
         assertTrue(capabilities.mayStart)
         assertTrue(capabilities.nfcEngagement.selected)
         assertFalse(capabilities.nfcEngagement.mayStart)
+    }
+
+    @Test
+    fun `NFCv2 retrieval cannot be selected without its NFC engagement path`() {
+        val available = MobileWalletProximityTransportCapability(
+            implemented = true,
+            profilePermitted = true,
+            runtimeAvailable = true,
+            selected = true,
+        )
+        val unselected = available.copy(selected = false)
+
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityCapabilities(
+                profile = MobileWalletProximityProfile.Iso180135Edition2Dis2026,
+                qrEngagement = available,
+                nfcEngagement = unselected,
+                bluetoothLowEnergy = unselected,
+                nfcRetrieval = unselected,
+                nfcV2Retrieval = available,
+                wifiAwareRetrieval = unselected,
+            )
+        }
+    }
+
+    @Test
+    fun `first-edition profile rejects NFCv2 instead of claiming unsupported compatibility`() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityConfiguration(
+                profile = MobileWalletProximityProfile.Iso1801352021,
+                engagement = MobileWalletProximityEngagementConfiguration.NfcOnly(
+                    MobileWalletProximityNfcEngagementMode.ProvisionalV2()
+                ),
+                retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityConfiguration(
+                profile = MobileWalletProximityProfile.Iso1801352021,
+                engagement = MobileWalletProximityEngagementConfiguration.QrAndNfc(
+                    MobileWalletProximityNfcEngagementMode.ProvisionalV2()
+                ),
+                retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(
+                    bluetoothLowEnergy = MobileWalletProximityBleConfiguration(),
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `retrieval family is tied to its engagement family without dormant bearer state`() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityRetrievalConfiguration.Conventional(
+                bluetoothLowEnergy = null,
+                nfc = null,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityConfiguration(
+                engagement = MobileWalletProximityEngagementConfiguration.NfcOnly(
+                    MobileWalletProximityNfcEngagementMode.ProvisionalV2()
+                ),
+                retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityConfiguration(
+                engagement = MobileWalletProximityEngagementConfiguration.NfcOnly(
+                    MobileWalletProximityNfcEngagementMode.Negotiated
+                ),
+                retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityConfiguration(
+                engagement = MobileWalletProximityEngagementConfiguration.NfcOnly(
+                    MobileWalletProximityNfcEngagementMode.ProvisionalV2()
+                ),
+                retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(
+                    qrNfc = MobileWalletProximityNfcRetrievalConfiguration(),
+                ),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityConfiguration(
+                engagement = MobileWalletProximityEngagementConfiguration.QrAndNfc(
+                    MobileWalletProximityNfcEngagementMode.ProvisionalV2()
+                ),
+                retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(),
+            )
+        }
+
+        MobileWalletProximityConfiguration(
+            engagement = MobileWalletProximityEngagementConfiguration.NfcOnly(
+                MobileWalletProximityNfcEngagementMode.ProvisionalV2()
+            ),
+            retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(),
+        )
+        MobileWalletProximityConfiguration(
+            engagement = MobileWalletProximityEngagementConfiguration.QrAndNfc(
+                MobileWalletProximityNfcEngagementMode.ProvisionalV2()
+            ),
+            retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(
+                qrNfc = MobileWalletProximityNfcRetrievalConfiguration(),
+            ),
+        )
+    }
+
+    @Test
+    fun `NFC length domains reject values outside their distinct wire limits`() {
+        MobileWalletProximityNfcRetrievalConfiguration(
+            maximumCommandDataLength = 255,
+            maximumResponseDataLength = 256,
+        )
+        MobileWalletProximityNfcRetrievalConfiguration(
+            maximumCommandDataLength = 65_535,
+            maximumResponseDataLength = 65_536,
+        )
+        MobileWalletProximityNfcEngagementMode.ProvisionalV2(1)
+        MobileWalletProximityNfcEngagementMode.ProvisionalV2(65_536)
+
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityNfcRetrievalConfiguration(maximumCommandDataLength = 254)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityNfcRetrievalConfiguration(maximumCommandDataLength = 65_536)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityNfcRetrievalConfiguration(maximumResponseDataLength = 255)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityNfcRetrievalConfiguration(maximumResponseDataLength = 65_537)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityNfcEngagementMode.ProvisionalV2(0)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityNfcEngagementMode.ProvisionalV2(65_537)
+        }
     }
 
     @Test

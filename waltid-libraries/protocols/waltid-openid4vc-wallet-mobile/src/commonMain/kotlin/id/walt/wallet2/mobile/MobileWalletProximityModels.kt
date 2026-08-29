@@ -11,7 +11,7 @@ import kotlin.time.Instant
  * @property id Stable identifier suitable for configuration and diagnostics.
  */
 public enum class MobileWalletProximityProfile(public val id: String) {
-    /** Provisional ISO/IEC 18013-5:2021 compatibility boundary. */
+    /** ISO/IEC 18013-5:2021 compatibility boundary. */
     Iso1801352021("iso-18013-5:2021"),
 
     /** ISO/IEC 18013-5 edition-2 DIS implementation boundary. */
@@ -34,18 +34,135 @@ public enum class MobileWalletProximityBleBearerPolicy {
     PreferL2cap,
 }
 
-/** Holder-to-reader engagement methods selected for a session. */
-public enum class MobileWalletProximityEngagementMethod {
-    Qr,
-    Nfc,
+/**
+ * Complete BLE bearer configuration; it cannot exist unless BLE retrieval is selected.
+ *
+ * @property roles Holder GATT roles prepared for the session.
+ * @property bearerPolicy GATT/L2CAP selection policy applied within the selected roles.
+ */
+public data class MobileWalletProximityBleConfiguration(
+    public val roles: MobileWalletProximityBleRoles = MobileWalletProximityBleRoles.Dual,
+    public val bearerPolicy: MobileWalletProximityBleBearerPolicy =
+        MobileWalletProximityBleBearerPolicy.PreferL2cap,
+)
+
+/**
+ * Complete conventional NFC retrieval length contract.
+ *
+ * @property maximumCommandDataLength Maximum command-data bytes accepted by the holder.
+ * @property maximumResponseDataLength Maximum response-data bytes returned by the holder.
+ */
+public data class MobileWalletProximityNfcRetrievalConfiguration(
+    public val maximumCommandDataLength: Int = 65_535,
+    public val maximumResponseDataLength: Int = 65_536,
+) {
+    init {
+        require(maximumCommandDataLength in 255..65_535)
+        require(maximumResponseDataLength in 256..65_536)
+    }
 }
 
-/** Device-retrieval transports selected for a session. */
-public enum class MobileWalletProximityRetrievalMethod {
-    BluetoothLowEnergy,
-    Nfc,
-    WifiAware,
+/**
+ * Retrieval configuration whose variant is tied to the selected NFC engagement family.
+ *
+ * Conventional retrieval methods and provisional NFCv2 same-channel retrieval are intentionally
+ * different variants: NFCv2 must never be represented as conventional NFC merely because both use
+ * ISO 7816 APDUs.
+ */
+public sealed interface MobileWalletProximityRetrievalConfiguration {
+    /**
+     * One or both conventional retrieval methods used by QR, Static Handover, or Negotiated Handover.
+     *
+     * @property bluetoothLowEnergy Optional BLE role and bearer policy.
+     * @property nfc Optional conventional NFC command/response contract.
+     */
+    public data class Conventional(
+        public val bluetoothLowEnergy: MobileWalletProximityBleConfiguration? =
+            MobileWalletProximityBleConfiguration(),
+        public val nfc: MobileWalletProximityNfcRetrievalConfiguration? = null,
+    ) : MobileWalletProximityRetrievalConfiguration {
+        init {
+            require(bluetoothLowEnergy != null || nfc != null) {
+                "Conventional proximity retrieval requires BLE, NFC, or both"
+            }
+        }
+    }
+
+    /**
+     * Provisional NFCv2 same-channel retrieval plus compatible optional paths.
+     *
+     * The NFCv2 APDU channel is always selected by this variant. BLE, when present, is an alternate
+     * bearer used as the NFCv2 hybrid transport. [qrNfc] is conventional NFC retrieval for the QR
+     * branch of a combined QR/NFCv2 engagement only; it is never encoded as an NFCv2 method.
+     *
+     * @property bluetoothLowEnergy Optional NFCv2 alternate BLE bearer and QR BLE bearer.
+     * @property qrNfc Optional conventional NFC retrieval for a concurrently prepared QR path.
+     */
+    public data class ProvisionalNfcV2(
+        public val bluetoothLowEnergy: MobileWalletProximityBleConfiguration? = null,
+        public val qrNfc: MobileWalletProximityNfcRetrievalConfiguration? = null,
+    ) : MobileWalletProximityRetrievalConfiguration
 }
+
+/** NFC engagement wire profile selected exactly once for a session. */
+public sealed interface MobileWalletProximityNfcEngagementMode {
+    /** NFC Forum Static Handover with holder-selected retrieval methods. */
+    public data object Static : MobileWalletProximityNfcEngagementMode
+
+    /** NFC Forum Negotiated Handover with a reader-selected retrieval method. */
+    public data object Negotiated : MobileWalletProximityNfcEngagementMode
+
+    /**
+     * Provisional second-edition NFC Engagement v2 behavior pinned to the selected source contract.
+     *
+     * @property maximumCommandDataLength Maximum command-data bytes accepted by the NFCv2 application.
+     */
+    public data class ProvisionalV2(public val maximumCommandDataLength: Int = 65_536) :
+        MobileWalletProximityNfcEngagementMode {
+        init {
+            require(maximumCommandDataLength in 1..65_536)
+        }
+    }
+}
+
+/** Engagement configuration in which QR/NFC combinations and NFC tuning cannot drift apart. */
+public sealed interface MobileWalletProximityEngagementConfiguration {
+    /** QR is the only configured engagement path. */
+    public data object QrOnly : MobileWalletProximityEngagementConfiguration
+
+    /**
+     * NFC is the only configured engagement path.
+     *
+     * @property mode NFC handover mode exposed for the session.
+     */
+    public data class NfcOnly(public val mode: MobileWalletProximityNfcEngagementMode) :
+        MobileWalletProximityEngagementConfiguration
+
+    /**
+     * QR and NFC are prepared as competing engagement paths.
+     *
+     * @property mode NFC handover mode exposed for the NFC path.
+     */
+    public data class QrAndNfc(public val mode: MobileWalletProximityNfcEngagementMode) :
+        MobileWalletProximityEngagementConfiguration
+}
+
+internal val MobileWalletProximityEngagementConfiguration.includesQr: Boolean
+    get() = this is MobileWalletProximityEngagementConfiguration.QrOnly ||
+        this is MobileWalletProximityEngagementConfiguration.QrAndNfc
+
+internal val MobileWalletProximityEngagementConfiguration.includesNfc: Boolean
+    get() = this is MobileWalletProximityEngagementConfiguration.NfcOnly ||
+        this is MobileWalletProximityEngagementConfiguration.QrAndNfc
+
+internal val MobileWalletProximityEngagementConfiguration.includesNfcV2: Boolean
+    get() = when (this) {
+        MobileWalletProximityEngagementConfiguration.QrOnly -> false
+        is MobileWalletProximityEngagementConfiguration.NfcOnly ->
+            mode is MobileWalletProximityNfcEngagementMode.ProvisionalV2
+        is MobileWalletProximityEngagementConfiguration.QrAndNfc ->
+            mode is MobileWalletProximityNfcEngagementMode.ProvisionalV2
+    }
 
 /** Holder authentication frozen for a reviewed document response. */
 public enum class MobileWalletProximityDeviceAuthenticationMethod {
@@ -93,10 +210,8 @@ public enum class MobileWalletProximityReaderPolicy {
  * Immutable configuration for one single-use proximity session.
  *
  * @property profile Protocol and application-profile boundary to enforce.
- * @property bleRoles BLE holder roles the platform transport may prepare.
- * @property bearerPolicy Preference between supported BLE bearer modes.
- * @property engagementMethods Holder-to-reader engagement methods selected for the session.
- * @property retrievalMethods Device-retrieval transports selected for the session.
+ * @property engagement Holder-to-reader engagement configuration selected for the session.
+ * @property retrieval Nonempty typed device-retrieval configuration.
  * @property readerPolicy Trust threshold applied before disclosure review.
  * @property deviceAuthenticationPolicy Allowed and preferred holder-authentication methods.
  * @property readerTrustEvaluator Application-owned reader trust boundary.
@@ -107,13 +222,10 @@ public enum class MobileWalletProximityReaderPolicy {
 public data class MobileWalletProximityConfiguration(
     public val profile: MobileWalletProximityProfile =
         MobileWalletProximityProfile.Iso180135Edition2Dis2026,
-    public val bleRoles: MobileWalletProximityBleRoles = MobileWalletProximityBleRoles.Dual,
-    public val bearerPolicy: MobileWalletProximityBleBearerPolicy =
-        MobileWalletProximityBleBearerPolicy.PreferL2cap,
-    public val engagementMethods: Set<MobileWalletProximityEngagementMethod> =
-        setOf(MobileWalletProximityEngagementMethod.Qr),
-    public val retrievalMethods: Set<MobileWalletProximityRetrievalMethod> =
-        setOf(MobileWalletProximityRetrievalMethod.BluetoothLowEnergy),
+    public val engagement: MobileWalletProximityEngagementConfiguration =
+        MobileWalletProximityEngagementConfiguration.QrOnly,
+    public val retrieval: MobileWalletProximityRetrievalConfiguration =
+        MobileWalletProximityRetrievalConfiguration.Conventional(),
     public val readerPolicy: MobileWalletProximityReaderPolicy =
         MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
     public val deviceAuthenticationPolicy: MobileWalletProximityDeviceAuthenticationPolicy =
@@ -127,8 +239,6 @@ public data class MobileWalletProximityConfiguration(
     public val maximumMessageBytes: Int = 1_048_576,
 ) {
     init {
-        require(engagementMethods.isNotEmpty()) { "At least one engagement method must be selected" }
-        require(retrievalMethods.isNotEmpty()) { "At least one retrieval method must be selected" }
         require(maximumMessageBytes in 1..16_777_216) {
             "Maximum proximity message size must be between 1 byte and 16 MiB"
         }
@@ -140,6 +250,25 @@ public data class MobileWalletProximityConfiguration(
             profile != MobileWalletProximityProfile.EudiArf3Fcaf202608 ||
                 deviceAuthenticationPolicy == MobileWalletProximityDeviceAuthenticationPolicy.SignatureOnly
         ) { "The selected EUDI profile requires device-signature authentication" }
+        require(profile != MobileWalletProximityProfile.Iso1801352021 || !engagement.includesNfcV2) {
+            "NFC Engagement v2 is not part of the ISO/IEC 18013-5:2021 compatibility profile"
+        }
+        val provisionalNfcV2Retrieval = retrieval as? MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2
+        require(engagement.includesNfcV2 == (provisionalNfcV2Retrieval != null)) {
+            "NFCv2 engagement and its distinct retrieval configuration must be selected together"
+        }
+        if (provisionalNfcV2Retrieval != null) {
+            if (engagement.includesQr) {
+                require(
+                    provisionalNfcV2Retrieval.bluetoothLowEnergy != null ||
+                        provisionalNfcV2Retrieval.qrNfc != null
+                ) { "A combined QR/NFCv2 session requires a QR-compatible retrieval method" }
+            } else {
+                require(provisionalNfcV2Retrieval.qrNfc == null) {
+                    "QR-only conventional NFC retrieval cannot be configured without a QR engagement path"
+                }
+            }
+        }
     }
 }
 
@@ -184,6 +313,7 @@ public enum class MobileWalletProximityRemediationAction {
     RequestBluetoothPermission,
     OpenApplicationSettings,
     EnableBluetooth,
+    EnableNfc,
     UseSupportedDevice,
     Retry,
 }
@@ -231,7 +361,8 @@ public data class MobileWalletProximityTransportCapability(
  * @property qrEngagement QR engagement capability.
  * @property nfcEngagement NFC engagement capability.
  * @property bluetoothLowEnergy BLE device-retrieval capability.
- * @property nfcRetrieval NFC device-retrieval capability.
+ * @property nfcRetrieval Conventional NFC device-retrieval capability.
+ * @property nfcV2Retrieval Provisional NFCv2 same-channel device-retrieval capability.
  * @property wifiAwareRetrieval Wi-Fi Aware device-retrieval capability.
  */
 public data class MobileWalletProximityCapabilities(
@@ -240,21 +371,37 @@ public data class MobileWalletProximityCapabilities(
     public val nfcEngagement: MobileWalletProximityTransportCapability,
     public val bluetoothLowEnergy: MobileWalletProximityTransportCapability,
     public val nfcRetrieval: MobileWalletProximityTransportCapability,
+    public val nfcV2Retrieval: MobileWalletProximityTransportCapability,
     public val wifiAwareRetrieval: MobileWalletProximityTransportCapability,
 ) {
     init {
         require(qrEngagement.selected || nfcEngagement.selected) {
             "At least one engagement capability must be selected"
         }
-        require(bluetoothLowEnergy.selected || nfcRetrieval.selected || wifiAwareRetrieval.selected) {
+        require(
+            bluetoothLowEnergy.selected || nfcRetrieval.selected ||
+                nfcV2Retrieval.selected || wifiAwareRetrieval.selected
+        ) {
             "At least one retrieval capability must be selected"
+        }
+        require(!nfcV2Retrieval.selected || nfcEngagement.selected) {
+            "NFCv2 same-channel retrieval requires the NFCv2 engagement path"
+        }
+        require(!nfcV2Retrieval.mayStart || nfcEngagement.mayStart) {
+            "NFCv2 same-channel retrieval cannot start without NFC engagement"
         }
     }
 
-    /** Whether at least one selected engagement and one selected retrieval method can start. */
+    /** Whether at least one selected engagement has a compatible retrieval path that can start. */
     public val mayStart: Boolean
-        get() = listOf(qrEngagement, nfcEngagement).any { it.mayStart } &&
-            listOf(bluetoothLowEnergy, nfcRetrieval, wifiAwareRetrieval).any { it.mayStart }
+        get() {
+            val qrPath = qrEngagement.mayStart &&
+                listOf(bluetoothLowEnergy, nfcRetrieval, wifiAwareRetrieval).any { it.mayStart }
+            val nfcPath = nfcEngagement.mayStart &&
+                listOf(bluetoothLowEnergy, nfcRetrieval, nfcV2Retrieval, wifiAwareRetrieval)
+                    .any { it.mayStart }
+            return qrPath || nfcPath
+        }
 
     /** Distinct host remediations for selected unavailable methods. */
     public val remediationActions: List<MobileWalletProximityRemediationAction>
@@ -263,6 +410,7 @@ public data class MobileWalletProximityCapabilities(
             nfcEngagement,
             bluetoothLowEnergy,
             nfcRetrieval,
+            nfcV2Retrieval,
             wifiAwareRetrieval,
         ).filter { it.selected }.flatMap { it.remediationActions }.distinct()
 }
