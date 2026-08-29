@@ -10,10 +10,13 @@ import id.walt.wallet2.mobile.MobileWalletProximityDocumentReview
 import id.walt.wallet2.mobile.MobileWalletProximityElementReference
 import id.walt.wallet2.mobile.MobileWalletProximityError
 import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
+import id.walt.wallet2.mobile.MobileWalletProximityEngagementConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
+import id.walt.wallet2.mobile.MobileWalletProximityNfcEngagementMode
 import id.walt.wallet2.mobile.MobileWalletProximityProfile
 import id.walt.wallet2.mobile.MobileWalletProximityReaderPolicy
 import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
+import id.walt.wallet2.mobile.MobileWalletProximityRetrievalConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityRequestedElement
 import id.walt.wallet2.mobile.MobileWalletProximityReview
 import id.walt.wallet2.mobile.MobileWalletProximitySession
@@ -24,6 +27,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -115,6 +120,16 @@ class WalletDemoProximityControllerTest {
         advanceUntilIdle()
 
         assertEquals(1, backend.startCalls)
+        val configuration = requireNotNull(backend.lastConfiguration)
+        val engagement = assertIs<MobileWalletProximityEngagementConfiguration.QrAndNfc>(
+            configuration.engagement,
+        )
+        assertIs<MobileWalletProximityNfcEngagementMode.Negotiated>(engagement.mode)
+        val retrieval = assertIs<MobileWalletProximityRetrievalConfiguration.Conventional>(
+            configuration.retrieval,
+        )
+        assertNotNull(retrieval.bluetoothLowEnergy)
+        assertNotNull(retrieval.nfc)
         assertEquals(session.state.value, controller.state.value.sessionState)
         assertTrue(controller.state.value.active)
         controller.dismiss()
@@ -375,6 +390,8 @@ private class FakeBackend(
     var startCalls: Int = 0
         private set
     val configurations = mutableListOf<MobileWalletProximityConfiguration>()
+    val lastConfiguration: MobileWalletProximityConfiguration?
+        get() = configurations.lastOrNull()
 
     override suspend fun proximityPresentationCapabilities(
         configuration: MobileWalletProximityConfiguration,

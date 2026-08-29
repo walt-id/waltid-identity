@@ -122,7 +122,7 @@ struct PresentView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("In-person presentation")
                         .font(.headline)
-                    Text("Show a device engagement QR code and present an mdoc to a nearby reader over Bluetooth.")
+                    Text("Show a QR code or hold this iPhone near a compatible reader to present an mdoc.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button("Present to nearby reader") {
