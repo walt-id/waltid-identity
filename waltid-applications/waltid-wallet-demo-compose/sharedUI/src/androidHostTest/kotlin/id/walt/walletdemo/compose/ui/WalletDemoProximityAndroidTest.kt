@@ -19,6 +19,10 @@ class WalletDemoProximityAndroidTest {
         scenarios.engagementKeepsTheExactDeviceQRCodeVisibleWhileConnecting()
 
     @Test
+    fun nfcOnlyEngagementShowsHoldGuidanceWithoutInventingAQrCode() =
+        scenarios.nfcOnlyEngagementShowsHoldGuidanceWithoutInventingAQrCode()
+
+    @Test
     fun reviewSeparatesReaderTrustAndSendsOnlyExplicitHolderActions() =
         scenarios.reviewSeparatesReaderTrustAndSendsOnlyExplicitHolderActions()
 

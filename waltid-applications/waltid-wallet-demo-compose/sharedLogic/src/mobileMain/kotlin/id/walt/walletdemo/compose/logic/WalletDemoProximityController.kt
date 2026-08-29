@@ -1,21 +1,25 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.ProximityAction
-import id.walt.wallet2.mobile.ProximityActionResult
-import id.walt.wallet2.mobile.ProximityActionType
-import id.walt.wallet2.mobile.ProximityCapabilities
-import id.walt.wallet2.mobile.ProximityConfiguration
-import id.walt.wallet2.mobile.ProximityDocumentSubmission
-import id.walt.wallet2.mobile.ProximityElementReference
-import id.walt.wallet2.mobile.ProximityError
-import id.walt.wallet2.mobile.ProximityErrorCategory
-import id.walt.wallet2.mobile.ProximityHostActionResult
-import id.walt.wallet2.mobile.ProximityRemediationAction
-import id.walt.wallet2.mobile.ProximityReview
-import id.walt.wallet2.mobile.ProximityRecovery
-import id.walt.wallet2.mobile.ProximitySession
-import id.walt.wallet2.mobile.ProximityState
-import id.walt.wallet2.mobile.ProximitySubmission
+import id.walt.wallet2.mobile.MobileWalletProximityAction
+import id.walt.wallet2.mobile.MobileWalletProximityActionResult
+import id.walt.wallet2.mobile.MobileWalletProximityActionType
+import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
+import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityDocumentSubmission
+import id.walt.wallet2.mobile.MobileWalletProximityElementReference
+import id.walt.wallet2.mobile.MobileWalletProximityError
+import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
+import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
+import id.walt.wallet2.mobile.MobileWalletProximityEngagementConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityNfcEngagementMode
+import id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
+import id.walt.wallet2.mobile.MobileWalletProximityRetrievalConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityReview
+import id.walt.wallet2.mobile.MobileWalletProximityRecovery
+import id.walt.wallet2.mobile.MobileWalletProximitySession
+import id.walt.wallet2.mobile.MobileWalletProximityState
+import id.walt.wallet2.mobile.MobileWalletProximitySubmission
 import id.walt.wallet2.mobile.legalActions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -86,8 +90,8 @@ fun interface WalletDemoProximityHostActionExecutor {
  */
 class WalletDemoProximityController(
     private val wallet: ProximityPresentationBackend,
-    private val configurationProvider: () -> ProximityConfiguration = {
-        ProximityConfiguration()
+    private val configurationProvider: () -> MobileWalletProximityConfiguration = {
+        walletDemoProximityConfiguration
     },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
@@ -364,7 +368,16 @@ private val ProximityCapabilities.automaticPermissionActions:
         it == ProximityRemediationAction.RequestBluetoothPermission
     }
 
-private fun ProximityReview.defaultSelections(): List<WalletDemoProximityDocumentSelection> =
+internal val walletDemoProximityConfiguration = MobileWalletProximityConfiguration(
+    engagement = MobileWalletProximityEngagementConfiguration.QrAndNfc(
+        MobileWalletProximityNfcEngagementMode.Negotiated,
+    ),
+    retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(
+        nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+    ),
+)
+
+private fun MobileWalletProximityReview.defaultSelections(): List<WalletDemoProximityDocumentSelection> =
     documents.map { document ->
         val credential = document.credentialOptions.first()
         WalletDemoProximityDocumentSelection(
