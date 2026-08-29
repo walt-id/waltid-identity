@@ -88,10 +88,6 @@ import id.walt.walletdemo.compose.ui.components.ReviewActionPresentation
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.resources.*
-import id.walt.walletdemo.compose.ui.resources.proximity_qr_accessibility
-import id.walt.walletdemo.compose.ui.resources.proximity_verifier
-import id.walt.walletdemo.compose.ui.resources.proximity_verifier
-import id.walt.walletdemo.compose.ui.resources.proximity_qr_accessibility
 import org.jetbrains.compose.resources.stringResource
 
 /** Mobile-only host that adds the shared proximity journey to the regular Compose demo. */
@@ -104,7 +100,6 @@ fun MobileWalletDemoApp(
 ) {
     val walletState by controller.state.collectAsState()
     val proximity by proximityController.state.collectAsState()
-    val trustSettings by readerTrustSettingsController.state.collectAsState()
     val hostActions = rememberProximityHostActions()
     val credentials = (walletState.session as? WalletSessionState.Ready)
         ?.credentials
@@ -134,9 +129,7 @@ fun MobileWalletDemoApp(
     WalletDemoAppHost(
         controller = controller,
         branding = branding,
-        onStartProximityPresentation = (proximityController::start).takeUnless { trustSettings.loading },
-        onOpenSettings = proximityController::dismiss,
-        onResetWallet = { controller.resetWallet { proximityController.closeAndAwait() } },
+        onStartProximityPresentation = proximityController::start,
         presentationContent = if (proximity.active) {
             {
                 WalletDemoProximityScreen(
@@ -309,7 +302,7 @@ private fun WalletDemoProximityReview(
         modifier = modifier,
         actions = {
             SharingActionsRow(
-                enabled = state.pendingReviewId == null,
+                enabled = true,
                 selectionComplete = state.canApprove,
                 onSubmit = onApprove,
                 onCancel = onCancel,
@@ -348,8 +341,7 @@ private fun PrerequisiteContent(
             if (capabilities.mayStart) {
                 stringResource(Res.string.proximity_ready_message)
             } else {
-                capabilities.bluetoothLowEnergy.unavailable?.message
-                    ?: capabilities.qrEngagement.unavailable?.message
+                capabilities.selectedUnavailableMessage
                     ?: stringResource(Res.string.proximity_generic_unavailable)
             }
         )
@@ -375,13 +367,23 @@ private fun PrerequisiteContent(
     }
 }
 
+private val MobileWalletProximityCapabilities.selectedUnavailableMessage: String?
+    get() = listOf(
+        nfcEngagement,
+        bluetoothLowEnergy,
+        nfcRetrieval,
+        nfcV2Retrieval,
+        qrEngagement,
+        wifiAwareRetrieval,
+    ).firstNotNullOfOrNull { capability -> capability.unavailable?.message.takeIf { capability.selected } }
+
 @Composable
 private fun EngagementContent(
     engagements: List<ProximityEngagement>,
     connecting: Boolean,
 ) {
-    val qrAccessibility = stringResource(Res.string.proximity_qr_accessibility)
-    val qr = engagements.filterIsInstance<ProximityEngagement.Qr>().singleOrNull()
+    val qr = engagements.filterIsInstance<MobileWalletProximityEngagement.Qr>().singleOrNull()
+    val hasNfc = engagements.any { it is MobileWalletProximityEngagement.Nfc }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -390,8 +392,12 @@ private fun EngagementContent(
         Text(
             if (connecting) {
                 stringResource(Res.string.proximity_reader_detected)
-            } else {
+            } else if (qr != null && hasNfc) {
+                stringResource(Res.string.proximity_reader_scan_or_hold_title)
+            } else if (qr != null) {
                 stringResource(Res.string.proximity_reader_scan_title)
+            } else {
+                stringResource(Res.string.proximity_reader_hold_title)
             },
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
@@ -399,8 +405,12 @@ private fun EngagementContent(
         Text(
             if (connecting) {
                 stringResource(Res.string.proximity_connecting_guidance)
-            } else {
+            } else if (qr != null && hasNfc) {
+                stringResource(Res.string.proximity_reader_scan_or_hold_guidance)
+            } else if (qr != null) {
                 stringResource(Res.string.proximity_reader_scan_guidance)
+            } else {
+                stringResource(Res.string.proximity_reader_hold_guidance)
             },
             textAlign = TextAlign.Center,
         )
@@ -420,7 +430,7 @@ private fun EngagementContent(
                         modifier = Modifier
                             .size(280.dp)
                             .semantics {
-                                contentDescription = qrAccessibility
+                                contentDescription = "Device engagement QR code"
                             }
                             .testTag(WalletUiTestTags.ProximityQr),
                     )
@@ -521,7 +531,7 @@ private fun ReaderMetadataCard(
     }
     if (suppliedAuthentications.isEmpty()) {
         ReviewMetadataSection(
-            title = stringResource(Res.string.proximity_verifier),
+            title = "Verifier",
             modifier = Modifier.testTag(WalletUiTestTags.ProximityReaderSection),
         ) {
             Text(
@@ -557,7 +567,7 @@ private fun ReaderMetadataCard(
     }
 
     ExpandableMetadataCard(
-        title = stringResource(Res.string.proximity_verifier),
+        title = "Verifier",
         expanded = expanded,
         onToggle = { expanded = !expanded },
         modifier = Modifier.testTag(WalletUiTestTags.ProximityReaderSection),

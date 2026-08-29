@@ -1,22 +1,25 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.ProximityAction
-import id.walt.wallet2.mobile.ProximityActionResult
-import id.walt.wallet2.mobile.ProximityActionType
-import id.walt.wallet2.mobile.ProximityCapabilities
-import id.walt.wallet2.mobile.ProximityConfiguration
-import id.walt.wallet2.mobile.ProximityDocumentSubmission
-import id.walt.wallet2.mobile.ProximityElementReference
-import id.walt.wallet2.mobile.ProximityError
-import id.walt.wallet2.mobile.ProximityErrorCategory
-import id.walt.wallet2.mobile.ProximityHostActionResult
-import id.walt.wallet2.mobile.ProximityRemediationAction
-import id.walt.wallet2.mobile.ProximityReview
-import id.walt.wallet2.mobile.ProximityReviewId
-import id.walt.wallet2.mobile.ProximityRecovery
-import id.walt.wallet2.mobile.ProximitySession
-import id.walt.wallet2.mobile.ProximityState
-import id.walt.wallet2.mobile.ProximitySubmission
+import id.walt.wallet2.mobile.MobileWalletProximityAction
+import id.walt.wallet2.mobile.MobileWalletProximityActionResult
+import id.walt.wallet2.mobile.MobileWalletProximityActionType
+import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
+import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityDocumentSubmission
+import id.walt.wallet2.mobile.MobileWalletProximityElementReference
+import id.walt.wallet2.mobile.MobileWalletProximityError
+import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
+import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
+import id.walt.wallet2.mobile.MobileWalletProximityEngagementConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityNfcEngagementMode
+import id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
+import id.walt.wallet2.mobile.MobileWalletProximityRetrievalConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityReview
+import id.walt.wallet2.mobile.MobileWalletProximityRecovery
+import id.walt.wallet2.mobile.MobileWalletProximitySession
+import id.walt.wallet2.mobile.MobileWalletProximityState
+import id.walt.wallet2.mobile.MobileWalletProximitySubmission
 import id.walt.wallet2.mobile.legalActions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -53,13 +56,12 @@ data class WalletDemoProximityUiState(
     val continueAfterResponse: Boolean = false,
     val hostActionInProgress: ProximityRemediationAction? = null,
     val actionError: ProximityError? = null,
-    val pendingReviewId: ProximityReviewId? = null,
 ) {
     val review: ProximityReview?
         get() = (sessionState as? ProximityState.ReviewRequired)?.review
 
     val canApprove: Boolean
-        get() = pendingReviewId == null && review?.let { current ->
+        get() = review?.let { current ->
             selections.map { it.requestIndex }.toSet() == current.documents.map { it.requestIndex }.toSet() &&
                 selections.all { it.disclosedElements.isNotEmpty() }
         } == true
@@ -88,8 +90,8 @@ fun interface WalletDemoProximityHostActionExecutor {
  */
 class WalletDemoProximityController(
     private val wallet: ProximityPresentationBackend,
-    private val configurationProvider: () -> ProximityConfiguration = {
-        ProximityConfiguration()
+    private val configurationProvider: () -> MobileWalletProximityConfiguration = {
+        walletDemoProximityConfiguration
     },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
@@ -98,7 +100,6 @@ class WalletDemoProximityController(
     val state: StateFlow<WalletDemoProximityUiState> = mutableState.asStateFlow()
 
     private var session: ProximitySession? = null
-    private var closingJob: Job? = null
     private var pendingConfiguration: ProximityConfiguration? = null
     private var sessionJob: Job? = null
     private var hostActionJob: Job? = null
@@ -119,11 +120,8 @@ class WalletDemoProximityController(
         startGeneration: Long,
     ) {
         sessionJob?.cancel()
-        val cleanup = closingJob
         sessionJob = scope.launch(dispatcher) {
             try {
-                cleanup?.join()
-                if (!isCurrent(startGeneration)) return@launch
                 val capabilities = wallet.proximityPresentationCapabilities(configuration)
                 if (!isCurrent(startGeneration)) return@launch
                 publish(ProximityState.CheckingPrerequisites(capabilities))
@@ -158,7 +156,6 @@ class WalletDemoProximityController(
     }
 
     fun selectCredential(requestIndex: Int, credentialId: String) {
-        if (mutableState.value.pendingReviewId != null) return
         val review = mutableState.value.review ?: return
         val document = review.documents.singleOrNull { it.requestIndex == requestIndex } ?: return
         val credential = document.credentialOptions.singleOrNull { it.credentialId == credentialId } ?: return
@@ -173,7 +170,6 @@ class WalletDemoProximityController(
     }
 
     fun toggleElement(requestIndex: Int, element: ProximityElementReference) {
-        if (mutableState.value.pendingReviewId != null) return
         val current = mutableState.value
         val review = current.review ?: return
         val selection = current.selections.singleOrNull { it.requestIndex == requestIndex } ?: return
@@ -305,32 +301,17 @@ class WalletDemoProximityController(
         }
     }
 
-    suspend fun closeAndAwait() {
-        dismiss()
-        withContext(NonCancellable) { closingJob?.join() }
-    }
-
     fun dismiss() {
         generation += 1
-        val starting = sessionJob
-        val hostAction = hostActionJob
-        starting?.cancel()
-        hostAction?.cancel()
+        sessionJob?.cancel()
         sessionJob = null
+        hostActionJob?.cancel()
         hostActionJob = null
         val closing = session
         session = null
         pendingConfiguration = null
         mutableState.value = WalletDemoProximityUiState()
-        val previous = closingJob
-        closingJob = scope.launch(dispatcher) {
-            withContext(NonCancellable) {
-                previous?.join()
-                starting?.join()
-                hostAction?.join()
-                closing?.close()
-            }
-        }
+        if (closing != null) scope.launch(dispatcher) { closing.close() }
     }
 
     /** Closes a terminal session before starting a fresh capability check and exchange. */
@@ -342,25 +323,13 @@ class WalletDemoProximityController(
 
     private fun dispatch(action: ProximityAction) {
         val currentSession = session ?: return
-        val reviewId = when (action) {
-            is ProximityAction.Approve -> action.reviewId
-            is ProximityAction.Decline -> action.reviewId
-            else -> null
-        }
-        if (reviewId != null && mutableState.value.pendingReviewId != null) return
         val actionGeneration = generation
-        mutableState.update { it.copy(actionError = null, pendingReviewId = reviewId ?: it.pendingReviewId) }
+        mutableState.update { it.copy(actionError = null) }
         scope.launch(dispatcher) {
-            val result = try { currentSession.dispatch(action) }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { ProximityActionResult.Rejected(demoSessionFailure) }
+            val result = currentSession.dispatch(action)
             if (generation != actionGeneration || !mutableState.value.active) return@launch
-            if (reviewId != null && mutableState.value.review?.reviewId != reviewId) return@launch
             mutableState.update {
-                it.copy(
-                    pendingReviewId = if (result is ProximityActionResult.Rejected) null else it.pendingReviewId,
-                    actionError = (result as? ProximityActionResult.Rejected)?.error,
-                )
+                it.copy(actionError = (result as? ProximityActionResult.Rejected)?.error)
             }
         }
     }
@@ -375,9 +344,6 @@ class WalletDemoProximityController(
                 ?.takeIf { current.review?.reviewId != it.reviewId }
             current.copy(
                 sessionState = sessionState,
-                pendingReviewId = current.pendingReviewId.takeIf {
-                    (sessionState as? ProximityState.ReviewRequired)?.review?.reviewId == it
-                },
                 selections = reviewForNewExchange?.defaultSelections() ?: current.selections,
                 continueAfterResponse = if (reviewForNewExchange != null) false else current.continueAfterResponse,
                 actionError = null,
@@ -402,7 +368,16 @@ private val ProximityCapabilities.automaticPermissionActions:
         it == ProximityRemediationAction.RequestBluetoothPermission
     }
 
-private fun ProximityReview.defaultSelections(): List<WalletDemoProximityDocumentSelection> =
+internal val walletDemoProximityConfiguration = MobileWalletProximityConfiguration(
+    engagement = MobileWalletProximityEngagementConfiguration.QrAndNfc(
+        MobileWalletProximityNfcEngagementMode.Negotiated,
+    ),
+    retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(
+        nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+    ),
+)
+
+private fun MobileWalletProximityReview.defaultSelections(): List<WalletDemoProximityDocumentSelection> =
     documents.map { document ->
         val credential = document.credentialOptions.first()
         WalletDemoProximityDocumentSelection(

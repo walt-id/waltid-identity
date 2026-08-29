@@ -56,8 +56,11 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     init(
         client: any ProximityWalletClient,
-        configurationProvider: @escaping @MainActor () throws -> ProximityConfiguration = {
-            .init()
+        configurationProvider: @escaping @MainActor () throws -> ProximityPresentationConfiguration = {
+            try .init(
+                engagement: .qrAndNFC(.negotiatedHandover),
+                retrieval: .conventional(.init(nfc: .init()))
+            )
         },
         hostActions: (any ProximityHostActionExecutor)? = nil
     ) {
