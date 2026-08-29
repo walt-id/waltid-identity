@@ -30,6 +30,7 @@ import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.engagement.BleCentralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
+import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
@@ -63,6 +64,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import org.kotlincrypto.hash.sha2.SHA256
 
@@ -98,7 +101,7 @@ class HolderProtocolEngineTest {
     }
 
     @Test
-    fun `Device Engagement restricts provisional retrieval methods to NFCv2 placement`() = runTest {
+    fun `Device Engagement enforces placement-specific retrieval methods`() = runTest {
         val deviceKey = agreementKey("engagement-placement")
         val context = EngagementContext(
             MdocProximityProfile.ISO_18013_5_ED2_DIS_2026,
@@ -115,8 +118,25 @@ class HolderProtocolEngineTest {
         assertFailsWith<IllegalArgumentException> {
             factory.create(deviceKey, listOf(DeviceRetrievalMethod.NfcV2()), context, capabilities)
         }
+        val negotiated = factory.create(deviceKey, listOf(readerOwnedBle), context, capabilities)
+        assertNull(negotiated.engagement.value.deviceRetrievalMethods)
+
+        val qrContext = context.copy(engagementMode = MdocEngagementMode.Qr)
+        val qrCapabilities = MdocSessionCapabilities.forSession(
+            qrContext.profile,
+            deviceKey,
+            emptySet(),
+        )
         assertFailsWith<IllegalArgumentException> {
-            factory.create(deviceKey, listOf(readerOwnedBle), context, capabilities)
+            factory.create(deviceKey, listOf(readerOwnedBle), qrContext, qrCapabilities)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            factory.create(
+                deviceKey,
+                listOf(DeviceRetrievalMethod.Ble(peripheralMode = BlePeripheralMode(ByteArray(16)))),
+                qrContext,
+                qrCapabilities,
+            )
         }
         assertFailsWith<IllegalArgumentException> {
             factory.create(
@@ -761,6 +781,36 @@ class HolderProtocolEngineTest {
     }
 
     @Test
+    fun `QR engagement lifetime is not shortened by the transport connection timeout`() = realDispatcherTest {
+        val result = runConnectionTimeoutSession(
+            mode = MdocEngagementMode.Qr,
+            qrPayload = "mdoc:test",
+            timeouts = MdocProximityTimeouts(
+                qrEngagementLifetime = 200.milliseconds,
+                transportConnection = 20.milliseconds,
+                totalSession = 1.seconds,
+            ),
+        )
+
+        assertEquals("engagement_timeout", assertIs<MdocHolderSessionResult.Failed>(result).error.code)
+    }
+
+    @Test
+    fun `NFC-only engagement retains the transport connection timeout`() = realDispatcherTest {
+        val result = runConnectionTimeoutSession(
+            mode = MdocEngagementMode.Nfc,
+            qrPayload = null,
+            timeouts = MdocProximityTimeouts(
+                qrEngagementLifetime = 200.milliseconds,
+                transportConnection = 20.milliseconds,
+                totalSession = 1.seconds,
+            ),
+        )
+
+        assertEquals("connection_timeout", assertIs<MdocHolderSessionResult.Failed>(result).error.code)
+    }
+
+    @Test
     fun `different per-document response limits use the strictest value`() = realDispatcherTest {
         val accepted = runSingleRequestSession(
             encodedRequest = encodeRequestWithResponseLimits(listOf(1_024u, 2_048u)),
@@ -903,6 +953,36 @@ class HolderProtocolEngineTest {
         var responseMessages = 0
         while (loopback.reader.receive() != null) responseMessages++
         return SessionRun(result, resolveCalls, responseMessages)
+    }
+
+    private suspend fun runConnectionTimeoutSession(
+        mode: MdocEngagementMode,
+        qrPayload: String?,
+        timeouts: MdocProximityTimeouts,
+    ): MdocHolderSessionResult {
+        val deviceKey = agreementKey("connection-timeout-${deviceKeyCounter++}")
+        val context = EngagementContext(
+            MdocProximityProfile.ISO_18013_5_ED2_DIS_2026,
+            1_048_576,
+            mode,
+        )
+        return MdocHolderProtocolEngine(
+            eDeviceKey = deviceKey,
+            engagementSources = listOf(NeverConnectingEngagementSource(mode, qrPayload)),
+            requestProcessor = object : MdocHolderRequestProcessor {
+                override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview =
+                    error("No request is reachable without a connection")
+
+                override suspend fun resolve(
+                    context: MdocHolderRequestContext,
+                    preview: MdocRequestPreview,
+                ): MdocResponseResolution = error("No request is reachable without a connection")
+            },
+            consentHandler = MdocConsentHandler { error("Consent is unreachable without a connection") },
+            engagementContext = context,
+            capabilities = MdocSessionCapabilities.forSession(context.profile, deviceKey, emptySet()),
+            timeouts = timeouts,
+        ).run()
     }
 
     private fun encodeRequest(docType: String): ByteArray = encodeRequest(listOf(docType))
@@ -1124,6 +1204,29 @@ class HolderProtocolEngineTest {
             override suspend fun close(reason: ProximityCloseReason) {
                 engaged.connection.close(reason)
             }
+        }
+    }
+
+    private class NeverConnectingEngagementSource(
+        mode: MdocEngagementMode,
+        private val qrPayload: String?,
+    ) : MdocEngagementSource {
+        override val modes: Set<MdocEngagementMode> = setOf(mode)
+
+        override suspend fun prepare(
+            context: MdocEngagementPreparationContext,
+            sessionScope: CoroutineScope,
+        ): PreparedMdocEngagement = object : PreparedMdocEngagement {
+            override val modes: Set<MdocEngagementMode> = this@NeverConnectingEngagementSource.modes
+            override val readiness: MdocEngagementReadiness = MdocEngagementReadiness(
+                qrPayload = this@NeverConnectingEngagementSource.qrPayload,
+                availableTransports = setOf(ProximityTransportKind.FAKE),
+                unavailableTransports = emptyMap(),
+            )
+
+            override suspend fun awaitConnection(): MdocEngagedConnection = awaitCancellation()
+
+            override suspend fun close(reason: ProximityCloseReason) = Unit
         }
     }
 
