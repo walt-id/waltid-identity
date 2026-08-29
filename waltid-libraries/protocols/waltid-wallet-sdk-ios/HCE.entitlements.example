@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.nfc.hce</key>
+	<true/>
+	<key>com.apple.developer.nfc.hce.iso7816.select-identifier-prefixes</key>
+	<array>
+		<string>D2760000850101</string>
+		<string>A0000002480400</string>
+		<string>A0000002480401</string>
+	</array>
+</dict>
+</plist>
