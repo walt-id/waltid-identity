@@ -127,8 +127,11 @@ internal object NfcMdocCarrierCodec {
             is BlePeripheralEndpoint.Mdoc -> require(actor == NfcMdocActor.HOLDER) {
                 "An mdoc peripheral endpoint can only be encoded in the holder carrier"
             }
-            is BlePeripheralEndpoint.Reader -> require(actor == NfcMdocActor.READER) {
-                "A reader peripheral endpoint can only be encoded in the reader carrier"
+            is BlePeripheralEndpoint.Reader -> require(
+                actor == NfcMdocActor.READER ||
+                    (omitUuid && method.peripheralMode == null)
+            ) {
+                "A holder carrier may contain a reader endpoint only when selecting mdoc central-client mode"
             }
             null -> Unit
         }
@@ -181,15 +184,17 @@ internal object NfcMdocCarrierCodec {
         val roles = decoded.roles(actor)
         val exactUuid = decoded.uuid ?: fallbackUuid
             ?: throw IllegalArgumentException("BLE carrier is missing its service UUID")
+        val endpoint = decoded.peripheralServerOptions()?.let { options ->
+            when {
+                actor == NfcMdocActor.READER -> BlePeripheralEndpoint.Reader(options)
+                roles.central && !roles.peripheral -> BlePeripheralEndpoint.Reader(options)
+                else -> BlePeripheralEndpoint.Mdoc(options)
+            }
+        }
         return DeviceRetrievalMethod.Ble(
             peripheralMode = BlePeripheralMode(exactUuid).takeIf { roles.peripheral },
             centralMode = BleCentralMode(exactUuid).takeIf { roles.central },
-            peripheralEndpoint = decoded.peripheralServerOptions()?.let { options ->
-                when (actor) {
-                    NfcMdocActor.HOLDER -> BlePeripheralEndpoint.Mdoc(options)
-                    NfcMdocActor.READER -> BlePeripheralEndpoint.Reader(options)
-                }
-            },
+            peripheralEndpoint = endpoint,
         )
     }
 
