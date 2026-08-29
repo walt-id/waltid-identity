@@ -81,12 +81,28 @@ class MdocDeviceEngagementFactory {
         require(eDeviceKey.spec.toMdocSessionCurve() == capabilities.selectedCurve) {
             "Selected session curve does not match the ephemeral device key"
         }
-        val provisionalOnlyMethod = methods.firstOrNull { method ->
-            method is DeviceRetrievalMethod.NfcV2 ||
-                method is DeviceRetrievalMethod.Ble && method.peripheralEndpoint is BlePeripheralEndpoint.Reader
+        require(
+            methods.none { it is DeviceRetrievalMethod.NfcV2 } ||
+                placement == MdocDeviceEngagementPlacement.PROVISIONAL_NFC_V2
+        ) {
+            "NFCv2 retrieval requires provisional NFCv2 placement"
         }
-        require(provisionalOnlyMethod == null || placement == MdocDeviceEngagementPlacement.PROVISIONAL_NFC_V2) {
-            "NFCv2 and reader-owned BLE endpoints require provisional NFCv2 placement"
+        require(
+            methods.none {
+                it is DeviceRetrievalMethod.Ble && it.peripheralEndpoint is BlePeripheralEndpoint.Reader
+            } || placement != MdocDeviceEngagementPlacement.QR
+        ) {
+            "QR Device Engagement cannot advertise a reader-owned BLE endpoint"
+        }
+        require(
+            placement != MdocDeviceEngagementPlacement.QR || methods.none { method ->
+                method is DeviceRetrievalMethod.Ble && listOfNotNull(
+                    method.peripheralMode?.uuid,
+                    method.centralMode?.uuid,
+                ).any { uuid -> (uuid[8].toInt() and 0xc0) != 0x80 }
+            }
+        ) {
+            "QR Device Engagement BLE UUIDs must use the RFC 4122 variant-1 encoding"
         }
         require(placement != MdocDeviceEngagementPlacement.PROVISIONAL_NFC_V2 || methods.size == 1) {
             "Provisional NFCv2 Device Engagement must select exactly one retrieval method"
@@ -400,29 +416,38 @@ class MdocHolderProtocolEngine(
                 readiness.availableTransports,
                 readiness.unavailableTransports,
             )
+            val onConnected = {
+                mutableState.value = MdocHolderSessionState.Connecting(
+                    readiness.qrPayload,
+                    engagementModes,
+                    readiness.availableTransports,
+                    readiness.unavailableTransports,
+                )
+            }
             val (winner, firstBytes) = if (readiness.qrPayload != null) {
                 phase(
                     timeouts.qrEngagementLifetime,
                     ProximityError.Protocol("engagement_timeout", "The QR engagement expired before session establishment"),
                 ) {
-                    connectAndReceiveEstablishment(prepared, budget) {
-                        mutableState.value = MdocHolderSessionState.Connecting(
-                            readiness.qrPayload,
-                            engagementModes,
-                            readiness.availableTransports,
-                            readiness.unavailableTransports,
-                        )
-                    }
-                }
-            } else {
-                connectAndReceiveEstablishment(prepared, budget) {
-                    mutableState.value = MdocHolderSessionState.Connecting(
-                        readiness.qrPayload,
-                        engagementModes,
-                        readiness.availableTransports,
-                        readiness.unavailableTransports,
+                    connectAndReceiveEstablishment(
+                        prepared = prepared,
+                        budget = budget,
+                        onConnected = onConnected,
+                        awaitConnection = { engagementCoordinator.awaitWinner(prepared) },
                     )
                 }
+            } else {
+                connectAndReceiveEstablishment(
+                    prepared = prepared,
+                    budget = budget,
+                    onConnected = onConnected,
+                    awaitConnection = {
+                        phase(
+                            timeouts.transportConnection,
+                            ProximityError.Transport("connection_timeout", "No reader connected in time"),
+                        ) { engagementCoordinator.awaitWinner(prepared) }
+                    },
+                )
             }
             winningSource = winner.source
             val engaged = winner.engaged
@@ -603,11 +628,9 @@ class MdocHolderProtocolEngine(
         prepared: PreparedMdocEngagements,
         budget: MdocSessionBudget,
         onConnected: () -> Unit,
+        awaitConnection: suspend () -> WinningMdocEngagement,
     ): Pair<WinningMdocEngagement, ImmutableBytes> {
-        val winner = phase(
-            timeouts.transportConnection,
-            ProximityError.Transport("connection_timeout", "No reader connected in time"),
-        ) { engagementCoordinator.awaitWinner(prepared) }
+        val winner = awaitConnection()
         onConnected()
         val firstBytes = phase(
             establishmentTimeout(winner.engaged.engagementMode),
