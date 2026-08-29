@@ -290,10 +290,36 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(configuration.profile, .iso180135Edition2DIS2026)
         XCTAssertEqual(configuration.readerPolicy, .allowAnonymousOrUntrusted)
         XCTAssertEqual(configuration.deviceAuthenticationPolicy, .signatureOnly)
-        XCTAssertEqual(configuration.engagementMethods, [.qr])
-        XCTAssertEqual(configuration.retrievalMethods, [.bluetoothLowEnergy])
+        XCTAssertEqual(configuration.engagement, .qrOnly)
+        XCTAssertEqual(configuration.retrieval, .conventional())
         XCTAssertEqual(configuration.maximumMessageBytes, 1_048_576)
         XCTAssertTrue(configuration.applicationProfiles.isEmpty)
+    }
+
+    func testProximityConfigurationRepresentsCombinedNFCSessionPrecisely() {
+        let configuration = ProximityPresentationConfiguration(
+            engagement: .qrAndNFC(.provisionalV2(.init(maximumCommandDataLength: 4_096))),
+            retrieval: .provisionalNFCV2(
+                .init(
+                    bluetoothLowEnergy: .init(roles: .peripheralServer, bearerPolicy: .gattOnly),
+                    qrNFC: .init(maximumCommandDataLength: 4_095, maximumResponseDataLength: 4_096)
+                )
+            )
+        )
+
+        XCTAssertEqual(
+            configuration.engagement,
+            .qrAndNFC(.provisionalV2(.init(maximumCommandDataLength: 4_096)))
+        )
+        XCTAssertEqual(
+            configuration.retrieval,
+            .provisionalNFCV2(
+                .init(
+                    bluetoothLowEnergy: .init(roles: .peripheralServer, bearerPolicy: .gattOnly),
+                    qrNFC: .init(maximumCommandDataLength: 4_095, maximumResponseDataLength: 4_096)
+                )
+            )
+        )
     }
 
     func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() {
@@ -414,12 +440,48 @@ final class WalletAPITests: XCTestCase {
             nfcEngagement: unavailable,
             bluetoothLowEnergy: available,
             nfcRetrieval: unavailable,
+            nfcV2Retrieval: unavailable,
             wifiAwareRetrieval: unavailable
         )
 
         XCTAssertTrue(capabilities.mayStart)
         XCTAssertTrue(capabilities.nfcEngagement.selected)
         XCTAssertFalse(capabilities.nfcEngagement.mayStart)
+    }
+
+    func testProximityCapabilitiesDoNotPairQRWithNFCV2Retrieval() {
+        let available = ProximityPresentationTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtimeAvailable: true,
+            selected: true,
+            unavailable: nil,
+            remediationActions: []
+        )
+        let unavailable = ProximityPresentationTransportCapability(
+            implemented: false,
+            profilePermitted: true,
+            runtimeAvailable: false,
+            selected: true,
+            unavailable: ProximityPresentationError(
+                category: .capability,
+                code: "not_available",
+                message: "The selected path is unavailable",
+                recoverable: false
+            ),
+            remediationActions: []
+        )
+        let capabilities = ProximityPresentationCapabilities(
+            profile: .iso180135Edition2DIS2026,
+            qrEngagement: available,
+            nfcEngagement: unavailable,
+            bluetoothLowEnergy: unavailable,
+            nfcRetrieval: unavailable,
+            nfcV2Retrieval: available,
+            wifiAwareRetrieval: unavailable
+        )
+
+        XCTAssertFalse(capabilities.mayStart)
     }
 
     func testBootstrapForwardsDefaultKeyTypeAndDidMethod() async throws {
@@ -1022,6 +1084,7 @@ private func makeTestProximityCapabilities() -> ProximityPresentationCapabilitie
             remediationActions: []
         ),
         nfcRetrieval: unavailable,
+        nfcV2Retrieval: unavailable,
         wifiAwareRetrieval: unavailable
     )
 }
