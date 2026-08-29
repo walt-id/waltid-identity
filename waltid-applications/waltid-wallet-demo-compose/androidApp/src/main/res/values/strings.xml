@@ -4,4 +4,6 @@
     <string name="app_name">walt.id Wallet</string>
     <string name="wallet_hce_service_description">walt.id Wallet</string>
     <string name="wallet_hce_aid_group_description">walt.id digital wallet</string>
+    <string name="mdoc_hce_service_description">In-person credential presentation</string>
+    <string name="mdoc_hce_aid_group_description">ISO mdoc presentation</string>
 </resources>

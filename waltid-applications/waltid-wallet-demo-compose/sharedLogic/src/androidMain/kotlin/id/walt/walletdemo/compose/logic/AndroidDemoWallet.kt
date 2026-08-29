@@ -8,6 +8,7 @@ import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.AndroidMobileWalletNfcConfiguration
 
 /**
  * An Android demo [MobileWallet] together with anything the caller must warn the user about.
@@ -50,7 +51,11 @@ suspend fun createAndroidDemoMobileWallet(
 ): AndroidDemoMobileWallet {
     val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
     return AndroidDemoMobileWallet(
-        wallet = MobileWalletFactory(context, interactionContextProvider).create(
+        wallet = MobileWalletFactory(
+            context = context,
+            interactionContextProvider = interactionContextProvider,
+            nfcConfiguration = AndroidMobileWalletNfcConfiguration(DemoMdocHostApduService::class.java),
+        ).create(
             MobileWalletConfig(
                 walletId = config.walletId,
                 attestationConfig = config.toWalletAttestationConfig(),

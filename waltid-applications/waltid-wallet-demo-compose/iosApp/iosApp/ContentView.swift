@@ -22,6 +22,7 @@ struct ContentView: UIViewControllerRepresentable {
         sharedUI.WalletDemoIosKt.walletDemoViewController(
             appGroupIdentifier: appGroupIdentifier,
             keychainAccessGroup: keychainAccessGroup,
+            nfcHostPlatformAdapter: ComposeNfcHostPlatformAdapter(),
             onDigitalCredentialRegistryChanged: onDigitalCredentialRegistryChanged,
             walletId: walletId,
             attestationBaseUrl: attestationBaseUrl,
