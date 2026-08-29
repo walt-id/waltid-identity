@@ -317,8 +317,7 @@ private fun PrerequisiteContent(
             if (capabilities.mayStart) {
                 stringResource(Res.string.proximity_ready_message)
             } else {
-                capabilities.bluetoothLowEnergy.unavailable?.message
-                    ?: capabilities.qrEngagement.unavailable?.message
+                capabilities.selectedUnavailableMessage
                     ?: stringResource(Res.string.proximity_generic_unavailable)
             }
         )
@@ -343,12 +342,23 @@ private fun PrerequisiteContent(
     }
 }
 
+private val MobileWalletProximityCapabilities.selectedUnavailableMessage: String?
+    get() = listOf(
+        nfcEngagement,
+        bluetoothLowEnergy,
+        nfcRetrieval,
+        nfcV2Retrieval,
+        qrEngagement,
+        wifiAwareRetrieval,
+    ).firstNotNullOfOrNull { capability -> capability.unavailable?.message.takeIf { capability.selected } }
+
 @Composable
 private fun EngagementContent(
     engagements: List<MobileWalletProximityEngagement>,
     connecting: Boolean,
 ) {
     val qr = engagements.filterIsInstance<MobileWalletProximityEngagement.Qr>().singleOrNull()
+    val hasNfc = engagements.any { it is MobileWalletProximityEngagement.Nfc }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -357,8 +367,12 @@ private fun EngagementContent(
         Text(
             if (connecting) {
                 stringResource(Res.string.proximity_reader_detected)
-            } else {
+            } else if (qr != null && hasNfc) {
+                stringResource(Res.string.proximity_reader_scan_or_hold_title)
+            } else if (qr != null) {
                 stringResource(Res.string.proximity_reader_scan_title)
+            } else {
+                stringResource(Res.string.proximity_reader_hold_title)
             },
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
@@ -366,8 +380,12 @@ private fun EngagementContent(
         Text(
             if (connecting) {
                 stringResource(Res.string.proximity_connecting_guidance)
-            } else {
+            } else if (qr != null && hasNfc) {
+                stringResource(Res.string.proximity_reader_scan_or_hold_guidance)
+            } else if (qr != null) {
                 stringResource(Res.string.proximity_reader_scan_guidance)
+            } else {
+                stringResource(Res.string.proximity_reader_hold_guidance)
             },
             textAlign = TextAlign.Center,
         )

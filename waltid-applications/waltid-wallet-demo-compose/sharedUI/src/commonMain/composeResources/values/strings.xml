@@ -22,7 +22,7 @@
     <string name="proximity_certificate_path">Certificate path</string>
     <string name="proximity_choose_credential">Choose a credential</string>
     <string name="proximity_credential_to_share">Credential to share</string>
-    <string name="proximity_connecting_guidance">Keep this screen open while a secure Bluetooth connection is established.</string>
+    <string name="proximity_connecting_guidance">Keep this screen open while the secure connection is established.</string>
     <string name="proximity_continue_after_response">Stay connected for another request</string>
     <string name="proximity_continue_after_response_description">You will review and approve each new request separately.</string>
     <string name="proximity_data_to_share">Data to share</string>
@@ -40,7 +40,7 @@
     <string name="proximity_failed_title">Presentation failed</string>
     <string name="proximity_generic_credential">Wallet credential</string>
     <string name="proximity_generic_unavailable">Nearby presentation is not available yet.</string>
-    <string name="proximity_in_person_description">Show a QR code and present an mdoc over Bluetooth to a nearby reader.</string>
+    <string name="proximity_in_person_description">Show a QR code or hold this phone near a compatible reader to present an mdoc.</string>
     <string name="proximity_in_person_entry">In-person presentation</string>
     <string name="proximity_in_person_title">Present in person</string>
     <string name="proximity_mandatory_suffix"> (mandatory)</string>
@@ -68,8 +68,12 @@
     <string name="proximity_reader_retention">Reader intends to retain this data</string>
     <string name="proximity_reader_scan_guidance">Open a compatible reader and scan this QR code. Keep both devices nearby.</string>
     <string name="proximity_reader_scan_title">Scan with the reader</string>
+    <string name="proximity_reader_scan_or_hold_guidance">Scan this QR code or hold this phone near a compatible reader.</string>
+    <string name="proximity_reader_scan_or_hold_title">Scan or hold near the reader</string>
+    <string name="proximity_reader_hold_guidance">Hold this phone near a compatible reader and keep this screen open.</string>
+    <string name="proximity_reader_hold_title">Hold near the reader</string>
     <string name="proximity_reader_trust_warning">A valid signature does not by itself make this reader trusted.</string>
-    <string name="proximity_ready_message">This device can create a QR code and present over Bluetooth.</string>
+    <string name="proximity_ready_message">This device is ready for nearby presentation.</string>
     <string name="proximity_requested_element">Requested element</string>
     <string name="proximity_revocation">Revocation</string>
     <string name="proximity_revocation_good">Good</string>

@@ -137,11 +137,23 @@ private struct ProximityPrerequisiteContent: View {
 
     private var message: String {
         if capabilities.mayStart {
-            return String(localized: "This device can create a QR code and present over Bluetooth.")
+            return String(localized: "This device is ready for nearby presentation.")
         }
-        return capabilities.bluetoothLowEnergy.unavailable?.message
-            ?? capabilities.qrEngagement.unavailable?.message
+        return capabilities.selectedUnavailableMessage
             ?? String(localized: "Nearby presentation is not available yet.")
+    }
+}
+
+private extension ProximityPresentationCapabilities {
+    var selectedUnavailableMessage: String? {
+        [
+            nfcEngagement,
+            bluetoothLowEnergy,
+            nfcRetrieval,
+            nfcV2Retrieval,
+            qrEngagement,
+            wifiAwareRetrieval,
+        ].first { $0.selected && $0.unavailable != nil }?.unavailable?.message
     }
 }
 
@@ -151,14 +163,14 @@ private struct ProximityEngagementContent: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text(connecting ? String(localized: "Reader detected") : String(localized: "Scan with the reader"))
+            Text(title)
                 .font(.title2.bold())
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(
                 connecting
-                    ? String(localized: "Keep this screen open while a secure Bluetooth connection is established.")
-                    : String(localized: "Open a compatible reader and scan this QR code. Keep both devices nearby.")
+                    ? String(localized: "Keep this screen open while the secure connection is established.")
+                    : guidance
             )
             .multilineTextAlignment(.center)
             if let payload = qrPayload {
@@ -178,6 +190,30 @@ private struct ProximityEngagementContent: View {
             guard case .qr(let payload) = engagement else { return nil }
             return payload
         }.first
+    }
+
+    private var hasNFC: Bool {
+        engagements.contains { engagement in
+            if case .nfc = engagement { return true }
+            return false
+        }
+    }
+
+    private var title: String {
+        if connecting { return String(localized: "Reader detected") }
+        if qrPayload != nil && hasNFC { return String(localized: "Scan or hold near the reader") }
+        if qrPayload != nil { return String(localized: "Scan with the reader") }
+        return String(localized: "Hold near the reader")
+    }
+
+    private var guidance: String {
+        if qrPayload != nil && hasNFC {
+            return String(localized: "Scan this QR code or hold this iPhone near a compatible reader.")
+        }
+        if qrPayload != nil {
+            return String(localized: "Open a compatible reader and scan this QR code. Keep both devices nearby.")
+        }
+        return String(localized: "Hold this iPhone near a compatible reader and keep this screen open.")
     }
 }
 

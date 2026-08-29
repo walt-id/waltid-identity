@@ -19,6 +19,15 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         try await waitUntil { viewModel.qrPayload == "mdoc:device-engagement" }
 
         XCTAssertEqual(client.startCount, 1)
+        let configuration = try XCTUnwrap(client.lastConfiguration)
+        guard case .qrAndNFC(.negotiatedHandover) = configuration.engagement else {
+            return XCTFail("The demo must prepare QR and NFC Negotiated Handover")
+        }
+        guard case let .conventional(retrieval) = configuration.retrieval,
+              retrieval.bluetoothLowEnergy != nil,
+              retrieval.nfc != nil else {
+            return XCTFail("The demo must prepare BLE and conventional NFC retrieval")
+        }
         XCTAssertTrue(viewModel.active)
 
         viewModel.handleLifecycleInterruption()
@@ -180,6 +189,7 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
     private let suspendStart: Bool
     private var startContinuation: CheckedContinuation<Void, Never>?
     private(set) var startCount = 0
+    private(set) var lastConfiguration: ProximityPresentationConfiguration?
 
     init(session: any DemoProximityPresentationSession, suspendStart: Bool = false) {
         self.session = session
@@ -190,6 +200,7 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
         configuration: ProximityPresentationConfiguration
     ) async throws -> any DemoProximityPresentationSession {
         startCount += 1
+        lastConfiguration = configuration
         if suspendStart {
             await withCheckedContinuation { startContinuation = $0 }
         }

@@ -9,7 +9,11 @@ import id.walt.wallet2.mobile.MobileWalletProximityElementReference
 import id.walt.wallet2.mobile.MobileWalletProximityError
 import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
 import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
+import id.walt.wallet2.mobile.MobileWalletProximityEngagementConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityNfcEngagementMode
+import id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
+import id.walt.wallet2.mobile.MobileWalletProximityRetrievalConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityReview
 import id.walt.wallet2.mobile.MobileWalletProximitySession
 import id.walt.wallet2.mobile.MobileWalletProximityState
@@ -76,7 +80,7 @@ fun interface WalletDemoProximityHostActionExecutor {
  */
 class WalletDemoProximityController(
     private val wallet: ProximityPresentationBackend,
-    private val configuration: MobileWalletProximityConfiguration = MobileWalletProximityConfiguration(),
+    private val configuration: MobileWalletProximityConfiguration = walletDemoProximityConfiguration,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
 ) {
@@ -301,6 +305,15 @@ class WalletDemoProximityController(
         }
     }
 }
+
+internal val walletDemoProximityConfiguration = MobileWalletProximityConfiguration(
+    engagement = MobileWalletProximityEngagementConfiguration.QrAndNfc(
+        MobileWalletProximityNfcEngagementMode.Negotiated,
+    ),
+    retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(
+        nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+    ),
+)
 
 private fun MobileWalletProximityReview.defaultSelections(): List<WalletDemoProximityDocumentSelection> =
     documents.map { document ->

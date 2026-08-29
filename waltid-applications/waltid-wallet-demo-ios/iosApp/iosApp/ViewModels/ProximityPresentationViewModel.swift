@@ -52,7 +52,10 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     init(
         client: any ProximityWalletClient,
-        configuration: ProximityPresentationConfiguration = .init(),
+        configuration: ProximityPresentationConfiguration = .init(
+            engagement: .qrAndNFC(.negotiatedHandover),
+            retrieval: .conventional(.init(nfc: .init()))
+        ),
         hostActions: (any ProximityHostActionExecutor)? = nil
     ) {
         self.client = client

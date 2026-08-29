@@ -49,7 +49,10 @@ class WalletDemoProximityTestScenarios {
                 state = WalletDemoProximityUiState(
                     active = true,
                     sessionState = MobileWalletProximityState.Connecting(
-                        listOf(MobileWalletProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(120)))
+                        listOf(
+                            MobileWalletProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(120)),
+                            MobileWalletProximityEngagement.Nfc,
+                        )
                     ),
                 ),
                 credentialDetailsById = emptyMap(),
@@ -71,6 +74,36 @@ class WalletDemoProximityTestScenarios {
         onNodeWithTag(WalletUiTestTags.ProximityQr).assertIsDisplayed()
         onNodeWithContentDescription("Device engagement QR code").assertIsDisplayed()
         onNodeWithText("Reader detected").assertIsDisplayed()
+        onNodeWithText("Keep this screen open while the secure connection is established.").assertIsDisplayed()
+    }
+
+    fun nfcOnlyEngagementShowsHoldGuidanceWithoutInventingAQrCode() = runComposeUiTest {
+        setContent {
+            WalletDemoProximityScreen(
+                state = WalletDemoProximityUiState(
+                    active = true,
+                    sessionState = MobileWalletProximityState.EngagementReady(
+                        listOf(MobileWalletProximityEngagement.Nfc)
+                    ),
+                ),
+                credentialDetailsById = emptyMap(),
+                hostActions = hostActions,
+                onSelectCredential = { _, _ -> },
+                onToggleElement = { _, _ -> },
+                onContinueAfterResponseChange = {},
+                onApprove = {},
+                onDecline = {},
+                onRetry = {},
+                onRemediate = { _, _ -> },
+                onCancel = {},
+                onDismiss = {},
+                onRestart = {},
+            )
+        }
+
+        onNodeWithText("Hold near the reader").assertIsDisplayed()
+        onNodeWithText("Hold this phone near a compatible reader and keep this screen open.").assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
     }
 
     fun reviewSeparatesReaderTrustAndSendsOnlyExplicitHolderActions() = runComposeUiTest {
