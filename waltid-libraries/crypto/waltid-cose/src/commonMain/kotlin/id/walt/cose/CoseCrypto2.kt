@@ -49,17 +49,17 @@ fun Key.selectCoseSignatureAlgorithm(acceptedAlgorithms: Set<Int>?): Int {
 }
 
 fun Int.toCrypto2SignatureAlgorithm(): SignatureAlgorithm = when (this) {
-    Cose.Algorithm.ES256, Cose.Algorithm.ES256K ->
+    Cose.Algorithm.ES256, Cose.Algorithm.ESP256, Cose.Algorithm.ES256K ->
         SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.IEEE_P1363)
-    Cose.Algorithm.ES384 -> SignatureAlgorithm.Ecdsa(
+    Cose.Algorithm.ES384, Cose.Algorithm.ESP384 -> SignatureAlgorithm.Ecdsa(
         DigestAlgorithm.SHA_384,
         EcdsaSignatureEncoding.IEEE_P1363,
     )
-    Cose.Algorithm.ES512 -> SignatureAlgorithm.Ecdsa(
+    Cose.Algorithm.ES512, Cose.Algorithm.ESP512 -> SignatureAlgorithm.Ecdsa(
         DigestAlgorithm.SHA_512,
         EcdsaSignatureEncoding.IEEE_P1363,
     )
-    Cose.Algorithm.EdDSA -> SignatureAlgorithm.EdDsa
+    Cose.Algorithm.EdDSA, Cose.Algorithm.Ed25519, Cose.Algorithm.Ed448 -> SignatureAlgorithm.EdDsa
     Cose.Algorithm.PS256 -> SignatureAlgorithm.RsaPss(DigestAlgorithm.SHA_256, saltLengthBytes = 32)
     Cose.Algorithm.PS384 -> SignatureAlgorithm.RsaPss(DigestAlgorithm.SHA_384, saltLengthBytes = 48)
     Cose.Algorithm.PS512 -> SignatureAlgorithm.RsaPss(DigestAlgorithm.SHA_512, saltLengthBytes = 64)
@@ -220,11 +220,16 @@ private fun validateCoseKeySpec(key: Key, algorithm: Int) {
     val spec = key.spec
     val valid = when (algorithm) {
         Cose.Algorithm.ES256 -> spec == KeySpec.Ec(EcCurve.P256)
+        Cose.Algorithm.ESP256 -> spec == KeySpec.Ec(EcCurve.P256)
         Cose.Algorithm.ES256K -> spec == KeySpec.Ec(EcCurve.SECP256K1)
         Cose.Algorithm.ES384 -> spec == KeySpec.Ec(EcCurve.P384)
+        Cose.Algorithm.ESP384 -> spec == KeySpec.Ec(EcCurve.P384)
         Cose.Algorithm.ES512 -> spec == KeySpec.Ec(EcCurve.P521)
+        Cose.Algorithm.ESP512 -> spec == KeySpec.Ec(EcCurve.P521)
         Cose.Algorithm.EdDSA -> spec == KeySpec.Edwards(EdwardsCurve.ED25519) ||
             spec == KeySpec.Edwards(EdwardsCurve.ED448)
+        Cose.Algorithm.Ed25519 -> spec == KeySpec.Edwards(EdwardsCurve.ED25519)
+        Cose.Algorithm.Ed448 -> spec == KeySpec.Edwards(EdwardsCurve.ED448)
         Cose.Algorithm.PS256,
         Cose.Algorithm.PS384,
         Cose.Algorithm.PS512,
@@ -239,9 +244,11 @@ private fun validateCoseKeySpec(key: Key, algorithm: Int) {
 
 private fun validateCoseSignatureLength(key: Key, algorithm: Int, signature: ByteArray) {
     val expected = when (algorithm) {
-        Cose.Algorithm.ES256, Cose.Algorithm.ES256K -> 64
-        Cose.Algorithm.ES384 -> 96
-        Cose.Algorithm.ES512 -> 132
+        Cose.Algorithm.ES256, Cose.Algorithm.ESP256, Cose.Algorithm.ES256K -> 64
+        Cose.Algorithm.ES384, Cose.Algorithm.ESP384 -> 96
+        Cose.Algorithm.ES512, Cose.Algorithm.ESP512 -> 132
+        Cose.Algorithm.Ed25519 -> 64
+        Cose.Algorithm.Ed448 -> 114
         Cose.Algorithm.EdDSA -> when (key.spec) {
             KeySpec.Edwards(EdwardsCurve.ED25519) -> 64
             KeySpec.Edwards(EdwardsCurve.ED448) -> 114

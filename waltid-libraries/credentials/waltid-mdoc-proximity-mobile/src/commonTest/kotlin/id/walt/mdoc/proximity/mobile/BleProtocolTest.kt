@@ -24,10 +24,11 @@ class BleProtocolTest {
         assertEquals("00112233-4455-6677-8899-aabbccddeeff", uuid.toString())
         assertContentEquals(bytes, BleServiceUuid.parse(uuid.toString()).encoded().copy())
         assertFailsWith<IllegalArgumentException> { BleServiceUuid.fromBytes(ByteArray(15)) }
-        assertFailsWith<IllegalArgumentException> { BleServiceUuid.fromBytes(ByteArray(16)) }
-        assertFailsWith<IllegalArgumentException> {
-            BleServiceUuid.parse("00112233-4455-6677-0099-aabbccddeeff")
-        }
+        assertEquals(
+            "00112233-4455-6677-0099-aabbccddeeff",
+            BleServiceUuid.parse("00112233-4455-6677-0099-aabbccddeeff").toString(),
+        )
+        assertFailsWith<IllegalArgumentException> { BleServiceUuid.parse("00112233") }
     }
 
     @Test

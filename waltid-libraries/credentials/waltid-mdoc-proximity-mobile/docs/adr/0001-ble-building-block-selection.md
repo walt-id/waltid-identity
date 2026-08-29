@@ -63,7 +63,7 @@ change requires no source-derived attribution notice beyond these decision refer
 `commonMain` owns:
 
 - role and bearer policy types that prevent unsupported Boolean/null combinations;
-- RFC 4122 Device Engagement UUID validation and dual-role invariants;
+- exact 16-byte BLE service-UUID validation, QR-specific RFC 4122 variant validation, and dual-role invariants;
 - BLEIdent HKDF and constant-time comparison;
 - ISO GATT and L2CAP framing, message limits, and truncation detection;
 - preparation/connection races, one receive consumer, serialized sends, timeouts, normalized errors,
