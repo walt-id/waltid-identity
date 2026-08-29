@@ -46,6 +46,13 @@ data class DeviceEngagement(
         require(deviceRetrievalMethods.orEmpty().distinctBy { it.type to it.version }.size == deviceRetrievalMethods.orEmpty().size) {
             "A DeviceRetrievalMethod type/version pair may be advertised only once"
         }
+        require(deviceRetrievalMethods.orEmpty().none { method ->
+            method is DeviceRetrievalMethod.Ble &&
+                method.peripheralEndpoint is BlePeripheralEndpoint.Reader &&
+                method.peripheralMode != null
+        }) {
+            "A reader-owned BLE endpoint in DeviceEngagement must select only mdoc central-client mode"
+        }
         require(extensions.keys.none { it in setOf(0L, 1L, 2L, 5L, 6L) }) {
             "DeviceEngagement extension collides with a standard field"
         }
@@ -85,6 +92,7 @@ enum class DeviceRetrievalMethodType(val code: UInt) {
     NFC(1u),
     BLE(2u),
     WIFI_AWARE(3u),
+    NFC_V2(5u),
 }
 
 sealed interface DeviceRetrievalMethod {
@@ -100,8 +108,11 @@ sealed interface DeviceRetrievalMethod {
         override val version: UInt = 1u
 
         init {
-            require(maximumCommandDataLength > 0u && maximumResponseDataLength > 0u) {
-                "NFC command and response limits must be positive"
+            require(maximumCommandDataLength in 255u..65_535u) {
+                "NFC maximum command data length must be in 255..65535"
+            }
+            require(maximumResponseDataLength in 256u..65_536u) {
+                "NFC maximum response data length must be in 256..65536"
             }
             require(extensions.keys.none { it in setOf(0u, 1u) }) {
                 "NFC option extension collides with a standard field"
@@ -109,9 +120,35 @@ sealed interface DeviceRetrievalMethod {
         }
     }
 
+    /**
+     * Provisional second-edition NFC retrieval method.
+     *
+     * This method is used only in NFCv2 CBOR handover and never as an NDEF carrier. The reader's
+     * [maximumResponseDataLength] is encoded at option key `0`. The holder's distinct maximum
+     * command-data size belongs to the NFCv2 application SELECT response, not this method.
+     */
+    data class NfcV2(
+        val maximumResponseDataLength: UInt = 65_536u,
+        val extensions: Map<UInt, CborElement> = emptyMap(),
+    ) : DeviceRetrievalMethod {
+        override val type: UInt = DeviceRetrievalMethodType.NFC_V2.code
+        override val version: UInt = 1u
+
+        init {
+            require(maximumResponseDataLength in 1u..65_536u) {
+                "NFCv2 maximum response data length must be in 1..65536"
+            }
+            require(0u !in extensions) {
+                "NFCv2 option extension collides with the maximum response data length"
+            }
+        }
+    }
+
     data class Ble(
         val peripheralMode: BlePeripheralMode? = null,
         val centralMode: BleCentralMode? = null,
+        /** Optional connection hints with explicit ownership of the advertising peripheral. */
+        val peripheralEndpoint: BlePeripheralEndpoint? = null,
         val extensions: Map<UInt, CborElement> = emptyMap(),
     ) : DeviceRetrievalMethod {
         override val type: UInt = DeviceRetrievalMethodType.BLE.code
@@ -119,6 +156,15 @@ sealed interface DeviceRetrievalMethod {
 
         init {
             require(peripheralMode != null || centralMode != null) { "BLE must advertise at least one role" }
+            when (peripheralEndpoint) {
+                is BlePeripheralEndpoint.Mdoc -> require(peripheralMode != null) {
+                    "An mdoc peripheral endpoint requires mdoc peripheral-server mode"
+                }
+                is BlePeripheralEndpoint.Reader -> require(centralMode != null) {
+                    "A reader peripheral endpoint requires mdoc central-client mode"
+                }
+                null -> Unit
+            }
             require(extensions.keys.none { it in setOf(0u, 1u, 10u, 11u, 20u, 21u) }) {
                 "BLE option extension collides with a standard field"
             }
@@ -165,20 +211,51 @@ sealed interface DeviceRetrievalMethod {
     }
 }
 
-class BlePeripheralMode(
-    val uuid: ByteArray,
-    val deviceAddress: ByteArray? = null,
-    val psm: UInt? = null,
-) {
-    init {
-        require(uuid.size == 16) { "BLE UUID must be 16 bytes" }
-        require(deviceAddress == null || deviceAddress.size == 6) { "BLE device address must be 6 bytes" }
-        require(psm == null || psm > 0u) { "BLE L2CAP PSM must be positive" }
+/** Exact standalone DeviceRetrievalMethod CBOR codec for handover protocols. */
+object DeviceRetrievalMethodCodec {
+    fun encode(method: DeviceRetrievalMethod): ByteArray {
+        require(method !is DeviceRetrievalMethod.Ble ||
+            method.peripheralEndpoint !is BlePeripheralEndpoint.Reader || method.peripheralMode == null) {
+            "A dual-role reader BLE offer requires the Reader Engagement codec"
+        }
+        return encodeUnchecked(method)
     }
 
-    override fun equals(other: Any?): Boolean = other is BlePeripheralMode &&
-        uuid.contentEquals(other.uuid) && deviceAddress.contentEquals(other.deviceAddress) && psm == other.psm
-    override fun hashCode(): Int = listOf(uuid.contentHashCode(), deviceAddress?.contentHashCode(), psm).hashCode()
+    /** Encodes a method offered by the reader in provisional NFCv2 Reader Engagement. */
+    fun encodeReaderEngagement(method: DeviceRetrievalMethod): ByteArray {
+        require(method !is DeviceRetrievalMethod.Ble || method.peripheralEndpoint !is BlePeripheralEndpoint.Mdoc) {
+            "Reader Engagement cannot contain an mdoc-owned peripheral endpoint"
+        }
+        return encodeUnchecked(method)
+    }
+
+    fun decode(encoded: ByteArray): DeviceRetrievalMethod = coseCompliantCbor.decodeFromByteArray(
+        CborElement.serializer(),
+        encoded,
+    ).toRetrievalMethod()
+
+    /**
+     * Decodes a method offered by the reader in provisional NFCv2 Reader Engagement.
+     * BLE option keys `20` and `21` describe the reader's peripheral endpoint in this context.
+     */
+    fun decodeReaderEngagement(encoded: ByteArray): DeviceRetrievalMethod = coseCompliantCbor.decodeFromByteArray(
+        CborElement.serializer(),
+        encoded,
+    ).toRetrievalMethod(readerEngagement = true)
+
+    private fun encodeUnchecked(method: DeviceRetrievalMethod): ByteArray = coseCompliantCbor.encodeToByteArray(
+        CborElement.serializer(),
+        method.toElement(),
+    )
+}
+
+class BlePeripheralMode(val uuid: ByteArray) {
+    init {
+        require(uuid.size == 16) { "BLE UUID must be 16 bytes" }
+    }
+
+    override fun equals(other: Any?): Boolean = other is BlePeripheralMode && uuid.contentEquals(other.uuid)
+    override fun hashCode(): Int = uuid.contentHashCode()
 }
 
 class BleCentralMode(val uuid: ByteArray) {
@@ -188,6 +265,45 @@ class BleCentralMode(val uuid: ByteArray) {
 
     override fun equals(other: Any?): Boolean = other is BleCentralMode && uuid.contentEquals(other.uuid)
     override fun hashCode(): Int = uuid.contentHashCode()
+}
+
+/**
+ * Ownership of the peripheral endpoint hints carried at BLE option keys `20` and `21`.
+ *
+ * Ordinary Device Engagement uses [Mdoc]. The provisional NFCv2 Reader Engagement profile uses
+ * [Reader] when the holder is offered mdoc central-client mode. Keeping the owner in the type
+ * avoids treating the same address or PSM as belonging to both peers.
+ */
+sealed interface BlePeripheralEndpoint {
+    val options: BlePeripheralServerOptions
+
+    /** Address and/or PSM exposed by the holder in mdoc peripheral-server mode. */
+    data class Mdoc(override val options: BlePeripheralServerOptions) : BlePeripheralEndpoint
+
+    /** Address and/or PSM exposed by the reader for the holder's central-client mode. */
+    data class Reader(override val options: BlePeripheralServerOptions) : BlePeripheralEndpoint
+}
+
+/** Optional address and/or L2CAP PSM published by the peripheral endpoint in this handover. */
+class BlePeripheralServerOptions(
+    val deviceAddress: ByteArray? = null,
+    val psm: UInt? = null,
+) {
+    init {
+        require(deviceAddress != null || psm != null) {
+            "BLE peripheral-server options must contain an address or L2CAP PSM"
+        }
+        require(deviceAddress == null || deviceAddress.size == 6) {
+            "BLE peripheral-server device address must be 6 bytes"
+        }
+        require(psm == null || psm in 1u..UShort.MAX_VALUE.toUInt()) {
+            "BLE peripheral-server L2CAP PSM must be in 1..65535"
+        }
+    }
+
+    override fun equals(other: Any?): Boolean = other is BlePeripheralServerOptions &&
+        deviceAddress.contentEquals(other.deviceAddress) && psm == other.psm
+    override fun hashCode(): Int = listOf(deviceAddress?.contentHashCode(), psm).hashCode()
 }
 
 object DeviceEngagementSerializer : KSerializer<DeviceEngagement> {
@@ -280,13 +396,17 @@ private fun DeviceRetrievalMethod.optionsElement(): CborElement = when (this) {
         put(CborInteger(1), CborBoolean(centralMode != null))
         peripheralMode?.uuid?.let { put(CborInteger(10), CborByteString(it)) }
         centralMode?.uuid?.let { put(CborInteger(11), CborByteString(it)) }
-        peripheralMode?.deviceAddress?.let { put(CborInteger(20), CborByteString(it)) }
-        peripheralMode?.psm?.let { put(CborInteger(21), CborInteger(it.toULong())) }
+        peripheralEndpoint?.options?.deviceAddress?.let { put(CborInteger(20), CborByteString(it)) }
+        peripheralEndpoint?.options?.psm?.let { put(CborInteger(21), CborInteger(it.toULong())) }
         extensions.forEach { (key, value) -> put(CborInteger(key.toULong()), value) }
     })
     is DeviceRetrievalMethod.Nfc -> CborMap(buildMap<CborElement, CborElement> {
         put(CborInteger(0), CborInteger(maximumCommandDataLength.toULong()))
         put(CborInteger(1), CborInteger(maximumResponseDataLength.toULong()))
+        extensions.forEach { (key, value) -> put(CborInteger(key.toULong()), value) }
+    })
+    is DeviceRetrievalMethod.NfcV2 -> CborMap(buildMap<CborElement, CborElement> {
+        put(CborInteger(0), CborInteger(maximumResponseDataLength.toULong()))
         extensions.forEach { (key, value) -> put(CborInteger(key.toULong()), value) }
     })
     is DeviceRetrievalMethod.WifiAware -> CborMap(buildMap<CborElement, CborElement> {
@@ -299,7 +419,7 @@ private fun DeviceRetrievalMethod.optionsElement(): CborElement = when (this) {
     is DeviceRetrievalMethod.Unknown -> encodedOptions
 }
 
-private fun CborElement.toRetrievalMethod(): DeviceRetrievalMethod {
+private fun CborElement.toRetrievalMethod(readerEngagement: Boolean = false): DeviceRetrievalMethod {
     val array = this as? CborArray ?: throw SerializationException("DeviceRetrievalMethod must be an array")
     if (array.size != 3) throw SerializationException("DeviceRetrievalMethod must contain three items")
     val type = array[0].requiredUInt()
@@ -307,13 +427,14 @@ private fun CborElement.toRetrievalMethod(): DeviceRetrievalMethod {
     return when {
         version != 1u -> DeviceRetrievalMethod.Unknown(type, version, array[2])
         type == DeviceRetrievalMethodType.NFC.code -> array[2].toNfcMethod()
-        type == DeviceRetrievalMethodType.BLE.code -> array[2].toBleMethod()
+        type == DeviceRetrievalMethodType.BLE.code -> array[2].toBleMethod(readerEngagement)
         type == DeviceRetrievalMethodType.WIFI_AWARE.code -> array[2].toWifiMethod()
+        type == DeviceRetrievalMethodType.NFC_V2.code -> array[2].toNfcV2Method()
         else -> DeviceRetrievalMethod.Unknown(type, version, array[2])
     }
 }
 
-private fun CborElement.toBleMethod(): DeviceRetrievalMethod.Ble {
+private fun CborElement.toBleMethod(readerEngagement: Boolean): DeviceRetrievalMethod.Ble {
     val map = this as? CborMap ?: throw SerializationException("BLE options must be a map")
     val peripheralSupported = map.requiredBoolean(0)
     val centralSupported = map.requiredBoolean(1)
@@ -325,14 +446,30 @@ private fun CborElement.toBleMethod(): DeviceRetrievalMethod.Ble {
     if (centralSupported != (centralUuid != null)) {
         throw SerializationException("BLE central UUID must be present exactly when central mode is supported")
     }
-    if (!peripheralSupported && (map[20] != null || map[21] != null)) {
-        throw SerializationException("BLE address and PSM require peripheral mode")
+    val peripheralOptions = if (map[20] != null || map[21] != null) {
+        BlePeripheralServerOptions(map[20]?.requiredBytes(), map[21]?.requiredUInt())
+    } else null
+    val peripheralEndpoint = peripheralOptions?.let { options ->
+        if (readerEngagement || !peripheralSupported) {
+            if (!centralSupported) {
+                throw SerializationException(
+                    "A reader peripheral endpoint requires offered mdoc central-client mode",
+                )
+            }
+            BlePeripheralEndpoint.Reader(options)
+        } else {
+            if (!peripheralSupported) {
+                throw SerializationException(
+                    "An mdoc peripheral endpoint requires mdoc peripheral-server mode",
+                )
+            }
+            BlePeripheralEndpoint.Mdoc(options)
+        }
     }
     return DeviceRetrievalMethod.Ble(
-        peripheralMode = peripheralUuid?.let {
-            BlePeripheralMode(it, map[20]?.requiredBytes(), map[21]?.requiredUInt())
-        },
+        peripheralMode = peripheralUuid?.let(::BlePeripheralMode),
         centralMode = centralUuid?.let(::BleCentralMode),
+        peripheralEndpoint = peripheralEndpoint,
         extensions = map.unsignedExtensions(setOf(0u, 1u, 10u, 11u, 20u, 21u)),
     )
 }
@@ -343,6 +480,14 @@ private fun CborElement.toNfcMethod(): DeviceRetrievalMethod.Nfc {
         maximumCommandDataLength = map.required(0).requiredUInt(),
         maximumResponseDataLength = map.required(1).requiredUInt(),
         extensions = map.unsignedExtensions(setOf(0u, 1u)),
+    )
+}
+
+private fun CborElement.toNfcV2Method(): DeviceRetrievalMethod.NfcV2 {
+    val map = this as? CborMap ?: throw SerializationException("NFCv2 options must be a map")
+    return DeviceRetrievalMethod.NfcV2(
+        maximumResponseDataLength = map.required(0).requiredUInt(),
+        extensions = map.unsignedExtensions(setOf(0u)),
     )
 }
 

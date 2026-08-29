@@ -1,8 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
 import id.walt.mdoc.proximity.ImmutableBytes
-import id.walt.mdoc.proximity.QrSessionTranscriptFactory
-import id.walt.mdoc.proximity.SessionTranscriptFactory
 
 /** A transaction-scoped 128-bit UUID encoded in the byte order used by Device Engagement. */
 public class BleServiceUuid private constructor(private val encoded: ImmutableBytes) {
@@ -101,13 +99,11 @@ public sealed interface BleBearerPolicy {
  * @property roles role or role pair selected for Device Engagement
  * @property bearerPolicy permitted GATT/L2CAP selection policy
  * @property eDeviceKeyBytes exact tagged EDeviceKeyBytes encoded into Device Engagement
- * @property sessionTranscriptFactory handover-aware transcript factory shared with the protocol engine
  */
 public data class BleProximityTransportConfiguration(
     public val roles: BleMdocRoles,
     public val bearerPolicy: BleBearerPolicy = BleBearerPolicy.PreferL2cap,
     public val eDeviceKeyBytes: ImmutableBytes,
-    public val sessionTranscriptFactory: SessionTranscriptFactory = QrSessionTranscriptFactory,
 ) {
     init {
         require(eDeviceKeyBytes.size > 0) { "EDeviceKeyBytes must not be empty" }

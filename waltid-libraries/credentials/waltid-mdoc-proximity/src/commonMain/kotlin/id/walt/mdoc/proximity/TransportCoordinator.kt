@@ -17,12 +17,20 @@ data class PreparedTransports internal constructor(
 ) {
     init {
         require(transports.isNotEmpty()) { "At least one proximity transport must be prepared" }
-        require(transports.map { it.kind }.distinct().size == transports.size) {
-            "A transport kind may be prepared only once"
+        require(transports.map { it.id }.distinct().size == transports.size) {
+            "A prepared transport identifier may be used only once"
         }
     }
 
     val connectionMethods get() = transports.map { it.connectionMethod }
+
+    companion object {
+        /** Creates a validated prepared-bearer set for an engagement implementation. */
+        fun of(
+            transports: List<PreparedTransport>,
+            unavailable: Map<ProximityTransportKind, ProximityError> = emptyMap(),
+        ): PreparedTransports = PreparedTransports(transports, unavailable)
+    }
 }
 
 data class WinningConnection(
@@ -37,8 +45,8 @@ class TransportCoordinator {
         sessionScope: CoroutineScope,
     ): PreparedTransports = coroutineScope {
         require(providers.isNotEmpty()) { "At least one transport provider is required" }
-        require(providers.map { it.kind }.distinct().size == providers.size) {
-            "A transport provider kind may be registered only once"
+        require(providers.map { it.id }.distinct().size == providers.size) {
+            "A transport provider identifier may be registered only once"
         }
         val prepared = mutableListOf<PreparedTransport>()
         val unavailable = mutableMapOf<ProximityTransportKind, ProximityError>()
@@ -62,8 +70,8 @@ class TransportCoordinator {
                     )
                     return@forEach
                 }
-                try {
-                    prepared += provider.prepare(context, sessionScope)
+                val candidate = try {
+                    provider.prepare(context, sessionScope)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (cause: Exception) {
@@ -71,7 +79,15 @@ class TransportCoordinator {
                         "transport_prepare_failed",
                         "${provider.kind} could not be prepared",
                     )
+                    return@forEach
                 }
+                if (candidate.id != provider.id) {
+                    withContext(NonCancellable) {
+                        runCatching { candidate.close(ProximityCloseReason.CANCELLED) }
+                    }
+                    throw IllegalArgumentException("A prepared transport must retain its provider identifier")
+                }
+                prepared += candidate
             }
             if (prepared.isEmpty()) throw ProximityException(
                 ProximityError.Capability("no_transport", "No requested proximity transport could be prepared")

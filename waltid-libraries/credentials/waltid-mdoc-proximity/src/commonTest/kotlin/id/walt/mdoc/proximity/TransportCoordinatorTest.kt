@@ -85,13 +85,31 @@ class TransportCoordinatorTest {
     }
 
     @Test
+    fun `prepared transport with a mismatched identifier is closed and rejected`() = runTest {
+        val candidate = TrackingPrepared(
+            kind = ProximityTransportKind.BLE,
+            id = PreparedTransportId("unexpected"),
+            waitForever = true,
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            TransportCoordinator().prepare(
+                listOf(provider(ProximityTransportKind.BLE) { candidate }),
+                EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1024, MdocEngagementMode.Qr),
+                this,
+            )
+        }
+
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), candidate.closeReasons)
+    }
+
+    @Test
     fun `a connection delivered after cancellation is discarded and closed`() = runTest {
         val release = CompletableDeferred<Unit>()
         val lateConnection = TrackingConnection()
         val prepared = object : PreparedTransport {
             override val kind = ProximityTransportKind.BLE
             override val connectionMethod = method
-            override val sessionTranscriptFactory = QrSessionTranscriptFactory
             val closeReasons = mutableListOf<ProximityCloseReason>()
             override suspend fun awaitConnection(): ProximityConnection = withContext(NonCancellable) {
                 release.await()
@@ -149,12 +167,12 @@ class TransportCoordinatorTest {
 
     private inner class TrackingPrepared(
         override val kind: ProximityTransportKind,
+        override val id: PreparedTransportId = PreparedTransportId(kind.name),
         private val connection: ProximityConnection? = null,
         private val failure: Throwable? = null,
         private val waitForever: Boolean = false,
     ) : PreparedTransport {
         override val connectionMethod: DeviceRetrievalMethod = method
-        override val sessionTranscriptFactory: SessionTranscriptFactory = QrSessionTranscriptFactory
         val closeReasons = mutableListOf<ProximityCloseReason>()
         override suspend fun awaitConnection(): ProximityConnection = when {
             waitForever -> awaitCancellation()
