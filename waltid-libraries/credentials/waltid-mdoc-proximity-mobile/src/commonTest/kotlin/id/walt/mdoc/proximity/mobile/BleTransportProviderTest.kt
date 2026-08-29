@@ -5,6 +5,10 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import id.walt.mdoc.objects.engagement.BleCentralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
+import id.walt.mdoc.objects.engagement.BlePeripheralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.EngagementContext
 import id.walt.mdoc.proximity.ImmutableBytes
@@ -14,6 +18,7 @@ import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ProximityTransportKind
+import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
@@ -76,7 +81,49 @@ class BleTransportProviderTest {
 
         assertNull(method.centralMode)
         assertContentEquals(peripheralUuid.encoded().copy(), method.peripheralMode!!.uuid)
-        assertEquals(0x80u, method.peripheralMode!!.psm)
+        assertEquals(0x80u, assertIs<BlePeripheralEndpoint.Mdoc>(method.peripheralEndpoint).options.psm)
+    }
+
+    @Test
+    fun `reader-selected combined BLE offer prefers and preserves the reader peripheral endpoint`() = runTest {
+        val readerUuid = BleServiceUuid.parse("12345678-1234-4abc-9234-1234567890ab")
+        val offered = DeviceRetrievalMethod.Ble(
+            peripheralMode = BlePeripheralMode(peripheralUuid.encoded().copy()),
+            centralMode = BleCentralMode(readerUuid.encoded().copy()),
+            peripheralEndpoint = BlePeripheralEndpoint.Reader(BlePeripheralServerOptions(psm = 0x81u)),
+        )
+        val platform = FakePlatform()
+        val provider = provider(BleMdocRoles.Dual(centralUuid, peripheralUuid), platform)
+        val offer = ReaderSelectedTransportOffer.Method(offered)
+
+        assertTrue(provider.acceptsReaderOffer(offer))
+        val prepared = provider.prepareReaderSelected(offer, context, this)
+        val selected = assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethod)
+
+        assertNull(selected.peripheralMode)
+        assertContentEquals(readerUuid.encoded().copy(), selected.centralMode!!.uuid)
+        assertEquals(
+            BlePeripheralServerOptions(psm = 0x81u),
+            assertIs<BlePeripheralEndpoint.Reader>(selected.peripheralEndpoint).options,
+        )
+        assertEquals(readerUuid, platform.central.serviceUuid)
+        assertTrue(platform.peripheral.closeReasons.isEmpty())
+    }
+
+    @Test
+    fun `conventional reader offer can defer the holder peripheral endpoint until preparation`() = runTest {
+        val platform = FakePlatform()
+        val provider = provider(BleMdocRoles.Dual(centralUuid, peripheralUuid), platform)
+        val offer = ReaderSelectedTransportOffer.BlePeripheralServer
+
+        assertTrue(provider.acceptsReaderOffer(offer))
+        val prepared = provider.prepareReaderSelected(offer, context, this)
+        val selected = assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethod)
+
+        assertNull(selected.centralMode)
+        assertContentEquals(peripheralUuid.encoded().copy(), selected.peripheralMode!!.uuid)
+        assertEquals(0x80u, assertIs<BlePeripheralEndpoint.Mdoc>(selected.peripheralEndpoint).options.psm)
+        assertEquals(peripheralUuid, platform.peripheral.serviceUuid)
     }
 
     @Test

@@ -20,7 +20,6 @@ enum class MdocProximityProfile(val id: String) {
 }
 
 enum class MdocProtocolFeature {
-    NEGOTIATED_HANDOVER_SESSION_ESTABLISHMENT,
     READER_AUTH_ALL,
     EXTENDED_REQUESTS,
 }
@@ -69,9 +68,7 @@ class MdocSessionCapabilities private constructor(
     internal fun toDeviceEngagementCapabilities(): DeviceEngagementCapabilities? {
         if (features.values.none { it.sessionSelected }) return null
         return DeviceEngagementCapabilities(
-            handoverSessionEstablishment = selected(
-                MdocProtocolFeature.NEGOTIATED_HANDOVER_SESSION_ESTABLISHMENT
-            ),
+            handoverSessionEstablishment = false,
             readerAuthAll = selected(MdocProtocolFeature.READER_AUTH_ALL),
             extendedRequests = selected(MdocProtocolFeature.EXTENDED_REQUESTS),
         )

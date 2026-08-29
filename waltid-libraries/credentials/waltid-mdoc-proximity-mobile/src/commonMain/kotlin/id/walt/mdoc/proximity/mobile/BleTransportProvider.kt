@@ -3,7 +3,9 @@
 package id.walt.mdoc.proximity.mobile
 
 import id.walt.mdoc.objects.engagement.BleCentralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
 import id.walt.mdoc.objects.engagement.BlePeripheralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.EngagementContext
 import id.walt.mdoc.proximity.ImmutableBytes
@@ -14,8 +16,8 @@ import id.walt.mdoc.proximity.ProximityConnection
 import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ProximityTransportKind
-import id.walt.mdoc.proximity.ProximityTransportProvider
-import id.walt.mdoc.proximity.SessionTranscriptFactory
+import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
+import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -36,7 +38,7 @@ import kotlin.time.Duration.Companion.seconds
 internal class DefaultBleProximityTransportProvider(
     private val configuration: BleProximityTransportConfiguration,
     private val platform: BlePlatformAdapter,
-) : ProximityTransportProvider {
+) : ReaderSelectedTransportProvider {
     override val kind: ProximityTransportKind = ProximityTransportKind.BLE
 
     override suspend fun capability(context: EngagementContext): ProximityCapability {
@@ -109,7 +111,6 @@ internal class DefaultBleProximityTransportProvider(
             return PreparedBleTransport(
                 roles = roles.toList(),
                 maximumMessageBytes = context.maximumMessageBytes,
-                sessionTranscriptFactory = configuration.sessionTranscriptFactory,
                 sessionJob = sessionScope.coroutineContext[Job],
             )
         } catch (failure: Throwable) {
@@ -120,25 +121,87 @@ internal class DefaultBleProximityTransportProvider(
         }
     }
 
+    override fun acceptsReaderOffer(offer: ReaderSelectedTransportOffer): Boolean {
+        val allowed = configuration.roles.selection
+        return when (offer) {
+            ReaderSelectedTransportOffer.BlePeripheralServer ->
+                allowed != BleMdocRoleSelection.CENTRAL_CLIENT
+            is ReaderSelectedTransportOffer.Method -> {
+                val offered = offer.value as? DeviceRetrievalMethod.Ble ?: return false
+                if (offered.peripheralEndpoint is BlePeripheralEndpoint.Mdoc) return false
+                (offered.centralMode != null && allowed != BleMdocRoleSelection.PERIPHERAL_SERVER) ||
+                    (offered.peripheralMode != null && allowed != BleMdocRoleSelection.CENTRAL_CLIENT)
+            }
+        }
+    }
+
+    override suspend fun prepareReaderSelected(
+        offer: ReaderSelectedTransportOffer,
+        context: EngagementContext,
+        sessionScope: CoroutineScope,
+    ): PreparedTransport {
+        require(acceptsReaderOffer(offer)) {
+            "The BLE reader-selected offer is not permitted by the configured holder roles"
+        }
+        val allowed = configuration.roles.selection
+        val exact = (offer as? ReaderSelectedTransportOffer.Method)?.value as? DeviceRetrievalMethod.Ble
+        val readerEndpoint = exact?.centralMode?.takeIf {
+            allowed != BleMdocRoleSelection.PERIPHERAL_SERVER
+        }
+        val selectedRoles = if (readerEndpoint != null) {
+            BleMdocRoles.CentralClient(BleServiceUuid.fromBytes(readerEndpoint.uuid))
+        } else {
+            val holderUuid = exact?.peripheralMode?.uuid?.let(BleServiceUuid::fromBytes)
+                ?: configuredPeripheralUuid()
+                ?: error("The configured BLE provider has no holder peripheral endpoint")
+            BleMdocRoles.PeripheralServer(holderUuid)
+        }
+        val prepared = DefaultBleProximityTransportProvider(
+            configuration.copy(roles = selectedRoles),
+            platform,
+        ).prepare(context, sessionScope)
+        return if (readerEndpoint == null) prepared else ReaderSelectedPreparedTransport(
+            prepared,
+            DeviceRetrievalMethod.Ble(
+                centralMode = readerEndpoint,
+                peripheralEndpoint = exact.peripheralEndpoint,
+                extensions = exact.extensions,
+            ),
+        )
+    }
+
+    private fun configuredPeripheralUuid(): BleServiceUuid? = when (val roles = configuration.roles) {
+        is BleMdocRoles.CentralClient -> null
+        is BleMdocRoles.PeripheralServer -> roles.mdocServiceUuid
+        is BleMdocRoles.Dual -> roles.mdocServiceUuid
+    }
+
     private companion object {
         val BLE_SETUP_TIMEOUT = 30.seconds
     }
 }
 
+private class ReaderSelectedPreparedTransport(
+    private val delegate: PreparedTransport,
+    override val connectionMethod: DeviceRetrievalMethod,
+) : PreparedTransport by delegate
+
 private class PreparedBleTransport(
     private val roles: List<BlePreparedPlatformRole>,
     private val maximumMessageBytes: Int,
-    override val sessionTranscriptFactory: SessionTranscriptFactory,
     sessionJob: Job?,
 ) : PreparedTransport {
     override val kind: ProximityTransportKind = ProximityTransportKind.BLE
     override val connectionMethod: DeviceRetrievalMethod = DeviceRetrievalMethod.Ble(
         peripheralMode = roles.singleOrNull { it.role == BlePlatformRole.PERIPHERAL_SERVER }?.let {
-            BlePeripheralMode(it.serviceUuid.encoded().copy(), psm = it.l2capPsm)
+            BlePeripheralMode(it.serviceUuid.encoded().copy())
         },
         centralMode = roles.singleOrNull { it.role == BlePlatformRole.CENTRAL_CLIENT }?.let {
             BleCentralMode(it.serviceUuid.encoded().copy())
         },
+        peripheralEndpoint = roles.singleOrNull { it.role == BlePlatformRole.PERIPHERAL_SERVER }
+            ?.l2capPsm
+            ?.let { BlePeripheralEndpoint.Mdoc(BlePeripheralServerOptions(psm = it)) },
     )
 
     private val closeMutex = Mutex()
