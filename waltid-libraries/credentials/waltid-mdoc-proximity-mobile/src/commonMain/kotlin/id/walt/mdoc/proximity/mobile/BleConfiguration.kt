@@ -2,7 +2,7 @@ package id.walt.mdoc.proximity.mobile
 
 import id.walt.mdoc.proximity.ImmutableBytes
 
-/** A transaction-scoped 128-bit UUID encoded in the byte order used by Device Engagement. */
+/** A transaction-scoped 128-bit BLE service UUID in Device Engagement byte order. */
 public class BleServiceUuid private constructor(private val encoded: ImmutableBytes) {
     /** Returns the immutable 16-byte Device Engagement representation. */
     public fun encoded(): ImmutableBytes = encoded
@@ -24,7 +24,7 @@ public class BleServiceUuid private constructor(private val encoded: ImmutableBy
     /** Returns a content-based hash of the encoded UUID. */
     override fun hashCode(): Int = encoded.hashCode()
 
-    /** Returns the canonical lowercase RFC 4122 representation. */
+    /** Returns the canonical lowercase 128-bit hexadecimal representation. */
     override fun toString(): String = platformString()
 
     /** Creates validated transaction UUID values. */
@@ -33,16 +33,13 @@ public class BleServiceUuid private constructor(private val encoded: ImmutableBy
         private val HYPHEN_POSITIONS: Set<Int> = setOf(4, 6, 8, 10)
         private val TEXT_HYPHEN_POSITIONS: Set<Int> = setOf(8, 13, 18, 23)
 
-        /** Creates a UUID from the 16-byte RFC 4122 representation used by Device Engagement. */
+        /** Creates a BLE service UUID from its exact 16-byte representation. */
         public fun fromBytes(encoded: ByteArray): BleServiceUuid {
             require(encoded.size == 16) { "A BLE service UUID must contain exactly 16 bytes" }
-            require((encoded[8].toInt() and 0xc0) == 0x80) {
-                "A BLE service UUID must use the RFC 4122 variant required by Device Engagement"
-            }
             return BleServiceUuid(ImmutableBytes.of(encoded))
         }
 
-        /** Parses a canonical RFC 4122 UUID string. */
+        /** Parses a canonical 128-bit hexadecimal UUID string. */
         public fun parse(value: String): BleServiceUuid {
             val valid = value.length == 36 && value.indices.all { index ->
                 if (index in TEXT_HYPHEN_POSITIONS) value[index] == '-'

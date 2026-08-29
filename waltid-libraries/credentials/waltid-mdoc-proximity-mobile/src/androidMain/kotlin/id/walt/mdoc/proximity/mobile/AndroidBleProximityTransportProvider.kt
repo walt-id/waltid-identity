@@ -7,7 +7,7 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import id.walt.mdoc.proximity.ProximityTransportProvider
+import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 
 /**
  * Android ISO mdoc BLE provider.
@@ -21,7 +21,7 @@ import id.walt.mdoc.proximity.ProximityTransportProvider
 internal class AndroidBleProximityTransportProvider(
     context: Context,
     configuration: BleProximityTransportConfiguration,
-) : ProximityTransportProvider by DefaultBleProximityTransportProvider(
+) : ReaderSelectedTransportProvider by DefaultBleProximityTransportProvider(
     configuration,
     AndroidBlePlatformAdapter(context.applicationContext, configuration.roles.selection),
 )
@@ -35,7 +35,7 @@ public class AndroidBleProximityTransportFactory(context: Context) : BleProximit
         AndroidBlePlatformAdapter(applicationContext, roles).capability()
 
     /** Creates a session-configured provider without starting BLE operations. */
-    override fun create(configuration: BleProximityTransportConfiguration): ProximityTransportProvider =
+    override fun create(configuration: BleProximityTransportConfiguration): ReaderSelectedTransportProvider =
         AndroidBleProximityTransportProvider(applicationContext, configuration)
 }
 

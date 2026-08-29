@@ -457,9 +457,14 @@ private class MobileWalletProximitySessionImpl(
     private companion object {
         val READER_AUTHENTICATION_ALGORITHMS: Set<Int> = setOf(
             Cose.Algorithm.ES256,
+            Cose.Algorithm.ESP256,
             Cose.Algorithm.ES384,
+            Cose.Algorithm.ESP384,
             Cose.Algorithm.ES512,
+            Cose.Algorithm.ESP512,
             Cose.Algorithm.EdDSA,
+            Cose.Algorithm.Ed25519,
+            Cose.Algorithm.Ed448,
         )
     }
 }

@@ -270,6 +270,10 @@ internal class MobileWalletProximityRequestProcessor(
         enforceReaderPolicy(readerAuthentication, selectedRequestIndices)
         var eligible = selection.eligibleDocuments.filter { it.requestIndex in selectedRequestIndices }
         val readerDisplay = readerAuthentication.toPublicEntries()
+        val selectedReaderDisplay = readerDisplay.filter { authentication ->
+            authentication.documentRequestIndex == null ||
+                authentication.documentRequestIndex in selectedRequestIndices
+        }
         val eligibleCredentialIds = eligible.map(SelectedDocument::credentialId).toSet()
         val profileSnapshots = evaluateApplicationProfiles(
             context,
@@ -329,7 +333,7 @@ internal class MobileWalletProximityRequestProcessor(
         val review = MobileWalletProximityReview(
             exchange = context.exchange,
             documents = documentReviews,
-            readerAuthentication = readerDisplay,
+            readerAuthentication = selectedReaderDisplay,
             useCases = useCases,
             applicationAuthorizations = profileSnapshots.map(ApplicationProfileSnapshot::public),
         )
@@ -345,7 +349,13 @@ internal class MobileWalletProximityRequestProcessor(
                 )
             },
             purposeHints = useCases.flatMap { it.purposeHints }.associate { it.type to it.code },
-            readerAuthentication = readerAuthentication.toDisplaySafe(),
+            readerAuthentication = readerAuthentication.toDisplaySafe().let { display ->
+                display.copy(
+                    documents = display.documents.filter { entry ->
+                        entry.documentRequestIndex in selectedRequestIndices
+                    },
+                )
+            },
             submissionBindingDigest = bindingDigest,
             applicationAuthorizations = profileSnapshots.map(ApplicationProfileSnapshot::lower),
         )

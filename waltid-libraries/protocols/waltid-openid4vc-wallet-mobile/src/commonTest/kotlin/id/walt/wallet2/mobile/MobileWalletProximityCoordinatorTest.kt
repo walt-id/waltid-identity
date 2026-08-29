@@ -3,11 +3,12 @@
 package id.walt.wallet2.mobile
 
 import id.walt.mdoc.objects.engagement.BleCentralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.FakeProximityLoopback
 import id.walt.mdoc.proximity.FakeTransportProvider
 import id.walt.mdoc.proximity.ProximityCloseReason
-import id.walt.mdoc.proximity.ProximityTransportProvider
+import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 import id.walt.mdoc.proximity.mobile.BleMdocRoles
 import id.walt.mdoc.proximity.mobile.BleMdocRoleSelection
 import id.walt.mdoc.proximity.mobile.BleProximityAvailability
@@ -383,13 +384,22 @@ class MobileWalletProximityCoordinatorTest {
             return availability
         }
 
-        override fun create(configuration: BleProximityTransportConfiguration): ProximityTransportProvider {
+        override fun create(configuration: BleProximityTransportConfiguration): ReaderSelectedTransportProvider {
             configurations += configuration
             val loopback = FakeProximityLoopback.create()
             return FakeTransportProvider(
-                method = DeviceRetrievalMethod.Ble(
-                    centralMode = BleCentralMode(ByteArray(16) { 1 }),
-                ),
+                method = when (val roles = configuration.roles) {
+                    is BleMdocRoles.CentralClient -> DeviceRetrievalMethod.Ble(
+                        centralMode = BleCentralMode(roles.readerServiceUuid.encoded().copy()),
+                    )
+                    is BleMdocRoles.PeripheralServer -> DeviceRetrievalMethod.Ble(
+                        peripheralMode = BlePeripheralMode(roles.mdocServiceUuid.encoded().copy()),
+                    )
+                    is BleMdocRoles.Dual -> DeviceRetrievalMethod.Ble(
+                        centralMode = BleCentralMode(roles.readerServiceUuid.encoded().copy()),
+                        peripheralMode = BlePeripheralMode(roles.mdocServiceUuid.encoded().copy()),
+                    )
+                },
                 connection = loopback.holder,
             )
         }

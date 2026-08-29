@@ -26,12 +26,15 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.DocRequest
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
+import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
@@ -63,6 +66,60 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MobileWalletProximityRequestProcessorTest {
+    @Test
+    fun `review retains authentication only for the satisfiable alternative document set`() = runTest {
+        withFixture { fixture ->
+            val processor = MobileWalletProximityRequestProcessor(
+                wallet = fixture.wallet,
+                configuration = MobileWalletProximityConfiguration(),
+                readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
+            )
+            val request = DeviceRequest(
+                version = DeviceRequest.VERSION_WITH_SIGNING,
+                docRequests = listOf(
+                    DocRequest.fromValues(
+                        docType = "org.iso.18013.5.1.mDL",
+                        requestedElements = mapOf("org.iso.18013.5.1" to listOf("given_name")),
+                        intentToRetain = false,
+                    ),
+                    DocRequest.fromValues(
+                        docType = "org.iso.23220.photoid.1",
+                        requestedElements = mapOf("org.iso.23220.1" to listOf("portrait")),
+                        intentToRetain = false,
+                    ),
+                ),
+                deviceRequestInfo = ByteStringWrapper(
+                    DeviceRequestInfo(
+                        useCases = listOf(
+                            UseCase(
+                                mandatory = true,
+                                documentSets = listOf(listOf(0u), listOf(1u)),
+                            )
+                        )
+                    )
+                ),
+            )
+            val context = requestContext(request, transcript(), fixture.readerEphemeralKey)
+
+            val preview = processor.preview(context)
+            val review = processor.review(
+                MdocConsentPrompt(
+                    bindingToken = ImmutableBytes.of(ByteArray(32) { 11 }),
+                    exchange = context.exchange,
+                    preview = preview,
+                )
+            )
+
+            assertEquals(listOf(0), review.documents.map { it.requestIndex })
+            assertEquals(listOf(0), review.useCases.single().documentRequestIndices)
+            assertEquals(listOf(0), review.readerAuthentication.mapNotNull { it.documentRequestIndex })
+            assertEquals(
+                listOf(0),
+                assertNotNull(preview.readerAuthentication).documents.mapNotNull { it.documentRequestIndex },
+            )
+        }
+    }
+
     @Test
     fun `review binds exact request profile constraint holder choice and response`() = runTest {
         withFixture { fixture ->

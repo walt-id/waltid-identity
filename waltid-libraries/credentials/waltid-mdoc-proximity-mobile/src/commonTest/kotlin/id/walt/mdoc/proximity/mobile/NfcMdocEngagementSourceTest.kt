@@ -358,7 +358,7 @@ class NfcMdocEngagementSourceTest {
         withKey { key ->
             val readerMethod = DeviceRetrievalMethod.Ble(
                 centralMode = BleCentralMode(
-                    "1234567812344abc92341234567890ab".hexToByteArray(),
+                    "e4eaff772b042453451a6c2abf52f590".hexToByteArray(),
                 ),
                 peripheralEndpoint = BlePeripheralEndpoint.Reader(
                     BlePeripheralServerOptions(psm = 0x81u),
@@ -453,7 +453,10 @@ class NfcMdocEngagementSourceTest {
         withKey { key ->
             val readerMethod = DeviceRetrievalMethod.Ble(
                 centralMode = BleCentralMode(
-                    "1234567812344abc92341234567890ab".hexToByteArray(),
+                    "e4eaff772b042453451a6c2abf52f590".hexToByteArray(),
+                ),
+                peripheralEndpoint = BlePeripheralEndpoint.Reader(
+                    BlePeripheralServerOptions(psm = 0x81u),
                 ),
             )
             val loopback = FakeProximityLoopback.create()

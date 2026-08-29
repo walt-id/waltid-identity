@@ -107,6 +107,29 @@ class BleTransportProviderTest {
     }
 
     @Test
+    fun `reader-selected NFC accepts an arbitrary exact 128-bit service UUID`() = runTest {
+        val readerUuid = BleServiceUuid.parse("e4eaff77-2b04-2453-451a-6c2abf52f590")
+        val offered = DeviceRetrievalMethod.Ble(
+            centralMode = BleCentralMode(readerUuid.encoded().copy()),
+            peripheralEndpoint = BlePeripheralEndpoint.Reader(BlePeripheralServerOptions(psm = 0xf3u)),
+        )
+        val platform = FakePlatform()
+        val provider = provider(BleMdocRoles.Dual(centralUuid, peripheralUuid), platform)
+
+        val prepared = provider.prepareReaderSelected(
+            ReaderSelectedTransportOffer.Method(offered),
+            context.copy(engagementMode = MdocEngagementMode.Nfc),
+            this,
+        )
+
+        assertEquals(readerUuid, platform.central.serviceUuid)
+        assertContentEquals(
+            readerUuid.encoded().copy(),
+            assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethod).centralMode!!.uuid,
+        )
+    }
+
+    @Test
     fun `conventional reader offer can defer the holder peripheral endpoint until preparation`() = runTest {
         val platform = FakePlatform()
         val provider = provider(BleMdocRoles.Dual(centralUuid, peripheralUuid), platform)

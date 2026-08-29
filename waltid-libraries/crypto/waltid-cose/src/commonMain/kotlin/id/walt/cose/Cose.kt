@@ -532,8 +532,14 @@ object Cose {
         /** ECDSA w/ SHA-256 */
         const val ES256 = -7
 
-        /** Fully specified ECDSA using P-256 and SHA-256 for algorithm negotiation. */
+        /** Fully specified ECDSA using P-256 and SHA-256. */
         const val ESP256 = -9
+
+        /** Fully specified ECDSA using P-384 and SHA-384. */
+        const val ESP384 = -51
+
+        /** Fully specified ECDSA using P-521 and SHA-512. */
+        const val ESP512 = -52
 
         /** ECDSA w/ SHA-384 */
         const val ES384 = -35
@@ -543,6 +549,12 @@ object Cose {
 
         /** EdDSA */
         const val EdDSA = -8
+
+        /** Fully specified EdDSA using Ed25519. */
+        const val Ed25519 = -19
+
+        /** Fully specified EdDSA using Ed448. */
+        const val Ed448 = -53
 
         /** RSASSA-PSS w/ SHA-256 */
         const val PS256 = -37
