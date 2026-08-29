@@ -32,5 +32,19 @@ kotlin {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
+        if (enableAndroidBuild) {
+            val androidHostTest by getting {
+                dependencies {
+                    implementation(kotlin("test"))
+                    implementation(identityLibs.kotlinx.coroutines.test)
+                    implementation(identityLibs.junit)
+                    implementation(identityLibs.robolectric)
+                }
+            }
+        }
     }
+}
+
+tasks.withType<Test>().configureEach {
+    if (name == "testAndroidHostTest") useJUnit()
 }

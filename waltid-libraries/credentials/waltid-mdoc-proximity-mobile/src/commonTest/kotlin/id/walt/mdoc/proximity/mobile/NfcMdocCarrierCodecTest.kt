@@ -1,0 +1,175 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
+package id.walt.mdoc.proximity.mobile
+
+import id.walt.mdoc.objects.engagement.BleCentralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
+import id.walt.mdoc.objects.engagement.BlePeripheralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
+import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
+import id.walt.mdoc.proximity.ImmutableBytes
+import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+
+class NfcMdocCarrierCodecTest {
+    @Test
+    fun `conventional NFC carrier uses bounded minimal integer fields`() {
+        val method = DeviceRetrievalMethod.Nfc(255u, 65_536u)
+        val carrier = NfcMdocCarrierCodec.encode(
+            method,
+            ImmutableBytes.of("nfc".encodeToByteArray()),
+            emptyList(),
+            NfcMdocActor.HOLDER,
+        )
+
+        assertContentEquals("010201ff0402010000".hexToByteArray(), carrier.carrierRecord.payload.copy())
+        val parsed = NfcHandoverCodec.validateSelect(NfcHandoverCodec.encodeSelect(listOf(carrier)))
+        assertEquals(method, NfcMdocCarrierCodec.decode(parsed.carriers.single(), NfcMdocActor.HOLDER))
+    }
+
+    @Test
+    fun `BLE carrier preserves actor role UUID address and PSM`() {
+        val uuid = ByteArray(16) { it.toByte() }
+        val holderPeripheral = DeviceRetrievalMethod.Ble(
+            peripheralMode = BlePeripheralMode(uuid),
+            peripheralEndpoint = BlePeripheralEndpoint.Mdoc(
+                BlePeripheralServerOptions(
+                    deviceAddress = byteArrayOf(1, 2, 3, 4, 5, 6),
+                    psm = 0x1001u,
+                ),
+            ),
+        )
+        val carrier = NfcMdocCarrierCodec.encode(
+            holderPeripheral,
+            ImmutableBytes.of("0".encodeToByteArray()),
+            emptyList(),
+            NfcMdocActor.HOLDER,
+        )
+        assertContentEquals(
+            byteArrayOf(2, 0x1c, 0, 0x11, 0x07) + uuid.reversedArray(),
+            carrier.carrierRecord.payload.copy().copyOf(21),
+        )
+        val parsed = NfcHandoverCodec.validateSelect(NfcHandoverCodec.encodeSelect(listOf(carrier)))
+
+        assertEquals(
+            holderPeripheral,
+            NfcMdocCarrierCodec.decode(parsed.carriers.single(), NfcMdocActor.HOLDER),
+        )
+    }
+
+    @Test
+    fun `reader and holder roles decode relative to the record origin`() {
+        val uuid = ByteArray(16) { (it + 16).toByte() }
+        val readerCentral = DeviceRetrievalMethod.Ble(centralMode = BleCentralMode(uuid))
+        val carrier = NfcMdocCarrierCodec.encode(
+            readerCentral,
+            ImmutableBytes.of("0".encodeToByteArray()),
+            emptyList(),
+            NfcMdocActor.READER,
+        )
+        val parsed = NfcHandoverCodec.validateRequest(NfcHandoverCodec.encodeRequest(listOf(carrier)))
+
+        assertEquals(readerCentral, NfcMdocCarrierCodec.decode(parsed.carriers.single(), NfcMdocActor.READER))
+        assertFailsWith<IllegalArgumentException> {
+            NfcMdocCarrierCodec.encode(
+                DeviceRetrievalMethod.NfcV2(),
+                ImmutableBytes.of("v2".encodeToByteArray()),
+                emptyList(),
+                NfcMdocActor.HOLDER,
+            )
+        }
+    }
+
+    @Test
+    fun `reader can offer a holder-owned peripheral endpoint without inventing a UUID`() {
+        val uuid = ByteArray(16) { (it + 32).toByte() }
+        val offer = DeviceRetrievalMethod.Ble(peripheralMode = BlePeripheralMode(uuid))
+        val carrier = NfcMdocCarrierCodec.encode(
+            offer,
+            ImmutableBytes.of("0".encodeToByteArray()),
+            emptyList(),
+            NfcMdocActor.READER,
+            omitBleUuid = true,
+        )
+        val parsed = NfcHandoverCodec.validateRequest(NfcHandoverCodec.encodeRequest(listOf(carrier)))
+
+        assertEquals(
+            ReaderSelectedTransportOffer.BlePeripheralServer,
+            NfcMdocCarrierCodec.decodeReaderOffer(parsed.carriers.single()),
+        )
+    }
+
+    @Test
+    fun `reader central-only offer rejects reader-peripheral endpoint data when UUID is omitted`() {
+        val uuid = ByteArray(16) { (it + 48).toByte() }
+        val carrier = NfcMdocCarrierCodec.encode(
+            DeviceRetrievalMethod.Ble(
+                peripheralMode = BlePeripheralMode(uuid),
+                peripheralEndpoint = BlePeripheralEndpoint.Mdoc(BlePeripheralServerOptions(psm = 0x1001u)),
+            ),
+            ImmutableBytes.of("0".encodeToByteArray()),
+            emptyList(),
+            NfcMdocActor.HOLDER,
+            omitBleUuid = true,
+        )
+        val readerOriginated = carrier.copy(
+            carrierRecord = carrier.carrierRecord.copy(
+                payload = ImmutableBytes.of(
+                    carrier.carrierRecord.payload.copy().also { payload ->
+                        payload[2] = 0x01
+                    },
+                ),
+            ),
+        )
+        val parsed = NfcHandoverCodec.validateRequest(
+            NfcHandoverCodec.encodeRequest(listOf(readerOriginated)),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            NfcMdocCarrierCodec.decodeReaderOffer(parsed.carriers.single())
+        }
+    }
+
+    @Test
+    fun `unrelated BLE service data is ignored but duplicate mdoc PSM data is rejected`() {
+        val method = DeviceRetrievalMethod.Ble(
+            peripheralMode = BlePeripheralMode(ByteArray(16) { it.toByte() }),
+            peripheralEndpoint = BlePeripheralEndpoint.Mdoc(BlePeripheralServerOptions(psm = 0x81u)),
+        )
+        val carrier = NfcMdocCarrierCodec.encode(
+            method,
+            ImmutableBytes.of("0".encodeToByteArray()),
+            emptyList(),
+            NfcMdocActor.HOLDER,
+        )
+        val withUnrelatedServiceData = carrier.copy(
+            carrierRecord = carrier.carrierRecord.copy(
+                payload = ImmutableBytes.of(
+                    carrier.carrierRecord.payload.copy() + byteArrayOf(3, 0x16, 0x34, 0x12),
+                ),
+            ),
+        )
+        val parsed = NfcHandoverCodec.validateSelect(
+            NfcHandoverCodec.encodeSelect(listOf(withUnrelatedServiceData)),
+        )
+        assertEquals(method, NfcMdocCarrierCodec.decode(parsed.carriers.single(), NfcMdocActor.HOLDER))
+
+        val withDuplicateMdocServiceData = carrier.copy(
+            carrierRecord = carrier.carrierRecord.copy(
+                payload = ImmutableBytes.of(
+                    carrier.carrierRecord.payload.copy() +
+                        byteArrayOf(4, 0x16, 0x01, 0xff.toByte(), 0xa0.toByte()),
+                ),
+            ),
+        )
+        val duplicate = NfcHandoverCodec.validateSelect(
+            NfcHandoverCodec.encodeSelect(listOf(withDuplicateMdocServiceData)),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            NfcMdocCarrierCodec.decode(duplicate.carriers.single(), NfcMdocActor.HOLDER)
+        }
+    }
+}
