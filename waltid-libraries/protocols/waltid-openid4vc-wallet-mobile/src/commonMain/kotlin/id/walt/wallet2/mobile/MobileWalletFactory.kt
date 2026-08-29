@@ -22,6 +22,7 @@ import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -156,6 +157,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
     managedDatabaseKeyProvider: DatabaseEncryptionKeyProvider,
     platformKeyProvider: PlatformManagedKeyProvider,
     proximityTransportFactory: BleProximityTransportFactory,
+    proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
     openEncryptedDriver: (
         databaseName: String,
         encryptionKey: DatabaseEncryptionKey,
@@ -185,6 +187,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         keyProvider = platformKeyProvider,
         registrationProjection = registrationProjection,
         proximityTransportFactory = proximityTransportFactory,
+        proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
         deleteLocalPersistence = {
             runCatching { driver.close() }
             deleteDatabase(databaseName)
@@ -199,6 +202,7 @@ internal fun createSqlDelightMobileWallet(
     db: WalletPersistenceDatabase,
     keyProvider: PlatformManagedKeyProvider,
     proximityTransportFactory: BleProximityTransportFactory? = null,
+    proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
     didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
@@ -250,6 +254,7 @@ internal fun createSqlDelightMobileWallet(
         onDigitalCredentialRegistryChanged = config.onDigitalCredentialRegistryChanged,
         readerTrustEvaluator = config.readerTrustEvaluator,
         proximityTransportFactory = proximityTransportFactory,
+        proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
         deleteLocalPersistence = deleteLocalPersistence,
     )
 }
