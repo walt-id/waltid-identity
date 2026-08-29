@@ -50,6 +50,7 @@ internal actual fun rememberProximityHostActionExecutor(): WalletDemoProximityHo
 internal actual fun ProximityPlatformSessionEffect(
     active: Boolean,
     qrVisible: Boolean,
+    nfcReviewVisible: Boolean,
     onInterrupted: () -> Unit,
 ) {
     val currentOnInterrupted = rememberUpdatedState(onInterrupted)
