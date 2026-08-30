@@ -925,8 +925,11 @@ private fun MobileWalletProximityState?.engagements(): List<MobileWalletProximit
 private fun MobileWalletProximityRemediationAction.label(): String = stringResource(
     when (this) {
         MobileWalletProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
+        MobileWalletProximityRemediationAction.RequestNearbyWifiPermission -> Res.string.proximity_allow_nearby_wifi
+        MobileWalletProximityRemediationAction.RequestLocalNetworkPermission -> Res.string.proximity_allow_local_network
         MobileWalletProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings
         MobileWalletProximityRemediationAction.EnableBluetooth -> Res.string.proximity_enable_bluetooth
+        MobileWalletProximityRemediationAction.EnableWifi -> Res.string.proximity_enable_wifi
         MobileWalletProximityRemediationAction.EnableNfc -> Res.string.proximity_enable_nfc
         MobileWalletProximityRemediationAction.UseSupportedDevice -> Res.string.proximity_use_supported_device
         MobileWalletProximityRemediationAction.Retry -> Res.string.proximity_try_again

@@ -474,8 +474,11 @@ final enum class id.walt.wallet2.mobile/MobileWalletProximityReaderTrustState : 
 final enum class id.walt.wallet2.mobile/MobileWalletProximityRemediationAction : kotlin/Enum<id.walt.wallet2.mobile/MobileWalletProximityRemediationAction> { // id.walt.wallet2.mobile/MobileWalletProximityRemediationAction|null[0]
     enum entry EnableBluetooth // id.walt.wallet2.mobile/MobileWalletProximityRemediationAction.EnableBluetooth|null[0]
     enum entry EnableNfc // id.walt.wallet2.mobile/MobileWalletProximityRemediationAction.EnableNfc|null[0]
+    enum entry EnableWifi // id.walt.wallet2.mobile/MobileWalletProximityRemediationAction.EnableWifi|null[0]
     enum entry OpenApplicationSettings // id.walt.wallet2.mobile/MobileWalletProximityRemediationAction.OpenApplicationSettings|null[0]
     enum entry RequestBluetoothPermission // id.walt.wallet2.mobile/MobileWalletProximityRemediationAction.RequestBluetoothPermission|null[0]
+    enum entry RequestLocalNetworkPermission // id.walt.wallet2.mobile/MobileWalletProximityRemediationAction.RequestLocalNetworkPermission|null[0]
+    enum entry RequestNearbyWifiPermission // id.walt.wallet2.mobile/MobileWalletProximityRemediationAction.RequestNearbyWifiPermission|null[0]
     enum entry Retry // id.walt.wallet2.mobile/MobileWalletProximityRemediationAction.Retry|null[0]
     enum entry UseSupportedDevice // id.walt.wallet2.mobile/MobileWalletProximityRemediationAction.UseSupportedDevice|null[0]
 
@@ -498,6 +501,16 @@ final enum class id.walt.wallet2.mobile/MobileWalletProximityRicalState : kotlin
 
     final fun valueOf(kotlin/String): id.walt.wallet2.mobile/MobileWalletProximityRicalState // id.walt.wallet2.mobile/MobileWalletProximityRicalState.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<id.walt.wallet2.mobile/MobileWalletProximityRicalState> // id.walt.wallet2.mobile/MobileWalletProximityRicalState.values|values#static(){}[0]
+}
+
+final enum class id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy : kotlin/Enum<id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy> { // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy|null[0]
+    enum entry NcsSk128 // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy.NcsSk128|null[0]
+
+    final val entries // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy> // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy> // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy.values|values#static(){}[0]
 }
 
 abstract fun interface id.walt.wallet2.mobile/MobileWalletProximityCredentialStatusEvaluator { // id.walt.wallet2.mobile/MobileWalletProximityCredentialStatusEvaluator|null[0]
@@ -1029,32 +1042,38 @@ sealed interface id.walt.wallet2.mobile/MobileWalletProximityReaderRevocationPol
 
 sealed interface id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration { // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration|null[0]
     final class Conventional : id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration { // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional|null[0]
-        constructor <init>(id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? = ...) // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.<init>|<init>(id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration?){}[0]
+        constructor <init>(id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration? = ...) // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.<init>|<init>(id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityWifiAwareConfiguration?){}[0]
 
         final val bluetoothLowEnergy // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.bluetoothLowEnergy|{}bluetoothLowEnergy[0]
             final fun <get-bluetoothLowEnergy>(): id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.bluetoothLowEnergy.<get-bluetoothLowEnergy>|<get-bluetoothLowEnergy>(){}[0]
         final val nfc // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.nfc|{}nfc[0]
             final fun <get-nfc>(): id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.nfc.<get-nfc>|<get-nfc>(){}[0]
+        final val wifiAware // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.wifiAware|{}wifiAware[0]
+            final fun <get-wifiAware>(): id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.wifiAware.<get-wifiAware>|<get-wifiAware>(){}[0]
 
         final fun component1(): id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.component1|component1(){}[0]
         final fun component2(): id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.component2|component2(){}[0]
-        final fun copy(id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? = ...): id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.copy|copy(id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration?){}[0]
+        final fun component3(): id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.component3|component3(){}[0]
+        final fun copy(id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration? = ...): id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.copy|copy(id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityWifiAwareConfiguration?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.Conventional.toString|toString(){}[0]
     }
 
     final class ProvisionalNfcV2 : id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration { // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2|null[0]
-        constructor <init>(id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? = ...) // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.<init>|<init>(id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration?){}[0]
+        constructor <init>(id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration? = ...) // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.<init>|<init>(id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityWifiAwareConfiguration?){}[0]
 
         final val bluetoothLowEnergy // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.bluetoothLowEnergy|{}bluetoothLowEnergy[0]
             final fun <get-bluetoothLowEnergy>(): id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.bluetoothLowEnergy.<get-bluetoothLowEnergy>|<get-bluetoothLowEnergy>(){}[0]
         final val qrNfc // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.qrNfc|{}qrNfc[0]
             final fun <get-qrNfc>(): id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.qrNfc.<get-qrNfc>|<get-qrNfc>(){}[0]
+        final val wifiAware // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.wifiAware|{}wifiAware[0]
+            final fun <get-wifiAware>(): id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.wifiAware.<get-wifiAware>|<get-wifiAware>(){}[0]
 
         final fun component1(): id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.component1|component1(){}[0]
         final fun component2(): id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.component2|component2(){}[0]
-        final fun copy(id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? = ...): id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2 // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.copy|copy(id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration?){}[0]
+        final fun component3(): id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration? // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.component3|component3(){}[0]
+        final fun copy(id.walt.wallet2.mobile/MobileWalletProximityBleConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityNfcRetrievalConfiguration? = ..., id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration? = ...): id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2 // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.copy|copy(id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration?;id.walt.wallet2.mobile.MobileWalletProximityWifiAwareConfiguration?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2.toString|toString(){}[0]
@@ -3485,6 +3504,19 @@ final class id.walt.wallet2.mobile/MobileWalletProximityUseCase { // id.walt.wal
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletProximityUseCase.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletProximityUseCase.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletProximityUseCase.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration { // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration|null[0]
+    constructor <init>(id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy = ...) // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration.<init>|<init>(id.walt.wallet2.mobile.MobileWalletProximityWifiAwareSecurityPolicy){}[0]
+
+    final val securityPolicy // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration.securityPolicy|{}securityPolicy[0]
+        final fun <get-securityPolicy>(): id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration.securityPolicy.<get-securityPolicy>|<get-securityPolicy>(){}[0]
+
+    final fun component1(): id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration.component1|component1(){}[0]
+    final fun copy(id.walt.wallet2.mobile/MobileWalletProximityWifiAwareSecurityPolicy = ...): id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration.copy|copy(id.walt.wallet2.mobile.MobileWalletProximityWifiAwareSecurityPolicy){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletProximityWifiAwareConfiguration.toString|toString(){}[0]
 }
 
 final class id.walt.wallet2.mobile/MobileWalletStaleRegistryEntryException : kotlin/IllegalArgumentException { // id.walt.wallet2.mobile/MobileWalletStaleRegistryEntryException|null[0]

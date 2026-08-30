@@ -61,7 +61,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         configurationProvider: @escaping @MainActor () -> ProximityPresentationConfiguration = {
             .init(
                 engagement: .qrAndNFC(.negotiatedHandover),
-                retrieval: .conventional(.init(nfc: .init()))
+                retrieval: .conventional(.init(nfc: .init(), wifiAware: .init()))
             )
         },
         hostActions: (any ProximityHostActionExecutor)? = nil
@@ -416,6 +416,8 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
         case .openApplicationSettings, .enableBluetooth:
             guard let url = URL(string: UIApplication.openSettingsURLString) else { return .failed }
             return await UIApplication.shared.open(url) ? .completed : .failed
+        case .requestNearbyWifiPermission, .requestLocalNetworkPermission, .enableWifi:
+            return .cancelled
         case .enableNFC:
             // iOS does not expose an app-addressable NFC power control.
             return .cancelled

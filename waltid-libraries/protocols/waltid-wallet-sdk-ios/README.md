@@ -141,9 +141,13 @@ The default selects QR engagement and BLE retrieval. The Swift facade installs
 the iOS BLE and NFC platform adapters automatically. NFC runtime reporting is
 limited to the public device, support, eligibility, session, and callback facts
 Core NFC exposes; entitlement and provisioning are verified separately in the
-approved signed build environment. Wi-Fi Aware remains unavailable until its
-platform adapter is installed. The SDK never silently substitutes an unselected
-method. Perform a
+approved signed build environment. Wi-Fi Aware reports `implemented = false` on
+iOS: Apple's public API requires paired devices and a statically declared DNS-SD
+service name, which cannot express ISO's fresh 32-character hexadecimal service
+name. Selecting it alongside BLE or NFC preserves that truthful capability while
+allowing the viable selected path to start; selecting it as the only retrieval
+keeps the session in prerequisite state. The SDK never silently substitutes an
+unselected method. Perform a
 suggested permission or settings effect in app UI and report its privacy-safe
 outcome with `.reportRemediation`. The SDK alone advances protocol state.
 

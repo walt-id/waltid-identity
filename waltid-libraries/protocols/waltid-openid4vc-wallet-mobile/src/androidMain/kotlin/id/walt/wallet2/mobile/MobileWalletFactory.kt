@@ -12,6 +12,7 @@ import id.walt.wallet2.persistence.stores.DriverFactory
 import id.walt.mdoc.proximity.mobile.AndroidBleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.AndroidMdocHostApduService
 import id.walt.mdoc.proximity.mobile.AndroidNfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.AndroidWifiAwareProximityTransportFactory
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
@@ -69,6 +70,7 @@ public actual class MobileWalletFactory(
             platformKeyProvider = AndroidPlatformKeyProvider(applicationContext, interactionContextProvider),
             proximityTransportFactory = AndroidBleProximityTransportFactory(applicationContext),
             proximityNfcHostPlatformAdapter = nfcHostAdapter,
+            proximityWifiAwareTransportFactory = AndroidWifiAwareProximityTransportFactory(applicationContext),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
         )

@@ -36,6 +36,9 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
                             requestBluetoothAuthorization()
                         MobileWalletProximityRemediationAction.OpenApplicationSettings,
                         MobileWalletProximityRemediationAction.EnableBluetooth -> openApplicationSettings()
+                        MobileWalletProximityRemediationAction.RequestNearbyWifiPermission,
+                        MobileWalletProximityRemediationAction.RequestLocalNetworkPermission,
+                        MobileWalletProximityRemediationAction.EnableWifi,
                         MobileWalletProximityRemediationAction.EnableNfc ->
                             MobileWalletProximityHostActionResult.Cancelled
                         MobileWalletProximityRemediationAction.Retry ->

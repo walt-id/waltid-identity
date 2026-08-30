@@ -23,6 +23,7 @@ import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettings
 import id.walt.wallet2.mobile.MobileWalletProximitySession
 import id.walt.wallet2.mobile.MobileWalletProximityState
 import id.walt.wallet2.mobile.MobileWalletProximitySubmission
+import id.walt.wallet2.mobile.MobileWalletProximityWifiAwareConfiguration
 import id.walt.wallet2.mobile.legalActions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -378,6 +379,7 @@ internal fun WalletDemoProximityTransportProfile.configuration(): MobileWalletPr
             ),
             retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(
                 nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+                wifiAware = MobileWalletProximityWifiAwareConfiguration(),
             ),
         )
         WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid ->

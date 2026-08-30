@@ -8,6 +8,7 @@ import id.walt.wallet2.persistence.keys.IosPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
 import id.walt.mdoc.proximity.mobile.IosBleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.IosWifiAwareProximityTransportFactory
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
@@ -56,6 +57,7 @@ public actual class MobileWalletFactory(
             platformKeyProvider = IosPlatformKeyProvider(),
             proximityTransportFactory = IosBleProximityTransportFactory(),
             proximityNfcHostPlatformAdapter = nfcHostPlatformAdapter,
+            proximityWifiAwareTransportFactory = IosWifiAwareProximityTransportFactory(),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
         )

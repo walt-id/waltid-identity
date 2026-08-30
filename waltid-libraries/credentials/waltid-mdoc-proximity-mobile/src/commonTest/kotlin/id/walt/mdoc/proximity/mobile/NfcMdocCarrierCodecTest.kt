@@ -199,4 +199,93 @@ class NfcMdocCarrierCodecTest {
             assertIs<BlePeripheralEndpoint.Reader>(ble.peripheralEndpoint).options.psm,
         )
     }
+
+    @Test
+    fun `Wi-Fi Aware carrier round trip preserves explicit NCS-SK selection and bands`() {
+        val method = DeviceRetrievalMethod.WifiAware(
+            passphraseInfo = "12345678",
+            operatingClass = 81u,
+            channelNumber = 6u,
+            supportedBands = byteArrayOf(0x14),
+        )
+        val carrier = NfcMdocCarrierCodec.encode(
+            method,
+            ImmutableBytes.of("W".encodeToByteArray()),
+            emptyList(),
+            NfcMdocActor.HOLDER,
+        )
+        assertContentEquals(
+            byteArrayOf(2, 1, 1, 9, 3) + "12345678".encodeToByteArray() + byteArrayOf(2, 4, 0x14, 3, 5, 81, 6),
+            carrier.carrierRecord.payload.copy(),
+        )
+
+        val parsed = NfcHandoverCodec.validateSelect(NfcHandoverCodec.encodeSelect(listOf(carrier)))
+        assertEquals(method, NfcMdocCarrierCodec.decode(parsed.carriers.single(), NfcMdocActor.HOLDER))
+    }
+
+    @Test
+    fun `Wi-Fi Aware reader offer accepts mandatory shared-key suite and ignores PK-only offer`() {
+        val selectedMethod = DeviceRetrievalMethod.WifiAware(
+            passphraseInfo = "12345678",
+            supportedBands = byteArrayOf(0x04),
+        )
+        val selectedCarrier = NfcMdocCarrierCodec.encode(
+            selectedMethod,
+            ImmutableBytes.of("W".encodeToByteArray()),
+            emptyList(),
+            NfcMdocActor.HOLDER,
+        )
+        val payload = selectedCarrier.carrierRecord.payload.copy()
+        val readerCarrier = selectedCarrier.copy(
+            carrierRecord = selectedCarrier.carrierRecord.copy(
+                payload = ImmutableBytes.of(payload.copyOfRange(0, 3) + payload.copyOfRange(13, payload.size)),
+            ),
+        )
+        val parsed = NfcHandoverCodec.validateRequest(NfcHandoverCodec.encodeRequest(listOf(readerCarrier)))
+        assertEquals(
+            ReaderSelectedTransportOffer.Method(
+                DeviceRetrievalMethod.WifiAware(
+                    passphraseInfo = null,
+                    supportedBands = byteArrayOf(0x04),
+                ),
+            ),
+            NfcMdocCarrierCodec.decodeReaderOffer(parsed.carriers.single()),
+        )
+
+        val pkOnlyCarrier = readerCarrier.copy(
+            carrierRecord = readerCarrier.carrierRecord.copy(
+                payload = ImmutableBytes.of(readerCarrier.carrierRecord.payload.copy().also { it[2] = 2 }),
+            ),
+        )
+        val pkOnly = NfcHandoverCodec.validateRequest(NfcHandoverCodec.encodeRequest(listOf(pkOnlyCarrier)))
+        assertEquals(null, NfcMdocCarrierCodec.decodeReaderOffer(pkOnly.carriers.single()))
+
+        val requestWithSelectedPassphrase = NfcHandoverCodec.validateRequest(
+            NfcHandoverCodec.encodeRequest(listOf(selectedCarrier)),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            NfcMdocCarrierCodec.decodeReaderOffer(requestWithSelectedPassphrase.carriers.single())
+        }
+    }
+
+    @Test
+    fun `Wi-Fi Aware selected carrier rejects missing shared-key passphrase`() {
+        val carrier = NfcMdocCarrierCodec.encode(
+            DeviceRetrievalMethod.WifiAware("12345678", supportedBands = byteArrayOf(0x04)),
+            ImmutableBytes.of("W".encodeToByteArray()),
+            emptyList(),
+            NfcMdocActor.HOLDER,
+        )
+        val payload = carrier.carrierRecord.payload.copy()
+        val withoutPassphrase = carrier.copy(
+            carrierRecord = carrier.carrierRecord.copy(
+                payload = ImmutableBytes.of(payload.copyOfRange(0, 3) + payload.copyOfRange(13, payload.size)),
+            ),
+        )
+        val parsed = NfcHandoverCodec.validateSelect(NfcHandoverCodec.encodeSelect(listOf(withoutPassphrase)))
+
+        assertFailsWith<IllegalArgumentException> {
+            NfcMdocCarrierCodec.decode(parsed.carriers.single(), NfcMdocActor.HOLDER)
+        }
+    }
 }
