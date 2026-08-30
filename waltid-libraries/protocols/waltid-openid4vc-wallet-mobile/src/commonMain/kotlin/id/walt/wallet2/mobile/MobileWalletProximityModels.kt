@@ -344,6 +344,7 @@ public enum class ProximityReaderTrustState {
 /** Result of validating the reader certificate path against explicitly configured trust material. */
 public enum class ProximityReaderCertificatePathState {
     NotEvaluated,
+    UnknownAuthority,
     Invalid,
     Valid,
 }
@@ -409,27 +410,9 @@ public data class ProximityReaderTrustDecision(
     public val reason: String? = null,
 ) {
     init {
-        require(state != ProximityReaderTrustState.NotEvaluated) {
-            "A trust evaluator must return an evaluated trust state"
-        }
         require(displayName == null || displayName.isNotBlank())
         require(reason == null || reason.isNotBlank())
-        require(state != ProximityReaderTrustState.Revoked ||
-            revocation == ProximityReaderRevocationState.Revoked) {
-            "A revoked trust decision requires a revoked certificate result"
-        }
-        require(revocation != ProximityReaderRevocationState.Revoked ||
-            state == ProximityReaderTrustState.Revoked) {
-            "A revoked certificate result requires a revoked trust decision"
-        }
-        require(state != ProximityReaderTrustState.Trusted ||
-            certificatePath == ProximityReaderCertificatePathState.Valid) {
-            "A trusted reader requires a valid certificate path"
-        }
-        require(state != ProximityReaderTrustState.Trusted ||
-            revocation != ProximityReaderRevocationState.Indeterminate) {
-            "A reader with indeterminate revocation status cannot be trusted"
-        }
+        validateReaderTrustFacts(state, certificatePath, revocation, rical)
     }
 }
 
@@ -518,18 +501,69 @@ public sealed interface ProximityReaderAuthenticationOutcome {
      * The statement could not be parsed.
      * @property reason Display-safe parsing failure.
      */
-    public data class Malformed(public val reason: String) : ProximityReaderAuthenticationOutcome
+    public data class Malformed(public val reason: String) : MobileWalletProximityReaderAuthenticationOutcome {
+        init { require(reason.isNotBlank()) }
+    }
     /**
      * Cryptographic authentication failed.
      * @property reason Display-safe verification failure.
      */
-    public data class Invalid(public val reason: String) : ProximityReaderAuthenticationOutcome
+    public data class Invalid(public val reason: String) : MobileWalletProximityReaderAuthenticationOutcome {
+        init { require(reason.isNotBlank()) }
+    }
     /**
      * Verified authentication with independent application trust facts.
      * @property trust Evaluated application trust, or the explicit not-evaluated default.
      */
     public data class Valid(public val trust: ProximityReaderTrustDecision) :
         ProximityReaderAuthenticationOutcome
+}
+
+private fun validateReaderTrustFacts(
+    state: MobileWalletProximityReaderTrustState,
+    certificatePath: MobileWalletProximityReaderCertificatePathState,
+    revocation: MobileWalletProximityReaderRevocationState,
+    rical: MobileWalletProximityRicalState,
+) {
+    require(state != MobileWalletProximityReaderTrustState.NotEvaluated) {
+        "Valid reader authentication requires an evaluated trust state"
+    }
+    require(state != MobileWalletProximityReaderTrustState.Revoked ||
+        revocation == MobileWalletProximityReaderRevocationState.Revoked) {
+        "A revoked trust decision requires a revoked certificate result"
+    }
+    require(revocation != MobileWalletProximityReaderRevocationState.Revoked ||
+        state == MobileWalletProximityReaderTrustState.Revoked) {
+        "A revoked certificate result requires a revoked trust decision"
+    }
+    require(state != MobileWalletProximityReaderTrustState.Trusted ||
+        certificatePath == MobileWalletProximityReaderCertificatePathState.Valid) {
+        "A trusted reader requires a valid certificate path"
+    }
+    require(state != MobileWalletProximityReaderTrustState.Revoked ||
+        certificatePath == MobileWalletProximityReaderCertificatePathState.Valid) {
+        "A revoked reader requires a valid certificate path"
+    }
+    require(certificatePath != MobileWalletProximityReaderCertificatePathState.UnknownAuthority ||
+        state == MobileWalletProximityReaderTrustState.ValidButUntrusted) {
+        "An unknown reader authority must remain valid but untrusted"
+    }
+    require(certificatePath != MobileWalletProximityReaderCertificatePathState.Invalid ||
+        state == MobileWalletProximityReaderTrustState.ValidButUntrusted) {
+        "An invalid reader path must remain valid but untrusted"
+    }
+    require(certificatePath != MobileWalletProximityReaderCertificatePathState.Invalid ||
+        revocation == MobileWalletProximityReaderRevocationState.NotChecked) {
+        "Revocation cannot be evaluated for an invalid reader path"
+    }
+    require(state != MobileWalletProximityReaderTrustState.Trusted ||
+        revocation != MobileWalletProximityReaderRevocationState.Indeterminate) {
+        "A reader with indeterminate revocation status cannot be trusted"
+    }
+    require(rical != MobileWalletProximityRicalState.Matched ||
+        certificatePath == MobileWalletProximityReaderCertificatePathState.Valid) {
+        "A matching RICAL authority requires a valid reader path"
+    }
 }
 
 /** Current status of a credential at the explicit application status boundary. */
