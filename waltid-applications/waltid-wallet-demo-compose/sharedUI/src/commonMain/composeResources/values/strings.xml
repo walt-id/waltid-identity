@@ -53,6 +53,7 @@
     <string name="proximity_open_app_settings">Open app settings</string>
     <string name="proximity_not_checked">Not checked</string>
     <string name="proximity_not_evaluated">Not evaluated</string>
+    <string name="proximity_unknown_authority">Unknown authority</string>
     <string name="proximity_preparing">Preparing a secure presentation…</string>
     <string name="proximity_presentation_complete">Presentation complete</string>
     <string name="proximity_presentation_complete_message">The approved credential data was sent to the reader.</string>

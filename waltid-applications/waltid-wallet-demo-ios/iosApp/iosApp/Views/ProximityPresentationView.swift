@@ -698,6 +698,7 @@ private extension ProximityReaderCertificatePathState {
     var label: String {
         switch self {
         case .notEvaluated: String(localized: "Not evaluated")
+        case .unknownAuthority: String(localized: "Unknown authority")
         case .invalid: String(localized: "Invalid")
         case .valid: String(localized: "Valid")
         }
