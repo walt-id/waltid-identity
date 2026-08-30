@@ -919,6 +919,7 @@ private fun MobileWalletProximityReaderTrustState.displayName(): String = string
 private fun MobileWalletProximityReaderCertificatePathState.displayName(): String = stringResource(
     when (this) {
         MobileWalletProximityReaderCertificatePathState.NotEvaluated -> Res.string.proximity_not_evaluated
+        MobileWalletProximityReaderCertificatePathState.UnknownAuthority -> Res.string.proximity_unknown_authority
         MobileWalletProximityReaderCertificatePathState.Invalid -> Res.string.proximity_auth_invalid
         MobileWalletProximityReaderCertificatePathState.Valid -> Res.string.proximity_auth_valid
     }

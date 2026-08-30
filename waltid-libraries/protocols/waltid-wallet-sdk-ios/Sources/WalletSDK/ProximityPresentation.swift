@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Versioned mdoc interoperability boundary selected for one proximity session.
 public enum ProximityPresentationProfile: String, Sendable, CaseIterable, Equatable {
@@ -102,6 +103,8 @@ public enum ProximityReaderTrustState: Sendable, Equatable {
 public enum ProximityReaderCertificatePathState: Sendable, Equatable {
     /// Certificate-path validation was not performed.
     case notEvaluated
+    /// The reader path is structurally valid, but no configured authority matches it.
+    case unknownAuthority
     /// The certificate path is invalid.
     case invalid
     /// The certificate path is valid.
@@ -209,7 +212,12 @@ public struct ProximityReaderTrustDecision: Sendable, Equatable {
         precondition(state != .revoked || revocation == .revoked)
         precondition(revocation != .revoked || state == .revoked)
         precondition(state != .trusted || certificatePath == .valid)
+        precondition(state != .revoked || certificatePath == .valid)
+        precondition(certificatePath != .unknownAuthority || state == .validButUntrusted)
+        precondition(certificatePath != .invalid || state == .validButUntrusted)
+        precondition(certificatePath != .invalid || revocation == .notChecked)
         precondition(state != .trusted || revocation != .indeterminate)
+        precondition(rical != .matched || certificatePath == .valid)
         precondition(displayName == nil || isProximityNonBlank(displayName!))
         precondition(reason == nil || isProximityNonBlank(reason!))
         self.state = state
@@ -227,6 +235,217 @@ public protocol ProximityReaderTrustEvaluator: Sendable {
     /// - Parameter evidence: Verified reader evidence for one authentication scope.
     /// - Returns: The application's coherent trust decision.
     func evaluate(_ evidence: ProximityReaderEvidence) async throws -> ProximityReaderTrustDecision
+}
+
+/// Explicit application-provisioned Reader CA certificate and optional display label.
+public struct ProximityReaderTrustAnchor: Sendable, Equatable {
+    /// DER-encoded Reader CA certificate.
+    public let certificateDER: Data
+    /// Display-safe authority label that does not establish trust by itself.
+    public let displayName: String?
+
+    public init(certificateDER: Data, displayName: String? = nil) {
+        precondition(isProximityX509Certificate(certificateDER))
+        precondition(displayName == nil || isProximityNonBlank(displayName!))
+        self.certificateDER = certificateDER
+        self.displayName = displayName
+    }
+}
+
+/// Immutable result from an application-owned certificate-status source.
+public struct ProximityCertificateRevocationResult: Sendable, Equatable {
+    enum Storage: Sendable, Equatable {
+        case good
+        case revoked(reason: String?)
+        case indeterminate(reason: String)
+    }
+
+    let storage: Storage
+
+    /// The configured source established that the certificate is not revoked.
+    public static let good = Self(storage: .good)
+
+    /// The configured source established that the certificate is revoked.
+    public static func revoked(reason: String? = nil) -> Self {
+        precondition(reason == nil || isProximityNonBlank(reason!))
+        return Self(storage: .revoked(reason: reason))
+    }
+
+    /// The configured source could not establish current revocation status.
+    public static func indeterminate(reason: String) -> Self {
+        precondition(isProximityNonBlank(reason))
+        return Self(storage: .indeterminate(reason: reason))
+    }
+}
+
+/// Application boundary for OCSP, CRL, or another reader-certificate status source.
+public protocol ProximityReaderRevocationEvaluator: Sendable {
+    func evaluate(_ evidence: ProximityReaderEvidence) async throws -> ProximityCertificateRevocationResult
+}
+
+/// Explicit revocation behavior selected for reader trust.
+public enum ProximityReaderRevocationPolicy: Sendable {
+    /// Do not perform revocation lookup; the resulting fact remains ``ProximityReaderRevocationState/notChecked``.
+    case notChecked
+    /// Require the supplied source to return a conclusive result before the reader can be trusted.
+    case check(any ProximityReaderRevocationEvaluator)
+}
+
+/// Exact RICAL signer evidence passed to an application-owned certificate-status source.
+public struct ProximityRICALSignerEvidence: Sendable, Equatable {
+    /// Stable identifier of the configured RICAL provider.
+    public let providerID: String
+    /// DER certificates in leaf-first order.
+    public let certificateChainDER: [Data]
+
+    public init(providerID: String, certificateChainDER: [Data]) {
+        precondition(isProximityNonBlank(providerID))
+        precondition(!certificateChainDER.isEmpty && certificateChainDER.allSatisfy { !$0.isEmpty })
+        self.providerID = providerID
+        self.certificateChainDER = certificateChainDER
+    }
+}
+
+/// Application boundary for RICAL-signer OCSP, CRL, or another status source.
+public protocol ProximityRICALSignerRevocationEvaluator: Sendable {
+    func evaluate(
+        _ evidence: ProximityRICALSignerEvidence
+    ) async throws -> ProximityCertificateRevocationResult
+}
+
+/// Explicit revocation behavior selected for one RICAL provider's signer certificate.
+public enum ProximityRICALSignerRevocationPolicy: Sendable {
+    /// Do not perform a signer-revocation lookup.
+    case notChecked
+    /// Require the supplied source to establish that the RICAL signer is not revoked.
+    case check(any ProximityRICALSignerRevocationEvaluator)
+}
+
+/// Explicit application-provisioned root for one RICAL provider.
+public struct ProximityRICALProviderTrustAnchor: Sendable, Equatable {
+    public let certificateDER: Data
+
+    public init(certificateDER: Data) {
+        precondition(isProximityX509Certificate(certificateDER))
+        self.certificateDER = certificateDER
+    }
+}
+
+/// Immutable active-RICAL result from an application-owned provider boundary.
+public struct ProximityRICALProviderResult: Sendable, Equatable {
+    enum Storage: Sendable, Equatable {
+        case available(signedRICAL: Data)
+        case unavailable(reason: String)
+        case conflict(reason: String)
+    }
+
+    let storage: Storage
+
+    /// Supplies exact untagged COSE_Sign1 bytes.
+    public static func available(signedRICAL: Data) -> Self {
+        precondition(!signedRICAL.isEmpty)
+        return Self(storage: .available(signedRICAL: signedRICAL))
+    }
+
+    /// No active list is available.
+    public static func unavailable(reason: String) -> Self {
+        precondition(isProximityNonBlank(reason))
+        return Self(storage: .unavailable(reason: reason))
+    }
+
+    /// The application detected conflicting active-list state.
+    public static func conflict(reason: String) -> Self {
+        precondition(isProximityNonBlank(reason))
+        return Self(storage: .conflict(reason: reason))
+    }
+}
+
+/// Supplies the latest application-selected RICAL without implicit SDK networking.
+public protocol ProximityRICALProvider: Sendable {
+    func current() async throws -> ProximityRICALProviderResult
+}
+
+/// One RICAL trust constraint. Values contain CBOR-encoded constraint data.
+public struct ProximityRICALTrustConstraint: Sendable, Equatable {
+    public let valuesCBOR: [String: Data]
+
+    public init(valuesCBOR: [String: Data]) {
+        precondition(!valuesCBOR.isEmpty)
+        precondition(valuesCBOR.allSatisfy { isProximityNonBlank($0.key) && !$0.value.isEmpty })
+        self.valuesCBOR = valuesCBOR
+    }
+}
+
+/// Application evaluator for ecosystem-specific RICAL trust-constraint semantics.
+public protocol ProximityRICALConstraintEvaluator: Sendable {
+    /// Returns true only when at least one complete constraint is understood and satisfied.
+    func accepts(
+        _ constraints: [ProximityRICALTrustConstraint],
+        reader: ProximityReaderEvidence
+    ) async throws -> Bool
+}
+
+/// Immutable policy for one explicitly configured RICAL provider.
+public struct ProximityRICALConfiguration: Sendable {
+    public let providerID: String
+    public let acceptedTypes: Set<String>
+    public let providerTrustAnchors: [ProximityRICALProviderTrustAnchor]
+    public let acceptedSignerCertificatePolicyOIDs: Set<String>
+    public let signerRevocationPolicy: ProximityRICALSignerRevocationPolicy
+    public let establishReaderTrust: Bool
+    public let provider: any ProximityRICALProvider
+    /// Nil rejects nonempty ecosystem-specific constraints as unsupported.
+    public let constraintEvaluator: (any ProximityRICALConstraintEvaluator)?
+
+    public init(
+        providerID: String,
+        acceptedTypes: Set<String>,
+        providerTrustAnchors: [ProximityRICALProviderTrustAnchor],
+        acceptedSignerCertificatePolicyOIDs: Set<String>,
+        signerRevocationPolicy: ProximityRICALSignerRevocationPolicy = .notChecked,
+        establishReaderTrust: Bool = false,
+        provider: any ProximityRICALProvider,
+        constraintEvaluator: (any ProximityRICALConstraintEvaluator)? = nil
+    ) {
+        precondition(isProximityNonBlank(providerID))
+        precondition(!acceptedTypes.isEmpty && acceptedTypes.allSatisfy(isProximityNonBlank))
+        precondition(
+            !providerTrustAnchors.isEmpty &&
+                Set(providerTrustAnchors.map(\.certificateDER)).count == providerTrustAnchors.count
+        )
+        precondition(
+            !acceptedSignerCertificatePolicyOIDs.isEmpty &&
+                acceptedSignerCertificatePolicyOIDs.allSatisfy(isProximityNonBlank)
+        )
+        self.providerID = providerID
+        self.acceptedTypes = acceptedTypes
+        self.providerTrustAnchors = providerTrustAnchors
+        self.acceptedSignerCertificatePolicyOIDs = acceptedSignerCertificatePolicyOIDs
+        self.signerRevocationPolicy = signerRevocationPolicy
+        self.establishReaderTrust = establishReaderTrust
+        self.provider = provider
+        self.constraintEvaluator = constraintEvaluator
+    }
+}
+
+/// Swift-native immutable configuration for the shared standards reader-trust evaluator.
+public struct ProximityReaderTrustConfiguration: Sendable {
+    public let trustAnchors: [ProximityReaderTrustAnchor]
+    public let ricalProviders: [ProximityRICALConfiguration]
+    public let revocationPolicy: ProximityReaderRevocationPolicy
+
+    public init(
+        trustAnchors: [ProximityReaderTrustAnchor] = [],
+        ricalProviders: [ProximityRICALConfiguration] = [],
+        revocationPolicy: ProximityReaderRevocationPolicy = .notChecked
+    ) {
+        precondition(!trustAnchors.isEmpty || !ricalProviders.isEmpty)
+        precondition(Set(trustAnchors.map(\.certificateDER)).count == trustAnchors.count)
+        precondition(Set(ricalProviders.map(\.providerID)).count == ricalProviders.count)
+        self.trustAnchors = trustAnchors
+        self.ricalProviders = ricalProviders
+        self.revocationPolicy = revocationPolicy
+    }
 }
 
 /// Application-owned status result for a candidate holder credential.
@@ -927,4 +1146,8 @@ public actor ProximityPresentationSession {
 
 private func isProximityNonBlank(_ value: String) -> Bool {
     !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+}
+
+private func isProximityX509Certificate(_ data: Data) -> Bool {
+    !data.isEmpty && SecCertificateCreateWithData(nil, data as CFData) != nil
 }

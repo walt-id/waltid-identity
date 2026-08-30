@@ -307,6 +307,42 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNil(evidence.documentRequestIndex)
     }
 
+    #if canImport(WalletCore) && os(iOS)
+    func testConfiguredReaderTrustFacadeKeepsMalformedEvidenceUntrusted() async throws {
+        let trustAnchorBase64 = [
+            "MIIBjjCCATOgAwIBAgIIQAAAAAAAAAEwCgYIKoZIzj0EAwIwGjEYMBYGA1UEAwwP",
+            "UklDQUwgVGVzdCBSb290MB4XDTI2MDgzMDIwNDIwNloXDTI3MDgzMDIwNDIwNlow",
+            "GjEYMBYGA1UEAwwPUklDQUwgVGVzdCBSb290MFkwEwYHKoZIzj0CAQYIKoZIzj0D",
+            "AQcDQgAE4Fc8ezWNtclkN8nWzjzYGxLUF0J6FO0r8pq5/YWiprJBGwTK0CIcesf",
+            "DL+/pxMofjHC5p4TRlb4yuCg9XlIW46NjMGEwHwYDVR0jBBgwFoAU0wI39+8eny",
+            "K9prUvHV4RWCaylxkwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwHQ",
+            "YDVR0OBBYEFNMCN/fvHp8ivaa1Lx1eEVgmspcZMAoGCCqGSM49BAMCA0kAMEYCIQ",
+            "DYcsOwU11G+fme3xD2EgCgE45qXt3Rg8nhJY2IuA2+3QIhALVJKhK8NfsJMONZo",
+            "8amHvX43b2PuSWhmB3DHufEOnE0",
+        ].joined()
+        let trustAnchor = try XCTUnwrap(Data(base64Encoded: trustAnchorBase64))
+        let evaluator = ProximityConfiguredReaderTrustEvaluator(
+            configuration: ProximityReaderTrustConfiguration(
+                trustAnchors: [
+                    ProximityReaderTrustAnchor(certificateDER: trustAnchor)
+                ]
+            )
+        )
+
+        let decision = try await evaluator.evaluate(
+            ProximityReaderEvidence(
+                scope: .wholeRequest,
+                certificateChainDER: [Data([0x02])]
+            )
+        )
+
+        XCTAssertEqual(decision.state, .validButUntrusted)
+        XCTAssertEqual(decision.certificatePath, .invalid)
+        XCTAssertEqual(decision.revocation, .notChecked)
+        XCTAssertEqual(decision.rical, .notEvaluated)
+    }
+    #endif
+
     func testProximityHolderAuthorizationKeepsPerDocumentMethods() {
         let authorization = ProximityHolderAuthorization(
             exchange: 2,
