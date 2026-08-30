@@ -142,11 +142,30 @@ class AndroidMdocHostApduServiceTest {
         val service = service()
         val router = RecordingRouter()
         AndroidNfcSessionRegistry.arm(router, Job())
+        assertNull(service.processCommandApdu(byteArrayOf(1), null))
+        eventually { service.responses.size == 1 }
 
         service.onDestroy()
 
         assertNull(AndroidNfcSessionRegistry.current())
         eventually { router.closeReasons == listOf(ProximityCloseReason.PLATFORM_UNAVAILABLE) }
+    }
+
+    @Test
+    fun staleServiceDestructionCannotCloseANewerGeneration() = runBlocking {
+        val service = service()
+        val first = AndroidNfcSessionRegistry.arm(RecordingRouter(), Job())
+        assertNull(service.processCommandApdu(byteArrayOf(1), null))
+        eventually { service.responses.size == 1 }
+        AndroidNfcSessionRegistry.disarm(first, ProximityCloseReason.COMPLETED)
+        val secondRouter = RecordingRouter()
+        val second = AndroidNfcSessionRegistry.arm(secondRouter, Job())
+
+        service.onDestroy()
+
+        assertTrue(AndroidNfcSessionRegistry.isCurrent(second))
+        assertTrue(secondRouter.closeReasons.isEmpty())
+        AndroidNfcSessionRegistry.disarm(second, ProximityCloseReason.COMPLETED)
     }
 
     private fun service(): RecordingMdocHostApduService =
