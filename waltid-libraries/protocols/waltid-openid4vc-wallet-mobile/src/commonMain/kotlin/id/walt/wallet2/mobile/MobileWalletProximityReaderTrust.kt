@@ -51,16 +51,20 @@ public sealed interface MobileWalletProximityCertificateRevocationResult {
     public data object Good : MobileWalletProximityCertificateRevocationResult
 
     /** The configured source established that the certificate is revoked. */
-    public data class Revoked(public val reason: String? = null) :
-        MobileWalletProximityCertificateRevocationResult {
+    public data class Revoked(
+        /** Optional display-safe reason supplied by the configured revocation source. */
+        public val reason: String? = null,
+    ) : MobileWalletProximityCertificateRevocationResult {
         init {
             require(reason == null || reason.isNotBlank())
         }
     }
 
     /** The configured source could not establish current revocation status. */
-    public data class Indeterminate(public val reason: String) :
-        MobileWalletProximityCertificateRevocationResult {
+    public data class Indeterminate(
+        /** Display-safe reason why current revocation status could not be established. */
+        public val reason: String,
+    ) : MobileWalletProximityCertificateRevocationResult {
         init {
             require(reason.isNotBlank())
         }
@@ -82,12 +86,14 @@ public sealed interface MobileWalletProximityReaderRevocationPolicy {
 
     /** Require the supplied source to return a conclusive result before the reader can be trusted. */
     public data class Check(
+        /** Application-owned reader-certificate revocation source. */
         public val evaluator: MobileWalletProximityReaderRevocationEvaluator,
     ) : MobileWalletProximityReaderRevocationPolicy
 }
 
 /** Exact RICAL signer evidence passed to an application-owned revocation source. */
 public data class MobileWalletProximityRicalSignerEvidence(
+    /** Stable application-configured identifier for the RICAL provider. */
     public val providerId: String,
     /** DER certificates in leaf-first order, encoded as unpadded Base64URL. */
     public val certificateChainDerBase64Url: List<String>,
@@ -101,6 +107,7 @@ public data class MobileWalletProximityRicalSignerEvidence(
 
 /** Explicit application boundary for RICAL-signer OCSP, CRL, or another status source. */
 public fun interface MobileWalletProximityRicalSignerRevocationEvaluator {
+    /** Evaluates the verified signer chain for the selected RICAL provider. */
     public suspend fun evaluate(
         evidence: MobileWalletProximityRicalSignerEvidence,
     ): MobileWalletProximityCertificateRevocationResult
@@ -113,6 +120,7 @@ public sealed interface MobileWalletProximityRicalSignerRevocationPolicy {
 
     /** Require the supplied source to establish that the RICAL signer is not revoked. */
     public data class Check(
+        /** Application-owned RICAL-signer revocation source. */
         public val evaluator: MobileWalletProximityRicalSignerRevocationEvaluator,
     ) : MobileWalletProximityRicalSignerRevocationPolicy
 }
@@ -132,24 +140,30 @@ public data class MobileWalletProximityRicalProviderTrustAnchor(
 /** Exact active RICAL supplied by an application-owned provider boundary. */
 public sealed interface MobileWalletProximityRicalProviderResult {
     /** Untagged COSE_Sign1 bytes encoded as unpadded Base64URL. */
-    public data class Available(public val signedRicalBase64Url: String) :
-        MobileWalletProximityRicalProviderResult {
+    public data class Available(
+        /** Untagged COSE_Sign1 bytes encoded as unpadded Base64URL. */
+        public val signedRicalBase64Url: String,
+    ) : MobileWalletProximityRicalProviderResult {
         init {
             require(signedRicalBase64Url.isTrustBase64Url())
         }
     }
 
     /** No active list is available. */
-    public data class Unavailable(public val reason: String) :
-        MobileWalletProximityRicalProviderResult {
+    public data class Unavailable(
+        /** Display-safe reason why the provider has no active list. */
+        public val reason: String,
+    ) : MobileWalletProximityRicalProviderResult {
         init {
             require(reason.isNotBlank())
         }
     }
 
     /** The application detected conflicting active list state. */
-    public data class Conflict(public val reason: String) :
-        MobileWalletProximityRicalProviderResult {
+    public data class Conflict(
+        /** Display-safe description of the conflicting provider state. */
+        public val reason: String,
+    ) : MobileWalletProximityRicalProviderResult {
         init {
             require(reason.isNotBlank())
         }
@@ -158,11 +172,13 @@ public sealed interface MobileWalletProximityRicalProviderResult {
 
 /** Supplies the latest application-selected RICAL without an implicit SDK network request. */
 public fun interface MobileWalletProximityRicalProvider {
+    /** Returns the application's current provider result for this evaluation. */
     public suspend fun current(): MobileWalletProximityRicalProviderResult
 }
 
 /** One RICAL trust constraint, with each value CBOR-encoded as unpadded Base64URL. */
 public data class MobileWalletProximityRicalTrustConstraint(
+    /** Constraint name to its CBOR-encoded value, using unpadded Base64URL. */
     public val valuesCborBase64Url: Map<String, String>,
 ) {
     init {
@@ -183,13 +199,20 @@ public fun interface MobileWalletProximityRicalConstraintEvaluator {
 
 /** Immutable policy for one explicitly configured RICAL provider. */
 public data class MobileWalletProximityRicalConfiguration(
+    /** Stable application-configured provider identifier. */
     public val providerId: String,
+    /** RICAL type identifiers accepted from this provider. */
     public val acceptedTypes: Set<String>,
+    /** Explicit X.509 trust anchors accepted for this provider's signer. */
     public val providerTrustAnchors: List<MobileWalletProximityRicalProviderTrustAnchor>,
+    /** Certificate-policy OIDs accepted on this provider's signer certificate. */
     public val acceptedSignerCertificatePolicyOids: Set<String>,
+    /** Revocation behavior for this provider's verified signer certificate. */
     public val signerRevocationPolicy: MobileWalletProximityRicalSignerRevocationPolicy =
         MobileWalletProximityRicalSignerRevocationPolicy.NotChecked,
+    /** Whether an accepted matching authority may establish product reader trust. */
     public val establishReaderTrust: Boolean = false,
+    /** Application-owned source of the current signed RICAL. */
     public val provider: MobileWalletProximityRicalProvider,
     /** Null rejects any non-empty, ecosystem-specific constraint as unsupported. */
     public val constraintEvaluator: MobileWalletProximityRicalConstraintEvaluator? = null,
@@ -216,8 +239,11 @@ public data class MobileWalletProximityRicalConfiguration(
  * RICAL providers are evaluated in configured order; the first matching authority owns the result.
  */
 public data class MobileWalletProximityReaderTrustConfiguration(
+    /** Explicit application-provisioned Reader CA trust anchors. */
     public val trustAnchors: List<MobileWalletProximityReaderTrustAnchor> = emptyList(),
+    /** Ordered application-configured RICAL provider policies. */
     public val ricalProviders: List<MobileWalletProximityRicalConfiguration> = emptyList(),
+    /** Revocation behavior for a reader chain trusted by a direct Reader CA anchor. */
     public val revocationPolicy: MobileWalletProximityReaderRevocationPolicy =
         MobileWalletProximityReaderRevocationPolicy.NotChecked,
 ) {
@@ -236,6 +262,7 @@ public data class MobileWalletProximityReaderTrustConfiguration(
 
 /** Shared standards-profile, path, revocation, RICAL, and product-trust evaluator. */
 public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constructor(
+    /** Immutable application-provisioned trust policy evaluated by this instance. */
     public val configuration: MobileWalletProximityReaderTrustConfiguration,
     private val now: () -> Instant,
 ) : MobileWalletProximityReaderTrustEvaluator {
