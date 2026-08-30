@@ -340,6 +340,6 @@ internal object NfcMdocCarrierCodec {
     private const val BLE_ROLE_ORIGINATOR_PERIPHERAL_ONLY = 0x00
     private const val BLE_ROLE_ORIGINATOR_CENTRAL_ONLY = 0x01
     private const val BLE_ROLE_ORIGINATOR_DUAL_CENTRAL_PREFERRED = 0x03
-    // Provisional value used by pinned Multipaz 0.100.0; the available DIS still contains XXXX.
+    // Provisional interoperability value; the available DIS still contains XXXX.
     private const val BLE_SERVICE_DATA_UUID = 0xff01
 }

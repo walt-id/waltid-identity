@@ -7,6 +7,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
@@ -159,7 +161,8 @@ class MdocEngagementCoordinator {
                     val result = try {
                         Result.success(source.awaitConnection())
                     } catch (cancelled: CancellationException) {
-                        throw cancelled
+                        currentCoroutineContext().ensureActive()
+                        Result.failure(cancelled)
                     } catch (failure: Exception) {
                         Result.failure(failure)
                     }

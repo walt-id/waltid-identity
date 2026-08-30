@@ -439,10 +439,10 @@ public abstract class AndroidMdocHostApduService : HostApduService() {
 
     /** Releases the service worker and invalidates any generation still owned by this service. */
     override fun onDestroy() {
-        fieldGeneration.set(NO_FIELD_GENERATION)
-        AndroidNfcSessionRegistry.current()?.let { session ->
+        val generation = fieldGeneration.getAndSet(NO_FIELD_GENERATION)
+        if (generation != NO_FIELD_GENERATION) {
             AndroidNfcSessionRegistry.requestDisarm(
-                session.generation,
+                generation,
                 ProximityCloseReason.PLATFORM_UNAVAILABLE,
             )
         }

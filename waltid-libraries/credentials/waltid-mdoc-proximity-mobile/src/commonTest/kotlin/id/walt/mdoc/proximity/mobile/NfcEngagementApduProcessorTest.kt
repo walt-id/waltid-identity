@@ -236,7 +236,7 @@ class NfcEngagementApduProcessorTest {
     }
 
     @Test
-    fun `DIS request with collision resolution and Multipaz-compatible request both validate`() {
+    fun `requests with and without collision resolution both validate`() {
         val disD32Request = (
             "91022548721591020263720102110204616301013000110206616301036e6663005102046163010157001a201e" +
                 "016170706c69636174696f6e2f766e642e626c7565746f6f74682e6c652e6f6f6230081b28078080bf2801021c" +
@@ -250,12 +250,12 @@ class NfcEngagementApduProcessorTest {
         assertContentEquals("cr".encodeToByteArray(), dis.embeddedMessage.records.first().type.copy())
         assertContentEquals(disD32Request, dis.outerMessage.encode())
 
-        val multipazCompatible = NfcHandoverCodec.validateRequest(handoverMessage("Hr"))
-        assertEquals(1, multipazCompatible.carriers.size)
-        assertEquals(1, multipazCompatible.embeddedMessage.records.size)
+        val withoutCollisionResolution = NfcHandoverCodec.validateRequest(handoverMessage("Hr"))
+        assertEquals(1, withoutCollisionResolution.carriers.size)
+        assertEquals(1, withoutCollisionResolution.embeddedMessage.records.size)
         assertContentEquals(
             "ac".encodeToByteArray(),
-            multipazCompatible.embeddedMessage.records.single().type.copy(),
+            withoutCollisionResolution.embeddedMessage.records.single().type.copy(),
         )
     }
 
