@@ -36,14 +36,17 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
                     when (action) {
                         ProximityRemediationAction.RequestBluetoothPermission ->
                             requestBluetoothAuthorization()
-                        ProximityRemediationAction.OpenApplicationSettings,
-                        ProximityRemediationAction.EnableBluetooth -> openApplicationSettings()
-                        ProximityRemediationAction.EnableNfc ->
-                            ProximityHostActionResult.Cancelled
-                        ProximityRemediationAction.Retry ->
-                            ProximityHostActionResult.Completed
-                        ProximityRemediationAction.UseSupportedDevice ->
-                            ProximityHostActionResult.Cancelled
+                        MobileWalletProximityRemediationAction.OpenApplicationSettings,
+                        MobileWalletProximityRemediationAction.EnableBluetooth -> openApplicationSettings()
+                        MobileWalletProximityRemediationAction.RequestNearbyWifiPermission,
+                        MobileWalletProximityRemediationAction.RequestLocalNetworkPermission,
+                        MobileWalletProximityRemediationAction.EnableWifi,
+                        MobileWalletProximityRemediationAction.EnableNfc ->
+                            MobileWalletProximityHostActionResult.Cancelled
+                        MobileWalletProximityRemediationAction.Retry ->
+                            MobileWalletProximityHostActionResult.Completed
+                        MobileWalletProximityRemediationAction.UseSupportedDevice ->
+                            MobileWalletProximityHostActionResult.Cancelled
                     }
                 }
             },
