@@ -39,9 +39,9 @@ internal object NfcHandoverCodec {
     /**
      * Validates a Handover Request while retaining non-carrier embedded records such as `cr`.
      *
-     * The DIS D.3.2 vector contains Collision Resolution, while pinned Multipaz 0.100.0 omits it.
-     * The holder has a fixed Handover Selector role, so accepting both forms preserves required
-     * interoperability without weakening carrier-reference validation.
+     * The DIS D.3.2 vector contains Collision Resolution, but deployed readers may omit it when the
+     * holder has the fixed Handover Selector role. Both forms receive the same carrier-reference
+     * validation.
      */
     public fun validateRequest(encoded: ByteArray, limits: NdefLimits = NdefLimits()): NfcHandoverMessage =
         validate(encoded, HANDOVER_REQUEST_TYPE, "Handover Request", limits)
