@@ -6,6 +6,7 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
@@ -78,6 +79,33 @@ class EngagementCoordinatorTest {
 
         assertEquals(listOf(ProximityCloseReason.LOST_RACE), qr.closeReasons)
         assertEquals(listOf(ProximityCloseReason.LOST_RACE), nfc.closeReasons)
+    }
+
+    @Test
+    fun `a source-local cancellation is a failed candidate rather than a stalled race`() = runTest {
+        val cancelling = object : PreparedMdocEngagement {
+            override val modes: Set<MdocEngagementMode> = setOf(MdocEngagementMode.Nfc)
+            override val readiness = MdocEngagementReadiness(
+                qrPayload = null,
+                availableTransports = setOf(ProximityTransportKind.NFC),
+                unavailableTransports = emptyMap(),
+            )
+            val closeReasons = mutableListOf<ProximityCloseReason>()
+
+            override suspend fun awaitConnection(): MdocEngagedConnection =
+                throw CancellationException("The NFC source stopped itself")
+
+            override suspend fun close(reason: ProximityCloseReason) {
+                closeReasons += reason
+            }
+        }
+
+        val failure = assertFailsWith<ProximityException> {
+            MdocEngagementCoordinator().awaitWinner(prepared(cancelling))
+        }
+
+        assertEquals("engagement_failed", failure.error.code)
+        assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), cancelling.closeReasons)
     }
 
     @Test

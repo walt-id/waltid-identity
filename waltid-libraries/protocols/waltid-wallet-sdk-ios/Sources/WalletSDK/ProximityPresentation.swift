@@ -126,7 +126,7 @@ public enum ProximityPresentationNFCEngagementMode: Sendable, Hashable {
     case staticHandover
     /// NFC Forum Negotiated Handover.
     case negotiatedHandover
-    /// Provisional NFC Engagement v2 contract sourced from the pinned interoperability target.
+    /// Provisional NFC Engagement v2 contract pending authoritative source reconciliation.
     case provisionalV2(ProximityPresentationNFCV2Configuration = .init())
 }
 

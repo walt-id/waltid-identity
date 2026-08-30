@@ -6,6 +6,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
@@ -108,7 +110,8 @@ class TransportCoordinator {
                     val result = try {
                         Result.success(transport.awaitConnection())
                     } catch (cancelled: CancellationException) {
-                        throw cancelled
+                        currentCoroutineContext().ensureActive()
+                        Result.failure(cancelled)
                     } catch (failure: Exception) {
                         Result.failure(failure)
                     }

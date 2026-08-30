@@ -24,10 +24,10 @@ internal val MdocSessionHandover.sessionMessageProfile: MdocSessionMessageProfil
 /**
  * Direction-local session-message sequence ownership, independent from AES-GCM and APDU counters.
  *
- * Pinned Multipaz 0.100.0 emits ordered NFCv2 values but does not validate inbound ordering. This
- * class therefore makes outgoing behavior deterministic and accepts every structurally valid
- * provisional inbound sequence value. Conventional sessions fail closed if a provisional field
- * crosses the profile.
+ * The provisional interoperability profile emits ordered NFCv2 values but does not enforce inbound
+ * ordering. This class therefore makes outgoing behavior deterministic and accepts every
+ * structurally valid provisional inbound sequence value. Conventional sessions fail closed if a
+ * provisional field crosses the profile.
  */
 internal class MdocSessionMessageSequencer(val profile: MdocSessionMessageProfile) {
     private var nextOutgoing: ULong = 0u

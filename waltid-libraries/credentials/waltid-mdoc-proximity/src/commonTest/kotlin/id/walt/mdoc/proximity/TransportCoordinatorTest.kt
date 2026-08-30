@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
@@ -48,6 +49,21 @@ class TransportCoordinatorTest {
         }
         assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), first.closeReasons)
         assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), second.closeReasons)
+    }
+
+    @Test
+    fun `a transport-local cancellation is a failed candidate rather than a stalled race`() = runTest {
+        val cancelled = TrackingPrepared(
+            ProximityTransportKind.NFC,
+            failure = CancellationException("The transport stopped itself"),
+        )
+
+        val failure = assertFailsWith<ProximityException> {
+            TransportCoordinator().awaitWinner(PreparedTransports(listOf(cancelled), emptyMap()))
+        }
+
+        assertEquals("connection_failed", failure.error.code)
+        assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), cancelled.closeReasons)
     }
 
     @Test
