@@ -37,6 +37,9 @@ public struct ProximityPresentationBLEConfiguration: Sendable, Hashable {
     public let bearerPolicy: ProximityPresentationBLEBearerPolicy
 
     /// Creates a complete BLE retrieval configuration.
+    /// - Parameters:
+    ///   - roles: BLE roles to prepare for the session.
+    ///   - bearerPolicy: Policy used to select the BLE bearer.
     public init(
         roles: ProximityPresentationBLERoles = .dual,
         bearerPolicy: ProximityPresentationBLEBearerPolicy = .preferL2CAP
@@ -54,6 +57,9 @@ public struct ProximityPresentationNFCRetrievalConfiguration: Sendable, Hashable
     public let maximumResponseDataLength: Int
 
     /// Creates a validated conventional NFC retrieval configuration.
+    /// - Parameters:
+    ///   - maximumCommandDataLength: Maximum command-data length accepted from the reader.
+    ///   - maximumResponseDataLength: Maximum response-data length returned to the reader.
     public init(
         maximumCommandDataLength: Int = 65_535,
         maximumResponseDataLength: Int = 65_536
@@ -71,6 +77,7 @@ public struct ProximityPresentationNFCV2Configuration: Sendable, Hashable {
     public let maximumCommandDataLength: Int
 
     /// Creates a validated provisional NFCv2 configuration.
+    /// - Parameter maximumCommandDataLength: Maximum command-data length accepted by the provisional holder application.
     public init(maximumCommandDataLength: Int = 65_536) {
         precondition((1...65_536).contains(maximumCommandDataLength))
         self.maximumCommandDataLength = maximumCommandDataLength
@@ -85,6 +92,9 @@ public struct ProximityPresentationConventionalRetrievalConfiguration: Sendable,
     public let nfc: ProximityPresentationNFCRetrievalConfiguration?
 
     /// Creates a nonempty conventional retrieval configuration.
+    /// - Parameters:
+    ///   - bluetoothLowEnergy: Optional BLE role and bearer configuration.
+    ///   - nfc: Optional conventional NFC command/response configuration.
     public init(
         bluetoothLowEnergy: ProximityPresentationBLEConfiguration? = .init(),
         nfc: ProximityPresentationNFCRetrievalConfiguration? = nil
@@ -103,6 +113,9 @@ public struct ProximityPresentationNFCV2RetrievalConfiguration: Sendable, Hashab
     public let qrNFC: ProximityPresentationNFCRetrievalConfiguration?
 
     /// Creates an NFCv2 retrieval configuration. The same NFCv2 APDU channel is always selected.
+    /// - Parameters:
+    ///   - bluetoothLowEnergy: Optional alternate BLE bearer for NFCv2 and QR engagement.
+    ///   - qrNFC: Optional conventional NFC retrieval prepared for a concurrent QR path.
     public init(
         bluetoothLowEnergy: ProximityPresentationBLEConfiguration? = nil,
         qrNFC: ProximityPresentationNFCRetrievalConfiguration? = nil

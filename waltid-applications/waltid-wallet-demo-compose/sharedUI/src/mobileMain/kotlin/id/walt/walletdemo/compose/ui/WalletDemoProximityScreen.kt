@@ -891,11 +891,12 @@ private fun ProximityState?.engagements(): List<ProximityEngagement> = when (thi
 @Composable
 private fun ProximityRemediationAction.label(): String = stringResource(
     when (this) {
-        ProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
-        ProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings
-        ProximityRemediationAction.EnableBluetooth -> Res.string.proximity_enable_bluetooth
-        ProximityRemediationAction.UseSupportedDevice -> Res.string.proximity_use_supported_device
-        ProximityRemediationAction.Retry -> Res.string.proximity_try_again
+        MobileWalletProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
+        MobileWalletProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings
+        MobileWalletProximityRemediationAction.EnableBluetooth -> Res.string.proximity_enable_bluetooth
+        MobileWalletProximityRemediationAction.EnableNfc -> Res.string.proximity_enable_nfc
+        MobileWalletProximityRemediationAction.UseSupportedDevice -> Res.string.proximity_use_supported_device
+        MobileWalletProximityRemediationAction.Retry -> Res.string.proximity_try_again
     }
 )
 
