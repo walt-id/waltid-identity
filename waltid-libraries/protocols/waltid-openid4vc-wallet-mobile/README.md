@@ -174,6 +174,38 @@ Multiple reader-authentication statements retain their independent
 `authenticationIndex`, and holder-key authorization is reported per document
 request so mixed signature/MAC responses cannot be collapsed into one prompt.
 
+Reader authentication validity does not establish reader trust. To require a
+trusted reader, provision Reader CA certificates out of band and pass the shared
+evaluator explicitly:
+
+```kotlin
+val readerTrust = MobileWalletProximityConfiguredReaderTrustEvaluator(
+    MobileWalletProximityReaderTrustConfiguration(
+        trustAnchors = listOf(
+            MobileWalletProximityReaderTrustAnchor(
+                certificateDerBase64Url = readerCaDerBase64Url,
+                displayName = "Example reader authority",
+            )
+        ),
+        revocationPolicy = MobileWalletProximityReaderRevocationPolicy.Check(
+            applicationRevocationEvaluator
+        ),
+    )
+)
+val configuration = MobileWalletProximityConfiguration(
+    readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+    readerTrustEvaluator = readerTrust,
+)
+```
+
+The SDK performs certificate profile, time, and explicit-anchor path validation,
+but performs no hidden network lookup and ships no reader trust list. A root sent
+by the reader is only path evidence; it is never trusted unless the application
+provisioned the same certificate. Optional RICAL providers use separate explicit
+provider roots, signer policy, revocation, and constraint boundaries. Demo apps
+can pass a named test anchor through the same configuration constructor, but
+test anchors must not become production defaults.
+
 Only one proximity session may be active per wallet. Always call `close()` when
 the journey leaves the screen; closing and cancellation are idempotent and every
 new session creates fresh engagement identifiers and ephemeral key material.
