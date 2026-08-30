@@ -40,6 +40,10 @@ import id.walt.mdoc.proximity.mobile.NfcMdocEngagementProfile
 import id.walt.mdoc.proximity.mobile.NfcMdocEngagementScope
 import id.walt.mdoc.proximity.mobile.NfcMdocEngagementSource
 import id.walt.mdoc.proximity.mobile.NfcV2MaximumCommandDataLength
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityAvailability
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportConfiguration
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
+import id.walt.mdoc.proximity.mobile.WifiAwareSecurityPolicy
 import id.walt.wallet2.data.Wallet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -100,7 +104,17 @@ internal class ProximityCoordinator(
                     message = "NFC host-card presentation is unavailable on this wallet platform",
                 )
         } else null
-        return ProximityCapabilities(
+        val wifiAwareConfiguration = configuration.retrieval.wifiAwareConfiguration
+        val wifiAwareSelected = wifiAwareConfiguration != null
+        val wifiAwareAvailability = if (wifiAwareSelected) {
+            wifiAwareTransportFactory?.capability(wifiAwareConfiguration.securityPolicy.toTransportPolicy())
+                ?: WifiAwareProximityAvailability.Unavailable(
+                    implemented = false,
+                    code = "wifi_aware_platform_unsupported",
+                    message = "Wi-Fi Aware proximity presentation is not implemented on this wallet platform",
+                )
+        } else null
+        return MobileWalletProximityCapabilities(
             profile = owned.profile,
             session = owned.session,
             qrEngagement = availableCapability(owned.session.qrRetrieval != null),
@@ -124,10 +138,10 @@ internal class ProximityCoordinator(
                 nfcHostPlatformAdapter != null,
                 nfcAvailability,
             ),
-            wifiAwareRetrieval = unavailableCapability(
-                selected = false,
-                code = "wifi_aware_not_implemented",
-                message = "Wi-Fi Aware retrieval is not implemented by this wallet build",
+            wifiAwareRetrieval = wifiAwareCapability(
+                selected = wifiAwareSelected,
+                implemented = wifiAwareTransportFactory != null,
+                availability = wifiAwareAvailability,
             ),
         )
     }
@@ -165,8 +179,9 @@ private class ProximitySessionImpl(
     private val configuration: ProximityConfiguration,
     private val bleTransportFactory: BleProximityTransportFactory?,
     private val nfcHostPlatformAdapter: NfcHostPlatformAdapter?,
-    private val capabilityCheck: suspend () -> ProximityCapabilities,
-    initialCapabilities: ProximityCapabilities,
+    private val wifiAwareTransportFactory: WifiAwareProximityTransportFactory?,
+    private val capabilityCheck: suspend () -> MobileWalletProximityCapabilities,
+    initialCapabilities: MobileWalletProximityCapabilities,
     sessionDispatcher: CoroutineDispatcher,
     private val onTerminal: suspend (ProximitySessionImpl) -> Unit,
 ) : ProximitySession {
@@ -480,10 +495,14 @@ private fun ProximityBleRoles.toTransportSelection(): BleMdocRoleSelection = whe
     ProximityBleRoles.Dual -> BleMdocRoleSelection.DUAL
 }
 
-private fun ProximityBleRoles.createTransactionRoles(sharedUuid: Boolean): BleMdocRoles = when (this) {
-    ProximityBleRoles.CentralClient -> BleMdocRoles.CentralClient(transactionUuid())
-    ProximityBleRoles.PeripheralServer -> BleMdocRoles.PeripheralServer(transactionUuid())
-    ProximityBleRoles.Dual -> {
+private fun MobileWalletProximityWifiAwareSecurityPolicy.toTransportPolicy(): WifiAwareSecurityPolicy = when (this) {
+    MobileWalletProximityWifiAwareSecurityPolicy.NcsSk128 -> WifiAwareSecurityPolicy.NcsSk128
+}
+
+private fun MobileWalletProximityBleRoles.createTransactionRoles(sharedUuid: Boolean): BleMdocRoles = when (this) {
+    MobileWalletProximityBleRoles.CentralClient -> BleMdocRoles.CentralClient(transactionUuid())
+    MobileWalletProximityBleRoles.PeripheralServer -> BleMdocRoles.PeripheralServer(transactionUuid())
+    MobileWalletProximityBleRoles.Dual -> {
         val reader = transactionUuid()
         var holder = if (sharedUuid) reader else transactionUuid()
         while (!sharedUuid && holder == reader) holder = transactionUuid()
@@ -539,6 +558,27 @@ private fun nfcCapability(
     )
 }
 
+private fun wifiAwareCapability(
+    selected: Boolean,
+    implemented: Boolean,
+    availability: WifiAwareProximityAvailability?,
+): MobileWalletProximityTransportCapability = when (availability) {
+    WifiAwareProximityAvailability.Available -> availableCapability(selected)
+    is WifiAwareProximityAvailability.Unavailable -> unavailableCapability(
+        selected = selected,
+        implemented = implemented && availability.implemented,
+        code = availability.code,
+        message = availability.message,
+        remediationActions = availability.code.toRemediationActions(),
+    )
+    null -> unavailableCapability(
+        selected = false,
+        implemented = implemented,
+        code = "wifi_aware_not_selected",
+        message = "Wi-Fi Aware retrieval is not selected for this session",
+    )
+}
+
 private fun unavailableCapability(
     selected: Boolean,
     implemented: Boolean = false,
@@ -583,7 +623,22 @@ internal fun String.toRemediationActions(): List<ProximityRemediationAction> = w
     "nfc_session_already_active",
     "nfc_foreground_routing_required",
     "nfc_card_session_active",
-    "nfc_session_expired" -> listOf(ProximityRemediationAction.Retry)
+    "nfc_session_expired" -> listOf(MobileWalletProximityRemediationAction.Retry)
+    "wifi_aware_nearby_permission_missing" ->
+        listOf(MobileWalletProximityRemediationAction.RequestNearbyWifiPermission)
+    "wifi_aware_local_network_permission_missing" ->
+        listOf(MobileWalletProximityRemediationAction.RequestLocalNetworkPermission)
+    "wifi_aware_radio_unavailable" -> listOf(MobileWalletProximityRemediationAction.EnableWifi)
+    "wifi_aware_api_unsupported",
+    "wifi_aware_feature_missing",
+    "wifi_aware_manager_unavailable",
+    "wifi_aware_ncs_sk_128_unsupported",
+    "wifi_aware_bands_unavailable",
+    "wifi_aware_platform_unsupported",
+    "wifi_aware_ios_api_unsupported" -> listOf(MobileWalletProximityRemediationAction.UseSupportedDevice)
+    "wifi_aware_characteristics_unavailable",
+    "wifi_aware_resources_unavailable",
+    "wifi_aware_capability_check_failed" -> listOf(MobileWalletProximityRemediationAction.Retry)
     else -> emptyList()
 }
 

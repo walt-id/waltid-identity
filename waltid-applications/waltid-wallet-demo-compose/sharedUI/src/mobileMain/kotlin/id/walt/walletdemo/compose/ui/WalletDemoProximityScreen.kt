@@ -1144,12 +1144,15 @@ private fun ProximityState?.engagements(): List<ProximityEngagement> = when (thi
 @Composable
 internal fun ProximityRemediationAction.label(): String = stringResource(
     when (this) {
-        ProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
-        ProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings
-        ProximityRemediationAction.EnableBluetooth -> Res.string.proximity_enable_bluetooth
-        ProximityRemediationAction.EnableNfc -> Res.string.proximity_enable_nfc
-        ProximityRemediationAction.UseSupportedDevice -> Res.string.proximity_use_supported_device
-        ProximityRemediationAction.Retry -> Res.string.proximity_try_again
+        MobileWalletProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
+        MobileWalletProximityRemediationAction.RequestNearbyWifiPermission -> Res.string.proximity_allow_nearby_wifi
+        MobileWalletProximityRemediationAction.RequestLocalNetworkPermission -> Res.string.proximity_allow_local_network
+        MobileWalletProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings
+        MobileWalletProximityRemediationAction.EnableBluetooth -> Res.string.proximity_enable_bluetooth
+        MobileWalletProximityRemediationAction.EnableWifi -> Res.string.proximity_enable_wifi
+        MobileWalletProximityRemediationAction.EnableNfc -> Res.string.proximity_enable_nfc
+        MobileWalletProximityRemediationAction.UseSupportedDevice -> Res.string.proximity_use_supported_device
+        MobileWalletProximityRemediationAction.Retry -> Res.string.proximity_try_again
     }
 )
 
