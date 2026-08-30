@@ -36,6 +36,7 @@
     <string name="proximity_document_request">Document request %1$d</string>
     <string name="proximity_document_scope">Document: %1$s</string>
     <string name="proximity_enable_bluetooth">Turn on Bluetooth</string>
+    <string name="proximity_enable_nfc">Turn on NFC</string>
     <string name="proximity_failed_title">Presentation failed</string>
     <string name="proximity_generic_credential">Wallet credential</string>
     <string name="proximity_generic_unavailable">Nearby presentation is not available yet.</string>
