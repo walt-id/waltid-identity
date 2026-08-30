@@ -21,7 +21,7 @@
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.2.0",
     "@julr/unocss-preset-forms": "^2.0.0",
-    "@nuxt/image": "^1.11.0",
+    "@nuxt/image": "^2.1.0",
     "@nuxt/kit": "^3.10.0",
     "@unocss/reset": "^66.4.2",
     "@vueuse/nuxt": "^13.6.0",
