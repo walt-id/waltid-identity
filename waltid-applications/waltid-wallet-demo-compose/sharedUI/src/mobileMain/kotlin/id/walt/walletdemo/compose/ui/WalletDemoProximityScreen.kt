@@ -875,6 +875,7 @@ private fun MobileWalletProximityRemediationAction.label(): String = stringResou
         MobileWalletProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
         MobileWalletProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings
         MobileWalletProximityRemediationAction.EnableBluetooth -> Res.string.proximity_enable_bluetooth
+        MobileWalletProximityRemediationAction.EnableNfc -> Res.string.proximity_enable_nfc
         MobileWalletProximityRemediationAction.UseSupportedDevice -> Res.string.proximity_use_supported_device
         MobileWalletProximityRemediationAction.Retry -> Res.string.proximity_try_again
     }

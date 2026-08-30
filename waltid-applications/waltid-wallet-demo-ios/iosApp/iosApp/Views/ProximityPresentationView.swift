@@ -683,6 +683,7 @@ private extension ProximityPresentationRemediationAction {
         case .requestBluetoothPermission: String(localized: "Allow Bluetooth")
         case .openApplicationSettings: String(localized: "Open app settings")
         case .enableBluetooth: String(localized: "Enable Bluetooth")
+        case .enableNFC: String(localized: "Enable NFC")
         case .useSupportedDevice: String(localized: "Use a supported device")
         case .retry: String(localized: "Check again")
         }
