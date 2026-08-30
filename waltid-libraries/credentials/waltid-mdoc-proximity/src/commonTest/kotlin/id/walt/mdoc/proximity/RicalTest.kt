@@ -68,7 +68,7 @@ class RicalTest {
             signatureValidator = RicalSignatureValidator { _, _ -> true },
             constraintEvaluator = RicalConstraintEvaluator { _, _ -> true },
             now = { Instant.parse("2026-01-02T00:00:00Z") },
-            pathValidator = RicalReaderPathValidator { _, _, _ -> RicalReaderPathState.VALID },
+            pathValidator = RicalReaderPathValidator { _, _ -> RicalReaderPathResult.Valid(authority) },
         ).evaluate(evidence)
 
         assertEquals(ReaderTrustState.VALID_BUT_UNTRUSTED, evaluate(false).state)
@@ -91,7 +91,7 @@ class RicalTest {
         suspend fun evaluate(
             providerResult: RicalProviderResult = RicalProviderResult.Available(baseSigned),
             signatureValid: Boolean = true,
-            path: RicalReaderPathState = RicalReaderPathState.VALID,
+            path: RicalReaderPathResult = RicalReaderPathResult.Valid(authority),
             constraintsValid: Boolean = true,
             now: Instant = Instant.parse("2026-01-03T00:00:00Z"),
         ) = RicalReaderTrustEvaluator(
@@ -105,40 +105,47 @@ class RicalTest {
             signatureValidator = RicalSignatureValidator { _, _ -> signatureValid },
             constraintEvaluator = RicalConstraintEvaluator { _, _ -> constraintsValid },
             now = { now },
-            pathValidator = RicalReaderPathValidator { _, _, _ -> path },
-        ).evaluate(evidence)
+            pathValidator = RicalReaderPathValidator { _, _ -> path },
+        ).evaluateDetailed(evidence)
 
         assertEquals(
-            ReaderTrustState.VALID_BUT_UNTRUSTED,
+            RicalEvaluationState.UNAVAILABLE,
             evaluate(RicalProviderResult.Unavailable("offline")).state,
         )
         assertEquals(
-            ReaderTrustState.VALID_BUT_UNTRUSTED,
+            RicalEvaluationState.INVALID,
             evaluate(RicalProviderResult.Conflict("two current versions")).state,
         )
         assertEquals(
-            ReaderTrustState.VALID_BUT_UNTRUSTED,
+            RicalEvaluationState.INVALID,
             evaluate(RicalProviderResult.Available(signed(baseRical.copy(provider = "other")))).state,
         )
-        assertEquals(ReaderTrustState.VALID_BUT_UNTRUSTED, evaluate(signatureValid = false).state)
-        assertEquals(ReaderTrustState.VALID_BUT_UNTRUSTED, evaluate(path = RicalReaderPathState.INVALID).state)
-        assertEquals(ReaderTrustState.VALID_BUT_UNTRUSTED, evaluate(constraintsValid = false).state)
+        assertEquals(RicalEvaluationState.INVALID, evaluate(signatureValid = false).state)
+        assertEquals(RicalEvaluationState.INVALID, evaluate(path = RicalReaderPathResult.Invalid).state)
         assertEquals(
-            ReaderTrustState.VALID_BUT_UNTRUSTED,
+            RicalEvaluationState.INVALID,
+            evaluate(path = RicalReaderPathResult.Valid(authority.copy(name = "Not in active RICAL"))).state,
+        )
+        assertEquals(RicalEvaluationState.NO_MATCHING_AUTHORITY, evaluate(constraintsValid = false).state)
+        assertEquals(
+            RicalEvaluationState.INVALID,
             evaluate(now = Instant.parse("2026-02-01T00:00:00Z")).state,
         )
         assertEquals(
-            ReaderTrustState.VALID_BUT_UNTRUSTED,
+            RicalEvaluationState.INVALID,
             evaluate(
                 RicalProviderResult.Available(
                     signed(baseRical.copy(date = Instant.parse("2026-01-04T00:00:00Z"), nextUpdate = null))
                 )
             ).state,
         )
-        assertEquals(ReaderTrustState.REVOKED, evaluate(path = RicalReaderPathState.REVOKED).state)
+        val revoked = evaluate(path = RicalReaderPathResult.Revoked)
+        assertEquals(RicalEvaluationState.MATCHED, revoked.state)
+        assertEquals(ReaderTrustState.REVOKED, revoked.decision.state)
 
         val overdueUpdate = evaluate()
-        assertEquals(ReaderTrustState.TRUSTED, overdueUpdate.state)
+        assertEquals(RicalEvaluationState.MATCHED, overdueUpdate.state)
+        assertEquals(ReaderTrustState.TRUSTED, overdueUpdate.decision.state)
         assertTrue(baseRical.nextUpdate!! < Instant.parse("2026-01-03T00:00:00Z"))
     }
 
