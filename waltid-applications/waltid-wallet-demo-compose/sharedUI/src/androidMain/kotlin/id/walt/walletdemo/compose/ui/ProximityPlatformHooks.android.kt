@@ -112,7 +112,11 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
                 when (action) {
                     ProximityRemediationAction.RequestBluetoothPermission ->
                         requestPermissions(bluetoothPermissions())
-                    ProximityRemediationAction.OpenApplicationSettings ->
+                    MobileWalletProximityRemediationAction.RequestNearbyWifiPermission ->
+                        requestPermissions(arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES))
+                    MobileWalletProximityRemediationAction.RequestLocalNetworkPermission ->
+                        requestPermissions(arrayOf(ACCESS_LOCAL_NETWORK_PERMISSION))
+                    MobileWalletProximityRemediationAction.OpenApplicationSettings ->
                         launchSystemSurface(
                             applicationSettingsIntent(context),
                             current = { systemSurface },
@@ -126,7 +130,14 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
                             setCurrent = { systemSurface = it },
                             launch = systemSurfaceLauncher::launch,
                         )
-                    ProximityRemediationAction.EnableNfc ->
+                    MobileWalletProximityRemediationAction.EnableWifi ->
+                        launchSystemSurface(
+                            Intent(Settings.ACTION_WIFI_SETTINGS),
+                            current = { systemSurface },
+                            setCurrent = { systemSurface = it },
+                            launch = systemSurfaceLauncher::launch,
+                        )
+                    MobileWalletProximityRemediationAction.EnableNfc ->
                         launchSystemSurface(
                             Intent(Settings.ACTION_NFC_SETTINGS),
                             current = { systemSurface },
@@ -140,18 +151,17 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
                 }
             },
             actionForDisplay = { action ->
-                if (
-                    action == ProximityRemediationAction.RequestBluetoothPermission &&
-                    permissionRoute(bluetoothPermissions()) == AndroidRuntimePermissionRoute.OpenSettings
-                ) {
-                    ProximityRemediationAction.OpenApplicationSettings
+                val permissions = runtimePermissionsFor(action)
+                if (permissions != null && permissionRoute(permissions) == AndroidRuntimePermissionRoute.OpenSettings) {
+                    MobileWalletProximityRemediationAction.OpenApplicationSettings
                 } else {
                     action
                 }
             },
             automaticallyPerform = { action ->
-                action != ProximityRemediationAction.RequestBluetoothPermission ||
-                    permissionRoute(bluetoothPermissions()) != AndroidRuntimePermissionRoute.OpenSettings
+                runtimePermissionsFor(action)?.let { permissions ->
+                    permissionRoute(permissions) != AndroidRuntimePermissionRoute.OpenSettings
+                } ?: true
             },
         )
     }
@@ -257,6 +267,7 @@ internal actual fun ProximityPlatformSessionEffect(
 }
 
 private const val NFC_REVIEW_PENDING_INTENT_REQUEST_CODE = 0x4D444F43
+private const val ACCESS_LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK"
 
 private fun bluetoothPermissions(): Array<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
     arrayOf(
@@ -266,6 +277,15 @@ private fun bluetoothPermissions(): Array<String> = if (Build.VERSION.SDK_INT >=
     )
 } else {
     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+}
+
+private fun runtimePermissionsFor(action: MobileWalletProximityRemediationAction): Array<String>? = when (action) {
+    MobileWalletProximityRemediationAction.RequestBluetoothPermission -> bluetoothPermissions()
+    MobileWalletProximityRemediationAction.RequestNearbyWifiPermission ->
+        arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES)
+    MobileWalletProximityRemediationAction.RequestLocalNetworkPermission ->
+        arrayOf(ACCESS_LOCAL_NETWORK_PERMISSION)
+    else -> null
 }
 
 internal enum class AndroidRuntimePermissionRoute { Granted, Request, OpenSettings }

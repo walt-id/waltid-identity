@@ -63,6 +63,18 @@ public data class ProximityNfcRetrievalConfiguration(
     }
 }
 
+/** Wi-Fi Aware NAN data-path security selected for one proximity session. */
+public enum class MobileWalletProximityWifiAwareSecurityPolicy {
+    /** Mandatory ISO holder baseline using NAN Cipher Suite NCS-SK-128. */
+    NcsSk128,
+}
+
+/** Complete Wi-Fi Aware retrieval configuration. */
+public data class MobileWalletProximityWifiAwareConfiguration(
+    public val securityPolicy: MobileWalletProximityWifiAwareSecurityPolicy =
+        MobileWalletProximityWifiAwareSecurityPolicy.NcsSk128,
+)
+
 /**
  * Nonempty conventional retrieval plan used by QR or NFC handover.
  * @property bluetoothLowEnergy Optional BLE role and bearer policy.
@@ -300,8 +312,11 @@ public enum class ProximityErrorCategory {
 /** Normalized host remediation suggested by a side-effect-free prerequisite check. */
 public enum class ProximityRemediationAction {
     RequestBluetoothPermission,
+    RequestNearbyWifiPermission,
+    RequestLocalNetworkPermission,
     OpenApplicationSettings,
     EnableBluetooth,
+    EnableWifi,
     EnableNfc,
     UseSupportedDevice,
     Retry,

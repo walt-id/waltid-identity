@@ -6,11 +6,12 @@
 
 ## Overview
 
-`waltid-mdoc-proximity-mobile` connects the
-[shared proximity engine](../waltid-mdoc-proximity/README.md) to platform radios.
-It owns BLE role setup, Ident checks, GATT/L2CAP framing, NFC handover/APDU framing
-and transport lifecycle. The shared engine owns engagement coordination,
-session encryption, request processing, consent and trust decisions.
+The module owns ISO/IEC 18013-5 BLE roles, Ident verification, GATT and L2CAP framing; bounded NFC
+NDEF, Connection Handover, APDU, and retrieval state; Wi-Fi Aware NCS-SK derivation, carrier and
+HTTP framing; the Android Bluetooth, host-card-emulation, and Wi-Fi Aware adapters; and the Apple
+CoreBluetooth adapter. Its NFC host boundary is consumed by the Swift CardSession adapter in
+`waltid-wallet-sdk-ios`. Device engagement coordination, session encryption, request processing,
+consent, and trust remain in `waltid-mdoc-proximity`.
 
 | Transport | Android | iOS |
 |---|---|---|
@@ -18,8 +19,21 @@ session encryption, request processing, consent and trust decisions.
 | Conventional NFC engagement and retrieval | Host-card emulation adapter | Host boundary consumed by Swift WalletSDK's entitlement-gated CardSession adapter |
 | Provisional NFCv2 | Explicit edition-2 draft path | Same host boundary; platform access and reader support required |
 
-These are implementation boundaries. Physical-device and independent-reader
-qualification remain separate from compilation, unit tests and API availability.
+`AndroidWifiAwareProximityTransportFactory` supports the mandatory NCS-SK-128 holder path on API
+33+ devices that expose Wi-Fi Aware, the cipher suite, a 2.4 GHz NAN band, and available publish/NDP
+resources. It performs no prompt or radio attach during capability checks. Android 13+ hosts request
+`NEARBY_WIFI_DEVICES`; target-37 hosts also request `ACCESS_LOCAL_NETWORK`. The provider publishes
+the transaction-derived service, establishes a secure responder data path, and serves bounded
+sequential `POST /mdoc` exchanges. `IosWifiAwareProximityTransportFactory` reports a precise
+unimplemented result because Apple's paired, statically declared DNS-SD service model cannot express
+the ISO transaction service name.
+
+Use `AndroidBleProximityTransportFactory` or `IosBleProximityTransportFactory` to check the exact
+role selection before generating session keys or transaction UUIDs. The probe does not prepare
+radio resources. After prerequisites pass, create a validated `BleProximityTransportConfiguration`
+for one transaction and ask the same factory for its provider. The provider prepares only methods
+that can actually be advertised and exposes them through the shared `ProximityTransportProvider`
+contract.
 
 ## Getting started
 
@@ -38,84 +52,9 @@ coordinate transports, stored credentials, Reader CA policy and the complete
 review/approval lifecycle. The transport provider itself does not select
 credentials or request consent.
 
-### Check Android BLE availability
-
-```kotlin
-import android.content.Context
-import id.walt.mdoc.proximity.mobile.*
-
-suspend fun checkBle(context: Context): BleProximityAvailability {
-    val factory = AndroidBleProximityTransportFactory(context)
-    return factory.capability(BleMdocRoleSelection.DUAL)
-}
-```
-
-`capability` checks exactly the selected roles without generating keys, creating
-transaction UUIDs or starting radio resources. Handle `Available` and
-`Unavailable` explicitly in the host; an unavailable result supplies a stable
-code and diagnostic message for the application's remediation UI.
-
-### Create a provider for one transaction
-
-After prerequisites pass, the integration supplies the role configuration and
-exact tagged `EDeviceKeyBytes` from that transaction's Device Engagement:
-
-```kotlin
-import id.walt.mdoc.proximity.ImmutableBytes
-import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
-import id.walt.mdoc.proximity.mobile.*
-
-fun createBleProvider(
-    factory: BleProximityTransportFactory,
-    roles: BleMdocRoles,
-    eDeviceKeyBytes: ImmutableBytes,
-): ReaderSelectedTransportProvider = factory.create(
-    BleProximityTransportConfiguration(
-        roles = roles,
-        bearerPolicy = BleBearerPolicy.PreferL2cap,
-        eDeviceKeyBytes = eDeviceKeyBytes,
-    ),
-)
-```
-
-Use `IosBleProximityTransportFactory` for the equivalent iOS integration. Factory
-creation does not start BLE: the engine prepares the provider for engagement and
-owns its lifetime. Prepared listeners remain available until a connection wins
-or the session closes, so an advertised QR cannot outlive its retrieval path.
-
-## Platform setup and lifecycle
-
-Android hosts need the merged manifest declarations and runtime permissions for
-the selected roles. Apple hosts need `NSBluetoothAlwaysUsageDescription`; the
-provider runs CoreBluetooth on its main queue and leaves authorization prompts
-to the app. See the platform provider KDoc for the permission matrix.
-
-Both central adapters follow the same Ident, bearer-selection, subscription and
-START order. Bounded GATT queues fail with `ble_receive_overflow` rather than
-retaining incomplete messages; callbacks after closure are ignored. Android
-blocking socket operations register cancellation-driven closure before native
-connect, accept, read or write operations begin.
-
-Active connections expose passive closure observation to the shared engine. BLE
-observes closure of its platform packet channel without consuming packets or
-starting the receive inactivity timeout.
-
-NFC host deactivation ends a direct APDU connection even while the wallet awaits
-consent. Conventional handover does not close the selected BLE connection; NFCv2
-hybrid retrieval remains viable while its alternate bearer is active or connecting.
-
-Successful L2CAP completion permits a one-second drain before native cleanup.
-This allows queued response bytes to leave the radio stack; it is not a reader
-acknowledgement. Cancellation and error cleanup remain immediate.
-
-## Tests and design references
-
-From the unified-build root:
-
-```bash
-./gradlew :waltid-libraries:credentials:waltid-mdoc-proximity-mobile:allTests -PenableAndroidBuild=true -PenableIosBuild=true
-```
-
-- [BLE building blocks and qualification boundary](docs/adr/0001-ble-building-block-selection.md)
-- [NFC, handover and provisional NFCv2](docs/adr/0002-nfc-building-block-selection.md)
-- [Wallet integration, reader trust and credential selection](../../protocols/waltid-openid4vc-wallet-mobile/README.md#in-person-proximity-presentation)
+See [ADR 0001](docs/adr/0001-ble-building-block-selection.md) for the BLE standards baseline,
+upstream candidates, selected native composition, ownership boundary, and qualification status.
+See [ADR 0002](docs/adr/0002-nfc-building-block-selection.md) for the equivalent NFC decision and
+the provisional NFCv2 evidence boundary. See [ADR 0003](docs/adr/0003-wifi-aware-building-block-selection.md)
+for Wi-Fi Aware sources, Android/iOS disposition, security scope, and evidence gates. Physical-device
+and external-reader qualification remains required before production support is claimed.

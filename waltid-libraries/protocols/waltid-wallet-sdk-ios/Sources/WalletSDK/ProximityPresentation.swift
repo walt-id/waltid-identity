@@ -76,19 +76,24 @@ public struct ProximityRetrievalOptions: Sendable, Hashable {
     /// Optional BLE role and bearer policy.
     public let bluetoothLowEnergy: ProximityBLEConfiguration?
     /// Optional conventional NFC command/response contract.
-    public let nfc: ProximityNFCRetrievalConfiguration?
+    public let nfc: ProximityPresentationNFCRetrievalConfiguration?
+    /// Optional Wi-Fi Aware holder-publisher contract.
+    public let wifiAware: ProximityPresentationWifiAwareConfiguration?
 
     /// Creates a nonempty conventional retrieval configuration.
     /// - Parameters:
     ///   - bluetoothLowEnergy: Optional BLE role and bearer configuration.
     ///   - nfc: Optional conventional NFC command/response configuration.
+    ///   - wifiAware: Optional Wi-Fi Aware configuration.
     public init(
-        bluetoothLowEnergy: ProximityBLEConfiguration? = .init(),
-        nfc: ProximityNFCRetrievalConfiguration? = nil
+        bluetoothLowEnergy: ProximityPresentationBLEConfiguration? = .init(),
+        nfc: ProximityPresentationNFCRetrievalConfiguration? = nil,
+        wifiAware: ProximityPresentationWifiAwareConfiguration? = nil
     ) {
-        precondition(bluetoothLowEnergy != nil || nfc != nil)
+        precondition(bluetoothLowEnergy != nil || nfc != nil || wifiAware != nil)
         self.bluetoothLowEnergy = bluetoothLowEnergy
         self.nfc = nfc
+        self.wifiAware = wifiAware
     }
 }
 
@@ -1009,10 +1014,16 @@ public enum ProximityRecovery: Sendable, Equatable {
 public enum ProximityRemediationAction: Sendable, Hashable {
     /// Request Bluetooth permission using the platform system surface.
     case requestBluetoothPermission
+    /// Request Nearby Wi-Fi devices permission using the platform system surface.
+    case requestNearbyWifiPermission
+    /// Request local-network permission using the platform system surface.
+    case requestLocalNetworkPermission
     /// Open application settings using the platform system surface.
     case openApplicationSettings
     /// Ask the user to enable Bluetooth through the platform-owned surface.
     case enableBluetooth
+    /// Ask the user to enable Wi-Fi through the platform-owned surface.
+    case enableWifi
     /// Ask the user to enable NFC through the platform-owned surface.
     case enableNFC
     /// Explain that the selected capability requires another device.
