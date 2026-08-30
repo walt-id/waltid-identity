@@ -488,6 +488,7 @@ private val readyCapabilities = ProximityCapabilities(
     nfcEngagement = availableUnselected,
     bluetoothLowEnergy = availableSelected,
     nfcRetrieval = availableUnselected,
+    nfcV2Retrieval = availableUnselected,
     wifiAwareRetrieval = availableUnselected,
 )
 
