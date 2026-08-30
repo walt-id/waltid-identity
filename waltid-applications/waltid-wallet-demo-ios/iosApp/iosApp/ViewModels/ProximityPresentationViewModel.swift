@@ -426,6 +426,9 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
             return await requestBluetoothPermission()
         case .openApplicationSettings, .enableBluetooth:
             return await openSettingsAndWaitForReturn()
+        case .enableNFC:
+            // iOS does not expose an app-addressable NFC power control.
+            return .cancelled
         case .retry:
             return .completed
         case .useSupportedDevice:
