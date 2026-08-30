@@ -33,7 +33,7 @@ Checkout the [documentation regarding mdoc credentials](https://docs.walt.id/con
 * **Present** mdoc documents with selective disclosure of issuer-signed items and mdoc device authentication, based on COSE Mac0 or COSE Sign1.
 * **Create** mdoc requests object with COSE Sign1 reader authentication
 * Support for **integration** with various crypto libraries and frameworks, to perform the cryptographic operations and key management
-* **Full Device Engagement Support (NFC, QR, Wi-Fi Aware):** Proximity flow support for all transmission technologies as defined in ISO/IEC 18013-5 (e.g., static \& negotiated handover for NFC).
+* **Typed Device Engagement models (NFC, QR, Wi-Fi Aware):** CBOR models for ISO/IEC 18013-5 retrieval methods. Stateful holder transports and their platform qualification live in `waltid-mdoc-proximity` and `waltid-mdoc-proximity-mobile`; model availability alone is not transport support.
 * **Revocation Support for Mobile Security Object (MSO):** Support for MSO revocation status encoding via both [IETF Status List](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/) and Identifier List methods.
 * **Multiplatform support**
   * Kotlin/Java for JVM
@@ -692,12 +692,17 @@ val wifiDeviceEngagement = DeviceEngagement(
     WifiDeviceRetrieval(
       retrievalOptions = WifiOptions(
         passPhrase = "secret-wifi-password",
-        bandInfoSupportedBands = ByteArray(0), //replace with band info (Wi-Fi aware carrier configuration record).
+        bandInfoSupportedBands = byteArrayOf(0x04), // 2.4 GHz NAN band; never use an empty bitmap.
       ),
     ),
   ),
 )
 ```
+
+This example constructs Device Engagement data only. It does not publish a NAN service, establish
+an encrypted data path, or prove platform/interoperability support. Mobile holder applications
+should use `waltid-mdoc-proximity-mobile`, whose capability result gates advertisement and resource
+preparation.
 
 _CBOR data (hex encoded string):_
 

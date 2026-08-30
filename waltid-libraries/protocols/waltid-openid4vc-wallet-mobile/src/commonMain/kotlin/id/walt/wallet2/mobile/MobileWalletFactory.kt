@@ -23,6 +23,7 @@ import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -158,6 +159,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
     platformKeyProvider: PlatformManagedKeyProvider,
     proximityTransportFactory: BleProximityTransportFactory,
     proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+    proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     openEncryptedDriver: (
         databaseName: String,
         encryptionKey: DatabaseEncryptionKey,
@@ -188,6 +190,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         registrationProjection = registrationProjection,
         proximityTransportFactory = proximityTransportFactory,
         proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
+        proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
         deleteLocalPersistence = {
             runCatching { driver.close() }
             deleteDatabase(databaseName)
@@ -203,6 +206,7 @@ internal fun createSqlDelightMobileWallet(
     keyProvider: PlatformManagedKeyProvider,
     proximityTransportFactory: BleProximityTransportFactory? = null,
     proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+    proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
@@ -255,6 +259,7 @@ internal fun createSqlDelightMobileWallet(
         readerTrustEvaluator = config.readerTrustEvaluator,
         proximityTransportFactory = proximityTransportFactory,
         proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
+        proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
         deleteLocalPersistence = deleteLocalPersistence,
     )
 }

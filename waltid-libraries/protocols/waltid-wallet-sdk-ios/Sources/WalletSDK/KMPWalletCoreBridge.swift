@@ -2255,8 +2255,11 @@ private extension WalletCore.ProximityRemediationAction {
     func toSwiftAction() -> ProximityRemediationAction {
         switch self {
         case .requestBluetoothPermission: return .requestBluetoothPermission
+        case .requestNearbyWifiPermission: return .requestNearbyWifiPermission
+        case .requestLocalNetworkPermission: return .requestLocalNetworkPermission
         case .openApplicationSettings: return .openApplicationSettings
         case .enableBluetooth: return .enableBluetooth
+        case .enableWifi: return .enableWifi
         case .enableNfc: return .enableNFC
         case .useSupportedDevice: return .useSupportedDevice
         case .retry: return .retry
@@ -2323,8 +2326,11 @@ private extension ProximityRemediationAction {
     func toKMPAction() -> WalletCore.ProximityRemediationAction {
         switch self {
         case .requestBluetoothPermission: return .requestBluetoothPermission
+        case .requestNearbyWifiPermission: return .requestNearbyWifiPermission
+        case .requestLocalNetworkPermission: return .requestLocalNetworkPermission
         case .openApplicationSettings: return .openApplicationSettings
         case .enableBluetooth: return .enableBluetooth
+        case .enableWifi: return .enableWifi
         case .enableNFC: return .enableNfc
         case .useSupportedDevice: return .useSupportedDevice
         case .retry: return .retry
