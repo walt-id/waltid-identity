@@ -92,7 +92,7 @@ signature/MAC response cannot be collapsed into a global authorization method.
 
 Cryptographic reader-authentication validity does not establish application
 trust. Provision Reader CA certificates through an out-of-band application
-channel and inject ``ProximityConfiguredReaderTrustEvaluator`` when the wallet
+channel and inject `ProximityConfiguredReaderTrustEvaluator` when the wallet
 requires a trusted reader:
 
 ```swift

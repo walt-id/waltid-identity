@@ -244,6 +244,10 @@ public struct ProximityReaderTrustAnchor: Sendable, Equatable {
     /// Display-safe authority label that does not establish trust by itself.
     public let displayName: String?
 
+    /// Creates an explicitly application-provisioned Reader CA trust anchor.
+    /// - Parameters:
+    ///   - certificateDER: DER-encoded Reader CA certificate.
+    ///   - displayName: Optional display-safe authority label.
     public init(certificateDER: Data, displayName: String? = nil) {
         precondition(isProximityX509Certificate(certificateDER))
         precondition(displayName == nil || isProximityNonBlank(displayName!))
@@ -280,6 +284,9 @@ public struct ProximityCertificateRevocationResult: Sendable, Equatable {
 
 /// Application boundary for OCSP, CRL, or another reader-certificate status source.
 public protocol ProximityReaderRevocationEvaluator: Sendable {
+    /// Evaluates current revocation status for a verified reader chain.
+    /// - Parameter evidence: Verified reader evidence for one authentication scope.
+    /// - Returns: The configured source's immutable certificate-status result.
     func evaluate(_ evidence: ProximityReaderEvidence) async throws -> ProximityCertificateRevocationResult
 }
 
@@ -298,6 +305,10 @@ public struct ProximityRICALSignerEvidence: Sendable, Equatable {
     /// DER certificates in leaf-first order.
     public let certificateChainDER: [Data]
 
+    /// Creates exact signer evidence for one configured RICAL provider.
+    /// - Parameters:
+    ///   - providerID: Stable identifier of the configured provider.
+    ///   - certificateChainDER: Nonempty DER certificate chain in leaf-first order.
     public init(providerID: String, certificateChainDER: [Data]) {
         precondition(isProximityNonBlank(providerID))
         precondition(!certificateChainDER.isEmpty && certificateChainDER.allSatisfy { !$0.isEmpty })
@@ -308,6 +319,9 @@ public struct ProximityRICALSignerEvidence: Sendable, Equatable {
 
 /// Application boundary for RICAL-signer OCSP, CRL, or another status source.
 public protocol ProximityRICALSignerRevocationEvaluator: Sendable {
+    /// Evaluates current revocation status for a verified RICAL signer chain.
+    /// - Parameter evidence: Exact signer evidence for the selected provider.
+    /// - Returns: The configured source's immutable certificate-status result.
     func evaluate(
         _ evidence: ProximityRICALSignerEvidence
     ) async throws -> ProximityCertificateRevocationResult
@@ -323,8 +337,11 @@ public enum ProximityRICALSignerRevocationPolicy: Sendable {
 
 /// Explicit application-provisioned root for one RICAL provider.
 public struct ProximityRICALProviderTrustAnchor: Sendable, Equatable {
+    /// DER-encoded trust anchor for this RICAL provider's signer.
     public let certificateDER: Data
 
+    /// Creates an explicitly application-provisioned RICAL signer trust anchor.
+    /// - Parameter certificateDER: DER-encoded trust-anchor certificate.
     public init(certificateDER: Data) {
         precondition(isProximityX509Certificate(certificateDER))
         self.certificateDER = certificateDER
@@ -362,13 +379,18 @@ public struct ProximityRICALProviderResult: Sendable, Equatable {
 
 /// Supplies the latest application-selected RICAL without implicit SDK networking.
 public protocol ProximityRICALProvider: Sendable {
+    /// Returns the application's current active-list result for this provider.
+    /// - Returns: Exact signed RICAL bytes or a display-safe unavailable/conflict result.
     func current() async throws -> ProximityRICALProviderResult
 }
 
 /// One RICAL trust constraint. Values contain CBOR-encoded constraint data.
 public struct ProximityRICALTrustConstraint: Sendable, Equatable {
+    /// Constraint name to CBOR-encoded value.
     public let valuesCBOR: [String: Data]
 
+    /// Creates one nonempty ecosystem-specific RICAL trust constraint.
+    /// - Parameter valuesCBOR: Constraint names mapped to nonempty CBOR-encoded values.
     public init(valuesCBOR: [String: Data]) {
         precondition(!valuesCBOR.isEmpty)
         precondition(valuesCBOR.allSatisfy { isProximityNonBlank($0.key) && !$0.value.isEmpty })
@@ -379,6 +401,10 @@ public struct ProximityRICALTrustConstraint: Sendable, Equatable {
 /// Application evaluator for ecosystem-specific RICAL trust-constraint semantics.
 public protocol ProximityRICALConstraintEvaluator: Sendable {
     /// Returns true only when at least one complete constraint is understood and satisfied.
+    /// - Parameters:
+    ///   - constraints: Complete constraints carried by the matched RICAL authority.
+    ///   - reader: Verified reader evidence to which the constraints apply.
+    /// - Returns: Whether an understood complete constraint is satisfied.
     func accepts(
         _ constraints: [ProximityRICALTrustConstraint],
         reader: ProximityReaderEvidence
@@ -387,16 +413,33 @@ public protocol ProximityRICALConstraintEvaluator: Sendable {
 
 /// Immutable policy for one explicitly configured RICAL provider.
 public struct ProximityRICALConfiguration: Sendable {
+    /// Stable application-configured provider identifier.
     public let providerID: String
+    /// RICAL type identifiers accepted from this provider.
     public let acceptedTypes: Set<String>
+    /// Explicit X.509 trust anchors accepted for this provider's signer.
     public let providerTrustAnchors: [ProximityRICALProviderTrustAnchor]
+    /// Certificate-policy OIDs accepted on this provider's signer certificate.
     public let acceptedSignerCertificatePolicyOIDs: Set<String>
+    /// Revocation behavior for this provider's verified signer certificate.
     public let signerRevocationPolicy: ProximityRICALSignerRevocationPolicy
+    /// Whether an accepted matching authority may establish product reader trust.
     public let establishReaderTrust: Bool
+    /// Application-owned source of the current signed RICAL.
     public let provider: any ProximityRICALProvider
     /// Nil rejects nonempty ecosystem-specific constraints as unsupported.
     public let constraintEvaluator: (any ProximityRICALConstraintEvaluator)?
 
+    /// Creates immutable policy for one explicitly configured RICAL provider.
+    /// - Parameters:
+    ///   - providerID: Stable application-configured provider identifier.
+    ///   - acceptedTypes: Nonempty set of accepted RICAL type identifiers.
+    ///   - providerTrustAnchors: Nonempty set of explicit signer trust anchors.
+    ///   - acceptedSignerCertificatePolicyOIDs: Nonempty set of accepted signer policy OIDs.
+    ///   - signerRevocationPolicy: Revocation behavior for the verified signer certificate.
+    ///   - establishReaderTrust: Whether an accepted authority may establish product reader trust.
+    ///   - provider: Application-owned source of the current signed RICAL.
+    ///   - constraintEvaluator: Optional evaluator for ecosystem-specific trust constraints.
     public init(
         providerID: String,
         acceptedTypes: Set<String>,
@@ -430,10 +473,18 @@ public struct ProximityRICALConfiguration: Sendable {
 
 /// Swift-native immutable configuration for the shared standards reader-trust evaluator.
 public struct ProximityReaderTrustConfiguration: Sendable {
+    /// Explicit application-provisioned Reader CA trust anchors.
     public let trustAnchors: [ProximityReaderTrustAnchor]
+    /// Ordered application-configured RICAL provider policies.
     public let ricalProviders: [ProximityRICALConfiguration]
+    /// Revocation behavior for reader chains trusted by direct Reader CA anchors.
     public let revocationPolicy: ProximityReaderRevocationPolicy
 
+    /// Creates immutable application-owned reader-trust configuration.
+    /// - Parameters:
+    ///   - trustAnchors: Explicit Reader CA trust anchors.
+    ///   - ricalProviders: Ordered RICAL provider policies.
+    ///   - revocationPolicy: Revocation behavior for directly anchored reader chains.
     public init(
         trustAnchors: [ProximityReaderTrustAnchor] = [],
         ricalProviders: [ProximityRICALConfiguration] = [],
