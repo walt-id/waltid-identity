@@ -13,7 +13,7 @@
   "devDependencies": {
     "@nuxtjs/tailwindcss": "^6.13.2",
     "@types/node": "^25.9.3",
-    "nuxt": "3.19.0",
+    "nuxt": "3.21.10",
     "typescript": "5.8.3"
   }
 }
