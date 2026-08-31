@@ -4,6 +4,34 @@ import XCTest
 final class MockWalletUITests: XCTestCase {
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
+    func testSettingsExposeAllProximityTransportProfiles() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            "Wallet ready"
+        )
+        ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        ui.assertExists(identifier: "wallet.settingsProximityPresentation")
+        ui.assertExists(identifier: "wallet.settingsProximityDefault")
+        ui.assertExists(identifier: "wallet.settingsProximityNfcV2Hybrid")
+        ui.assertExists(identifier: "wallet.settingsProximityNfcV2Direct")
+
+        ui.tapElement(identifier: "wallet.settingsProximityNfcV2Direct")
+        XCTAssertEqual(
+            app.buttons["wallet.settingsProximityNfcV2Direct"].value as? String,
+            "Selected"
+        )
+
+        ui.tapElement(identifier: "wallet.settingsProximityDefault")
+        XCTAssertEqual(
+            app.buttons["wallet.settingsProximityDefault"].value as? String,
+            "Selected"
+        )
+    }
+
     func testProximityPresentationCanBeDismissedAndStartedAgain() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)

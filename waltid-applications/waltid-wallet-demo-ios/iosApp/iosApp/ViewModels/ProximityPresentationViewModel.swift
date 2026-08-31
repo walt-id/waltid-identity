@@ -43,7 +43,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     @Published private(set) var startupFailed = false
 
     private let client: any ProximityWalletClient
-    private let configuration: ProximityPresentationConfiguration
+    private let configurationProvider: () -> ProximityPresentationConfiguration
     private let hostActions: any ProximityHostActionExecutor
     private var session: (any DemoProximityPresentationSession)?
     private var observationTask: Task<Void, Never>?
@@ -56,10 +56,11 @@ final class ProximityPresentationViewModel: ObservableObject {
             engagement: .qrAndNFC(.negotiatedHandover),
             retrieval: .conventional(.init(nfc: .init()))
         ),
+        configurationProvider: (() -> ProximityPresentationConfiguration)? = nil,
         hostActions: (any ProximityHostActionExecutor)? = nil
     ) {
         self.client = client
-        self.configuration = configuration
+        self.configurationProvider = configurationProvider ?? { configuration }
         self.hostActions = hostActions ?? IOSProximityHostActionExecutor()
     }
 
@@ -95,6 +96,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         startupFailed = false
         sessionGeneration &+= 1
         let generation = sessionGeneration
+        let configuration = configurationProvider()
         observationTask = Task { [weak self] in
             guard let self else { return }
             do {
