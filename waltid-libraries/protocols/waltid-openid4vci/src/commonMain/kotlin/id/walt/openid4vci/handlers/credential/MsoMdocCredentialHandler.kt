@@ -52,6 +52,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult {
         return try {

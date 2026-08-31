@@ -53,6 +53,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult {
         return try {
@@ -77,6 +78,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                         docType = docType,
                         validFrom = validFrom,
                         validUntil = effectiveValidUntil,
+                        expectedUpdate = expectedUpdate,
                         status = credentialStatus,
                         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                         verifiedProof = verifiedProof,
@@ -112,6 +114,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult = try {
         computeCredentialResult(
@@ -132,6 +135,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                     docType = docType,
                     validFrom = validFrom,
                     validUntil = effectiveValidUntil,
+                    expectedUpdate = expectedUpdate,
                     status = credentialStatus,
                     mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                     verifiedProof = verifiedProof,

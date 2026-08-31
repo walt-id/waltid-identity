@@ -585,6 +585,7 @@ class DefaultOAuth2Provider(
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
         val verifiedProofs = when (
@@ -621,6 +622,7 @@ class DefaultOAuth2Provider(
             credentialStatus = credentialStatus,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             verifiedProofs = verifiedProofs,
         )
     }
@@ -641,6 +643,7 @@ class DefaultOAuth2Provider(
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
         val verifiedProofs = when (
@@ -685,6 +688,7 @@ class DefaultOAuth2Provider(
             credentialStatus = credentialStatus,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             verifiedProofs = verifiedProofs,
         )
     }

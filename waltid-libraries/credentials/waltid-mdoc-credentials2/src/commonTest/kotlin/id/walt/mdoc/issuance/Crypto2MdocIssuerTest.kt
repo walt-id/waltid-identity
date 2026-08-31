@@ -55,6 +55,7 @@ class Crypto2MdocIssuerTest {
         val certificate = X509CertificateUtil.createSelfSignedCertificate(issuerKey, sigAlg) {
             subjectDn = "CN=Crypto2 mdoc issuer"
         }
+        val expectedUpdate = kotlin.time.Clock.System.now().plus(kotlin.time.Duration.parse("180d"))
         val issued = MdocIssuer.issueUniversal(
             issuerKey = issuerKey,
             signatureAlgorithm = Cose.Algorithm.ES256,
@@ -66,10 +67,13 @@ class Crypto2MdocIssuerTest {
                     "org.example" to JsonObject(mapOf("given_name" to JsonPrimitive("Jane")))
                 )
             ),
+            expectedUpdate = expectedUpdate,
         )
 
         assertTrue(issued.issuerAuth.verify(issuerKey, Cose.Algorithm.ES256))
-        assertEquals("org.example.mdoc", issued.issuerAuth.decodeIsoPayload<MobileSecurityObject>().docType)
+        val mso = issued.issuerAuth.decodeIsoPayload<MobileSecurityObject>()
+        assertEquals("org.example.mdoc", mso.docType)
+        assertEquals(expectedUpdate.epochSeconds, mso.validityInfo.expectedUpdate?.epochSeconds)
         val parsedIssuerAuth = issued.getParsedIssuerAuthCrypto2()
         assertTrue(issued.issuerAuth.verify(parsedIssuerAuth.signerKey, Cose.Algorithm.ES256))
         val verification = verifyIssuerAuthentication(

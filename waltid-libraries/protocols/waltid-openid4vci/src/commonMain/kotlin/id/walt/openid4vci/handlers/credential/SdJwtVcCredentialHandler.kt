@@ -49,6 +49,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEnd
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult = sign(configuration, verifiedProofs) { vct, verifiedProof ->
         SdJwtVcCredentialSigner.generateSdJwtVC(
@@ -82,6 +83,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEnd
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult = sign(configuration, verifiedProofs) { vct, verifiedProof ->
         SdJwtVcCredentialSigner.generateSdJwtVC(
