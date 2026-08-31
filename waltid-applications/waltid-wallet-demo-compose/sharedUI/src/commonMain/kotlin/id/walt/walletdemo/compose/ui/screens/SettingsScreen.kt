@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,6 +39,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletDemoProximityTransportProfile
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.displayMessage
 import id.walt.walletdemo.compose.logic.isBusy
@@ -50,6 +52,7 @@ import id.walt.walletdemo.compose.ui.components.title
 internal fun SettingsScreen(
     state: WalletDemoUiState,
     onShowDcApiPresentationPreviewChange: (Boolean) -> Unit,
+    onProximityTransportProfileChange: ((WalletDemoProximityTransportProfile) -> Unit)?,
     onBack: () -> Unit,
     onLock: () -> Unit,
     onResetWallet: () -> Unit,
@@ -127,6 +130,12 @@ internal fun SettingsScreen(
                 ready = ready,
                 onRequestChange = onRequestSigningProtectionChange,
             )
+            if (onProximityTransportProfileChange != null) {
+                ProximityPresentationSettings(
+                    selected = state.proximityTransportProfile,
+                    onSelect = onProximityTransportProfileChange,
+                )
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -236,6 +245,89 @@ internal fun SettingsScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun ProximityPresentationSettings(
+    selected: WalletDemoProximityTransportProfile,
+    onSelect: (WalletDemoProximityTransportProfile) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(WalletUiTestTags.SettingsProximityPresentation),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            "Proximity Presentation",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            "Choose the transport profile for the next in-person presentation session.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ProximityTransportProfileChoice(
+            profile = WalletDemoProximityTransportProfile.Default,
+            selected = selected,
+            title = "Default (QR + conventional NFC)",
+            description = "Production default with negotiated QR/NFC engagement and conventional retrieval.",
+            testTag = WalletUiTestTags.SettingsProximityDefault,
+            onSelect = onSelect,
+        )
+        ProximityTransportProfileChoice(
+            profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid,
+            selected = selected,
+            title = "NFCv2 hybrid (provisional)",
+            description = "Starts over NFCv2 and transfers the session over Bluetooth LE.",
+            testTag = WalletUiTestTags.SettingsProximityNfcV2Hybrid,
+            onSelect = onSelect,
+        )
+        ProximityTransportProfileChoice(
+            profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct,
+            selected = selected,
+            title = "NFCv2 direct (provisional)",
+            description = "Keeps engagement and encrypted session messages on NFCv2.",
+            testTag = WalletUiTestTags.SettingsProximityNfcV2Direct,
+            onSelect = onSelect,
+        )
+        Text(
+            "Availability is checked before engagement. The active session keeps its starting profile.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ProximityTransportProfileChoice(
+    profile: WalletDemoProximityTransportProfile,
+    selected: WalletDemoProximityTransportProfile,
+    title: String,
+    description: String,
+    testTag: String,
+    onSelect: (WalletDemoProximityTransportProfile) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = profile == selected,
+            onClick = { onSelect(profile) },
+            modifier = Modifier.testTag(testTag),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

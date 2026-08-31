@@ -66,6 +66,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationError
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewResult
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewHandle
+import id.walt.walletdemo.compose.logic.WalletDemoProximityTransportProfile
 import id.walt.walletdemo.compose.logic.WalletDemoResponseEncryption
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
@@ -1087,7 +1088,7 @@ class WalletDemoAppTestScenarios(
         val wallet = FakeDemoWallet()
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
-        setWalletContent { WalletDemoApp(controller) }
+        setWalletContent { WalletDemoApp(controller, onStartProximityPresentation = {}) }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
@@ -1113,6 +1114,16 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).assertIsOff()
         assertEquals(false, controller.state.value.showDcApiPresentationPreview)
+        onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation)
+            .performScrollTo()
+            .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsProximityNfcV2Direct)
+            .performScrollTo()
+            .performClick()
+        assertEquals(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct,
+            controller.state.value.proximityTransportProfile,
+        )
         onNodeWithTag(WalletUiTestTags.SettingsLock)
             .performScrollTo()
             .assertIsDisplayed()

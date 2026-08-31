@@ -33,6 +33,8 @@ data class WalletDemoUiState(
     val statusExpanded: Boolean = false,
     val statusOccurrenceId: Long = 0,
     val showDcApiPresentationPreview: Boolean = true,
+    val proximityTransportProfile: WalletDemoProximityTransportProfile =
+        WalletDemoProximityTransportProfile.Default,
 ) {
     val presentationPreview: WalletDemoPresentationPreview?
         get() = (presentationReview as? WalletDemoPresentationPreviewResult.Ready)?.preview
