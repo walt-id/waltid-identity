@@ -693,6 +693,7 @@ class WalletDemoControllerTest {
         runCurrent()
         assertTrue(pinStore.hasPin())
         controller.setShowDcApiPresentationPreview(false)
+        controller.setProximityTransportProfile(WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct)
 
         controller.resetWallet()
         runCurrent()
@@ -703,6 +704,14 @@ class WalletDemoControllerTest {
         assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
         assertFalse(controller.state.value.showDcApiPresentationPreview)
         assertFalse(sharingSettings.showDcApiPresentationPreview())
+        assertEquals(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct,
+            controller.state.value.proximityTransportProfile,
+        )
+        assertEquals(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct,
+            sharingSettings.proximityTransportProfile(),
+        )
     }
 
     @Test
@@ -717,6 +726,26 @@ class WalletDemoControllerTest {
 
         val recreatedController = controllerWith(FakeDemoWallet(), this, sharingSettings = sharingSettings)
         assertFalse(recreatedController.state.value.showDcApiPresentationPreview)
+    }
+
+    @Test
+    fun proximityTransportProfilePersistsAcrossControllerRecreation() = runTest {
+        val sharingSettings = InMemoryDemoSharingSettingsStore()
+        val firstController = controllerWith(FakeDemoWallet(), this, sharingSettings = sharingSettings)
+        assertEquals(
+            WalletDemoProximityTransportProfile.Default,
+            firstController.state.value.proximityTransportProfile,
+        )
+
+        firstController.setProximityTransportProfile(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid,
+        )
+
+        val recreatedController = controllerWith(FakeDemoWallet(), this, sharingSettings = sharingSettings)
+        assertEquals(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid,
+            recreatedController.state.value.proximityTransportProfile,
+        )
     }
 
     @Test

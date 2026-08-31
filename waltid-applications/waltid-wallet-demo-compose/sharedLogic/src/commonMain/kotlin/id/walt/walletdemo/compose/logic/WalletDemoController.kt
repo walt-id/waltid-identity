@@ -48,6 +48,7 @@ class WalletDemoController(
         signingProtectionMode = signingProtectionMode,
         selectedSigningProtection = signingProtectionMode.resolve(signingProtectionStore.load()),
         showDcApiPresentationPreview = sharingSettings.showDcApiPresentationPreview(),
+        proximityTransportProfile = sharingSettings.proximityTransportProfile(),
     )
 
     init {
@@ -166,6 +167,11 @@ class WalletDemoController(
     fun setShowDcApiPresentationPreview(enabled: Boolean) {
         sharingSettings.setShowDcApiPresentationPreview(enabled)
         _state.update { it.copy(showDcApiPresentationPreview = enabled) }
+    }
+
+    fun setProximityTransportProfile(profile: WalletDemoProximityTransportProfile) {
+        sharingSettings.setProximityTransportProfile(profile)
+        _state.update { it.copy(proximityTransportProfile = profile) }
     }
 
     fun unlockWithBiometrics(force: Boolean = false) {

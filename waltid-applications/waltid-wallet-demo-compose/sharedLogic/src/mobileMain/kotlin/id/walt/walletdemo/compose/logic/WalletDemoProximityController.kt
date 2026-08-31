@@ -4,6 +4,9 @@ import id.walt.wallet2.mobile.MobileWalletProximityAction
 import id.walt.wallet2.mobile.MobileWalletProximityActionResult
 import id.walt.wallet2.mobile.MobileWalletProximityActionType
 import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
+import id.walt.wallet2.mobile.MobileWalletProximityBleBearerPolicy
+import id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityBleRoles
 import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityDocumentSubmission
 import id.walt.wallet2.mobile.MobileWalletProximityElementReference
@@ -17,6 +20,7 @@ import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
 import id.walt.wallet2.mobile.MobileWalletProximityRetrievalConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityReview
 import id.walt.wallet2.mobile.MobileWalletProximityRecovery
+import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettings
 import id.walt.wallet2.mobile.MobileWalletProximitySession
 import id.walt.wallet2.mobile.MobileWalletProximityState
 import id.walt.wallet2.mobile.MobileWalletProximitySubmission
@@ -90,9 +94,10 @@ fun interface WalletDemoProximityHostActionExecutor {
  */
 class WalletDemoProximityController(
     private val wallet: ProximityPresentationBackend,
-    private val configurationProvider: () -> MobileWalletProximityConfiguration = {
-        walletDemoProximityConfiguration
-    },
+    private val profileProvider: () -> WalletDemoProximityTransportProfile =
+        { WalletDemoProximityTransportProfile.Default },
+    private val readerTrustSettingsProvider: () -> MobileWalletProximityReaderTrustSettings =
+        { MobileWalletProximityReaderTrustSettings() },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
 ) {
@@ -107,7 +112,9 @@ class WalletDemoProximityController(
 
     fun start() {
         if (mutableState.value.active) return
-        val configuration = configurationProvider()
+        val configuration = readerTrustSettingsProvider().applyTo(
+            profileProvider().configuration()
+        )
         generation += 1
         val startGeneration = generation
         pendingConfiguration = configuration
@@ -368,14 +375,36 @@ private val ProximityCapabilities.automaticPermissionActions:
         it == ProximityRemediationAction.RequestBluetoothPermission
     }
 
-internal val walletDemoProximityConfiguration = MobileWalletProximityConfiguration(
-    engagement = MobileWalletProximityEngagementConfiguration.QrAndNfc(
-        MobileWalletProximityNfcEngagementMode.Negotiated,
-    ),
-    retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(
-        nfc = MobileWalletProximityNfcRetrievalConfiguration(),
-    ),
-)
+internal fun WalletDemoProximityTransportProfile.configuration(): MobileWalletProximityConfiguration =
+    when (this) {
+        WalletDemoProximityTransportProfile.Default -> MobileWalletProximityConfiguration(
+            engagement = MobileWalletProximityEngagementConfiguration.QrAndNfc(
+                MobileWalletProximityNfcEngagementMode.Negotiated,
+            ),
+            retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(
+                nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+            ),
+        )
+        WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid ->
+            MobileWalletProximityConfiguration(
+                engagement = MobileWalletProximityEngagementConfiguration.NfcOnly(
+                    MobileWalletProximityNfcEngagementMode.ProvisionalV2(),
+                ),
+                retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(
+                    bluetoothLowEnergy = MobileWalletProximityBleConfiguration(
+                        roles = MobileWalletProximityBleRoles.CentralClient,
+                        bearerPolicy = MobileWalletProximityBleBearerPolicy.GattOnly,
+                    ),
+                ),
+            )
+        WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct ->
+            MobileWalletProximityConfiguration(
+                engagement = MobileWalletProximityEngagementConfiguration.NfcOnly(
+                    MobileWalletProximityNfcEngagementMode.ProvisionalV2(),
+                ),
+                retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(),
+            )
+    }
 
 private fun MobileWalletProximityReview.defaultSelections(): List<WalletDemoProximityDocumentSelection> =
     documents.map { document ->
