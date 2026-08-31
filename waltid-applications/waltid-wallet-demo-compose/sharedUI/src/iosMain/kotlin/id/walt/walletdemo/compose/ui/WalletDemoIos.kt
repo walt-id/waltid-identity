@@ -14,7 +14,6 @@ import id.walt.walletdemo.compose.logic.createIosDemoWallet
 import id.walt.walletdemo.compose.logic.createIosDemoPinStore
 import id.walt.walletdemo.compose.logic.createIosDemoSharingSettingsStore
 import id.walt.walletdemo.compose.logic.createIosDemoReaderTrustSettingsStore
-import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.walletdemo.compose.logic.createIosDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.createIosDemoSigningProtectionStore
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
@@ -105,24 +104,22 @@ fun walletDemoViewController(
         nfcHostPlatformAdapter = nfcHostPlatformAdapter,
         onDigitalCredentialRegistryChanged = { onDigitalCredentialRegistryChanged() },
     )
+    val sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier)
     val controller = WalletDemoController(
         wallet = wallet,
         pinStore = createIosDemoPinStore(config.walletId),
         biometricAuthenticator = createIosDemoBiometricAuthenticator(),
         signingProtectionMode = parsedSigningProtectionMode,
         signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
-        sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier),
+        sharingSettings = sharingSettings,
     )
     val readerTrustSettingsController = DemoReaderTrustSettingsController(
         createIosDemoReaderTrustSettingsStore(appGroupIdentifier)
     )
     val proximityController = WalletDemoProximityController(
         wallet = wallet,
-        configurationProvider = {
-            readerTrustSettingsController.sessionSnapshot().applyTo(
-                MobileWalletProximityConfiguration()
-            )
-        },
+        profileProvider = sharingSettings::proximityTransportProfile,
+        readerTrustSettingsProvider = readerTrustSettingsController::sessionSnapshot,
     )
     iosController = controller
     iosProximityController?.dismiss()

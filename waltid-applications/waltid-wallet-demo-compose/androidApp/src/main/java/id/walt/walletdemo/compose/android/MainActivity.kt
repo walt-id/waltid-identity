@@ -18,7 +18,6 @@ import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
 import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.logic.createAndroidDemoReaderTrustSettingsStore
-import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.walletdemo.compose.logic.createAndroidDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.ui.MobileWalletDemoApp
@@ -56,24 +55,22 @@ class MainActivity : FragmentActivity() {
             config = walletConfig,
             interactionContextProvider = { this@MainActivity },
         )
+        val sharingSettings = createAndroidDemoSharingSettingsStore(applicationContext)
         controller = WalletDemoController(
             wallet = wallet,
             pinStore = createAndroidDemoPinStore(applicationContext, walletConfig.walletId),
             biometricAuthenticator = createAndroidDemoBiometricAuthenticator { this@MainActivity },
             signingProtectionMode = walletConfig.signingProtectionMode,
             signingProtectionStore = walletConfig.signingProtectionStore(applicationContext),
-            sharingSettings = createAndroidDemoSharingSettingsStore(applicationContext),
+            sharingSettings = sharingSettings,
         )
         readerTrustSettingsController = DemoReaderTrustSettingsController(
             createAndroidDemoReaderTrustSettingsStore(applicationContext)
         )
         proximityController = WalletDemoProximityController(
             wallet = wallet,
-            configurationProvider = {
-                readerTrustSettingsController.sessionSnapshot().applyTo(
-                    MobileWalletProximityConfiguration()
-                )
-            },
+            profileProvider = sharingSettings::proximityTransportProfile,
+            readerTrustSettingsProvider = readerTrustSettingsController::sessionSnapshot,
         )
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         handleIntent(intent)
