@@ -83,6 +83,7 @@ public struct ProximityPresentationWifiAwareConfiguration: Sendable, Hashable {
     public let securityPolicy: ProximityPresentationWifiAwareSecurityPolicy
 
     /// Creates a complete Wi-Fi Aware retrieval configuration.
+    /// - Parameter securityPolicy: NAN data-path security policy.
     public init(securityPolicy: ProximityPresentationWifiAwareSecurityPolicy = .ncsSK128) {
         self.securityPolicy = securityPolicy
     }
