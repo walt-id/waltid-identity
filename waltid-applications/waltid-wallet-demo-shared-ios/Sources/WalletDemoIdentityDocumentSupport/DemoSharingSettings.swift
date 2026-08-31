@@ -1,4 +1,42 @@
 import Foundation
+import WalletSDK
+
+/// Stable demo choices for one immutable proximity-presentation session.
+public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifiable, Sendable {
+    case defaultProfile = "default"
+    case provisionalNfcV2Hybrid = "provisional_nfc_v2_hybrid"
+    case provisionalNfcV2Direct = "provisional_nfc_v2_direct"
+
+    public var id: String { rawValue }
+
+    /// Resolves this persisted demo choice to the same typed SDK configuration as the Compose app.
+    public var configuration: ProximityPresentationConfiguration {
+        switch self {
+        case .defaultProfile:
+            return ProximityPresentationConfiguration(
+                engagement: .qrAndNFC(.negotiatedHandover),
+                retrieval: .conventional(.init(nfc: .init()))
+            )
+        case .provisionalNfcV2Hybrid:
+            return ProximityPresentationConfiguration(
+                engagement: .nfcOnly(.provisionalV2()),
+                retrieval: .provisionalNFCV2(
+                    .init(
+                        bluetoothLowEnergy: .init(
+                            roles: .centralClient,
+                            bearerPolicy: .gattOnly
+                        )
+                    )
+                )
+            )
+        case .provisionalNfcV2Direct:
+            return ProximityPresentationConfiguration(
+                engagement: .nfcOnly(.provisionalV2()),
+                retrieval: .provisionalNFCV2()
+            )
+        }
+    }
+}
 
 /// Demo UX preference for whether DC API / Identity Document presentations show the wallet preview.
 ///
@@ -7,6 +45,8 @@ import Foundation
 public enum DemoSharingSettings {
     public static let showDcApiPresentationPreviewKey =
         "id.walt.walletdemo.sharing.showDcApiPresentationPreview"
+    public static let proximityTransportProfileKey =
+        "id.walt.walletdemo.sharing.proximityTransportProfile"
 
     public static func showDcApiPresentationPreview(appGroupIdentifier: String) -> Bool {
         let defaults = UserDefaults(suiteName: appGroupIdentifier)
@@ -22,5 +62,22 @@ public enum DemoSharingSettings {
     ) {
         UserDefaults(suiteName: appGroupIdentifier)?
             .set(enabled, forKey: showDcApiPresentationPreviewKey)
+    }
+
+    public static func proximityTransportProfile(
+        appGroupIdentifier: String
+    ) -> WalletDemoProximityTransportProfile {
+        let rawValue = UserDefaults(suiteName: appGroupIdentifier)?
+            .string(forKey: proximityTransportProfileKey)
+        return rawValue.flatMap(WalletDemoProximityTransportProfile.init(rawValue:))
+            ?? .defaultProfile
+    }
+
+    public static func setProximityTransportProfile(
+        _ profile: WalletDemoProximityTransportProfile,
+        appGroupIdentifier: String
+    ) {
+        UserDefaults(suiteName: appGroupIdentifier)?
+            .set(profile.rawValue, forKey: proximityTransportProfileKey)
     }
 }

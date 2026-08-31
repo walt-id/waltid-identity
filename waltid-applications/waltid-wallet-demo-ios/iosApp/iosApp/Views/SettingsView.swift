@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import WalletDemoIdentityDocumentSupport
 import WalletDemoSharingUI
 import WalletSDK
 
@@ -62,6 +63,7 @@ struct SettingsView: View {
                 .accessibilityIdentifier(WalletAccessibilityID.settingsReaderAuthentication)
             }
             .accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
+            proximityPresentationSection
             Section {
                 Button("Lock") {
                     viewModel.lock()
@@ -102,6 +104,70 @@ struct SettingsView: View {
         } message: {
             Text("This creates a new key and DID, and removes all credentials. Credentials must be issued again.")
         }
+    }
+
+    @ViewBuilder
+    private var proximityPresentationSection: some View {
+        Section {
+            Text("Choose the transport profile for the next in-person presentation session.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            proximityTransportProfileChoice(
+                .defaultProfile,
+                title: "Default (QR + conventional NFC)",
+                description: "Production default with negotiated QR/NFC engagement and conventional retrieval.",
+                accessibilityIdentifier: WalletAccessibilityID.settingsProximityDefault
+            )
+            proximityTransportProfileChoice(
+                .provisionalNfcV2Hybrid,
+                title: "NFCv2 hybrid (provisional)",
+                description: "Starts over NFCv2 and transfers the session over Bluetooth LE.",
+                accessibilityIdentifier: WalletAccessibilityID.settingsProximityNfcV2Hybrid
+            )
+            proximityTransportProfileChoice(
+                .provisionalNfcV2Direct,
+                title: "NFCv2 direct (provisional)",
+                description: "Keeps engagement and encrypted session messages on NFCv2.",
+                accessibilityIdentifier: WalletAccessibilityID.settingsProximityNfcV2Direct
+            )
+            Text("Availability is checked before engagement. The active session keeps its starting profile.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Proximity Presentation")
+                .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
+        }
+    }
+
+    private func proximityTransportProfileChoice(
+        _ profile: WalletDemoProximityTransportProfile,
+        title: String,
+        description: String,
+        accessibilityIdentifier: String
+    ) -> some View {
+        Button {
+            viewModel.proximityTransportProfile = profile
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(
+                    systemName: viewModel.proximityTransportProfile == profile
+                        ? "largecircle.fill.circle"
+                        : "circle"
+                )
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .foregroundStyle(.primary)
+                    Text(description)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityValue(viewModel.proximityTransportProfile == profile ? "Selected" : "Not selected")
     }
 
     @ViewBuilder
