@@ -49,6 +49,7 @@ object MdocIssuer {
 
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
         /**
@@ -83,7 +84,8 @@ object MdocIssuer {
                 signed = signedTimestamp,
                 validFrom = effectiveValidFrom,
                 // ISO 18013-5 MSO tdate fields must not include fractional seconds
-                validUntil = Instant.fromEpochSeconds(validUntil.epochSeconds)
+                validUntil = Instant.fromEpochSeconds(validUntil.epochSeconds),
+                expectedUpdate = expectedUpdate?.let { Instant.fromEpochSeconds(it.epochSeconds) },
             ),
             status = status
         )
@@ -149,6 +151,7 @@ object MdocIssuer {
         data: MdocUniversalIssuanceData,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
 
@@ -183,6 +186,7 @@ object MdocIssuer {
             docType = docType,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             status = status,
             digestAlgorithm = digestAlgorithm,
             protectedHeaderX5u = protectedHeaderX5u,
@@ -204,6 +208,7 @@ object MdocIssuer {
         validFrom: Instant? = null,
 
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256"
     ): IssuerSigned {
@@ -217,6 +222,7 @@ object MdocIssuer {
             docType = typesafeData.docType,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             status = status,
             digestAlgorithm = digestAlgorithm
         )

@@ -17,6 +17,7 @@ import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.mdoc.MsoValidityResolver
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequest
@@ -433,6 +434,14 @@ class OpenId4VciProtocolService(
             }
         }
         val nonceBinding = credentialNonceBinding()
+        val resolvedMsoValidity = if (configuration.format == CredentialFormat.MSO_MDOC) {
+            MsoValidityResolver.resolve(session.msoData)
+        } else {
+            require(session.msoData == null || session.msoData.isEmpty()) {
+                "msoData is only supported for mso_mdoc credentials"
+            }
+            null
+        }
 
         val credentialResponse = try {
             when (val result = oauth2Provider.createCredentialResponse(
@@ -446,6 +455,9 @@ class OpenId4VciProtocolService(
                 x5Chain = x5Chain,
                 mDocNameSpacesDataMappingConfig = session.mDocNameSpacesDataMappingConfig,
                 credentialStatus = mDocStatus,
+                validFrom = resolvedMsoValidity?.validFrom,
+                validUntil = resolvedMsoValidity?.validUntil,
+                expectedUpdate = resolvedMsoValidity?.expectedUpdate,
                 proofValidationContext = CredentialProofValidationContext(
                     credentialIssuer = nonceBinding.credentialIssuer,
                     clientId = requestWithSession.accessTokenClientId,

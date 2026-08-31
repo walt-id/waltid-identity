@@ -47,6 +47,7 @@ class MdocCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult {
         return try {
@@ -69,6 +70,7 @@ class MdocCredentialHandler : CredentialEndpointHandler {
                 credentialStatus = credentialStatus,
                 validFrom = validFrom,
                 validUntil = validUntil,
+                expectedUpdate = expectedUpdate,
                 verifiedProofs = verifiedProofs,
             )
         } catch (e: Exception) {
@@ -87,6 +89,7 @@ class MdocCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult.Success {
         val docType = configuration.doctype
@@ -126,6 +129,7 @@ class MdocCredentialHandler : CredentialEndpointHandler {
                 docType = docType,
                 validFrom = validFrom,
                 validUntil = resolveValidUntil(request, validUntil),
+                expectedUpdate = expectedUpdate,
                 status = credentialStatus,
                 mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                 verifiedProof = verifiedProof,

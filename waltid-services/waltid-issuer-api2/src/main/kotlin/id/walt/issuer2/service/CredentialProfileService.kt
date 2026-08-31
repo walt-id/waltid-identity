@@ -4,7 +4,10 @@ import id.walt.issuer2.config.CredentialProfileConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.domain.CredentialProfile
+import id.walt.openid4vci.CredentialFormat
 import io.ktor.server.plugins.NotFoundException
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class CredentialProfileService(
     private val profilesConfig: Issuer2ProfilesConfig,
@@ -48,6 +51,13 @@ class CredentialProfileService(
             "Credential profile ${profile.profileId} references unsupported credential configuration " +
                     profile.credentialConfigurationId
         }
+        if (profile.msoData != null && !profile.msoData.isEmpty()) {
+            val format = metadataConfig.credentialConfigurations[profile.credentialConfigurationId]
+                ?.jsonObject?.get("format")?.jsonPrimitive?.content
+            require(format == CredentialFormat.MSO_MDOC.value) {
+                "msoData is only supported for mso_mdoc credential profiles"
+            }
+        }
         return profile
     }
 
@@ -63,6 +73,7 @@ class CredentialProfileService(
             selectiveDisclosure = selectiveDisclosure,
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            msoData = msoData,
             x5Chain = x5Chain,
             notifications = notifications,
             credentialStatus = credentialStatus,

@@ -5,6 +5,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.sdjwt.SDJwt
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
@@ -140,6 +141,13 @@ fun assertMdocCredentialPayload(
     }
 
     return issuedCredential
+}
+
+@OptIn(ExperimentalSerializationApi::class)
+fun mdocValidityInfo(credentialPayload: JsonObject): ValidityInfo {
+    val issuedCredentialBytes = issuedCredentialString(credentialPayload).decodeFromBase64Url()
+    val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(issuedCredentialBytes)
+    return issuerSigned.decodeMobileSecurityObject().validityInfo
 }
 
 fun assertIsoMdlCredentialPayload(
