@@ -40,9 +40,9 @@ class NfcV2ApduProcessorTest {
 
     @Test
     fun `select and NFC-only handover match the pinned provisional shape`() = runTest {
-        val nfcV2 = DeviceRetrievalMethod.NfcV2()
+        val nfcV2 = DeviceRetrievalMethod.NfcV2
         val exactRequest = request(nfcV2)
-        assertContentEquals("a100a10281830501a1001a00010000".hexToByteArray(), exactRequest)
+        assertContentEquals("a100a10281830501a0".hexToByteArray(), exactRequest)
         val handovers = mutableListOf<NfcV2Handover>()
         val processor = NfcV2ApduProcessor(
             NfcV2MaximumCommandDataLength(65_536),
@@ -79,7 +79,7 @@ class NfcV2ApduProcessorTest {
 
     @Test
     fun `alternate bearer handover retains the NFC payload path`() = runTest {
-        val nfcV2 = DeviceRetrievalMethod.NfcV2()
+        val nfcV2 = DeviceRetrievalMethod.NfcV2
         val ble = DeviceRetrievalMethod.Ble(centralMode = BleCentralMode(ByteArray(16)))
         val handovers = mutableListOf<NfcV2Handover>()
         val processor = NfcV2ApduProcessor(
@@ -100,8 +100,8 @@ class NfcV2ApduProcessorTest {
     }
 
     @Test
-    fun `reader NFCv2 response limit bounds handover and session response chunks`() = runTest {
-        val nfcV2 = DeviceRetrievalMethod.NfcV2(maximumResponseDataLength = 8u)
+    fun `APDU response length bounds handover and session response chunks`() = runTest {
+        val nfcV2 = DeviceRetrievalMethod.NfcV2
         val processor = NfcV2ApduProcessor(
             NfcV2MaximumCommandDataLength(4_096),
             128 * 1_024,
@@ -110,28 +110,28 @@ class NfcV2ApduProcessorTest {
         processor.process(selectNfcV2())
 
         val firstHandover = response(
-            processor.process(envelope(NfcDo53.encode(request(nfcV2)), responseLength = 65_536)),
+            processor.process(envelope(NfcDo53.encode(request(nfcV2)), responseLength = 8)),
         )
         assertEquals(8, firstHandover.data.size)
         assertEquals(0x61, firstHandover.statusByte1.toInt())
-        drainResponse(processor, firstHandover)
+        drainResponse(processor, firstHandover, responseLength = 8)
         assertEquals(NfcV2State.AWAITING_PAYLOAD, processor.state)
 
         val pending = assertIs<NfcV2ApduResult.Request>(
-            processor.process(envelope(NfcDo53.encode(byteArrayOf(1)), responseLength = 65_536)),
+            processor.process(envelope(NfcDo53.encode(byteArrayOf(1)), responseLength = 8)),
         )
         val firstSessionResponse = NfcResponseApdu.decode(
             processor.completeResponse(pending.identifier, ByteArray(32) { it.toByte() }).copy(),
         )
         assertEquals(8, firstSessionResponse.data.size)
         assertEquals(0x61, firstSessionResponse.statusByte1.toInt())
-        drainResponse(processor, firstSessionResponse)
+        drainResponse(processor, firstSessionResponse, responseLength = 8)
         assertEquals(NfcV2State.AWAITING_PAYLOAD, processor.state)
     }
 
     @Test
     fun `oversized wallet response retains pending ownership for a valid retry`() = runTest {
-        val nfcV2 = DeviceRetrievalMethod.NfcV2()
+        val nfcV2 = DeviceRetrievalMethod.NfcV2
         val processor = NfcV2ApduProcessor(
             NfcV2MaximumCommandDataLength(4_096),
             128,
@@ -155,7 +155,7 @@ class NfcV2ApduProcessorTest {
 
     @Test
     fun `handover is not published when its exact select exceeds the configured limit`() = runTest {
-        val nfcV2 = DeviceRetrievalMethod.NfcV2()
+        val nfcV2 = DeviceRetrievalMethod.NfcV2
         val handovers = mutableListOf<NfcV2Handover>()
         val processor = NfcV2ApduProcessor(
             NfcV2MaximumCommandDataLength(4_096),
@@ -175,7 +175,7 @@ class NfcV2ApduProcessorTest {
 
     @Test
     fun `handover selection cancellation propagates and deactivates the processor`() = runTest {
-        val nfcV2 = DeviceRetrievalMethod.NfcV2()
+        val nfcV2 = DeviceRetrievalMethod.NfcV2
         val processor = NfcV2ApduProcessor(
             NfcV2MaximumCommandDataLength(4_096),
             128,
@@ -224,13 +224,50 @@ class NfcV2ApduProcessorTest {
             processor.process(selectNfcV2())
             val result = response(
                 processor.process(
-                    envelope(NfcDo53.encode(request(DeviceRetrievalMethod.NfcV2(), offered)), 65_536),
+                    envelope(NfcDo53.encode(request(DeviceRetrievalMethod.NfcV2, offered)), 65_536),
                 ),
             )
 
             assertEquals(NfcStatusWord.SUCCESS, result.statusWord)
             assertEquals(selected, assertIs<NfcV2Handover.AlternateBearer>(handovers.single()).selectedMethod)
         }
+    }
+
+    @Test
+    fun `Multipaz hybrid reader offer with NFC fallback is accepted`() = runTest {
+        val sharedUuid = ByteArray(16) { it.toByte() }
+        val readerOptions = BlePeripheralServerOptions(psm = 183u)
+        val offeredBle = DeviceRetrievalMethod.Ble(
+            peripheralMode = BlePeripheralMode(sharedUuid),
+            centralMode = BleCentralMode(sharedUuid),
+            peripheralEndpoint = BlePeripheralEndpoint.Reader(readerOptions),
+        )
+        val selectedBle = DeviceRetrievalMethod.Ble(
+            centralMode = BleCentralMode(sharedUuid),
+            peripheralEndpoint = BlePeripheralEndpoint.Reader(readerOptions),
+        )
+        val exactRequest = request(
+            DeviceRetrievalMethod.NfcV2,
+            offeredBle,
+            DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
+        )
+        val failures = mutableListOf<Throwable>()
+        val handovers = mutableListOf<NfcV2Handover>()
+        val processor = NfcV2ApduProcessor(
+            NfcV2MaximumCommandDataLength(65_536),
+            128 * 1_024,
+            select = { selection(selectedBle) },
+            onHandover = handovers::add,
+            onFailure = failures::add,
+        )
+
+        processor.process(selectNfcV2())
+        val command = envelope(NfcDo53.encode(exactRequest), responseLength = 65_279)
+        val result = response(processor.process(command))
+
+        assertEquals(NfcStatusWord.SUCCESS, result.statusWord, failures.singleOrNull()?.message)
+        assertEquals(0, failures.size)
+        assertEquals(selectedBle, assertIs<NfcV2Handover.AlternateBearer>(handovers.single()).selectedMethod)
     }
 
     @Test
@@ -252,7 +289,7 @@ class NfcV2ApduProcessorTest {
         processor.process(selectNfcV2())
         val result = response(
             processor.process(
-                envelope(NfcDo53.encode(request(DeviceRetrievalMethod.NfcV2(), offered)), 65_536),
+                envelope(NfcDo53.encode(request(DeviceRetrievalMethod.NfcV2, offered)), 65_536),
             ),
         )
 
@@ -318,6 +355,7 @@ class NfcV2ApduProcessorTest {
     private suspend fun drainResponse(
         processor: NfcV2ApduProcessor,
         first: NfcResponseApdu,
+        responseLength: Int = 65_536,
     ): ByteArray {
         val chunks = mutableListOf(first.data.copy())
         var current = first
@@ -329,11 +367,11 @@ class NfcV2ApduProcessorTest {
                         0xc0u,
                         0u,
                         0u,
-                        expectedResponseDataLength = 65_536,
+                        expectedResponseDataLength = responseLength,
                     ).encode(),
                 ),
             )
-            assertEquals(true, current.data.size <= 8)
+            assertEquals(true, current.data.size <= responseLength)
             chunks += current.data.copy()
         }
         assertEquals(NfcStatusWord.SUCCESS, current.statusWord)
