@@ -26,6 +26,7 @@ kotlin {
                 chromeExecutable?.let { environment("CHROME_BIN", it) }
                 useKarma {
                     useChromeHeadless()
+                    useConfigDirectory(project.file("karma.config.d"))
                 }
             }
         }
