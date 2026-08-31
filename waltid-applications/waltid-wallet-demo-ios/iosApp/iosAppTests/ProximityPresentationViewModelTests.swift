@@ -3,6 +3,7 @@ import XCTest
 import WalletDemoSharingUI
 import ZXingCpp
 @testable import iosApp
+import WalletDemoIdentityDocumentSupport
 @testable import WalletSDK
 
 final class ProximityPresentationViewModelTests: XCTestCase {
@@ -179,6 +180,90 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         try await waitUntil { client.startCount == 2 }
         XCTAssertEqual(resolutionCount, 2)
         XCTAssertEqual(client.configurations.last?.readerPolicy, .requireTrusted)
+    }
+
+    func testNativeProfilesResolveToTheSameTransportConfigurationsAsCompose() throws {
+        let defaultConfiguration = WalletDemoProximityTransportProfile.defaultProfile.configuration
+        guard case .qrAndNFC(.negotiatedHandover) = defaultConfiguration.engagement,
+              case let .conventional(defaultRetrieval) = defaultConfiguration.retrieval else {
+            return XCTFail("The default profile must use negotiated QR/NFC engagement")
+        }
+        XCTAssertNotNil(defaultRetrieval.bluetoothLowEnergy)
+        XCTAssertNotNil(defaultRetrieval.nfc)
+
+        let hybridConfiguration = WalletDemoProximityTransportProfile
+            .provisionalNfcV2Hybrid.configuration
+        guard case .nfcOnly(.provisionalV2) = hybridConfiguration.engagement,
+              case let .provisionalNFCV2(hybridRetrieval) = hybridConfiguration.retrieval else {
+            return XCTFail("The hybrid profile must use NFCv2 engagement and retrieval")
+        }
+        XCTAssertEqual(hybridRetrieval.bluetoothLowEnergy?.roles, .centralClient)
+        XCTAssertEqual(hybridRetrieval.bluetoothLowEnergy?.bearerPolicy, .gattOnly)
+        XCTAssertNil(hybridRetrieval.qrNFC)
+
+        let directConfiguration = WalletDemoProximityTransportProfile
+            .provisionalNfcV2Direct.configuration
+        guard case .nfcOnly(.provisionalV2) = directConfiguration.engagement,
+              case let .provisionalNFCV2(directRetrieval) = directConfiguration.retrieval else {
+            return XCTFail("The direct profile must use NFCv2 engagement and retrieval")
+        }
+        XCTAssertNil(directRetrieval.bluetoothLowEnergy)
+        XCTAssertNil(directRetrieval.qrNFC)
+    }
+
+    func testNativeProfilePersistenceUsesStableComposeValuesAndFallsBackSafely() {
+        let suiteName = "id.walt.walletdemo.tests.\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertEqual(
+            DemoSharingSettings.proximityTransportProfile(appGroupIdentifier: suiteName),
+            .defaultProfile
+        )
+        DemoSharingSettings.setProximityTransportProfile(
+            .provisionalNfcV2Hybrid,
+            appGroupIdentifier: suiteName
+        )
+        XCTAssertEqual(
+            DemoSharingSettings.proximityTransportProfile(appGroupIdentifier: suiteName),
+            .provisionalNfcV2Hybrid
+        )
+        XCTAssertEqual(
+            UserDefaults(suiteName: suiteName)?
+                .string(forKey: DemoSharingSettings.proximityTransportProfileKey),
+            "provisional_nfc_v2_hybrid"
+        )
+
+        UserDefaults(suiteName: suiteName)?
+            .set("unknown_future_profile", forKey: DemoSharingSettings.proximityTransportProfileKey)
+        XCTAssertEqual(
+            DemoSharingSettings.proximityTransportProfile(appGroupIdentifier: suiteName),
+            .defaultProfile
+        )
+    }
+
+    @MainActor
+    func testStartSnapshotsTheSelectedNativeProfileBeforeLaunchingTheSession() async throws {
+        var selectedProfile = WalletDemoProximityTransportProfile.defaultProfile
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session, suspendStart: true)
+        let viewModel = ProximityPresentationViewModel(
+            client: client,
+            configurationProvider: { selectedProfile.configuration },
+            hostActions: FakeProximityHostActionExecutor()
+        )
+
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        selectedProfile = .provisionalNfcV2Direct
+
+        let startedConfiguration = try XCTUnwrap(client.lastConfiguration)
+        guard case .qrAndNFC(.negotiatedHandover) = startedConfiguration.engagement else {
+            return XCTFail("The active session must retain the profile selected at start")
+        }
+
+        viewModel.cancel()
+        client.resumeStart()
+        try await waitUntilAsync { await session.closeCount == 1 }
     }
 }
 
