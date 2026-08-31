@@ -93,7 +93,7 @@ object Issuer2ManagementRoutesDocs {
             be applied per credential for one offer only. Supported
             override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
             idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, authorizedTransactionDataTypes,
-            x5Chain, notifications, and credentialStatus.
+            msoData, x5Chain, notifications, and credentialStatus.
             credentialData is applied as a partial object patch over the configured profile data:
             nested objects are merged, while primitive, array, and null values replace the configured value.
             Each offered credential uses its configured `credentialStatus` for all copies issued from it.

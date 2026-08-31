@@ -3,6 +3,7 @@ package id.walt.issuer2.config
 import id.walt.commons.config.WaltConfig
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
+import id.walt.openid4vci.mdoc.MsoData
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -36,6 +37,7 @@ data class CredentialProfileConfig(
      * that type; presenting transaction data of an unlisted type is rejected.
      */
     val authorizedTransactionDataTypes: List<String>? = null,
+    val msoData: MsoData? = null,
     val x5Chain: List<String>? = null,
     val notifications: IssuanceNotifications? = null,
     val credentialStatus: JsonElement? = null,
