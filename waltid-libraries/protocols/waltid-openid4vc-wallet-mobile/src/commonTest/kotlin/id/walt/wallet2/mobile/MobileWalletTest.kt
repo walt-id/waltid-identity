@@ -2,12 +2,14 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseKey
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseKey
 import id.walt.cose.toCoseSigner
 import id.walt.cose.toCoseVerifier
 import id.walt.credentials.CredentialDetectorTypes
@@ -20,24 +22,29 @@ import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.deviceretrieval.UseCase
+import id.walt.mdoc.objects.document.Document
 import id.walt.openid4vci.offers.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
@@ -49,12 +56,14 @@ import id.walt.x509.GenericX509CertificateProfileData
 import id.walt.x509.X509DistinguishedName
 import id.walt.x509.X509KeyUsage
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
-import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
+import id.walt.wallet2.data.WalletPublicKeyMaterial
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
@@ -63,6 +72,7 @@ import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
@@ -91,6 +101,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -112,7 +123,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
-import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 
 class MobileWalletTest {
 
@@ -1146,8 +1156,6 @@ class MobileWalletTest {
     @Test
     fun annexCReaderAuthenticationUsesVerifierTranscriptBuildsResponseAndRejectsTampering() = runTest {
         val origin = "https://verifier.example"
-        val namespace = "org.iso.18013.5.1"
-        val docType = "org.iso.18013.5.1.mDL"
         val readerCertificate = Base64.decode(READER_CERTIFICATE_BASE64)
         // The pre-signed request avoids platform-specific private-key imports; the assertion below prevents fixture drift.
         val signedRequest = DeviceRequest.decodeFromBase64Url(SIGNED_READER_REQUEST)
@@ -1173,25 +1181,16 @@ class MobileWalletTest {
             )
         )
         val holderKeyId = holderSigner.id.value
+        val holderKeyStore = PreloadedKeyStore(
+            WalletKeyInfo(keyId = holderKeyId, keyType = "Ed25519"),
+            managedKey = holderSigner,
+        )
         val wallet = MobileWallet(
             walletId = "annex-c-reader-auth-wallet",
-            keyStore = PreloadedKeyStore(
-                WalletKeyInfo(keyId = holderKeyId, keyType = "Ed25519"),
-                managedKey = holderSigner,
-            ),
+            keyStore = holderKeyStore,
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(
-                StoredCredential(
-                    id = "mdl-1",
-                    credential = MdocsCredential(
-                        credentialData = buildJsonObject {
-                            put(namespace, buildJsonObject { put("given_name", "Ada") })
-                        },
-                        signed = MdocsExamples.mdocsExampleBase64Url,
-                        docType = docType,
-                    ),
-                    label = "mDL",
-                )
+                annexCBoundMdl(holderSigner, holderKeyStore),
             ),
             generateAndPersistKey = { _, _ -> error("Reader-authentication preview must not generate keys") },
             readerTrustEvaluator = MobileWalletReaderTrustEvaluator { chain ->
@@ -1273,26 +1272,17 @@ class MobileWalletTest {
                 usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             )
         )
+        val holderKeyStore = PreloadedKeyStore(
+            WalletKeyInfo(keyId = holderSigner.id.value, keyType = "Ed25519"),
+            managedKey = holderSigner,
+        )
         // No readerTrustEvaluator: this exercises the default policy, which must never report Trusted.
         val wallet = MobileWallet(
             walletId = "annex-c-reader-trust-states-wallet",
-            keyStore = PreloadedKeyStore(
-                WalletKeyInfo(keyId = holderSigner.id.value, keyType = "Ed25519"),
-                managedKey = holderSigner,
-            ),
+            keyStore = holderKeyStore,
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(
-                StoredCredential(
-                    id = "mdl-1",
-                    credential = MdocsCredential(
-                        credentialData = buildJsonObject {
-                            put(namespace, buildJsonObject { put("given_name", "Ada") })
-                        },
-                        signed = MdocsExamples.mdocsExampleBase64Url,
-                        docType = docType,
-                    ),
-                    label = "mDL",
-                )
+                annexCBoundMdl(holderSigner, holderKeyStore),
             ),
             generateAndPersistKey = { _, _ -> error("Reader-trust previews must not generate keys") },
         )
@@ -1863,26 +1853,9 @@ class MobileWalletTest {
         headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
     )
 
-    /** A wallet holding one mDL, for Annex C tests that must reach reader-authentication checks. */
-    private fun annexCWalletWithMdl(walletId: String): MobileWallet = MobileWallet(
-        walletId = walletId,
-        keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "unused-key", keyType = "secp256r1")),
-        didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:unused", document = JsonObject(emptyMap()))),
-        credentialStore = RecordingCredentialStore(
-            StoredCredential(
-                id = "mdl-1",
-                credential = MdocsCredential(
-                    credentialData = buildJsonObject {
-                        put("org.iso.18013.5.1", buildJsonObject { put("given_name", "Ada") })
-                    },
-                    signed = MdocsExamples.mdocsExampleBase64Url,
-                    docType = "org.iso.18013.5.1.mDL",
-                ),
-                label = "mDL",
-            )
-        ),
-        generateAndPersistKey = unusedKeyGenerator(),
-    )
+    /** A wallet holding one bound mDL, for Annex C tests that must reach reader-authentication checks. */
+    private suspend fun annexCWalletWithMdl(walletId: String): MobileWallet =
+        annexCWalletWithMdlAndHolderKey(walletId)
 
     /** [annexCWalletWithMdl] with a signing key, for Annex C tests that build a response. */
     private suspend fun annexCWalletWithMdlAndHolderKey(walletId: String): MobileWallet {
@@ -1895,28 +1868,64 @@ class MobileWalletTest {
                 usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             )
         )
+        val holderKeyStore = PreloadedKeyStore(
+            WalletKeyInfo(keyId = holderSigner.id.value, keyType = "Ed25519"),
+            managedKey = holderSigner,
+        )
         return MobileWallet(
             walletId = walletId,
-            keyStore = PreloadedKeyStore(
-                WalletKeyInfo(keyId = holderSigner.id.value, keyType = "Ed25519"),
-                managedKey = holderSigner,
-            ),
+            keyStore = holderKeyStore,
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(
-                StoredCredential(
-                    id = "mdl-1",
-                    credential = MdocsCredential(
-                        credentialData = buildJsonObject {
-                            put("org.iso.18013.5.1", buildJsonObject { put("given_name", "Ada") })
-                        },
-                        signed = MdocsExamples.mdocsExampleBase64Url,
-                        docType = "org.iso.18013.5.1.mDL",
-                    ),
-                    label = "mDL",
-                )
+                annexCBoundMdl(holderSigner, holderKeyStore),
             ),
             generateAndPersistKey = unusedKeyGenerator(),
         )
+    }
+
+    /** Issues an mDL to [holderKey] and persists its exact provider-qualified holder-key binding. */
+    private suspend fun annexCBoundMdl(
+        holderKey: ManagedKeyMaterial,
+        keyStore: MobileWalletKeyStore,
+    ): StoredCredential {
+        val issuerKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("annex-c-issuer-key"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val signatureAlgorithm = SignatureAlgorithm.Ecdsa(
+            DigestAlgorithm.SHA_256,
+            EcdsaSignatureEncoding.DER,
+        )
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(issuerKey, signatureAlgorithm) {
+            subjectDn = "CN=Annex C wallet test issuer"
+        }
+        val holderPublicJwk = holderKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
+        val issuerSigned = MdocIssuer.issueUniversal(
+            issuerKey = issuerKey,
+            signatureAlgorithm = Cose.Algorithm.ES256,
+            issuerCertificate = listOf(CoseCertificate(certificate.encodedDer.toByteArray())),
+            holderKey = holderPublicJwk.toCoseKey(),
+            docType = "org.iso.18013.5.1.mDL",
+            data = MdocIssuer.MdocUniversalIssuanceData(
+                namespaces = mapOf(
+                    "org.iso.18013.5.1" to JsonObject(mapOf("given_name" to JsonPrimitive("Ada")))
+                )
+            ),
+        )
+        val raw = coseCompliantCbor.encodeToByteArray(
+            Document.serializer(),
+            Document(docType = "org.iso.18013.5.1.mDL", issuerSigned = issuerSigned),
+        ).encodeToBase64Url()
+        val credential = StoredCredential(
+            id = "mdl-1",
+            credential = CredentialParser.detectAndParse(raw).second,
+            label = "mDL",
+        )
+        return Wallet(id = "annex-c-binding", keyStores = listOf(keyStore))
+            .withImportedHolderKeyBinding(credential)
     }
 
     /**
@@ -2009,6 +2018,14 @@ class MobileWalletTest {
         override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): ManagedKeyMaterial? {
             managedKeyLookupCalls++
             return managedKey.takeIf { keyId == keyInfo.keyId }
+        }
+
+        override suspend fun getPublicKeyMaterial(keyId: String): WalletPublicKeyMaterial? {
+            val matchingKey = managedKey.takeIf { keyId == keyInfo.keyId } ?: return null
+            val publicJwk = matchingKey.capabilities.publicKeyExporter
+                ?.exportPublicKey() as? EncodedKey.Jwk
+                ?: return null
+            return WalletPublicKeyMaterial(publicJwk)
         }
 
         override suspend fun listKeys(): Flow<WalletKeyInfo> {

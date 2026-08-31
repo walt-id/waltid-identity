@@ -557,7 +557,14 @@ class WalletIssuanceSessionService(
                     restoreDeferred(record.copy(dpopNonce = response.dpopNonce))
                     return failed(record.sessionId, WalletIssuanceErrorCode.PROTOCOL)
                 }
-            val stored = credentials.map { wallet.parseAndStore(it, record.label, record.metadata) }
+            val stored = credentials.map {
+                wallet.parseAndStore(
+                    issued = it,
+                    label = record.label,
+                    metadata = record.metadata,
+                    keyMaterial = record.keyMaterial,
+                )
+            }
             stored.forEach { emitEvent(WalletSessionEvent.issuance_credential_stored) }
             emitEvent(WalletSessionEvent.issuance_completed)
             WalletIssuanceOutcome.Stored(record.sessionId, stored.map { it.id })
@@ -708,7 +715,12 @@ class WalletIssuanceSessionService(
                     )
                     credentials.forEach { issued ->
                         val stored = try {
-                            wallet.parseAndStore(issued, label, metadata)
+                            wallet.parseAndStore(
+                                issued = issued,
+                                label = label,
+                                metadata = metadata,
+                                keyMaterial = active.keyMaterial,
+                            )
                         } catch (error: CancellationException) {
                             throw error
                         } catch (error: Exception) {
@@ -1318,17 +1330,22 @@ class WalletIssuanceSessionService(
         issued: IssuedCredential,
         label: String?,
         metadata: JsonObject? = null,
+        keyMaterial: WalletKeyStoreEntry,
     ): StoredCredential {
         val raw = issued.credential.let { value ->
             if (value is JsonPrimitive) value.content else value.toString()
         }
         val (_, parsed) = CredentialParser.detectAndParse(raw)
-        return StoredCredential(
+        val stored = StoredCredential(
             id = Uuid.random().toString(),
             credential = parsed,
             label = label,
             addedAt = Clock.System.now(),
             metadata = metadata,
+        )
+        return withVerifiedIssuanceHolderKeyBinding(
+            credential = stored,
+            keyMaterial = keyMaterial,
         ).also { addCredential(it) }
     }
 
