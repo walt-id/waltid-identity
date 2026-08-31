@@ -247,8 +247,6 @@ internal class NfcV2ApduProcessor(
 
     private suspend fun completeHandover(exactRequest: ByteArray): NfcV2ApduResult {
         val request = parseHandoverRequest(exactRequest)
-        val nfcV2Method = request.availableMethods.filterIsInstance<DeviceRetrievalMethod.NfcV2>().single()
-        exchange.setMaximumResponseDataLength(nfcV2Method.maximumResponseDataLength.toInt())
         val selection = select(request)
         require(request.availableMethods.any { offered -> selectionWasOffered(selection.selectedMethod, offered) }) {
             "NFCv2 holder selected a retrieval method not offered by the reader"

@@ -123,25 +123,13 @@ sealed interface DeviceRetrievalMethod {
     /**
      * Provisional second-edition NFC retrieval method.
      *
-     * This method is used only in NFCv2 CBOR handover and never as an NDEF carrier. The reader's
-     * [maximumResponseDataLength] is encoded at option key `0`. The holder's distinct maximum
-     * command-data size belongs to the NFCv2 application SELECT response, not this method.
+     * This method is used only in NFCv2 CBOR handover and never as an NDEF carrier. Its options
+     * map is empty; the holder's maximum command-data size belongs to the NFCv2 application SELECT
+     * response and the response size is negotiated by the APDU `Le` field.
      */
-    data class NfcV2(
-        val maximumResponseDataLength: UInt = 65_536u,
-        val extensions: Map<UInt, CborElement> = emptyMap(),
-    ) : DeviceRetrievalMethod {
+    data object NfcV2 : DeviceRetrievalMethod {
         override val type: UInt = DeviceRetrievalMethodType.NFC_V2.code
         override val version: UInt = 1u
-
-        init {
-            require(maximumResponseDataLength in 1u..65_536u) {
-                "NFCv2 maximum response data length must be in 1..65536"
-            }
-            require(0u !in extensions) {
-                "NFCv2 option extension collides with the maximum response data length"
-            }
-        }
     }
 
     data class Ble(
@@ -405,10 +393,7 @@ private fun DeviceRetrievalMethod.optionsElement(): CborElement = when (this) {
         put(CborInteger(1), CborInteger(maximumResponseDataLength.toULong()))
         extensions.forEach { (key, value) -> put(CborInteger(key.toULong()), value) }
     })
-    is DeviceRetrievalMethod.NfcV2 -> CborMap(buildMap<CborElement, CborElement> {
-        put(CborInteger(0), CborInteger(maximumResponseDataLength.toULong()))
-        extensions.forEach { (key, value) -> put(CborInteger(key.toULong()), value) }
-    })
+    DeviceRetrievalMethod.NfcV2 -> CborMap(emptyMap())
     is DeviceRetrievalMethod.WifiAware -> CborMap(buildMap<CborElement, CborElement> {
         passphraseInfo?.let { put(CborInteger(0), CborString(it)) }
         operatingClass?.let { put(CborInteger(1), CborInteger(it.toULong())) }
@@ -484,11 +469,8 @@ private fun CborElement.toNfcMethod(): DeviceRetrievalMethod.Nfc {
 }
 
 private fun CborElement.toNfcV2Method(): DeviceRetrievalMethod.NfcV2 {
-    val map = this as? CborMap ?: throw SerializationException("NFCv2 options must be a map")
-    return DeviceRetrievalMethod.NfcV2(
-        maximumResponseDataLength = map.required(0).requiredUInt(),
-        extensions = map.unsignedExtensions(setOf(0u)),
-    )
+    this as? CborMap ?: throw SerializationException("NFCv2 options must be a map")
+    return DeviceRetrievalMethod.NfcV2
 }
 
 private fun CborElement.toWifiMethod(): DeviceRetrievalMethod.WifiAware {
