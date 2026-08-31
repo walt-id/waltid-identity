@@ -52,9 +52,7 @@ sealed class NotificationDeliveryResult {
     fun isSuccess(): Boolean = this is Success
 }
 
-/**
- * Sends wallet notifications to the issuer's advertised Notification Endpoint.
- */
+/** Sends OpenID4VCI 1.0 Section 11 events to the issuer's advertised Notification Endpoint. */
 class NotificationRequestBuilder(
     private val httpClient: HttpClient,
 ) {

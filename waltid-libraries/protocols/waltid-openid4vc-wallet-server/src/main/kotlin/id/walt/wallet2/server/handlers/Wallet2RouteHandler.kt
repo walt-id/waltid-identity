@@ -635,6 +635,8 @@ object Wallet2RouteHandler {
                         description =
                             "Resolves the offer, requests a token, signs proof-of-possession, " +
                                     "fetches the credential(s) and stores them. " +
+                                    "If the issuer advertises a notification endpoint and returns a notification_id, " +
+                                    "the wallet sends credential_accepted after storage or credential_failure when storage fails. " +
                                     "Returns a stream of stored credentials as they arrive."
                         request { pathParameter<String>("walletId"); body<ReceiveCredentialRequest>() }
                         response {

@@ -26,7 +26,7 @@ Use this service for new issuer integrations that need OpenID4VCI 1.0 support. T
 
 ## Features
 
-- **OpenID4VCI 1.0** — Credential offer, authorization, token, nonce, and credential endpoints
+- **OpenID4VCI 1.0** — Credential offer, authorization, token, nonce, credential, and notification endpoints
 - **Credential profiles** — Configurable issuance profiles in `issuer2-profiles.conf`
 - **Metadata endpoints** — Credential issuer, authorization server, JWT VC issuer, JWKS, and VCT metadata
 - **Grant types** — Pre-authorized code and authorization code flows
@@ -61,6 +61,8 @@ Configuration files live in `config/`:
 
 The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Update this value when deploying behind a public host or reverse proxy so generated metadata and credential offers contain externally reachable URLs.
 
+`walletNotificationEndpointEnabled` controls whether issuer metadata advertises the OpenID4VCI Notification Endpoint. It is enabled by default.
+
 `ciTokenStoredKey` optionally carries an encoded crypto2 `StoredKey` sidecar for `ciTokenKey` and takes precedence at startup. The service validates that both values identify the same signing and verification key. If the sidecar is absent, a legacy JWK is migrated only in memory; the configuration file is never rewritten. A malformed or mismatched sidecar fails startup without falling back to `ciTokenKey`.
 
 ## API Endpoints
@@ -90,6 +92,7 @@ The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Upd
 | `POST` | `/openid4vci/token` | Token endpoint |
 | `POST` | `/openid4vci/nonce` | Nonce endpoint |
 | `POST` | `/openid4vci/credential` | Credential endpoint |
+| `POST` | `/openid4vci/notification` | Notification endpoint |
 
 ## Creating a Credential Offer
 
@@ -110,6 +113,63 @@ curl -X POST http://localhost:7005/issuer2/credential-offers \
 ```
 
 The response contains the credential offer URL or offer reference that a wallet can use to start the OpenID4VCI flow.
+
+## Wallet Notifications
+
+Issuer2 implements the optional [OpenID4VCI 1.0 Notification Endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#name-notification-endpoint). When enabled, issuer metadata contains `notification_endpoint`, and a successful Credential Response containing credentials also contains `notification_id`.
+
+The wallet sends one of these events after processing the response:
+
+| Event | Meaning |
+|-------|---------|
+| `credential_accepted` | Credential issuance completed successfully |
+| `credential_failure` | Credential issuance failed for a reason other than user action |
+| `credential_deleted` | Credential issuance failed because of a user action |
+
+```mermaid
+sequenceDiagram
+    participant Wallet
+    participant Issuer2
+    Wallet->>Issuer2: POST /openid4vci/credential
+    Issuer2-->>Wallet: credentials + notification_id
+    opt notification_endpoint and notification_id are present
+        alt credential stored
+            Wallet->>Issuer2: POST /notification (credential_accepted)
+        else processing or storage failure
+            Wallet->>Issuer2: POST /notification (credential_failure)
+        else user action
+            Wallet->>Issuer2: POST /notification (credential_deleted)
+        end
+        Issuer2-->>Wallet: 204 No Content
+    end
+```
+
+Notification delivery is possible only after a response containing credentials supplies a `notification_id`. An initial deferred response therefore does not contain one. A single identifier can refer to multiple credentials returned in the same Credential Response.
+
+Issuer2 validates the access token and notification identifier, then stores the latest event and optional description on the issuance session. Repeating the same request is idempotent. Unknown request properties are ignored. Notification state expires with the session; event history and independent notification retention are not implemented.
+
+### Manual Request
+
+After obtaining an access token and proof with the Wallet2 isolated issuance endpoints, call the Credential Endpoint directly to make the identifier visible:
+
+```bash
+curl -X POST http://localhost:7005/openid4vci/credential \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d "{\"credential_configuration_id\":\"$CONFIGURATION_ID\",\"proofs\":{\"jwt\":[\"$PROOF_JWT\"]}}"
+```
+
+Copy `notification_id` from the response and acknowledge successful storage:
+
+```bash
+curl -i -X POST http://localhost:7005/openid4vci/notification \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"notification_id\":\"$NOTIFICATION_ID\",\"event\":\"credential_accepted\",\"event_description\":\"Credential stored successfully\"}"
+```
+
+Success returns `204 No Content`. Invalid input returns `invalid_notification_request`, and an identifier not belonging to the authorized issuance session returns `invalid_notification_id`. Use `GET /issuer2/sessions/{sessionId}` to inspect the stored event during development; that management endpoint is not part of OpenID4VCI.
 
 ## Persistence
 
