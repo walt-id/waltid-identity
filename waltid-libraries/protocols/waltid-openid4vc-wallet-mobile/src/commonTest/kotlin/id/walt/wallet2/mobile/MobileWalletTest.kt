@@ -108,6 +108,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -674,6 +675,9 @@ class MobileWalletTest {
         assertEquals(listOf(listOf("given_name")), record.fields.map { it.path })
         assertFalse(record.fields.any { it.path.singleOrNull() == "iss" })
         assertFalse(record.fields.single().selectivelyDisclosable)
+        assertNull(record.iconPng)
+        assertTrue(record.cardArtImageUris.isEmpty())
+        assertNull(record.cardArtBackgroundColor)
     }
 
     @Test

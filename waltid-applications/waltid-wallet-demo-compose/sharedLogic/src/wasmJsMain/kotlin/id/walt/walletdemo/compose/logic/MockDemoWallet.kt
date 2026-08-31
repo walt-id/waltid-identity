@@ -44,11 +44,27 @@ private class MockDemoWallet : DemoWallet {
                     doctype = null,
                     display = WalletDemoMetadataDisplay(
                         name = "Mock credential",
+                        logoUri = "https://issuer.example/mock-logo.png",
+                        logoAltText = "Mock credential logo",
+                        description = "A mock credential with card art",
+                        backgroundColor = "#12107c",
+                        backgroundImageUri = "https://issuer.example/mock-bg.png",
+                        textColor = "#FFFFFF",
+                    ),
+                    claims = emptyList(),
+                ),
+                WalletDemoOfferedCredentialMetadata(
+                    configurationId = "DefaultCardCredential",
+                    format = "jwt_vc_json",
+                    vct = null,
+                    doctype = null,
+                    display = WalletDemoMetadataDisplay(
+                        name = "Default card credential",
                         logoUri = null,
                         logoAltText = null,
                     ),
                     claims = emptyList(),
-                )
+                ),
             ),
             transactionCode = null,
         ),
@@ -70,7 +86,29 @@ private class MockDemoWallet : DemoWallet {
                 label = "Mock credential",
                 addedAt = "2026-06-17",
                 credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
-            )
+                metadataJson = """
+                    {
+                      "issuerDisplay":[{"name":"walt.id demo issuer","locale":"en"}],
+                      "credentialDisplay":[{
+                        "name":"Mock credential",
+                        "locale":"en",
+                        "logo":{"uri":"https://issuer.example/mock-logo.png","alt_text":"Mock credential logo"},
+                        "background_color":"#12107c",
+                        "background_image":{"uri":"https://issuer.example/mock-bg.png"},
+                        "text_color":"#FFFFFF"
+                      }]
+                    }
+                """.trimIndent(),
+            ),
+            WalletDemoCredential(
+                id = "mock-default-card",
+                format = "jwt_vc_json",
+                issuer = "walt.id demo issuer",
+                subject = "did:key:mock-holder",
+                label = "Default card credential",
+                addedAt = "2026-06-17",
+                credentialDataJson = """{"given_name":"Ada"}""",
+            ),
         )
         return WalletDemoIssuanceOutcome.Stored(credentials.map { it.id })
     }

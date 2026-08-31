@@ -245,11 +245,21 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
                 queryId = option.queryId,
                 credentialId = option.credentialId,
                 multiple = option.multiple,
-                label = option.label ?: option.format,
+                label = resolveCardTitle(
+                    format = option.format,
+                    credentialDataJson = option.credentialDataJson,
+                    displayName = presentationDisplayName(
+                        format = option.format,
+                        metadataJson = option.metadataJson,
+                        storedLabel = option.label,
+                    ),
+                    fallback = option.format,
+                ),
                 issuer = option.issuer,
                 subject = option.subject,
                 format = option.format,
                 credentialDataJson = option.credentialDataJson,
+                metadataJson = option.metadataJson,
                 disclosures = option.disclosures.map { disclosure ->
                     WalletDemoPresentationDisclosure(
                         label = CredentialDisplayVocabulary.disclosureLabel(disclosure.name, disclosure.path),
@@ -299,6 +309,9 @@ internal fun MobileWalletMetadataDisplay.toDemoMetadataDisplay(): WalletDemoMeta
         logoUri = logoUri,
         logoAltText = logoAltText,
         description = description,
+        backgroundColor = backgroundColor,
+        backgroundImageUri = backgroundImageUri,
+        textColor = textColor,
     )
 
 internal fun MobileWalletVerifierMetadata.toDemoMetadata(): WalletDemoVerifierMetadata =

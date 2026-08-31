@@ -68,6 +68,7 @@ data class WalletDemoPresentationCredentialOption(
     val format: String,
     val credentialDataJson: String,
     val disclosures: List<WalletDemoPresentationDisclosure>,
+    val metadataJson: String? = null,
 ) {
     val selection: WalletDemoPresentationCredentialSelection
         get() = WalletDemoPresentationCredentialSelection(queryId = queryId, credentialId = credentialId)

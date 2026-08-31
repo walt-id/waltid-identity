@@ -134,8 +134,8 @@ class WalletDemoAppIosTest {
         scenarios.credentialDetailsCanCopyAndDelete()
 
     @Test
-    fun presentationDetailsDeleteUsesStoreCredentialId() =
-        scenarios.presentationDetailsDeleteUsesStoreCredentialId()
+    fun deleteFromCredentialsWhileAReviewIsActive() =
+        scenarios.deleteFromCredentialsWhileAReviewIsActive()
 
     @Test
     fun successStatusCanBeDismissedFromTheHeader() =

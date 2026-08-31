@@ -682,56 +682,17 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun presentationDetailsDeleteUsesStoreCredentialId() = runTest {
-        val option = WalletDemoPresentationCredentialOption(
-            queryId = "pid",
-            credentialId = "cred-1",
-            label = "Example Credential",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
-        )
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = null,
-            clientId = null,
-            credentialOptions = listOf(option),
-        )
-        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential), presentationPreview = preview)
-        val controller = unlockedControllerWith(wallet, this)
-
-        controller.selectTab(WalletDemoTab.Present)
-        controller.updatePresentationRequestUrl("openid4vp://example")
-        controller.previewPresentation()
-        runCurrent()
-
-        val details = option.toCredentialDetails()
-        assertEquals(option.selection.id, details.summary.id)
-        assertEquals("cred-1", details.summary.credentialId)
-        assertTrue(details.summary.id != details.summary.credentialId)
-
-        controller.deleteCredential(details.summary.credentialId)
-        runCurrent()
-
-        assertEquals(listOf("cred-1"), wallet.deletedCredentialIds)
-        assertEquals(null, controller.state.value.presentationReview)
-        assertFalse(controller.state.value.presentationReviewEnabled)
-        val session = controller.state.value.session as WalletSessionState.Ready
-        assertEquals(emptyList(), session.credentials)
-    }
-
-    @Test
     fun resetWalletDeletesDataClearsPinAndReturnsToSetup() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val pinStore = InMemoryDemoPinStore()
-        val controller = controllerWith(wallet, this, pinStore)
+        val sharingSettings = InMemoryDemoSharingSettingsStore()
+        val controller = controllerWith(wallet, this, pinStore, sharingSettings = sharingSettings)
         controller.updatePin("1234")
         controller.updatePinConfirmation("1234")
         controller.submitPin()
         runCurrent()
         assertTrue(pinStore.hasPin())
+        controller.setShowDcApiPresentationPreview(false)
 
         controller.resetWallet()
         runCurrent()
@@ -740,6 +701,22 @@ class WalletDemoControllerTest {
         assertFalse(pinStore.hasPin())
         assertTrue(controller.state.value.auth is WalletAuthState.Setup)
         assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
+        assertFalse(controller.state.value.showDcApiPresentationPreview)
+        assertFalse(sharingSettings.showDcApiPresentationPreview())
+    }
+
+    @Test
+    fun dcApiPresentationPreviewPreferencePersistsAcrossControllerRecreation() = runTest {
+        val sharingSettings = InMemoryDemoSharingSettingsStore()
+        val firstController = controllerWith(FakeDemoWallet(), this, sharingSettings = sharingSettings)
+        assertTrue(firstController.state.value.showDcApiPresentationPreview)
+
+        firstController.setShowDcApiPresentationPreview(false)
+        assertFalse(firstController.state.value.showDcApiPresentationPreview)
+        assertFalse(sharingSettings.showDcApiPresentationPreview())
+
+        val recreatedController = controllerWith(FakeDemoWallet(), this, sharingSettings = sharingSettings)
+        assertFalse(recreatedController.state.value.showDcApiPresentationPreview)
     }
 
     @Test
@@ -850,7 +827,7 @@ class WalletDemoControllerTest {
         assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
         assertEquals(1, wallet.receiveCalls)
         assertEquals(
-            WalletOperationState.Succeeded("Received 1 credential(s)", WalletDemoTab.Receive),
+            WalletOperationState.Succeeded("Received 1 credential(s)", WalletDemoTab.Credentials),
             controller.state.value.operation,
         )
         assertEquals("Received 1 credential(s)", controller.state.value.statusText)
@@ -903,7 +880,8 @@ class WalletDemoControllerTest {
 
         assertEquals(1, wallet.receiveCalls)
         assertEquals("abc-123", wallet.receivedTxCode)
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
         assertEquals("", controller.state.value.requestDrafts.txCode)
         assertEquals(null, controller.state.value.offerPreview)
     }
@@ -987,7 +965,8 @@ class WalletDemoControllerTest {
 
         assertEquals(listOf("openid://callback?code=code-1&state=state-1"), wallet.authorizationCallbackUris)
         assertEquals(listOf("cred-auth"), controller.state.value.lastReceivedCredentialIds)
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
         assertEquals(null, controller.state.value.offerPreview)
     }
 
@@ -1022,7 +1001,8 @@ class WalletDemoControllerTest {
         assertEquals(listOf(deferredCredential.id), wallet.resumedDeferredCredentialIds)
         assertEquals(emptyList(), controller.state.value.deferredCredentials)
         assertEquals(listOf("cred-deferred"), controller.state.value.lastReceivedCredentialIds)
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
     }
 
     @Test
@@ -1049,7 +1029,8 @@ class WalletDemoControllerTest {
 
         assertEquals(1, wallet.startIssuanceCalls)
         assertEquals(1, wallet.receiveCalls)
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
     }
 
     @Test
@@ -1269,7 +1250,9 @@ class WalletDemoControllerTest {
             controller.state.value.operation,
         )
 
-        controller.startNewPresentationFlow()
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
+
         controller.updatePresentationRequestUrl("openid4vp://example")
         controller.previewPresentation()
         runCurrent()
@@ -1281,10 +1264,13 @@ class WalletDemoControllerTest {
             controller.state.value.operation,
         )
         assertEquals(null, controller.state.value.presentationPreview)
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
         assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
         assertEquals(emptySet(), controller.state.value.selectedPresentationDisclosureOptions)
         assertEquals(listOf(presentationPreviewHandle), wallet.discardedPresentationPreviewHandles)
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
 
+        controller.updatePresentationRequestUrl("openid4vp://example")
         controller.previewPresentation()
         runCurrent()
         controller.rejectPresentation()
@@ -1850,21 +1836,24 @@ class WalletDemoControllerTest {
         runCurrent()
         controller.acceptOffer()
         runCurrent()
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
 
         controller.updatePresentationRequestUrl(presentationUrl)
         controller.previewPresentation()
         runCurrent()
         controller.submitPresentation()
         runCurrent()
-        assertTrue(controller.state.value.presentationCompleted)
+        assertFalse(controller.state.value.presentationCompleted)
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
 
         val presentationResetKeyBeforeOfferLink = controller.state.value.presentationNavigationResetKey
         controller.handleDeepLink(offerUrl)
 
         assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
         assertEquals(offerUrl, controller.state.value.requestDrafts.offerUrl)
-        assertEquals(1, controller.state.value.receiveNavigationResetKey)
+        assertEquals(2, controller.state.value.receiveNavigationResetKey)
         assertEquals(presentationResetKeyBeforeOfferLink + 1, controller.state.value.presentationNavigationResetKey)
         assertEquals(emptyList(), controller.state.value.lastReceivedCredentialIds)
         assertFalse(controller.state.value.receiveCompleted)
@@ -1913,23 +1902,18 @@ class WalletDemoControllerTest {
         controller.acceptOffer()
         runCurrent()
 
-        assertTrue(controller.state.value.receiveCompleted)
-        assertFalse(controller.state.value.receiveUrlEntryEnabled)
-        assertFalse(controller.state.value.receiveActionEnabled)
-        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
-        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
-
-        val resetKeyBeforeNewFlow = controller.state.value.receiveNavigationResetKey
-        controller.startNewReceiveFlow()
-
-        assertEquals("", controller.state.value.requestDrafts.offerUrl)
-        assertEquals(emptyList(), controller.state.value.lastReceivedCredentialIds)
-        assertTrue(!controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
         assertTrue(controller.state.value.receiveUrlEntryEnabled)
         assertFalse(controller.state.value.receiveActionEnabled)
-        assertEquals(resetKeyBeforeNewFlow + 1, controller.state.value.receiveNavigationResetKey)
-        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
-        assertEquals("Wallet ready", controller.state.value.statusText)
+        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
+        assertEquals("", controller.state.value.requestDrafts.offerUrl)
+        assertEquals("Received 1 credential(s)", controller.state.value.statusText)
+
+        controller.selectTab(WalletDemoTab.Receive)
+        assertTrue(controller.state.value.receiveUrlEntryEnabled)
+        assertEquals("", controller.state.value.requestDrafts.offerUrl)
+        assertFalse(controller.state.value.receiveActionEnabled)
     }
 
     @Test
@@ -1947,7 +1931,8 @@ class WalletDemoControllerTest {
         controller.acceptOffer()
         runCurrent()
 
-        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
         assertEquals(listOf("new-cred"), controller.state.value.lastReceivedCredentialIds)
         assertEquals("Received 1 credential(s)", controller.state.value.statusText)
         assertEquals(listOf(newCredential), controller.state.value.receivedCredentials())
@@ -1982,7 +1967,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun presentationCompletionCanStartNewFlow() = runTest {
+    fun presentationCompletionReturnsToDefaultEntry() = runTest {
         val preview = WalletDemoPresentationPreview(
             previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
@@ -2019,26 +2004,18 @@ class WalletDemoControllerTest {
         controller.submitPresentation()
         runCurrent()
 
-        assertTrue(controller.state.value.presentationCompleted)
+        assertFalse(controller.state.value.presentationCompleted)
         assertEquals(null, controller.state.value.presentationPreview)
         assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
-        assertFalse(controller.state.value.presentationUrlEntryEnabled)
-        assertFalse(controller.state.value.presentationPreviewActionEnabled)
-        assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
-
-        val resetKeyBeforeNewFlow = controller.state.value.presentationNavigationResetKey
-        controller.startNewPresentationFlow()
-
         assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
-        assertEquals(null, controller.state.value.presentationPreview)
-        assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
-        assertEquals(emptySet(), controller.state.value.selectedPresentationDisclosureOptions)
-        assertTrue(!controller.state.value.presentationCompleted)
         assertTrue(controller.state.value.presentationUrlEntryEnabled)
         assertFalse(controller.state.value.presentationPreviewActionEnabled)
-        assertEquals(resetKeyBeforeNewFlow + 1, controller.state.value.presentationNavigationResetKey)
-        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
-        assertEquals("Wallet ready", controller.state.value.statusText)
+        assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
+        assertEquals(
+            WalletOperationState.Succeeded("Presentation sent", WalletDemoTab.Present),
+            controller.state.value.operation,
+        )
+        assertEquals("Presentation sent", controller.state.value.statusText)
     }
 
     @Test
@@ -2069,7 +2046,9 @@ class WalletDemoControllerTest {
         controller.completePresentationContinuation()
 
         assertEquals(null, controller.state.value.pendingPresentationContinuation)
-        assertTrue(controller.state.value.presentationCompleted)
+        assertFalse(controller.state.value.presentationCompleted)
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
         assertEquals(
             WalletOperationState.Succeeded(WalletDisplayText.PresentationRejected, WalletDemoTab.Present),
             controller.state.value.operation,
@@ -2120,6 +2099,7 @@ class WalletDemoControllerTest {
         biometricAuthenticator: DemoBiometricAuthenticator = UnavailableDemoBiometricAuthenticator,
         signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
         signingProtectionStore: WalletDemoSigningProtectionStore = InMemoryWalletDemoSigningProtectionStore(),
+        sharingSettings: DemoSharingSettingsStore = InMemoryDemoSharingSettingsStore(),
     ): WalletDemoController =
         WalletDemoController(
             wallet = wallet,
@@ -2127,6 +2107,7 @@ class WalletDemoControllerTest {
             biometricAuthenticator = biometricAuthenticator,
             signingProtectionMode = signingProtectionMode,
             signingProtectionStore = signingProtectionStore,
+            sharingSettings = sharingSettings,
             scope = scope.backgroundScope,
             dispatcher = StandardTestDispatcher(scope.testScheduler),
         )

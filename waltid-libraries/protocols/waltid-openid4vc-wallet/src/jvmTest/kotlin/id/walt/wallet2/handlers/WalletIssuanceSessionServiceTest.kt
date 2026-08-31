@@ -957,6 +957,7 @@ class WalletIssuanceSessionServiceTest {
         val credential = preview.offer.credentials.single()
 
         assertEquals("mso_mdoc", credential.format)
+        assertEquals("org.iso.18013.5.1.mDL", credential.doctype)
         assertEquals("Mobiler Fuehrerschein", credential.name)
         assertEquals("Deutsche Beschreibung", credential.descriptionText)
         assertEquals("https://issuer.example/mdl-de.png", credential.logoUri)
@@ -1183,6 +1184,58 @@ class WalletIssuanceSessionServiceTest {
 
         assertEquals(1, result.credentialIds.size)
         assertEquals(result.credentialIds, store.credentials.map { it.id })
+    }
+
+    @Test
+    fun issuancePreviewAndStoredMetadataExposeCredentialCardDisplay() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val credential = key.signJws(
+            """{"iss":"https://issuer.example","sub":"did:key:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"did:key:holder","given_name":"Ada"}}}"""
+                .encodeToByteArray()
+        )
+        val store = RecordingCredentialStore()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadataWithCredentialDisplay())
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    buildJsonObject {
+                        put(
+                            "credentials",
+                            Json.parseToJsonElement("""[{"credential":${Json.encodeToString(credential)}}]"""),
+                        )
+                    }.toString()
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            Wallet("test", staticKey = key, credentialStores = listOf(store)),
+            httpClient = client,
+        )
+
+        val session = service.start(preAuthorizedRequest())
+        val preview = session.offer.credentials.single()
+        assertEquals("Personal ID", preview.name)
+        assertEquals("#12107c", preview.backgroundColor)
+        assertEquals("https://issuer.example/pid-bg.png", preview.backgroundImageUri)
+        assertEquals("#FFFFFF", preview.textColor)
+        assertEquals("https://issuer.example/pid.png", preview.logoUri)
+
+        val result = assertIs<WalletIssuanceOutcome.Stored>(service.continuePreAuthorized(session.id))
+        val stored = store.credentials.single { it.id == result.credentialIds.single() }
+        val credentialDisplay = stored.metadata!!
+            .getValue("credentialDisplay")
+            .jsonArray
+            .single()
+            .jsonObject
+        assertEquals("Personal ID", credentialDisplay.getValue("name").jsonPrimitive.content)
+        assertEquals("#12107c", credentialDisplay.getValue("background_color").jsonPrimitive.content)
+        assertEquals(
+            "https://issuer.example/pid-bg.png",
+            credentialDisplay.getValue("background_image").jsonObject.getValue("uri").jsonPrimitive.content,
+        )
     }
 
     @Test
@@ -1930,6 +1983,31 @@ class WalletIssuanceSessionServiceTest {
         }
         """.trimIndent()
     }
+
+    private fun issuerMetadataWithCredentialDisplay(): String = """
+        {
+          "credential_issuer":"$ISSUER",
+          "credential_endpoint":"$CREDENTIAL_ENDPOINT",
+          "display":[{"name":"Example Issuer","locale":"en"}],
+          "credential_configurations_supported":{
+            "test-credential":{
+              "format":"jwt_vc_json",
+              "credential_definition":{"type":["VerifiableCredential","TestCredential"]},
+              "credential_metadata":{
+                "display":[{
+                  "name":"Personal ID",
+                  "locale":"en",
+                  "logo":{"uri":"https://issuer.example/pid.png","alt_text":"PID logo"},
+                  "description":"Government identity",
+                  "background_color":"#12107c",
+                  "background_image":{"uri":"https://issuer.example/pid-bg.png"},
+                  "text_color":"#FFFFFF"
+                }]
+              }
+            }
+          }
+        }
+    """.trimIndent()
 
     private fun attestedAuthorizationServerMetadata() = """
         {

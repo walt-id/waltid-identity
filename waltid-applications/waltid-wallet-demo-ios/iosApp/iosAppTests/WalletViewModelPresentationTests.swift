@@ -50,12 +50,13 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertTrue(viewModel.presentationReviewEnabled)
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Review presentation error")
 
-        viewModel.startNewPresentationFlow()
+        viewModel.cancelPresentationReview()
         try await waitUntilAsync {
             await walletClient.discardedPresentationPreviewHandles == [previewHandle]
         }
 
         XCTAssertNil(viewModel.presentationError)
+        XCTAssertEqual(viewModel.presentationRequestUrl, "")
         XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
         let rejectedAfterDismiss = await walletClient.rejectedPresentationPreviewHandles
         XCTAssertEqual(rejectedAfterDismiss, [])
@@ -64,12 +65,14 @@ final class WalletViewModelPresentationTests: XCTestCase {
         viewModel.previewPresentation()
         try await waitUntil { viewModel.presentationError == previewError }
         viewModel.rejectPresentation()
-        try await waitUntil { viewModel.presentationCompleted }
+        try await waitUntil { viewModel.presentationError == nil && viewModel.presentationRequestUrl.isEmpty && !viewModel.isLoading }
 
         XCTAssertNil(viewModel.presentationError)
         let rejectedAfterNotify = await walletClient.rejectedPresentationPreviewHandles
         XCTAssertEqual(rejectedAfterNotify, [previewHandle])
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Verifier notified")
+        XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
+        XCTAssertFalse(viewModel.presentationCompleted)
     }
 
     @MainActor
@@ -104,7 +107,9 @@ final class WalletViewModelPresentationTests: XCTestCase {
         viewModel.completePresentationContinuation()
 
         XCTAssertNil(viewModel.pendingPresentationContinuationURL)
-        XCTAssertTrue(viewModel.presentationCompleted)
+        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertEqual(viewModel.presentationRequestUrl, "")
+        XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Presentation rejected")
     }
 
@@ -381,45 +386,6 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedPresentationCredentialOptions, [])
         let discarded = await walletClient.discardedPresentationPreviewHandles
         XCTAssertEqual(discarded.count, 1)
-    }
-
-    @MainActor
-    func testPresentationDetailsDeleteUsesStoreCredentialId() async throws {
-        let walletClient = MockWalletClient(
-            storedCredentials: [
-                Credential(
-                    id: "cred-1",
-                    format: "jwt_vc_json",
-                    issuer: "Example Issuer",
-                    subject: nil,
-                    label: "Example Credential",
-                    addedAt: nil,
-                    credentialDataJSON: "{}"
-                )
-            ]
-        )
-        let viewModel = WalletViewModel(
-            walletID: "delete-details-\(UUID().uuidString)",
-            walletClient: walletClient
-        )
-        viewModel.unlockForTests()
-        try await waitUntil { viewModel.isReady }
-        viewModel.presentationRequestUrl = "openid4vp://mock"
-        viewModel.previewPresentation()
-        try await waitUntil { viewModel.presentationReviewEnabled }
-
-        guard case .ready(let preview) = viewModel.presentationReview else {
-            return XCTFail("Expected a ready presentation preview")
-        }
-        let option = try XCTUnwrap(preview.credentialOptions.first)
-        let details = CredentialDisplayNormalizer.details(for: option)
-        XCTAssertEqual(details.id, option.selection.id)
-        XCTAssertEqual(details.credentialId, option.credentialID)
-        XCTAssertNotEqual(details.id, details.credentialId)
-
-        viewModel.deleteCredential(id: details.credentialId)
-        try await waitUntil { viewModel.credentials.isEmpty && viewModel.presentationReview == nil }
-        XCTAssertFalse(viewModel.presentationReviewEnabled)
     }
 
     @MainActor

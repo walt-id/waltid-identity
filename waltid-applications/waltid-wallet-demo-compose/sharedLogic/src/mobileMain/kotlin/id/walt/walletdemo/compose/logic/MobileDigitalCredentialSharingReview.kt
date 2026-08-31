@@ -107,11 +107,21 @@ private fun MobileWalletPresentationCredentialOption.toDemoCredentialOption(): W
         queryId = queryId,
         credentialId = credentialId,
         multiple = multiple,
-        label = label ?: format,
+        label = resolveCardTitle(
+            format = format,
+            credentialDataJson = credentialDataJson,
+            displayName = presentationDisplayName(
+                format = format,
+                metadataJson = metadataJson,
+                storedLabel = label,
+            ),
+            fallback = format,
+        ),
         issuer = issuer,
         subject = subject,
         format = format,
         credentialDataJson = credentialDataJson,
+        metadataJson = metadataJson,
         disclosures = disclosures.map { disclosure ->
             WalletDemoPresentationDisclosure(
                 label = CredentialDisplayVocabulary.disclosureLabel(disclosure.name, disclosure.path),
