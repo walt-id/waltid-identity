@@ -49,6 +49,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
     ): CredentialResponseResult {
         return try {
             val docType = configuration.doctype

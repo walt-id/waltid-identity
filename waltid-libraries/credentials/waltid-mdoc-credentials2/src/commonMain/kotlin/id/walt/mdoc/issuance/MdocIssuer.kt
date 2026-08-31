@@ -52,6 +52,7 @@ object MdocIssuer {
 
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
         /**
@@ -76,6 +77,7 @@ object MdocIssuer {
             docType = docType,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             status = status,
             digestAlgorithm = digestAlgorithm,
             protectedHeaderX5u = protectedHeaderX5u,
@@ -98,6 +100,7 @@ object MdocIssuer {
         docType: String,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
         protectedHeaderX5u: String? = null,
@@ -111,6 +114,7 @@ object MdocIssuer {
         docType = docType,
         validFrom = validFrom,
         validUntil = validUntil,
+        expectedUpdate = expectedUpdate,
         status = status,
         digestAlgorithm = digestAlgorithm,
         protectedHeaderX5u = protectedHeaderX5u,
@@ -128,6 +132,7 @@ object MdocIssuer {
         docType: String,
         validFrom: Instant?,
         validUntil: Instant,
+        expectedUpdate: Instant?,
         status: Status?,
         digestAlgorithm: String,
         protectedHeaderX5u: String?,
@@ -144,8 +149,11 @@ object MdocIssuer {
             })
         }
         val signedTimestamp = Instant.fromEpochSeconds((signedAt ?: Clock.System.now()).epochSeconds)
-        val effectiveValidFrom = if (validFrom != null && validFrom > signedTimestamp)
-            Instant.fromEpochSeconds(validFrom.epochSeconds) else signedTimestamp
+        // ISO 18013-5 requires validFrom >= signed. Raise a provided value that fell behind
+        // the sign timestamp (claim-time resolution vs. signing) without blocking a future validFrom.
+        val effectiveValidFrom = Instant.fromEpochSeconds(
+            (validFrom ?: signedTimestamp).coerceAtLeast(signedTimestamp).epochSeconds
+        )
 
         val mso = MobileSecurityObject(
             version = "1.0",
@@ -157,7 +165,8 @@ object MdocIssuer {
                 signed = signedTimestamp,
                 validFrom = effectiveValidFrom,
                 // ISO 18013-5 MSO tdate fields must not include fractional seconds
-                validUntil = Instant.fromEpochSeconds(validUntil.epochSeconds)
+                validUntil = Instant.fromEpochSeconds(validUntil.epochSeconds),
+                expectedUpdate = expectedUpdate?.let { Instant.fromEpochSeconds(it.epochSeconds) },
             ),
             status = status
         )
@@ -224,6 +233,7 @@ object MdocIssuer {
         data: MdocUniversalIssuanceData,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
 
@@ -255,6 +265,7 @@ object MdocIssuer {
             docType = docType,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             status = status,
             digestAlgorithm = digestAlgorithm,
             protectedHeaderX5u = protectedHeaderX5u,
@@ -273,6 +284,7 @@ object MdocIssuer {
         data: MdocUniversalIssuanceData,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
         protectedHeaderX5u: String? = null,
@@ -295,6 +307,7 @@ object MdocIssuer {
         docType = docType,
         validFrom = validFrom,
         validUntil = validUntil,
+        expectedUpdate = expectedUpdate,
         status = status,
         digestAlgorithm = digestAlgorithm,
         protectedHeaderX5u = protectedHeaderX5u,
@@ -317,6 +330,7 @@ object MdocIssuer {
         validFrom: Instant? = null,
 
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256"
     ): IssuerSigned {
@@ -330,6 +344,7 @@ object MdocIssuer {
             docType = typesafeData.docType,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             status = status,
             digestAlgorithm = digestAlgorithm
         )
@@ -343,6 +358,7 @@ object MdocIssuer {
         typesafeData: MdocData,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
     ): IssuerSigned = signMsoForIssuerSignedObjects(
@@ -354,6 +370,7 @@ object MdocIssuer {
         docType = typesafeData.docType,
         validFrom = validFrom,
         validUntil = validUntil,
+        expectedUpdate = expectedUpdate,
         status = status,
         digestAlgorithm = digestAlgorithm,
     )

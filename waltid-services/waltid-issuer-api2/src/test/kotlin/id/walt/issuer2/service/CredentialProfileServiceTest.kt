@@ -5,6 +5,7 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
+import id.walt.openid4vci.mdoc.MsoData
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
 import io.ktor.server.plugins.NotFoundException
@@ -105,6 +106,48 @@ class CredentialProfileServiceTest {
     }
 
     @Test
+    fun `maps msoData for mdoc profiles`() {
+        val service = serviceWithProfiles(
+            profiles = mapOf(
+                "isoMdl" to profileConfig(
+                    name = "ISO mDL",
+                    credentialConfigurationId = MDOC_CONFIGURATION_ID,
+                    msoData = MsoData(
+                        validFrom = "<timestamp>",
+                        validUntil = "<timestamp-in:365d>",
+                        expectedUpdate = "<timestamp-in:180d>",
+                    ),
+                )
+            ),
+            metadataConfig = metadataConfig(
+                extraConfigurations = mapOf(
+                    MDOC_CONFIGURATION_ID to buildJsonObject { put("format", "mso_mdoc") }
+                )
+            ),
+        )
+
+        val profile = service.getProfile("isoMdl")
+        assertEquals("<timestamp>", profile.msoData?.validFrom)
+        assertEquals("<timestamp-in:365d>", profile.msoData?.validUntil)
+        assertEquals("<timestamp-in:180d>", profile.msoData?.expectedUpdate)
+    }
+
+    @Test
+    fun `rejects msoData on non-mdoc profiles`() {
+        val service = serviceWithProfiles(
+            profiles = mapOf(
+                PROFILE_ID to profileConfig(
+                    msoData = MsoData(validUntil = "<timestamp-in:365d>"),
+                )
+            )
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            service.getProfile(PROFILE_ID)
+        }
+    }
+
+    @Test
     fun `rejects invalid profile values`() {
         val service = serviceWithProfiles(
             profiles = mapOf(
@@ -144,6 +187,7 @@ class CredentialProfileServiceTest {
         mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
         x5Chain: List<String>? = null,
         notifications: IssuanceNotifications? = null,
+        msoData: MsoData? = null,
     ): CredentialProfileConfig =
         CredentialProfileConfig(
             name = name,
@@ -155,17 +199,20 @@ class CredentialProfileServiceTest {
             selectiveDisclosure = selectiveDisclosure,
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            msoData = msoData,
             x5Chain = x5Chain,
             notifications = notifications,
         )
 
-    private fun metadataConfig(): Issuer2MetadataConfig =
+    private fun metadataConfig(
+        extraConfigurations: Map<String, JsonObject> = emptyMap(),
+    ): Issuer2MetadataConfig =
         Issuer2MetadataConfig(
             credentialConfigurations = mapOf(
                 CREDENTIAL_CONFIGURATION_ID to buildJsonObject {
                     put("format", "jwt_vc_json")
                 }
-            )
+            ) + extraConfigurations
         )
 
     private fun defaultIssuerKey(): JsonObject = buildJsonObject {
@@ -182,6 +229,7 @@ class CredentialProfileServiceTest {
     private companion object {
         const val PROFILE_ID = "openBadgeCredential"
         const val CREDENTIAL_CONFIGURATION_ID = "OpenBadgeCredential_jwt_vc_json"
+        const val MDOC_CONFIGURATION_ID = "org.iso.18013.5.1.mDL"
         const val DEFAULT_ISSUER_KEY_D = "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ"
     }
 }
