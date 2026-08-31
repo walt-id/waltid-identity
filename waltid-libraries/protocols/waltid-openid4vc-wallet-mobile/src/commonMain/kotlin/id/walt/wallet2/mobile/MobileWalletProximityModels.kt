@@ -68,7 +68,11 @@ public enum class MobileWalletProximityWifiAwareSecurityPolicy {
     NcsSk128,
 }
 
-/** Complete Wi-Fi Aware retrieval configuration. */
+/**
+ * Complete Wi-Fi Aware retrieval configuration.
+ *
+ * @property securityPolicy NAN data-path security required for the prepared transport.
+ */
 public data class MobileWalletProximityWifiAwareConfiguration(
     public val securityPolicy: MobileWalletProximityWifiAwareSecurityPolicy =
         MobileWalletProximityWifiAwareSecurityPolicy.NcsSk128,
