@@ -3,6 +3,8 @@ package id.walt.walletdemo.compose.logic
 import id.walt.wallet2.mobile.MobileWalletProximityAction
 import id.walt.wallet2.mobile.MobileWalletProximityActionResult
 import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
+import id.walt.wallet2.mobile.MobileWalletProximityBleBearerPolicy
+import id.walt.wallet2.mobile.MobileWalletProximityBleRoles
 import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityCredentialOption
 import id.walt.wallet2.mobile.MobileWalletProximityDeviceAuthenticationMethod
@@ -64,6 +66,58 @@ class WalletDemoProximityControllerTest {
         assertNotNull(retrieval.nfc)
         assertEquals(session.state.value, controller.state.value.sessionState)
         assertTrue(controller.state.value.active)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `provisional NFCv2 hybrid profile selects only NFC engagement with alternate GATT BLE`() {
+        val configuration = WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid.configuration()
+
+        val engagement = assertIs<MobileWalletProximityEngagementConfiguration.NfcOnly>(
+            configuration.engagement,
+        )
+        assertIs<MobileWalletProximityNfcEngagementMode.ProvisionalV2>(engagement.mode)
+        val retrieval = assertIs<MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2>(
+            configuration.retrieval,
+        )
+        val bluetooth = assertNotNull(retrieval.bluetoothLowEnergy)
+        assertEquals(MobileWalletProximityBleRoles.CentralClient, bluetooth.roles)
+        assertEquals(MobileWalletProximityBleBearerPolicy.GattOnly, bluetooth.bearerPolicy)
+        assertNull(retrieval.qrNfc)
+    }
+
+    @Test
+    fun `provisional NFCv2 direct profile has no fallback bearer`() {
+        val configuration = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct.configuration()
+
+        val engagement = assertIs<MobileWalletProximityEngagementConfiguration.NfcOnly>(
+            configuration.engagement,
+        )
+        assertIs<MobileWalletProximityNfcEngagementMode.ProvisionalV2>(engagement.mode)
+        val retrieval = assertIs<MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2>(
+            configuration.retrieval,
+        )
+        assertNull(retrieval.bluetoothLowEnergy)
+        assertNull(retrieval.qrNfc)
+    }
+
+    @Test
+    fun `start snapshots the selected profile before launching the session`() = runTest {
+        var selected = WalletDemoProximityTransportProfile.Default
+        val session = FakeSession(
+            MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026)
+        )
+        val backend = FakeBackend(session = session)
+        val controller = controller(backend) { selected }
+
+        controller.start()
+        selected = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct
+        advanceUntilIdle()
+
+        assertIs<MobileWalletProximityEngagementConfiguration.QrAndNfc>(
+            requireNotNull(backend.lastConfiguration).engagement,
+        )
         controller.dismiss()
         advanceUntilIdle()
     }
@@ -268,8 +322,12 @@ class WalletDemoProximityControllerTest {
 
     private fun kotlinx.coroutines.test.TestScope.controller(
         backend: ProximityPresentationBackend,
+        profileProvider: () -> WalletDemoProximityTransportProfile = {
+            WalletDemoProximityTransportProfile.Default
+        },
     ): WalletDemoProximityController = WalletDemoProximityController(
         wallet = backend,
+        profileProvider = profileProvider,
         scope = this,
         dispatcher = StandardTestDispatcher(testScheduler),
     )

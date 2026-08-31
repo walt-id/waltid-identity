@@ -102,15 +102,19 @@ fun walletDemoViewController(
         nfcHostPlatformAdapter = nfcHostPlatformAdapter,
         onDigitalCredentialRegistryChanged = { onDigitalCredentialRegistryChanged() },
     )
+    val sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier)
     val controller = WalletDemoController(
         wallet = wallet,
         pinStore = createIosDemoPinStore(config.walletId),
         biometricAuthenticator = createIosDemoBiometricAuthenticator(),
         signingProtectionMode = parsedSigningProtectionMode,
         signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
-        sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier),
+        sharingSettings = sharingSettings,
     )
-    val proximityController = WalletDemoProximityController(wallet)
+    val proximityController = WalletDemoProximityController(
+        wallet = wallet,
+        profileProvider = sharingSettings::proximityTransportProfile,
+    )
     iosController = controller
     iosProximityController?.dismiss()
     iosProximityController = proximityController

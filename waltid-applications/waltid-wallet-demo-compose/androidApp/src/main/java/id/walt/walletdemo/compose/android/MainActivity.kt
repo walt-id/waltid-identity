@@ -52,15 +52,19 @@ class MainActivity : FragmentActivity() {
             config = walletConfig,
             interactionContextProvider = { this@MainActivity },
         )
+        val sharingSettings = createAndroidDemoSharingSettingsStore(applicationContext)
         controller = WalletDemoController(
             wallet = wallet,
             pinStore = createAndroidDemoPinStore(applicationContext, walletConfig.walletId),
             biometricAuthenticator = createAndroidDemoBiometricAuthenticator { this@MainActivity },
             signingProtectionMode = walletConfig.signingProtectionMode,
             signingProtectionStore = walletConfig.signingProtectionStore(applicationContext),
-            sharingSettings = createAndroidDemoSharingSettingsStore(applicationContext),
+            sharingSettings = sharingSettings,
         )
-        proximityController = WalletDemoProximityController(wallet)
+        proximityController = WalletDemoProximityController(
+            wallet = wallet,
+            profileProvider = sharingSettings::proximityTransportProfile,
+        )
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         handleIntent(intent)
 

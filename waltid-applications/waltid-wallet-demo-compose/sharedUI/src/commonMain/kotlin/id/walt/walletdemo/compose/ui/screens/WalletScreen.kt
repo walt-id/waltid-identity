@@ -40,6 +40,9 @@ internal fun WalletScreen(
         SettingsScreen(
             state = state,
             onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
+            onProximityTransportProfileChange = onStartProximityPresentation?.let {
+                controller::setProximityTransportProfile
+            },
             onBack = { showingSettings = false },
             onLock = controller::lock,
             onResetWallet = controller::resetWallet,
