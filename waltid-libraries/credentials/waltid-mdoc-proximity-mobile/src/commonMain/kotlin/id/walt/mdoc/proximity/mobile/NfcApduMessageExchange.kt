@@ -5,10 +5,9 @@ import id.walt.mdoc.proximity.ImmutableBytes
 /** Shared ISO 7816 ENVELOPE/GET RESPONSE mechanism used by conventional NFC and NFCv2. */
 internal class NfcApduMessageExchange(
     private val maximumCommandDataLength: Int,
-    maximumResponseDataLength: Int,
+    private val maximumResponseDataLength: Int,
     private val maximumMessageBytes: Int,
 ) {
-    private var maximumResponseDataLength: Int = maximumResponseDataLength
     sealed interface IncomingResult {
         data class Continue(val response: NfcResponseApdu) : IncomingResult
         data class Message(val bytes: ByteArray) : IncomingResult
@@ -85,13 +84,6 @@ internal class NfcApduMessageExchange(
     }
 
     val hasOutgoingData: Boolean get() = outgoing != null
-
-    fun setMaximumResponseDataLength(value: Int) {
-        require(value in 1..NfcCommandApdu.MAX_RESPONSE_DATA_LENGTH)
-        require(outgoing == null) { "Cannot change an NFC response limit while bytes remain staged" }
-        maximumResponseDataLength = value
-        responseLength = minOf(responseLength, value)
-    }
 
     private fun nextResponse(maximumDataLength: Int): NfcResponseApdu {
         require(maximumDataLength > 0)

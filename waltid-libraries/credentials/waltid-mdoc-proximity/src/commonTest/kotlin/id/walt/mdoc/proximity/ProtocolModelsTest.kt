@@ -262,11 +262,14 @@ class ProtocolModelsTest {
         }
         assertFailsWith<IllegalArgumentException> { DeviceRetrievalMethod.Nfc(254u, 256u) }
         assertFailsWith<IllegalArgumentException> { DeviceRetrievalMethod.Nfc(255u, 257u + 65_280u) }
-        assertFailsWith<IllegalArgumentException> { DeviceRetrievalMethod.NfcV2(0u) }
-        assertFailsWith<IllegalArgumentException> { DeviceRetrievalMethod.NfcV2(65_537u) }
-        assertFailsWith<kotlinx.serialization.SerializationException> {
-            DeviceRetrievalMethodCodec.decode("830501a0".hexToByteArray())
-        }
+        assertEquals(
+            DeviceRetrievalMethod.NfcV2,
+            DeviceRetrievalMethodCodec.decode("830501a0".hexToByteArray()),
+        )
+        assertEquals(
+            DeviceRetrievalMethod.NfcV2,
+            DeviceRetrievalMethodCodec.decode("830501a10001".hexToByteArray()),
+        )
 
         val items = ItemsRequest(
             docType = "org.example.document",
@@ -641,7 +644,7 @@ class ProtocolModelsTest {
     @Test
     fun `conventional and provisional NFC methods have distinct wire contracts`() {
         val conventional = DeviceRetrievalMethod.Nfc(255u, 65_536u)
-        val nfcV2 = DeviceRetrievalMethod.NfcV2(maximumResponseDataLength = 4_096u)
+        val nfcV2 = DeviceRetrievalMethod.NfcV2
         val encodedKey = coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicKey)
         val engagement = DeviceEngagement(
             version = DeviceEngagement.VERSION_1_0,
@@ -655,7 +658,7 @@ class ProtocolModelsTest {
         assertEquals(conventional, decoded.deviceRetrievalMethods!![0])
         assertEquals(nfcV2, decoded.deviceRetrievalMethods!![1])
         assertContentEquals(
-            "830501a100191000".hexToByteArray(),
+            "830501a0".hexToByteArray(),
             DeviceRetrievalMethodCodec.encode(nfcV2),
         )
         assertContentEquals(encoded, coseCompliantCbor.encodeToByteArray(DeviceEngagement.serializer(), decoded))

@@ -112,7 +112,7 @@ class HolderProtocolEngineTest {
         )
 
         assertFailsWith<IllegalArgumentException> {
-            factory.create(deviceKey, listOf(DeviceRetrievalMethod.NfcV2()), context, capabilities)
+            factory.create(deviceKey, listOf(DeviceRetrievalMethod.NfcV2), context, capabilities)
         }
         val negotiated = factory.create(deviceKey, listOf(readerOwnedBle), context, capabilities)
         assertNull(negotiated.engagement.value.deviceRetrievalMethods)
@@ -137,7 +137,7 @@ class HolderProtocolEngineTest {
         assertFailsWith<IllegalArgumentException> {
             factory.create(
                 deviceKey,
-                listOf(DeviceRetrievalMethod.NfcV2(), readerOwnedBle),
+                listOf(DeviceRetrievalMethod.NfcV2, readerOwnedBle),
                 context,
                 capabilities,
                 MdocDeviceEngagementPlacement.PROVISIONAL_NFC_V2,
@@ -561,7 +561,7 @@ class HolderProtocolEngineTest {
         val capabilities = MdocSessionCapabilities.forSession(context.profile, deviceKey, emptySet())
         val engagement = MdocDeviceEngagementFactory().create(
             eDeviceKey = deviceKey,
-            methods = listOf(DeviceRetrievalMethod.NfcV2()),
+            methods = listOf(DeviceRetrievalMethod.NfcV2),
             context = context,
             capabilities = capabilities,
             placement = MdocDeviceEngagementPlacement.PROVISIONAL_NFC_V2,

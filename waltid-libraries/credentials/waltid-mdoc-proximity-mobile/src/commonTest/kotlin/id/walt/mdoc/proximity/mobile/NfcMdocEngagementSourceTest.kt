@@ -343,7 +343,7 @@ class NfcMdocEngagementSourceTest {
             val methods = engagement[CborInteger(2)] as CborArray
             assertEquals(1, methods.size)
             assertEquals(
-                DeviceRetrievalMethod.NfcV2(),
+                DeviceRetrievalMethod.NfcV2,
                 DeviceRetrievalMethodCodec.decode(
                     coseCompliantCbor.encodeToByteArray(CborElement.serializer(), methods.single())
                 ),
@@ -382,7 +382,7 @@ class NfcMdocEngagementSourceTest {
             )
 
             assertStatus(NfcStatusWord.SUCCESS, platform.router.process(select(MdocNfcAid.NFC_V2)))
-            val exactRequest = v2Request(DeviceRetrievalMethod.NfcV2(), readerMethod)
+            val exactRequest = v2Request(DeviceRetrievalMethod.NfcV2, readerMethod)
             val response = platform.router.process(envelope(NfcDo53.encode(exactRequest)))
             val engaged = prepared.awaitConnection()
 
@@ -594,7 +594,7 @@ class NfcMdocEngagementSourceTest {
             assertStatus(NfcStatusWord.SUCCESS, platform.router.process(select(MdocNfcAid.NFC_V2)))
             val beforeSelection = testScheduler.currentTime
             val response = platform.router.process(
-                envelope(NfcDo53.encode(v2Request(DeviceRetrievalMethod.NfcV2(), readerMethod)))
+                envelope(NfcDo53.encode(v2Request(DeviceRetrievalMethod.NfcV2, readerMethod)))
             )
             assertEquals(2_000, testScheduler.currentTime - beforeSelection)
 
@@ -608,7 +608,7 @@ class NfcMdocEngagementSourceTest {
             val engagement = selectMap[CborInteger(0)] as CborMap
             val methods = engagement[CborInteger(2)] as CborArray
             assertEquals(
-                DeviceRetrievalMethod.NfcV2(),
+                DeviceRetrievalMethod.NfcV2,
                 DeviceRetrievalMethodCodec.decode(
                     coseCompliantCbor.encodeToByteArray(CborElement.serializer(), methods.single())
                 ),
@@ -717,7 +717,7 @@ class NfcMdocEngagementSourceTest {
     }
 
     private fun v2Request(vararg methods: DeviceRetrievalMethod): ByteArray {
-        val requested = methods.takeIf { it.isNotEmpty() } ?: arrayOf(DeviceRetrievalMethod.NfcV2())
+        val requested = methods.takeIf { it.isNotEmpty() } ?: arrayOf(DeviceRetrievalMethod.NfcV2)
         val methodElements = requested.map { method ->
             coseCompliantCbor.decodeFromByteArray<CborElement>(
                 DeviceRetrievalMethodCodec.encodeReaderEngagement(method),
