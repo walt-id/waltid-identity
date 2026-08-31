@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Test
@@ -75,8 +76,12 @@ class AndroidNfcSessionRegistryTest {
         AndroidNfcSessionRegistry.arm(router, parent)
 
         parent.cancelAndJoin()
-        eventually { AndroidNfcSessionRegistry.current() == null }
+        assertEquals(
+            ProximityCloseReason.CANCELLED,
+            withTimeout(1_000) { router.deactivation.await() },
+        )
 
+        assertNull(AndroidNfcSessionRegistry.current())
         assertEquals(listOf(ProximityCloseReason.CANCELLED), router.closeReasons)
     }
 
@@ -144,6 +149,7 @@ class AndroidNfcSessionRegistryTest {
     private open class RecordingRouter : AndroidNfcSessionRegistry.Router {
         val commands = mutableListOf<ByteArray>()
         val closeReasons = mutableListOf<ProximityCloseReason>()
+        val deactivation = CompletableDeferred<ProximityCloseReason>()
 
         override suspend fun process(command: ByteArray): ImmutableBytes {
             commands += command.copyOf()
@@ -152,6 +158,7 @@ class AndroidNfcSessionRegistryTest {
 
         override suspend fun deactivate(reason: ProximityCloseReason) {
             closeReasons += reason
+            deactivation.complete(reason)
         }
     }
 
