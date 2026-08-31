@@ -18,5 +18,11 @@ fun createIosDemoSharingSettingsStore(appGroupIdentifier: String): DemoSharingSe
         writeEnabled = { enabled ->
             defaults.setBool(enabled, forKey = SHOW_DC_API_PRESENTATION_PREVIEW_KEY)
         },
+        readProximityTransportProfile = {
+            defaults.stringForKey(PROXIMITY_TRANSPORT_PROFILE_KEY)
+        },
+        writeProximityTransportProfile = { profile ->
+            defaults.setObject(profile, forKey = PROXIMITY_TRANSPORT_PROFILE_KEY)
+        },
     )
 }
