@@ -52,6 +52,7 @@ class MdocCredentialHandler(
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
     ): CredentialResponseResult {
         return try {
             if (configuration.format != CredentialFormat.MSO_MDOC) {
@@ -76,6 +77,7 @@ class MdocCredentialHandler(
                         signedAt = signedAt,
                         validFrom = effectiveValidFrom,
                         validUntil = effectiveValidUntil,
+                        expectedUpdate = expectedUpdate,
                         status = instance.input.credentialStatus,
                         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                         verifiedProof = instance.verifiedProof,
@@ -110,6 +112,7 @@ class MdocCredentialHandler(
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
     ): CredentialResponseResult = try {
         computeCredentialResult(
             request = request,
@@ -130,6 +133,7 @@ class MdocCredentialHandler(
                     signedAt = signedAt,
                     validFrom = effectiveValidFrom,
                     validUntil = effectiveValidUntil,
+                    expectedUpdate = expectedUpdate,
                     status = instance.input.credentialStatus,
                     mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                     verifiedProof = instance.verifiedProof,

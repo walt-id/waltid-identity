@@ -62,5 +62,9 @@ data class ValidityInfo(
 
     fun precheck() {
         require(validUntil >= validFrom) { "validFrom cannot be lower than validUntil" }
+        expectedUpdate?.let { update ->
+            require(update >= validFrom) { "expectedUpdate cannot be before validFrom" }
+            require(update <= validUntil) { "expectedUpdate cannot be after validUntil" }
+        }
     }
 }
