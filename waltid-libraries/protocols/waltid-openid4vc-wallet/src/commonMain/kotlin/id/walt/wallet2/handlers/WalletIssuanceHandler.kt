@@ -384,8 +384,19 @@ data class FetchCredentialRequest(
 
 @Serializable
 data class FetchCredentialResult(
-    val rawCredentials: List<String>
+    val rawCredentials: List<String>,
+    val notificationId: String? = null,
 )
+
+private data class FetchedCredentialResponse(
+    val rawCredentials: List<String>,
+    val credentialResponse: CredentialResponse,
+) {
+    fun toResult() = FetchCredentialResult(
+        rawCredentials = rawCredentials,
+        notificationId = credentialResponse.notificationId,
+    )
+}
 
 /**
  * A sanitized failure returned by an OpenID4VCI Credential Endpoint.
@@ -1046,12 +1057,20 @@ object WalletIssuanceHandler {
     internal suspend fun fetchCredential(
         request: FetchCredentialRequest,
         httpClient: HttpClient,
-    ): FetchCredentialResult {
+    ): FetchCredentialResult = fetchCredentialResponse(request, httpClient).toResult()
+
+    private suspend fun fetchCredentialResponse(
+        request: FetchCredentialRequest,
+        httpClient: HttpClient,
+    ): FetchedCredentialResponse {
         val credentialResponse = requestCredential(request, httpClient)
         val rawCredentials = credentialResponse.credentials
             ?.map { it.credential.let { c -> if (c is JsonPrimitive) c.content else c.toString() } }
             ?: error("Credential response contained no credentials")
-        return FetchCredentialResult(rawCredentials = rawCredentials)
+        return FetchedCredentialResponse(
+            rawCredentials = rawCredentials,
+            credentialResponse = credentialResponse,
+        )
     }
 
     private suspend fun requestCredential(
@@ -1122,7 +1141,14 @@ object WalletIssuanceHandler {
      *
      * When [FetchCredentialRequest.storeInWallet] is true, pass
      * [FetchCredentialRequest.credentialIssuerBaseUrl] so issuer display metadata and labels
-     * are persisted like the full receive path.
+     * are persisted like the full receive path. If that metadata advertises a notification
+     * endpoint and the credential response contains a notification id, the issuer is notified
+     * only after every credential has been stored. Stateless fetches return the notification id
+     * to the caller but do not notify because the wallet has not accepted the credential.
+     *
+     * Batch storage is not transactional: if a later credential or callback fails, earlier
+     * credentials may remain stored. Notification delivery is best-effort and never rolls back
+     * successful storage.
      */
     suspend fun fetchCredential(
         wallet: Wallet,
@@ -1131,33 +1157,69 @@ object WalletIssuanceHandler {
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
-    ): FetchCredentialResult =
-        fetchCredential(request, httpClient).also { result ->
-            if (request.storeInWallet) {
-                if (request.credentialIssuerBaseUrl.isNullOrBlank() && request.metadata == null && request.label == null) {
-                    log.warn {
-                        "storeInWallet=true without credentialIssuerBaseUrl/metadata/label; " +
-                            "issuer display metadata and labels will not be persisted"
-                    }
-                }
-                val storage = resolveCredentialStorageContext(
-                    credentialIssuerBaseUrl = request.credentialIssuerBaseUrl,
-                    credentialConfigurationId = request.credentialConfigurationId,
-                    requestMetadata = request.metadata,
-                    labelOverride = request.label,
-                )
-                if (result.rawCredentials.isNotEmpty()) beforeCredentialsStored(result.rawCredentials.size)
-                result.rawCredentials.forEach { raw ->
-                    onCredentialStored(
-                        wallet.parseAndStore(
-                            rawCredential = raw,
-                            label = storage.label,
-                            metadata = storage.metadata,
-                        )
-                    )
-                }
+    ): FetchCredentialResult {
+        val fetched = fetchCredentialResponse(request, httpClient)
+
+        if (!request.storeInWallet) {
+            return fetched.toResult()
+        }
+
+        if (request.credentialIssuerBaseUrl.isNullOrBlank() && request.metadata == null && request.label == null) {
+            log.warn {
+                "storeInWallet=true without credentialIssuerBaseUrl/metadata/label; " +
+                    "issuer display metadata and labels will not be persisted"
             }
         }
+        val issuerMetadata = request.credentialIssuerBaseUrl?.let {
+            IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(it)
+        }
+        val storage = resolveCredentialStorageContext(
+            credentialIssuerBaseUrl = null,
+            credentialConfigurationId = request.credentialConfigurationId,
+            requestMetadata = request.metadata,
+            labelOverride = request.label,
+            httpClient = httpClient,
+            issuerMetadata = issuerMetadata,
+        )
+
+        try {
+            if (fetched.rawCredentials.isNotEmpty()) beforeCredentialsStored(fetched.rawCredentials.size)
+            fetched.rawCredentials.forEach { raw ->
+                onCredentialStored(
+                    wallet.parseAndStore(
+                        rawCredential = raw,
+                        label = storage.label,
+                        metadata = storage.metadata,
+                    )
+                )
+            }
+            issuerMetadata?.let {
+                notifyIssuer(
+                    issuerMetadata = it,
+                    credentialResponse = fetched.credentialResponse,
+                    accessToken = request.accessToken,
+                    event = NotificationEvent.CREDENTIAL_ACCEPTED,
+                    httpClient = httpClient,
+                )
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            issuerMetadata?.let {
+                notifyIssuer(
+                    issuerMetadata = it,
+                    credentialResponse = fetched.credentialResponse,
+                    accessToken = request.accessToken,
+                    event = NotificationEvent.CREDENTIAL_FAILURE,
+                    description = "Credential storage failed",
+                    httpClient = httpClient,
+                )
+            }
+            throw error
+        }
+
+        return fetched.toResult()
+    }
 
     // ---------------------------------------------------------------------------
     // Helpers
