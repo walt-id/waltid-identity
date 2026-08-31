@@ -75,7 +75,7 @@ class NfcMdocCarrierCodecTest {
         assertEquals(readerCentral, NfcMdocCarrierCodec.decode(parsed.carriers.single(), NfcMdocActor.READER))
         assertFailsWith<IllegalArgumentException> {
             NfcMdocCarrierCodec.encode(
-                DeviceRetrievalMethod.NfcV2(),
+                DeviceRetrievalMethod.NfcV2,
                 ImmutableBytes.of("v2".encodeToByteArray()),
                 emptyList(),
                 NfcMdocActor.HOLDER,
