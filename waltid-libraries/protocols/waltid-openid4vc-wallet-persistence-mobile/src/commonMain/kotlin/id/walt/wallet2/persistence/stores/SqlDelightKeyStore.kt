@@ -7,6 +7,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.keys.Key as StoredKeyMaterial
 import id.walt.crypto2.keys.KeyEncodingFormat
 import id.walt.crypto2.providers.CryptoOperation
@@ -17,6 +18,8 @@ import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletKeyStoreEntry
+import id.walt.wallet2.data.WalletPublicKeyMaterial
+import id.walt.wallet2.data.WalletKeyUsageUnsupportedException
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
@@ -56,9 +59,20 @@ public class SqlDelightKeyStore(
         queries.selectByKeyId(keyId).executeAsOneOrNull()?.let { ref ->
             restoreStoredKey(decodeStoredKey(ref.key_id, ref.stored_key)).also { key ->
                 key?.let { restored ->
-                    require(usages.all(restored.usages::contains)) { "Mobile key does not permit requested usages" }
+                    if (!usages.all(restored.usages::contains)) {
+                        throw WalletKeyUsageUnsupportedException("Mobile key does not permit requested usages")
+                    }
                 }
             }
+        }
+
+    /** Reads only the descriptor's public material; no operational key is restored or authorized. */
+    override suspend fun getPublicKeyMaterial(keyId: String): WalletPublicKeyMaterial? =
+        queries.selectByKeyId(keyId).executeAsOneOrNull()?.let { ref ->
+            when (val stored = decodeStoredKey(ref.key_id, ref.stored_key)) {
+                is StoredKey.Software -> stored.material.toPublicJwk(stored.spec)
+                is StoredKey.Managed -> stored.publicKey?.toPublicJwk(stored.spec)
+            }?.let(::WalletPublicKeyMaterial)
         }
 
     /** Restores a persisted key as a wallet key-store entry. */

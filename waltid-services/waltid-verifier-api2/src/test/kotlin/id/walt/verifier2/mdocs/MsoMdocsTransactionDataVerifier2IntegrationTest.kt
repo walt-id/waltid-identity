@@ -79,9 +79,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
     }
 
     private val holderKey: JWKKey = runBlocking {
-        KeyManager.resolveSerializedKey(
-            """{"type":"jwk","jwk":{"kty":"EC","d":"QN9Y3k_3Hy2OV0C5Pmez_ObEXJKcXonnMg3xTpcLOAg","crv":"P-256","x":"eTT2WdzlmOWBItdgSmsqB1_BP69wfuwOe1IYvaY1WdI","y":"wbOu3GP02JiOVIRQ_ufWLRNOmDB6seYAabCmsGBfr_4"}}"""
-        ) as JWKKey
+        KeyManager.resolveSerializedKey(HOLDER_SERIALIZED_KEY) as JWKKey
     }
 
     private val issuerCertPem = MDL_FIXTURE_X5C
@@ -251,16 +249,18 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
 
             val sessionId = verificationSessionResponse.sessionId
             val bootstrapUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
+            val holderCrypto2Key = restoreMdlHolderCrypto2Key("transaction-data-mdoc-holder")
 
             val presentationResult = testAndReturn("Present mdoc with transaction data") {
                 WalletPresentFunctionality2.walletPresentHandling(
-                    holderKey = holderKey,
+                    holderKey = holderCrypto2Key,
                     holderDid = null,
                     presentationRequestUrl = bootstrapUrl!!,
                     selectCredentialsForQuery = { query -> selectCredentialsForQuery(walletCredentials, query) },
                     holderPoliciesToRun = null,
                     runPolicies = null,
                     transactionDataTypeRegistry = typeRegistry,
+                    mdocHolderKeyResolver = { _, _ -> holderCrypto2Key },
                 )
             }
 

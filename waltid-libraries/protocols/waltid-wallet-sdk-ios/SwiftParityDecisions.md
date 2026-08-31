@@ -13,3 +13,8 @@ the current Swift facade remains correct.
   mobile wallet KMP modules. No Swift facade shape change is needed because this
   commit is a contract gate for the existing `WalletSDK` boundary, not a new
   wallet capability.
+- 2026-08-26: Added the persisted mdoc holder-key binding field to the
+  SQLDelight-generated credential records and queries. No Swift facade shape
+  change is needed because `WalletSDK` does not expose those generated
+  persistence types; holder-key binding remains automatic internal wallet
+  storage behavior.
