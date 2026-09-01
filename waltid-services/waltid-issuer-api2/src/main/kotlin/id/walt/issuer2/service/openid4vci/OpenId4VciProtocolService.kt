@@ -34,6 +34,7 @@ import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestTargetResolution
 import id.walt.openid4vci.requests.credential.resolveCredentialConfigurationId
+import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
 import id.walt.openid4vci.requests.notification.NotificationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -45,7 +46,6 @@ import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
-import id.walt.openid4vci.requests.notification.NotificationRequest
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
@@ -762,7 +762,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     suspend fun processNotificationRequest(
         authorizationHeaders: List<String>,
         dpopProofHeaderValues: List<String>,
-        request: NotificationRequest,
+        requestBody: String,
     ): NotificationResponseHttp {
         val authorization = parseCredentialAuthorization(authorizationHeaders) ?: return oauth2Provider.writeNotificationError(
             OAuthError(
@@ -770,6 +770,14 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 "Invalid Auth Token"
             )
         )
+
+        val request = try {
+            json.decodeFromString(DefaultNotificationRequest.serializer(), requestBody)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return invalidNotificationRequest()
+        }
 
         when (
             val result = oauth2Provider.createNotificationRequest(
@@ -814,7 +822,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         return oauth2Provider.writeNotificationResponse()
     }
 
-    fun invalidNotificationRequest(): NotificationResponseHttp =
+    private fun invalidNotificationRequest(): NotificationResponseHttp =
         oauth2Provider.writeNotificationError(
             NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_REQUEST)
         )

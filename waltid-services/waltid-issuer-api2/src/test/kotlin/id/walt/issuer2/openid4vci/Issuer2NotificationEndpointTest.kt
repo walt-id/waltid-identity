@@ -14,10 +14,12 @@ import id.walt.openid4vci.requests.notification.NotificationEvent
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
@@ -159,6 +161,25 @@ class Issuer2NotificationEndpointTest {
         }
         assertEquals(HttpStatusCode.Unauthorized, unauthorized.status, unauthorized.bodyAsText())
         assertEquals("invalid_token", unauthorized.body<JsonObject>()["error"]?.jsonPrimitive?.content)
+        assertNull(client.getSession(issuance.sessionId).walletNotificationEvent)
+    }
+
+    @Test
+    fun notificationEndpointAuthenticatesBeforeDecodingMalformedJson() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val issuance = client.issueCredential()
+
+        listOf(null, "Basic invalid-token").forEach { authorization ->
+            val response = client.post(issuance.notificationEndpoint) {
+                authorization?.let { header(HttpHeaders.Authorization, it) }
+                contentType(ContentType.Application.Json)
+                setBody("{")
+            }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status, response.bodyAsText())
+            assertEquals("invalid_token", response.body<JsonObject>()["error"]?.jsonPrimitive?.content)
+        }
         assertNull(client.getSession(issuance.sessionId).walletNotificationEvent)
     }
 

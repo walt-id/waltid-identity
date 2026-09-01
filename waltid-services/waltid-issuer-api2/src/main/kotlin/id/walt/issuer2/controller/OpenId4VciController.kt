@@ -10,7 +10,6 @@ import id.walt.openid4vci.dpop.DPoPConstants
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
-import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseBody
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.notification.NotificationResponseHttp
@@ -37,7 +36,6 @@ import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.util.toMap
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -47,11 +45,6 @@ class OpenId4VciController(
     private val offerService: CredentialOfferService,
     private val notificationService: IssuanceNotificationService,
 ) {
-    private val notificationRequestJson = Json {
-        ignoreUnknownKeys = true
-        explicitNulls = false
-    }
-
     fun register(route: Route) {
         route.get(".well-known/openid-credential-issuer/openid4vci", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
             call.response.headers.append(HttpHeaders.Vary, HttpHeaders.Accept)
@@ -230,26 +223,12 @@ class OpenId4VciController(
 
             if (metadataService.walletNotificationEndpointEnabled()) {
                 post("notification", OpenId4VciRoutesDocs.notification()) {
-                    val request = try {
-                        notificationRequestJson.decodeFromJsonElement(
-                            DefaultNotificationRequest.serializer(),
-                            call.receive<JsonObject>(),
-                        )
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        call.respondNotificationResponse(
-                            protocolService.invalidNotificationRequest()
-                        )
-                        return@post
-                    }
-
                     val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
                     val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
                     val response = protocolService.processNotificationRequest(
                         authorizationHeaders = authorizationHeaders,
                         dpopProofHeaderValues = dpopProofHeaderValues,
-                        request = request,
+                        requestBody = call.receiveText(),
                     )
                     call.respondNotificationResponse(response)
                 }
