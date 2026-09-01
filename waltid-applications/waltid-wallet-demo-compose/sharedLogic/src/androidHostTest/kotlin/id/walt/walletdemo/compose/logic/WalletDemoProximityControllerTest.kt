@@ -389,7 +389,7 @@ class WalletDemoProximityControllerTest {
     }
 
     @Test
-    fun `configuration provider is resolved once for each new session`() = runTest {
+    fun `transport and reader settings are combined once for each new session`() = runTest {
         val session = FakeSession(
             ProximityState.Completed(
                 exchanges = 1,
@@ -397,9 +397,11 @@ class WalletDemoProximityControllerTest {
             )
         )
         val backend = FakeBackend(session)
-        var policy = ProximityReaderPolicy.AllowAnonymousOrUntrusted
+        var profile = WalletDemoProximityTransportProfile.Default
+        var policy = MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted
         val controller = WalletDemoProximityController(
             wallet = backend,
+            profileProvider = { profile },
             readerTrustSettingsProvider = {
                 MobileWalletProximityReaderTrustSettings(readerPolicy = policy)
             },
@@ -409,19 +411,24 @@ class WalletDemoProximityControllerTest {
 
         controller.start()
         advanceUntilIdle()
-        policy = ProximityReaderPolicy.RequireTrusted
+        profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct
+        policy = MobileWalletProximityReaderPolicy.RequireTrusted
+        val first = backend.configurations.single()
+        assertIs<MobileWalletProximityEngagementConfiguration.QrAndNfc>(first.engagement)
         assertEquals(
-            ProximityReaderPolicy.AllowAnonymousOrUntrusted,
-            backend.configurations.single().readerPolicy,
+            MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
+            first.readerPolicy,
         )
 
         controller.dismiss()
         advanceUntilIdle()
         controller.start()
         advanceUntilIdle()
+        val second = backend.configurations.last()
+        assertIs<MobileWalletProximityEngagementConfiguration.NfcOnly>(second.engagement)
         assertEquals(
-            ProximityReaderPolicy.RequireTrusted,
-            backend.configurations.last().readerPolicy,
+            MobileWalletProximityReaderPolicy.RequireTrusted,
+            second.readerPolicy,
         )
     }
 

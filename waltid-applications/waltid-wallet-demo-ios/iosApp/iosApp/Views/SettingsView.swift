@@ -57,13 +57,13 @@ struct SettingsView: View {
                 Text("When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                proximityPresentationSettings
                 NavigationLink("Reader Authentication") {
                     ReaderTrustSettingsView(controller: viewModel.readerTrustSettings)
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsReaderAuthentication)
             }
             .accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
-            proximityPresentationSection
             Section {
                 Button("Lock") {
                     viewModel.lock()
@@ -107,8 +107,11 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var proximityPresentationSection: some View {
-        Section {
+    private var proximityPresentationSettings: some View {
+        Group {
+            Text("Proximity Presentation")
+                .font(.headline)
+                .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
             Text("Choose the transport profile for the next in-person presentation session.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -133,9 +136,6 @@ struct SettingsView: View {
             Text("Availability is checked before engagement. The active session keeps its starting profile.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-        } header: {
-            Text("Proximity Presentation")
-                .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
         }
     }
 
