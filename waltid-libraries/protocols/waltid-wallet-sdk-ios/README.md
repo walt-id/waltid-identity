@@ -187,6 +187,15 @@ policy, revocation, and constraint boundaries. Demo apps can inject a named
 test anchor through the same configuration initializer without making it a
 production default.
 
+For holder-managed configuration, use `ProximityReaderTrustSettingsCodec` to
+validate and preview public Reader CA or versioned walt.id trust-bundle files
+before persisting the returned `ProximityReaderTrustSettings`. The importer
+accepts DER and certificate-only PEM Reader CAs plus static signed RICAL bundle
+entries. It rejects private keys, PKCS#12/PFX, unknown bundle semantics,
+duplicates, invalid or expired trust material, and files larger than 1 MiB.
+Apply one immutable snapshot to a new session with `settings.applying(to:)`;
+changes made while a session is active apply only to the next session.
+
 ## Protected keys
 
 New signing keys default to `.biometricCurrentSet`. Select `.none` explicitly

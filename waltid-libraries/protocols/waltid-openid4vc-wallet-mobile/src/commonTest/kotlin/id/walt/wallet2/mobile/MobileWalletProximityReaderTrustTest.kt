@@ -34,9 +34,12 @@ import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotSame
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
@@ -268,6 +271,232 @@ class MobileWalletProximityReaderTrustTest {
             }
         }
     }
+
+    @Test
+    fun `settings codec round trips policy and public trust material`() = runTest {
+        withCertificates { certificates ->
+            val settings = MobileWalletProximityReaderTrustSettings(
+                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+                trustAnchors = listOf(
+                    MobileWalletProximityStoredReaderTrustAnchor(
+                        certificates.root.base64Url(),
+                        "Local Reader CA",
+                    )
+                ),
+            )
+
+            val encoded = MobileWalletProximityReaderTrustSettingsCodec.encode(settings)
+            val decoded = MobileWalletProximityReaderTrustSettingsCodec.decode(encoded)
+
+            assertEquals(settings, decoded)
+            assertContains(encoded, "require_trusted")
+            assertTrue(!encoded.contains("PRIVATE KEY"))
+        }
+    }
+
+    @Test
+    fun `DER and multi PEM imports validate CAs and prepare review without persisting`() = runTest {
+        withCertificates { certificates ->
+            val second = certificates.createRoot("Second reader root")
+            val existing = MobileWalletProximityReaderTrustSettings(
+                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+            )
+
+            val der = MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                sourceName = "reader-ca.der",
+                bytes = certificates.root.encodedDer.toByteArray(),
+                existing = existing,
+            )
+            assertEquals(existing.readerPolicy, der.resultingSettings.readerPolicy)
+            assertEquals(1, der.readerAuthorities.size)
+            assertEquals("ISO mdoc Reader CA", der.readerAuthorities.single().profile)
+            assertEquals(0, existing.trustAnchors.size)
+
+            val pem = MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                sourceName = "reader-cas.pem",
+                bytes = "${certificates.root.encodedPem}\n${second.encodedPem}".encodeToByteArray(),
+                existing = existing,
+            )
+            assertEquals(2, pem.readerAuthorities.size)
+            assertEquals(2, pem.resultingSettings.trustAnchors.size)
+        }
+    }
+
+    @Test
+    fun `import rejects private keys pfx malformed duplicate and non CA material`() = runTest {
+        withCertificates { certificates ->
+            assertContains(
+                assertFailsWith<IllegalArgumentException> {
+                    MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                        "reader.p12",
+                        byteArrayOf(1),
+                        MobileWalletProximityReaderTrustSettings(),
+                    )
+                }.message.orEmpty(),
+                "PKCS#12",
+            )
+            assertContains(
+                assertFailsWith<IllegalArgumentException> {
+                    MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                        "secret.pem",
+                        "-----BEGIN PRIVATE KEY-----\nAA==\n-----END PRIVATE KEY-----".encodeToByteArray(),
+                        MobileWalletProximityReaderTrustSettings(),
+                    )
+                }.message.orEmpty(),
+                "Private keys",
+            )
+            assertFailsWith<IllegalArgumentException> {
+                MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                    "broken.der",
+                    byteArrayOf(1, 2, 3),
+                    MobileWalletProximityReaderTrustSettings(),
+                )
+            }
+            assertContains(
+                assertFailsWith<IllegalArgumentException> {
+                    MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                        "reader.der",
+                        certificates.reader.encodedDer.toByteArray(),
+                        MobileWalletProximityReaderTrustSettings(),
+                    )
+                }.message.orEmpty(),
+                "not a valid current CA",
+            )
+            val existing = MobileWalletProximityReaderTrustSettings(
+                trustAnchors = listOf(
+                    MobileWalletProximityStoredReaderTrustAnchor(
+                        certificates.root.base64Url(),
+                        "Existing",
+                    )
+                )
+            )
+            assertContains(
+                assertFailsWith<IllegalArgumentException> {
+                    MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                        "reader.der",
+                        certificates.root.encodedDer.toByteArray(),
+                        existing,
+                    )
+                }.message.orEmpty(),
+                "Duplicate",
+            )
+        }
+    }
+
+    @Test
+    fun `strict bundle validates signed RICAL and rejects unknown or expired data`() = runTest {
+        val bundle = ricalBundleJson()
+        val preview = MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+            sourceName = "qualification.walt-reader-trust.json",
+            bytes = bundle.encodeToByteArray(),
+            existing = MobileWalletProximityReaderTrustSettings(
+                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+            ),
+            now = Instant.parse("2026-09-02T00:00:00Z"),
+        )
+
+        assertEquals(MobileWalletProximityReaderTrustImportKind.TrustBundle, preview.kind)
+        assertEquals(1, preview.ricalProviders.size)
+        assertTrue(preview.ricalProviders.single().establishesReaderTrust)
+        assertContains(preview.policyEffect, "Only readers trusted")
+
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                "unknown.json",
+                bundle.replaceFirst("\"version\": 1,", "\"version\": 1, \"unknown\": true,")
+                    .encodeToByteArray(),
+                MobileWalletProximityReaderTrustSettings(),
+            )
+        }
+        assertContains(
+            assertFailsWith<IllegalArgumentException> {
+                MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                    "expired.json",
+                    bundle.encodeToByteArray(),
+                    MobileWalletProximityReaderTrustSettings(),
+                    now = Instant.parse("2028-01-01T00:00:00Z"),
+                )
+            }.message.orEmpty(),
+            "current CA",
+        )
+    }
+
+    @Test
+    fun `import rejects oversized truncated and unsupported version data`() = runTest {
+        assertContains(
+            assertFailsWith<IllegalArgumentException> {
+                MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                    "oversized.der",
+                    ByteArray(MobileWalletProximityReaderTrustSettingsCodec.MaximumImportBytes + 1),
+                    MobileWalletProximityReaderTrustSettings(),
+                )
+            }.message.orEmpty(),
+            "exceeds 1 MiB",
+        )
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                "truncated.pem",
+                "-----BEGIN CERTIFICATE-----\nAA".encodeToByteArray(),
+                MobileWalletProximityReaderTrustSettings(),
+            )
+        }
+        assertContains(
+            assertFailsWith<IllegalArgumentException> {
+                MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                    "unsupported.json",
+                    """{"version":2,"type":"org.waltid.wallet.reader-trust","readerAuthorities":[],"ricalProviders":[]}"""
+                        .encodeToByteArray(),
+                    MobileWalletProximityReaderTrustSettings(),
+                )
+            }.message.orEmpty(),
+            "version",
+        )
+    }
+
+    @Test
+    fun `each proximity session receives an immutable settings snapshot`() = runTest {
+        withCertificates { certificates ->
+            val trusted = MobileWalletProximityReaderTrustSettings(
+                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+                trustAnchors = listOf(
+                    MobileWalletProximityStoredReaderTrustAnchor(
+                        certificates.root.base64Url(),
+                        "Snapshot authority",
+                    )
+                ),
+            ).applyTo(MobileWalletProximityConfiguration())
+            val reset = MobileWalletProximityReaderTrustSettings()
+                .applyTo(MobileWalletProximityConfiguration())
+
+            assertEquals(MobileWalletProximityReaderPolicy.RequireTrusted, trusted.readerPolicy)
+            assertEquals(
+                MobileWalletProximityReaderTrustState.Trusted,
+                trusted.readerTrustEvaluator.evaluate(certificates.evidence()).state,
+            )
+            assertEquals(
+                MobileWalletProximityReaderTrustState.ValidButUntrusted,
+                reset.readerTrustEvaluator.evaluate(certificates.evidence()).state,
+            )
+            assertNotSame(trusted.readerTrustEvaluator, reset.readerTrustEvaluator)
+        }
+    }
+
+    private fun ricalBundleJson(): String = """
+        {
+          "version": 1,
+          "type": "org.waltid.wallet.reader-trust",
+          "ricalProviders": [
+            {
+              "providerId": "test-provider",
+              "acceptedTypes": ["org.iso.18013.5.1.reader_authentication"],
+              "providerTrustAnchorsDerBase64Url": ["$RICAL_PROVIDER_ROOT"],
+              "acceptedSignerCertificatePolicyOids": ["1.2.3.4"],
+              "establishReaderTrust": true,
+              "signedRicalBase64Url": "$SIGNED_RICAL"
+            }
+          ]
+        }
+    """.trimIndent()
 
     private fun evaluator(
         root: X509Certificate,

@@ -206,6 +206,48 @@ provider roots, signer policy, revocation, and constraint boundaries. Demo apps
 can pass a named test anchor through the same configuration constructor, but
 test anchors must not become production defaults.
 
+Wallet applications that let holders manage this policy can persist a canonical
+`MobileWalletProximityReaderTrustSettings` snapshot. Use
+`MobileWalletProximityReaderTrustSettingsCodec.prepareImport` to validate and
+preview public trust material before saving the returned settings. The importer
+accepts DER or certificate-only PEM Reader CAs and versioned walt.id JSON trust
+bundles containing named Reader CAs and static signed RICAL configuration. It
+rejects private keys, PKCS#12/PFX files, unknown JSON fields or versions,
+duplicates, non-CA or expired anchors, invalid RICAL signatures and paths, and
+files larger than 1 MiB. The codec performs no persistence or network access.
+
+The version-1 bundle shape is deliberately narrow; every encoded value is
+unpadded Base64URL and unknown fields are rejected:
+
+```json
+{
+  "version": 1,
+  "type": "org.waltid.wallet.reader-trust",
+  "readerAuthorities": [
+    {
+      "name": "Example Reader CA",
+      "certificateDerBase64Url": "<public DER certificate>"
+    }
+  ],
+  "ricalProviders": [
+    {
+      "providerId": "<RICAL provider identifier>",
+      "acceptedTypes": ["<RICAL type>"],
+      "providerTrustAnchorsDerBase64Url": ["<public DER certificate>"],
+      "acceptedSignerCertificatePolicyOids": ["<certificate-policy OID>"],
+      "establishReaderTrust": false,
+      "signedRicalBase64Url": "<untagged COSE_Sign1>"
+    }
+  ]
+}
+```
+
+Read one immutable settings snapshot when a new session starts and apply it with
+`MobileWalletProximityReaderTrustSettings.applyTo`. Settings changed during a
+session therefore affect only the next session. The demo wallets expose this as
+**Settings → Credential Sharing → Reader Authentication** and store only the
+canonical public configuration in app-private storage.
+
 Only one proximity session may be active per wallet. Always call `close()` when
 the journey leaves the screen; closing and cancellation are idempotent and every
 new session creates fresh engagement identifiers and ephemeral key material.
