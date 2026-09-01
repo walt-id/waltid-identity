@@ -138,6 +138,39 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             )
         )
     }
+
+    @MainActor
+    func testConfigurationProviderIsResolvedOncePerSession() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        var policy = ProximityPresentationReaderPolicy.allowAnonymousOrUntrusted
+        var resolutionCount = 0
+        let viewModel = ProximityPresentationViewModel(
+            client: client,
+            configurationProvider: {
+                resolutionCount += 1
+                return ProximityPresentationConfiguration(readerPolicy: policy)
+            },
+            hostActions: FakeProximityHostActionExecutor()
+        )
+
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        XCTAssertEqual(resolutionCount, 1)
+        XCTAssertEqual(client.configurations.single?.readerPolicy, .allowAnonymousOrUntrusted)
+
+        policy = .requireTrusted
+        viewModel.start()
+        XCTAssertEqual(client.startCount, 1)
+        XCTAssertEqual(resolutionCount, 1)
+
+        viewModel.dismiss()
+        try await waitUntilAsync { await session.closeCount == 1 }
+        viewModel.start()
+        try await waitUntil { client.startCount == 2 }
+        XCTAssertEqual(resolutionCount, 2)
+        XCTAssertEqual(client.configurations.last?.readerPolicy, .requireTrusted)
+    }
 }
 
 private func combinedProximityReview(exchange: Int = 1) -> ProximityPresentationReview {
@@ -198,6 +231,7 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
     private let suspendStart: Bool
     private var startContinuation: CheckedContinuation<Void, Never>?
     private(set) var startCount = 0
+    private(set) var configurations: [ProximityPresentationConfiguration] = []
 
     init(session: any DemoProximityPresentationSession, suspendStart: Bool = false) {
         self.session = session
@@ -208,6 +242,7 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
         configuration: ProximityPresentationConfiguration
     ) async throws -> any DemoProximityPresentationSession {
         startCount += 1
+        configurations.append(configuration)
         if suspendStart {
             await withCheckedContinuation { startContinuation = $0 }
         }
@@ -219,6 +254,10 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
         startContinuation = nil
         continuation?.resume()
     }
+}
+
+private extension Collection {
+    var single: Element? { count == 1 ? first : nil }
 }
 
 private actor FakeProximitySession: DemoProximityPresentationSession {

@@ -64,6 +64,7 @@ import id.walt.wallet2.mobile.legalActions
 import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityDocumentSelection
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
@@ -93,6 +94,7 @@ import org.jetbrains.compose.resources.stringResource
 fun MobileWalletDemoApp(
     controller: WalletDemoController,
     proximityController: WalletDemoProximityController,
+    readerTrustSettingsController: DemoReaderTrustSettingsController,
     branding: WalletDemoBranding = WalletDemoBranding(),
 ) {
     val walletState by controller.state.collectAsState()
@@ -141,6 +143,11 @@ fun MobileWalletDemoApp(
                 )
             }
         } else null,
+        sharingSettingsContent = {
+            DemoReaderTrustSettings(
+                controller = readerTrustSettingsController,
+            )
+        },
     )
 }
 

@@ -44,6 +44,7 @@ internal fun WalletDemoAppHost(
     branding: WalletDemoBranding = WalletDemoBranding(),
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
+    sharingSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
@@ -97,6 +98,7 @@ internal fun WalletDemoAppHost(
                         state = state,
                         onStartProximityPresentation = onStartProximityPresentation,
                         presentationContent = presentationContent,
+                        sharingSettingsContent = sharingSettingsContent,
                     )
                 }
             }
