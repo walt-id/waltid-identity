@@ -120,6 +120,9 @@ fun MobileWalletDemoApp(
     LaunchedEffect(walletState.selectedTab, proximity.active) {
         if (proximity.active && walletState.selectedTab != WalletDemoTab.Present) proximityController.cancel()
     }
+    LaunchedEffect(proximity.sessionState, proximity.automaticPermissionAction) {
+        proximity.automaticPermissionAction?.let { proximityController.remediate(it, hostActions) }
+    }
     WalletDemoAppHost(
         controller = controller,
         branding = branding,

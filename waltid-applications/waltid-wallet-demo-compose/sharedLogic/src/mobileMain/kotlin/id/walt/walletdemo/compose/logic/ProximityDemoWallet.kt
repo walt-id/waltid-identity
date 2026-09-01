@@ -1,10 +1,15 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
 import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximitySession
 
 /** Narrow shared boundary used by the proximity journey controller. */
 interface ProximityPresentationBackend {
+    suspend fun proximityPresentationCapabilities(
+        configuration: MobileWalletProximityConfiguration,
+    ): MobileWalletProximityCapabilities
+
     suspend fun startProximityPresentation(
         configuration: MobileWalletProximityConfiguration,
     ): MobileWalletProximitySession
@@ -16,6 +21,11 @@ interface ProximityDemoWallet : DemoWallet, ProximityPresentationBackend
 internal class LazyProximityDemoWallet(
     createWallet: suspend () -> ProximityDemoWallet,
 ) : LazyDemoWallet<ProximityDemoWallet>(createWallet), ProximityDemoWallet {
+    override suspend fun proximityPresentationCapabilities(
+        configuration: MobileWalletProximityConfiguration,
+    ): MobileWalletProximityCapabilities =
+        wallet().proximityPresentationCapabilities(configuration)
+
     override suspend fun startProximityPresentation(
         configuration: MobileWalletProximityConfiguration,
     ): MobileWalletProximitySession =
