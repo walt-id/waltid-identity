@@ -1,6 +1,7 @@
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.selectJwsAlgorithm
@@ -394,6 +395,11 @@ data class FetchCredentialRequest(
     val metadata: JsonObject? = null,
     /** Optional credential label override; otherwise derived from credential configuration display. */
     val label: String? = null,
+    /**
+     * Wallet key used for the proof that the issuer binds into an mdoc MSO DeviceKey. Required when
+     * [storeInWallet] stores an mdoc; it must identify the exact key used to create [proofJwt].
+     */
+    val keyId: String? = null,
 )
 
 @Serializable
@@ -494,6 +500,11 @@ data class PollDeferredRequest(
     val metadata: JsonObject? = null,
     /** Optional credential label override; otherwise derived from credential configuration display. */
     val label: String? = null,
+    /**
+     * Wallet key used for the original proof of possession. Required when the deferred response
+     * stores an mdoc; it must identify the exact key used for the original credential request.
+     */
+    val keyId: String? = null,
 )
 
 // Auth-code grant isolated steps
@@ -710,9 +721,6 @@ object WalletIssuanceHandler {
         log.trace { "Resolved offer: issuer=${offer.credentialIssuer}, configIds=${offer.credentialConfigurationIds}" }
         onEvent(WalletSessionEvent.issuance_offer_resolved)
 
-        // Merge issuer display metadata with request metadata
-        val metadata = mergeIssuerDisplayMetadata(issuerMetadata, requestMetadata)
-
         log.debug { "Offer contains ${offeredCredentials.size} credential(s)" }
 
         // 3. Pre-authorized code grant only (auth-code handled by separate flow)
@@ -839,7 +847,12 @@ object WalletIssuanceHandler {
                 val entry = wallet.parseAndStore(
                     issuedCredential,
                     label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name,
-                    metadata = metadata,
+                    metadata = storedCredentialDisplayMetadata(
+                        issuerMetadata = issuerMetadata,
+                        credentialConfigurationId = offeredCredential.credentialConfigurationId,
+                        requestMetadata = requestMetadata,
+                    ),
+                    keyMaterial = keyMaterial,
                 )
                 onCredentialStored(entry)
                 onEvent(WalletSessionEvent.issuance_credential_stored)
@@ -1301,6 +1314,10 @@ object WalletIssuanceHandler {
                     requestMetadata = request.metadata,
                     labelOverride = request.label,
                 )
+                val keyMaterial = request.keyId?.let { keyId ->
+                    wallet.resolveKeyMaterial(keyId, setOf(KeyUsage.SIGN))
+                        ?: error("Holder key '$keyId' is unavailable while storing an issued credential")
+                }
                 if (result.rawCredentials.isNotEmpty()) beforeCredentialsStored(result.rawCredentials.size)
                 result.rawCredentials.forEach { raw ->
                     onCredentialStored(
@@ -1308,6 +1325,7 @@ object WalletIssuanceHandler {
                             rawCredential = raw,
                             label = storage.label,
                             metadata = storage.metadata,
+                            keyMaterial = keyMaterial,
                         )
                     )
                 }
@@ -1450,57 +1468,55 @@ object WalletIssuanceHandler {
         issuedCredential: id.walt.openid4vci.responses.credential.IssuedCredential,
         label: String? = null,
         metadata: JsonObject? = null,
+        keyMaterial: WalletKeyStoreEntry? = null,
     ): StoredCredential = parseAndStore(
         rawCredential = issuedCredential.credential.let {
             if (it is JsonPrimitive) it.content else it.toString()
         },
         label = label,
         metadata = metadata,
+        keyMaterial = keyMaterial,
     )
 
     private suspend fun Wallet.parseAndStore(
         rawCredential: String,
         label: String? = null,
         metadata: JsonObject? = null,
+        keyMaterial: WalletKeyStoreEntry? = null,
     ): StoredCredential {
         val (_, parsed) = CredentialParser.detectAndParse(rawCredential)
-        return StoredCredential(
+        val stored = StoredCredential(
             id = Uuid.random().toString(),
             credential = parsed,
             label = label,
             addedAt = Clock.System.now(),
             metadata = metadata,
-        ).also { addCredential(it) }
+        )
+        val bound = if (stored.credential is MdocsCredential) {
+            withVerifiedIssuanceHolderKeyBinding(
+                credential = stored,
+                keyMaterial = requireNotNull(keyMaterial) {
+                    "Exact issuance holder-key material is required when storing an mdoc"
+                },
+            )
+        } else {
+            stored
+        }
+        return bound.also { addCredential(it) }
     }
 
     /**
-     * Merges issuer display metadata from the credential issuer metadata into the request metadata.
-     * The issuer display information is stored under the "issuerDisplay" key as a JSON array.
+     * Merges issuer and credential configuration display into sidecar metadata.
      */
     private fun mergeIssuerDisplayMetadata(
         issuerMetadata: CredentialIssuerMetadata,
-        requestMetadata: JsonObject? = null
-    ): JsonObject? {
-        val issuerDisplayArray = issuerMetadata.display?.takeIf { it.isNotEmpty() }?.let { displays ->
-            JsonArray(displays.map { display ->
-                buildJsonObject {
-                    display.name?.let { put("name", it) }
-                    display.locale?.let { put("locale", it) }
-                    display.logo?.let { logo ->
-                        put("logo", buildJsonObject {
-                            put("uri", logo.uri)
-                            logo.altText?.let { put("alt_text", it) }
-                        })
-                    }
-                }
-            })
-        } ?: return requestMetadata
-
-        val baseMetadata = requestMetadata ?: JsonObject(emptyMap())
-        return JsonObject(baseMetadata.toMutableMap().apply {
-            put("issuerDisplay", issuerDisplayArray)
-        })
-    }
+        requestMetadata: JsonObject? = null,
+        credentialConfigurationId: String? = null,
+    ): JsonObject? = storedCredentialDisplayMetadata(
+        issuerMetadata = issuerMetadata,
+        credentialConfigurationId = credentialConfigurationId,
+        requestMetadata = requestMetadata,
+    )
 
     private fun credentialConfigurationLabel(
         issuerMetadata: CredentialIssuerMetadata?,
@@ -1539,7 +1555,13 @@ object WalletIssuanceHandler {
             label = labelOverride
                 ?: credentialConfigurationLabel(resolvedIssuerMetadata, credentialConfigurationId),
             metadata = resolvedIssuerMetadata
-                ?.let { mergeIssuerDisplayMetadata(it, requestMetadata) }
+                ?.let {
+                    mergeIssuerDisplayMetadata(
+                        issuerMetadata = it,
+                        requestMetadata = requestMetadata,
+                        credentialConfigurationId = credentialConfigurationId,
+                    )
+                }
                 ?: requestMetadata,
         )
     }
@@ -2006,6 +2028,10 @@ object WalletIssuanceHandler {
             labelOverride = request.label,
             httpClient = httpClient,
         )
+        val keyMaterial = request.keyId?.let { keyId ->
+            wallet.resolveKeyMaterial(keyId, setOf(KeyUsage.SIGN))
+                ?: error("Holder key '$keyId' is unavailable while storing a deferred credential")
+        }
 
         if (rawCredentials.isNotEmpty()) beforeCredentialsStored(rawCredentials.size)
 
@@ -2014,6 +2040,7 @@ object WalletIssuanceHandler {
                 issuedCredential,
                 label = storage.label,
                 metadata = storage.metadata,
+                keyMaterial = keyMaterial,
             )
             onCredentialStored(entry)
             onEvent(WalletSessionEvent.issuance_credential_stored)
@@ -2168,6 +2195,7 @@ object WalletIssuanceHandler {
                 rawCredential = rawString,
                 label = storage.label,
                 metadata = storage.metadata,
+                keyMaterial = keyMaterial,
             )
             onCredentialStored(entry)
             onEvent(WalletSessionEvent.issuance_credential_stored)

@@ -712,14 +712,29 @@ public struct WalletBootstrapResult: Equatable, Sendable {
     /// DID created for the wallet.
     public let did: String
 
+    /// Public JWK of ``keyID`` as a JSON object string. Private material is never included.
+    public let publicJWK: String
+
+    /// Immutable authorization policy of the persisted signing key.
+    public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
     /// Creates a bootstrap result.
     ///
     /// - Parameters:
     ///   - keyID: Identifier of the created or selected wallet key.
     ///   - did: DID created for the wallet.
-    public init(keyID: String, did: String) {
+    ///   - publicJWK: Public JWK of the wallet key as a JSON object string.
+    ///   - keyUseAuthorizationPolicy: Authorization required for private-key use.
+    public init(
+        keyID: String,
+        did: String,
+        publicJWK: String,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+    ) {
         self.keyID = keyID
         self.did = did
+        self.publicJWK = publicJWK
+        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
     }
 }
 
@@ -897,6 +912,21 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     /// Accessibility text for the credential logo when advertised.
     public let logoAltText: String?
 
+    /// Suggested credential background color from OpenID4VCI display metadata.
+    public let backgroundColor: String?
+
+    /// Suggested credential background image URI from OpenID4VCI display metadata.
+    public let backgroundImageURI: URL?
+
+    /// Suggested credential text color from OpenID4VCI display metadata.
+    public let textColor: String?
+
+    /// SD-JWT VC type from the offered credential configuration, when present.
+    public let vct: String?
+
+    /// mdoc document type from the offered credential configuration, when present.
+    public let doctype: String?
+
     /// Creates a credential preview.
     ///
     /// - Parameters:
@@ -906,13 +936,23 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     ///   - descriptionText: Localized credential description.
     ///   - logoURI: Credential logo URL.
     ///   - logoAltText: Accessibility text for the credential logo.
+    ///   - backgroundColor: Suggested credential background color.
+    ///   - backgroundImageURI: Suggested credential background image URI.
+    ///   - textColor: Suggested credential text color.
+    ///   - vct: SD-JWT VC type from the offered configuration.
+    ///   - doctype: mdoc document type from the offered configuration.
     public init(
         configurationID: String,
         format: String,
         name: String?,
         descriptionText: String?,
         logoURI: URL?,
-        logoAltText: String? = nil
+        logoAltText: String? = nil,
+        backgroundColor: String? = nil,
+        backgroundImageURI: URL? = nil,
+        textColor: String? = nil,
+        vct: String? = nil,
+        doctype: String? = nil
     ) {
         self.configurationID = configurationID
         self.format = format
@@ -920,6 +960,31 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
         self.descriptionText = descriptionText
         self.logoURI = logoURI
         self.logoAltText = logoAltText
+        self.backgroundColor = backgroundColor
+        self.backgroundImageURI = backgroundImageURI
+        self.textColor = textColor
+        self.vct = vct
+        self.doctype = doctype
+    }
+
+    /// Minimal payload so `CredentialTitles` can resolve a friendly type when display omits a name.
+    public var typePayloadJSON: String? {
+        var fields: [String] = []
+        if let vct, !vct.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields.append(#""vct":\#(Self.jsonString(vct))"#)
+        }
+        if let doctype, !doctype.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields.append(#""docType":\#(Self.jsonString(doctype))"#)
+        }
+        guard !fields.isEmpty else { return nil }
+        return "{\(fields.joined(separator: ","))}"
+    }
+
+    private static func jsonString(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
     }
 }
 
@@ -1533,6 +1598,9 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
     /// Requested credential values shown for informed consent.
     public let disclosures: [PresentationDisclosure]
 
+    /// Optional stored display metadata encoded as JSON, including issuer and credential card art.
+    public let metadataJSON: String?
+
     /// Creates a presentation credential option.
     ///
     /// - Parameters:
@@ -1545,6 +1613,7 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
     ///   - label: User-facing credential label when available.
     ///   - credentialDataJSON: Parsed credential data encoded as JSON.
     ///   - disclosures: Credential values requested from this credential.
+    ///   - metadataJSON: Optional stored display metadata encoded as JSON.
     public init(
         queryID: String,
         credentialID: String,
@@ -1554,7 +1623,8 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
         subject: String?,
         label: String?,
         credentialDataJSON: String,
-        disclosures: [PresentationDisclosure] = []
+        disclosures: [PresentationDisclosure] = [],
+        metadataJSON: String? = nil
     ) {
         precondition(
             isNonBlank(queryID),
@@ -1569,6 +1639,7 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
         self.label = label
         self.credentialDataJSON = credentialDataJSON
         self.disclosures = disclosures
+        self.metadataJSON = metadataJSON
     }
 }
 

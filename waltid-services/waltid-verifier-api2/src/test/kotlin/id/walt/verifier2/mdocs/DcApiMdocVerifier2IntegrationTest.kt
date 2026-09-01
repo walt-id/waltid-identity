@@ -8,13 +8,6 @@ import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.KeyManager
-import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.crypto2.serialization.BinaryData
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.ClaimsQuery
@@ -132,22 +125,6 @@ class DcApiMdocVerifier2IntegrationTest {
             ),
         )
     )
-
-    /**
-     * The holder key must be the `deviceKey` inside the fixture's MSO, otherwise `device_key_auth`
-     * fails for reasons unrelated to the DC API transcript.
-     */
-    private val holderCrypto2KeyFun = suspend {
-        CryptoRuntime(defaultSoftwareKeyProviders()).restore(
-            EncodedKey.Jwk(
-                BinaryData(HOLDER_JWK.encodeToByteArray()),
-                privateMaterial = true,
-            ).toStoredSoftwareKey(
-                id = KeyId("dc-api-test-holder"),
-                usages = setOf(KeyUsage.SIGN),
-            )
-        )
-    }
 
     /**
      * Walks the `policy_results` tree and collects every `success == false` leaf, with its
@@ -279,12 +256,15 @@ class DcApiMdocVerifier2IntegrationTest {
             }
 
             val dcApiResponse = testAndReturn("Wallet builds DC API response") {
+                // Device auth must use the private key embedded in the fixture's MSO.
+                val holderKey = restoreMdlHolderCrypto2Key("dc-api-test-holder")
                 WalletPresentFunctionality2.walletPresentDcApiHandling(
-                    holderKey = holderCrypto2KeyFun(),
+                    holderKey = holderKey,
                     holderDid = null,
                     request = resolved,
                     selectCredentialsForQuery = ::selectCredentialsForQuery,
                     transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                    mdocHolderKeyResolver = { _, _ -> holderKey },
                 ).getOrThrow()
             }
             println("Wallet DC API response: ${DcApiWallet.encodeResponse(dcApiResponse)}")

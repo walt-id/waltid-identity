@@ -5,6 +5,7 @@ import TestHelpers
 @MainActor
 final class WalletE2EUI {
     let app: XCUIApplication
+    private let pin = "1234"
 
     init(app: XCUIApplication) {
         self.app = app
@@ -12,8 +13,8 @@ final class WalletE2EUI {
 
     func launch(attestation: [String: String] = [:], environment: [String: String] = [:]) {
         app.launchEnvironment["E2E_WALLET_ID"] = app.launchEnvironment["E2E_WALLET_ID"] ?? "e2e-\(UUID().uuidString)"
-        app.launchEnvironment["WALLET_BIOMETRIC_ENABLED"] =
-            app.launchEnvironment["WALLET_BIOMETRIC_ENABLED"] ?? "false"
+        app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
+            app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] ?? "disabled"
         for (key, value) in attestation {
             app.launchEnvironment[key] = value
         }
@@ -21,6 +22,7 @@ final class WalletE2EUI {
             app.launchEnvironment[key] = value
         }
         app.launch()
+        unlockWallet()
     }
 
     func waitForStatus(prefixes: [String], timeout: TimeInterval) -> String? {
@@ -132,6 +134,11 @@ final class WalletE2EUI {
     }
 
     func tapNavigationBack() {
+        let close = app.buttons["wallet.detailsBack"]
+        if close.waitForExistence(timeout: 2) {
+            close.tap()
+            return
+        }
         let button = app.navigationBars.buttons.firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 20), "Navigation back button not found")
         button.tap()
@@ -241,17 +248,16 @@ final class WalletE2EUI {
         switch label {
         case "Credentials":
             return app.staticTexts["No credentials yet"].exists
-                || app.staticTexts["Credential details"].exists
+                || app.otherElements["wallet.credentialDetailsScreen"].exists
                 || firstHittableElement(identifierPrefix: "wallet.credentialCard.") != nil
         case "Receive":
             return textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL").isHittable
                 || app.staticTexts["Received credentials"].exists
-                || app.staticTexts["Credential details"].exists
+                || app.otherElements["wallet.credentialDetailsScreen"].exists
         case "Present":
             return textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").isHittable
                 || app.staticTexts["Review presentation request"].exists
-                || app.staticTexts["Credential details"].exists
-                || app.buttons["wallet.presentationNewButton"].exists
+                || app.otherElements["wallet.credentialDetailsScreen"].exists
         default:
             return false
         }
@@ -289,6 +295,28 @@ final class WalletE2EUI {
             return element
         }
         return elements[0]
+    }
+
+    private func unlockWallet() {
+        let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        guard pinInput.waitForExistence(timeout: 10) else {
+            return
+        }
+
+        replaceText(in: pinInput, value: pin)
+
+        let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+        if confirmation.waitForExistence(timeout: 2) {
+            replaceText(in: confirmation, value: pin)
+        }
+
+        let submit = firstExisting([
+            app.buttons["wallet.pinSubmitButton"],
+            app.buttons["Set PIN"],
+            app.buttons["Unlock"],
+        ])
+        XCTAssertTrue(submit.waitForExistence(timeout: 10), "PIN submit button not found")
+        submit.tap()
     }
 }
 

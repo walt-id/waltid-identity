@@ -59,7 +59,12 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             operation: "bootstrap wallet"
         )
 
-        return .init(keyID: value.keyId, did: value.did)
+        return .init(
+            keyID: value.keyId,
+            did: value.did,
+            publicJWK: value.publicJwk,
+            keyUseAuthorizationPolicy: toSwiftAuthorizationPolicy(value.keyUseAuthorizationPolicy)
+        )
     }
 
     func keyUseAuthorizationPreflight(
@@ -171,6 +176,18 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
 
         throw WalletError.internalFailure("Unexpected credentials result type: \(type(of: value))")
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
+        let result = try await bridge.deleteCredential(credentialId: id)
+        let value = try Self.successAnyValue(result, operation: "delete credential")
+        if let flag = value as? KotlinBoolean {
+            return flag.boolValue
+        }
+        if let flag = value as? Bool {
+            return flag
+        }
+        throw WalletError.internalFailure("Unexpected delete credential result type: \(type(of: value))")
     }
 
     func deleteLocalData() async throws {
@@ -424,7 +441,12 @@ private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
             name: name,
             descriptionText: descriptionText,
             logoURI: logoUri.flatMap(URL.init(string:)),
-            logoAltText: logoAltText
+            logoAltText: logoAltText,
+            backgroundColor: backgroundColor,
+            backgroundImageURI: backgroundImageUri.flatMap(URL.init(string:)),
+            textColor: textColor,
+            vct: vct,
+            doctype: doctype
         )
     }
 }
@@ -820,6 +842,19 @@ private extension WalletBridgeKeyUseAuthorizationPolicy {
     }
 }
 
+private func toSwiftAuthorizationPolicy(
+    _ policy: any Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicy
+) -> WalletKeyUseAuthorizationPolicy {
+    switch onEnum(of: policy) {
+    case .none:
+        return .none
+    case .biometricCurrentSet:
+        return .biometricCurrentSet
+    case .biometricTimedReuse(let timedReuse):
+        return .biometricTimedReuse(timeoutSeconds: Int(timedReuse.timeoutSeconds))
+    }
+}
+
 private extension WalletBridgeKeyUseAuthorizationReuseEnforcement {
     func toSwiftAuthorizationReuseEnforcement() -> WalletKeyUseAuthorizationReuseEnforcement {
         switch self {
@@ -1101,7 +1136,8 @@ private extension MobileWalletPresentationCredentialOption {
             label: label,
             credentialDataJSON: requiredCredentialDataJSON(credentialDataJson),
             disclosures: swiftArray(disclosures, of: MobileWalletPresentationDisclosure.self)
-                .map { $0.toSwiftDisclosure() }
+                .map { $0.toSwiftDisclosure() },
+            metadataJSON: metadataJson
         )
     }
 }

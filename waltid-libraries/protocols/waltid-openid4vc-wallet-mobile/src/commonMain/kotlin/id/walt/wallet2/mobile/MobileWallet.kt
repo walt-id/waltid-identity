@@ -6,6 +6,7 @@ import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.utils.ShaUtils
 import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
@@ -16,7 +17,7 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
@@ -96,10 +97,16 @@ private object MobileDidSupport {
  *
  * @property keyId Identifier of the persisted signing key used by the wallet.
  * @property did Decentralized identifier registered for the persisted key.
+ * @property keyUseAuthorizationPolicy Immutable authorization policy of the persisted signing key.
  */
 public data class MobileWalletBootstrapResult(
     public val keyId: String,
     public val did: String,
+    /**
+     * Public JWK of [keyId] as a JSON object string. Private material is never included.
+     */
+    public val publicJwk: String,
+    public val keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
 )
 
 /**
@@ -197,7 +204,7 @@ public data class WalletAttestationConfig(
  */
 public class MobileWallet internal constructor(
     walletId: String,
-    private val keyStore: WalletKeyStore,
+    private val keyStore: MobileWalletKeyStore,
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
@@ -292,6 +299,10 @@ public class MobileWallet internal constructor(
             return MobileWalletBootstrapResult(
                 keyId = existingKey.keyId,
                 did = existingDids.first().did,
+                publicJwk = publicJwkJson(existingKey.keyId),
+                keyUseAuthorizationPolicy = requireNotNull(
+                    keyStore.keyUseAuthorizationPolicy(existingKey.keyId),
+                ) { "Wallet '${wallet.id}' persisted key '${existingKey.keyId}' has no authorization policy" },
             )
         }
 
@@ -327,7 +338,12 @@ public class MobileWallet internal constructor(
                     document = didResult.didDocument.toJsonObject(),
                 )
             )
-            return MobileWalletBootstrapResult(keyId = key.id.value, did = didResult.did)
+            return MobileWalletBootstrapResult(
+                keyId = key.id.value,
+                did = didResult.did,
+                publicJwk = publicJwkJson(key),
+                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
+            )
         } catch (cause: Throwable) {
             try {
                 withContext(NonCancellable) {
@@ -338,6 +354,20 @@ public class MobileWallet internal constructor(
             }
             throw cause
         }
+    }
+
+    private suspend fun publicJwkJson(keyId: String): String {
+        val key = requireNotNull(keyStore.getCrypto2Key(keyId)) {
+            "Wallet '${wallet.id}' persisted key '$keyId' is unavailable"
+        }
+        return publicJwkJson(key)
+    }
+
+    private suspend fun publicJwkJson(key: Key): String {
+        val encoded = requireNotNull(key.capabilities.publicKeyExporter) {
+            "Wallet key '${key.id.value}' does not export public material"
+        }.exportPublicKey().toPublicJwk(key.spec)
+        return encoded.data.toByteArray().decodeToString()
     }
 
     /**
@@ -883,6 +913,7 @@ public class MobileWallet internal constructor(
                     selectable = disclosure.selectable,
                 )
             },
+            metadataJson = metadata?.encodeJsonObject(),
         )
 
     private fun PresentationCredentialRequirement.toMobileCredentialRequirement(): MobileWalletPresentationCredentialRequirement =
@@ -902,24 +933,40 @@ public class MobileWallet internal constructor(
             val registryEntryId = "dc-${ShaUtils.calculateSha256Base64Url("${wallet.id}\u0000${stored.id}").take(32)}"
             val metadata = stored.toMetadata()
             when (val credential = stored.credential) {
-                is MdocsCredential -> MobileWalletCredentialRegistryRecord(
-                    registryEntryId = registryEntryId,
-                    credentialId = stored.id,
-                    format = MobileWalletDigitalCredentialFormat.MDOC,
-                    type = credential.docType,
-                    fields = credential.credentialData
-                        .filterKeys { it != "docType" }
-                        .flatMap { (namespace, value) ->
-                            value.jsonObject.map { (element, elementValue) ->
-                                MobileWalletCredentialRegistryField(
-                                    path = listOf(namespace, element),
-                                    valueJson = Json.encodeToString(JsonElement.serializer(), elementValue),
-                                    selectivelyDisclosable = true,
-                                )
-                            }
-                        },
-                    displayName = metadata.label ?: credential.docType,
-                )
+                is MdocsCredential -> {
+                    val display = MobileWalletRegistryDisplay.resolve(
+                        format = MobileWalletDigitalCredentialFormat.MDOC,
+                        type = credential.docType,
+                        credentialData = credential.credentialData,
+                        storedLabel = metadata.label,
+                    )
+                    val cardArt = MobileWalletRegistryIcons.extractCardArt(
+                        metadata = stored.metadata,
+                        credentialData = credential.credentialData,
+                    )
+                    MobileWalletCredentialRegistryRecord(
+                        registryEntryId = registryEntryId,
+                        credentialId = stored.id,
+                        format = MobileWalletDigitalCredentialFormat.MDOC,
+                        type = credential.docType,
+                        fields = credential.credentialData
+                            .filterKeys { it != "docType" }
+                            .flatMap { (namespace, value) ->
+                                value.jsonObject.map { (element, elementValue) ->
+                                    MobileWalletCredentialRegistryField(
+                                        path = listOf(namespace, element),
+                                        valueJson = Json.encodeToString(JsonElement.serializer(), elementValue),
+                                        selectivelyDisclosable = true,
+                                    )
+                                }
+                            },
+                        displayName = display.title,
+                        subtitle = display.subtitle,
+                        cardArtImageUris = cardArt.imageUris,
+                        cardArtBackgroundColor = cardArt.backgroundColor,
+                        cardArtFallbackPng = cardArt.fallbackPng,
+                    )
+                }
                 else -> if (metadata.format in setOf("vc+sd-jwt", "dc+sd-jwt", "sd-jwt-vc")) {
                     val data = credential.credentialData
                     val type = data["vct"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
@@ -928,6 +975,16 @@ public class MobileWallet internal constructor(
                         .orEmpty()
                         .mapNotNull { disclosure -> disclosure.location?.toRegistryFieldPath() }
                         .toSet()
+                    val display = MobileWalletRegistryDisplay.resolve(
+                        format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                        type = type,
+                        credentialData = data,
+                        storedLabel = metadata.label,
+                    )
+                    val cardArt = MobileWalletRegistryIcons.extractCardArt(
+                        metadata = stored.metadata,
+                        credentialData = data,
+                    )
                     MobileWalletCredentialRegistryRecord(
                         registryEntryId = registryEntryId,
                         credentialId = stored.id,
@@ -941,7 +998,11 @@ public class MobileWallet internal constructor(
                                     selectivelyDisclosablePaths = selectivelyDisclosablePaths,
                                 )
                             },
-                        displayName = metadata.label ?: type,
+                        displayName = display.title,
+                        subtitle = display.subtitle,
+                        cardArtImageUris = cardArt.imageUris,
+                        cardArtBackgroundColor = cardArt.backgroundColor,
+                        cardArtFallbackPng = cardArt.fallbackPng,
                     )
                 } else null
             }

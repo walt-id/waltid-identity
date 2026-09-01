@@ -36,11 +36,8 @@ fun createIosDemoWallet(
                     preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },
                     crossProcessAccess = crossProcessAccess,
                     onDigitalCredentialRegistryChanged = onDigitalCredentialRegistryChanged,
-                    defaultKeyUseAuthorizationPolicy = if (config.biometricEnabled) {
-                        KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
-                    } else {
-                        KeyUseAuthorizationPolicy.None
-                    },
+                    defaultKeyUseAuthorizationPolicy =
+                        config.signingProtectionMode.defaultSelection.toKeyUseAuthorizationPolicy(),
                     keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
                         reason = "Authorize wallet signing",
                         cancelText = "Cancel",

@@ -134,6 +134,11 @@ data class WalletIssuanceCredentialPreview(
     val descriptionText: String?,
     val logoUri: String?,
     val logoAltText: String? = null,
+    val backgroundColor: String? = null,
+    val backgroundImageUri: String? = null,
+    val textColor: String? = null,
+    val vct: String? = null,
+    val doctype: String? = null,
 )
 
 /** Typed offer preview retained by the issuance session. */
@@ -552,7 +557,14 @@ class WalletIssuanceSessionService(
                     restoreDeferred(record.copy(dpopNonce = response.dpopNonce))
                     return failed(record.sessionId, WalletIssuanceErrorCode.PROTOCOL)
                 }
-            val stored = credentials.map { wallet.parseAndStore(it, record.label) }
+            val stored = credentials.map {
+                wallet.parseAndStore(
+                    issued = it,
+                    label = record.label,
+                    metadata = record.metadata,
+                    keyMaterial = record.keyMaterial,
+                )
+            }
             stored.forEach { emitEvent(WalletSessionEvent.issuance_credential_stored) }
             emitEvent(WalletSessionEvent.issuance_completed)
             WalletIssuanceOutcome.Stored(record.sessionId, stored.map { it.id })
@@ -697,9 +709,18 @@ class WalletIssuanceSessionService(
                         ?: throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
                     emitEvent(WalletSessionEvent.issuance_credential_received)
                     val label = active.public.offer.credentialName(offered.credentialConfigurationId)
+                    val metadata = storedCredentialDisplayMetadata(
+                        issuerMetadata = active.resolved.issuerMetadata.metadata,
+                        credentialConfigurationId = offered.credentialConfigurationId,
+                    )
                     credentials.forEach { issued ->
                         val stored = try {
-                            wallet.parseAndStore(issued, label)
+                            wallet.parseAndStore(
+                                issued = issued,
+                                label = label,
+                                metadata = metadata,
+                                keyMaterial = active.keyMaterial,
+                            )
                         } catch (error: CancellationException) {
                             throw error
                         } catch (error: Exception) {
@@ -731,6 +752,10 @@ class WalletIssuanceSessionService(
                         intervalSeconds = response.interval,
                     )
                     val label = active.public.offer.credentialName(offered.credentialConfigurationId)
+                    val metadata = storedCredentialDisplayMetadata(
+                        issuerMetadata = active.resolved.issuerMetadata.metadata,
+                        credentialConfigurationId = offered.credentialConfigurationId,
+                    )
                     pending += PendingDeferred(
                         public = public,
                         record = DeferredRecord(
@@ -747,6 +772,7 @@ class WalletIssuanceSessionService(
                             selectedPublicJwk = active.keyMaterial.exportPublicJwkObject().toString(),
                             persistable = active.persistable,
                             label = label,
+                            metadata = metadata,
                         ),
                     )
                 }
@@ -1041,6 +1067,11 @@ class WalletIssuanceSessionService(
                     descriptionText = display?.description,
                     logoUri = display?.logo?.uri,
                     logoAltText = display?.logo?.altText,
+                    backgroundColor = display?.backgroundColor,
+                    backgroundImageUri = display?.backgroundImage?.uri,
+                    textColor = display?.textColor,
+                    vct = offered.configuration.vct,
+                    doctype = offered.configuration.doctype,
                 )
             },
             transactionCode = txCode?.let {
@@ -1295,16 +1326,26 @@ class WalletIssuanceSessionService(
         persistActive(active)
     }
 
-    private suspend fun Wallet.parseAndStore(issued: IssuedCredential, label: String?): StoredCredential {
+    private suspend fun Wallet.parseAndStore(
+        issued: IssuedCredential,
+        label: String?,
+        metadata: JsonObject? = null,
+        keyMaterial: WalletKeyStoreEntry,
+    ): StoredCredential {
         val raw = issued.credential.let { value ->
             if (value is JsonPrimitive) value.content else value.toString()
         }
         val (_, parsed) = CredentialParser.detectAndParse(raw)
-        return StoredCredential(
+        val stored = StoredCredential(
             id = Uuid.random().toString(),
             credential = parsed,
             label = label,
             addedAt = Clock.System.now(),
+            metadata = metadata,
+        )
+        return withVerifiedIssuanceHolderKeyBinding(
+            credential = stored,
+            keyMaterial = keyMaterial,
         ).also { addCredential(it) }
     }
 
@@ -1539,6 +1580,7 @@ class WalletIssuanceSessionService(
                     keyId = record.keyId,
                     selectedPublicJwk = record.selectedPublicJwk,
                     label = record.label,
+                    metadata = record.metadata,
                 )
                 store.put(
                     WalletIssuanceSessionRecord(
@@ -1589,6 +1631,7 @@ class WalletIssuanceSessionService(
             selectedPublicJwk = persisted.selectedPublicJwk,
             persistable = true,
             label = persisted.label,
+            metadata = persisted.metadata,
         )
     }
 
@@ -1756,6 +1799,7 @@ class WalletIssuanceSessionService(
         val selectedPublicJwk: String,
         val persistable: Boolean,
         val label: String?,
+        val metadata: JsonObject? = null,
     )
 
     private data class PendingDeferred(
@@ -1806,6 +1850,7 @@ class WalletIssuanceSessionService(
         val keyId: String?,
         val selectedPublicJwk: String,
         val label: String?,
+        val metadata: JsonObject? = null,
     )
 
     private suspend fun resolveIssuanceKeyMaterial(

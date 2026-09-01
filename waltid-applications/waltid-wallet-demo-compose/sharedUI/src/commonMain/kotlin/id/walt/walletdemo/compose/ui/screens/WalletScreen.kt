@@ -2,10 +2,12 @@ package id.walt.walletdemo.compose.ui.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -13,18 +15,14 @@ import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
-import id.walt.walletdemo.compose.logic.receivedCredentials
-import id.walt.walletdemo.compose.logic.toCredentialDetails
-import id.walt.walletdemo.compose.ui.WalletRoute
 
 @Composable
 internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
     val ready = state.session as? WalletSessionState.Ready
     val credentials = ready?.credentials.orEmpty()
-    val credentialsBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
-    val receiveBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
-    val presentBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
     val uriHandler = LocalUriHandler.current
+    var showingSettings by remember { mutableStateOf(false) }
+    var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
 
     LaunchedEffect(state.authorizationRequestUrl) {
         state.authorizationRequestUrl?.let { authorizationUrl ->
@@ -33,20 +31,33 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
         }
     }
 
-    LaunchedEffect(state.receiveNavigationResetKey) {
-        receiveBackStack.resetToRoot()
-    }
-    LaunchedEffect(state.presentationNavigationResetKey) {
-        presentBackStack.resetToRoot()
+    if (showingSettings) {
+        SettingsScreen(
+            state = state,
+            onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
+            onBack = { showingSettings = false },
+            onLock = controller::lock,
+            onResetWallet = controller::resetWallet,
+            onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
+            onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
+            onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
+        )
+        return
     }
 
     Scaffold(
         topBar = {
-            WalletHeader(
-                did = ready?.did,
-                state = state,
-                onLock = controller::lock,
-            )
+            val chrome = detailsChrome
+            if (chrome != null) {
+                CredentialDetailsTopBar(chrome)
+            } else {
+                WalletHeader(
+                    state = state,
+                    onSettings = { showingSettings = true },
+                    onDismissStatus = controller::dismissStatus,
+                    onToggleStatusExpanded = controller::toggleStatusExpanded,
+                )
+            }
         },
         bottomBar = {
             WalletBottomBar(
@@ -60,66 +71,37 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             .padding(contentPadding)
 
         when (state.selectedTab) {
-            WalletDemoTab.Credentials -> WalletTabNavDisplay(
-                backStack = credentialsBackStack,
-                details = credentials.map { it.toCredentialDetails() },
+            WalletDemoTab.Credentials -> CredentialsTab(
+                credentials = credentials,
+                onDeleteCredential = controller::deleteCredential,
+                onDetailsChromeChange = { detailsChrome = it },
                 modifier = modifier,
-                root = {
-                    CredentialsTab(
-                        credentials = credentials,
-                        onCredentialClick = { detailsId -> credentialsBackStack.pushDetails(detailsId) },
-                    )
-                },
             )
             WalletDemoTab.Receive -> {
-                val receivedDetails = state.receivedCredentials()
-                    .map { it.toCredentialDetails() }
-
-                WalletTabNavDisplay(
-                    backStack = receiveBackStack,
-                    details = receivedDetails,
+                ReceiveTab(
+                    state = state,
+                    requestDrafts = state.requestDrafts,
+                    onOfferUrlChange = controller::updateOfferUrl,
+                    onTxCodeChange = controller::updateTxCode,
+                    onPreviewOffer = controller::previewOffer,
+                    onAcceptOffer = controller::acceptOffer,
+                    onDeclineOffer = controller::declineOffer,
+                    onResumeDeferred = controller::resumeDeferredCredential,
                     modifier = modifier,
-                    root = {
-                        ReceiveTab(
-                            state = state,
-                            requestDrafts = state.requestDrafts,
-                            onOfferUrlChange = controller::updateOfferUrl,
-                            onTxCodeChange = controller::updateTxCode,
-                            onPreviewOffer = controller::previewOffer,
-                            onAcceptOffer = controller::acceptOffer,
-                            onDeclineOffer = controller::declineOffer,
-                            onStartNew = controller::startNewReceiveFlow,
-                            onResumeDeferred = controller::resumeDeferredCredential,
-                            onCredentialClick = { detailsId -> receiveBackStack.pushDetails(detailsId) },
-                        )
-                    },
                 )
             }
             WalletDemoTab.Present -> {
-                val presentationDetails = state.presentationPreview
-                    ?.credentialOptions
-                    .orEmpty()
-                    .map { it.toCredentialDetails() }
-
-                WalletTabNavDisplay(
-                    backStack = presentBackStack,
-                    details = presentationDetails.ifEmpty { credentials.map { it.toCredentialDetails() } },
+                PresentTab(
+                    state = state,
+                    requestDrafts = state.requestDrafts,
+                    onPresentationRequestUrlChange = controller::updatePresentationRequestUrl,
+                    onPreview = controller::previewPresentation,
+                    onToggleCredential = controller::togglePresentationCredential,
+                    onToggleDisclosure = controller::togglePresentationDisclosure,
+                    onSubmit = controller::submitPresentation,
+                    onReject = controller::rejectPresentation,
+                    onCancel = controller::cancelPresentationReview,
                     modifier = modifier,
-                    root = {
-                        PresentTab(
-                            state = state,
-                            requestDrafts = state.requestDrafts,
-                            onPresentationRequestUrlChange = controller::updatePresentationRequestUrl,
-                            onPreview = controller::previewPresentation,
-                            onStartNew = controller::startNewPresentationFlow,
-                            onToggleCredential = controller::togglePresentationCredential,
-                            onToggleDisclosure = controller::togglePresentationDisclosure,
-                            onCredentialClick = { detailsId -> presentBackStack.pushDetails(detailsId) },
-                            onSubmit = controller::submitPresentation,
-                            onReject = controller::rejectPresentation,
-                            onCancel = controller::cancelPresentationReview,
-                        )
-                    },
                 )
             }
         }

@@ -16,7 +16,7 @@ struct ContentView: UIViewControllerRepresentable {
     /// Called from Kotlin after the wallet's credential set changed, so this process can reconcile
     /// Apple's registration store. Only the app may call `IdentityDocumentServices`.
     let onDigitalCredentialRegistryChanged: () -> Void
-    let biometricEnabled: Bool
+    let signingProtectionMode: String
 
     func makeUIViewController(context: Context) -> UIViewController {
         sharedUI.WalletDemoIosKt.walletDemoViewController(
@@ -29,7 +29,7 @@ struct ContentView: UIViewControllerRepresentable {
             attestationBearerToken: attestationBearerToken,
             attestationHostHeader: attestationHostHeader,
             transactionDataProfilesUrl: transactionDataProfilesUrl,
-            biometricEnabled: biometricEnabled
+            signingProtectionMode: signingProtectionMode
         )
     }
 
@@ -48,6 +48,6 @@ struct ContentView: UIViewControllerRepresentable {
         appGroupIdentifier: "",
         keychainAccessGroup: "",
         onDigitalCredentialRegistryChanged: {},
-        biometricEnabled: false
+        signingProtectionMode: "disabled"
     )
 }

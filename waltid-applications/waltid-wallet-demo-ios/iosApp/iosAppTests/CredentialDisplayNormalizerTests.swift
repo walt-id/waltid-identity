@@ -1,5 +1,5 @@
 import Foundation
-import WalletDemoSharingUI
+@testable import WalletDemoSharingUI
 import WalletSDK
 import XCTest
 
@@ -750,6 +750,125 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.groups.first?.title, "Personal details")
     }
 
+    func testPresentationCredentialOptionSurfacesStoredCardArt() {
+        let option = PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: "credential-1",
+            format: "dc+sd-jwt",
+            issuer: "https://issuer.example",
+            subject: "did:key:holder",
+            label: "PID",
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
+            metadataJSON: """
+            {
+              "credentialDisplay": [
+                {
+                  "name": "Personal ID",
+                  "background_image": { "uri": "https://issuer.example/pid-bg.png" }
+                }
+              ]
+            }
+            """
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: option)
+
+        XCTAssertEqual(details.cardSummary.backgroundImageURI, "https://issuer.example/pid-bg.png")
+        XCTAssertEqual(details.cardSummary.title, "Personal ID")
+    }
+
+    func testPresentationOptionUsesStoredLabelWhenMetadataAndPayloadHaveNoTitle() {
+        let option = PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: "credential-1",
+            format: "mso_mdoc",
+            issuer: nil,
+            subject: nil,
+            label: "Personal ID",
+            credentialDataJSON: #"{"given_name":"Ada"}"#
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: option)
+        XCTAssertEqual(details.cardSummary.title, "Personal ID")
+    }
+
+    func testRecognizesMdocSignatureImageBytes() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "Mobile driving licence",
+            issuer: nil,
+            subject: nil,
+            format: "mso_mdoc",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "org.iso.18013.5.1": {
+                "signature_usual_mark": {
+                  "elementValue": \(onePixelPNGByteArrayJSON())
+                }
+              }
+            }
+            """
+        )
+
+        let signature = try XCTUnwrap(
+            details.groups
+                .flatMap(\.items)
+                .first { $0.path.id == "org.iso.18013.5.1.signature_usual_mark.elementValue" }
+        )
+        XCTAssertEqual(signature.label, "Signature or usual mark")
+        guard case .image = signature.value else {
+            return XCTFail("Expected signature_usual_mark to use the image display path")
+        }
+    }
+
+    func testRecognizesStandardMdocBiometricImageBytes() throws {
+        let imageBytes = onePixelPNGByteArrayJSON()
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "Mobile driving licence",
+            issuer: nil,
+            subject: nil,
+            format: "mso_mdoc",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "org.iso.18013.5.1": {
+                "biometric_template_face": \(imageBytes),
+                "biometric_template_finger": \(imageBytes),
+                "biometric_template_signature_sign": \(imageBytes),
+                "biometric_template_iris": \(imageBytes)
+              }
+            }
+            """
+        )
+        let claims = Dictionary(
+            uniqueKeysWithValues: details.groups.flatMap(\.items).map { ($0.path.id, $0) }
+        )
+
+        for elementIdentifier in [
+            "biometric_template_face",
+            "biometric_template_finger",
+            "biometric_template_signature_sign",
+            "biometric_template_iris"
+        ] {
+            let claim = try XCTUnwrap(claims["org.iso.18013.5.1.\(elementIdentifier)"])
+            guard case .image = claim.value else {
+                return XCTFail("Expected \(elementIdentifier) to use the image display path")
+            }
+        }
+    }
+
+    func testListPreviewIsBoundedAndReportsTheOriginalCount() {
+        let preview = DisplayListPreview(
+            values: (0..<30).map { .number("item \($0)") }
+        )
+
+        XCTAssertEqual(preview.values.count, 25)
+        XCTAssertEqual(preview.values.last, .number("item 24"))
+        XCTAssertEqual(preview.overflowLabel, "Showing first 25 of 30 items")
+    }
+
     func testBuildsCredentialInfoGroupFromWalletSummaryFields() throws {
         let addedAt = try XCTUnwrap(Self.isoDateFormatter.date(from: "2026-07-09T12:00:00Z"))
         let details = CredentialDisplayNormalizer.details(
@@ -890,6 +1009,64 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.issuerDisplay?.name, "Demo Issuer")
         XCTAssertEqual(details.issuerDisplay?.logoURI, "https://issuer.example/logo.png")
         XCTAssertEqual(details.cardSummary.issuer, "Demo Issuer")
+    }
+
+    func testParsesStoredCredentialDisplayFromMetadataJSON() {
+        let display = StoredCredentialMetadataParser.credentialDisplay(
+            from: """
+            {
+              "credentialDisplay": [
+                {
+                  "name": "Personal ID",
+                  "locale": "en-US",
+                  "logo": { "uri": "https://issuer.example/pid.png", "alt_text": "PID logo" },
+                  "background_color": "#12107c",
+                  "background_image": { "uri": "https://issuer.example/pid-bg.png" },
+                  "text_color": "#FFFFFF"
+                }
+              ]
+            }
+            """
+        )
+
+        XCTAssertEqual(display?.name, "Personal ID")
+        XCTAssertEqual(display?.logoURI, "https://issuer.example/pid.png")
+        XCTAssertEqual(display?.backgroundColor, "#12107c")
+        XCTAssertEqual(display?.backgroundImageURI, "https://issuer.example/pid-bg.png")
+        XCTAssertEqual(display?.textColor, "#FFFFFF")
+    }
+
+    func testCredentialDetailsSurfacesCredentialDisplayOnCardSummary() {
+        let credential = Credential(
+            id: "cred-1",
+            format: "vc+sd-jwt",
+            issuer: "https://issuer.example",
+            subject: "did:key:holder",
+            label: "PID",
+            addedAt: nil,
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
+            metadataJSON: """
+            {
+              "issuerDisplay": [
+                { "name": "Demo Issuer", "logo": { "uri": "https://issuer.example/logo.png" } }
+              ],
+              "credentialDisplay": [
+                {
+                  "name": "Personal ID",
+                  "logo": { "uri": "https://issuer.example/pid.png" },
+                  "background_color": "#12107c",
+                  "text_color": "#FFFFFF"
+                }
+              ]
+            }
+            """
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: credential)
+        XCTAssertEqual(details.credentialDisplay?.name, "Personal ID")
+        XCTAssertEqual(details.cardSummary.backgroundColor, "#12107c")
+        XCTAssertEqual(details.cardSummary.logoURI, "https://issuer.example/pid.png")
+        XCTAssertEqual(details.cardSummary.title, "Personal ID")
     }
 
     private func onePixelPNGByteArrayJSON() -> String {
