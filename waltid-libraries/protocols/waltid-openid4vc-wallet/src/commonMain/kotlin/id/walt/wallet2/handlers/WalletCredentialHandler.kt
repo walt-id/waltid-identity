@@ -3,6 +3,7 @@ package id.walt.wallet2.handlers
 import id.walt.credentials.CredentialParser
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.withImportedHolderKeyBinding
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -16,11 +17,12 @@ data class ImportCredentialRequest(
 object WalletCredentialHandler {
     suspend fun importCredential(wallet: Wallet, request: ImportCredentialRequest): StoredCredential {
         val (_, credential) = CredentialParser.detectAndParse(request.rawCredential)
-        return StoredCredential(
+        val stored = StoredCredential(
             id = Uuid.random().toString(),
             credential = credential,
             label = request.label,
             addedAt = Clock.System.now(),
-        ).also { wallet.addCredential(it) }
+        )
+        return wallet.withImportedHolderKeyBinding(stored).also { wallet.addCredential(it) }
     }
 }

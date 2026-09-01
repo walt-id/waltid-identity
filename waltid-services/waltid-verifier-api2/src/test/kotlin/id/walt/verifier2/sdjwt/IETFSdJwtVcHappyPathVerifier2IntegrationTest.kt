@@ -44,6 +44,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.http.Url
 import io.ktor.server.application.Application
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -101,7 +102,10 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 dcqlQuery = sdJwtVcDcqlQuery,
                 policies = sdjwtvcPolicies,
                 notifications = notifications,
-            )
+            ),
+            redirects = Verification2Session.VerificationSessionRedirects(
+                successRedirectUri = Url("https://example.com/success"),
+            ),
         )
 
     private val holderKeyFun = suspend {
@@ -257,7 +261,9 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 val resp = presentationResult.getOrThrow()
                 println(resp)
                 assertTrue("Transmission did not succeed") { resp.transmissionSuccess == true }
-                assertTrue { resp.verifierResponse!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
+                val redirectUri = resp.verifierResponse!!.jsonObject["redirect_uri"]!!.jsonPrimitive.content
+                assertTrue(redirectUri.startsWith("https://example.com/success"))
+                assertTrue(redirectUri.contains("response_code="))
             }
 
             val info2 = testAndReturn("View presented session") {
@@ -278,6 +284,8 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 assertTrue { info2.policyResults!!.overallSuccess }
                 assertEquals(1, info2.policyResults!!.vcPolicies.size)
                 assertEquals("my_pid", info2.policyResults!!.vcPolicies.single().queryId)
+                assertNotNull(info2.responseCode)
+                assertTrue(info2.responseCode!!.isNotBlank())
             }
 
             test("Emit successful verification callback events") {
