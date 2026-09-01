@@ -1206,7 +1206,7 @@ private extension WalletBridgeStoredDid {
     }
 }
 
-private extension Data {
+extension Data {
     func toKotlinByteArray() -> KotlinByteArray {
         let bytes = [UInt8](self)
         let array = KotlinByteArray(size: Int32(bytes.count))
@@ -2396,13 +2396,13 @@ private extension WalletCore.ProximityApplicationAuthorization {
     }
 }
 
-private extension KotlinInstant {
+extension KotlinInstant {
     func toDate() -> Date {
         Date(timeIntervalSince1970: TimeInterval(epochSeconds) + TimeInterval(nanosecondsOfSecond) / 1_000_000_000)
     }
 }
 
-private extension Data {
+extension Data {
     init?(base64URLEncoded value: String) {
         var base64 = value.replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")
