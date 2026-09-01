@@ -39,6 +39,73 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalletDemoProximityControllerTest {
     @Test
+    fun `selected runtime permission is resolved before the SDK session starts`() = runTest {
+        var capabilities = blockedCapabilities
+        val session = FakeSession(
+            MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026)
+        )
+        val backend = FakeBackend(session = session, capabilities = { capabilities })
+        val controller = controller(backend)
+        val performed = mutableListOf<MobileWalletProximityRemediationAction>()
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals(1, backend.capabilityCalls)
+        assertEquals(0, backend.startCalls)
+        assertEquals(
+            MobileWalletProximityState.CheckingPrerequisites(blockedCapabilities),
+            controller.state.value.sessionState,
+        )
+
+        controller.remediate(
+            MobileWalletProximityRemediationAction.RequestBluetoothPermission,
+            WalletDemoProximityHostActionExecutor { action ->
+                performed += action
+                capabilities = readyCapabilities
+                MobileWalletProximityHostActionResult.Completed
+            },
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission), performed)
+        assertEquals(2, backend.capabilityCalls)
+        assertEquals(1, backend.startCalls)
+        assertEquals(session.state.value, controller.state.value.sessionState)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `denied selected permission cannot silently fall back to another transport`() = runTest {
+        assertTrue(fallbackCapabilities.mayStart)
+        val session = FakeSession(
+            MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026)
+        )
+        val backend = FakeBackend(session = session, capabilities = { fallbackCapabilities })
+        val controller = controller(backend)
+
+        controller.start()
+        advanceUntilIdle()
+        assertEquals(0, backend.startCalls)
+
+        controller.remediate(
+            MobileWalletProximityRemediationAction.RequestBluetoothPermission,
+            WalletDemoProximityHostActionExecutor { MobileWalletProximityHostActionResult.Cancelled },
+        )
+        advanceUntilIdle()
+
+        assertEquals(2, backend.capabilityCalls)
+        assertEquals(0, backend.startCalls)
+        assertEquals(
+            MobileWalletProximityState.CheckingPrerequisites(fallbackCapabilities),
+            controller.state.value.sessionState,
+        )
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun `start observes the SDK session without copying protocol state`() = runTest {
         val session = FakeSession(MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026))
         val backend = FakeBackend(session = session)
@@ -301,10 +368,20 @@ class WalletDemoProximityControllerTest {
 private class FakeBackend(
     private val session: MobileWalletProximitySession,
     private val startGate: CompletableDeferred<Unit>? = null,
+    private val capabilities: () -> MobileWalletProximityCapabilities = { readyCapabilities },
 ) : ProximityPresentationBackend {
+    var capabilityCalls: Int = 0
+        private set
     var startCalls: Int = 0
         private set
     val configurations = mutableListOf<MobileWalletProximityConfiguration>()
+
+    override suspend fun proximityPresentationCapabilities(
+        configuration: MobileWalletProximityConfiguration,
+    ): MobileWalletProximityCapabilities {
+        capabilityCalls += 1
+        return capabilities()
+    }
 
     override suspend fun startProximityPresentation(
         configuration: MobileWalletProximityConfiguration,
@@ -418,4 +495,9 @@ private val blockedCapabilities = readyCapabilities.copy(
         unavailable = bluetoothUnavailable,
         remediationActions = listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission),
     )
+)
+
+private val fallbackCapabilities = blockedCapabilities.copy(
+    nfcEngagement = availableSelected,
+    nfcRetrieval = availableSelected,
 )
