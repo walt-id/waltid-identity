@@ -7,11 +7,19 @@ internal data class ReaderTrustImportFile(
     val bytes: ByteArray,
 )
 
+internal sealed interface ReaderTrustImportPickerResult {
+    data class Selected(val file: ReaderTrustImportFile) : ReaderTrustImportPickerResult
+
+    data object Cancelled : ReaderTrustImportPickerResult
+
+    data class Failed(val error: Throwable) : ReaderTrustImportPickerResult
+}
+
 internal fun interface ReaderTrustImportPicker {
     fun launch()
 }
 
 @Composable
 internal expect fun rememberReaderTrustImportPicker(
-    onResult: (Result<ReaderTrustImportFile>) -> Unit,
+    onResult: (ReaderTrustImportPickerResult) -> Unit,
 ): ReaderTrustImportPicker

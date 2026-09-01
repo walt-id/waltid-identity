@@ -25,6 +25,7 @@ public enum WalletAccessibilityID {
     public static let readerTrustImportConfirm = identifier("readerTrustImportConfirm")
     public static let readerTrustImportCancel = identifier("readerTrustImportCancel")
     public static let readerTrustReset = identifier("readerTrustReset")
+    public static let readerTrustResetConfirm = identifier("readerTrustResetConfirm")
     public static let readerTrustError = identifier("readerTrustError")
     public static let settingsLock = identifier("settingsLock")
     public static let settingsReset = identifier("settingsReset")

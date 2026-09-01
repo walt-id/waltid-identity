@@ -126,6 +126,10 @@ class WalletDemoAppIosTest {
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
 
     @Test
+    fun readerTrustSettingsReviewPublicCaBeforePersisting() =
+        scenarios.readerTrustSettingsReviewPublicCaBeforePersisting()
+
+    @Test
     fun lockDoesNotAutoPromptBiometrics() =
         scenarios.lockDoesNotAutoPromptBiometrics()
 
