@@ -43,7 +43,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     @Published private(set) var startupFailed = false
 
     private let client: any ProximityWalletClient
-    private let configuration: ProximityPresentationConfiguration
+    private let configurationProvider: @MainActor () -> ProximityPresentationConfiguration
     private let hostActions: any ProximityHostActionExecutor
     private var session: (any DemoProximityPresentationSession)?
     private var observationTask: Task<Void, Never>?
@@ -52,11 +52,13 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     init(
         client: any ProximityWalletClient,
-        configuration: ProximityPresentationConfiguration = .init(),
+        configurationProvider: @escaping @MainActor () -> ProximityPresentationConfiguration = {
+            .init()
+        },
         hostActions: (any ProximityHostActionExecutor)? = nil
     ) {
         self.client = client
-        self.configuration = configuration
+        self.configurationProvider = configurationProvider
         self.hostActions = hostActions ?? IOSProximityHostActionExecutor()
     }
 
@@ -92,6 +94,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         startupFailed = false
         sessionGeneration &+= 1
         let generation = sessionGeneration
+        let configuration = configurationProvider()
         observationTask = Task { [weak self] in
             guard let self else { return }
             do {

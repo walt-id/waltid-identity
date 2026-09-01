@@ -48,6 +48,12 @@ whole physical-pixel modules.
 This demo proves the wallet-side SDK integration. External reader interoperability, prolonged
 reliability, and release qualification are tracked separately and must not be inferred from the demo.
 
+**Settings → Credential Sharing → Reader Authentication** exposes the reader policy and holder-owned
+Reader CA/RICAL configuration. Imports use the native document picker and accept DER,
+certificate-only PEM, or versioned walt.id JSON trust bundles. The app previews validated public trust
+material before saving it in the wallet App Group, rejects private keys and PKCS#12/PFX reader
+identities, and applies one immutable settings snapshot to each new proximity session.
+
 ## Local wallet data
 
 The demo uses the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in iOS Keychain. During local development, reset wallet state by calling `Wallet.deleteLocalData()` from the SDK facade, deleting the app from the simulator/device, or removing the app's local data.

@@ -76,7 +76,9 @@ fun interface WalletDemoProximityHostActionExecutor {
  */
 class WalletDemoProximityController(
     private val wallet: ProximityPresentationBackend,
-    private val configuration: MobileWalletProximityConfiguration = MobileWalletProximityConfiguration(),
+    private val configurationProvider: () -> MobileWalletProximityConfiguration = {
+        MobileWalletProximityConfiguration()
+    },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
 ) {
@@ -95,7 +97,8 @@ class WalletDemoProximityController(
         mutableState.value = WalletDemoProximityUiState(active = true)
         sessionJob = scope.launch(dispatcher) {
             try {
-                val started = wallet.startProximityPresentation(configuration)
+                // Resolve exactly once per start: settings changes cannot mutate an active session.
+                val started = wallet.startProximityPresentation(configurationProvider())
                 if (!currentCoroutineContext().isActive ||
                     generation != startGeneration || !mutableState.value.active
                 ) {

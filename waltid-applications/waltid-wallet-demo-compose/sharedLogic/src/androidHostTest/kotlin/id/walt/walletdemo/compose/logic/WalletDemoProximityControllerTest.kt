@@ -12,6 +12,7 @@ import id.walt.wallet2.mobile.MobileWalletProximityError
 import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
 import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
 import id.walt.wallet2.mobile.MobileWalletProximityProfile
+import id.walt.wallet2.mobile.MobileWalletProximityReaderPolicy
 import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
 import id.walt.wallet2.mobile.MobileWalletProximityRequestedElement
 import id.walt.wallet2.mobile.MobileWalletProximityReview
@@ -251,6 +252,43 @@ class WalletDemoProximityControllerTest {
         assertTrue(controller.state.value.selections.isEmpty())
     }
 
+    @Test
+    fun `configuration provider is resolved once for each new session`() = runTest {
+        val session = FakeSession(
+            MobileWalletProximityState.Completed(
+                exchanges = 1,
+                declined = false,
+            )
+        )
+        val backend = FakeBackend(session)
+        var policy = MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted
+        val controller = WalletDemoProximityController(
+            wallet = backend,
+            configurationProvider = {
+                MobileWalletProximityConfiguration(readerPolicy = policy)
+            },
+            scope = this,
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        policy = MobileWalletProximityReaderPolicy.RequireTrusted
+        assertEquals(
+            MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
+            backend.configurations.single().readerPolicy,
+        )
+
+        controller.dismiss()
+        advanceUntilIdle()
+        controller.start()
+        advanceUntilIdle()
+        assertEquals(
+            MobileWalletProximityReaderPolicy.RequireTrusted,
+            backend.configurations.last().readerPolicy,
+        )
+    }
+
     private fun kotlinx.coroutines.test.TestScope.controller(
         backend: ProximityPresentationBackend,
     ): WalletDemoProximityController = WalletDemoProximityController(
@@ -266,11 +304,13 @@ private class FakeBackend(
 ) : ProximityPresentationBackend {
     var startCalls: Int = 0
         private set
+    val configurations = mutableListOf<MobileWalletProximityConfiguration>()
 
     override suspend fun startProximityPresentation(
         configuration: MobileWalletProximityConfiguration,
     ): MobileWalletProximitySession {
         startCalls += 1
+        configurations += configuration
         startGate?.let { withContext(NonCancellable) { it.await() } }
         return session
     }

@@ -49,6 +49,13 @@ and both renderers add an exact four-module quiet zone.
 This demo proves the wallet-side SDK integration. External reader interoperability, prolonged
 reliability, and release qualification are tracked separately and must not be inferred from the demo.
 
+The mobile settings screen exposes **Credential Sharing → Reader Authentication** on Compose Android
+and Compose iOS. It supports a permissive or trusted-reader-only policy, lists and removes configured
+Reader CAs/RICAL providers, and imports DER, certificate-only PEM, or versioned walt.id JSON trust
+bundles through the platform document picker. Every import is validated and previewed before an atomic
+save to app-private storage; private keys and PKCS#12/PFX reader identities are deliberately rejected.
+Each new proximity session freezes the current settings, so an active exchange cannot be reconfigured.
+
 ## Local wallet data
 
 Android and iOS demo targets use the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in platform-protected storage. During local development, reset wallet state through `MobileWallet.deleteWallet()`, by uninstalling the app, or by deleting the app's local data.
