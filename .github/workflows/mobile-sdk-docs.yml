@@ -126,7 +126,7 @@ jobs:
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
-          generate-dokka: ${{ inputs.generate-linux-docs && 'false' || 'true' }}
+          generate-dokka: true
           check-snippets: ${{ inputs.generate-linux-docs && 'false' || 'true' }}
           skip-wallet-core-assemble: ${{ steps.restore-wallet-core.outputs.skip_assemble }}
 

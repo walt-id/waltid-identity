@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Skip the Linux Gradle job when every changed file is a docs/asset path that
-# used to be listed in build.yml paths-ignore. The workflow itself must still
-# start so ci-gate can run as a required check.
+# Skip Linux Gradle and macos-predicate-tests when every changed file is a
+# docs/asset path that used to be listed in build.yml paths-ignore. The
+# workflow itself must still start so ci-gate can run as a required check.
 set -euo pipefail
 
 set_decision() {

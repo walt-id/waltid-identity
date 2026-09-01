@@ -17,6 +17,8 @@ permissions:
 
 jobs:
   macos-predicate-tests:
+    needs: gradle-eligibility
+    if: ${{ needs.gradle-eligibility.outputs.should-run == 'true' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

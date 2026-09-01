@@ -9,7 +9,8 @@ does not currently require individual job names. The stable check to require is
 
 The Build workflow is not skipped for documentation or asset-only changes.
 Those runs still emit `ci-gate` so a required check cannot stay pending;
-`gradle-build` is skipped instead.
+`gradle-build` and `macos-predicate-tests` are skipped instead. Path
+eligibility still runs so `docs/mobile-sdk-api` can start `sdk-docs`.
 
 Release and fix-release Maven publish is a separate job that waits for the
 Gradle job and, when requested, the live conformance job.
@@ -29,9 +30,9 @@ force those specific lanes.
 | `ios-simulator` | Kotlin `common*` / `ios*` sources, library Gradle files, wallet-mobile, shared build-logic/CI | Kotlin iOS compile + `iosSimulatorArm64Test` | Swift package, XCFramework, native/Compose demos, DocC |
 | `native` + `compose` (one WalletCore consumer job) | Native demo / Compose demo / `waltid-wallet-demo-shared-ios` / wallet-mobile / wallet-sdk-ios / `Package.swift` / shared build-logic | One WalletCore XCFramework assemble, then the selected demo tests and document-provider checks | Kotlin simulator tests, Enterprise iOS, ABI/DocC |
 | `enterprise` | wallet-mobile / persistence-mobile / wallet-sdk-ios / shared build-logic | Enterprise iOS mobile integration against Identity | Community Identity-only compilation |
-| `sdk-docs` | Mobile SDK modules, DocC/Dokka workflow, or `ci:sdk-docs` | Linux Dokka + snippets; macOS `checkKotlinAbi` with iOS targets + Swift DocC | Demo Xcode tests |
+| `sdk-docs` | Mobile SDK modules, DocC/Dokka workflow, or `ci:sdk-docs` | Linux Dokka + snippets; macOS `checkKotlinAbi` with iOS targets, iOS-enabled Dokka, and Swift DocC | Demo Xcode tests |
 | `crypto2-platform-tests` | crypto2/jose/cose paths, or `ci:crypto2` | Windows + macOS x64 + macOS arm64/iOS crypto2 tests | Unrelated library changes |
-| `macos-predicate-tests` | Every Build workflow run | Fixture coverage of the A3 path predicates | Runtime job success |
+| `macos-predicate-tests` | Code changes (skipped for docs/asset-only PRs and pushes) | Fixture coverage of the A3 path predicates | Runtime job success |
 
 Main and release keep a cacheless Gradle rebuild (`clean cleanAllTests --rerun-tasks --no-daemon`).
 PR Gradle keeps `clean cleanAllTests --no-daemon` and omits `--rerun-tasks` until that
