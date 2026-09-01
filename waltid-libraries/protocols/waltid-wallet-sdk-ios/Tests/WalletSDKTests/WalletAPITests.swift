@@ -322,6 +322,26 @@ final class WalletAPITests: XCTestCase {
         )
     }
 
+    func testApplyingReaderTrustSettingsPreservesTransportConfiguration() {
+        let configuration = ProximityPresentationConfiguration(
+            engagement: .nfcOnly(.provisionalV2()),
+            retrieval: .provisionalNFCV2(
+                .init(
+                    bluetoothLowEnergy: .init(roles: .peripheralServer, bearerPolicy: .gattOnly)
+                )
+            ),
+            maximumMessageBytes: 2_097_152
+        )
+
+        let updated = ProximityReaderTrustSettings(readerPolicy: .requireTrusted)
+            .applying(to: configuration)
+
+        XCTAssertEqual(updated.engagement, configuration.engagement)
+        XCTAssertEqual(updated.retrieval, configuration.retrieval)
+        XCTAssertEqual(updated.readerPolicy, ProximityPresentationReaderPolicy.requireTrusted)
+        XCTAssertEqual(updated.maximumMessageBytes, configuration.maximumMessageBytes)
+    }
+
     func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() {
         let evidence = ProximityReaderEvidence(
             scope: .wholeRequest,
