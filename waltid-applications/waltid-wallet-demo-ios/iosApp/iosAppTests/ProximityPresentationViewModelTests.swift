@@ -182,6 +182,45 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         XCTAssertEqual(client.configurations.last?.readerPolicy, .requireTrusted)
     }
 
+    @MainActor
+    func testConfigurationProviderCombinesTransportAndReaderSettings() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        var profile = WalletDemoProximityTransportProfile.provisionalNfcV2Direct
+        var policy = ProximityStoredReaderPolicy.requireTrusted
+        let viewModel = ProximityPresentationViewModel(
+            client: client,
+            configurationProvider: {
+                ProximityReaderTrustSettings(readerPolicy: policy).applying(
+                    to: profile.configuration
+                )
+            },
+            hostActions: FakeProximityHostActionExecutor()
+        )
+
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        let first = try XCTUnwrap(client.lastConfiguration)
+        guard case .nfcOnly(.provisionalV2) = first.engagement else {
+            return XCTFail("The selected transport profile must be preserved")
+        }
+        XCTAssertEqual(first.readerPolicy, .requireTrusted)
+
+        profile = .defaultProfile
+        policy = .allowAnonymousOrUntrusted
+        XCTAssertEqual(client.configurations.count, 1)
+
+        viewModel.dismiss()
+        try await waitUntilAsync { await session.closeCount == 1 }
+        viewModel.start()
+        try await waitUntil { client.startCount == 2 }
+        let second = try XCTUnwrap(client.lastConfiguration)
+        guard case .qrAndNFC(.negotiatedHandover) = second.engagement else {
+            return XCTFail("The next session must use the newly selected transport profile")
+        }
+        XCTAssertEqual(second.readerPolicy, .allowAnonymousOrUntrusted)
+    }
+
     func testNativeProfilesResolveToTheSameTransportConfigurationsAsCompose() throws {
         let defaultConfiguration = WalletDemoProximityTransportProfile.defaultProfile.configuration
         guard case .qrAndNFC(.negotiatedHandover) = defaultConfiguration.engagement,

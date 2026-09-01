@@ -15,6 +15,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -130,12 +131,6 @@ internal fun SettingsScreen(
                 ready = ready,
                 onRequestChange = onRequestSigningProtectionChange,
             )
-            if (onProximityTransportProfileChange != null) {
-                ProximityPresentationSettings(
-                    selected = state.proximityTransportProfile,
-                    onSelect = onProximityTransportProfileChange,
-                )
-            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -170,6 +165,13 @@ internal fun SettingsScreen(
                         checked = state.showDcApiPresentationPreview,
                         onCheckedChange = onShowDcApiPresentationPreviewChange,
                         modifier = Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview),
+                    )
+                }
+                if (onProximityTransportProfileChange != null) {
+                    HorizontalDivider()
+                    ProximityPresentationSettings(
+                        selected = state.proximityTransportProfile,
+                        onSelect = onProximityTransportProfileChange,
                     )
                 }
                 sharingSettingsContent?.invoke()

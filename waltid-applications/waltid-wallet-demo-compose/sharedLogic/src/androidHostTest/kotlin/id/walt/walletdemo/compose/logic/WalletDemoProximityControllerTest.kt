@@ -390,7 +390,7 @@ class WalletDemoProximityControllerTest {
     }
 
     @Test
-    fun `configuration provider is resolved once for each new session`() = runTest {
+    fun `transport and reader settings are combined once for each new session`() = runTest {
         val session = FakeSession(
             MobileWalletProximityState.Completed(
                 exchanges = 1,
@@ -398,9 +398,11 @@ class WalletDemoProximityControllerTest {
             )
         )
         val backend = FakeBackend(session)
+        var profile = WalletDemoProximityTransportProfile.Default
         var policy = MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted
         val controller = WalletDemoProximityController(
             wallet = backend,
+            profileProvider = { profile },
             readerTrustSettingsProvider = {
                 MobileWalletProximityReaderTrustSettings(readerPolicy = policy)
             },
@@ -410,19 +412,24 @@ class WalletDemoProximityControllerTest {
 
         controller.start()
         advanceUntilIdle()
+        profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct
         policy = MobileWalletProximityReaderPolicy.RequireTrusted
+        val first = backend.configurations.single()
+        assertIs<MobileWalletProximityEngagementConfiguration.QrAndNfc>(first.engagement)
         assertEquals(
             MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
-            backend.configurations.single().readerPolicy,
+            first.readerPolicy,
         )
 
         controller.dismiss()
         advanceUntilIdle()
         controller.start()
         advanceUntilIdle()
+        val second = backend.configurations.last()
+        assertIs<MobileWalletProximityEngagementConfiguration.NfcOnly>(second.engagement)
         assertEquals(
             MobileWalletProximityReaderPolicy.RequireTrusted,
-            backend.configurations.last().readerPolicy,
+            second.readerPolicy,
         )
     }
 
