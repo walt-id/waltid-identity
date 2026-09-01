@@ -21,6 +21,7 @@ internal fun WalletScreen(
     state: WalletDemoUiState,
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
+    sharingSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val uriHandler = LocalUriHandler.current
     var showingSettings by remember { mutableStateOf(false) }
@@ -43,6 +44,7 @@ internal fun WalletScreen(
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
+            sharingSettingsContent = sharingSettingsContent,
         )
         return
     }
