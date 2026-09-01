@@ -27,10 +27,15 @@ public struct ProximityStoredReaderTrustAnchor: Sendable, Equatable, Identifiabl
 public struct ProximityStoredRICALProvider: Sendable, Equatable, Identifiable {
     /// Stable provider identifier.
     public var id: String { providerID }
+    /// Identifier asserted by the RICAL provider configuration.
     public let providerID: String
+    /// RICAL entry types accepted from this provider.
     public let acceptedTypes: Set<String>
+    /// Provider trust anchors encoded as unpadded Base64URL DER certificates.
     public let providerTrustAnchorsDERBase64URL: [String]
+    /// Certificate-policy object identifiers accepted for the RICAL signer.
     public let acceptedSignerCertificatePolicyOIDs: Set<String>
+    /// Whether a valid entry from this provider can establish reader trust.
     public let establishesReaderTrust: Bool
     /// Exact untagged COSE_Sign1 bytes encoded as unpadded Base64URL.
     public let signedRICALBase64URL: String
@@ -54,11 +59,15 @@ public struct ProximityStoredRICALProvider: Sendable, Equatable, Identifiable {
 
 /// Complete immutable Reader Authentication settings snapshot.
 public struct ProximityReaderTrustSettings: Sendable, Equatable {
+    /// Policy applied when evaluating reader authentication.
     public let readerPolicy: ProximityStoredReaderPolicy
+    /// Reader CA certificates trusted by the holder.
     public let trustAnchors: [ProximityStoredReaderTrustAnchor]
+    /// Static RICAL providers configured by the holder.
     public let ricalProviders: [ProximityStoredRICALProvider]
 
     /// Creates empty settings with the selected reader policy.
+    /// - Parameter readerPolicy: Policy to apply when evaluating reader authentication.
     public init(readerPolicy: ProximityStoredReaderPolicy = .allowAnonymousOrUntrusted) {
         self.readerPolicy = readerPolicy
         trustAnchors = []
@@ -76,11 +85,13 @@ public struct ProximityReaderTrustSettings: Sendable, Equatable {
     }
 
     /// Returns a new snapshot with the selected reader policy.
+    /// - Parameter policy: Policy to use in the returned settings snapshot.
     public func updatingReaderPolicy(_ policy: ProximityStoredReaderPolicy) -> Self {
         .init(readerPolicy: policy, trustAnchors: trustAnchors, ricalProviders: ricalProviders)
     }
 
     /// Returns a new snapshot without the selected Reader CA.
+    /// - Parameter id: Stable identifier of the Reader CA to remove.
     public func removingReaderTrustAnchor(id: String) -> Self {
         .init(
             readerPolicy: readerPolicy,
@@ -90,6 +101,7 @@ public struct ProximityReaderTrustSettings: Sendable, Equatable {
     }
 
     /// Returns a new snapshot without the selected RICAL provider.
+    /// - Parameter id: Stable identifier of the RICAL provider to remove.
     public func removingRICALProvider(id: String) -> Self {
         .init(
             readerPolicy: readerPolicy,
@@ -99,6 +111,7 @@ public struct ProximityReaderTrustSettings: Sendable, Equatable {
     }
 
     /// Applies this immutable settings snapshot to one new proximity session.
+    /// - Parameter configuration: Base presentation configuration to update.
     public func applying(
         to configuration: ProximityPresentationConfiguration = .init()
     ) -> ProximityPresentationConfiguration {
@@ -122,49 +135,75 @@ public struct ProximityReaderTrustSettings: Sendable, Equatable {
 
 /// Kind of validated reader-trust material awaiting confirmation.
 public enum ProximityReaderTrustImportKind: Sendable, Equatable {
+    /// One or more public Reader CA certificates.
     case readerCA
+    /// A versioned walt.id reader-trust bundle.
     case trustBundle
 }
 
 /// Display-safe preview of one imported Reader CA.
 public struct ProximityReaderTrustAnchorImportPreview: Sendable, Equatable, Identifiable {
+    /// Stable preview identity derived from the certificate fingerprint.
     public var id: String { sha256Fingerprint }
+    /// Holder-visible label for the Reader CA.
     public let displayName: String
+    /// Distinguished name of the certificate subject.
     public let subject: String
+    /// Distinguished name of the certificate issuer.
     public let issuer: String
+    /// SHA-256 fingerprint of the canonical DER certificate.
     public let sha256Fingerprint: String
+    /// Beginning of the certificate validity interval.
     public let validFrom: Date
+    /// End of the certificate validity interval.
     public let validUntil: Date
+    /// Validated certificate profile reported by the importer.
     public let profile: String
 }
 
 /// Display-safe preview of one validated static RICAL provider.
 public struct ProximityRICALImportPreview: Sendable, Equatable, Identifiable {
+    /// Stable preview identity derived from the provider identifier.
     public var id: String { providerID }
+    /// Identifier asserted by the RICAL provider configuration.
     public let providerID: String
+    /// Holder-visible provider name.
     public let providerName: String
+    /// Validated RICAL type.
     public let type: String
+    /// Time at which the RICAL was issued.
     public let issuedAt: Date
+    /// Optional time at which the provider expects to publish an update.
     public let nextUpdate: Date?
+    /// Optional end of the RICAL validity interval.
     public let validUntil: Date?
+    /// Whether the imported provider can establish reader trust.
     public let establishesReaderTrust: Bool
 }
 
 /// Immutable import review which must be explicitly confirmed before persistence.
 public struct ProximityReaderTrustImportPreview: Sendable, Equatable {
+    /// Kind of trust material represented by the preview.
     public let kind: ProximityReaderTrustImportKind
+    /// File name or other holder-visible import source.
     public let sourceName: String
+    /// Validated Reader CA certificates awaiting confirmation.
     public let readerAuthorities: [ProximityReaderTrustAnchorImportPreview]
+    /// Validated RICAL providers awaiting confirmation.
     public let ricalProviders: [ProximityRICALImportPreview]
+    /// Display-safe description of the resulting policy effect.
     public let policyEffect: String
+    /// Complete settings snapshot to persist after holder confirmation.
     public let resultingSettings: ProximityReaderTrustSettings
 }
 
 /// Shared canonical settings codec and strict Reader CA / RICAL importer.
 public enum ProximityReaderTrustSettingsCodec {
+    /// Maximum number of bytes accepted from one imported file.
     public static let maximumImportBytes = 1_048_576
 
     /// Encodes settings using the shared versioned persistence schema.
+    /// - Parameter settings: Validated reader-trust settings to encode.
     public static func encode(_ settings: ProximityReaderTrustSettings) throws -> String {
         #if canImport(WalletCore) && os(iOS)
         return MobileWalletProximityReaderTrustSettingsCodec.shared.encode(
@@ -176,6 +215,7 @@ public enum ProximityReaderTrustSettingsCodec {
     }
 
     /// Decodes and validates the shared versioned persistence schema.
+    /// - Parameter encoded: Versioned reader-trust settings document.
     public static func decode(_ encoded: String) throws -> ProximityReaderTrustSettings {
         #if canImport(WalletCore) && os(iOS)
         return try MobileWalletProximityReaderTrustSettingsCodec.shared
@@ -187,6 +227,11 @@ public enum ProximityReaderTrustSettingsCodec {
     }
 
     /// Validates imported bytes and returns a review without persisting any material.
+    /// - Parameters:
+    ///   - sourceName: File name or other holder-visible import source.
+    ///   - data: Reader CA or trust-bundle bytes to validate.
+    ///   - existing: Existing settings to which the imported material would be applied.
+    ///   - now: Reference time used for validity checks.
     public static func prepareImport(
         sourceName: String,
         data: Data,
@@ -213,10 +258,14 @@ public enum ProximityReaderTrustSettingsCodec {
     }
 }
 
+/// Errors produced by the Swift reader-trust settings facade.
 public enum ProximityReaderTrustSettingsCodecError: LocalizedError, Sendable {
+    /// The operation requires WalletCore on a supported iOS target.
     case walletCoreUnavailable
+    /// WalletCore returned reader-trust data that could not be represented safely.
     case invalidCoreData
 
+    /// A localized, user-readable description of the codec error.
     public var errorDescription: String? {
         switch self {
         case .walletCoreUnavailable:
@@ -224,6 +273,21 @@ public enum ProximityReaderTrustSettingsCodecError: LocalizedError, Sendable {
         case .invalidCoreData:
             return "WalletCore returned invalid reader trust data"
         }
+    }
+
+    /// A localized explanation of why the codec error occurred.
+    public var failureReason: String? {
+        nil
+    }
+
+    /// A localized recovery suggestion for the codec error.
+    public var recoverySuggestion: String? {
+        nil
+    }
+
+    /// A localized help anchor for documentation related to the codec error.
+    public var helpAnchor: String? {
+        nil
     }
 }
 
