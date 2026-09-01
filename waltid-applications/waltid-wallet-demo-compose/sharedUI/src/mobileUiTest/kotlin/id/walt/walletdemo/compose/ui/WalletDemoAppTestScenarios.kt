@@ -1032,7 +1032,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("Enter your PIN").assertIsDisplayed()
     }
 
-    fun readerTrustSettingsReviewPublicCaBeforePersisting() = runComposeUiTest {
+    fun readerTrustSettingsReviewAndPersistPublicCa() = runComposeUiTest {
         val store = InMemoryDemoReaderTrustSettingsStore()
         val controller = DemoReaderTrustSettingsController(
             store = store,
@@ -1127,6 +1127,28 @@ class WalletDemoAppTestScenarios {
             .assertTextContains("The selected file could not be read")
         assertEquals("The selected file could not be read", controller.state.value.error)
         assertTrue(store.load().trustAnchors.isEmpty())
+
+        runOnIdle {
+            handleReaderTrustImportPickerResult(
+                controller,
+                ReaderTrustImportPickerResult.Selected(
+                    ReaderTrustImportFile(
+                        name = "wal-1349-local-reader-ca.der",
+                        bytes = Base64.Default.decode(TestReaderCaDerBase64),
+                    )
+                ),
+            )
+        }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.pendingImport != null }
+        onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportConfirm).performClick()
+        waitForIdle()
+
+        assertEquals(null, controller.state.value.pendingImport)
+        assertEquals(1, store.load().trustAnchors.size)
+        assertEquals(
+            MobileWalletProximityReaderPolicy.RequireTrusted,
+            store.load().readerPolicy,
+        )
     }
 
     fun lockDoesNotAutoPromptBiometrics() = runComposeUiTest {
