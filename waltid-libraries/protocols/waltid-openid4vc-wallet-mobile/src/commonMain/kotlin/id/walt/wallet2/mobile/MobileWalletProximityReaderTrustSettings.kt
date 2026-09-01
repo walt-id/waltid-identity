@@ -436,7 +436,9 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
             displayName = displayName,
             subject = data.subjectDn,
             issuer = data.issuerDn,
-            sha256Fingerprint = fingerprintSha256Hex,
+            sha256Fingerprint = fingerprintSha256Hex
+                .chunked(2)
+                .joinToString(":") { it.uppercase() },
             validFrom = data.validity.notBefore,
             validUntil = data.validity.notAfter,
         )
