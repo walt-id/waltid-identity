@@ -19,7 +19,7 @@ import platform.posix.memcpy
 
 @Composable
 internal actual fun rememberReaderTrustImportPicker(
-    onResult: (Result<ReaderTrustImportFile>) -> Unit,
+    onResult: (ReaderTrustImportPickerResult) -> Unit,
 ): ReaderTrustImportPicker {
     val delegate = remember { ReaderTrustDocumentPickerDelegate() }
     delegate.onResult = onResult
@@ -32,13 +32,17 @@ internal actual fun rememberReaderTrustImportPicker(
             UIApplication.sharedApplication.keyWindow?.rootViewController
                 ?.topPresentedViewController()
                 ?.presentViewController(picker, animated = true, completion = null)
-                ?: onResult(Result.failure(IllegalStateException("File picker is unavailable")))
+                ?: onResult(
+                    ReaderTrustImportPickerResult.Failed(
+                        IllegalStateException("File picker is unavailable")
+                    )
+                )
         }
     }
 }
 
 private class ReaderTrustDocumentPickerDelegate : NSObject(), UIDocumentPickerDelegateProtocol {
-    var onResult: (Result<ReaderTrustImportFile>) -> Unit = {}
+    var onResult: (ReaderTrustImportPickerResult) -> Unit = {}
 
     override fun documentPicker(
         controller: UIDocumentPickerViewController,
@@ -46,10 +50,14 @@ private class ReaderTrustDocumentPickerDelegate : NSObject(), UIDocumentPickerDe
     ) {
         val url = didPickDocumentsAtURLs.singleOrNull() as? NSURL
         if (url == null) {
-            onResult(Result.failure(IllegalArgumentException("Select one reader trust file")))
+            onResult(
+                ReaderTrustImportPickerResult.Failed(
+                    IllegalArgumentException("Select one reader trust file")
+                )
+            )
             return
         }
-        onResult(runCatching {
+        runCatching {
             require(url.startAccessingSecurityScopedResource()) {
                 "The selected file could not be accessed"
             }
@@ -71,10 +79,15 @@ private class ReaderTrustDocumentPickerDelegate : NSObject(), UIDocumentPickerDe
             } finally {
                 url.stopAccessingSecurityScopedResource()
             }
-        })
+        }.fold(
+            onSuccess = { onResult(ReaderTrustImportPickerResult.Selected(it)) },
+            onFailure = { onResult(ReaderTrustImportPickerResult.Failed(it)) },
+        )
     }
 
-    override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) = Unit
+    override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
+        onResult(ReaderTrustImportPickerResult.Cancelled)
+    }
 }
 
 private fun NSData.toByteArray(): ByteArray = ByteArray(length.toInt()).also { result ->

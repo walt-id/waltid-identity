@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -18,6 +19,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,10 +36,7 @@ internal fun DemoReaderTrustSettings(
 ) {
     val state by controller.state.collectAsState()
     val picker = rememberReaderTrustImportPicker { result ->
-        result.fold(
-            onSuccess = { controller.prepareImport(it.name, it.bytes) },
-            onFailure = { controller.reportImportError(it.message ?: "The selected file could not be read") },
-        )
+        handleReaderTrustImportPickerResult(controller, result)
     }
     Column(
         modifier = Modifier
@@ -91,7 +94,13 @@ internal fun DemoReaderTrustSettings(
             enabled = !state.importInProgress,
             modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.SettingsReaderTrustImport),
         ) {
-            if (state.importInProgress) CircularProgressIndicator()
+            if (state.importInProgress) {
+                CircularProgressIndicator(
+                    modifier = Modifier.semantics {
+                        contentDescription = "Validating reader trust material"
+                    }
+                )
+            }
             else Text("Import Reader CA or trust bundle")
         }
         OutlinedButton(
@@ -106,13 +115,16 @@ internal fun DemoReaderTrustSettings(
         state.error?.let { error ->
             Text(
                 error,
-                modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustError),
+                modifier = Modifier
+                    .testTag(WalletUiTestTags.SettingsReaderTrustError)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
     }
 
     state.pendingImport?.let { preview ->
         AlertDialog(
+            modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImportReview),
             onDismissRequest = controller::cancelImport,
             title = { Text("Review reader trust import") },
             text = {
@@ -160,11 +172,32 @@ private fun ReaderPolicyChoice(
     onSelect: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().testTag(tag),
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(
+                selected = selected,
+                onClick = onSelect,
+                role = Role.RadioButton,
+            )
+            .testTag(tag),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = onSelect)
+        RadioButton(selected = selected, onClick = null)
         Text(title, modifier = Modifier.padding(start = 8.dp))
+    }
+}
+
+internal fun handleReaderTrustImportPickerResult(
+    controller: DemoReaderTrustSettingsController,
+    result: ReaderTrustImportPickerResult,
+) {
+    when (result) {
+        is ReaderTrustImportPickerResult.Selected ->
+            controller.prepareImport(result.file.name, result.file.bytes)
+        ReaderTrustImportPickerResult.Cancelled -> Unit
+        is ReaderTrustImportPickerResult.Failed -> controller.reportImportError(
+            result.error.message ?: "The selected file could not be read"
+        )
     }
 }
 

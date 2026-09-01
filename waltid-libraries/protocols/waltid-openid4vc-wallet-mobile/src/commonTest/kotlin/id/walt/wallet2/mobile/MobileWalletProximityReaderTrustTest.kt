@@ -310,6 +310,10 @@ class MobileWalletProximityReaderTrustTest {
             assertEquals(existing.readerPolicy, der.resultingSettings.readerPolicy)
             assertEquals(1, der.readerAuthorities.size)
             assertEquals("ISO mdoc Reader CA", der.readerAuthorities.single().profile)
+            assertTrue(
+                Regex("(?:[0-9A-F]{2}:){31}[0-9A-F]{2}")
+                    .matches(der.readerAuthorities.single().sha256Fingerprint),
+            )
             assertEquals(0, existing.trustAnchors.size)
 
             val pem = MobileWalletProximityReaderTrustSettingsCodec.prepareImport(

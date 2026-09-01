@@ -48,6 +48,55 @@ enum DemoReaderTrustSettingsPersistenceError: LocalizedError {
     }
 }
 
+enum ReaderTrustImportFileSelection: Equatable {
+    case cancelled
+    case selected(sourceName: String, data: Data)
+}
+
+enum ReaderTrustImportFileLoader {
+    static func load(
+        _ result: Result<[URL], Error>
+    ) throws -> ReaderTrustImportFileSelection {
+        let urls: [URL]
+        do {
+            urls = try result.get()
+        } catch {
+            if error is CancellationError ||
+                (error as? CocoaError)?.code == .userCancelled {
+                return .cancelled
+            }
+            throw error
+        }
+
+        guard urls.count == 1, let url = urls.first else {
+            throw ReaderTrustFileImportError.selectOneFile
+        }
+        let accessGranted = url.startAccessingSecurityScopedResource()
+        defer { if accessGranted { url.stopAccessingSecurityScopedResource() } }
+        let fileSize = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize
+        if let fileSize, fileSize > ProximityReaderTrustSettingsCodec.maximumImportBytes {
+            throw ReaderTrustFileImportError.fileTooLarge
+        }
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        guard data.count <= ProximityReaderTrustSettingsCodec.maximumImportBytes else {
+            throw ReaderTrustFileImportError.fileTooLarge
+        }
+        return .selected(sourceName: url.lastPathComponent, data: data)
+    }
+}
+
+enum ReaderTrustFileImportError: LocalizedError {
+    case selectOneFile
+    case fileTooLarge
+
+    var errorDescription: String? {
+        switch self {
+        case .selectOneFile: return "Select one Reader Authentication file"
+        case .fileTooLarge: return "The imported file exceeds 1 MiB"
+        }
+    }
+}
+
 @MainActor
 final class DemoReaderTrustSettingsController: ObservableObject {
     @Published private(set) var settings: ProximityReaderTrustSettings

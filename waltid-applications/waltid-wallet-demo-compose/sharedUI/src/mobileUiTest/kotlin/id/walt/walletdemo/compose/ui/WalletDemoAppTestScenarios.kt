@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.material3.Text
@@ -31,11 +33,14 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runComposeUiTest
+import id.walt.wallet2.mobile.MobileWalletProximityReaderPolicy
 import id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.DemoBiometricResult
 import id.walt.walletdemo.compose.logic.DemoPinStore
+import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
+import id.walt.walletdemo.compose.logic.InMemoryDemoReaderTrustSettingsStore
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
@@ -71,6 +76,9 @@ import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.isStatusVisible
 import id.walt.walletdemo.compose.logic.statusText
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlin.io.encoding.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -1024,6 +1032,103 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("Enter your PIN").assertIsDisplayed()
     }
 
+    fun readerTrustSettingsReviewPublicCaBeforePersisting() = runComposeUiTest {
+        val store = InMemoryDemoReaderTrustSettingsStore()
+        val controller = DemoReaderTrustSettingsController(
+            store = store,
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            dispatcher = Dispatchers.Unconfined,
+        )
+
+        setContent { DemoReaderTrustSettings(controller) }
+
+        val allowUntrusted = onNodeWithTag(
+            WalletUiTestTags.SettingsReaderPolicyAllowUntrusted
+        )
+        val requireTrusted = onNodeWithTag(
+            WalletUiTestTags.SettingsReaderPolicyRequireTrusted
+        )
+        allowUntrusted.assertHasClickAction()
+        requireTrusted.assertHasClickAction()
+        assertEquals(
+            true,
+            allowUntrusted.fetchSemanticsNode().config[SemanticsProperties.Selected],
+        )
+        assertEquals(
+            false,
+            requireTrusted.fetchSemanticsNode().config[SemanticsProperties.Selected],
+        )
+
+        requireTrusted.performClick()
+        waitForIdle()
+        assertEquals(
+            MobileWalletProximityReaderPolicy.RequireTrusted,
+            store.load().readerPolicy,
+        )
+        assertEquals(
+            true,
+            requireTrusted.fetchSemanticsNode().config[SemanticsProperties.Selected],
+        )
+
+        runOnIdle {
+            handleReaderTrustImportPickerResult(
+                controller,
+                ReaderTrustImportPickerResult.Selected(
+                    ReaderTrustImportFile(
+                        name = "wal-1349-local-reader-ca.der",
+                        bytes = Base64.Default.decode(TestReaderCaDerBase64),
+                    )
+                ),
+            )
+        }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.pendingImport != null }
+
+        val preview = requireNotNull(controller.state.value.pendingImport)
+        assertEquals("wal-1349-local-reader-ca.der", preview.sourceName)
+        assertEquals(
+            "CN=WAL-1349 Local Reader Test CA",
+            preview.readerAuthorities.single().displayName,
+        )
+        assertEquals("CN=WAL-1349 Local Reader Test CA", preview.readerAuthorities.single().subject)
+        assertEquals(TestReaderCaSha256, preview.readerAuthorities.single().sha256Fingerprint)
+        assertTrue(store.load().trustAnchors.isEmpty())
+        onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportReview).assertIsDisplayed()
+        onNodeWithText("Review reader trust import").assertIsDisplayed()
+        onNodeWithText("wal-1349-local-reader-ca.der").assertIsDisplayed()
+        onNodeWithText("WAL-1349 Local Reader Test CA", substring = true).assertIsDisplayed()
+
+        onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportCancel).performClick()
+        waitForIdle()
+        assertEquals(null, controller.state.value.pendingImport)
+        assertTrue(store.load().trustAnchors.isEmpty())
+        assertEquals(
+            MobileWalletProximityReaderPolicy.RequireTrusted,
+            store.load().readerPolicy,
+        )
+
+        val stateBeforePickerCancellation = controller.state.value
+        runOnIdle {
+            handleReaderTrustImportPickerResult(
+                controller,
+                ReaderTrustImportPickerResult.Cancelled,
+            )
+        }
+        assertEquals(stateBeforePickerCancellation, controller.state.value)
+
+        runOnIdle {
+            handleReaderTrustImportPickerResult(
+                controller,
+                ReaderTrustImportPickerResult.Failed(
+                    IllegalStateException("The selected file could not be read")
+                ),
+            )
+        }
+        onNodeWithTag(WalletUiTestTags.SettingsReaderTrustError)
+            .assertTextContains("The selected file could not be read")
+        assertEquals("The selected file could not be read", controller.state.value.error)
+        assertTrue(store.load().trustAnchors.isEmpty())
+    }
+
     fun lockDoesNotAutoPromptBiometrics() = runComposeUiTest {
         val pinStore = InMemoryDemoPinStore()
         val biometrics = RecordingDemoBiometricAuthenticator()
@@ -1238,6 +1343,15 @@ class WalletDemoAppTestScenarios {
     }
 
     companion object {
+        // Public certificate generated and owned by walt.id for WAL-1349 qualification tests.
+        // No private key or third-party fixture material is embedded here.
+        private const val TestReaderCaDerBase64 =
+            "MIIB5jCCAYygAwIBAgIIQAAAAAAAAAIwCgYIKoZIzj0EAwIwKDEmMCQGA1UEAwwdV0FMLTEzNDkgTG9jYWwgUmVhZGVyIFRlc3QgQ0EwHhcNMjYwOTAxMDgxNTIyWhcNMzYwODI5MDgxNTIyWjAoMSYwJAYDVQQDDB1XQUwtMTM0OSBMb2NhbCBSZWFkZXIgVGVzdCBDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABLkoxDaSw3orgCt+rU6tkUzMqbvwbGSW79yUDGFF7/RACZJuY33ELFPTTZnx6vYGuVFZ4DiMI8a7YfPwQRY4mVajgZ8wgZwwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFI7/672ZcKzVj4pzE9lFgmc6kpFvMFcGA1UdIwRQME6AFI7/672ZcKzVj4pzE9lFgmc6kpFvoSykKjAoMSYwJAYDVQQDDB1XQUwtMTM0OSBMb2NhbCBSZWFkZXIgVGVzdCBDQYIIQAAAAAAAAAIwCgYIKoZIzj0EAwIDSAAwRQIhAKrZrpvBEYeWpezCh6b48gvPzaHLXUbGfmOApayRI9MVAiBds/mL9fhhsBWtlFj2LSaMGsuPYVVIbT2d3YeWSVrJxg=="
+
+        private const val TestReaderCaSha256 =
+            "6C:5B:A7:9B:60:AF:AE:DE:74:4C:DF:E6:7F:EB:A1:51:" +
+                "DE:5D:89:D7:D2:5B:20:1E:8E:94:CC:CB:AE:78:52:09"
+
         val sampleCredential = WalletDemoCredential(
             id = "cred-1",
             format = "jwt_vc_json",

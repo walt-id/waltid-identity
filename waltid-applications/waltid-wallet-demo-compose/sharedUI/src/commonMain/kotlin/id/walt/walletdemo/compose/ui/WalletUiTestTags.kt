@@ -27,6 +27,7 @@ internal object WalletUiTestTags {
     val SettingsReaderPolicyAllowUntrusted = tag("settingsReaderPolicyAllowUntrusted")
     val SettingsReaderPolicyRequireTrusted = tag("settingsReaderPolicyRequireTrusted")
     val SettingsReaderTrustImport = tag("settingsReaderTrustImport")
+    val SettingsReaderTrustImportReview = tag("settingsReaderTrustImportReview")
     val SettingsReaderTrustImportConfirm = tag("settingsReaderTrustImportConfirm")
     val SettingsReaderTrustImportCancel = tag("settingsReaderTrustImportCancel")
     val SettingsReaderTrustReset = tag("settingsReaderTrustReset")

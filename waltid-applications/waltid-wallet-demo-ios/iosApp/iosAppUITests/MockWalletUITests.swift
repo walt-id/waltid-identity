@@ -4,6 +4,47 @@ import XCTest
 final class MockWalletUITests: XCTestCase {
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
+    func testReaderTrustSettingsExposePolicyAndFileImport() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            "Wallet ready"
+        )
+        ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        ui.tapElement(identifier: "wallet.settingsReaderAuthentication")
+
+        let allowUntrusted = app.descendants(matching: .any)[
+            "wallet.readerTrustAllowUntrusted"
+        ]
+        let requireTrusted = app.descendants(matching: .any)[
+            "wallet.readerTrustRequireTrusted"
+        ]
+        XCTAssertTrue(allowUntrusted.waitForExistence(timeout: 10))
+        XCTAssertTrue(requireTrusted.waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            app.buttons["wallet.readerTrustImport"].waitForExistence(timeout: 10)
+        )
+
+        allowUntrusted.tap()
+        XCTAssertTrue(allowUntrusted.isSelected)
+        XCTAssertEqual(allowUntrusted.value as? String, "Selected")
+        requireTrusted.tap()
+        XCTAssertTrue(requireTrusted.isSelected)
+        XCTAssertEqual(requireTrusted.value as? String, "Selected")
+        XCTAssertEqual(allowUntrusted.value as? String, "Not selected")
+
+        ui.tapButton(
+            identifier: "wallet.readerTrustReset",
+            fallbackLabel: "Reset Reader Authentication settings"
+        )
+        ui.tapButton(identifier: "wallet.readerTrustResetConfirm", fallbackLabel: "Reset")
+        XCTAssertEqual(allowUntrusted.value as? String, "Selected")
+        XCTAssertFalse(app.buttons["wallet.readerTrustReset"].exists)
+    }
+
     func testProximityPresentationCanBeDismissedAndStartedAgain() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
