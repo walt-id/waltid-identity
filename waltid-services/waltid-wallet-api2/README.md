@@ -261,9 +261,9 @@ failure. The issuer acknowledgement is best-effort: a delivery failure does
 not undo stored credentials, and no separate Wallet2 route is required.
 
 The current implementation covers immediate responses in the full
-pre-authorized flow. Isolated and deferred flows do not send notifications
-automatically, `credential_deleted` is not connected to credential deletion,
-and failed delivery is not persisted for retry.
+pre-authorized flow and wallet-aware isolated credential fetching when
+`storeInWallet` is enabled. No explicit user-rejection flow emits
+`credential_deleted`, and failed delivery is not persisted for retry.
 
 ```bash
 # offerUrl from a QR code / deep link
@@ -295,9 +295,12 @@ curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive \
 
 #### Step-by-step (isolated steps)
 
-These endpoints expose the issuance steps independently and do not send an
-issuer notification automatically. They can be used to inspect the raw
-Credential Response and call the issuer Notification Endpoint manually.
+These endpoints expose the issuance steps independently. The wallet-aware
+`fetch-credential` endpoint sends an issuer notification after storage when
+`storeInWallet` is true and `credentialIssuerBaseUrl` allows issuer metadata
+to be resolved. Stateless fetches return `notificationId` without notifying,
+allowing the caller to inspect the Credential Response and call the issuer
+Notification Endpoint manually.
 
 ```bash
 # Step 1: Resolve the offer - returns grant/endpoints plus issuer display and offered-credential metadata
@@ -337,7 +340,9 @@ curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive/fetc
     \"credentialEndpoint\": \"https://issuer.example.com/credential\",
     \"accessToken\": \"$ACCESS_TOKEN\",
     \"credentialConfigurationId\": \"pid_sd_jwt\",
-    \"proofJwt\": \"$PROOF_JWT\"
+    \"proofJwt\": \"$PROOF_JWT\",
+    \"storeInWallet\": true,
+    \"credentialIssuerBaseUrl\": \"https://issuer.example.com\"
   }"
 ```
 
