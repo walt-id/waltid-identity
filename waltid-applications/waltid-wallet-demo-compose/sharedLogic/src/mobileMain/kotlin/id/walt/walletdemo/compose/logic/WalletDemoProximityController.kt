@@ -368,7 +368,9 @@ class WalletDemoProximityController(
 private val MobileWalletProximityCapabilities.automaticPermissionActions:
     List<MobileWalletProximityRemediationAction>
     get() = remediationActions.filter {
-        it == MobileWalletProximityRemediationAction.RequestBluetoothPermission
+        it == MobileWalletProximityRemediationAction.RequestBluetoothPermission ||
+            it == MobileWalletProximityRemediationAction.RequestNearbyWifiPermission ||
+            it == MobileWalletProximityRemediationAction.RequestLocalNetworkPermission
     }
 
 internal fun WalletDemoProximityTransportProfile.configuration(): MobileWalletProximityConfiguration =
