@@ -233,9 +233,12 @@ class TokenRequestBuilderTest {
         }
 
         assertEquals("invalid_grant", error.oauthError)
+        // Available to callers that trust their token endpoint...
         assertEquals("Pre-authorized code is invalid or has already been used", error.oauthErrorDescription)
-        // The reason the grant was refused has to reach the operator, not just the status code.
-        assertTrue(error.message.orEmpty().contains("already been used"), error.message.orEmpty())
+        // ...but never in the message, because for a wallet the token endpoint is a third-party
+        // issuer and the message can reach a response we return to our own client.
+        assertFalse(error.message.orEmpty().contains("already been used"), error.message.orEmpty())
+        assertTrue(error.message.orEmpty().contains("invalid_grant"), error.message.orEmpty())
     }
 
     /**
@@ -261,10 +264,11 @@ class TokenRequestBuilderTest {
 
         assertEquals(HttpStatusCode.BadRequest.value, error.statusCode)
         assertNull(error.oauthError)
-        assertEquals("response body is not an OAuth error object", error.oauthErrorDescription)
+        assertTrue(error.nonOAuthErrorBody)
         // Still sanitized: the opaque body itself never reaches the message.
         assertFalse(error.message.orEmpty().contains("Missing call ID"))
-        // But the failure is no longer a bare status code that reads like a refused grant.
+        // But the failure is no longer a bare status code that reads like a refused grant. This text
+        // is ours, not the server's, so it is safe to surface.
         assertTrue(error.message.orEmpty().contains("not an OAuth error object"), error.message.orEmpty())
     }
 
