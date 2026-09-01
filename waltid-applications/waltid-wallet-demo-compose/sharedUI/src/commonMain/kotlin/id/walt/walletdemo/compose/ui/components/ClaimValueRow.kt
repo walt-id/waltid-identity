@@ -258,11 +258,6 @@ private fun QrCodeValue(
             )
         }
         Text(
-            "QR code",
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium,
-        )
-        Text(
             when (val payload = value.payload) {
                 is QrCodePayload.Text -> "${payload.value.length} characters"
                 is QrCodePayload.Binary -> "ICAO Compact VDS, ${payload.bytes.size.toReadableByteCount()}"

@@ -1,5 +1,5 @@
 {
-  "originHash" : "0bd5c3f68876330160aa2f59a8391853425893f019b888d9bf5cd02e9f34dd69",
+  "originHash" : "5f0b9a0e87e8b230748eb25c365aa3a55ea6ca507c6c251881bb54ab7ad903af",
   "pins" : [
     {
       "identity" : "sqlcipher.swift",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "07bf6bc2191a063d6f1e7c3b5f276a3fadfe36b7",
         "version" : "4.16.0"
+      }
+    },
+    {
+      "identity" : "zxing-cpp",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/zxing-cpp/zxing-cpp.git",
+      "state" : {
+        "revision" : "287c85df6f961c8efbfb5ffd736cd9457b8b890e",
+        "version" : "3.1.1"
       }
     }
   ],

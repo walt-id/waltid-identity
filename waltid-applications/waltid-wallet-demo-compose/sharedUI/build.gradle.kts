@@ -68,7 +68,12 @@ kotlin {
             }
 
             if (enableIosBuild) {
-                iosMain.get().dependsOn(mobileMain)
+                iosMain.get().apply {
+                    dependsOn(mobileMain)
+                    dependencies {
+                        implementation(identityLibs.zxing.cpp.kotlin.native)
+                    }
+                }
             }
         }
 

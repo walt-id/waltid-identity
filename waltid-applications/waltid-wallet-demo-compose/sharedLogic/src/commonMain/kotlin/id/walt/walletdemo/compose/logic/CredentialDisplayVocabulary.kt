@@ -263,6 +263,7 @@ internal object CredentialDisplayVocabulary {
         val roles = descriptorFor(leaf)?.roles.orEmpty().toMutableSet()
         if (path.isCredentialTypeClaimPath()) roles += ClaimRole.CredentialType
         if (pathHasRole(path, ClaimRole.Image)) roles += ClaimRole.Image
+        if (pathHasRole(path, ClaimRole.QrCode)) roles += ClaimRole.QrCode
         return roles
     }
 

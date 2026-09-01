@@ -20,6 +20,7 @@ compose-material3 = "1.11.0-alpha07"
 compose-material-icons = "1.7.3"
 easyqrscan = "0.7.1"
 zxing = "3.5.4"
+zxing-cpp = "3.1.1"
 compose-navigation3 = "1.1.1"
 dokka = "2.2.0"
 coil = "3.5.0"
@@ -279,6 +280,7 @@ compose-material3 = { module = "org.jetbrains.compose.material3:material3", vers
 compose-material-icons-core = { module = "org.jetbrains.compose.material:material-icons-core", version.ref = "compose-material-icons" }
 easyqrscan = { module = "io.github.kalinjul.easyqrscan:scanner", version.ref = "easyqrscan" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+zxing-cpp-kotlin-native = { module = "io.github.zxing-cpp:kotlin-native", version.ref = "zxing-cpp" }
 compose-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "compose-navigation3" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }

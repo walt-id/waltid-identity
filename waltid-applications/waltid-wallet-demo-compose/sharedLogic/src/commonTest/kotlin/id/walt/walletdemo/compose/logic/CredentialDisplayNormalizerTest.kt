@@ -748,6 +748,24 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun recognizesCamelCaseQrDataAlias() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = null,
+                label = "PoC eID",
+                credentialDataJson = """{"qrData":"alias payload"}""",
+            )
+        )
+
+        val claim = details.groups.single().items.single()
+        assertEquals("QR code", claim.label)
+        assertEquals(DisplayValue.QrCode(QrCodePayload.Text("alias payload")), claim.value)
+        assertTrue(ClaimRole.QrCode in claim.roles)
+    }
+
+    @Test
     fun keepsBlankQrDataAsText() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
@@ -781,6 +799,26 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun rendersWrappedIcaoCompactVdsAsBinaryQrCodeWithOuterClaimLabel() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "PoC eID",
+                credentialDataJson = """{"qr_data":{"elementValue":[220,3,0,255,65]}}""",
+            )
+        )
+
+        val claim = details.groups.single().items.single()
+        assertEquals("qr_data.elementValue", claim.path.id)
+        assertEquals("QR code", claim.label)
+        val payload = assertIs<QrCodePayload.Binary>(assertIs<DisplayValue.QrCode>(claim.value).payload)
+        assertTrue(payload.bytes.contentEquals(byteArrayOf(0xDC.toByte(), 0x03, 0x00, 0xFF.toByte(), 0x41)))
+        assertTrue(ClaimRole.QrCode in claim.roles)
+    }
+
+    @Test
     fun rendersBase64UrlEncodedIcaoCompactVdsAsBinaryQrCode() {
         val vdsBytes = byteArrayOf(
             0xDC.toByte(), 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
@@ -801,6 +839,56 @@ class CredentialDisplayNormalizerTest {
             assertIs<DisplayValue.QrCode>(details.groups.single().items.single().value).payload
         )
         assertTrue(payload.bytes.contentEquals(vdsBytes))
+    }
+
+    @Test
+    fun rendersDataUriEncodedIcaoCompactVdsAsBinaryQrCode() {
+        val vdsBytes = byteArrayOf(
+            0xDC.toByte(), 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        )
+        val encoded = Base64.Default.encode(vdsBytes)
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = null,
+                label = "PoC eID",
+                credentialDataJson = """{"qr_data":"data:;base64,$encoded"}""",
+            )
+        )
+
+        val payload = assertIs<QrCodePayload.Binary>(
+            assertIs<DisplayValue.QrCode>(details.groups.single().items.single().value).payload
+        )
+        assertTrue(payload.bytes.contentEquals(vdsBytes))
+    }
+
+    @Test
+    fun keepsUnsupportedOrIncompleteCompactVdsHeadersAsLiteralText() {
+        val invalidPayloads = listOf(
+            byteArrayOf(0xDB.toByte(), 0x03, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07),
+            byteArrayOf(0xDC.toByte(), 0x01, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07),
+            byteArrayOf(0xDC.toByte(), 0x04, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07),
+            byteArrayOf(0xDC.toByte()),
+        )
+
+        invalidPayloads.forEach { bytes ->
+            val encoded = Base64.Default.encode(bytes)
+            val details = CredentialDisplayNormalizer.toDetails(
+                CredentialSummary(
+                    id = "cred-1",
+                    format = "dc+sd-jwt",
+                    issuer = null,
+                    label = "PoC eID",
+                    credentialDataJson = """{"qr_data":"$encoded"}""",
+                )
+            )
+
+            assertEquals(
+                DisplayValue.QrCode(QrCodePayload.Text(encoded)),
+                details.groups.single().items.single().value,
+            )
+        }
     }
 
     @Test

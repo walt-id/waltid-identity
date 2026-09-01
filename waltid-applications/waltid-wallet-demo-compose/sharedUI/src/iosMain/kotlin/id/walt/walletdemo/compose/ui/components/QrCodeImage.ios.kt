@@ -3,65 +3,89 @@ package id.walt.walletdemo.compose.ui.components
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import id.walt.walletdemo.compose.logic.QrCodePayload
-import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.usePinned
+import kotlinx.cinterop.readBytes
+import kotlinx.cinterop.toKString
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
-import platform.CoreImage.CIContext
-import platform.CoreImage.CIFilter
-import platform.CoreImage.filterWithName
-import platform.CoreImage.kCIFormatRGBA8
-import platform.CoreGraphics.CGColorSpaceCreateDeviceRGB
-import platform.CoreGraphics.CGRectGetHeight
-import platform.CoreGraphics.CGRectGetWidth
-import platform.Foundation.NSData
-import platform.Foundation.create
-import platform.Foundation.setValue
+import zxingcpp.Barcode
+import zxingcpp.BarcodeFormat
+import zxingcpp.CreatorOptions
+import zxingcpp.ExperimentalWriterApi
+import zxingcpp.WriterOptions
+import zxingcpp.cinterop.ZXing_Image_data
+import zxingcpp.cinterop.ZXing_Image_delete
+import zxingcpp.cinterop.ZXing_Image_height
+import zxingcpp.cinterop.ZXing_Image_width
+import zxingcpp.cinterop.ZXing_LastErrorMsg
+import zxingcpp.cinterop.ZXing_WriteBarcodeToImage
+import zxingcpp.cinterop.ZXing_free
 
-@OptIn(BetaInteropApi::class, ExperimentalForeignApi::class)
+@OptIn(ExperimentalWriterApi::class)
 internal actual fun encodeQrCode(payload: QrCodePayload): ImageBitmap {
-    val message = when (payload) {
-        is QrCodePayload.Text -> payload.value.encodeToByteArray()
-        is QrCodePayload.Binary -> payload.bytes
-    }
-    require(message.isNotEmpty()) { "QR code payload must not be empty" }
-    val filter = checkNotNull(CIFilter.filterWithName("CIQRCodeGenerator"))
-    filter.setValue(message.toNSData(), forKey = "inputMessage")
-    filter.setValue("M", forKey = "inputCorrectionLevel")
-    val output = checkNotNull(filter.outputImage)
-    val width = CGRectGetWidth(output.extent).toInt()
-    val height = CGRectGetHeight(output.extent).toInt()
-    val rowBytes = width * RGBA_BYTES_PER_PIXEL
-    val pixels = ByteArray(rowBytes * height)
-
-    pixels.usePinned { pinned ->
-        qrContext.render(
-            image = output,
-            toBitmap = pinned.addressOf(0),
-            rowBytes = rowBytes.toLong(),
-            bounds = output.extent,
-            format = kCIFormatRGBA8,
-            colorSpace = qrColorSpace,
-        )
+    val qrCode = encodeQrCodeRaster(payload)
+    val pixels = ByteArray(qrCode.luminance.size * RGBA_BYTES_PER_PIXEL)
+    qrCode.luminance.forEachIndexed { index, value ->
+        val offset = index * RGBA_BYTES_PER_PIXEL
+        pixels[offset] = value
+        pixels[offset + 1] = value
+        pixels[offset + 2] = value
+        pixels[offset + 3] = 0xFF.toByte()
     }
 
     return Image.makeRaster(
-        imageInfo = ImageInfo(width, height, ColorType.RGBA_8888, ColorAlphaType.OPAQUE),
+        imageInfo = ImageInfo(qrCode.width, qrCode.height, ColorType.RGBA_8888, ColorAlphaType.OPAQUE),
         bytes = pixels,
-        rowBytes = rowBytes,
+        rowBytes = qrCode.width * RGBA_BYTES_PER_PIXEL,
     ).toComposeImageBitmap()
 }
 
-@OptIn(BetaInteropApi::class, ExperimentalForeignApi::class)
-private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
-    NSData.create(bytes = pinned.addressOf(0), length = size.toULong())
+internal data class QrCodeRaster(
+    val luminance: ByteArray,
+    val width: Int,
+    val height: Int,
+)
+
+@OptIn(ExperimentalForeignApi::class, ExperimentalWriterApi::class)
+internal fun encodeQrCodeRaster(payload: QrCodePayload): QrCodeRaster {
+    val creatorOptions = CreatorOptions(BarcodeFormat.QRCode).apply {
+        options = when (payload) {
+            is QrCodePayload.Text -> "ecLevel=M, eci=UTF-8"
+            is QrCodePayload.Binary -> "ecLevel=M"
+        }
+    }
+    val barcode = when (payload) {
+        is QrCodePayload.Text -> Barcode(payload.value.encodeToByteArray(), creatorOptions)
+        is QrCodePayload.Binary -> Barcode(payload.bytes, creatorOptions)
+    }
+    val writerOptions = WriterOptions().apply {
+        scale = 1
+        addQuietZones = false
+    }
+    val image = ZXing_WriteBarcodeToImage(barcode.cValue, writerOptions.cValue)
+        ?: error("ZXing-C++ could not render the QR code${lastZxingError()?.let { ": $it" }.orEmpty()}")
+
+    // ZXing-C++ 3.1.1's Kotlin Image.data accessor incorrectly frees this borrowed pixel buffer.
+    // Keep ownership explicit here until that wrapper defect is fixed upstream.
+    return try {
+        val width = ZXing_Image_width(image)
+        val height = ZXing_Image_height(image)
+        val luminance = ZXing_Image_data(image)?.readBytes(width * height) ?: throw OutOfMemoryError()
+        QrCodeRaster(luminance, width, height)
+    } finally {
+        ZXing_Image_delete(image)
+    }
 }
 
-private val qrContext = CIContext.contextWithOptions(null)
 @OptIn(ExperimentalForeignApi::class)
-private val qrColorSpace = checkNotNull(CGColorSpaceCreateDeviceRGB())
+private fun lastZxingError(): String? = ZXing_LastErrorMsg()?.let { error ->
+    try {
+        error.toKString()
+    } finally {
+        ZXing_free(error)
+    }
+}
+
 private const val RGBA_BYTES_PER_PIXEL = 4

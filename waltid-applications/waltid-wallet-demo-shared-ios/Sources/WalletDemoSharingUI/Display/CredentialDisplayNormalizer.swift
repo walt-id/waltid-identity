@@ -290,8 +290,8 @@ public enum CredentialDisplayNormalizer {
             let childItem = claimItem(path: childPath, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
             let rows = flattenObjectForClaimRows(path: childPath, item: childItem, value: member.value)
             if rows.count == 1,
-               case .image = rows[0].item.value,
-               rows[0].item.label == CredentialDisplayVocabulary.humanizedLabel(imageWrapperClaimName) {
+               isCredentialMedia(rows[0].item.value),
+               rows[0].item.label == CredentialDisplayVocabulary.humanizedLabel(mediaWrapperClaimName) {
                 return [ClaimRow(path: rows[0].path, item: rows[0].item.relabelled(item.label))]
             }
             return rows
@@ -311,8 +311,8 @@ public enum CredentialDisplayNormalizer {
         return entries.flatMap { entry in
             let rows = flattenDisplayObjectForClaimRows(entry)
             if rows.count == 1,
-               case .image = rows[0].item.value,
-               rows[0].item.label == CredentialDisplayVocabulary.humanizedLabel(imageWrapperClaimName) {
+               isCredentialMedia(rows[0].item.value),
+               rows[0].item.label == CredentialDisplayVocabulary.humanizedLabel(mediaWrapperClaimName) {
                 return [ClaimRow(path: rows[0].path, item: rows[0].item.relabelled(item.label))]
             }
             return rows
@@ -443,7 +443,14 @@ public enum CredentialDisplayNormalizer {
 
     private static let minimumCredibleEpochSeconds: Int64 = 100_000_000
     private static let epochMillisecondsThreshold: Int64 = 10_000_000_000
-    private static let imageWrapperClaimName = "elementValue"
+    private static func isCredentialMedia(_ value: DisplayValue) -> Bool {
+        switch value {
+        case .image, .qrCode: return true
+        default: return false
+        }
+    }
+
+    private static let mediaWrapperClaimName = "elementValue"
     private static let mdocFormat = "mso_mdoc"
 }
 

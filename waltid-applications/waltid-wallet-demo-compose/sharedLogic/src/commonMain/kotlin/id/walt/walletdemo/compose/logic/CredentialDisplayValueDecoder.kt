@@ -72,17 +72,17 @@ private fun ByteArray.toIcaoCompactVdsQrCode(): DisplayValue.QrCode? =
         ?.let { bytes -> DisplayValue.QrCode(QrCodePayload.Binary(bytes)) }
 
 private object IcaoCompactVds {
-    // ICAO Doc 9303, Part 13 defines the Compact VDS header as 0xDC followed by version 2 or 3.
+    // ICAO Doc 9303, Part 13 uses version identifiers 0x02 and 0x03 for specification versions 3 and 4.
     fun hasSupportedHeader(bytes: ByteArray): Boolean =
         bytes.size >= HeaderSize &&
                 bytes[MagicOffset].toInt() and 0xFF == Magic &&
-                bytes[VersionOffset].toInt() and 0xFF in SupportedVersions
+                bytes[VersionOffset].toInt() and 0xFF in SupportedVersionIdentifiers
 
     private const val HeaderSize = 2
     private const val MagicOffset = 0
     private const val VersionOffset = 1
     private const val Magic = 0xDC
-    private val SupportedVersions = setOf(0x02, 0x03)
+    private val SupportedVersionIdentifiers = setOf(0x02, 0x03)
 }
 
 private data class EncodedPayload(

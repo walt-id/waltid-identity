@@ -134,5 +134,7 @@ sealed interface QrCodePayload {
             this === other || other is Binary && bytes.contentEquals(other.bytes)
 
         override fun hashCode(): Int = bytes.contentHashCode()
+
+        override fun toString(): String = "Binary(${bytes.size} bytes)"
     }
 }

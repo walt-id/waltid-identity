@@ -1,7 +1,6 @@
-import CoreImage
-import CoreImage.CIFilterBuiltins
 import SwiftUI
 import UIKit
+import ZXingCpp
 
 public struct ClaimValueRow: View {
     public let item: ClaimItem
@@ -194,8 +193,6 @@ private struct QRCodeValue: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             }
-            Text("QR code")
-                .font(.caption.weight(.medium))
             Text(metadata)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -238,24 +235,24 @@ private struct QRCodeValue: View {
 
 enum QRCodeRenderer {
     static func image(payload: QrCodePayload) -> UIImage? {
-        let data: Data
+        let options = ZXIWriterOptions(
+            format: .QR_CODE,
+            width: 0,
+            height: 0,
+            ecLevel: QR_ERROR_CORRECTION_MEDIUM,
+            margin: 0
+        )
+        let writer = ZXIBarcodeWriter(options: options)
+        let encoded: Unmanaged<CGImage>?
         switch payload {
-        case .text(let value): data = Data(value.utf8)
-        case .binary(let value): data = value
+        case .text(let value): encoded = try? writer.write(value)
+        case .binary(let data): encoded = try? writer.write(data)
         }
-        guard !data.isEmpty else { return nil }
-
-        let filter = CIFilter.qrCodeGenerator()
-        filter.message = data
-        filter.correctionLevel = "M"
-        guard let output = filter.outputImage,
-              let cgImage = context.createCGImage(output, from: output.extent) else {
+        guard let encoded else {
             return nil
         }
-        return UIImage(cgImage: cgImage)
+        return UIImage(cgImage: encoded.takeRetainedValue())
     }
-
-    private static let context = CIContext()
 }
 
 private struct CredentialMediaViewer<Content: View>: View {
@@ -307,6 +304,7 @@ private extension View {
         if #available(iOS 16.4, *) {
             presentationBackground(.clear)
         } else {
+            // `presentationBackground` starts at iOS 16.4; the package still supports iOS 15.4.
             background(TransparentPresentationBackground())
         }
     }

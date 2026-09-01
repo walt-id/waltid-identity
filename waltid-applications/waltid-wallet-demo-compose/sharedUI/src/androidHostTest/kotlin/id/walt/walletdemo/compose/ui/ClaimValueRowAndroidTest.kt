@@ -33,13 +33,45 @@ class ClaimValueRowAndroidTest {
     }
 
     @Test
+    fun qrEncoderRoundTripsUnicodeTextWithUtf8Eci() {
+        val payload = "အောင် မင်းသူ|ရန်ကုန်၊ မြန်မာ"
+
+        val decoded = decode(encodeQrCode(QrCodePayload.Text(payload)))
+
+        assertEquals(payload, decoded.text)
+        assertContentEquals(payload.encodeToByteArray(), decoded.byteSegments?.single())
+    }
+
+    @Test
     fun qrEncoderPreservesCompactVdsBytes() {
         val payload = byteArrayOf(0xDC.toByte(), 0x03, 0x00, 0xFF.toByte(), 0x7F)
 
-        val byteSegments = decode(encodeQrCode(QrCodePayload.Binary(payload))).byteSegments
+        val decoded = decode(encodeQrCode(QrCodePayload.Binary(payload)))
 
-        assertEquals(1, byteSegments?.size)
-        assertContentEquals(payload, byteSegments?.single())
+        assertEquals(1, decoded.byteSegments?.size)
+        assertContentEquals(payload, decoded.byteSegments?.single())
+        assertEquals(1, decoded.symbologyModifier) // QR byte segment without ECI.
+    }
+
+    @Test
+    fun textQrEncoderMatchesCrossPlatformModuleFingerprint() {
+        assertEquals(
+            "37x37:77c32a6ddc54699d",
+            matrixFingerprint(encodeQrCode(QrCodePayload.Text("အောင် မင်းသူ|ရန်ကုန်၊ မြန်မာ"))),
+        )
+    }
+
+    @Test
+    fun binaryQrEncoderHasStableJavaZxingModuleFingerprint() {
+        // Java ZXing has no ECI 899 entry, so this differs from the two ZXing-C++ iOS renderers.
+        assertEquals(
+            "21x21:6245c13f9fd1b88d",
+            matrixFingerprint(
+                encodeQrCode(
+                    QrCodePayload.Binary(byteArrayOf(0xDC.toByte(), 0x03, 0x00, 0xFF.toByte(), 0x41)),
+                ),
+            ),
+        )
     }
 
     @Test
@@ -73,5 +105,21 @@ class ClaimValueRowAndroidTest {
             }
         }
         return Decoder().decode(matrix)
+    }
+
+    private fun matrixFingerprint(image: androidx.compose.ui.graphics.ImageBitmap): String {
+        val pixels = IntArray(image.width * image.height)
+        image.readPixels(pixels)
+        return matrixFingerprint(image.width, image.height) { index ->
+            pixels[index] and 0x00FFFFFF == 0
+        }
+    }
+
+    private fun matrixFingerprint(width: Int, height: Int, isDark: (Int) -> Boolean): String {
+        var hash = 14695981039346656037uL
+        repeat(width * height) { index ->
+            hash = (hash xor if (isDark(index)) 1uL else 0uL) * 1099511628211uL
+        }
+        return "${width}x${height}:${hash.toString(16).padStart(16, '0')}"
     }
 }

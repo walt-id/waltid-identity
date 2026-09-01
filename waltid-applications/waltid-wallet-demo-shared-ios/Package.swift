@@ -26,12 +26,14 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../../waltid-libraries/protocols/waltid-wallet-sdk-ios"),
+        .package(url: "https://github.com/zxing-cpp/zxing-cpp.git", exact: "3.1.1"),
     ],
     targets: [
         .target(
             name: "WalletDemoSharingUI",
             dependencies: [
                 .product(name: "WalletSDK", package: "waltid-wallet-sdk-ios"),
+                .product(name: "ZXingCpp", package: "zxing-cpp"),
             ],
             resources: [
                 .process("Resources"),

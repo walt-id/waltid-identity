@@ -2,6 +2,7 @@ import Foundation
 @testable import WalletDemoSharingUI
 import WalletSDK
 import XCTest
+import ZXingCpp
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
 
@@ -1104,6 +1105,23 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(claims.first { $0.path.id == "note" }?.value, .text(qrData))
     }
 
+    func testRecognizesCamelCaseQRDataAlias() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "PoC eID",
+            issuer: nil,
+            subject: nil,
+            format: "dc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: #"{"qrData":"alias payload"}"#
+        )
+
+        let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
+        XCTAssertEqual(claim.label, "QR code")
+        XCTAssertEqual(claim.value, .qrCode(.text("alias payload")))
+        XCTAssertTrue(claim.roles.contains(.qrCode))
+    }
+
     func testRendersICAOCompactVDSByteArrayAsBinaryQRCode() throws {
         let details = CredentialDisplayNormalizer.details(
             id: "credential-1",
@@ -1117,6 +1135,24 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
         let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
         XCTAssertEqual(claim.value, .qrCode(.binary(Data([0xDC, 0x03, 0x00, 0xFF, 0x41]))))
+    }
+
+    func testRendersWrappedICAOCompactVDSAsBinaryQRCodeWithOuterClaimLabel() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "PoC eID",
+            issuer: nil,
+            subject: nil,
+            format: "mso_mdoc",
+            addedAt: nil,
+            credentialDataJSON: #"{"qr_data":{"elementValue":[220,3,0,255,65]}}"#
+        )
+
+        let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
+        XCTAssertEqual(claim.path.id, "qr_data.elementValue")
+        XCTAssertEqual(claim.label, "QR code")
+        XCTAssertEqual(claim.value, .qrCode(.binary(Data([0xDC, 0x03, 0x00, 0xFF, 0x41]))))
+        XCTAssertTrue(claim.roles.contains(.qrCode))
     }
 
     func testRendersBase64URLEncodedICAOCompactVDSAsBinaryQRCode() throws {
@@ -1135,6 +1171,117 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
         XCTAssertEqual(claim.value, .qrCode(.binary(vds)))
         XCTAssertNotNil(QRCodeRenderer.image(payload: .binary(vds)))
+    }
+
+    func testAppleQRCodeRendererRoundTripsBinaryPayload() throws {
+        let vds = Data([0xDC, 0x03, 0x00, 0xFF, 0x41])
+        let image = try XCTUnwrap(QRCodeRenderer.image(payload: .binary(vds)))
+        let cgImage = try XCTUnwrap(image.cgImage)
+        let result = try XCTUnwrap(try ZXIBarcodeReader().read(cgImage).first)
+
+        XCTAssertEqual(result.bytes as Data, vds)
+    }
+
+    func testAppleQRCodeRendererRoundTripsUnicodeTextWithUTF8ECI() throws {
+        let payload = "အောင် မင်းသူ|ရန်ကုန်၊ မြန်မာ"
+        let image = try XCTUnwrap(QRCodeRenderer.image(payload: .text(payload)))
+        let cgImage = try XCTUnwrap(image.cgImage)
+        let result = try XCTUnwrap(try ZXIBarcodeReader().read(cgImage).first)
+
+        XCTAssertEqual(result.text, payload)
+        XCTAssertEqual(result.bytes as Data, Data(payload.utf8))
+    }
+
+    func testAppleTextQRCodeRendererMatchesCrossPlatformModuleFingerprint() throws {
+        XCTAssertEqual(
+            try qrMatrixFingerprint(payload: .text("အောင် မင်းသူ|ရန်ကုန်၊ မြန်မာ")),
+            "37x37:77c32a6ddc54699d"
+        )
+    }
+
+    func testAppleBinaryQRCodeRendererMatchesComposeIOSModuleFingerprint() throws {
+        // ZXing-C++ marks arbitrary bytes with ECI 899; Compose iOS uses the same engine and options.
+        XCTAssertEqual(
+            try qrMatrixFingerprint(payload: .binary(Data([0xDC, 0x03, 0x00, 0xFF, 0x41]))),
+            "21x21:0688cb671d6022d3"
+        )
+    }
+
+    func testAppleQRCodeRendererSurvivesRepeatedTextAndBinaryEncodes() throws {
+        for index in 0..<250 {
+            try autoreleasepool {
+                let payload: QrCodePayload = if index.isMultiple(of: 2) {
+                    .text("အောင် မင်းသူ|\(index)")
+                } else {
+                    .binary(Data([0xDC, 0x03, UInt8(truncatingIfNeeded: index), 0xFF]))
+                }
+                let image = try XCTUnwrap(QRCodeRenderer.image(payload: payload))
+                XCTAssertGreaterThan(image.size.width, 0)
+                XCTAssertEqual(image.size.width, image.size.height)
+            }
+        }
+    }
+
+    private func qrMatrixFingerprint(payload: QrCodePayload) throws -> String {
+        let image = try XCTUnwrap(QRCodeRenderer.image(payload: payload))
+        let cgImage = try XCTUnwrap(image.cgImage)
+        let provider = try XCTUnwrap(cgImage.dataProvider)
+        let data = try XCTUnwrap(provider.data) as Data
+
+        XCTAssertEqual(cgImage.bitsPerPixel, 8)
+        XCTAssertGreaterThanOrEqual(data.count, cgImage.bytesPerRow * cgImage.height)
+
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for row in 0..<cgImage.height {
+            let rowStart = row * cgImage.bytesPerRow
+            for column in 0..<cgImage.width {
+                let isDark = data[rowStart + column] < 128
+                hash = (hash ^ (isDark ? 1 : 0)) &* 1_099_511_628_211
+            }
+        }
+        return "\(cgImage.width)x\(cgImage.height):\(String(format: "%016llx", hash))"
+    }
+
+    func testRendersDataURIEncodedICAOCompactVDSAsBinaryQRCode() throws {
+        let vds = Data([0xDC, 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07])
+        let encoded = vds.base64EncodedString()
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "PoC eID",
+            issuer: nil,
+            subject: nil,
+            format: "dc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: #"{"qr_data":"data:;base64,\#(encoded)"}"#
+        )
+
+        let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
+        XCTAssertEqual(claim.value, .qrCode(.binary(vds)))
+    }
+
+    func testKeepsUnsupportedOrIncompleteCompactVDSHeadersAsLiteralText() throws {
+        let invalidPayloads = [
+            Data([0xDB, 0x03, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]),
+            Data([0xDC, 0x01, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]),
+            Data([0xDC, 0x04, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]),
+            Data([0xDC]),
+        ]
+
+        for data in invalidPayloads {
+            let encoded = data.base64EncodedString()
+            let details = CredentialDisplayNormalizer.details(
+                id: "credential-1",
+                title: "PoC eID",
+                issuer: nil,
+                subject: nil,
+                format: "dc+sd-jwt",
+                addedAt: nil,
+                credentialDataJSON: #"{"qr_data":"\#(encoded)"}"#
+            )
+
+            let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
+            XCTAssertEqual(claim.value, .qrCode(.text(encoded)))
+        }
     }
 
     func testKeepsNonVDSBase64QRDataAsLiteralText() throws {

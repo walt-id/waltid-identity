@@ -275,8 +275,8 @@ object CredentialDisplayNormalizer {
                 val rows = value.flattenObjectForClaimRows(path = childPath, item = childItem)
                 if (
                     rows.size == 1 &&
-                    rows.single().item.value is DisplayValue.Image &&
-                    rows.single().item.label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName)
+                    rows.single().item.value.isCredentialMedia() &&
+                    rows.single().item.label == CredentialDisplayVocabulary.humanizedClaimLabel(mediaWrapperClaimName)
                 ) {
                     listOf(rows.single().copy(item = rows.single().item.copy(label = item.label)))
                 } else {
@@ -303,8 +303,8 @@ object CredentialDisplayNormalizer {
                 val rows = entry.flattenDisplayObjectForClaimRows()
                 if (
                     rows.size == 1 &&
-                    rows.single().item.value is DisplayValue.Image &&
-                    rows.single().item.label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName)
+                    rows.single().item.value.isCredentialMedia() &&
+                    rows.single().item.label == CredentialDisplayVocabulary.humanizedClaimLabel(mediaWrapperClaimName)
                 ) {
                     listOf(rows.single().copy(item = rows.single().item.copy(label = label)))
                 } else {
@@ -363,9 +363,14 @@ object CredentialDisplayNormalizer {
             Instant.fromEpochSeconds(epochSeconds).toLocalDateTime(TimeZone.UTC).date.toString()
         }.getOrNull()
     }
+
     private const val minimumCredibleEpochSeconds = 100_000_000L
     private const val epochMillisecondsThreshold = 10_000_000_000L
-    private const val imageWrapperClaimName = "elementValue"
+
+    private fun DisplayValue.isCredentialMedia(): Boolean =
+        this is DisplayValue.Image || this is DisplayValue.QrCode
+
+    private const val mediaWrapperClaimName = "elementValue"
     private const val MdocFormat = "mso_mdoc"
 }
 
