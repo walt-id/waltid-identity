@@ -57,23 +57,26 @@ private const val NON_OAUTH_ERROR_BODY = "response body is not an OAuth error ob
 /**
  * Sanitized token endpoint failure that never retains the response body.
  *
- * Only the `error` and `error_description` fields of an OAuth 2.0 error response (RFC 6749 §5.2)
- * are carried, because those are server-authored and meant to be shown. A response that is not an
- * OAuth error object is reported as such rather than echoed, so an opaque server-side failure
- * stays distinguishable from a genuinely rejected grant.
+ * [oauthErrorDescription] is written by the token endpoint, which for a wallet is a third-party
+ * issuer, so it is deliberately kept out of [message]: anything in the message can end up in a
+ * response this process returns to its own client. Callers that trust their token endpoint - the
+ * license client talking to walt.id, for example - read the property explicitly.
+ *
+ * A response that is not an OAuth error object is reported through [nonOAuthErrorBody] rather than
+ * echoed, so an opaque server-side failure stays distinguishable from a rejected grant.
  */
 class TokenRequestException(
     val statusCode: Int,
     val oauthError: String? = null,
     val oauthErrorDescription: String? = null,
+    val nonOAuthErrorBody: Boolean = false,
     cause: Throwable? = null,
 ) : Exception(
     buildString {
         append("Token request failed with HTTP ")
         append(statusCode)
-        listOfNotNull(oauthError, oauthErrorDescription)
-            .takeIf { it.isNotEmpty() }
-            ?.let { append(" (").append(it.joinToString(": ")).append(')') }
+        oauthError?.let { append(" (").append(it).append(')') }
+        if (nonOAuthErrorBody) append(" (").append(NON_OAUTH_ERROR_BODY).append(')')
     },
     cause,
 )
@@ -485,11 +488,11 @@ class TokenRequestBuilder(
                     throw TokenRequestException(
                         statusCode = response.status.value,
                         oauthError = oauthError,
+                        oauthErrorDescription = errorResponse?.description,
                         // A body that is not an OAuth error object means the request failed before the
                         // grant was ever evaluated, so name that instead of leaving a bare status code
                         // that reads like a rejected grant.
-                        oauthErrorDescription = errorResponse?.description
-                            ?: NON_OAUTH_ERROR_BODY.takeIf { errorResponse == null },
+                        nonOAuthErrorBody = errorResponse == null,
                     )
             }
 
