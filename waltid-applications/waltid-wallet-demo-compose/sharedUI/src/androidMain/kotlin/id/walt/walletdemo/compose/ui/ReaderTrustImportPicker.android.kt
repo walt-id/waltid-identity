@@ -13,11 +13,18 @@ import java.io.ByteArrayOutputStream
 
 @Composable
 internal actual fun rememberReaderTrustImportPicker(
-    onResult: (Result<ReaderTrustImportFile>) -> Unit,
+    onResult: (ReaderTrustImportPickerResult) -> Unit,
 ): ReaderTrustImportPicker {
     val resolver = LocalContext.current.contentResolver
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) onResult(runCatching { resolver.readReaderTrustFile(uri) })
+        if (uri == null) {
+            onResult(ReaderTrustImportPickerResult.Cancelled)
+        } else {
+            runCatching { resolver.readReaderTrustFile(uri) }.fold(
+                onSuccess = { onResult(ReaderTrustImportPickerResult.Selected(it)) },
+                onFailure = { onResult(ReaderTrustImportPickerResult.Failed(it)) },
+            )
+        }
     }
     return remember(launcher) {
         ReaderTrustImportPicker {
