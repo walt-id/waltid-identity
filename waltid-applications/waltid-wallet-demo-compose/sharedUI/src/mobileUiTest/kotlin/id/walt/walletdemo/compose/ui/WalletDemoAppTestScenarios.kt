@@ -221,6 +221,19 @@ class WalletDemoAppTestScenarios {
         onAllNodesWithTag(WalletUiTestTags.claimImageViewer(portraitPath)).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.claimImage(portraitPath)).assertIsDisplayed()
+        val qrCodePath = "qr_data"
+        onNodeWithTag(WalletUiTestTags.claimQrCode(qrCodePath))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.claimQrCodeViewer(qrCodePath)).assertIsDisplayed()
+        onNodeWithContentDescription("Full-screen QR code").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimQrCodeViewerClose(qrCodePath))
+            .assertIsDisplayed()
+            .performClick()
+        onAllNodesWithTag(WalletUiTestTags.claimQrCodeViewer(qrCodePath)).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
         onAllNodesWithText("Raw credential data").assertCountEquals(0)
         onNodeWithTag("wallet.detailsBack").performClick()
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
@@ -708,6 +721,19 @@ class WalletDemoAppTestScenarios {
         onAllNodesWithTag(WalletUiTestTags.claimImageViewer(portraitDisclosurePath)).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).assertIsDisplayed()
+        val qrCodeDisclosurePath = "disclosures[1].qr_data"
+        onNodeWithTag(WalletUiTestTags.claimQrCode(qrCodeDisclosurePath))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.claimQrCodeViewer(qrCodeDisclosurePath)).assertIsDisplayed()
+        onNodeWithContentDescription("Full-screen QR code").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimQrCodeViewerClose(qrCodeDisclosurePath))
+            .assertIsDisplayed()
+            .performClick()
+        onAllNodesWithTag(WalletUiTestTags.claimQrCodeViewer(qrCodeDisclosurePath)).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
     }
 
     fun presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails() = runComposeUiTest {
@@ -1252,7 +1278,8 @@ class WalletDemoAppTestScenarios {
                   },
                   "portrait": {
                     "elementValue": [-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]
-                  }
+                  },
+                  "qr_data": "12/POC(N)000001|Aung Min Thu|1990-06-15|Male|Myanmar|Yangon, Myanmar|true"
                 }
             """.trimIndent(),
         )
@@ -1328,13 +1355,22 @@ class WalletDemoAppTestScenarios {
                     valueJson = samplePortraitDisclosureValueJson,
                     displayValue = null,
                     selectivelyDisclosable = true,
-                )
+                ),
+                WalletDemoPresentationDisclosure(
+                    label = "QR code",
+                    path = "$.qr_data",
+                    valueJson = "\"$sampleQrData\"",
+                    displayValue = sampleQrData,
+                    selectivelyDisclosable = true,
+                ),
             ),
         )
 
         const val sampleDidClientId = "decentralized_identifier:did:jwk:abc"
         private const val samplePortraitDisclosureValueJson =
             "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
+        private const val sampleQrData =
+            "12/POC(N)000001|Aung Min Thu|1990-06-15|Male|Myanmar|Yangon, Myanmar|true"
 
         private val samplePresentationCredentialOption: WalletDemoPresentationCredentialOption
             get() = samplePresentationPreview.credentialOptions.single()

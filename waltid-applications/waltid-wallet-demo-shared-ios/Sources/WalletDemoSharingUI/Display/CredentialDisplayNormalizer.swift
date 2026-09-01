@@ -324,6 +324,11 @@ public enum CredentialDisplayNormalizer {
         case .null:
             return .null
         case .string(let string):
+            if CredentialDisplayVocabulary.roles(for: path.components).contains(.qrCode),
+               !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return CredentialDisplayValueDecoder.qrCodeDisplayValue(for: string)
+                    ?? .qrCode(.text(string))
+            }
             if let dateText = epochDateStringIfTemporal(value: string, path: path) {
                 return .text(dateText)
             }
@@ -345,6 +350,12 @@ public enum CredentialDisplayNormalizer {
             }
             return .object(items)
         case .array(let list):
+            if let qrCode = CredentialDisplayValueDecoder.qrCodeDisplayValue(
+                for: list,
+                roles: CredentialDisplayVocabulary.roles(for: path.components)
+            ) {
+                return qrCode
+            }
             if let image = CredentialDisplayValueDecoder.imageDisplayValue(
                 for: list,
                 roles: CredentialDisplayVocabulary.roles(for: path.components)

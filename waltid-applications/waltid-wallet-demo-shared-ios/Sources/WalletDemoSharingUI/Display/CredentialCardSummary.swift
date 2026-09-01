@@ -203,7 +203,7 @@ private func textValue(_ value: DisplayValue) -> String? {
         return value
     case .bool(let value):
         return value ? "true" : "false"
-    case .null, .object, .list, .image:
+    case .null, .object, .list, .image, .qrCode:
         return nil
     }
 }

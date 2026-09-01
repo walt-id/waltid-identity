@@ -31,6 +31,26 @@ public enum CredentialDisplayValueDecoder {
         return imageValue(for: data, mimeType: mimeType)
     }
 
+    public static func qrCodeDisplayValue(for encodedValue: String) -> DisplayValue? {
+        guard let data = EncodedPayload.parse(encodedValue)?.base64.decode(),
+              IcaoCompactVDS.hasSupportedHeader(data) else {
+            return nil
+        }
+        return .qrCode(.binary(data))
+    }
+
+    public static func qrCodeDisplayValue(
+        for list: [CredentialDisplayJSONValue],
+        roles: Set<ClaimRole>
+    ) -> DisplayValue? {
+        guard roles.contains(.qrCode),
+              let data = byteArrayData(from: list),
+              IcaoCompactVDS.hasSupportedHeader(data) else {
+            return nil
+        }
+        return .qrCode(.binary(data))
+    }
+
     private static func byteArrayData(from list: [CredentialDisplayJSONValue]) -> Data? {
         guard !list.isEmpty else { return nil }
         var bytes: [UInt8] = []
@@ -54,6 +74,22 @@ public enum CredentialDisplayValueDecoder {
             byteCount: data.count
         )
     }
+}
+
+private enum IcaoCompactVDS {
+    // ICAO Doc 9303, Part 13 defines the Compact VDS header as 0xDC followed by version 2 or 3.
+    static func hasSupportedHeader(_ data: Data) -> Bool {
+        let header = [UInt8](data.prefix(headerSize))
+        return header.count == headerSize &&
+            header[magicOffset] == magic &&
+            supportedVersions.contains(header[versionOffset])
+    }
+
+    private static let headerSize = 2
+    private static let magicOffset = 0
+    private static let versionOffset = 1
+    private static let magic: UInt8 = 0xDC
+    private static let supportedVersions: Set<UInt8> = [0x02, 0x03]
 }
 
 private struct EncodedPayload {

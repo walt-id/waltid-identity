@@ -95,6 +95,18 @@ public enum WalletAccessibilityID {
         dynamicIdentifier("claimImageViewerClose", path)
     }
 
+    public static func claimQRCode(_ path: String) -> String {
+        dynamicIdentifier("claimQRCode", path)
+    }
+
+    public static func claimQRCodeViewer(_ path: String) -> String {
+        dynamicIdentifier("claimQRCodeViewer", path)
+    }
+
+    public static func claimQRCodeViewerClose(_ path: String) -> String {
+        dynamicIdentifier("claimQRCodeViewerClose", path)
+    }
+
     public static func claimGroup(_ title: String) -> String {
         dynamicIdentifier("claimGroup", title)
     }

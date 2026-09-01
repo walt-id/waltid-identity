@@ -322,7 +322,8 @@ object CredentialDisplayNormalizer {
                     value.toClaimItem(path = ClaimPath.child(path, key), label = CredentialDisplayVocabulary.humanizedClaimLabel(key))
                 }
             )
-            is JsonArray -> valueDecoder.imageFromByteArray(this, CredentialDisplayVocabulary.roles(path))
+            is JsonArray -> valueDecoder.qrCodeFromByteArray(this, CredentialDisplayVocabulary.roles(path))
+                ?: valueDecoder.imageFromByteArray(this, CredentialDisplayVocabulary.roles(path))
                 ?: DisplayValue.ListValue(mapIndexed { index, value -> value.toDisplayValue(ClaimPath.indexed(path, index)) })
             is JsonPrimitive -> toPrimitiveDisplayValue(path)
         }
@@ -335,6 +336,10 @@ object CredentialDisplayNormalizer {
         }
 
         val text = contentOrNull.orEmpty()
+        if (isString && text.isNotBlank() && CredentialDisplayVocabulary.hasRole(path, ClaimRole.QrCode)) {
+            return valueDecoder.qrCodeFromEncodedString(text)
+                ?: DisplayValue.QrCode(QrCodePayload.Text(text))
+        }
         text.formatEpochDateIfTemporal(path)?.let { return DisplayValue.Text(it) }
 
         val decoded = valueDecoder.decodedString(text, path)

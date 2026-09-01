@@ -706,6 +706,15 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                     selectivelyDisclosable: true,
                     required: false,
                     selectable: true
+                ),
+                PresentationDisclosure(
+                    path: #"["$","qr_data"]"#,
+                    name: "qr_data",
+                    valueJSON: #""12/POC(N)000001|Aung Min Thu""#,
+                    displayValue: "12/POC(N)000001|Aung Min Thu",
+                    selectivelyDisclosable: true,
+                    required: false,
+                    selectable: true
                 )
             ]
         )
@@ -714,14 +723,18 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
         let requested = try XCTUnwrap(details.groups.first)
         XCTAssertEqual(requested.title, "Requested disclosures")
-        XCTAssertEqual(requested.items.map(\.label), ["Given name", "Portrait"])
-        XCTAssertEqual(requested.items.map(\.path.id), ["disclosures[0].given_name", "disclosures[1].portrait"])
+        XCTAssertEqual(requested.items.map(\.label), ["Given name", "Portrait", "QR code"])
+        XCTAssertEqual(
+            requested.items.map(\.path.id),
+            ["disclosures[0].given_name", "disclosures[1].portrait", "disclosures[2].qr_data"]
+        )
         XCTAssertEqual(requested.items.first?.value, .text("Alice"))
-        guard case .image(_, _, let mimeType, let byteCount) = requested.items.last?.value else {
+        guard case .image(_, _, let mimeType, let byteCount) = requested.items[1].value else {
             return XCTFail("Expected requested portrait disclosure to render as an image")
         }
         XCTAssertEqual(mimeType, "image/png")
         XCTAssertEqual(byteCount, onePixelPNGData.count)
+        XCTAssertEqual(requested.items.last?.value, .qrCode(.text("12/POC(N)000001|Aung Min Thu")))
 
         let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
         XCTAssertEqual(personal.items.map(\.label), ["Given name", "Family name"])
@@ -1071,6 +1084,90 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.cardSummary.title, "Personal ID")
     }
 
+    func testRendersConfirmedQRDataClaimAsQRCodeWithoutReclassifyingOtherText() throws {
+        let qrData = "12/POC(N)000001|Aung Min Thu|1990-06-15|Male|Myanmar|Yangon, Myanmar|true"
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "PoC eID",
+            issuer: nil,
+            subject: nil,
+            format: "dc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: #"{"qr_data":"\#(qrData)","note":"\#(qrData)"}"#
+        )
+
+        let claims = details.groups.flatMap(\.items)
+        let qrClaim = try XCTUnwrap(claims.first { $0.path.id == "qr_data" })
+        XCTAssertEqual(qrClaim.label, "QR code")
+        XCTAssertEqual(qrClaim.value, .qrCode(.text(qrData)))
+        XCTAssertTrue(qrClaim.roles.contains(.qrCode))
+        XCTAssertEqual(claims.first { $0.path.id == "note" }?.value, .text(qrData))
+    }
+
+    func testRendersICAOCompactVDSByteArrayAsBinaryQRCode() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "PoC eID",
+            issuer: nil,
+            subject: nil,
+            format: "dc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: #"{"qr_data":[220,3,0,255,65]}"#
+        )
+
+        let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
+        XCTAssertEqual(claim.value, .qrCode(.binary(Data([0xDC, 0x03, 0x00, 0xFF, 0x41]))))
+    }
+
+    func testRendersBase64URLEncodedICAOCompactVDSAsBinaryQRCode() throws {
+        let vds = Data([0xDC, 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07])
+        let encoded = vds.base64URLEncodedString
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "PoC eID",
+            issuer: nil,
+            subject: nil,
+            format: "dc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: #"{"qr_data":"\#(encoded)"}"#
+        )
+
+        let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
+        XCTAssertEqual(claim.value, .qrCode(.binary(vds)))
+        XCTAssertNotNil(QRCodeRenderer.image(payload: .binary(vds)))
+    }
+
+    func testKeepsNonVDSBase64QRDataAsLiteralText() throws {
+        let encoded = Data("plain text".utf8).base64URLEncodedString
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "PoC eID",
+            issuer: nil,
+            subject: nil,
+            format: "dc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: #"{"qr_data":"\#(encoded)"}"#
+        )
+
+        let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
+        XCTAssertEqual(claim.value, .qrCode(.text(encoded)))
+    }
+
+    func testKeepsBlankQRDataAsText() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "PoC eID",
+            issuer: nil,
+            subject: nil,
+            format: "dc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: #"{"qr_data":""}"#
+        )
+
+        let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
+        XCTAssertEqual(claim.value, .text(""))
+    }
+
     private func onePixelPNGByteArrayJSON() -> String {
         "[" + onePixelPNGData.map { String($0) }.joined(separator: ",") + "]"
     }
@@ -1090,6 +1187,15 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
         return formatter
     }()
+}
+
+private extension Data {
+    var base64URLEncodedString: String {
+        base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
 }
 
 private extension ClaimItem {

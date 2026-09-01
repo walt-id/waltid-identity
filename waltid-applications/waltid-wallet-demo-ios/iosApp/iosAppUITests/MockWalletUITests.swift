@@ -382,6 +382,12 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertFalse(app.images["Full-screen credential image"].waitForExistence(timeout: 1))
         XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
         ui.assertExists(identifierPrefix: "wallet.claimImage.", timeout: 10)
+        ui.tapElement(identifierPrefix: "wallet.claimQRCode.")
+        ui.assertExists(identifierPrefix: "wallet.claimQRCodeViewer.", timeout: 10)
+        XCTAssertTrue(app.images["Full-screen QR code"].waitForExistence(timeout: 10))
+        ui.tapElement(identifierPrefix: "wallet.claimQRCodeViewerClose.")
+        XCTAssertFalse(app.images["Full-screen QR code"].waitForExistence(timeout: 1))
+        XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
     }
 
@@ -525,6 +531,12 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertFalse(app.images["Full-screen credential image"].waitForExistence(timeout: 1))
         ui.assertExists(identifier: "wallet.credentialDetailsScreen", timeout: 10)
         ui.assertExists(identifierPrefix: "wallet.claimImage.", timeout: 10)
+        ui.tapElement(identifierPrefix: "wallet.claimQRCode.")
+        ui.assertExists(identifierPrefix: "wallet.claimQRCodeViewer.", timeout: 10)
+        XCTAssertTrue(app.images["Full-screen QR code"].waitForExistence(timeout: 10))
+        ui.tapElement(identifierPrefix: "wallet.claimQRCodeViewerClose.")
+        XCTAssertFalse(app.images["Full-screen QR code"].waitForExistence(timeout: 1))
+        ui.assertExists(identifier: "wallet.credentialDetailsScreen", timeout: 10)
     }
 
     func testTabbedReceiveAndPresentFlowUsesMockWallet() {

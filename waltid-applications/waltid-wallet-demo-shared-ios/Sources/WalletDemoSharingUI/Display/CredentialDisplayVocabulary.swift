@@ -88,6 +88,7 @@ public enum CredentialDisplayVocabulary {
         ClaimDescriptor("picture", roles: [.image], displayOrder: 72),
         ClaimDescriptor("image", roles: [.image], displayOrder: 73),
         ClaimDescriptor("logo", roles: [.image], displayOrder: 74),
+        ClaimDescriptor("qr_data", aliases: ["qrData"], label: "QR code", roles: [.qrCode], displayOrder: 90),
         ClaimDescriptor(
             "signature_usual_mark",
             label: "Signature or usual mark",
@@ -296,6 +297,9 @@ public enum CredentialDisplayVocabulary {
         }
         if pathHasRole(claimPath, role: .image) {
             roles.insert(.image)
+        }
+        if pathHasRole(claimPath, role: .qrCode) {
+            roles.insert(.qrCode)
         }
         return roles
     }

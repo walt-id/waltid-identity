@@ -1,3 +1,5 @@
+import CoreImage
+import CoreImage.CIFilterBuiltins
 import SwiftUI
 import UIKit
 
@@ -35,6 +37,8 @@ private struct ClaimValueView: View {
                 .font(.caption)
         case .image(_, let data, let mimeType, let byteCount):
             ImageValue(data: data, mimeType: mimeType, byteCount: byteCount, path: path)
+        case .qrCode(let payload):
+            QRCodeValue(payload: payload, path: path)
         case .list(let values):
             let preview = DisplayListPreview(values: values)
             VStack(alignment: .leading, spacing: 4) {
@@ -129,11 +133,20 @@ private struct ImageValue: View {
         }
         .fullScreenCover(isPresented: $viewerOpen) {
             if let image {
-                CredentialImageViewer(
-                    image: image,
-                    path: path,
+                CredentialMediaViewer(
+                    viewerIdentifier: WalletAccessibilityID.claimImageViewer(path.id),
+                    viewerLabel: "Credential image viewer",
+                    closeIdentifier: WalletAccessibilityID.claimImageViewerClose(path.id),
+                    closeLabel: "Close full-screen credential image",
                     onDismiss: { viewerOpen = false }
-                )
+                ) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 64)
+                        .accessibilityLabel("Full-screen credential image")
+                }
                 .transparentPresentationBackground()
             }
         }
@@ -148,24 +161,119 @@ private struct ImageValue: View {
     }
 }
 
-private struct CredentialImageViewer: View {
-    let image: UIImage
+private struct QRCodeValue: View {
+    let payload: QrCodePayload
     let path: ClaimItemPath
+    @State private var viewerOpen = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let image {
+                Button {
+                    viewerOpen = true
+                } label: {
+                    Image(uiImage: image)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(12)
+                        .frame(width: 112, height: 112)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(.separator), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("QR code")
+                .accessibilityHint("Opens the QR code full screen")
+                .accessibilityIdentifier(WalletAccessibilityID.claimQRCode(path.id))
+            } else {
+                Text("QR code unavailable")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+            Text("QR code")
+                .font(.caption.weight(.medium))
+            Text(metadata)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .fullScreenCover(isPresented: $viewerOpen) {
+            if let image {
+                CredentialMediaViewer(
+                    viewerIdentifier: WalletAccessibilityID.claimQRCodeViewer(path.id),
+                    viewerLabel: "QR code viewer",
+                    closeIdentifier: WalletAccessibilityID.claimQRCodeViewerClose(path.id),
+                    closeLabel: "Close full-screen QR code",
+                    onDismiss: { viewerOpen = false }
+                ) {
+                    Image(uiImage: image)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(24)
+                        .background(Color.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 64)
+                        .accessibilityLabel("Full-screen QR code")
+                }
+                .transparentPresentationBackground()
+            }
+        }
+    }
+
+    private var image: UIImage? {
+        QRCodeRenderer.image(payload: payload)
+    }
+
+    private var metadata: String {
+        switch payload {
+        case .text(let value): return "\(value.count) characters"
+        case .binary(let data): return "ICAO Compact VDS, \(data.readableByteCount)"
+        }
+    }
+}
+
+enum QRCodeRenderer {
+    static func image(payload: QrCodePayload) -> UIImage? {
+        let data: Data
+        switch payload {
+        case .text(let value): data = Data(value.utf8)
+        case .binary(let value): data = value
+        }
+        guard !data.isEmpty else { return nil }
+
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = data
+        filter.correctionLevel = "M"
+        guard let output = filter.outputImage,
+              let cgImage = context.createCGImage(output, from: output.extent) else {
+            return nil
+        }
+        return UIImage(cgImage: cgImage)
+    }
+
+    private static let context = CIContext()
+}
+
+private struct CredentialMediaViewer<Content: View>: View {
+    let viewerIdentifier: String
+    let viewerLabel: String
+    let closeIdentifier: String
+    let closeLabel: String
     let onDismiss: () -> Void
+    @ViewBuilder let content: () -> Content
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.72)
                 .ignoresSafeArea()
-                .accessibilityLabel("Credential image viewer")
-                .accessibilityIdentifier(WalletAccessibilityID.claimImageViewer(path.id))
+                .accessibilityLabel(viewerLabel)
+                .accessibilityIdentifier(viewerIdentifier)
 
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .padding(.horizontal, 24)
-                .padding(.vertical, 64)
-                .accessibilityLabel("Full-screen credential image")
+            content()
 
             VStack {
                 HStack {
@@ -177,13 +285,19 @@ private struct CredentialImageViewer: View {
                             .frame(width: 44, height: 44)
                             .background(Color.black.opacity(0.48), in: Circle())
                     }
-                    .accessibilityLabel("Close full-screen credential image")
-                    .accessibilityIdentifier(WalletAccessibilityID.claimImageViewerClose(path.id))
+                    .accessibilityLabel(closeLabel)
+                    .accessibilityIdentifier(closeIdentifier)
                 }
                 Spacer()
             }
             .padding(16)
         }
+    }
+}
+
+private extension Data {
+    var readableByteCount: String {
+        count == 1 ? "1 byte" : "\(count) bytes"
     }
 }
 

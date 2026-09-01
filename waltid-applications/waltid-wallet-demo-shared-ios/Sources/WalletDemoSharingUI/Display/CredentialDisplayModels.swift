@@ -95,9 +95,15 @@ public enum DisplayValue: Equatable {
     case object([ClaimItem])
     case list([DisplayValue])
     case image(encoded: String, data: Data, mimeType: String, byteCount: Int)
+    case qrCode(QrCodePayload)
     case decodedText(String)
     case raw(String)
     case null
+}
+
+public enum QrCodePayload: Equatable {
+    case text(String)
+    case binary(Data)
 }
 
 public struct ClaimItemPath: Hashable {
@@ -216,6 +222,7 @@ public enum ClaimRole: Hashable {
     case temporal
     case expiryDate
     case image
+    case qrCode
     case credentialType
 }
 

@@ -19,7 +19,6 @@ internal class CredentialDisplayValueDecoder(
         ImageBytes.detectMime(bytes, payload.imageMimeTypeHint)?.let { mime ->
             return bytes.toImageValue(mime, encoded = payload.base64.value)
         }
-
         val decodedText = runCatching { bytes.decodeToString() }.getOrNull()
             ?.takeIf { it.isMostlyReadable() }
             ?: return null
@@ -30,6 +29,16 @@ internal class CredentialDisplayValueDecoder(
         }
 
         return DisplayValue.DecodedText(decodedText)
+    }
+
+    fun qrCodeFromEncodedString(value: String): DisplayValue.QrCode? {
+        val bytes = EncodedPayload.parse(value)?.base64?.decode() ?: return null
+        return bytes.toIcaoCompactVdsQrCode()
+    }
+
+    fun qrCodeFromByteArray(value: JsonArray, roles: Set<ClaimRole>): DisplayValue.QrCode? {
+        if (ClaimRole.QrCode !in roles) return null
+        return value.toByteArrayOrNull()?.toIcaoCompactVdsQrCode()
     }
 
     fun imageFromByteArray(value: JsonArray, roles: Set<ClaimRole>): DisplayValue.Image? {
@@ -56,6 +65,24 @@ internal class CredentialDisplayValueDecoder(
             byteCount = size,
         )
     }
+}
+
+private fun ByteArray.toIcaoCompactVdsQrCode(): DisplayValue.QrCode? =
+    takeIf(IcaoCompactVds::hasSupportedHeader)
+        ?.let { bytes -> DisplayValue.QrCode(QrCodePayload.Binary(bytes)) }
+
+private object IcaoCompactVds {
+    // ICAO Doc 9303, Part 13 defines the Compact VDS header as 0xDC followed by version 2 or 3.
+    fun hasSupportedHeader(bytes: ByteArray): Boolean =
+        bytes.size >= HeaderSize &&
+                bytes[MagicOffset].toInt() and 0xFF == Magic &&
+                bytes[VersionOffset].toInt() and 0xFF in SupportedVersions
+
+    private const val HeaderSize = 2
+    private const val MagicOffset = 0
+    private const val VersionOffset = 1
+    private const val Magic = 0xDC
+    private val SupportedVersions = setOf(0x02, 0x03)
 }
 
 private data class EncodedPayload(

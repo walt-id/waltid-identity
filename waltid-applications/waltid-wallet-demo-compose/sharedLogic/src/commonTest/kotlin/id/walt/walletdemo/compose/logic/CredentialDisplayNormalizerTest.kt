@@ -722,6 +722,107 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun rendersConfirmedQrDataClaimAsQrCodeWithoutReclassifyingOtherText() {
+        val qrData = "12/POC(N)000001|Aung Min Thu|1990-06-15|Male|Myanmar|Yangon, Myanmar|true"
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = null,
+                label = "PoC eID",
+                credentialDataJson = """
+                    {
+                      "qr_data": "$qrData",
+                      "note": "$qrData"
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val claims = details.groups.flatMap { it.items }
+        val qrClaim = claims.first { it.path.id == "qr_data" }
+        assertEquals("QR code", qrClaim.label)
+        assertEquals(DisplayValue.QrCode(QrCodePayload.Text(qrData)), qrClaim.value)
+        assertTrue(ClaimRole.QrCode in qrClaim.roles)
+        assertEquals(DisplayValue.Text(qrData), claims.first { it.path.id == "note" }.value)
+    }
+
+    @Test
+    fun keepsBlankQrDataAsText() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = null,
+                label = "PoC eID",
+                credentialDataJson = """{"qr_data":""}""",
+            )
+        )
+
+        assertEquals(DisplayValue.Text(""), details.groups.single().items.single().value)
+    }
+
+    @Test
+    fun rendersIcaoCompactVdsByteArrayAsBinaryQrCode() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = null,
+                label = "PoC eID",
+                credentialDataJson = """{"qr_data":[220,3,0,255,65]}""",
+            )
+        )
+
+        val payload = assertIs<QrCodePayload.Binary>(
+            assertIs<DisplayValue.QrCode>(details.groups.single().items.single().value).payload
+        )
+        assertTrue(payload.bytes.contentEquals(byteArrayOf(0xDC.toByte(), 0x03, 0x00, 0xFF.toByte(), 0x41)))
+    }
+
+    @Test
+    fun rendersBase64UrlEncodedIcaoCompactVdsAsBinaryQrCode() {
+        val vdsBytes = byteArrayOf(
+            0xDC.toByte(), 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        )
+        val encoded = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+            .encode(vdsBytes)
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = null,
+                label = "PoC eID",
+                credentialDataJson = """{"qr_data":"$encoded"}""",
+            )
+        )
+
+        val payload = assertIs<QrCodePayload.Binary>(
+            assertIs<DisplayValue.QrCode>(details.groups.single().items.single().value).payload
+        )
+        assertTrue(payload.bytes.contentEquals(vdsBytes))
+    }
+
+    @Test
+    fun keepsNonVdsBase64QrDataAsLiteralText() {
+        val encoded = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode("plain text".encodeToByteArray())
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = null,
+                label = "PoC eID",
+                credentialDataJson = """{"qr_data":"$encoded"}""",
+            )
+        )
+
+        assertEquals(
+            DisplayValue.QrCode(QrCodePayload.Text(encoded)),
+            details.groups.single().items.single().value,
+        )
+    }
+
+    @Test
     fun validatesDataUriImageBytesBeforeUsingMimeHint() {
         val encodedJson = Base64.Default.encode("""{"purpose":"age proof"}""".encodeToByteArray())
         val encodedText = Base64.Default.encode("Hello, wallet".encodeToByteArray())
@@ -893,6 +994,15 @@ class CredentialDisplayNormalizerTest {
                     required = false,
                     selectable = true,
                 ),
+                WalletDemoPresentationDisclosure(
+                    label = CredentialDisplayVocabulary.disclosureLabel("qr_data", """["${'$'}","qr_data"]"""),
+                    path = """["${'$'}","qr_data"]""",
+                    valueJson = "\"12/POC(N)000001|Aung Min Thu\"",
+                    displayValue = "12/POC(N)000001|Aung Min Thu",
+                    selectivelyDisclosable = true,
+                    required = false,
+                    selectable = true,
+                ),
             ),
         )
 
@@ -900,10 +1010,17 @@ class CredentialDisplayNormalizerTest {
 
         val requested = assertNotNull(details.groups.firstOrNull())
         assertEquals("Requested disclosures", requested.title)
-        assertEquals(listOf("Given name", "Portrait"), requested.items.map { it.label })
-        assertEquals(listOf("disclosures[0].given_name", "disclosures[1].portrait"), requested.items.map { it.path.id })
+        assertEquals(listOf("Given name", "Portrait", "QR code"), requested.items.map { it.label })
+        assertEquals(
+            listOf("disclosures[0].given_name", "disclosures[1].portrait", "disclosures[2].qr_data"),
+            requested.items.map { it.path.id },
+        )
         assertEquals(DisplayValue.Text("Ada"), requested.items.first().value)
-        assertIs<DisplayValue.Image>(requested.items.last().value)
+        assertIs<DisplayValue.Image>(requested.items[1].value)
+        assertEquals(
+            DisplayValue.QrCode(QrCodePayload.Text("12/POC(N)000001|Aung Min Thu")),
+            requested.items.last().value,
+        )
 
         val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
         assertEquals(listOf("Given name", "Family name"), personal.items.map { it.label })

@@ -120,7 +120,19 @@ sealed interface DisplayValue {
             return result
         }
     }
+    data class QrCode(val payload: QrCodePayload) : DisplayValue
     data class DecodedText(val value: String) : DisplayValue
     data class Raw(val value: String) : DisplayValue
     data object NullValue : DisplayValue
+}
+
+sealed interface QrCodePayload {
+    data class Text(val value: String) : QrCodePayload
+
+    class Binary(val bytes: ByteArray) : QrCodePayload {
+        override fun equals(other: Any?): Boolean =
+            this === other || other is Binary && bytes.contentEquals(other.bytes)
+
+        override fun hashCode(): Int = bytes.contentHashCode()
+    }
 }
