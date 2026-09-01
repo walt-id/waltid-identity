@@ -879,6 +879,7 @@ object WalletIssuanceHandler {
                     credentialResponse = credentialResponse,
                     accessToken = tokenResponse.access_token,
                     event = NotificationEvent.CREDENTIAL_ACCEPTED,
+                    dpop = credentialDpop,
                     httpClient = httpClient,
                 )
             } catch (error: CancellationException) {
@@ -890,6 +891,7 @@ object WalletIssuanceHandler {
                     accessToken = tokenResponse.access_token,
                     event = NotificationEvent.CREDENTIAL_FAILURE,
                     description = "Credential storage failed",
+                    dpop = credentialDpop,
                     httpClient = httpClient,
                 )
                 throw error
@@ -1552,6 +1554,7 @@ object WalletIssuanceHandler {
         accessToken: String,
         event: NotificationEvent,
         description: String? = null,
+        dpop: DpopRequestContext? = null,
         httpClient: HttpClient = defaultHttpClient(),
     ) {
         val endpoint = issuerMetadata.notificationEndpoint ?: return
@@ -1566,6 +1569,17 @@ object WalletIssuanceHandler {
                     event = event,
                     eventDescription = description,
                 ),
+                dpopProofFactory = dpop?.let { context ->
+                    { notificationEndpoint, nonce ->
+                        buildDpopProof(
+                            keyMaterial = context.keyMaterial,
+                            algorithms = context.algorithms,
+                            endpoint = notificationEndpoint,
+                            accessToken = accessToken,
+                            nonce = nonce,
+                        )
+                    }
+                },
             )
             when (result) {
                 is NotificationDeliveryResult.Success -> Unit
