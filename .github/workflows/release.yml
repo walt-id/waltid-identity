@@ -40,6 +40,7 @@ jobs:
       enable-android-build: true
       publish: true
       cacheless: true
+      run-conformance: true
       run-issuer-conformance: true
       run-haip-conformance: true
       report-check-name: 'gradle / gradle (ubuntu-22.04)'

@@ -21,6 +21,11 @@ on:
         required: false
         type: boolean
         default: false
+      run-conformance:
+        description: "Run the live OpenID4VP and OpenID4VCI conformance suites"
+        required: false
+        type: boolean
+        default: false
       run-issuer-conformance:
         description: "Run the OpenID4VCI Issuer2 conformance matrix"
         required: false
@@ -169,7 +174,7 @@ jobs:
 
   conformance:
     name: conformance (ubuntu-22.04)
-    if: ${{ inputs.run-issuer-conformance || inputs.run-haip-conformance }}
+    if: ${{ inputs.run-conformance || inputs.run-issuer-conformance || inputs.run-haip-conformance }}
     runs-on: ubuntu-22.04
     steps:
       - name: Set up swap space

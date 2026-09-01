@@ -40,8 +40,8 @@ jobs:
       pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
       pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
       pr-draft: ${{ github.event.pull_request.draft || false }}
-  issuer-conformance-eligibility:
-    uses: ./.github/workflows/issuer-conformance-eligibility.yml
+  conformance-eligibility:
+    uses: ./.github/workflows/conformance-eligibility.yml
     with:
       event-name: ${{ github.event_name }}
       ref: ${{ github.ref }}
@@ -139,15 +139,14 @@ jobs:
   gradle-build:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
-    needs: [android-eligibility, issuer-conformance-eligibility, cacheless-eligibility, gradle-eligibility]
+    needs: [android-eligibility, conformance-eligibility, cacheless-eligibility, gradle-eligibility]
     if: ${{ needs.gradle-eligibility.outputs.should-run == 'true' }}
     with:
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       cacheless: ${{ needs.cacheless-eligibility.outputs.should-run == 'true' }}
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
       conformance-report-check-name: 'gradle-build / conformance (ubuntu-22.04)'
-      run-issuer-conformance: ${{ needs.issuer-conformance-eligibility.outputs.should-run == 'true' }}
-      run-haip-conformance: ${{ needs.issuer-conformance-eligibility.outputs.should-run == 'true' }}
+      run-conformance: ${{ needs.conformance-eligibility.outputs.should-run == 'true' }}
   ci-gate:
     name: ci-gate
     if: always() && !cancelled()
@@ -155,7 +154,7 @@ jobs:
       - macos-predicate-tests
       - android-eligibility
       - macos-eligibility
-      - issuer-conformance-eligibility
+      - conformance-eligibility
       - crypto2-eligibility
       - cacheless-eligibility
       - gradle-eligibility

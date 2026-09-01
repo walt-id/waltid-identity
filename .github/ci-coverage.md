@@ -16,14 +16,15 @@ Gradle job and, when requested, the live conformance job.
 
 Labels add coverage; they are not the only way to obtain it. `ci:macos` and
 `ci:mobile` force every macOS lane. `ci:sdk-docs`, `ci:cacheless`, `ci:crypto2`,
-`ci:issuer-conformance`, and `ci:android` force those specific lanes.
+`ci:conformance` (or the older `ci:issuer-conformance` alias), and `ci:android`
+force those specific lanes.
 
 ## Lanes
 
 | Lane | Automatic when | Covers | Not a substitute for |
 |---|---|---|---|
 | `gradle-build` | Code changes (skipped for docs/asset-only PRs and pushes) | Unified Gradle `build allTests`, including Android host compilation when `android-eligibility` is true, and coordinated Enterprise graph compilation | Live OpenID conformance, device/UI tests, iOS XCFramework consumers |
-| `conformance` | Issuer/verifier/OpenID4VCI-sensitive paths, or `ci:issuer-conformance` | Cloudflare tunnel + live conformance runners | The default Gradle job (live suites are skipped there) |
+| `conformance` | Issuer/verifier/wallet OpenID4VP and OpenID4VCI paths, or `ci:conformance` / `ci:issuer-conformance` | Cloudflare tunnel + live conformance runners | The default Gradle job (live suites are skipped there) |
 | `android-device-tests` | Android-relevant paths, or `ci:android` / `ci:mobile` | Selected instrumented device phases | Host-side Android compilation in `gradle-build` |
 | `ios-simulator` | Kotlin `common*` / `ios*` sources, library Gradle files, wallet-mobile, shared build-logic/CI | Kotlin iOS compile + `iosSimulatorArm64Test` | Swift package, XCFramework, native/Compose demos, DocC |
 | `native` + `compose` (one WalletCore consumer job) | Native demo / Compose demo / `waltid-wallet-demo-shared-ios` / wallet-mobile / wallet-sdk-ios / `Package.swift` / shared build-logic | One WalletCore XCFramework assemble, then the selected demo tests and document-provider checks | Kotlin simulator tests, Enterprise iOS, ABI/DocC |
