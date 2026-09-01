@@ -37,10 +37,15 @@ public data class MobileWalletProximityStoredReaderTrustAnchor(
 
 /** Persisted, already validated static qualification RICAL provider. */
 public data class MobileWalletProximityStoredRicalProvider(
+    /** Stable application-owned identifier for this provider. */
     public val providerId: String,
+    /** RICAL list types this provider is allowed to supply. */
     public val acceptedTypes: Set<String>,
+    /** DER provider trust anchors encoded as unpadded Base64URL values. */
     public val providerTrustAnchorsDerBase64Url: List<String>,
+    /** Certificate-policy OIDs accepted for the RICAL signer. */
     public val acceptedSignerCertificatePolicyOids: Set<String>,
+    /** Whether a valid list from this provider may establish reader trust. */
     public val establishReaderTrust: Boolean,
     /** Exact untagged COSE_Sign1 bytes encoded as unpadded Base64URL. */
     public val signedRicalBase64Url: String,
@@ -57,9 +62,12 @@ public data class MobileWalletProximityStoredRicalProvider(
 
 /** Complete holder-owned Reader Authentication settings snapshot. */
 public data class MobileWalletProximityReaderTrustSettings(
+    /** Reader policy applied after the configured trust evidence is evaluated. */
     public val readerPolicy: MobileWalletProximityReaderPolicy =
         MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
+    /** Validated Reader CA trust anchors available to new sessions. */
     public val trustAnchors: List<MobileWalletProximityStoredReaderTrustAnchor> = emptyList(),
+    /** Validated static RICAL providers available to new sessions. */
     public val ricalProviders: List<MobileWalletProximityStoredRicalProvider> = emptyList(),
 ) {
     init {
@@ -110,41 +118,64 @@ public data class MobileWalletProximityReaderTrustSettings(
     }
 }
 
+/** Kind of public reader-trust material represented by an import preview. */
 public enum class MobileWalletProximityReaderTrustImportKind {
+    /** One or more public Reader CA certificates. */
     ReaderCa,
+    /** A versioned walt.id reader-trust bundle. */
     TrustBundle,
 }
 
 /** Display-safe preview of an imported Reader CA. */
 public data class MobileWalletProximityReaderTrustAnchorPreview(
+    /** Holder-visible authority name proposed for persistence. */
     public val displayName: String,
+    /** Display-safe certificate subject. */
     public val subject: String,
+    /** Display-safe certificate issuer. */
     public val issuer: String,
+    /** Colon-separated SHA-256 certificate fingerprint. */
     public val sha256Fingerprint: String,
+    /** Beginning of the certificate validity interval. */
     public val validFrom: Instant,
+    /** End of the certificate validity interval. */
     public val validUntil: Instant,
+    /** Validated certificate profile shown during import review. */
     public val profile: String = "ISO mdoc Reader CA",
 )
 
 /** Display-safe preview of a validated static RICAL provider. */
 public data class MobileWalletProximityRicalPreview(
+    /** Stable provider identifier from the imported bundle. */
     public val providerId: String,
+    /** Holder-visible provider name. */
     public val providerName: String,
+    /** Validated RICAL list type. */
     public val type: String,
+    /** Time at which the signed list was issued. */
     public val issuedAt: Instant,
+    /** Optional time at which the provider expects a newer list. */
     public val nextUpdate: Instant?,
+    /** Optional end of the signed list validity interval. */
     public val validUntil: Instant?,
+    /** Whether this provider is configured to establish reader trust. */
     public val establishesReaderTrust: Boolean,
 )
 
 /** Import review which must be explicitly confirmed before its settings are persisted. */
 public data class MobileWalletProximityReaderTrustImportPreview(
+    /** Kind of imported public trust material. */
     public val kind: MobileWalletProximityReaderTrustImportKind,
+    /** Original display-safe file name supplied by the platform picker. */
     public val sourceName: String,
+    /** Reader CA previews added by this import. */
     public val readerAuthorities: List<MobileWalletProximityReaderTrustAnchorPreview>,
+    /** RICAL provider previews added by this import. */
     public val ricalProviders: List<MobileWalletProximityRicalPreview>,
+    /** Complete immutable settings that will replace the prior value after confirmation. */
     public val resultingSettings: MobileWalletProximityReaderTrustSettings,
 ) {
+    /** Display-safe description of the policy enforced by [resultingSettings]. */
     public val policyEffect: String
         get() = when (resultingSettings.readerPolicy) {
             MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted ->
@@ -156,6 +187,7 @@ public data class MobileWalletProximityReaderTrustImportPreview(
 
 /** Strict codec and importer for holder-owned Reader Authentication settings. */
 public object MobileWalletProximityReaderTrustSettingsCodec {
+    /** Maximum accepted encoded settings or import-file size in bytes. */
     public const val MaximumImportBytes: Int = 1_048_576
 
     private val json = Json {
@@ -164,9 +196,15 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
         encodeDefaults = true
     }
 
+    /** Encodes validated settings into the versioned app-private persistence representation. */
     public fun encode(settings: MobileWalletProximityReaderTrustSettings): String =
         json.encodeToString(settings.toPersisted())
 
+    /**
+     * Decodes and validates the versioned app-private persistence representation.
+     *
+     * @throws IllegalArgumentException when the representation is malformed or unsupported.
+     */
     @Throws(IllegalArgumentException::class)
     public fun decode(encoded: String): MobileWalletProximityReaderTrustSettings = try {
         json.decodeFromString<PersistedSettings>(encoded).toPublic().also(::validateStoredShape)
