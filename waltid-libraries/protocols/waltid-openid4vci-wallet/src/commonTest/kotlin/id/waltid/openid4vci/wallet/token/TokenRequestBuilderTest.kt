@@ -25,6 +25,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TokenRequestBuilderTest {
 
@@ -212,6 +213,59 @@ class TokenRequestBuilderTest {
 
         assertEquals(HttpStatusCode.OK.value, error.statusCode)
         assertEquals(null, error.oauthError)
+    }
+
+    @Test
+    fun testOAuthErrorDescriptionIsSurfaced() = runTest {
+        val client = createMockClient {
+            respond(
+                content = """{"error":"invalid_grant","error_description":"Pre-authorized code is invalid or has already been used"}""",
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+            )
+        }
+
+        assertEquals("invalid_grant", error.oauthError)
+        assertEquals("Pre-authorized code is invalid or has already been used", error.oauthErrorDescription)
+        // The reason the grant was refused has to reach the operator, not just the status code.
+        assertTrue(error.message.orEmpty().contains("already been used"), error.message.orEmpty())
+    }
+
+    /**
+     * A 400 that carries no OAuth error means the request failed before the grant was evaluated, and
+     * must not be indistinguishable from a refused grant. This is the missing call ID case.
+     */
+    @Test
+    fun testNonOAuthErrorBodyIsNamedWithoutBeingEchoed() = runTest {
+        val client = createMockClient {
+            respond(
+                content = "Missing call ID",
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Plain.toString()),
+            )
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest.value, error.statusCode)
+        assertNull(error.oauthError)
+        assertEquals("response body is not an OAuth error object", error.oauthErrorDescription)
+        // Still sanitized: the opaque body itself never reaches the message.
+        assertFalse(error.message.orEmpty().contains("Missing call ID"))
+        // But the failure is no longer a bare status code that reads like a refused grant.
+        assertTrue(error.message.orEmpty().contains("not an OAuth error object"), error.message.orEmpty())
     }
 
     @Test
