@@ -5,9 +5,12 @@ import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
 import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
+import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 import id.walt.walletdemo.compose.logic.createIosDemoWallet
 import id.walt.walletdemo.compose.logic.createIosDemoPinStore
 import id.walt.walletdemo.compose.logic.createIosDemoSharingSettingsStore
+import id.walt.walletdemo.compose.logic.createIosDemoReaderTrustSettingsStore
+import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.walletdemo.compose.logic.createIosDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.createIosDemoSigningProtectionStore
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
@@ -84,14 +87,24 @@ fun walletDemoViewController(
         signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
         sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier),
     )
-    val proximityController = WalletDemoProximityController(wallet)
+    val readerTrustSettingsController = DemoReaderTrustSettingsController(
+        createIosDemoReaderTrustSettingsStore(appGroupIdentifier)
+    )
+    val proximityController = WalletDemoProximityController(
+        wallet = wallet,
+        configurationProvider = {
+            readerTrustSettingsController.sessionSnapshot().applyTo(
+                MobileWalletProximityConfiguration()
+            )
+        },
+    )
     iosController = controller
     iosProximityController?.dismiss()
     iosProximityController = proximityController
     pendingDeepLink?.let(controller::handleDeepLink)
     pendingDeepLink = null
     return ComposeUIViewController {
-        MobileWalletDemoApp(controller, proximityController)
+        MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController)
     }
 }
 

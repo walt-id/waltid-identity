@@ -12,10 +12,13 @@ import androidx.fragment.app.FragmentActivity
 import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
+import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
 import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
+import id.walt.walletdemo.compose.logic.createAndroidDemoReaderTrustSettingsStore
+import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.walletdemo.compose.logic.createAndroidDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.ui.MobileWalletDemoApp
@@ -27,6 +30,7 @@ const val WALLET_SIGNING_PROTECTION_MODE_EXTRA =
 class MainActivity : FragmentActivity() {
     private lateinit var controller: WalletDemoController
     private lateinit var proximityController: WalletDemoProximityController
+    private lateinit var readerTrustSettingsController: DemoReaderTrustSettingsController
     private lateinit var walletConfig: DemoWalletConfig
     private val onCredentialStoreChanged: () -> Unit = {
         if (::controller.isInitialized) {
@@ -60,12 +64,22 @@ class MainActivity : FragmentActivity() {
             signingProtectionStore = walletConfig.signingProtectionStore(applicationContext),
             sharingSettings = createAndroidDemoSharingSettingsStore(applicationContext),
         )
-        proximityController = WalletDemoProximityController(wallet)
+        readerTrustSettingsController = DemoReaderTrustSettingsController(
+            createAndroidDemoReaderTrustSettingsStore(applicationContext)
+        )
+        proximityController = WalletDemoProximityController(
+            wallet = wallet,
+            configurationProvider = {
+                readerTrustSettingsController.sessionSnapshot().applyTo(
+                    MobileWalletProximityConfiguration()
+                )
+            },
+        )
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         handleIntent(intent)
 
         setContent {
-            MobileWalletDemoApp(controller, proximityController)
+            MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController)
         }
     }
 
