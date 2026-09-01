@@ -459,7 +459,7 @@ export const SIMPLE_CREDENTIAL_OPTIONS: SimpleCredentialOption[] = [
     verifier: {
       credentialId: "simple_identity_sd_jwt",
       meta: {
-        vct_values: ["https://credentials.example.com/identity_credential"],
+        vct_values: ["https://issuer2.demo.walt.id/openid4vci/identity_credential"],
       },
       claims: [
         { id: "given_name", label: "Given name", path: ["given_name"] },

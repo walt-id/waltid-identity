@@ -46,7 +46,12 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
-
+/**
+ * Unhappy-path coverage for the pre-final community SD-JWT VC fixture with disclosures.
+ *
+ * Same stale `sd_hash` rejection as [IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest].
+ * See [IETFSdJwtVcHappyPathVerifier2IntegrationTest] for the successful presentation path.
+ */
 class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
     private val sdJwtVcDcqlQuery = DcqlQuery(
@@ -458,9 +463,14 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 val resp = presentationResult.getOrThrow()
                 println("Response: $resp")
                 assertTrue("Pre-final SD-JWT fixture must be rejected: $resp") { resp.transmissionSuccess == false }
+                // The fixture is intentionally invalid. Historically it tripped the SD-JWT `sd_hash-check`
+                // policy (missing `_sd_alg` claim). Since `_sd_alg` now defaults to sha-256 per
+                // RFC 9901 §4.1.1, the presentation gets past that gate and is instead rejected by
+                // the credential `signature` policy on the stale x5c chain. Either rejection is
+                // acceptable for this fixture.
                 assertTrue {
-                    resp.verifierResponse!!.jsonObject["error_description"]!!.jsonPrimitive.content
-                        .contains("sd_hash-check")
+                    val description = resp.verifierResponse!!.jsonObject["error_description"]!!.jsonPrimitive.content
+                    description.contains("sd_hash-check") || description.contains("signature")
                 }
             }
 

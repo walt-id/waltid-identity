@@ -98,7 +98,7 @@ class Crypto2JwtKeyResolver(
     ): ResolvedJwtVerificationKey {
         val certificateChain = x5c.map { it.jsonPrimitive.content }
         return ResolvedJwtVerificationKey(
-            key = restore(X5CKeyResolver.resolveJwkFromX5c(x5c)),
+            key = X5CKeyResolver.restoreKeyFromX5c(x5c, runtime),
             source = JwtKeyResolutionSource.X5C,
             signerIdentifier = signerIdentifier,
             keyId = kid,
@@ -115,17 +115,41 @@ class Crypto2JwtKeyResolver(
 
     private fun selectDidKey(keys: Set<Key>, did: String, kid: String?): Key {
         require(keys.isNotEmpty()) { "No verification keys resolved for DID: $did" }
+        if (did.startsWith("did:jwk:")) {
+            return selectDidJwkKey(keys, did, kid)
+        }
         if (kid == null) {
             require(keys.size == 1) { "JWT with multiple DID verification keys must include kid" }
             return keys.single()
         }
-        if (keys.size == 1 && kid == did && (did.startsWith("did:key:") || did.startsWith("did:jwk:"))) {
+        if (keys.size == 1 && kid == did && did.startsWith("did:key:")) {
             return keys.single()
         }
         val kidCandidates = idCandidates(kid)
         val matches = keys.filter { key -> idCandidates(key.id.value).any(kidCandidates::contains) }
         require(matches.size <= 1) { "Multiple DID verification keys match kid: $kid" }
-        return matches.singleOrNull() ?: throw NoSuchElementException("No DID verification key matches kid: $kid")
+        return matches.singleOrNull()
+            ?: throw NoSuchElementException("No DID verification key matches kid: $kid")
+    }
+
+    /**
+     * did:jwk always publishes a single verification method `{did}#0`.
+     * Pre-2115 issuers wrote KMS-path or thumbprint fragments. Accept those as a
+     * compatibility fallback: the DID encodes exactly one key, so kid cannot select
+     * another key. Ignoring a non-`#0` kid is not spec-compliant DID URL matching;
+     * new issuance must still emit `{did}#0`.
+     */
+    private fun selectDidJwkKey(keys: Set<Key>, did: String, kid: String?): Key {
+        require(keys.size == 1) { "did:jwk must resolve to exactly one verification key" }
+        val methodKid = "$did#0"
+        if (kid != null && kid != methodKid) {
+            log.warn {
+                "did:jwk verification is ignoring non-spec kid '$kid' for '$did'; " +
+                    "the method verification method is '$methodKid'. " +
+                    "did:jwk documents contain exactly one key."
+            }
+        }
+        return keys.single()
     }
 
     private fun idCandidates(id: String): Set<String> =

@@ -7,6 +7,8 @@ data class DemoWalletConfig(
     val attestationBearerToken: String = DemoPublicBackendDefaults.attestationBearerToken,
     val attestationHostHeader: String = DemoPublicBackendDefaults.attestationHostHeader,
     val transactionDataProfilesUrl: String = DemoPublicBackendDefaults.transactionDataProfilesUrl,
+    /** Product constraint for runtime signing protection selection. */
+    val signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
 )
 
 object DemoPublicBackendDefaults {

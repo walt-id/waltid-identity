@@ -1,5 +1,6 @@
 package id.walt.openid4vci.core
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
@@ -59,7 +60,6 @@ import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.tokens.access.dpopJwkThumbprint
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.sdjwt.SDMap
-import id.walt.x509.CertificateDer
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -189,15 +189,6 @@ class DefaultOAuth2Provider(
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
     ): AuthorizationRequestResult {
-        if (parameters["request_uri"].orEmpty().any { it.isNotBlank() }) {
-            return AuthorizationRequestResult.Failure(
-                OAuthError(
-                    error = OAuthErrorCodes.INVALID_REQUEST,
-                    description = "request_uri is not allowed at the pushed authorization request endpoint",
-                )
-            )
-        }
-
         val authenticatedClient = when (
             val authResult = authenticateClient(
                 endpoint = ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION,
@@ -215,6 +206,15 @@ class DefaultOAuth2Provider(
         ) {
             is ClientIdParameterResolution.Success -> resolution.parameters
             is ClientIdParameterResolution.Failure -> return AuthorizationRequestResult.Failure(resolution.error)
+        }
+
+        if (effectiveParameters["request_uri"].orEmpty().any { it.isNotBlank() }) {
+            return AuthorizationRequestResult.Failure(
+                OAuthError(
+                    error = OAuthErrorCodes.INVALID_REQUEST,
+                    description = "request_uri is not allowed at the pushed authorization request endpoint",
+                )
+            )
         }
 
         return when (val result = config.authorizationRequestValidator.validate(effectiveParameters)) {
@@ -451,7 +451,8 @@ class DefaultOAuth2Provider(
 
         val description = request.grantTypes.joinToString(" ").takeIf { it.isNotBlank() }
         return AccessTokenResponseResult.Failure(
-            OAuthError("unsupported_grant_type", description),
+            request = request.withSession(null),
+            error = OAuthError(OAuthErrorCodes.UNSUPPORTED_GRANT_TYPE, description),
         )
     }
 
@@ -581,7 +582,7 @@ class DefaultOAuth2Provider(
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
@@ -637,7 +638,7 @@ class DefaultOAuth2Provider(
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,

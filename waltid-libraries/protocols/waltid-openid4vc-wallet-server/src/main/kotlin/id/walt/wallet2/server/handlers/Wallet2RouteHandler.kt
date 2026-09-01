@@ -7,56 +7,17 @@ import id.walt.did.dids.DidService
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
-import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.data.StoredCredentialMetadata
-import id.walt.wallet2.data.Wallet
-import id.walt.wallet2.data.WalletCredentialStore
-import id.walt.wallet2.data.WalletDidEntry
-import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyInfo
-import id.walt.wallet2.data.WalletKeyStore
-import id.walt.wallet2.handlers.BuildVpTokenRequest
-import id.walt.wallet2.handlers.BuildVpTokenResult
-import id.walt.wallet2.handlers.CredentialEndpointException
-import id.walt.wallet2.handlers.ExchangeCodeRequest
-import id.walt.wallet2.handlers.FetchCredentialRequest
-import id.walt.wallet2.handlers.FetchCredentialResult
-import id.walt.wallet2.handlers.GenerateAuthorizationUrlRequest
-import id.walt.wallet2.handlers.GenerateAuthorizationUrlResult
-import id.walt.wallet2.handlers.ImportCredentialRequest
-import id.walt.wallet2.handlers.MatchCredentialsFromStoreRequest
-import id.walt.wallet2.handlers.MatchCredentialsRequest
-import id.walt.wallet2.handlers.MatchCredentialsResult
-import id.walt.wallet2.handlers.PollDeferredRequest
-import id.walt.wallet2.handlers.PresentCredentialIsolatedRequest
-import id.walt.wallet2.handlers.PresentCredentialRequest
-import id.walt.wallet2.handlers.PreviewPresentationRequest
-import id.walt.wallet2.handlers.ReceiveCredentialRequest
-import id.walt.wallet2.handlers.ReceiveCredentialResult
-import id.walt.wallet2.handlers.RejectPresentationByRequestUrlRequest
-import id.walt.wallet2.handlers.RequestNonceRequest
-import id.walt.wallet2.handlers.RequestNonceResult
-import id.walt.wallet2.handlers.RequestTokenRequest
-import id.walt.wallet2.handlers.RequestTokenResult
-import id.walt.wallet2.handlers.ResolveOfferRequest
-import id.walt.wallet2.handlers.ResolveOfferResult
-import id.walt.wallet2.handlers.ResolveVpRequestRequest
-import id.walt.wallet2.handlers.ResolveVpRequestResult
-import id.walt.wallet2.handlers.SendAuthorizationResponseRequest
-import id.walt.wallet2.handlers.SignProofRequest
-import id.walt.wallet2.handlers.SignProofResult
-import id.walt.wallet2.handlers.WalletCredentialHandler
-import id.walt.wallet2.handlers.WalletIssuanceHandler
-import id.walt.wallet2.handlers.WalletPresentationHandler
+import id.walt.wallet2.data.*
+import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.WalletResolver
 import id.walt.wallet2.server.models.PresentationPreviewResponse
 import id.walt.wallet2.server.models.ResolveOfferDetailedResponse
 import id.walt.wallet2.server.models.toDetailedResponse
 import id.walt.wallet2.server.models.toPreviewResponse
 import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
-import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.token.TokenRequestException
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
@@ -280,6 +241,7 @@ object Wallet2RouteHandler {
                         require(storeId in registeredCredentialStoreIds) { "Credential store '$storeId' not found" }
                         requireNotNull(resolver.resolveCredentialStore(storeId)) { "Credential store '$storeId' disappeared between validation and use" }
                     }
+
                 else -> listOf(resolver.createCredentialStore("$id-credentials"))
             }
 
@@ -719,6 +681,8 @@ object Wallet2RouteHandler {
                                 "stored in the wallet, removing the need to call the import endpoint afterwards. " +
                                 "Pass credentialIssuerBaseUrl when storing so issuer display metadata and labels " +
                                 "are persisted like the full receive path. " +
+                                "When the response can contain an mdoc, keyId must identify the exact wallet key " +
+                                "used to create proofJwt. " +
                                 "If the issuer returns invalid_nonce, request a fresh nonce, sign a new proof, " +
                                 "and repeat this isolated fetch step."
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
@@ -743,22 +707,30 @@ object Wallet2RouteHandler {
                         summary = "Auth-code grant: generate authorization redirect URL"
                         description =
                             "Resolves the offer and builds the OAuth authorization URL. " +
-                            "The caller must redirect to this URL and capture the returned code. " +
-                            "The response includes continuation data for later token and credential requests."
+                                    "The caller must redirect to this URL and capture the returned code. " +
+                                    "The response includes continuation data for later token and credential requests."
                         request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest>() }
                         response { HttpStatusCode.OK to { body<GenerateAuthorizationUrlResult>() } }
                     }) {
+                        // Wallet-aware overload: PAR is a client-authenticated endpoint, so the
+                        // authorization request can only be pushed when a signing key is available.
+                        // The assembler goes with it because a pushed request authenticates the client
+                        // just as the token request does, and under HAIP attestation is the only
+                        // client authentication the authorization server accepts.
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<GenerateAuthorizationUrlRequest>()
-                        call.respond(WalletIssuanceHandler.generateAuthorizationUrl(req))
+                        call.respond(
+                            WalletIssuanceHandler.generateAuthorizationUrl(wallet, req, attestationAssembler)
+                        )
                     }
 
                     post("/exchange-code", {
                         summary = "Auth-code grant: exchange authorization code for access token"
                         description =
                             "Exchanges the authorization code for an access token. " +
-                            "credentialIssuerBaseUrl is used to resolve authorization server metadata. " +
-                            "If attestation is configured and supported by the issuer, the wallet key is used " +
-                            "to create token endpoint client authentication headers."
+                                    "credentialIssuerBaseUrl is used to resolve authorization server metadata. " +
+                                    "If attestation is configured and supported by the issuer, the wallet key is used " +
+                                    "to create token endpoint client authentication headers."
                         request { pathParameter<String>("walletId"); body<ExchangeCodeRequest>() }
                         response { HttpStatusCode.OK to { body<RequestTokenResult>() } }
                     }) {
@@ -783,7 +755,9 @@ object Wallet2RouteHandler {
                             "Polls the issuer's deferred credential endpoint for a previously " +
                                     "deferred credential. Returns immediately with empty list if still pending. " +
                                     "Pass credentialIssuerBaseUrl (and optionally credentialConfigurationId) so " +
-                                    "issuer display metadata and labels are stored like the full receive path."
+                                    "issuer display metadata and labels are stored like the full receive path. " +
+                                    "When the response can contain an mdoc, keyId must identify the exact wallet " +
+                                    "key used for the original credential request."
                         request { pathParameter<String>("walletId"); body<PollDeferredRequest>() }
                         response { HttpStatusCode.OK to { body<ReceiveCredentialResult>() } }
                     }) {
@@ -793,6 +767,34 @@ object Wallet2RouteHandler {
                         WalletIssuanceHandler.pollDeferredFlow(wallet, req)
                             .collect { ids += it.id }
                         call.respond(ReceiveCredentialResult(credentialIds = ids))
+                    }
+                    post("/authorized", {
+                        summary = "Complete the authorization-code grant"
+                        description =
+                            "Exchanges an authorization code for an access token, builds the proof of " +
+                                    "possession, fetches the credential(s) and stores them - the " +
+                                    "authorization-code counterpart of POST /credentials/receive. Pass the " +
+                                    "code from the redirect callback plus the codeVerifier and endpoints " +
+                                    "returned by /credentials/receive/authorization-url."
+                        request {
+                            pathParameter<String>("walletId")
+                            body<ReceiveAuthorizedCredentialRequest>()
+                        }
+                        response { HttpStatusCode.OK to { body<ReceiveCredentialResult>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                        val req = call.receive<ReceiveAuthorizedCredentialRequest>()
+                        try {
+                            call.respond(
+                                WalletIssuanceHandler.receiveCredentialAuthCode(
+                                    wallet = wallet,
+                                    request = req,
+                                    attestationAssembler = attestationAssembler,
+                                )
+                            )
+                        } catch (e: TokenRequestException) {
+                            throw e.toWebException()
+                        }
                     }
                 }
 
@@ -806,7 +808,7 @@ object Wallet2RouteHandler {
                             "Resolves the VP request, DCQL-matches credentials from the wallet " +
                                     "stores, signs the presentation(s) and submits to the verifier."
                         request { pathParameter<String>("walletId"); body<PresentCredentialRequest>() }
-                        response { HttpStatusCode.OK to { body<id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult>() } }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialRequest>()
@@ -824,7 +826,7 @@ object Wallet2RouteHandler {
                     post("/isolated", {
                         summary = "Present credential(s) — stateless, inline credentials"
                         request { pathParameter<String>("walletId"); body<PresentCredentialIsolatedRequest>() }
-                        response { HttpStatusCode.OK to { body<id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult>() } }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialIsolatedRequest>()

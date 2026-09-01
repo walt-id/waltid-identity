@@ -301,6 +301,7 @@ final class SharingReviewModelTests: XCTestCase {
                 policyURI: nil,
                 termsOfServiceURI: nil
             ),
+            requestAuthentication: .unauthenticated,
             responseEncryption: .notRequired
         ).sharingRequest()
 
@@ -423,6 +424,7 @@ final class SharingReviewModelTests: XCTestCase {
             request: PresentationRequestInfo(
                 clientID: "https://verifier.example",
                 verifierMetadata: verifierMetadata,
+                requestAuthentication: .unauthenticated,
                 responseURI: URL(string: "https://verifier.example/response"),
                 state: "state-123",
                 nonce: "nonce-456",

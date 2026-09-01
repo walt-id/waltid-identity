@@ -6,10 +6,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SignumKeyPolicy(
+    /** Hardware backing preference; [SignumHardwarePolicy.REQUIRED] requires backend-observed hardware. */
     val hardware: SignumHardwarePolicy = SignumHardwarePolicy.PREFERRED,
     val authentication: SignumAuthenticationPolicy = SignumAuthenticationPolicy.None,
     /** Enables platform ECDH for keys with [KeyUsage.KEY_AGREEMENT] usage. */
     val keyAgreement: Boolean = false,
+    /** Requests attestation evidence in addition to any hardware backing requirement. */
     val attestationChallenge: BinaryData? = null,
 ) {
     init {
@@ -41,14 +43,34 @@ sealed interface SignumAuthenticationPolicy {
         val cancelText: String = "Cancel",
     ) : SignumAuthenticationPolicy {
         init {
-            require(biometric || deviceCredential) { "At least one authentication factor must be enabled" }
-            require(biometric || !allowNewBiometrics) { "New biometrics cannot be allowed when biometrics are disabled" }
-            require(timeoutSeconds >= 0) { "Authentication timeout cannot be negative" }
+            require(biometric || deviceCredential) {
+                "At least one authentication factor must be enabled"
+            }
+            require(biometric || !allowNewBiometrics) {
+                "New biometrics cannot be allowed when biometrics are disabled"
+            }
+            require(timeoutSeconds >= 0) {
+                "Authentication timeout cannot be negative"
+            }
             require(prompt.isNotBlank()) { "Authentication prompt cannot be blank" }
             require(cancelText.isNotBlank()) { "Authentication cancel text cannot be blank" }
         }
     }
 }
+
+internal fun SignumAuthenticationPolicy.isBiometricCurrentSetEveryUse(): Boolean =
+    this is SignumAuthenticationPolicy.UserPresence &&
+        biometric &&
+        !allowNewBiometrics &&
+        !deviceCredential &&
+        timeoutSeconds == 0
+
+internal fun SignumAuthenticationPolicy.isBiometricTimedReuse(): Boolean =
+    this is SignumAuthenticationPolicy.UserPresence &&
+        biometric &&
+        allowNewBiometrics &&
+        !deviceCredential &&
+        timeoutSeconds > 0
 
 @Serializable
 enum class SignumProtectionLevel {
@@ -69,6 +91,7 @@ data class SignumKeyAttestation(
     }
 }
 
+/** Derives only evidence-backed protection; REQUIRED is verified by each native backend before reporting HARDWARE. */
 internal fun SignumKeyPolicy.effectiveProtection(attestation: SignumKeyAttestation?): SignumProtectionLevel = when {
     attestation != null -> SignumProtectionLevel.HARDWARE
     hardware == SignumHardwarePolicy.DISCOURAGED -> SignumProtectionLevel.SOFTWARE

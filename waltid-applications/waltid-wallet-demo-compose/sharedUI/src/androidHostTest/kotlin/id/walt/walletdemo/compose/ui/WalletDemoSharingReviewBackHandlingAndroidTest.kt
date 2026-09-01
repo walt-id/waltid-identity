@@ -3,7 +3,9 @@ package id.walt.walletdemo.compose.ui
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.AndroidComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -32,12 +34,12 @@ import org.robolectric.annotation.Config
 class WalletDemoSharingReviewBackHandlingAndroidTest {
 
     /**
-     * With credential details open the gesture is the screen's own navigation: it closes them and the host
+     * With the claims dialog open the gesture is the dialog's own dismiss: it closes it and the host
      * is told nothing, rather than ending an OS-invoked surface because the user looked at what they were
      * about to share.
      */
     @Test
-    fun backClosesCredentialDetailsWithoutLeavingTheReview() =
+    fun backClosesClaimsDialogWithoutLeavingTheReview() =
         runAndroidComposeUiTest<ComponentActivity> {
             var backAtRoot = 0
             var cancelled = 0
@@ -55,11 +57,12 @@ class WalletDemoSharingReviewBackHandlingAndroidTest {
             onNodeWithTag(WalletUiTestTags.credentialCard(option.selection.id))
                 .performScrollTo()
                 .performClick()
-            onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
+            onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
 
             pressBack()
 
             onNodeWithTag(WalletDemoSharingReviewTestTags.Review).assertIsDisplayed()
+            onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
             assertEquals(0, backAtRoot)
             assertEquals(0, cancelled)
         }

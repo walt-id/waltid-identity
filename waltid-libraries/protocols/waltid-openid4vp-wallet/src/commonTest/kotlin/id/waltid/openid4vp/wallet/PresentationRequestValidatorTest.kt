@@ -153,7 +153,7 @@ class PresentationRequestValidatorTest {
         )
 
         val result = PresentationRequestValidator.validate(
-            resolvedRequest = ResolvedAuthorizationRequest.WithRequestObject(
+            resolvedRequest = ResolvedAuthorizationRequest.UnsignedRequestObject(
                 authorizationRequest = request,
                 requestObject = "authenticated.request.object",
             ),
@@ -410,7 +410,7 @@ class PresentationRequestValidatorTest {
     private fun validate(
         request: AuthorizationRequest,
         transactionDataTypes: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
-        resolvedRequest: ResolvedAuthorizationRequest = ResolvedAuthorizationRequest.WithRequestObject(
+        resolvedRequest: ResolvedAuthorizationRequest = ResolvedAuthorizationRequest.UnsignedRequestObject(
             authorizationRequest = request,
             requestObject = "authenticated.request.object",
         ),

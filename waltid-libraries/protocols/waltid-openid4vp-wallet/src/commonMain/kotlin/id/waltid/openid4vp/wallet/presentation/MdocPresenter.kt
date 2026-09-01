@@ -9,16 +9,15 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.cose.createAndSignDetached
 import id.walt.cose.protectedAlgorithm
 import id.walt.cose.selectCoseSignatureAlgorithm
-import id.walt.cose.toCoseAlgorithm
-import id.walt.cose.toCoseSigner
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.dcql.DcqlMatcher
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
@@ -210,31 +209,40 @@ object MdocPresenter {
         )
 
         // Sign using the detached payload function
-        val crypto2Key = holderCrypto2Key ?: holderKey?.let { WalletCrypto2KeyAdapter.signingKey(it) }
-        val algorithm = crypto2Key?.selectCoseSignatureAlgorithm(allowedAlgorithms)
-            ?: requireNotNull(requireNotNull(holderKey).keyType.toCoseAlgorithm()) {
-                "Holder key type ${holderKey.keyType} does not support COSE signing"
-            }
-        val p256Key = crypto2Key?.spec == KeySpec.Ec(EcCurve.P256) || holderKey?.keyType == KeyType.secp256r1
+        val crypto2Key = requireNotNull(
+            holderCrypto2Key ?: holderKey?.let { WalletCrypto2KeyAdapter.signingKey(it) }
+        ) { "Mdoc device authentication requires a Crypto2 signing key" }
+        requireHolderKeyMatchesMso(credential, crypto2Key)
+        val algorithm = crypto2Key.selectCoseSignatureAlgorithm(allowedAlgorithms)
+        val p256Key = crypto2Key.spec == KeySpec.Ec(EcCurve.P256)
         require(allowedAlgorithms == null || allowedAlgorithms.acceptsCoseAlgorithm(algorithm, p256Key)) {
             "Verifier does not support mdoc device authentication algorithm $algorithm"
         }
-        val deviceSignature = if (crypto2Key != null) {
-            CoseSign1.createAndSignDetached(
-                protectedHeaders = CoseHeaders(algorithm = algorithm),
-                detachedPayload = deviceAuthBytes,
-                key = crypto2Key,
-            )
-        } else {
-            CoseSign1.createAndSignDetached(
-                protectedHeaders = CoseHeaders(algorithm = algorithm),
-                detachedPayload = deviceAuthBytes,
-                signer = requireNotNull(holderKey).toCoseSigner(),
-            )
-        }
+        val deviceSignature = CoseSign1.createAndSignDetached(
+            protectedHeaders = CoseHeaders(algorithm = algorithm),
+            detachedPayload = deviceAuthBytes,
+            key = crypto2Key,
+        )
         val deviceAuth = DeviceAuth(deviceSignature = deviceSignature)
 
         return deviceAuth
+    }
+
+    /** Fail closed before signing when a caller supplies a wallet default or stale key. */
+    private suspend fun requireHolderKeyMatchesMso(
+        credential: MdocsCredential,
+        holderKey: Crypto2Key,
+    ) {
+        val msoKey = credential.getHolderCrypto2Key()
+        val msoJwk = requireNotNull(msoKey.capabilities.publicKeyExporter) {
+            "The mdoc MSO DeviceKey cannot export public material"
+        }.exportPublicKey().toPublicJwk(msoKey.spec)
+        val holderJwk = requireNotNull(holderKey.capabilities.publicKeyExporter) {
+            "The selected holder key cannot export public material"
+        }.exportPublicKey().toPublicJwk(holderKey.spec)
+        require(Jwk.sha256Thumbprint(msoJwk) == Jwk.sha256Thumbprint(holderJwk)) {
+            "The selected holder key does not match the mdoc MSO DeviceKey"
+        }
     }
 
     @Deprecated("Use the Crypto2Key overload")

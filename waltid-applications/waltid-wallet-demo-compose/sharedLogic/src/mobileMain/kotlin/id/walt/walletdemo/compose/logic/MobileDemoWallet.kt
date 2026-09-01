@@ -15,19 +15,44 @@ import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 
 internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,
     private val warning: String? = null,
 ) : DemoWallet {
-    override suspend fun bootstrap(): WalletDemoBootstrapResult =
-        mobileWallet.bootstrap().let { result ->
+    override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult =
+        mobileWallet.bootstrap(
+            keyUseAuthorizationPolicy = signingProtection.toKeyUseAuthorizationPolicy(),
+        ).let { result ->
             WalletDemoBootstrapResult(
                 keyId = result.keyId,
                 did = result.did,
+                publicJwk = result.publicJwk,
+                signingProtection = result.keyUseAuthorizationPolicy.toDemoSigningProtection(),
                 warning = warning,
             )
         }
+
+    override suspend fun signingProtectionAvailability(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoSigningProtectionAvailability = when (
+        val support = mobileWallet.keyUseAuthorizationPreflight(
+            keyUseAuthorizationPolicy = signingProtection.toKeyUseAuthorizationPolicy(),
+        )
+    ) {
+        is KeyUseAuthorizationSupport.Supported -> WalletDemoSigningProtectionAvailability.Available
+        is KeyUseAuthorizationSupport.Unsupported -> when (support.reason) {
+            KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled ->
+                WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+            KeyUseAuthorizationUnsupportedReason.BiometricUnavailable ->
+                WalletDemoSigningProtectionAvailability.BiometricUnavailable
+            KeyUseAuthorizationUnsupportedReason.UnsupportedCombination ->
+                WalletDemoSigningProtectionAvailability.Unsupported
+        }
+    }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         mobileWallet.credentials().map { credential ->
@@ -146,6 +171,30 @@ internal class MobileDemoWallet(
             failureMessage = WalletDisplayText.RejectionFinishedWithoutVerifierConfirmation,
         )
 
+    override suspend fun deleteCredential(credentialId: String): Boolean =
+        mobileWallet.deleteCredential(credentialId)
+
+    override suspend fun deleteWallet() {
+        mobileWallet.deleteWallet()
+    }
+}
+
+internal fun WalletDemoSigningProtection.toKeyUseAuthorizationPolicy(): KeyUseAuthorizationPolicy = when (this) {
+    WalletDemoSigningProtection.None -> KeyUseAuthorizationPolicy.None
+    WalletDemoSigningProtection.Biometric -> KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
+}
+
+private fun KeyUseAuthorizationPolicy.toDemoSigningProtection(): WalletDemoSigningProtection = when (this) {
+    KeyUseAuthorizationPolicy.None -> WalletDemoSigningProtection.None
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> {
+        check(timeoutSeconds == 10) {
+            "Wallet key uses an unsupported biometric signing timeout: $timeoutSeconds seconds"
+        }
+        WalletDemoSigningProtection.Biometric
+    }
+    KeyUseAuthorizationPolicy.BiometricCurrentSet -> error(
+        "Wallet key uses an unsupported per-operation biometric signing policy",
+    )
 }
 
 private fun MobileWalletPresentationResult.toDemoOperationResult(
@@ -196,11 +245,21 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
                 queryId = option.queryId,
                 credentialId = option.credentialId,
                 multiple = option.multiple,
-                label = option.label ?: option.format,
+                label = resolveCardTitle(
+                    format = option.format,
+                    credentialDataJson = option.credentialDataJson,
+                    displayName = presentationDisplayName(
+                        format = option.format,
+                        metadataJson = option.metadataJson,
+                        storedLabel = option.label,
+                    ),
+                    fallback = option.format,
+                ),
                 issuer = option.issuer,
                 subject = option.subject,
                 format = option.format,
                 credentialDataJson = option.credentialDataJson,
+                metadataJson = option.metadataJson,
                 disclosures = option.disclosures.map { disclosure ->
                     WalletDemoPresentationDisclosure(
                         label = CredentialDisplayVocabulary.disclosureLabel(disclosure.name, disclosure.path),
@@ -250,6 +309,9 @@ internal fun MobileWalletMetadataDisplay.toDemoMetadataDisplay(): WalletDemoMeta
         logoUri = logoUri,
         logoAltText = logoAltText,
         description = description,
+        backgroundColor = backgroundColor,
+        backgroundImageUri = backgroundImageUri,
+        textColor = textColor,
     )
 
 internal fun MobileWalletVerifierMetadata.toDemoMetadata(): WalletDemoVerifierMetadata =

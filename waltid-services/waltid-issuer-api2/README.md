@@ -94,6 +94,65 @@ The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Upd
 | `POST` | `/openid4vci/credential` | Credential endpoint |
 | `POST` | `/openid4vci/notification` | Notification endpoint |
 
+## Issuance Lifecycle Events
+
+Issuer sessions publish the same `KtorSessionUpdate` envelope to SSE and to an optional webhook configured on the credential offer. The `event` field progresses through the supported OpenID4VCI flow:
+
+| Stage | Events |
+|------|--------|
+| Offer | `credential_offer_created`, `credential_offer_retrieved` |
+| Pushed authorization | `pushed_authorization_request_succeeded`, `pushed_authorization_request_failed` |
+| Authorization | `authorization_request_succeeded`, `authorization_request_failed` |
+| Unclassified token request | `token_request_failed` |
+| Authorization-code token request | `token_request_authorization_code_succeeded`, `token_request_authorization_code_failed` |
+| Pre-authorized-code token request | `token_request_pre_authorized_code_succeeded`, `token_request_pre_authorized_code_failed` |
+| Refresh-token request | `token_request_refresh_token_succeeded`, `token_request_refresh_token_failed` |
+| Nonce request | `nonce_request_succeeded`, `nonce_request_failed` |
+| Unresolved credential request | `credential_request_failed` |
+| SD-JWT VC credential request | `credential_request_sd_jwt_vc_succeeded`, `credential_request_sd_jwt_vc_failed` |
+| W3C VC credential request | `credential_request_w3c_vc_succeeded`, `credential_request_w3c_vc_failed` |
+| mdoc credential request | `credential_request_mso_mdoc_succeeded`, `credential_request_mso_mdoc_failed` |
+| Session lifecycle | `issuance_status_changed` |
+
+Kotlin enum constants are `SCREAMING_SNAKE_CASE`; webhook and SSE payloads use the lowercase `value` strings above.
+
+### Emission rule
+
+Offer events report management and retrieval facts. Protocol endpoint events report one final outcome. A successful request is emitted only after its protocol response has been constructed.
+
+An event contains the issuance session only after the request has been correlated using trusted protocol state. An unknown code, malformed request, or failure before grant resolution is published only on the issuer-level stream with its request ID and an empty session. The request ID is the Ktor call ID shared by the response `X-Request-ID` header and logging MDC; issuer2 accepts a valid incoming value or generates one when absent. The service does not decode an unverified token merely to obtain a session ID. Notification delivery is best effort and never changes the protocol response.
+
+Nonce request events are always issuer-level. The OpenID4VCI Nonce Endpoint is not protected by an access token and its request contains no issuance-session identifier.
+
+The token event identifies the grant that was processed. Once a trusted issuance session and its credential configuration have been resolved, credential failures use the corresponding `credential_request_<format>_failed` event. Failures before that point use `credential_request_failed` because issuer2 cannot safely assign a format. A request produces at most one endpoint outcome event.
+
+### Failure detail
+
+Failure events carry the protocol error directly on the event envelope:
+
+```json
+{ "event": "token_request_pre_authorized_code_failed",
+  "error": "invalid_grant",
+  "error_description": "tx_code is invalid",
+  "session": { "sessionId": "..." } }
+```
+
+`error` and `error_description` are the OAuth or OpenID4VCI error returned to the wallet. The event catalogue does not define a second error taxonomy such as `tx_code_validation_failed`; consumers use the specification error and description for diagnosis. For terminal credential failures the object is stored on the session and can be read from `GET /issuer2/sessions/{sessionId}`. Retryable credential proof and nonce failures publish it only on the event because the session remains usable.
+
+### Ordering and delivery
+
+Events raised while handling a single request are delivered in order, on both transports. Concurrent requests on the same session may interleave. `credential_offer_created` is effectively webhook-only: it is published before the session id is returned to the caller, so no SSE subscriber can exist yet.
+
+On successful credential issuance the session is persisted as `SUCCESSFUL` before the credential success event and `issuance_status_changed` are published. A terminal credential failure is persisted as `UNSUCCESSFUL` before the credential failure event and `issuance_status_changed` are published. The status event carries `status`, `statusReason`, and `isClosed`.
+
+Only terminal credential endpoint failures conclude a session. Earlier stages and retryable credential proof or nonce failures leave it usable. An incorrect `tx_code`, for example, does not consume the pre-authorized code, so the wallet can retry and complete the same session.
+
+Published session payloads redact issuer signing key material (`issuerKey.type = "redacted"`). Credential data may still be present; use trusted webhook receivers and avoid exposing event payloads in public logs or screenshots.
+
+### Breaking event-name migration
+
+This catalogue replaces the legacy mixed names. `credential_offer_resolved` becomes `credential_offer_retrieved`; token success/failure names now include the grant; credential `*_issued`, generic failure, DPoP, and proof events become the format-specific credential request outcome; `issuance_status` becomes `issuance_status_changed`. The former `*_received` and `tx_code_validation_failed` events are removed.
+
 ## Creating a Credential Offer
 
 Create offers by selecting a configured profile:

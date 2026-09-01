@@ -34,6 +34,12 @@ The demo unlock PIN is stored separately as a salted PBKDF2-SHA256 verifier in a
 
 The UI stays focused on the production default. Non-default persistence options, including provided database keys and custom stores, are documented and tested at the SDK layer.
 
+## Whitelabel branding
+
+Edit `WalletDemoBranding` in `sharedUI` to change the in-app wallet title and Material3 colours (`primary`, `secondary`, `primaryContainer`, and their on-colours). Hosts can also pass a custom instance into `WalletDemoApp`.
+
+Launcher names stay in platform manifests: Android `app_name` in `androidApp/src/main/res/values/strings.xml`, and iOS `CFBundleDisplayName` in the app and document-provider `Info.plist` files.
+
 ## Public demo backend defaults
 
 Clean demo installs use the public walt.id demo profile endpoint for OpenID4VP transaction-data support:
@@ -91,7 +97,7 @@ implementation, and is unrelated to Credential Manager Digital Credentials issua
 Android builds register with Credential Manager for:
 
 - **Presentation (`GET_CREDENTIAL`)** — OpenID4VP unsigned and ISO 18013-7 Annex C, via `DigitalCredentialProviderActivity` (full-screen consent for now).
-- **Issuance (`CREATE_CREDENTIAL`)** — OpenID4VCI (`openid4vci-v1`), via `DigitalCredentialCreateActivity`.
+- **Issuance (`CREATE_CREDENTIAL`)** — OpenID4VCI (`openid4vci-v1` and historical aliases), via `DigitalCredentialCreateActivity`.
 
 Issuance uses a translucent create Activity and a Material bottom sheet for offer review (including transaction-code entry). Pre-authorized offers complete in that sheet. Authorization-code offers use the same external-browser + `openid://` path as the Receive tab; `DigitalCredentialCreateAuthHandoff` returns the callback to the still-running create Activity (or completes wallet-side issuance if that Activity was destroyed). The Credential Manager create-option picker remains system-owned; the sheet is wallet fulfillment UI after the user selects this wallet.
 

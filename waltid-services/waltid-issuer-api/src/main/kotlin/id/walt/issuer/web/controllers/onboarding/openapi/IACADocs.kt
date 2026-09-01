@@ -309,7 +309,8 @@ object IACADocs {
                             "issuerAlternativeNameConf": {
                               "uri": "https://iaca.example.com"
                             }
-                          }
+                          },
+                          "certificateValidationResult": []
                         }
                     """.trimIndent()
                     )

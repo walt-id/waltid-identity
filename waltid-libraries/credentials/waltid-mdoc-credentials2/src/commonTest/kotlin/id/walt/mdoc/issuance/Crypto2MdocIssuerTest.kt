@@ -1,5 +1,6 @@
 package id.walt.mdoc.issuance
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.toCoseKey
@@ -17,9 +18,6 @@ import id.walt.mdoc.crypto.MdocCrypto.getSharedSecret
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.verification.verifyIssuerAuthentication
-import id.walt.x509.GenericX509CertificateBuilder
-import id.walt.x509.GenericX509CertificateProfileData
-import id.walt.x509.X509DistinguishedName
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.JsonObject
@@ -50,21 +48,17 @@ class Crypto2MdocIssuerTest {
         )
         val holderJwk = holderKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
         val holderCoseKey = holderJwk.toCoseKey()
-        val certificate = GenericX509CertificateBuilder().buildDer(
-            profileData = GenericX509CertificateProfileData(
-                subjectName = X509DistinguishedName(commonName = "Crypto2 mdoc issuer"),
-            ),
-            subjectPublicKey = issuerKey,
-            signingKey = issuerKey,
-            signatureAlgorithm = SignatureAlgorithm.Ecdsa(
-                DigestAlgorithm.SHA_256,
-                EcdsaSignatureEncoding.DER,
-            ),
+        val sigAlg = SignatureAlgorithm.Ecdsa(
+            DigestAlgorithm.SHA_256,
+            EcdsaSignatureEncoding.DER,
         )
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(issuerKey, sigAlg) {
+            subjectDn = "CN=Crypto2 mdoc issuer"
+        }
         val issued = MdocIssuer.issueUniversal(
             issuerKey = issuerKey,
             signatureAlgorithm = Cose.Algorithm.ES256,
-            issuerCertificate = listOf(CoseCertificate(certificate.bytes.toByteArray())),
+            issuerCertificate = listOf(CoseCertificate(certificate.encodedDer.toByteArray())),
             holderKey = holderCoseKey,
             docType = "org.example.mdoc",
             data = MdocIssuer.MdocUniversalIssuanceData(
@@ -88,7 +82,7 @@ class Crypto2MdocIssuerTest {
         val typesafeIssued = MdocIssuer.issueTypesafe(
             issuerKey = issuerKey,
             signatureAlgorithm = Cose.Algorithm.ES256,
-            issuerCertificate = listOf(CoseCertificate(certificate.bytes.toByteArray())),
+            issuerCertificate = listOf(CoseCertificate(certificate.encodedDer.toByteArray())),
             holderKey = holderCoseKey,
             typesafeData = Mdl(
                 familyName = "Doe",

@@ -30,7 +30,10 @@ class CredentialOfferService(
     private val config: Issuer2ServiceConfig,
     private val notificationService: IssuanceNotificationService,
 ) {
-    suspend fun createCredentialOffer(request: CredentialOfferCreateRequest): CredentialOfferCreateResponse {
+    suspend fun createCredentialOffer(
+        request: CredentialOfferCreateRequest,
+        requestId: String,
+    ): CredentialOfferCreateResponse {
         val profile = profileService.resolveProfile(request.profileId)
         val sessionId = request.sessionId ?: UUID.randomUUID().toString()
         val expiresAt = expirationTimestamp(request.expiresInSeconds)
@@ -110,6 +113,12 @@ class CredentialOfferService(
             credentialStatus = overrides?.credentialStatus ?: profile.credentialStatus,
         )
         sessionService.createSession(session)
+        // BY_VALUE offers are never dereferenced, so this is their only offer-stage event.
+        notificationService.notify(
+            requestId = requestId,
+            session = session,
+            event = IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+        )
 
         val offerRequest = when (request.valueMode) {
             CredentialOfferValueMode.BY_VALUE -> CredentialOfferRequest(credentialOffer = credentialOffer)
@@ -129,12 +138,13 @@ class CredentialOfferService(
         )
     }
 
-    suspend fun getCredentialOffer(sessionId: String): CredentialOffer? {
+    suspend fun getCredentialOffer(sessionId: String, requestId: String): CredentialOffer? {
         val session = sessionService.getSessionOrNull(sessionId) ?: return null
         val credentialOffer = session.credentialOffer ?: return null
         notificationService.notify(
+            requestId = requestId,
             session = session,
-            event = IssuanceSessionEvent.resolved_credential_offer,
+            event = IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED,
         )
         return credentialOffer
     }

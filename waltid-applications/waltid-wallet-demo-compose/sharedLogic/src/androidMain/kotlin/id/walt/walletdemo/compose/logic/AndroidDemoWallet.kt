@@ -3,6 +3,9 @@ package id.walt.walletdemo.compose.logic
 import android.content.Context
 import android.os.LocaleList
 import id.walt.wallet2.mobile.MobileWallet
+import androidx.fragment.app.FragmentActivity
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
 
@@ -16,7 +19,20 @@ import id.walt.wallet2.mobile.MobileWalletFactory
 data class AndroidDemoMobileWallet(
     val wallet: MobileWallet,
     val transactionDataProfilesWarning: String?,
-)
+) {
+    suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult {
+        val demoWallet = MobileDemoWallet(wallet, transactionDataProfilesWarning)
+        val availability = demoWallet.signingProtectionAvailability(signingProtection)
+        check(availability == WalletDemoSigningProtectionAvailability.Available) {
+            "Signing protection is unavailable: $availability"
+        }
+        return demoWallet.bootstrap(signingProtection).also { result ->
+            check(result.signingProtection == signingProtection) {
+                "Open the wallet app to apply the configured signing protection before using Digital Credentials"
+            }
+        }
+    }
+}
 
 /**
  * The single Android [MobileWallet] construction for this demo app.
@@ -30,10 +46,11 @@ data class AndroidDemoMobileWallet(
 suspend fun createAndroidDemoMobileWallet(
     context: Context,
     config: DemoWalletConfig = DemoWalletConfig(),
+    interactionContextProvider: () -> FragmentActivity? = { null },
 ): AndroidDemoMobileWallet {
     val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
     return AndroidDemoMobileWallet(
-        wallet = MobileWalletFactory(context).create(
+        wallet = MobileWalletFactory(context, interactionContextProvider).create(
             MobileWalletConfig(
                 walletId = config.walletId,
                 attestationConfig = config.toWalletAttestationConfig(),
@@ -41,6 +58,12 @@ suspend fun createAndroidDemoMobileWallet(
                 preferredLocales = LocaleList.getDefault().let { locales ->
                     List(locales.size()) { index -> locales[index].toLanguageTag() }
                 },
+                defaultKeyUseAuthorizationPolicy =
+                    config.signingProtectionMode.defaultSelection.toKeyUseAuthorizationPolicy(),
+                keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
+                    reason = "Authorize wallet signing",
+                    cancelText = "Cancel",
+                ),
             )
         ),
         transactionDataProfilesWarning = transactionDataProfiles.warning,
@@ -50,8 +73,12 @@ suspend fun createAndroidDemoMobileWallet(
 fun createAndroidDemoWallet(
     context: Context,
     config: DemoWalletConfig = DemoWalletConfig(),
-): DemoWallet = LazyDemoWallet {
-    createAndroidDemoMobileWallet(context, config).let { created ->
-        MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning)
+    interactionContextProvider: () -> FragmentActivity? = { null },
+): DemoWallet {
+
+    return LazyDemoWallet {
+        createAndroidDemoMobileWallet(context, config, interactionContextProvider).let { created ->
+            MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning)
+        }
     }
 }

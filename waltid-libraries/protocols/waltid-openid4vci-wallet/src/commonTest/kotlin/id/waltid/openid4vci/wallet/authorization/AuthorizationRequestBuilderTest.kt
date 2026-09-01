@@ -7,6 +7,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -144,4 +146,64 @@ class AuthorizationRequestBuilderTest {
 
     private fun authorizationDetail(authorizationDetails: String) =
         Json.parseToJsonElement(authorizationDetails).jsonArray.single().jsonObject
+
+    /**
+     * OID4VCI 1.0 Section 5.1.1: `locations` MUST be present and equal the Credential Issuer
+     * Identifier once the issuer advertises `authorization_servers`. The field was modelled but never
+     * populated, so the suite rejected every authorization request with
+     * "openid_credential authorization_details entry is missing 'locations'".
+     */
+    @Test
+    fun `authorization details carry locations when the issuer advertises authorization servers`() {
+        val issuer = "https://issuer.example/vci"
+        val builder = AuthorizationRequestBuilder(
+            ClientConfiguration("wallet", listOf("https://wallet.example/cb"))
+        )
+
+        val pushed = builder.buildPushedAuthorizationRequestStateForCredentialConfigurations(
+            credentialConfigurationIds = listOf("pid"),
+            credentialIssuerLocations = listOf(issuer),
+        )
+        val withLocations = pushed.parameters.getValue("authorization_details")
+        assertTrue(
+            """"locations":["$issuer"]""" in withLocations.replace(" ", ""),
+            "expected locations in $withLocations",
+        )
+
+        // Omitted when the issuer implies a single authorization server, where it is optional.
+        val without = builder.buildPushedAuthorizationRequestStateForCredentialConfigurations(
+            credentialConfigurationIds = listOf("pid"),
+        ).parameters.getValue("authorization_details")
+        assertFalse("locations" in without, "expected no locations in $without")
+    }
+
+    /**
+     * OID4VCI 1.0 Section 5.1.2 defines `authorization_details` and `scope` as alternative ways to
+     * request a credential. Sending both leaves the authorization server to guess, and a server
+     * driving the scope-based profile (HAIP fixes `authorization_request_type=simple`) rejects the
+     * surplus `authorization_details` as an unexpected parameter.
+     */
+    @Test
+    fun `a scope replaces authorization details rather than accompanying it`() {
+        val builder = AuthorizationRequestBuilder(
+            ClientConfiguration("wallet", listOf("https://wallet.example/cb"))
+        )
+
+        val withScope = builder.buildPushedAuthorizationRequestStateForCredentialConfigurations(
+            credentialConfigurationIds = listOf("pid"),
+            scope = "eu.europa.ec.eudi.pid.1",
+        ).parameters
+        assertEquals("eu.europa.ec.eudi.pid.1", withScope["scope"])
+        assertFalse(
+            withScope.containsKey("authorization_details"),
+            "scope and authorization_details are alternatives, got $withScope",
+        )
+
+        // Default stays RAR: authorization_details, no scope.
+        val withoutScope = builder.buildPushedAuthorizationRequestStateForCredentialConfigurations(
+            credentialConfigurationIds = listOf("pid"),
+        ).parameters
+        assertTrue(withoutScope.containsKey("authorization_details"))
+        assertFalse(withoutScope.containsKey("scope"))
+    }
 }

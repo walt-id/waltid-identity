@@ -8,11 +8,21 @@ public struct WalletConfiguration: Sendable {
     /// Default key type used when bootstrapping a new wallet DID.
     public var defaultKeyType: WalletKeyType
 
+    /// Default authorization policy for newly created wallet signing keys.
+    public var defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
+    /// Prompt text used for protected signing operations.
+    public var keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt
+
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
     /// Trust anchors used to authenticate verifier Request Objects.
     public var clientIDTrustConfiguration: WalletClientIDTrustConfiguration
+
+    /// Optional verifier for signed Credential Issuer Metadata. When `nil`, signed metadata is
+    /// neither requested nor accepted.
+    public var issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)?
 
     /// Wallet-local persistence configuration.
     public var persistence: WalletPersistence
@@ -36,6 +46,9 @@ public struct WalletConfiguration: Sendable {
     ///     that require client attestation.
     ///   - clientIDTrustConfiguration: Trust anchors used to authenticate verifier
     ///     Request Objects. The default trusts no X.509 verifier by configuration.
+    ///   - issuerMetadataTrustResolver: Verifies signed Credential Issuer Metadata
+    ///     and establishes the signer's authority. When `nil`, signed metadata is neither
+    ///     requested nor accepted.
     ///   - persistence: Local persistence configuration for wallet-owned state.
     ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
     ///     wallet accepts before previewing or submitting a presentation.
@@ -43,20 +56,29 @@ public struct WalletConfiguration: Sendable {
     ///     credential, and verifier display metadata.
     ///   - crossProcessAccess: Optional shared app/extension storage and Keychain configuration
     ///     for IdentityDocumentServices.
+    ///   - defaultKeyUseAuthorizationPolicy: Default authorization policy for newly
+    ///     created wallet signing keys.
+    ///   - keyUseAuthorizationPrompt: Prompt text used for protected signing operations.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
         clientIDTrustConfiguration: WalletClientIDTrustConfiguration = .init(),
+        issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)? = nil,
         persistence: WalletPersistence = WalletPersistence(),
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
         preferredLocales: [String] = Locale.preferredLanguages,
-        crossProcessAccess: WalletCrossProcessAccess? = nil
+        crossProcessAccess: WalletCrossProcessAccess? = nil,
+        defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .biometricCurrentSet,
+        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init()
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
+        self.defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy
+        self.keyUseAuthorizationPrompt = keyUseAuthorizationPrompt
         self.attestation = attestation
         self.clientIDTrustConfiguration = clientIDTrustConfiguration
+        self.issuerMetadataTrustResolver = issuerMetadataTrustResolver
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
         self.preferredLocales = preferredLocales
@@ -84,17 +106,161 @@ public struct WalletCrossProcessAccess: Equatable, Sendable {
     }
 }
 
+/// Authorization policy for private-key use selected when a wallet key is created.
+public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
+    /// Ordinary non-interactive private-key operations.
+    case none
+
+    /// Strong biometric authentication for every operation; new biometric enrollment invalidates the key.
+    case biometricCurrentSet
+
+    ///
+    /// Strong biometric authentication reusable for a fixed, non-sliding interval after authorization.
+    /// Android verifies the native KeyStore interval. iOS configures the interval in Signum but cannot
+    /// independently inspect its effective positive timeout after restoration. This is recent platform
+    /// or provider authentication, not consent for issuance, presentation, or another wallet action.
+    case biometricTimedReuse(timeoutSeconds: Int)
+}
+
+/// Prompt text supplied to the operating-system-owned authorization UI.
+public struct WalletKeyUseAuthorizationPrompt: Equatable, Sendable {
+    /// Human-readable reason shown by the platform authorization UI.
+    public var message: String
+    /// Action label shown for cancelling the platform authorization UI.
+    public var cancelText: String
+
+    /// Creates prompt text for protected signing operations.
+    ///
+    /// - Parameters:
+    ///   - message: Human-readable authorization reason.
+    ///   - cancelText: Cancellation action label.
+    public init(
+        message: String = "Please authorize cryptographic signature",
+        cancelText: String = "Cancel"
+    ) {
+        self.message = message
+        self.cancelText = cancelText
+    }
+}
+
+/// Stable protected-key failure reasons exposed by the wallet SDK.
+public enum WalletKeyUseAuthorizationFailure: Equatable, Sendable {
+    /// The key type or usage set cannot satisfy the selected policy.
+    case unsupportedCombination
+    /// The platform cannot provide the required biometric capability.
+    case biometricUnavailable
+    /// No biometric is enrolled on the device.
+    case biometricNotEnrolled
+    /// The host application did not provide a usable interaction context.
+    case interactionContextUnavailable
+    /// The user cancelled or did not complete authorization.
+    case authorizationNotCompleted
+    /// The protected native key is missing or invalidated.
+    case protectedKeyUnavailable
+    /// Persisted key metadata is malformed or inconsistent.
+    case invalidStoredKeyMetadata
+}
+
+/// Stable reasons a protected-key preflight cannot currently be supported.
+public enum WalletKeyUseAuthorizationUnsupportedReason: Equatable, Sendable {
+    /// The key type or usage set cannot satisfy the selected protected-key policy.
+    case unsupportedCombination
+    /// The platform cannot provide the required biometric capability.
+    case biometricUnavailable
+    /// No biometric is enrolled on the device.
+    case biometricNotEnrolled
+}
+
+/// Result of checking whether a protected-key request is supported.
+public enum WalletKeyUseAuthorizationPreflight: Equatable, Sendable {
+    /// The requested protected-key policy can be created with reported timed-reuse metadata.
+    case supported(
+        effectivePolicy: WalletKeyUseAuthorizationPolicy,
+        reuseEnforcement: WalletKeyUseAuthorizationReuseEnforcement?,
+        timeoutValidation: WalletKeyUseAuthorizationReuseTimeoutValidation?
+    )
+    /// The requested policy cannot currently be supported; the reason explains why.
+    case unsupported(WalletKeyUseAuthorizationUnsupportedReason)
+}
+
+/// Enforcement boundary reported when timed biometric reuse is supported.
+public enum WalletKeyUseAuthorizationReuseEnforcement: Equatable, Sendable {
+    /// The native key store enforces the authorization validity interval.
+    case platformKeyStore
+
+    /// The platform crypto provider reuses process-local authorization state.
+    case providerProcess
+}
+
+/// Timeout-validation capability reported when timed biometric reuse is supported.
+public enum WalletKeyUseAuthorizationReuseTimeoutValidation: Equatable, Sendable {
+    /// Native metadata can be independently read back and compared after creation or restoration.
+    case independentReadback
+
+    /// The provider receives the interval, but its effective timeout cannot be independently read back.
+    case providerConfigurationOnly
+}
+
+/// Trusted signer details returned after verifying signed Credential Issuer Metadata.
+public struct IssuerMetadataSigner: Equatable, Sendable {
+    /// Identifier of the trusted verification key, as reported by the trust resolver.
+    public let keyID: String?
+    /// JWS algorithm verified by the trust resolver.
+    public let algorithm: String
+    /// Authority category established by the trust resolver.
+    public let trustType: MetadataTrustType
+
+    /// Creates trusted signer details.
+    ///
+    /// - Parameters:
+    ///   - keyID: Identifier of the trusted verification key, as reported by the trust resolver.
+    ///   - algorithm: JWS algorithm verified by the trust resolver.
+    ///   - trustType: Authority category established by the trust resolver.
+    public init(keyID: String?, algorithm: String, trustType: MetadataTrustType) {
+        self.keyID = keyID
+        self.algorithm = algorithm
+        self.trustType = trustType
+    }
+}
+
+/// Authority category established for a signer of Credential Issuer Metadata.
+public enum MetadataTrustType: Equatable, Sendable {
+    /// The signer is the trusted credential issuer.
+    case trustedIssuer
+    /// The signer is a trusted delegate of the credential issuer.
+    case trustedDelegate
+}
+
+/// Verifies signed Credential Issuer Metadata before the wallet reads its claims.
+public protocol IssuerMetadataTrustResolver: Sendable {
+    /// Verifies a compact JWS and establishes that its signer is authorized for the expected issuer.
+    ///
+    /// - Parameters:
+    ///   - compactJWT: Compact JWS returned by the Credential Issuer Metadata endpoint.
+    ///   - expectedCredentialIssuer: Credential issuer for which signer authority must be established.
+    /// - Returns: Trusted signer details used to retain metadata provenance.
+    func verify(compactJWT: String, expectedCredentialIssuer: String) async throws -> IssuerMetadataSigner
+}
+
 /// Trust configuration used to authenticate verifier Request Objects.
 public struct WalletClientIDTrustConfiguration: Sendable, Equatable {
     /// PEM-encoded X.509 trust anchors pinned by the hosting application.
     public var x509TrustAnchorsPEM: [String]
 
+    /// Explicit pre-registered client metadata JSON, keyed by client ID.
+    public var preRegisteredClientMetadataJSON: [String: String]
+
     /// Creates client-ID trust configuration.
     ///
-    /// - Parameter x509TrustAnchorsPEM: PEM-encoded X.509 trust anchors pinned
-    ///   by the hosting application.
-    public init(x509TrustAnchorsPEM: [String] = []) {
+    /// - Parameters:
+    ///   - x509TrustAnchorsPEM: PEM-encoded X.509 trust anchors pinned by the hosting application.
+    ///   - preRegisteredClientMetadataJSON: Client metadata JSON for explicit pre-registered verifiers.
+    public init(
+        x509TrustAnchorsPEM: [String] = [],
+        preRegisteredClientMetadataJSON: [String: String] = [:]
+    ) {
         self.x509TrustAnchorsPEM = x509TrustAnchorsPEM
+        self.preRegisteredClientMetadataJSON = preRegisteredClientMetadataJSON
     }
 }
 
@@ -546,14 +712,29 @@ public struct WalletBootstrapResult: Equatable, Sendable {
     /// DID created for the wallet.
     public let did: String
 
+    /// Public JWK of ``keyID`` as a JSON object string. Private material is never included.
+    public let publicJWK: String
+
+    /// Immutable authorization policy of the persisted signing key.
+    public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
     /// Creates a bootstrap result.
     ///
     /// - Parameters:
     ///   - keyID: Identifier of the created or selected wallet key.
     ///   - did: DID created for the wallet.
-    public init(keyID: String, did: String) {
+    ///   - publicJWK: Public JWK of the wallet key as a JSON object string.
+    ///   - keyUseAuthorizationPolicy: Authorization required for private-key use.
+    public init(
+        keyID: String,
+        did: String,
+        publicJWK: String,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+    ) {
         self.keyID = keyID
         self.did = did
+        self.publicJWK = publicJWK
+        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
     }
 }
 
@@ -648,6 +829,9 @@ public struct IssuanceIssuerPreview: Equatable, Sendable {
     /// Alternative text for the issuer logo.
     public let logoAltText: String?
 
+    /// Source and verification provenance for this metadata.
+    public let metadataProvenance: MetadataProvenance
+
     /// Creates an issuer preview.
     ///
     /// - Parameters:
@@ -656,12 +840,55 @@ public struct IssuanceIssuerPreview: Equatable, Sendable {
     ///   - locale: Locale associated with the display entry.
     ///   - logoURI: Issuer logo URL.
     ///   - logoAltText: Alternative text for the issuer logo.
-    public init(identifier: String, name: String?, locale: String?, logoURI: URL?, logoAltText: String?) {
+    ///   - metadataProvenance: Source and verification provenance for this metadata.
+    public init(
+        identifier: String,
+        name: String?,
+        locale: String?,
+        logoURI: URL?,
+        logoAltText: String?,
+        metadataProvenance: MetadataProvenance
+    ) {
         self.identifier = identifier
         self.name = name
         self.locale = locale
         self.logoURI = logoURI
         self.logoAltText = logoAltText
+        self.metadataProvenance = metadataProvenance
+    }
+}
+
+/// Provenance for Credential Issuer Metadata used by the wallet.
+public enum MetadataProvenance: Equatable, Sendable {
+    /// Metadata was received as an unsigned JSON document.
+    case unsigned
+    /// Metadata was received in a JWS verified by the configured trust resolver.
+    case signed(SignedMetadataProvenance)
+}
+
+/// Verified signed Credential Issuer Metadata provenance.
+public struct SignedMetadataProvenance: Equatable, Sendable {
+    /// Exact compact JWS returned by the issuer.
+    public let compactJWT: String
+    /// JWS algorithm verified by the configured trust resolver.
+    public let algorithm: String
+    /// Identifier of the trusted verification key, as reported by the trust resolver.
+    public let keyID: String?
+    /// Authority category established by the trust resolver.
+    public let trustType: MetadataTrustType
+
+    /// Creates signed metadata provenance.
+    ///
+    /// - Parameters:
+    ///   - compactJWT: Exact compact JWS returned by the issuer.
+    ///   - algorithm: JWS algorithm verified by the trust resolver.
+    ///   - keyID: Identifier of the trusted verification key, as reported by the trust resolver.
+    ///   - trustType: Authority category established by the trust resolver.
+    public init(compactJWT: String, algorithm: String, keyID: String?, trustType: MetadataTrustType) {
+        self.compactJWT = compactJWT
+        self.algorithm = algorithm
+        self.keyID = keyID
+        self.trustType = trustType
     }
 }
 
@@ -682,6 +909,24 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     /// Credential logo URL when advertised.
     public let logoURI: URL?
 
+    /// Accessibility text for the credential logo when advertised.
+    public let logoAltText: String?
+
+    /// Suggested credential background color from OpenID4VCI display metadata.
+    public let backgroundColor: String?
+
+    /// Suggested credential background image URI from OpenID4VCI display metadata.
+    public let backgroundImageURI: URL?
+
+    /// Suggested credential text color from OpenID4VCI display metadata.
+    public let textColor: String?
+
+    /// SD-JWT VC type from the offered credential configuration, when present.
+    public let vct: String?
+
+    /// mdoc document type from the offered credential configuration, when present.
+    public let doctype: String?
+
     /// Creates a credential preview.
     ///
     /// - Parameters:
@@ -690,12 +935,56 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     ///   - name: Localized credential name.
     ///   - descriptionText: Localized credential description.
     ///   - logoURI: Credential logo URL.
-    public init(configurationID: String, format: String, name: String?, descriptionText: String?, logoURI: URL?) {
+    ///   - logoAltText: Accessibility text for the credential logo.
+    ///   - backgroundColor: Suggested credential background color.
+    ///   - backgroundImageURI: Suggested credential background image URI.
+    ///   - textColor: Suggested credential text color.
+    ///   - vct: SD-JWT VC type from the offered configuration.
+    ///   - doctype: mdoc document type from the offered configuration.
+    public init(
+        configurationID: String,
+        format: String,
+        name: String?,
+        descriptionText: String?,
+        logoURI: URL?,
+        logoAltText: String? = nil,
+        backgroundColor: String? = nil,
+        backgroundImageURI: URL? = nil,
+        textColor: String? = nil,
+        vct: String? = nil,
+        doctype: String? = nil
+    ) {
         self.configurationID = configurationID
         self.format = format
         self.name = name
         self.descriptionText = descriptionText
         self.logoURI = logoURI
+        self.logoAltText = logoAltText
+        self.backgroundColor = backgroundColor
+        self.backgroundImageURI = backgroundImageURI
+        self.textColor = textColor
+        self.vct = vct
+        self.doctype = doctype
+    }
+
+    /// Minimal payload so `CredentialTitles` can resolve a friendly type when display omits a name.
+    public var typePayloadJSON: String? {
+        var fields: [String] = []
+        if let vct, !vct.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields.append(#""vct":\#(Self.jsonString(vct))"#)
+        }
+        if let doctype, !doctype.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields.append(#""docType":\#(Self.jsonString(doctype))"#)
+        }
+        guard !fields.isEmpty else { return nil }
+        return "{\(fields.joined(separator: ","))}"
+    }
+
+    private static func jsonString(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
     }
 }
 
@@ -1077,6 +1366,9 @@ public struct PresentationRequestContext: Equatable, Sendable {
     /// Typed metadata supplied by the OpenID4VP verifier when available.
     public let verifierMetadata: VerifierMetadata?
 
+    /// Authentication established for the authorization request or its Request Object.
+    public let requestAuthentication: PresentationRequestAuthentication
+
     /// Response URI used for direct-post responses when available.
     public let responseURI: URL?
 
@@ -1094,6 +1386,7 @@ public struct PresentationRequestContext: Equatable, Sendable {
     /// - Parameters:
     ///   - clientID: Validated OpenID4VP client identifier from the request.
     ///   - verifierMetadata: Typed metadata supplied by the verifier when available.
+    ///   - requestAuthentication: Authentication facts established while resolving the request.
     ///   - responseURI: Response URI to which the wallet would submit the presentation or error, when provided.
     ///   - state: OpenID state value from the request, when provided.
     ///   - nonce: OpenID nonce value from the request, when provided. May be nil if the missing nonce is the validation error.
@@ -1101,6 +1394,7 @@ public struct PresentationRequestContext: Equatable, Sendable {
     public init(
         clientID: String,
         verifierMetadata: VerifierMetadata? = nil,
+        requestAuthentication: PresentationRequestAuthentication,
         responseURI: URL? = nil,
         state: String? = nil,
         nonce: String? = nil,
@@ -1112,6 +1406,7 @@ public struct PresentationRequestContext: Equatable, Sendable {
         )
         self.clientID = clientID
         self.verifierMetadata = verifierMetadata
+        self.requestAuthentication = requestAuthentication
         self.responseURI = responseURI
         self.state = state
         self.nonce = nonce
@@ -1168,6 +1463,37 @@ public struct ResponseEncryptionDetails: Equatable, Sendable {
     }
 }
 
+/// Authentication established for an OpenID4VP authorization request.
+public enum PresentationRequestAuthentication: Equatable, Sendable {
+    /// No signed Request Object authenticated this request.
+    case unauthenticated
+    /// The Request Object was authenticated by the OpenID4VP client-ID layer.
+    case authenticated(
+        compactRequestObject: String,
+        algorithm: String,
+        keyID: String?,
+        clientIDScheme: PresentationClientIDScheme
+    )
+}
+
+/// Client identifier scheme established while authenticating a Request Object.
+public enum PresentationClientIDScheme: Equatable, Sendable {
+    /// The verifier is identified through pre-registered metadata.
+    case preRegistered
+    /// The verifier is identified by a redirect URI.
+    case redirectURI
+    /// The verifier is identified by an X.509 SAN DNS name.
+    case x509SanDNS
+    /// The verifier is identified by an X.509 certificate hash.
+    case x509Hash
+    /// The verifier is identified by a decentralized identifier.
+    case decentralizedIdentifier
+    /// The verifier is identified by a verifier attestation.
+    case verifierAttestation
+    /// The verifier is identified through OpenID Federation.
+    case openIDFederation
+}
+
 /// Verifier, transaction, and response-protection metadata extracted from a presentation request.
 public struct PresentationRequestInfo: Equatable, Sendable {
     /// OpenID4VP client identifier.
@@ -1175,6 +1501,9 @@ public struct PresentationRequestInfo: Equatable, Sendable {
 
     /// Typed metadata supplied by the OpenID4VP verifier when available.
     public let verifierMetadata: VerifierMetadata?
+
+    /// Authentication established for the authorization request or its Request Object.
+    public let requestAuthentication: PresentationRequestAuthentication
 
     /// Response URI used for direct-post responses when available.
     public let responseURI: URL?
@@ -1196,6 +1525,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     /// - Parameters:
     ///   - clientID: OpenID4VP client identifier from the request.
     ///   - verifierMetadata: Typed metadata supplied by the verifier.
+    ///   - requestAuthentication: Authentication facts established while resolving the request.
     ///   - responseURI: Direct-post response URI when available.
     ///   - state: OpenID state value from the request.
     ///   - nonce: OpenID nonce value from the request.
@@ -1204,6 +1534,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     public init(
         clientID: String,
         verifierMetadata: VerifierMetadata? = nil,
+        requestAuthentication: PresentationRequestAuthentication,
         responseURI: URL? = nil,
         state: String? = nil,
         nonce: String,
@@ -1216,6 +1547,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
         )
         self.clientID = clientID
         self.verifierMetadata = verifierMetadata
+        self.requestAuthentication = requestAuthentication
         self.responseURI = responseURI
         self.state = state
         self.nonce = nonce
@@ -1266,6 +1598,9 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
     /// Requested credential values shown for informed consent.
     public let disclosures: [PresentationDisclosure]
 
+    /// Optional stored display metadata encoded as JSON, including issuer and credential card art.
+    public let metadataJSON: String?
+
     /// Creates a presentation credential option.
     ///
     /// - Parameters:
@@ -1278,6 +1613,7 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
     ///   - label: User-facing credential label when available.
     ///   - credentialDataJSON: Parsed credential data encoded as JSON.
     ///   - disclosures: Credential values requested from this credential.
+    ///   - metadataJSON: Optional stored display metadata encoded as JSON.
     public init(
         queryID: String,
         credentialID: String,
@@ -1287,7 +1623,8 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
         subject: String?,
         label: String?,
         credentialDataJSON: String,
-        disclosures: [PresentationDisclosure] = []
+        disclosures: [PresentationDisclosure] = [],
+        metadataJSON: String? = nil
     ) {
         precondition(
             isNonBlank(queryID),
@@ -1302,6 +1639,7 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
         self.label = label
         self.credentialDataJSON = credentialDataJSON
         self.disclosures = disclosures
+        self.metadataJSON = metadataJSON
     }
 }
 

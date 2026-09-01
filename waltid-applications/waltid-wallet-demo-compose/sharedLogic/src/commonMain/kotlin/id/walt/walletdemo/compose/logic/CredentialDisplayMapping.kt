@@ -1,7 +1,23 @@
 package id.walt.walletdemo.compose.logic
 
+fun WalletDemoPresentationCredentialOption.resolvedCardTitle(): String =
+    resolveCardTitle(
+        format = format,
+        credentialDataJson = credentialDataJson,
+        displayName = presentationDisplayName(format = format, metadataJson = metadataJson, storedLabel = label),
+        fallback = format,
+    )
+
+internal fun presentationDisplayName(
+    format: String,
+    metadataJson: String?,
+    storedLabel: String?,
+): String? =
+    StoredCredentialMetadataParser.credentialDisplay(metadataJson, platformPreferredLocales())?.name
+        ?: storedLabel?.trim()?.takeIf { it.isNotBlank() && !it.equals(format, ignoreCase = true) }
+
 fun CredentialSummary.toCredentialDetails(): CredentialDetails =
-    CredentialDisplayNormalizer.toDetails(this)
+    CredentialDisplayNormalizer.toDetails(this, platformPreferredLocales())
 
 fun WalletDemoPresentationCredentialOption.toCredentialDetails(): CredentialDetails {
     val summary = CredentialSummary(
@@ -12,6 +28,7 @@ fun WalletDemoPresentationCredentialOption.toCredentialDetails(): CredentialDeta
         label = label,
         addedAt = null,
         credentialDataJson = credentialDataJson,
+        metadataJson = metadataJson,
     )
     val parsed = summary.toCredentialDetails()
     val requestedGroup = toRequestedDisclosureGroup()

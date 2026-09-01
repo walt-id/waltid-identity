@@ -316,6 +316,29 @@ class ProviderPushedAuthorizationFlowTest {
     }
 
     @Test
+    fun `provider authenticates PAR client before rejecting request_uri`() = runTest {
+        val provider = buildParProvider(
+            clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                methods = listOf(AcceptingClientSecretPostAuthenticationMethod),
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION to
+                        setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                ),
+            ),
+        )
+
+        val result = assertIs<AuthorizationRequestResult.Failure>(
+            provider.createPushedAuthorizationRequest(
+                validPushedParameters() +
+                    ("request_uri" to listOf("urn:ietf:params:oauth:request_uri:nested"))
+            )
+        )
+
+        assertEquals(OAuthErrorCodes.INVALID_CLIENT, result.error.error)
+        assertEquals("Client authentication is required for this endpoint", result.error.description)
+    }
+
+    @Test
     fun `provider writes PAR responses with no-store headers`() = runTest {
         val provider = buildParProvider()
         val pushedRequest = assertIs<AuthorizationRequestResult.Success>(

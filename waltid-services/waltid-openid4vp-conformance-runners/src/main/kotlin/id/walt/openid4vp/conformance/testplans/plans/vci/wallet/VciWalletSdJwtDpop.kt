@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.wallet
 
+import id.walt.openid4vp.conformance.config.ConformanceConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -57,7 +58,11 @@ class VciWalletSdJwtDpop(
         "client_auth_type" to "private_key_jwt",
         "vci_grant_type" to "authorization_code",
         "vci_authorization_code_flow_variant" to "issuer_initiated",
-        "authorization_request_type" to "simple",
+        // Wallet2 authorizes with `authorization_details` carrying the credential_configuration_id
+        // (OID4VCI 1.0 Section 5.1.2), i.e. it is a Rich Authorization Requests client. Declaring
+        // "simple" made AbstractVCIWalletTest run ExtractRequestedScopes - "only check scopes if we
+        // expect scopes" - which fails with "Missing scope parameter" for a RAR client.
+        "authorization_request_type" to "rar",
         "fapi_request_method" to "unsigned",
         "vci_credential_encryption" to "plain",
         "vci_credential_issuance_mode" to "immediate",
@@ -128,10 +133,10 @@ class VciWalletSdJwtDpop(
                 }
             },
             "vci": {
-                "credential_offer_endpoint": "http://$adapterHost:7007/credential-offer",
+                "credential_offer_endpoint": "${ConformanceConfig.vciSuiteCredentialOfferEndpoint(adapterHost)}",
                 "credential_configuration_id": "eu.europa.ec.eudi.pid.1"
             },
-            "waitTimeoutSeconds": 120,
+            "waitTimeoutSeconds": 30,
             "publish": "no"
         }
         """.trimIndent()

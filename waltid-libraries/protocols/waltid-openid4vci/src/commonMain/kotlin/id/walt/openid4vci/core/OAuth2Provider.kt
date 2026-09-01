@@ -1,5 +1,6 @@
 package id.walt.openid4vci.core
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.OAuthError
@@ -36,7 +37,6 @@ import id.walt.openid4vci.requests.notification.NotificationRequestResult
 import id.walt.openid4vci.responses.notification.NotificationResponse
 import id.walt.openid4vci.responses.notification.NotificationResponseHttp
 import id.walt.sdjwt.SDMap
-import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 
@@ -147,7 +147,7 @@ interface OAuth2Provider {
         credentialData: JsonObject,
         dataMapping: JsonObject? = null,
         selectiveDisclosure: SDMap? = null,
-        x5Chain: List<CertificateDer>? = null,
+        x5Chain: List<X509Certificate>? = null,
         display: List<CredentialDisplay>? = null,
         w3cVersion: String? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
@@ -166,7 +166,7 @@ interface OAuth2Provider {
         credentialData: JsonObject,
         dataMapping: JsonObject? = null,
         selectiveDisclosure: SDMap? = null,
-        x5Chain: List<CertificateDer>? = null,
+        x5Chain: List<X509Certificate>? = null,
         display: List<CredentialDisplay>? = null,
         w3cVersion: String? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,

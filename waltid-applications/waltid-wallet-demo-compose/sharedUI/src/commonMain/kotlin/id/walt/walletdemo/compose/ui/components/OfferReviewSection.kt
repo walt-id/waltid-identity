@@ -6,13 +6,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -20,10 +23,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
-import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
-import id.walt.walletdemo.compose.logic.claimDisplayGroups
+import id.walt.walletdemo.compose.logic.resolvedCardTitle
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -36,8 +39,11 @@ internal fun OfferReviewSection(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     modifier: Modifier = Modifier,
+    cardFirst: Boolean = false,
+    showActions: Boolean = true,
 ) {
     val focusManager = LocalFocusManager.current
+    var issuerExpanded by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -45,30 +51,71 @@ internal fun OfferReviewSection(
             .testTag(WalletUiTestTags.OfferReview),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        if (!cardFirst) {
         Text("Credential offer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 
-        ReviewMetadataSection(
+        val issuerName = preview.issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
+        val issuerIdentifier = preview.issuer.credentialIssuer.trim()
+        val issuerDetails = listOf(
+            MetadataDetailItem(
+                label = "Credential Issuer",
+                value = issuerIdentifier.takeIf { issuerName != null && it != issuerName },
+                linkUri = issuerIdentifier,
+            ),
+        ).filter { !it.value.isNullOrBlank() }
+        ExpandableMetadataCard(
             title = "Issuer",
+            expanded = issuerExpanded,
+            onToggle = { issuerExpanded = !issuerExpanded },
             modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerSection),
-        ) {
-            MetadataIdentityRow(
-                display = preview.issuer.display,
-                fallbackName = preview.issuer.credentialIssuer,
-                supportingText = preview.issuer.credentialIssuer.takeIf {
-                    it.isNotBlank() && it != preview.issuer.display?.name
-                },
-            )
+            toggleTestTag = WalletUiTestTags.OfferIssuerDetailsToggle,
+            summary = {
+                MetadataIdentityRow(
+                    display = preview.issuer.display,
+                    fallbackName = issuerIdentifier,
+                )
+            },
+            details = {
+                if (issuerDetails.isNotEmpty()) {
+                    MetadataDetailList(
+                        issuerDetails,
+                        modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerDetails),
+                    )
+                }
+            },
+        )
+
         }
 
         if (preview.offeredCredentials.isNotEmpty()) {
+            if (cardFirst) {
+                preview.offeredCredentials.forEach { credential ->
+                    FlippableOfferCard(
+                        credential = credential,
+                        issuerDisplay = preview.issuer.display,
+                        issuerFallback = preview.issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: preview.issuer.credentialIssuer,
+                    )
+                }
+            } else {
             ReviewMetadataSection(
                 title = "Offered credentials",
                 modifier = Modifier.testTag(WalletUiTestTags.OfferCredentialsSection),
             ) {
-                preview.offeredCredentials.forEachIndexed { index, credential ->
-                    if (index > 0) HorizontalDivider()
-                    OfferedCredentialContent(credential)
+                preview.offeredCredentials.forEach { credential ->
+                    val title = credential.resolvedCardTitle()
+                    CredentialCardArt(
+                        art = (credential.display ?: WalletDemoMetadataDisplay(
+                            name = title,
+                            logoUri = null,
+                            logoAltText = null,
+                        )).toCardArt(
+                            id = credential.configurationId,
+                            fallbackName = title,
+                        ),
+                    )
                 }
+            }
             }
         }
 
@@ -129,73 +176,40 @@ internal fun OfferReviewSection(
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = onAccept,
-                enabled = acceptEnabled,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferAcceptButton),
-            ) {
-                Text(if (preview.requiresIssuerAuthentication) "Continue to sign in" else "Accept")
-            }
-            TextButton(
-                onClick = onDecline,
-                enabled = reviewEnabled,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferDeclineButton),
-            ) {
-                Text("Decline")
-            }
+        if (showActions) {
+            OfferReviewActions(
+                requiresIssuerAuthentication = preview.requiresIssuerAuthentication,
+                acceptEnabled = acceptEnabled,
+                reviewEnabled = reviewEnabled,
+                onAccept = onAccept,
+                onDecline = onDecline,
+            )
         }
     }
 }
 
 @Composable
-private fun OfferedCredentialContent(credential: WalletDemoOfferedCredentialMetadata) {
-    val title = credential.display?.name
-        ?: credential.vct
-        ?: credential.doctype
-        ?: credential.configurationId
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        MetadataIdentityRow(
-            display = credential.display,
-            fallbackName = title,
-            supportingText = credential.display?.description,
-        )
-        val details = listOf(
-            MetadataDetailItem("Format", credential.format),
-            MetadataDetailItem("Type", credential.vct ?: credential.doctype),
-        ).filter { !it.value.isNullOrBlank() }
-        if (details.isNotEmpty()) {
-            MetadataRowDivider()
-            MetadataDetailList(details)
+internal fun OfferReviewActions(
+    requiresIssuerAuthentication: Boolean,
+    acceptEnabled: Boolean,
+    reviewEnabled: Boolean,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = onAccept,
+            enabled = acceptEnabled,
+            modifier = Modifier.testTag(WalletUiTestTags.OfferAcceptButton),
+        ) {
+            Text(if (requiresIssuerAuthentication) "Continue to sign in" else "Accept")
         }
-        if (credential.claims.isNotEmpty()) {
-            MetadataRowDivider()
-            MetadataDisclosure(
-                title = "Supported claims (${credential.claims.size})",
-                initiallyExpanded = false,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferSupportedClaims),
-            ) {
-                credential.claimDisplayGroups().forEachIndexed { groupIndex, group ->
-                    if (groupIndex > 0) MetadataRowDivider()
-                    Text(
-                        text = group.title,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    group.claims.forEachIndexed { index, claim ->
-                        if (index > 0) MetadataRowDivider()
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(claim.label, style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                text = claim.inclusion,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
+        TextButton(
+            onClick = onDecline,
+            enabled = reviewEnabled,
+            modifier = Modifier.testTag(WalletUiTestTags.OfferDeclineButton),
+        ) {
+            Text("Decline")
         }
     }
 }

@@ -1,5 +1,11 @@
 package id.walt.openid4vci.clientauth.attestation.verifier
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
+import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.extensionExtendedKeyUsage
+import id.walt.certificate.x509.extension.KeyUsageExtension
+import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
@@ -21,10 +27,6 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.clientauth.attestation.AttestationBasedClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationJwtTypes
-import id.walt.x509.GenericX509CertificateBuilder
-import id.walt.x509.GenericX509CertificateProfileData
-import id.walt.x509.X509DistinguishedName
-import id.walt.x509.X509KeyUsage
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
@@ -45,8 +47,8 @@ class X509ChainClientAttestationVerifierTest {
         )
         val method = AttestationBasedClientAuthenticationMethod(
             attestationVerifier = X509ChainClientAttestationVerifier(
-                trustedRootCertificatesPem = listOf(TRUSTED_ROOT_CERTIFICATE_PEM),
-            ),
+                listOf(TRUSTED_ROOT_CERTIFICATE_PEM)
+            )
         )
 
         val result = method.authenticate(
@@ -76,8 +78,8 @@ class X509ChainClientAttestationVerifierTest {
         )
         val method = AttestationBasedClientAuthenticationMethod(
             attestationVerifier = X509ChainClientAttestationVerifier(
-                trustedRootCertificatesPem = listOf(UNTRUSTED_ROOT_CERTIFICATE_PEM),
-            ),
+                listOf(UNTRUSTED_ROOT_CERTIFICATE_PEM),
+            )
         )
 
         val result = method.authenticate(
@@ -141,32 +143,29 @@ class X509ChainClientAttestationVerifierTest {
                 usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             )
         )
-        val rootName = X509DistinguishedName(commonName = "Wallet Attestation Root")
         val signatureAlgorithm = SignatureAlgorithm.Ecdsa(
             DigestAlgorithm.SHA_256,
             EcdsaSignatureEncoding.DER,
         )
-        val rootCertificate = GenericX509CertificateBuilder().buildDer(
-            profileData = GenericX509CertificateProfileData(
-                subjectName = rootName,
-                isCertificateAuthority = true,
-                keyUsage = setOf(X509KeyUsage.KeyCertSign, X509KeyUsage.CRLSign),
-            ),
-            subjectPublicKey = rootKey,
-            signingKey = rootKey,
-            signatureAlgorithm = signatureAlgorithm,
-        )
-        val leafCertificate = GenericX509CertificateBuilder().buildDer(
-            profileData = GenericX509CertificateProfileData(
-                subjectName = X509DistinguishedName(commonName = "Wallet Unit Attestation"),
-                issuerName = rootName,
-                keyUsage = setOf(X509KeyUsage.DigitalSignature),
-                extendedKeyUsageOids = setOf("1.3.130.2.0.0.1.2"),
-            ),
-            subjectPublicKey = leafKey,
-            signingKey = rootKey,
-            signatureAlgorithm = signatureAlgorithm,
-        )
+        val rootCertificate = X509CertificateUtil.createSelfSignedCertificate(rootKey, signatureAlgorithm) {
+            subjectDn = "CN=Wallet Attestation Root"
+            extensionBasicConstraints {
+                cA = true
+            }
+            extensionKeyUsage {
+                addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign, KeyUsageExtension.KeyUsage.cRLSign)
+            }
+        }
+        val leafCertificate = X509CertificateUtil.createCertificate(rootKey, rootCertificate, signatureAlgorithm) {
+            subjectDn = "CN=Wallet Unit Attestation"
+            subjectPublicKey(leafKey)
+            extensionKeyUsage {
+                addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
+            }
+            extensionExtendedKeyUsage {
+                addKeyUsage("1.3.130.2.0.0.1.2")
+            }
+        }
         val payload = buildJsonObject { put("sub", "wallet-client") }
         val jwt = CompactJws.sign(
             payload = payload.toString().encodeToByteArray(),
@@ -178,7 +177,7 @@ class X509ChainClientAttestationVerifierTest {
                     "x5c",
                     JsonArray(
                         listOf(leafCertificate, rootCertificate).map {
-                            JsonPrimitive(Base64.encode(it.bytes.toByteArray()))
+                            JsonPrimitive(Base64.encode(it.encodedDer.toByteArray()))
                         }
                     ),
                 )
@@ -186,8 +185,19 @@ class X509ChainClientAttestationVerifierTest {
         )
         val decoded = CompactJws.decodeUnverified(jwt)
 
+        val result = X509ChainClientAttestationVerifier(
+            InMemoryTrustStore(listOf(rootCertificate))
+        )
+            .verifyAttestationJwt(jwt, decoded.protectedHeader, payload)
+
+        if (result is ClientAttestationVerificationResult.Rejected) {
+            println("Rejected: ${result.reason}")
+        }
+
         assertIs<ClientAttestationVerificationResult.Verified>(
-            X509ChainClientAttestationVerifier(listOf(rootCertificate.toPEMEncodedString()))
+            X509ChainClientAttestationVerifier(
+                InMemoryTrustStore(listOf(rootCertificate))
+            )
                 .verifyAttestationJwt(jwt, decoded.protectedHeader, payload)
         )
     }

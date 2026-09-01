@@ -2,55 +2,25 @@ package id.walt.x509
 
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.CryptoSignature
-import at.asitplus.signum.indispensable.SignatureAlgorithm as SignumSignatureAlgorithm
 import at.asitplus.signum.indispensable.josef.JsonWebKey
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
-import at.asitplus.signum.indispensable.josef.toJsonWebKey
 import at.asitplus.signum.indispensable.pki.Pkcs10CertificationRequest
 import at.asitplus.signum.indispensable.pki.TbsCertificationRequest
-import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.indispensable.toX509SignatureAlgorithm
-import id.walt.crypto.keys.Key as LegacyKey
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.ManagedKey
-import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.x509.iso.authorityKeyIdentifierExtension
-import id.walt.x509.iso.basicConstraintsExtension
-import id.walt.x509.iso.buildSignumX509CertificateDer
-import id.walt.x509.iso.crlDistributionPointExtension
-import id.walt.x509.iso.DocumentSignerEkuOID
-import id.walt.x509.iso.extendedKeyUsageExtension
-import id.walt.x509.iso.generateIsoCompliantX509CertificateSerialNo
-import id.walt.x509.iso.issuerAlternativeNameExtension
-import id.walt.x509.iso.keyUsageExtension
-import id.walt.x509.iso.subjectAlternativeNamesExtension
-import id.walt.x509.iso.subjectKeyIdentifierExtension
-import id.walt.x509.iso.toSignumName
+import id.walt.x509.iso.*
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import kotlinx.io.bytestring.ByteString
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-
-fun CertificateDer.crypto2PublicJwk(): EncodedKey.Jwk {
-    val publicKey = X509Certificate.decodeFromDer(bytes.toByteArray()).decodedPublicKey.getOrThrow()
-    return publicKey.toCrypto2PublicJwk()
-}
-
-fun CertificateSigningRequestDer.crypto2PublicJwk(): EncodedKey.Jwk =
-    Pkcs10CertificationRequest.decodeFromDer(bytes.toByteArray()).tbsCsr.publicKey.toCrypto2PublicJwk()
+import at.asitplus.signum.indispensable.SignatureAlgorithm as SignumSignatureAlgorithm
+import id.walt.crypto.keys.Key as LegacyKey
 
 /**
  * Restores the certificate's subject public key as a crypto2 key that may only verify signatures.
@@ -59,22 +29,16 @@ fun CertificateSigningRequestDer.crypto2PublicJwk(): EncodedKey.Jwk =
  * leaf can ask for the key instead of assembling a stored-key record themselves; the key carries no
  * private material and no usage other than [KeyUsage.VERIFY].
  */
-suspend fun CertificateDer.crypto2VerificationKey(): Key {
-    val jwk = crypto2PublicJwk()
-    return verificationKeyRuntime.restore(
-        jwk.toStoredSoftwareKey(KeyId(Jwk.sha256Thumbprint(jwk)), setOf(KeyUsage.VERIFY))
-    )
-}
+@Deprecated(
+    "Don't use old X509 API",
+    ReplaceWith("id.walt.certificate.x509.X509Certificate.restoreSubjectPublicKey")
+)
+suspend fun CertificateDer.crypto2VerificationKey(): Key =
+    X509CertificateUtil.parseCertificateDerEncoded(bytes)
+        .restoreSubjectPublicKey(verificationKeyRuntime)
+
 
 private val verificationKeyRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
-
-internal fun CryptoPublicKey.toCrypto2PublicJwk(): EncodedKey.Jwk =
-    EncodedKey.Jwk(
-        data = BinaryData(
-            joseCompliantSerializer.encodeToString(toJsonWebKey()).encodeToByteArray()
-        ),
-        privateMaterial = false,
-    )
 
 internal suspend fun LegacyKey.toCrypto2PublicJwk(): EncodedKey.Jwk =
     EncodedKey.Jwk(

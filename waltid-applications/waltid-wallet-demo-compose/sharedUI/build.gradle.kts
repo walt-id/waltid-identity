@@ -1,5 +1,6 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
+import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -36,6 +37,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedLogic"))
+            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(identityLibs.compose.runtime)
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.ui)
@@ -44,6 +46,7 @@ kotlin {
             implementation(identityLibs.compose.navigation3.ui)
             implementation(identityLibs.coil.compose)
             implementation(identityLibs.coil.network.ktor3)
+            implementation(compose.components.resources)
         }
 
         if (enableAndroidBuild || enableIosBuild) {
@@ -102,8 +105,25 @@ kotlin {
     }
 }
 
+compose {
+    resources {
+        publicResClass = true
+        packageOfResClass = "id.walt.walletdemo.compose.ui.resources"
+    }
+}
+
 tasks.withType<Test>().configureEach {
     if (name == "testAndroidHostTest") {
         useJUnit()
+    }
+}
+
+// Asset processing is off by default for Android KMP libraries. Compose Multiplatform resources
+// copy into those assets; without this the generated waltid_logo never reaches the APK.
+if (enableAndroidBuild) {
+    extensions.configure<KotlinMultiplatformAndroidComponentsExtension>("androidComponents") {
+        finalizeDsl { android ->
+            android.androidResources.enable = true
+        }
     }
 }

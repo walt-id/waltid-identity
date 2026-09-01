@@ -592,9 +592,7 @@ object Verifier2OpenApiExamples {
                         VicalPolicy(
                             vical = "<base64 encoded VICAL file>",
                             enableDocumentTypeValidation = true,
-                            enableTrustedChainRoot = true,
-                            enableSystemTrustAnchors = true,
-                            enableRevocation = true
+                            enableRevocation = false
                         )
                     )
                 )

@@ -2,17 +2,15 @@
 
 package id.walt.verifier2
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto2.jose.CompactJws
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.parser.MdocParser
 import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.mdoc.verification.MdocVerifier
 import id.walt.mdoc.verification.verifyDeviceAuthentication
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
-import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.openid4vp.clientidprefix.ClientValidationResult
-import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.*
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vp.policies.VPPolicyList
@@ -26,23 +24,12 @@ import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.RequestMode
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.DcApiJsonDirectPostResponse
-import io.ktor.http.URLBuilder
+import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import kotlinx.io.bytestring.ByteString
+import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
+import kotlin.test.*
 import kotlin.time.Instant
 
 class DcApiTest {
@@ -186,10 +173,14 @@ class DcApiTest {
             ),
             preRegisteredMetadataProvider = { null },
             trustConfiguration = ClientIdTrustConfiguration(
-                x509TrustAnchors = listOf(
-                    id.walt.x509.CertificateDer(Base64.Default.decode(TRUST_ANCHOR)),
-                ),
-            ),
+                x509TrustAnchors = InMemoryTrustStore(
+                    listOf(
+                        X509CertificateUtil.parseCertificateDerEncoded(
+                            ByteString(Base64.Default.decode(TRUST_ANCHOR))
+                        )
+                    )
+                )
+            )
         )
         assertIs<ClientValidationResult.Success>(result)
     }

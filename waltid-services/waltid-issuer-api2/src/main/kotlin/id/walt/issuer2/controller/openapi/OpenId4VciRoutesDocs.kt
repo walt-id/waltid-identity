@@ -228,11 +228,15 @@ object OpenId4VciRoutesDocs {
 
     fun nonce(): RouteConfig.() -> Unit = {
         summary = "Nonce endpoint"
-        description = "Return a signed nonce."
+        description = "Return a signed OpenID4VCI c_nonce. This endpoint is not protected by an access token."
         response {
             HttpStatusCode.OK to {
                 description = "Nonce response"
                 body<JsonObject>()
+            }
+            HttpStatusCode.InternalServerError to {
+                description = "Nonce generation failed"
+                body<OAuthError>()
             }
         }
     }
