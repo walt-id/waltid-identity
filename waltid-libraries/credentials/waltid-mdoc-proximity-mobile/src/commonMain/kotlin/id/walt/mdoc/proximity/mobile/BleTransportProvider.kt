@@ -181,35 +181,22 @@ private class PreparedBleTransport(
             var failures = 0
             val causes = mutableListOf<Throwable>()
             var winner: Pair<BlePreparedPlatformRole, BleRawConnection>? = null
-            try {
-                withTimeout(BLE_CONNECTION_TIMEOUT) {
-                    while (winner == null && failures < roles.size) {
-                        val (role, result) = results.receive()
-                        result.onSuccess { winner = role to it }.onFailure {
-                            failures++
-                            causes += it
-                        }
-                    }
+            while (winner == null && failures < roles.size) {
+                val (role, result) = results.receive()
+                result.onSuccess { winner = role to it }.onFailure {
+                    failures++
+                    causes += it
                 }
-            } catch (_: TimeoutCancellationException) {
-                val roleFailure = causes.firstOrNull()
-                if (roleFailure is ProximityException) throw roleFailure
-                if (roleFailure != null) throw ProximityException(
-                    ProximityError.Transport(
-                        "ble_connection_failed",
-                        "A prepared BLE role failed before another peer connected",
-                    ),
-                    roleFailure,
-                )
-                throw ProximityException(
-                    ProximityError.Transport("ble_connection_timeout", "No BLE peer connected within 30 seconds")
-                )
             }
             jobs.forEach { if (it.isActive) it.cancelAndJoin() }
-            val selected = winner ?: throw ProximityException(
-                ProximityError.Transport("ble_connection_failed", "Every prepared BLE role failed"),
-                causes.firstOrNull(),
-            )
+            val selected = winner ?: run {
+                val roleFailure = causes.firstOrNull()
+                if (roleFailure is ProximityException) throw roleFailure
+                throw ProximityException(
+                    ProximityError.Transport("ble_connection_failed", "Every prepared BLE role failed"),
+                    roleFailure,
+                )
+            }
             roles.filterNot { it === selected.first }.forEach { it.close(ProximityCloseReason.LOST_RACE) }
             val connection = BleMessageConnection(selected.second, maximumMessageBytes)
             val accepted = closeMutex.withLock {
@@ -228,10 +215,7 @@ private class PreparedBleTransport(
         } catch (failure: Throwable) {
             withContext(NonCancellable) {
                 jobs.forEach { if (it.isActive) it.cancelAndJoin() }
-                val reason = if (
-                    failure is ProximityException && failure.error.code == "ble_connection_timeout"
-                ) ProximityCloseReason.TIMEOUT else ProximityCloseReason.CANCELLED
-                roles.forEach { it.close(reason) }
+                roles.forEach { it.close(ProximityCloseReason.CANCELLED) }
             }
             throw failure
         } finally {
@@ -257,10 +241,6 @@ private class PreparedBleTransport(
                 roles.forEach { it.close(reason) }
             }
         }
-    }
-
-    private companion object {
-        val BLE_CONNECTION_TIMEOUT = 30.seconds
     }
 }
 

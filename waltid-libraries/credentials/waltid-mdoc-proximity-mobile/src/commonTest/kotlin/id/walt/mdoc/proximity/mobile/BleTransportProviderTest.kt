@@ -1,4 +1,7 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(
+    kotlinx.coroutines.ExperimentalCoroutinesApi::class,
+    kotlinx.serialization.ExperimentalSerializationApi::class,
+)
 
 package id.walt.mdoc.proximity.mobile
 
@@ -10,6 +13,7 @@ import id.walt.mdoc.proximity.MdocProximityProfile
 import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
+import id.walt.mdoc.proximity.ProximityTransportKind
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
@@ -120,20 +124,27 @@ class BleTransportProviderTest {
     }
 
     @Test
-    fun `prepared listener times out once and cannot be awaited again`() = runTest {
+    fun `prepared listener remains available until its session owner closes it`() = runTest {
         val platform = FakePlatform()
         val prepared = provider(BleMdocRoles.CentralClient(centralUuid), platform).prepare(context, this)
+        val pending = async(start = CoroutineStart.UNDISPATCHED) { prepared.awaitConnection() }
 
-        val timeout = assertFailsWith<ProximityException> { prepared.awaitConnection() }
+        testScheduler.advanceTimeBy(30_001)
+        assertFalse(pending.isCompleted)
+
+        val raw = FakeRawConnection(BleRawBearer.GATT, 23)
+        platform.central.connection.complete(raw)
+        val connection = pending.await()
         val secondAwait = assertFailsWith<ProximityException> { prepared.awaitConnection() }
 
-        assertEquals("ble_connection_timeout", timeout.error.code)
+        assertEquals(ProximityTransportKind.BLE, connection.kind)
         assertEquals("ble_listener_unavailable", secondAwait.error.code)
-        assertEquals(listOf(ProximityCloseReason.TIMEOUT), platform.central.closeReasons)
+        prepared.close(ProximityCloseReason.CANCELLED)
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), platform.central.closeReasons)
     }
 
     @Test
-    fun `dual role timeout preserves a failed role's proximity error`() = runTest {
+    fun `dual role failure preserves the first proximity error when every role fails`() = runTest {
         val platform = FakePlatform()
         val prepared = provider(BleMdocRoles.Dual(centralUuid, peripheralUuid), platform).prepare(context, this)
         platform.central.connection.completeExceptionally(
@@ -144,6 +155,7 @@ class BleTransportProviderTest {
                 )
             )
         )
+        platform.peripheral.connection.completeExceptionally(IllegalStateException("advertiser failed"))
 
         val failure = assertFailsWith<ProximityException> { prepared.awaitConnection() }
 

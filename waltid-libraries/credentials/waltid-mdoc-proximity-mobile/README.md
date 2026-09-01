@@ -18,6 +18,11 @@ for one transaction and ask the same factory for its provider. The provider prep
 that can actually be advertised and exposes them through the shared `ProximityTransportProvider`
 contract.
 
+Prepared BLE listeners remain available until the shared proximity session selects a connection or
+closes them. The radio-independent engine owns the advertised engagement lifetime so a displayed QR
+code cannot outlive its BLE retrieval path; the BLE module still bounds radio setup and
+post-connection inactivity.
+
 Android applications need the merged manifest permissions plus runtime grants for the selected
 role. Apple applications need `NSBluetoothAlwaysUsageDescription`; the provider uses CoreBluetooth
 on its main queue and does not request authorization itself.
