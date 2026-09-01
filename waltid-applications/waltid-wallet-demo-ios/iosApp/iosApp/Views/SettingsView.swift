@@ -304,6 +304,7 @@ private struct ReaderTrustSettingsView: View {
             titleVisibility: .visible
         ) {
             Button("Reset", role: .destructive, action: controller.reset)
+                .accessibilityIdentifier(WalletAccessibilityID.readerTrustResetConfirm)
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This removes all imported Reader CAs and RICAL providers and restores the permissive reader policy.")
@@ -336,6 +337,12 @@ private struct ReaderTrustSettingsView: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityValue(
+            controller.settings.readerPolicy == policy ? "Selected" : "Not selected"
+        )
+        .accessibilityAddTraits(
+            controller.settings.readerPolicy == policy ? .isSelected : []
+        )
     }
 
     private func configuredMaterialRow(
@@ -358,22 +365,13 @@ private struct ReaderTrustSettingsView: View {
 
     private func handleImportResult(_ result: Result<[URL], Error>) {
         do {
-            let urls = try result.get()
-            guard let url = urls.single else {
-                throw ReaderTrustFileImportError.selectOneFile
-            }
-            let accessGranted = url.startAccessingSecurityScopedResource()
-            defer { if accessGranted { url.stopAccessingSecurityScopedResource() } }
-            let fileSize = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize
-            if let fileSize, fileSize > ProximityReaderTrustSettingsCodec.maximumImportBytes {
-                throw ReaderTrustFileImportError.fileTooLarge
-            }
-            let data = try Data(contentsOf: url, options: .mappedIfSafe)
-            guard data.count <= ProximityReaderTrustSettingsCodec.maximumImportBytes else {
-                throw ReaderTrustFileImportError.fileTooLarge
-            }
-            Task {
-                await controller.prepareImport(sourceName: url.lastPathComponent, data: data)
+            switch try ReaderTrustImportFileLoader.load(result) {
+            case .cancelled:
+                return
+            case let .selected(sourceName, data):
+                Task {
+                    await controller.prepareImport(sourceName: sourceName, data: data)
+                }
             }
         } catch {
             controller.reportImportError(error.localizedDescription)
@@ -475,20 +473,4 @@ private struct ReaderTrustImportReviewView: View {
             Text(value, style: .date).font(.footnote)
         }
     }
-}
-
-private enum ReaderTrustFileImportError: LocalizedError {
-    case selectOneFile
-    case fileTooLarge
-
-    var errorDescription: String? {
-        switch self {
-        case .selectOneFile: return "Select one Reader Authentication file"
-        case .fileTooLarge: return "The imported file exceeds 1 MiB"
-        }
-    }
-}
-
-private extension Collection {
-    var single: Element? { count == 1 ? first : nil }
 }
