@@ -56,6 +56,7 @@ internal fun SettingsScreen(
     onRequestSigningProtectionChange: (WalletDemoSigningProtection) -> Unit,
     onConfirmSigningProtectionChange: () -> Unit,
     onCancelSigningProtectionChange: () -> Unit,
+    sharingSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val ready = state.session as? WalletSessionState.Ready
     val clipboard = LocalClipboardManager.current
@@ -162,6 +163,7 @@ internal fun SettingsScreen(
                         modifier = Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview),
                     )
                 }
+                sharingSettingsContent?.invoke()
             }
             OutlinedButton(
                 onClick = onLock,
