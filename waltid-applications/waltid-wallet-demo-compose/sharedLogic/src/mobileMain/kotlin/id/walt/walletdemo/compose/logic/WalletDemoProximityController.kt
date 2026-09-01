@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.logic
 import id.walt.wallet2.mobile.MobileWalletProximityAction
 import id.walt.wallet2.mobile.MobileWalletProximityActionResult
 import id.walt.wallet2.mobile.MobileWalletProximityActionType
+import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
 import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityDocumentSubmission
 import id.walt.wallet2.mobile.MobileWalletProximityElementReference
@@ -59,6 +60,13 @@ data class WalletDemoProximityUiState(
                 selections.all { it.disclosedElements.isNotEmpty() }
         } == true
 
+    /** Runtime permission the demo host must resolve before the SDK session may be created. */
+    val automaticPermissionAction: MobileWalletProximityRemediationAction?
+        get() = (sessionState as? MobileWalletProximityState.CheckingPrerequisites)
+            ?.capabilities
+            ?.automaticPermissionActions
+            ?.firstOrNull()
+
     val isTerminal: Boolean
         get() = sessionState.isTerminal()
 }
@@ -86,25 +94,41 @@ class WalletDemoProximityController(
     val state: StateFlow<WalletDemoProximityUiState> = mutableState.asStateFlow()
 
     private var session: MobileWalletProximitySession? = null
+    private var pendingConfiguration: MobileWalletProximityConfiguration? = null
     private var sessionJob: Job? = null
     private var hostActionJob: Job? = null
     private var generation: Long = 0
 
     fun start() {
         if (mutableState.value.active) return
+        val configuration = configurationProvider()
         generation += 1
         val startGeneration = generation
+        pendingConfiguration = configuration
         mutableState.value = WalletDemoProximityUiState(active = true)
+        checkPrerequisitesAndStart(configuration, startGeneration)
+    }
+
+    private fun checkPrerequisitesAndStart(
+        configuration: MobileWalletProximityConfiguration,
+        startGeneration: Long,
+    ) {
+        sessionJob?.cancel()
         sessionJob = scope.launch(dispatcher) {
             try {
-                // Resolve exactly once per start: settings changes cannot mutate an active session.
-                val started = wallet.startProximityPresentation(configurationProvider())
-                if (!currentCoroutineContext().isActive ||
-                    generation != startGeneration || !mutableState.value.active
-                ) {
+                val capabilities = wallet.proximityPresentationCapabilities(configuration)
+                if (!isCurrent(startGeneration)) return@launch
+                publish(MobileWalletProximityState.CheckingPrerequisites(capabilities))
+                // Runtime dialogs belong to the app host. Do not let another viable transport
+                // silently bypass a permission required by the selected demo configuration.
+                if (capabilities.automaticPermissionActions.isNotEmpty()) return@launch
+
+                val started = wallet.startProximityPresentation(configuration)
+                if (!isCurrent(startGeneration)) {
                     kotlinx.coroutines.withContext(NonCancellable) { started.close() }
                     return@launch
                 }
+                pendingConfiguration = null
                 session = started
                 started.state
                     .onEach {
@@ -188,7 +212,16 @@ class WalletDemoProximityController(
 
     fun decline() = dispatch(MobileWalletProximityAction.Decline)
 
-    fun retryPrerequisites() = dispatch(MobileWalletProximityAction.RetryPrerequisites)
+    fun retryPrerequisites() {
+        val configuration = pendingConfiguration
+        if (session == null && configuration != null) {
+            if (mutableState.value.hostActionInProgress == null) {
+                checkPrerequisitesAndStart(configuration, generation)
+            }
+        } else {
+            dispatch(MobileWalletProximityAction.RetryPrerequisites)
+        }
+    }
 
     fun remediate(
         action: MobileWalletProximityRemediationAction,
@@ -197,7 +230,9 @@ class WalletDemoProximityController(
         val capabilities = (mutableState.value.sessionState as? MobileWalletProximityState.CheckingPrerequisites)
             ?.capabilities ?: return
         if (action !in capabilities.remediationActions || mutableState.value.hostActionInProgress != null) return
-        val currentSession = session ?: return
+        val currentSession = session
+        val configuration = pendingConfiguration
+        if (currentSession == null && configuration == null) return
         mutableState.update { it.copy(hostActionInProgress = action, actionError = null) }
         val actionGeneration = generation
         val job = scope.launch(dispatcher, start = CoroutineStart.LAZY) {
@@ -210,15 +245,20 @@ class WalletDemoProximityController(
                     MobileWalletProximityHostActionResult.Failed
                 }
                 if (generation != actionGeneration || !mutableState.value.active) return@launch
-                val dispatchResult = currentSession.dispatch(
-                    MobileWalletProximityAction.ReportRemediation(action, result)
-                )
-                if (generation != actionGeneration || !mutableState.value.active) return@launch
-                mutableState.update {
-                    it.copy(
-                        hostActionInProgress = null,
-                        actionError = (dispatchResult as? MobileWalletProximityActionResult.Rejected)?.error,
+                if (currentSession == null) {
+                    mutableState.update { it.copy(hostActionInProgress = null) }
+                    checkPrerequisitesAndStart(requireNotNull(configuration), actionGeneration)
+                } else {
+                    val dispatchResult = currentSession.dispatch(
+                        MobileWalletProximityAction.ReportRemediation(action, result)
                     )
+                    if (generation != actionGeneration || !mutableState.value.active) return@launch
+                    mutableState.update {
+                        it.copy(
+                            hostActionInProgress = null,
+                            actionError = (dispatchResult as? MobileWalletProximityActionResult.Rejected)?.error,
+                        )
+                    }
                 }
             } finally {
                 if (generation == actionGeneration) hostActionJob = null
@@ -229,6 +269,10 @@ class WalletDemoProximityController(
     }
 
     fun cancel() {
+        if (session == null) {
+            dismiss()
+            return
+        }
         val current = mutableState.value.sessionState
         if (current == null) {
             dismiss()
@@ -256,6 +300,7 @@ class WalletDemoProximityController(
         hostActionJob = null
         val closing = session
         session = null
+        pendingConfiguration = null
         mutableState.value = WalletDemoProximityUiState()
         if (closing != null) scope.launch(dispatcher) { closing.close() }
     }
@@ -279,6 +324,9 @@ class WalletDemoProximityController(
             }
         }
     }
+
+    private suspend fun isCurrent(expectedGeneration: Long): Boolean =
+        currentCoroutineContext().isActive && generation == expectedGeneration && mutableState.value.active
 
     private fun publish(sessionState: MobileWalletProximityState) {
         mutableState.update { current ->
@@ -304,6 +352,12 @@ class WalletDemoProximityController(
         }
     }
 }
+
+private val MobileWalletProximityCapabilities.automaticPermissionActions:
+    List<MobileWalletProximityRemediationAction>
+    get() = remediationActions.filter {
+        it == MobileWalletProximityRemediationAction.RequestBluetoothPermission
+    }
 
 private fun MobileWalletProximityReview.defaultSelections(): List<WalletDemoProximityDocumentSelection> =
     documents.map { document ->

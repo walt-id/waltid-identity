@@ -32,6 +32,9 @@ The Android and iOS apps expose a dedicated **Present in person** journey for ho
 proximity presentation. The Wallet SDK remains the source of session, request, reader-authentication,
 trust, disclosure, and terminal-state meaning; the shared Compose UI renders those facts and performs
 only platform-owned permission, settings, lifecycle, screen-awake, and brightness actions.
+Before creating a session, the demo queries the SDK capabilities and automatically requests any
+runtime permission required by the selected proximity configuration. Radio, power, and settings
+remediation remains an explicit user action.
 
 The current journey displays Device Engagement as an accessible QR code and retrieves over the
 available Bluetooth Low Energy method. It supports per-document credential and element selection,

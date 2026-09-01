@@ -9,6 +9,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationRequestInfo
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
 import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximitySession
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
@@ -25,6 +26,11 @@ internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,
     private val warning: String? = null,
 ) : ProximityDemoWallet {
+    override suspend fun proximityPresentationCapabilities(
+        configuration: MobileWalletProximityConfiguration,
+    ): MobileWalletProximityCapabilities =
+        mobileWallet.proximityPresentationCapabilities(configuration)
+
     override suspend fun startProximityPresentation(
         configuration: MobileWalletProximityConfiguration,
     ): MobileWalletProximitySession =
