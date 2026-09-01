@@ -3,6 +3,8 @@ package id.waltid.openid4vci.wallet.notification
 import id.walt.openid4vci.errors.NotificationErrorCodes
 import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
 import id.walt.openid4vci.requests.notification.NotificationEvent
+import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
+import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -22,6 +24,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class NotificationRequestBuilderTest {
     private fun client(
@@ -36,6 +39,7 @@ class NotificationRequestBuilderTest {
             assertEquals("https://issuer.example/notification", request.url.toString())
             assertEquals(HttpMethod.Post, request.method)
             assertEquals("Bearer access-token", request.headers[HttpHeaders.Authorization])
+            assertNull(request.headers[DPOP_HEADER])
             assertEquals(ContentType.Application.Json, request.body.contentType)
 
             val body = Json.parseToJsonElement(request.bodyText()).jsonObject
@@ -58,6 +62,78 @@ class NotificationRequestBuilderTest {
         )
 
         assertEquals(notification, assertIs<NotificationDeliveryResult.Success>(result).request)
+    }
+
+    @Test
+    fun `posts notification request with dpop access token and fresh proof`() = runTest {
+        val proofInputs = mutableListOf<Pair<String, String?>>()
+        val client = client { request ->
+            assertEquals("DPoP access-token", request.headers[HttpHeaders.Authorization])
+            assertEquals("proof-1", request.headers[DPOP_HEADER])
+            respond(content = "", status = HttpStatusCode.NoContent)
+        }
+        val notificationEndpoint = "https://issuer.example/notification"
+
+        val result = NotificationRequestBuilder(client).send(
+            notificationEndpoint = notificationEndpoint,
+            accessToken = "access-token",
+            request = DefaultNotificationRequest(
+                notificationId = "notification-id",
+                event = NotificationEvent.CREDENTIAL_ACCEPTED,
+            ),
+            dpopProofFactory = { endpoint, nonce ->
+                proofInputs += endpoint to nonce
+                "proof-${proofInputs.size}"
+            },
+        )
+
+        assertIs<NotificationDeliveryResult.Success>(result)
+        assertEquals(listOf<Pair<String, String?>>(notificationEndpoint to null), proofInputs)
+    }
+
+    @Test
+    fun `retries dpop notification once with server nonce and fresh proof`() = runTest {
+        var callCount = 0
+        val proofInputs = mutableListOf<Pair<String, String?>>()
+        val client = client { request ->
+            callCount += 1
+            assertEquals("DPoP access-token", request.headers[HttpHeaders.Authorization])
+            assertEquals("proof-$callCount", request.headers[DPOP_HEADER])
+            if (callCount == 1) {
+                respond(
+                    content = "{}",
+                    status = HttpStatusCode.Unauthorized,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
+                        HttpHeaders.WWWAuthenticate to listOf("DPoP error=\"use_dpop_nonce\""),
+                        DPOP_NONCE_HEADER to listOf("server-nonce"),
+                    ),
+                )
+            } else {
+                respond(content = "", status = HttpStatusCode.NoContent)
+            }
+        }
+        val notificationEndpoint = "https://issuer.example/notification"
+
+        val result = NotificationRequestBuilder(client).send(
+            notificationEndpoint = notificationEndpoint,
+            accessToken = "access-token",
+            request = DefaultNotificationRequest(
+                notificationId = "notification-id",
+                event = NotificationEvent.CREDENTIAL_FAILURE,
+            ),
+            dpopProofFactory = { endpoint, nonce ->
+                proofInputs += endpoint to nonce
+                "proof-${proofInputs.size}"
+            },
+        )
+
+        assertIs<NotificationDeliveryResult.Success>(result)
+        assertEquals(2, callCount)
+        assertEquals(
+            listOf(notificationEndpoint to null, notificationEndpoint to "server-nonce"),
+            proofInputs,
+        )
     }
 
     @Test
