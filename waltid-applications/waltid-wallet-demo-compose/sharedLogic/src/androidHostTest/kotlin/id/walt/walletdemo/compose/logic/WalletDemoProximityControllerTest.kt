@@ -60,6 +60,34 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalletDemoProximityControllerTest {
     @Test
+    fun `selected WiFi permissions gate the session before another transport can start`() = runTest {
+        listOf(
+            MobileWalletProximityRemediationAction.RequestNearbyWifiPermission,
+            MobileWalletProximityRemediationAction.RequestLocalNetworkPermission,
+        ).forEach { permissionAction ->
+            val capabilities = wifiPermissionCapabilities(permissionAction)
+            assertTrue(capabilities.mayStart)
+            val backend = FakeBackend(
+                session = FakeSession(
+                    MobileWalletProximityState.Preparing(
+                        MobileWalletProximityProfile.Iso180135Edition2Dis2026
+                    )
+                ),
+                capabilities = { capabilities },
+            )
+            val controller = controller(backend)
+
+            controller.start()
+            advanceUntilIdle()
+
+            assertEquals(0, backend.startCalls)
+            assertEquals(permissionAction, controller.state.value.automaticPermissionAction)
+            controller.dismiss()
+            advanceUntilIdle()
+        }
+    }
+
+    @Test
     fun `selected runtime permission is resolved before the SDK session starts`() = runTest {
         var capabilities = blockedCapabilities
         val session = FakeSession(
@@ -1117,6 +1145,26 @@ private val fallbackCapabilities = blockedCapabilities.copy(
     ),
     nfcEngagement = availableSelected,
     nfcRetrieval = availableSelected,
+)
+
+private val wifiPermissionUnavailable = MobileWalletProximityError(
+    category = MobileWalletProximityErrorCategory.Capability,
+    code = "wifi_permission_required",
+    message = "WiFi permission is required",
+    recoverable = true,
+)
+
+private fun wifiPermissionCapabilities(
+    action: MobileWalletProximityRemediationAction,
+): MobileWalletProximityCapabilities = readyCapabilities.copy(
+    wifiAwareRetrieval = MobileWalletProximityTransportCapability(
+        implemented = true,
+        profilePermitted = true,
+        runtimeAvailable = false,
+        selected = true,
+        unavailable = wifiPermissionUnavailable,
+        remediationActions = listOf(action),
+    )
 )
 
 /** Host-only fixture. Permission invariants are covered by real signed-request tests in the SDK module. */
