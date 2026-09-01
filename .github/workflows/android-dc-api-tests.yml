@@ -1,0 +1,25 @@
+name: Android DC API tests
+
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  android-dc-api-tests:
+    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci:mobile-dc-api') }}
+    uses: ./.github/workflows/android-device-tests.yml
+    secrets: inherit
+    with:
+      job_name_prefix: android-dc-api-tests
+      run_dc_api: true
+      dc_api_only: true

@@ -37,9 +37,10 @@ import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
-import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
+import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
@@ -69,11 +70,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
-import org.junit.Assume.assumeTrue
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.MessageDigest
@@ -89,7 +88,7 @@ import java.security.MessageDigest
  * session could not be bound to this caller either: it requires a secure-context origin, while
  * Credential Manager asserts `android:apk-key-hash:...` for a native one.
  *
- * These require Google Play services, so only the dedicated Play Store lane runs them.
+ * These require Google Play services, so only the dedicated Google APIs lane runs them.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalDigitalCredentialApi::class)
@@ -101,8 +100,43 @@ class DigitalCredentialSharingE2ETest {
     fun prepareTest() {
         val fixture = fixture()
         assertCredentialManagerIdle(fixture)
+        createAndroidDemoSharingSettingsStore(fixture.context).setShowDcApiPresentationPreview(true)
         activeRequests.clear()
         runBlocking { assertSharedCredentialStateUnchanged() }
+    }
+
+    /**
+     * A small platform gate before the protocol assertions: registration has to be visible to the
+     * platform and a real Digital Credentials request has to open Google's selector. The remaining
+     * tests then exercise the same selector through issuance, matching, review, and submission.
+     */
+    @Test
+    fun credentialManagerPlatformSmoke() = runBlocking {
+        val fixture = fixture()
+        val registration = wallet.refreshDigitalCredentialRegistration()
+        assertTrue(
+            "Credential Manager registration was unavailable in the platform smoke: ${registration.reason}",
+            registration.available,
+        )
+        assertTrue(
+            "Credential Manager registered no credentials in the platform smoke",
+            registration.registeredEntryCount > 0,
+        )
+
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            scenario = scenario,
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+        )
+        val request = fixture.startCredentialRequest(session.requestJson)
+        try {
+            assertNotNull(
+                "Credential Manager selector did not open for a real DC API request",
+                fixture.device.wait(Until.findObject(By.pkg(CREDENTIAL_SELECTOR_PACKAGE)), UI_ELEMENT_TIMEOUT),
+            )
+        } finally {
+            request.abandon()
+        }
     }
 
     @After
@@ -116,10 +150,39 @@ class DigitalCredentialSharingE2ETest {
         }
         activeRequests.clear()
         settleCredentialManagerInteraction(fixture)
+        createAndroidDemoSharingSettingsStore(fixture.context).setShowDcApiPresentationPreview(true)
         assertEquals(
             "Verifier request registry was not empty after test cleanup",
             0,
             DigitalCredentialTestVerifier.activeRequestCount(),
+        )
+    }
+
+    /** Disabling the wallet preview submits the picker's default selection without showing a sheet. */
+    @Test
+    fun sharesMdocWithoutWalletReviewWhenPreviewIsDisabled() = runBlocking {
+        val fixture = fixture()
+        val settings = createAndroidDemoSharingSettingsStore(fixture.context)
+        settings.setShowDcApiPresentationPreview(false)
+        assertFalse(settings.showDcApiPresentationPreview())
+
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            scenario = scenario,
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+        )
+
+        val credential = fixture.shareWithoutWalletReview(
+            request = fixture.startCredentialRequest(session.requestJson),
+            candidateText = MDL_DOC_TYPE,
+        )
+        assertFalse("Wallet review appeared while preview was disabled", fixture.walletReviewVisible())
+
+        assertVerifierAccepted(
+            sessionId = session.sessionId,
+            responseJson = credential.credentialJson,
+            presentedCredentialId = "mdl",
+            requiredPolicyIds = MDOC_REQUIRED_POLICIES,
         )
     }
 
@@ -257,7 +320,9 @@ class DigitalCredentialSharingE2ETest {
         val extraCredentialIds = mutableListOf<String>()
         try {
             extraCredentialIds += issueFromDemoIssuer(wallet, scaScenario)
-            extraCredentialIds += issueFromDemoIssuer(wallet, ageScenario)
+            val ageCredentialIds = issueFromDemoIssuer(wallet, ageScenario)
+            extraCredentialIds += ageCredentialIds
+            val ageCredentialId = ageCredentialIds.single()
             val registration = wallet.refreshDigitalCredentialRegistration()
             assertTrue("Temporary SCA/age registration was unavailable: ${registration.reason}", registration.available)
             assertEquals(4, registration.registeredEntryCount)
@@ -314,13 +379,29 @@ class DigitalCredentialSharingE2ETest {
                         message = "SCA payment currency missing from the wallet review",
                     )
                     // The review received both credentials, not just the one the prompt was built from.
-                    // The requested disclosure is asserted rather than the credential card, because a card
-                    // would also appear for a credential the platform offered without any claims selected.
+                    // Open the exact age credential and assert its requested disclosure: a card can also
+                    // appear when the platform offered a credential without selecting claims.
+                    clickByTag(
+                        device = device,
+                        tag = WalletDemoSharingReviewTestTags.credentialCard(
+                            queryId = AGE_CREDENTIAL_QUERY_ID,
+                            credentialId = ageCredentialId,
+                        ),
+                    )
+                    assertNotNull(
+                        "Age credential claims dialog did not open",
+                        waitForResource(
+                            device = device,
+                            tag = WalletDemoSharingReviewTestTags.ClaimsDialog,
+                            timeoutMs = UI_ELEMENT_TIMEOUT,
+                        ),
+                    )
                     assertTextContainingVisibleAfterScrolling(
                         device = device,
                         substring = AGE_DISCLOSURE_LABEL,
                         message = "Review did not receive the second credential",
                     )
+                    clickByTag(device, WalletDemoSharingReviewTestTags.ClaimsCloseButton)
                 },
             )
 
@@ -646,6 +727,45 @@ class DigitalCredentialSharingE2ETest {
         val response = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) {
             request.await().getOrThrow()
         }
+        return requireNotNull(response.credential as? DigitalCredential) {
+            "Caller did not receive a digital credential: ${response.credential}"
+        }
+    }
+
+    /** Selects a Credential Manager candidate and requires completion without a wallet review. */
+    private suspend fun Fixture.shareWithoutWalletReview(
+        request: DigitalCredentialRequestHandle,
+        candidateText: String,
+    ): DigitalCredential {
+        val deadline = System.currentTimeMillis() + CREDENTIAL_OPERATION_TIMEOUT
+        var candidateSelected = false
+
+        while (!request.isComplete && System.currentTimeMillis() < deadline) {
+            assertFalse("Wallet review appeared while preview was disabled", walletReviewVisible())
+            if (!candidateSelected && device.findCredentialManagerText(candidateText) != null) {
+                assertTrue(
+                    "Could not click the '$candidateText' candidate",
+                    device.clickCredentialManagerCandidate(candidateText),
+                )
+                candidateSelected = true
+            } else if (device.findEnabledCredentialManagerContinue() != null) {
+                assertTrue(
+                    "Could not click Credential Manager's Continue button",
+                    device.clickCredentialManagerNode(::isCredentialManagerContinue),
+                )
+            }
+            delay(CLEANUP_POLL_MILLIS)
+        }
+
+        if (!request.isComplete) {
+            fail(
+                "Credential Manager did not complete without a wallet review.\n" +
+                    pickerDiagnostic(request, candidateText, candidateSelected),
+            )
+        }
+        assertFalse("Wallet review appeared while preview was disabled", walletReviewVisible())
+
+        val response = request.await().getOrThrow()
         return requireNotNull(response.credential as? DigitalCredential) {
             "Caller did not receive a digital credential: ${response.credential}"
         }
@@ -1120,7 +1240,7 @@ class DigitalCredentialSharingE2ETest {
         fun provisionCredentials() = runBlocking {
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val context = instrumentation.targetContext
-            assumeTrue(
+            assertTrue(
                 "Digital Credentials E2E requires an Android emulator with Google Play services",
                 hasGooglePlayServices(context),
             )

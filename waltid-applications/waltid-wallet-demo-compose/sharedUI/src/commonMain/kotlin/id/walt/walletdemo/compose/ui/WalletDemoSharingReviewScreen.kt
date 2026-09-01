@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.logic.defaultCredentialSelection
@@ -217,6 +218,18 @@ object WalletDemoSharingReviewTestTags {
 
     /** Cancel button. */
     val CancelButton: String get() = WalletUiTestTags.PresentationCancelButton
+
+    /** Claims dialog opened from a compact credential card. */
+    val ClaimsDialog: String get() = WalletUiTestTags.PresentationClaimsDialog
+
+    /** Close button in the claims dialog. */
+    val ClaimsCloseButton: String get() = WalletUiTestTags.PresentationClaimsClose
+
+    /** Compact credential card for the given presentation option. */
+    fun credentialCard(queryId: String, credentialId: String): String =
+        WalletUiTestTags.credentialCard(
+            WalletDemoPresentationCredentialSelection(queryId = queryId, credentialId = credentialId).id,
+        )
 
     /** Requester section. */
     val RequesterSection: String get() = WalletUiTestTags.PresentationVerifierSection
