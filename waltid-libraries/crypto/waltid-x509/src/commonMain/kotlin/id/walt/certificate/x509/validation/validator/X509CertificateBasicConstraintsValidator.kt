@@ -16,7 +16,8 @@ import id.walt.certificate.x509.validation.ValidationResult
  * ensure the remaining number of sub-CAs does not exceed the allowed maximum limit.
  *
  * Criticality Verification: Ensure CA certificates mark the basic constraints extension as
- * critical according to baseline public key infrastructure profile standards.
+ * critical according to baseline public key infrastructure profile standards (Severity is WARNING and
+ * not ERROR because criticality is not mentioned in RFC 5280 section 6.1.4).
  *
  * Leaf Rejection: Confirm that an end-user or server leaf certificate does not
  * feature cA:TRUE. (this can be
@@ -42,7 +43,7 @@ class X509CertificateBasicConstraintsValidator(val leafCanBeCa: Boolean = false)
         } else {
             if (!basicConstraints.critical) {
                 context.addLogEntry(
-                    ValidationResult.Severity.ERROR,
+                    ValidationResult.Severity.WARNING,
                     "Certificate extension '${BasicConstraintsExtension.OID}' ('${BasicConstraintsExtension.NAME}') must have critical flag set"
                 )
             }
