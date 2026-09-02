@@ -798,6 +798,68 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun classifiesMdocSignatureUsualMarkByteArrayAsImage() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "Mobile driving licence",
+                credentialDataJson = """
+                    {
+                      "org.iso.18013.5.1": {
+                        "signature_usual_mark": {
+                          "elementValue": ${onePixelPngByteArrayJson()}
+                        }
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val signature = details.groups
+            .flatMap { it.items }
+            .first { it.path.id == "org.iso.18013.5.1.signature_usual_mark.elementValue" }
+        assertEquals("Signature or usual mark", signature.label)
+        assertIs<DisplayValue.Image>(signature.value)
+    }
+
+    @Test
+    fun classifiesStandardMdlBiometricTemplateByteArraysAsImages() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "mso_mdoc",
+                credentialDataJson = """
+                    {
+                      "org.iso.18013.5.1": {
+                        "biometric_template_face": ${onePixelPngByteArrayJson()},
+                        "biometric_template_finger": ${onePixelPngByteArrayJson()},
+                        "biometric_template_signature_sign": ${onePixelPngByteArrayJson()},
+                        "biometric_template_iris": ${onePixelPngByteArrayJson()}
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val claimsByPath = details.groups
+            .flatMap { it.items }
+            .associateBy { it.path.id }
+        listOf(
+            "biometric_template_face",
+            "biometric_template_finger",
+            "biometric_template_signature_sign",
+            "biometric_template_iris",
+        ).forEach { elementIdentifier ->
+            val claim = assertNotNull(claimsByPath["org.iso.18013.5.1.$elementIdentifier"])
+            assertIs<DisplayValue.Image>(claim.value)
+        }
+    }
+
+    @Test
     fun presentationCredentialOptionPrependsReadableRequestedDisclosures() {
         val option = WalletDemoPresentationCredentialOption(
             queryId = "pid",
@@ -1075,6 +1137,7 @@ class CredentialDisplayNormalizerTest {
         }
 
     private companion object {
+        // Deterministic 1 x 1 PNG fixture containing no third-party artwork.
         const val onePixelPngBase64 =
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
     }

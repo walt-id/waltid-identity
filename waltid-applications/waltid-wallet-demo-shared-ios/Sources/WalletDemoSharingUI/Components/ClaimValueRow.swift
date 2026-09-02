@@ -36,13 +36,19 @@ private struct ClaimValueView: View {
         case .image(_, let data, let mimeType, let byteCount):
             ImageValue(data: data, mimeType: mimeType, byteCount: byteCount, path: path)
         case .list(let values):
+            let preview = DisplayListPreview(values: values)
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(values.enumerated()), id: \.offset) { index, value in
+                ForEach(Array(preview.values.enumerated()), id: \.offset) { index, value in
                     HStack(alignment: .top, spacing: 4) {
                         Text("\(index + 1).")
                             .font(.caption)
                         ClaimValueView(value: value, path: path.indexedChild(index))
                     }
+                }
+                if let overflowLabel = preview.overflowLabel {
+                    Text(overflowLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
         case .null:
@@ -61,6 +67,20 @@ private struct ClaimValueView: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
+    }
+}
+
+struct DisplayListPreview {
+    static let maxItems = 25
+
+    let values: [DisplayValue]
+    let overflowLabel: String?
+
+    init(values: [DisplayValue]) {
+        self.values = Array(values.prefix(Self.maxItems))
+        self.overflowLabel = values.count > Self.maxItems
+            ? "Showing first \(Self.maxItems) of \(values.count) items"
+            : nil
     }
 }
 
