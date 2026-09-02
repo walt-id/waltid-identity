@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -32,8 +33,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 
 @Composable
-internal actual fun rememberProximityHostActionExecutor(): WalletDemoProximityHostActionExecutor {
+internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActions {
     val context = LocalContext.current
+    val activity = context.findActivity()
+    val permissionHistory = remember(context.applicationContext) {
+        AndroidPermissionRequestHistory(context.applicationContext)
+    }
     var permissionRequest by remember {
         mutableStateOf<CompletableDeferred<MobileWalletProximityHostActionResult>?>(null)
     }
@@ -43,6 +48,7 @@ internal actual fun rememberProximityHostActionExecutor(): WalletDemoProximityHo
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { grants ->
+        permissionHistory.recordDecision(grants.keys)
         permissionRequest?.complete(
             if (grants.isNotEmpty() && grants.values.all { it }) {
                 MobileWalletProximityHostActionResult.Completed
@@ -58,55 +64,85 @@ internal actual fun rememberProximityHostActionExecutor(): WalletDemoProximityHo
         systemSurface?.complete(MobileWalletProximityHostActionResult.Completed)
         systemSurface = null
     }
-
-    return remember(context, permissionLauncher, systemSurfaceLauncher) {
-        WalletDemoProximityHostActionExecutor { action ->
-            when (action) {
-                MobileWalletProximityRemediationAction.RequestBluetoothPermission -> {
-                    val permissions = bluetoothPermissions()
-                    if (permissions.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }) {
-                        MobileWalletProximityHostActionResult.Completed
-                    } else if (permissionRequest != null) {
-                        MobileWalletProximityHostActionResult.Failed
-                    } else {
-                        CompletableDeferred<MobileWalletProximityHostActionResult>().let { result ->
-                            permissionRequest = result
-                            try {
-                                permissionLauncher.launch(permissions)
-                                result.await()
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (_: Throwable) {
-                                MobileWalletProximityHostActionResult.Failed
-                            } finally {
-                                if (permissionRequest === result) permissionRequest = null
-                            }
-                        }
-                    }
-                }
-                MobileWalletProximityRemediationAction.OpenApplicationSettings ->
-                    launchSystemSurface(
-                        Intent(
-                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                            Uri.fromParts("package", context.packageName, null),
-                        ),
-                        current = { systemSurface },
-                        setCurrent = { systemSurface = it },
-                        launch = systemSurfaceLauncher::launch,
-                    )
-                MobileWalletProximityRemediationAction.EnableBluetooth ->
-                    launchSystemSurface(
-                        Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE),
-                        current = { systemSurface },
-                        setCurrent = { systemSurface = it },
-                        launch = systemSurfaceLauncher::launch,
-                    )
-                MobileWalletProximityRemediationAction.Retry ->
-                    MobileWalletProximityHostActionResult.Completed
-                MobileWalletProximityRemediationAction.UseSupportedDevice ->
-                    MobileWalletProximityHostActionResult.Cancelled
+    fun permissionRoute(permissions: Array<String>): AndroidRuntimePermissionRoute =
+        androidRuntimePermissionRoute(
+            permissions = permissions.asList(),
+            isGranted = { permission ->
+                ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+            },
+            wasRequested = permissionHistory::wasRequested,
+            shouldShowRationale = { permission ->
+                activity?.shouldShowRequestPermissionRationale(permission) == true
+            },
+        )
+    suspend fun requestPermissions(permissions: Array<String>): MobileWalletProximityHostActionResult {
+        when (permissionRoute(permissions)) {
+            AndroidRuntimePermissionRoute.Granted -> return MobileWalletProximityHostActionResult.Completed
+            AndroidRuntimePermissionRoute.OpenSettings -> return launchSystemSurface(
+                applicationSettingsIntent(context),
+                current = { systemSurface },
+                setCurrent = { systemSurface = it },
+                launch = systemSurfaceLauncher::launch,
+            )
+            AndroidRuntimePermissionRoute.Request -> Unit
+        }
+        if (permissionRequest != null) return MobileWalletProximityHostActionResult.Failed
+        return CompletableDeferred<MobileWalletProximityHostActionResult>().let { result ->
+            permissionRequest = result
+            try {
+                permissionLauncher.launch(permissions)
+                result.await()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                MobileWalletProximityHostActionResult.Failed
+            } finally {
+                if (permissionRequest === result) permissionRequest = null
             }
         }
+    }
+
+    return remember(context, permissionLauncher, systemSurfaceLauncher, activity) {
+        WalletDemoProximityHostActions(
+            executor = WalletDemoProximityHostActionExecutor { action ->
+                when (action) {
+                    MobileWalletProximityRemediationAction.RequestBluetoothPermission ->
+                        requestPermissions(bluetoothPermissions())
+                    MobileWalletProximityRemediationAction.OpenApplicationSettings ->
+                        launchSystemSurface(
+                            applicationSettingsIntent(context),
+                            current = { systemSurface },
+                            setCurrent = { systemSurface = it },
+                            launch = systemSurfaceLauncher::launch,
+                        )
+                    MobileWalletProximityRemediationAction.EnableBluetooth ->
+                        launchSystemSurface(
+                            Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE),
+                            current = { systemSurface },
+                            setCurrent = { systemSurface = it },
+                            launch = systemSurfaceLauncher::launch,
+                        )
+                    MobileWalletProximityRemediationAction.Retry ->
+                        MobileWalletProximityHostActionResult.Completed
+                    MobileWalletProximityRemediationAction.UseSupportedDevice ->
+                        MobileWalletProximityHostActionResult.Cancelled
+                }
+            },
+            actionForDisplay = { action ->
+                if (
+                    action == MobileWalletProximityRemediationAction.RequestBluetoothPermission &&
+                    permissionRoute(bluetoothPermissions()) == AndroidRuntimePermissionRoute.OpenSettings
+                ) {
+                    MobileWalletProximityRemediationAction.OpenApplicationSettings
+                } else {
+                    action
+                }
+            },
+            automaticallyPerform = { action ->
+                action != MobileWalletProximityRemediationAction.RequestBluetoothPermission ||
+                    permissionRoute(bluetoothPermissions()) != AndroidRuntimePermissionRoute.OpenSettings
+            },
+        )
     }
 }
 
@@ -172,6 +208,47 @@ private fun bluetoothPermissions(): Array<String> = if (Build.VERSION.SDK_INT >=
 } else {
     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
 }
+
+internal enum class AndroidRuntimePermissionRoute { Granted, Request, OpenSettings }
+
+/** Distinguishes a first request from Android's otherwise identical permanent-denial state. */
+internal fun androidRuntimePermissionRoute(
+    permissions: List<String>,
+    isGranted: (String) -> Boolean,
+    wasRequested: (String) -> Boolean,
+    shouldShowRationale: (String) -> Boolean,
+): AndroidRuntimePermissionRoute {
+    val missing = permissions.filterNot(isGranted)
+    if (missing.isEmpty()) return AndroidRuntimePermissionRoute.Granted
+    return if (missing.any { wasRequested(it) && !shouldShowRationale(it) }) {
+        AndroidRuntimePermissionRoute.OpenSettings
+    } else {
+        AndroidRuntimePermissionRoute.Request
+    }
+}
+
+private class AndroidPermissionRequestHistory(context: Context) {
+    private val preferences: SharedPreferences = context.getSharedPreferences(
+        PERMISSION_REQUEST_HISTORY_PREFERENCES,
+        Context.MODE_PRIVATE,
+    )
+
+    fun wasRequested(permission: String): Boolean = preferences.getBoolean(permission, false)
+
+    fun recordDecision(permissions: Set<String>) {
+        if (permissions.isEmpty()) return
+        preferences.edit().apply {
+            permissions.forEach { putBoolean(it, true) }
+        }.apply()
+    }
+}
+
+private fun applicationSettingsIntent(context: Context): Intent = Intent(
+    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+    Uri.fromParts("package", context.packageName, null),
+)
+
+private const val PERMISSION_REQUEST_HISTORY_PREFERENCES = "proximity_permission_request_history"
 
 private suspend fun launchSystemSurface(
     intent: Intent,

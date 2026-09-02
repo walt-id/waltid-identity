@@ -99,7 +99,7 @@ fun MobileWalletDemoApp(
 ) {
     val walletState by controller.state.collectAsState()
     val proximity by proximityController.state.collectAsState()
-    val hostActions = rememberProximityHostActionExecutor()
+    val hostActions = rememberProximityHostActions()
     val credentials = (walletState.session as? WalletSessionState.Ready)
         ?.credentials
         .orEmpty()
@@ -121,7 +121,9 @@ fun MobileWalletDemoApp(
         if (proximity.active && walletState.selectedTab != WalletDemoTab.Present) proximityController.cancel()
     }
     LaunchedEffect(proximity.sessionState, proximity.automaticPermissionAction) {
-        proximity.automaticPermissionAction?.let { proximityController.remediate(it, hostActions) }
+        proximity.automaticPermissionAction
+            ?.takeIf(hostActions::mayPerformAutomatically)
+            ?.let { proximityController.remediate(it, hostActions.executor) }
     }
     WalletDemoAppHost(
         controller = controller,
@@ -132,7 +134,8 @@ fun MobileWalletDemoApp(
                 WalletDemoProximityScreen(
                     state = proximity,
                     credentialDetailsById = credentialDetailsById,
-                    hostActions = hostActions,
+                    hostActions = hostActions.executor,
+                    hostActionForDisplay = hostActions::displayedAction,
                     onSelectCredential = proximityController::selectCredential,
                     onToggleElement = proximityController::toggleElement,
                     onContinueAfterResponseChange = proximityController::setContinueAfterResponse,
@@ -159,6 +162,8 @@ internal fun WalletDemoProximityScreen(
     state: WalletDemoProximityUiState,
     credentialDetailsById: Map<String, CredentialDetails>,
     hostActions: WalletDemoProximityHostActionExecutor,
+    hostActionForDisplay: (MobileWalletProximityRemediationAction) ->
+        MobileWalletProximityRemediationAction = { it },
     onSelectCredential: (Int, String) -> Unit,
     onToggleElement: (Int, MobileWalletProximityElementReference) -> Unit,
     onContinueAfterResponseChange: (Boolean) -> Unit,
@@ -219,6 +224,7 @@ internal fun WalletDemoProximityScreen(
                     is MobileWalletProximityState.CheckingPrerequisites -> PrerequisiteContent(
                         capabilities = sessionState.capabilities,
                         hostActionInProgress = state.hostActionInProgress,
+                        hostActionForDisplay = hostActionForDisplay,
                         onRetry = onRetry,
                         onRemediate = { onRemediate(it, hostActions) },
                     )
@@ -316,6 +322,7 @@ private fun WalletDemoProximityReview(
 private fun PrerequisiteContent(
     capabilities: MobileWalletProximityCapabilities,
     hostActionInProgress: MobileWalletProximityRemediationAction?,
+    hostActionForDisplay: (MobileWalletProximityRemediationAction) -> MobileWalletProximityRemediationAction,
     onRetry: () -> Unit,
     onRemediate: (MobileWalletProximityRemediationAction) -> Unit,
 ) {
@@ -334,6 +341,7 @@ private fun PrerequisiteContent(
             }
         )
         capabilities.remediationActions.forEach { action ->
+            val displayedAction = hostActionForDisplay(action)
             OutlinedButton(
                 onClick = { onRemediate(action) },
                 enabled = hostActionInProgress == null,
@@ -343,7 +351,7 @@ private fun PrerequisiteContent(
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.size(8.dp))
                 }
-                Text(action.label())
+                Text(displayedAction.label())
             }
         }
         Button(

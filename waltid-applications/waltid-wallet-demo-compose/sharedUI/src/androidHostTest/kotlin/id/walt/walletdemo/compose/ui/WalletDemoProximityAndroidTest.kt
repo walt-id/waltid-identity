@@ -11,6 +11,10 @@ class WalletDemoProximityAndroidTest {
     private val scenarios = WalletDemoProximityTestScenarios()
 
     @Test
+    fun userFixedPermissionShowsSettingsWithoutChangingTheSdkAction() =
+        scenarios.userFixedPermissionShowsSettingsWithoutChangingTheSdkAction()
+
+    @Test
     fun engagementKeepsTheExactDeviceQRCodeVisibleWhileConnecting() =
         scenarios.engagementKeepsTheExactDeviceQRCodeVisibleWhileConnecting()
 
