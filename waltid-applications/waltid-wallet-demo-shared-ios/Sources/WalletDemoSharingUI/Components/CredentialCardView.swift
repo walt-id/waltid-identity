@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import UIKit
 import WalletSDK
@@ -64,7 +65,7 @@ public struct CredentialCardArtView: View {
                         .foregroundStyle(label)
                         .lineLimit(2)
                         .padding(padding)
-                    DefaultWaltLogo()
+                    credentialLogo()
                         .frame(width: logoSize, height: logoSize)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .padding(padding)
@@ -79,6 +80,34 @@ public struct CredentialCardArtView: View {
             loadedMetadataArt = await loadMetadataArt(from: summary.backgroundImageURI)
             metadataArtFailed = loadedMetadataArt == nil && httpsURL(summary.backgroundImageURI) != nil
         }
+    }
+
+    @ViewBuilder
+    private func credentialLogo() -> some View {
+        switch credentialCardLogoSource(summary.logoURI) {
+        case let .metadata(url):
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case let .success(image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .accessibilityLabel(credentialLogoAccessibilityLabel)
+                default:
+                    DefaultWaltLogo()
+                }
+            }
+        case .bundledWalt:
+            DefaultWaltLogo()
+        }
+    }
+
+    private var credentialLogoAccessibilityLabel: String {
+        if let label = summary.logoAltText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !label.isEmpty {
+            return label
+        }
+        return "\(summary.title) logo"
     }
 }
 
@@ -214,6 +243,15 @@ private func bundledWaltLogo() -> UIImage? {
         return nil
     }
     return UIImage(contentsOfFile: url.path)
+}
+
+public enum CredentialCardLogoSource: Equatable {
+    case metadata(URL)
+    case bundledWalt
+}
+
+public func credentialCardLogoSource(_ value: String?) -> CredentialCardLogoSource {
+    httpsURL(value).map(CredentialCardLogoSource.metadata) ?? .bundledWalt
 }
 
 public func showsConstructedCardArtOverlay(

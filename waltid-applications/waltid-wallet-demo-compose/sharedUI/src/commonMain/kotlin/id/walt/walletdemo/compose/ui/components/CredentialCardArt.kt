@@ -44,6 +44,8 @@ internal data class CredentialCardArtModel(
     val backgroundColor: String? = null,
     val backgroundImageUri: String? = null,
     val textColor: String? = null,
+    val logoUri: String? = null,
+    val logoAltText: String? = null,
 )
 
 internal fun CredentialCardDisplayData.toCardArt(): CredentialCardArtModel =
@@ -53,6 +55,8 @@ internal fun CredentialCardDisplayData.toCardArt(): CredentialCardArtModel =
         backgroundColor = backgroundColor,
         backgroundImageUri = backgroundImageUri,
         textColor = textColor,
+        logoUri = logoUri,
+        logoAltText = logoAltText,
     )
 
 internal fun WalletDemoMetadataDisplay.toCardArt(
@@ -65,7 +69,22 @@ internal fun WalletDemoMetadataDisplay.toCardArt(
         backgroundColor = backgroundColor,
         backgroundImageUri = backgroundImageUri,
         textColor = textColor,
+        logoUri = logoUri,
+        logoAltText = logoAltText,
     )
+
+internal sealed interface CredentialCardLogoSource {
+    data class Metadata(val uri: String) : CredentialCardLogoSource
+    data object BundledWalt : CredentialCardLogoSource
+}
+
+internal fun credentialCardLogoSource(uri: String?): CredentialCardLogoSource =
+    uri?.takeIf(::isHttpsUrl)
+        ?.let(CredentialCardLogoSource::Metadata)
+        ?: CredentialCardLogoSource.BundledWalt
+
+internal fun credentialCardLogoContentDescription(name: String, altText: String?): String =
+    altText?.trim()?.takeIf(String::isNotEmpty) ?: "$name logo"
 
 @Composable
 internal fun CredentialCardArt(
@@ -77,6 +96,7 @@ internal fun CredentialCardArt(
     val constructedColor = parseCssColor(art.backgroundColor) ?: DefaultWaltCardBlue
     val labelColor = parseCssColor(art.textColor) ?: Color.White
     val backgroundImageUri = art.backgroundImageUri?.takeIf(::isHttpsUrl)
+    val logoSource = credentialCardLogoSource(art.logoUri)
     var metadataArtState by remember(backgroundImageUri) {
         mutableStateOf(
             if (backgroundImageUri == null) {
@@ -133,13 +153,22 @@ internal fun CredentialCardArt(
         }
 
         if (showConstructedCardArtOverlay(metadataArtState)) {
-            DefaultWaltLogo(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(namePadding)
-                    .size(logoSize)
-                    .testTag(WalletUiTestTags.CredentialCardConstructedArt),
-            )
+            val logoModifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(namePadding)
+                .size(logoSize)
+                .testTag(WalletUiTestTags.CredentialCardConstructedArt)
+            when (logoSource) {
+                is CredentialCardLogoSource.Metadata -> SubcomposeAsyncImage(
+                    model = logoSource.uri,
+                    contentDescription = credentialCardLogoContentDescription(art.name, art.logoAltText),
+                    modifier = logoModifier,
+                    contentScale = ContentScale.Fit,
+                    loading = { DefaultWaltLogo(Modifier.fillMaxSize()) },
+                    error = { DefaultWaltLogo(Modifier.fillMaxSize()) },
+                )
+                CredentialCardLogoSource.BundledWalt -> DefaultWaltLogo(logoModifier)
+            }
             Text(
                 text = art.name,
                 color = labelColor,
