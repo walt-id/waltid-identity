@@ -272,6 +272,7 @@ private val permissionBlockedCapabilities = MobileWalletProximityCapabilities(
         remediationActions = listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission),
     ),
     nfcRetrieval = availableUnselectedCapability(),
+    nfcV2Retrieval = availableUnselectedCapability(),
     wifiAwareRetrieval = availableUnselectedCapability(),
 )
 
