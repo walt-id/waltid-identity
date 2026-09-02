@@ -84,6 +84,8 @@ data class PresentCredentialRequest(
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     val did: String? = null,
+    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
+    val didReference: String? = null,
     val runPolicies: Boolean? = null
 ) : VpRequestSource
 
@@ -111,7 +113,9 @@ data class PresentCredentialIsolatedRequest(
     /** Inline signing key; takes precedence over [keyId]. */
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
-    val did: String? = null
+    val did: String? = null,
+    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
+    val didReference: String? = null,
 ) : VpRequestSource
 
 // Isolated step types
@@ -300,6 +304,8 @@ data class SubmitPresentationRequest(
     val selectedDisclosureOptions: List<PresentationDisclosureSelection>? = null,
     val keyId: String? = null,
     val did: String? = null,
+    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
+    val didReference: String? = null,
     val runPolicies: Boolean? = null,
 )
 
@@ -323,6 +329,8 @@ data class SubmitDcApiPresentationRequest(
     val selectedCredentialOptions: List<PresentationCredentialSelection>,
     val selectedDisclosureOptions: List<PresentationDisclosureSelection>? = null,
     val did: String? = null,
+    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
+    val didReference: String? = null,
 )
 
 class MissingPresentationPreviewException :
@@ -438,7 +446,9 @@ object WalletPresentationHandler {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
-        val did = request.did ?: wallet.defaultDid()
+        val did = request.did
+            ?: request.didReference?.let { wallet.didStore?.getDid(it)?.did }
+            ?: wallet.defaultDid()
         log.trace { "presentCredential: keyId=${keyMaterial.keyId}, did=$did, requestUrl=${request.requestUrl}" }
 
         onEvent(WalletSessionEvent.presentation_request_parsed)
@@ -525,7 +535,9 @@ object WalletPresentationHandler {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for isolated presentation")
-        val did = request.did ?: wallet.defaultDid()
+        val did = request.did
+            ?: request.didReference?.let { wallet.didStore?.getDid(it)?.did }
+            ?: wallet.defaultDid()
 
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
@@ -891,7 +903,9 @@ object WalletPresentationHandler {
         // Sign with exactly the key the request was validated against during preview.
         val keyMaterial = wallet.resolveKeyMaterial(ready.keyId, setOf(KeyUsage.SIGN))
             ?: error("Key '${ready.keyId}' selected while previewing is no longer available")
-        val did = request.did ?: wallet.defaultDid()
+        val did = request.did
+            ?: request.didReference?.let { wallet.didStore?.getDid(it)?.did }
+            ?: wallet.defaultDid()
         val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
         validateSelectedTransactionDataCredentials(
             resolvedAuthorizationRequest.authorizationRequest.transactionData.orEmpty(),
@@ -1050,7 +1064,9 @@ object WalletPresentationHandler {
             val holderKey = requireNotNull(keyMaterial.crypto2Key) {
                 "Key '${keyMaterial.keyId}' has no crypto2 signing representation"
             }
-            val did = request.did ?: wallet.defaultDid()
+            val did = request.did
+                ?: request.didReference?.let { wallet.didStore?.getDid(it)?.did }
+                ?: wallet.defaultDid()
             val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
             validateSelectedTransactionDataCredentials(
                 authorizationRequest.transactionData.orEmpty(),
@@ -1220,7 +1236,9 @@ object WalletPresentationHandler {
             formatCapabilities = { keyMaterial.presentationCapabilities() },
             resolveAuthorizationRequest = resolveAuthorizationRequest,
         )
-        val did = request.did ?: wallet.defaultDid()
+        val did = request.did
+            ?: request.didReference?.let { wallet.didStore?.getDid(it)?.did }
+            ?: wallet.defaultDid()
 
         val dcqlQuery = authorizationRequest.dcqlQuery
             ?: throw IllegalArgumentException("AuthorizationRequest has no dcql_query")
@@ -1792,6 +1810,8 @@ data class BuildVpTokenRequest(
     val keyId: String? = null,
     /** DID to use as holder binding. Defaults to the wallet's default DID. */
     val did: String? = null,
+    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
+    val didReference: String? = null,
 ) : VpRequestSource
 
 internal fun BuildVpTokenRequest.resolveSelectedCredentialOptions(): List<PresentationCredentialSelection> {
