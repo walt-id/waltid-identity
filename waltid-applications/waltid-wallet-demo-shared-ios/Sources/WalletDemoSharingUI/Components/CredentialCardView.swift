@@ -93,8 +93,10 @@ public struct CredentialCardArtView: View {
                         .resizable()
                         .scaledToFit()
                         .accessibilityLabel(credentialLogoAccessibilityLabel)
-                default:
-                    DefaultWaltLogo()
+                case .empty, .failure:
+                    EmptyView()
+                @unknown default:
+                    EmptyView()
                 }
             }
         case .bundledWalt:

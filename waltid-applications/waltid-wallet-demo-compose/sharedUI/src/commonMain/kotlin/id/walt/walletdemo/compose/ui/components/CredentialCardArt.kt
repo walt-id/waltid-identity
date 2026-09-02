@@ -161,11 +161,19 @@ internal fun CredentialCardArt(
             when (logoSource) {
                 is CredentialCardLogoSource.Metadata -> SubcomposeAsyncImage(
                     model = logoSource.uri,
-                    contentDescription = credentialCardLogoContentDescription(art.name, art.logoAltText),
+                    contentDescription = null,
                     modifier = logoModifier,
                     contentScale = ContentScale.Fit,
-                    loading = { DefaultWaltLogo(Modifier.fillMaxSize()) },
-                    error = { DefaultWaltLogo(Modifier.fillMaxSize()) },
+                    success = { state ->
+                        Image(
+                            painter = state.painter,
+                            contentDescription = credentialCardLogoContentDescription(art.name, art.logoAltText),
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
+                    },
+                    loading = {},
+                    error = {},
                 )
                 CredentialCardLogoSource.BundledWalt -> DefaultWaltLogo(logoModifier)
             }

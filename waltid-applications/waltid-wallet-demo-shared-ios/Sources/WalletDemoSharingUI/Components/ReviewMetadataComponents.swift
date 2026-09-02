@@ -172,12 +172,10 @@ public struct MetadataIdentityView: View {
                         switch phase {
                         case let .success(image):
                             image.resizable().scaledToFit()
-                        case .empty:
-                            ProgressView()
-                        case .failure:
-                            MetadataLogoFallback(name: name)
+                        case .empty, .failure:
+                            EmptyView()
                         @unknown default:
-                            MetadataLogoFallback(name: name)
+                            EmptyView()
                         }
                     }
                     .accessibilityLabel(display?.logoAltText ?? "\(name) logo")
