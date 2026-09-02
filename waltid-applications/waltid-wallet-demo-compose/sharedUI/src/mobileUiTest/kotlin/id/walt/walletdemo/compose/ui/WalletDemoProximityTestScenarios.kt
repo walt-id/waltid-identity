@@ -297,6 +297,7 @@ private val permissionBlockedCapabilities = ProximityCapabilities(
         ), listOf(ProximityRemediationAction.RequestBluetoothPermission)),
     ),
     nfcRetrieval = availableUnselectedCapability(),
+    nfcV2Retrieval = availableUnselectedCapability(),
     wifiAwareRetrieval = availableUnselectedCapability(),
 )
 
