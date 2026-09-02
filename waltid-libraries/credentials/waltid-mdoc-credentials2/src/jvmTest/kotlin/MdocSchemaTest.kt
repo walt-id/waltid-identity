@@ -1,8 +1,11 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
-import MdocIssuanceTest.Companion.createTestKeyMaterial
+import MdocIssuanceTest.Companion.holderKeyInit
+import MdocIssuanceTest.Companion.issuerCertCose
+import MdocIssuanceTest.Companion.issuerKeyInit
 import MdocIssuanceTest.Companion.makeDocument
 import MdocIssuanceTest.Companion.verifyIssued
+import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.mdoc.encoding.toMdocTDateString
@@ -52,7 +55,8 @@ class MdocSchemaTest {
 
     @Test
     fun testIssuanceWithSchema() = runTest {
-        val (issuerKey, holderKey, issuerCertificateChain) = createTestKeyMaterial()
+        val issuerKey = issuerKeyInit()
+        val holderKey = holderKeyInit().getPublicKey().getCosePublicKey()
         val issuerPublicKey = issuerKey.getPublicKey()
         val issuerPublicCoseVerifier = issuerPublicKey.toCoseVerifier()
 
@@ -91,7 +95,7 @@ class MdocSchemaTest {
 
         val issuerSigned = MdocIssuer.issueUniversal(
             issuerKey = issuerKey,
-            issuerCertificate = issuerCertificateChain,
+            issuerCertificate = issuerCertCose,
             holderKey = holderKey,
             docType = docType,
             data = credentialData,
@@ -119,7 +123,8 @@ class MdocSchemaTest {
 
     @Test
     fun testCustomIssuanceWithoutSchema() = runTest {
-        val (issuerKey, holderKey, issuerCertificateChain) = createTestKeyMaterial()
+        val issuerKey = issuerKeyInit()
+        val holderKey = holderKeyInit().getPublicKey().getCosePublicKey()
         val issuerPublicKey = issuerKey.getPublicKey()
         val issuerPublicCoseVerifier = issuerPublicKey.toCoseVerifier()
 
@@ -157,7 +162,7 @@ class MdocSchemaTest {
 
         val issuerSigned = MdocIssuer.issueUniversal(
             issuerKey = issuerKey,
-            issuerCertificate = issuerCertificateChain,
+            issuerCertificate = issuerCertCose,
             holderKey = holderKey,
             docType = docType,
             data = credentialData
