@@ -279,7 +279,7 @@ private fun bluetoothPermissions(): Array<String> = if (Build.VERSION.SDK_INT >=
     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
 }
 
-private fun runtimePermissionsFor(action: MobileWalletProximityRemediationAction): Array<String>? = when (action) {
+internal fun runtimePermissionsFor(action: MobileWalletProximityRemediationAction): Array<String>? = when (action) {
     MobileWalletProximityRemediationAction.RequestBluetoothPermission -> bluetoothPermissions()
     MobileWalletProximityRemediationAction.RequestNearbyWifiPermission ->
         arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES)
