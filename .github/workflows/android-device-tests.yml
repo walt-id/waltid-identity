@@ -2,6 +2,12 @@ name: Android device tests
 
 on:
   workflow_dispatch:
+    inputs:
+      run_dc_api:
+        description: 'Include the Digital Credentials API device-test phase.'
+        type: boolean
+        required: false
+        default: true
   workflow_call:
     inputs:
       job_name_prefix:
@@ -9,6 +15,16 @@ on:
         type: string
         required: false
         default: ''
+      run_dc_api:
+        description: 'Include the Digital Credentials API device-test phase.'
+        type: boolean
+        required: false
+        default: false
+      dc_api_only:
+        description: 'Run only the Digital Credentials API phase.'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   checks: write
@@ -20,12 +36,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # dc-api-compose is disabled: Play Store AVD GMS prep is flaky in CI
-        # (empty GMS versionCode vs required>=26.29.32). Re-enable when AVD prep is reliable.
-        phase: [wallet-mobile, compose-demo, enterprise-mobile]
+        phase: ${{ fromJSON(inputs.dc_api_only && '["dc-api-compose"]' || inputs.run_dc_api && '["wallet-mobile","compose-demo","dc-api-compose","enterprise-mobile"]' || '["wallet-mobile","compose-demo","enterprise-mobile"]') }}
     env:
       MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
       MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+      MIN_GMS_VERSION: '24.31.0'
+      DC_API_SYSTEM_IMAGE_PACKAGE: 'system-images;android-37.0;google_apis;x86_64'
+      DC_API_SYSTEM_IMAGE_REVISION: '6.5.11'
+      DC_API_AVD_NAME: 'dc-api-api37-pixel7-google-apis'
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
@@ -54,18 +72,21 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Restore warmed DC API AVD
+      - name: Restore configured DC API AVD
         if: matrix.phase == 'dc-api-compose'
         id: dc-api-avd-cache
         uses: actions/cache/restore@v4
         with:
-          # Keep the reusable baseline separate from the Gradle/test workspace. The key excludes
-          # commit and unrelated workflow changes; the schema, substrate, and preparation scripts
-          # make changes to the prepared-device contract explicit cache invalidation points.
+          # Cache the configured AVD disk plus the host ADB key pair that authorizes it. The restored
+          # userdata contains that key in its adbd authorization list; omitting the matching host key
+          # makes a cross-runner cache boot as `unauthorized`. This excludes the ADB daemon/device
+          # runtime state (`adb*.log`, sockets, server state) and no Quick Boot snapshot is reused.
           path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: dc-api-avd-v1-${{ runner.os }}-api37-x86_64-pixel7-playstore_ps16k-emulator-runner-2.38.0-${{ hashFiles('waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
+            ~/.android/avd/dc-api-api37-pixel7-google-apis.ini
+            ~/.android/avd/dc-api-api37-pixel7-google-apis.avd
+            ~/.android/adbkey
+            ~/.android/adbkey.pub
+          key: dc-api-avd-v6-minimal-${{ runner.os }}-api37-x86_64-pixel7-disk6g-emulator-37.1.11-platform-tools-37.0.1-system-image-6.5.11-${{ hashFiles('waltid-identity/.github/workflows/android-device-tests.yml', 'waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
 
       - name: Report DC API AVD cache state
         if: matrix.phase == 'dc-api-compose'
@@ -107,7 +128,7 @@ jobs:
         if: matrix.phase == 'enterprise-mobile'
         run: ./waltid-identity/.github/scripts/mobile-ci/prepare-enterprise-android-mobile-tests.sh
 
-      - name: Prepare warmed DC API AVD baseline
+      - name: Prepare configured DC API AVD baseline
         if: matrix.phase == 'dc-api-compose' && steps.dc-api-avd-cache.outputs.cache-hit != 'true'
         id: dc-api-avd-preparation
         uses: reactivecircus/android-emulator-runner@v2.38.0
@@ -119,18 +140,21 @@ jobs:
           profile: ${{ steps.android-device-phase.outputs.emulator_profile }}
           target: ${{ steps.android-device-phase.outputs.emulator_target }}
           emulator-boot-timeout: 600
+          disk-size: 6G
           emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
           disable-animations: true
           script: ./waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh
 
-      - name: Save warmed DC API AVD baseline
+      - name: Save configured DC API AVD baseline
         if: matrix.phase == 'dc-api-compose' && steps.dc-api-avd-cache.outputs.cache-hit != 'true' && steps.dc-api-avd-preparation.outcome == 'success'
         uses: actions/cache/save@v4
         with:
           path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: dc-api-avd-v1-${{ runner.os }}-api37-x86_64-pixel7-playstore_ps16k-emulator-runner-2.38.0-${{ hashFiles('waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
+            ~/.android/avd/dc-api-api37-pixel7-google-apis.ini
+            ~/.android/avd/dc-api-api37-pixel7-google-apis.avd
+            ~/.android/adbkey
+            ~/.android/adbkey.pub
+          key: dc-api-avd-v6-minimal-${{ runner.os }}-api37-x86_64-pixel7-disk6g-emulator-37.1.11-platform-tools-37.0.1-system-image-6.5.11-${{ hashFiles('waltid-identity/.github/workflows/android-device-tests.yml', 'waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
 
       - name: Run Android device tests
         if: matrix.phase != 'dc-api-compose'
@@ -155,7 +179,8 @@ jobs:
           profile: ${{ steps.android-device-phase.outputs.emulator_profile }}
           target: ${{ steps.android-device-phase.outputs.emulator_target }}
           emulator-boot-timeout: 600
-          emulator-options: ${{ steps.android-device-phase.outputs.emulator_test_options }}
+          disk-size: 6G
+          emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
           disable-animations: true
           script: ${{ steps.android-device-phase.outputs.script }}
 
