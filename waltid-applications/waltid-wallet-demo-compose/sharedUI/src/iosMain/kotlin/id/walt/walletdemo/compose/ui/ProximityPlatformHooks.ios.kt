@@ -26,22 +26,24 @@ import platform.UIKit.UIScreen
 import platform.darwin.NSObject
 
 @Composable
-internal actual fun rememberProximityHostActionExecutor(): WalletDemoProximityHostActionExecutor =
+internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActions =
     remember {
-        WalletDemoProximityHostActionExecutor { action ->
-            withContext(Dispatchers.Main) {
-                when (action) {
-                    MobileWalletProximityRemediationAction.RequestBluetoothPermission ->
-                        requestBluetoothAuthorization()
-                    MobileWalletProximityRemediationAction.OpenApplicationSettings,
-                    MobileWalletProximityRemediationAction.EnableBluetooth -> openApplicationSettings()
-                    MobileWalletProximityRemediationAction.Retry ->
-                        MobileWalletProximityHostActionResult.Completed
-                    MobileWalletProximityRemediationAction.UseSupportedDevice ->
-                        MobileWalletProximityHostActionResult.Cancelled
+        WalletDemoProximityHostActions(
+            executor = WalletDemoProximityHostActionExecutor { action ->
+                withContext(Dispatchers.Main) {
+                    when (action) {
+                        MobileWalletProximityRemediationAction.RequestBluetoothPermission ->
+                            requestBluetoothAuthorization()
+                        MobileWalletProximityRemediationAction.OpenApplicationSettings,
+                        MobileWalletProximityRemediationAction.EnableBluetooth -> openApplicationSettings()
+                        MobileWalletProximityRemediationAction.Retry ->
+                            MobileWalletProximityHostActionResult.Completed
+                        MobileWalletProximityRemediationAction.UseSupportedDevice ->
+                            MobileWalletProximityHostActionResult.Cancelled
+                    }
                 }
-            }
-        }
+            },
+        )
     }
 
 @Composable

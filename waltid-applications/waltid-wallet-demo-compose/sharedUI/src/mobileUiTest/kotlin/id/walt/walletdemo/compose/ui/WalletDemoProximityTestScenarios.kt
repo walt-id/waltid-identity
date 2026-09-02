@@ -13,10 +13,13 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.wallet2.mobile.MobileWalletProximityCredentialOption
+import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
 import id.walt.wallet2.mobile.MobileWalletProximityDeviceAuthenticationMethod
 import id.walt.wallet2.mobile.MobileWalletProximityDocumentReview
 import id.walt.wallet2.mobile.MobileWalletProximityElementReference
 import id.walt.wallet2.mobile.MobileWalletProximityEngagement
+import id.walt.wallet2.mobile.MobileWalletProximityError
+import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
 import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
 import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthentication
 import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthenticationScope
@@ -25,9 +28,12 @@ import id.walt.wallet2.mobile.MobileWalletProximityReaderCertificatePathState
 import id.walt.wallet2.mobile.MobileWalletProximityReaderRevocationState
 import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustState
 import id.walt.wallet2.mobile.MobileWalletProximityRequestedElement
+import id.walt.wallet2.mobile.MobileWalletProximityProfile
+import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
 import id.walt.wallet2.mobile.MobileWalletProximityReview
 import id.walt.wallet2.mobile.MobileWalletProximityRicalState
 import id.walt.wallet2.mobile.MobileWalletProximityState
+import id.walt.wallet2.mobile.MobileWalletProximityTransportCapability
 import id.walt.walletdemo.compose.logic.ClaimGroup
 import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.ClaimItemPath
@@ -43,6 +49,40 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoProximityTestScenarios {
+    fun userFixedPermissionShowsSettingsWithoutChangingTheSdkAction() = runComposeUiTest {
+        var remediated: MobileWalletProximityRemediationAction? = null
+        setContent {
+            WalletDemoProximityScreen(
+                state = WalletDemoProximityUiState(
+                    active = true,
+                    sessionState = MobileWalletProximityState.CheckingPrerequisites(permissionBlockedCapabilities),
+                ),
+                credentialDetailsById = emptyMap(),
+                hostActions = hostActions,
+                hostActionForDisplay = { action ->
+                    if (action == MobileWalletProximityRemediationAction.RequestBluetoothPermission) {
+                        MobileWalletProximityRemediationAction.OpenApplicationSettings
+                    } else {
+                        action
+                    }
+                },
+                onSelectCredential = { _, _ -> },
+                onToggleElement = { _, _ -> },
+                onContinueAfterResponseChange = {},
+                onApprove = {},
+                onDecline = {},
+                onRetry = {},
+                onRemediate = { action, _ -> remediated = action },
+                onCancel = {},
+                onDismiss = {},
+                onRestart = {},
+            )
+        }
+
+        onNodeWithText("Open app settings").assertIsDisplayed().performClick()
+        assertEquals(MobileWalletProximityRemediationAction.RequestBluetoothPermission, remediated)
+    }
+
     fun engagementKeepsTheExactDeviceQRCodeVisibleWhileConnecting() = runComposeUiTest {
         setContent {
             WalletDemoProximityScreen(
@@ -208,6 +248,39 @@ class WalletDemoProximityTestScenarios {
 private val hostActions = WalletDemoProximityHostActionExecutor {
     MobileWalletProximityHostActionResult.Completed
 }
+
+private val permissionBlockedCapabilities = MobileWalletProximityCapabilities(
+    profile = MobileWalletProximityProfile.Iso180135Edition2Dis2026,
+    qrEngagement = MobileWalletProximityTransportCapability(
+        implemented = true,
+        profilePermitted = true,
+        runtimeAvailable = true,
+        selected = true,
+    ),
+    nfcEngagement = availableUnselectedCapability(),
+    bluetoothLowEnergy = MobileWalletProximityTransportCapability(
+        implemented = true,
+        profilePermitted = true,
+        runtimeAvailable = false,
+        selected = true,
+        unavailable = MobileWalletProximityError(
+            category = MobileWalletProximityErrorCategory.Capability,
+            code = "bluetooth_permission_required",
+            message = "Bluetooth permission is required",
+            recoverable = true,
+        ),
+        remediationActions = listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission),
+    ),
+    nfcRetrieval = availableUnselectedCapability(),
+    wifiAwareRetrieval = availableUnselectedCapability(),
+)
+
+private fun availableUnselectedCapability() = MobileWalletProximityTransportCapability(
+    implemented = true,
+    profilePermitted = true,
+    runtimeAvailable = true,
+    selected = false,
+)
 
 private const val namespace = "org.iso.18013.5.1"
 private const val proofNamespace = "org.waltid.example.proof"
