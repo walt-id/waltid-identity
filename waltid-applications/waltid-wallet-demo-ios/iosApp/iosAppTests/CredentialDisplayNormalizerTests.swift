@@ -1,5 +1,5 @@
 import Foundation
-import WalletDemoSharingUI
+@testable import WalletDemoSharingUI
 import WalletSDK
 import XCTest
 
@@ -790,6 +790,83 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
         let details = CredentialDisplayNormalizer.details(for: option)
         XCTAssertEqual(details.cardSummary.title, "Personal ID")
+    }
+
+    func testRecognizesMdocSignatureImageBytes() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "Mobile driving licence",
+            issuer: nil,
+            subject: nil,
+            format: "mso_mdoc",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "org.iso.18013.5.1": {
+                "signature_usual_mark": {
+                  "elementValue": \(onePixelPNGByteArrayJSON())
+                }
+              }
+            }
+            """
+        )
+
+        let signature = try XCTUnwrap(
+            details.groups
+                .flatMap(\.items)
+                .first { $0.path.id == "org.iso.18013.5.1.signature_usual_mark.elementValue" }
+        )
+        XCTAssertEqual(signature.label, "Signature or usual mark")
+        guard case .image = signature.value else {
+            return XCTFail("Expected signature_usual_mark to use the image display path")
+        }
+    }
+
+    func testRecognizesStandardMdocBiometricImageBytes() throws {
+        let imageBytes = onePixelPNGByteArrayJSON()
+        let details = CredentialDisplayNormalizer.details(
+            id: "credential-1",
+            title: "Mobile driving licence",
+            issuer: nil,
+            subject: nil,
+            format: "mso_mdoc",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "org.iso.18013.5.1": {
+                "biometric_template_face": \(imageBytes),
+                "biometric_template_finger": \(imageBytes),
+                "biometric_template_signature_sign": \(imageBytes),
+                "biometric_template_iris": \(imageBytes)
+              }
+            }
+            """
+        )
+        let claims = Dictionary(
+            uniqueKeysWithValues: details.groups.flatMap(\.items).map { ($0.path.id, $0) }
+        )
+
+        for elementIdentifier in [
+            "biometric_template_face",
+            "biometric_template_finger",
+            "biometric_template_signature_sign",
+            "biometric_template_iris"
+        ] {
+            let claim = try XCTUnwrap(claims["org.iso.18013.5.1.\(elementIdentifier)"])
+            guard case .image = claim.value else {
+                return XCTFail("Expected \(elementIdentifier) to use the image display path")
+            }
+        }
+    }
+
+    func testListPreviewIsBoundedAndReportsTheOriginalCount() {
+        let preview = DisplayListPreview(
+            values: (0..<30).map { .number("item \($0)") }
+        )
+
+        XCTAssertEqual(preview.values.count, 25)
+        XCTAssertEqual(preview.values.last, .number("item 24"))
+        XCTAssertEqual(preview.overflowLabel, "Showing first 25 of 30 items")
     }
 
     func testBuildsCredentialInfoGroupFromWalletSummaryFields() throws {

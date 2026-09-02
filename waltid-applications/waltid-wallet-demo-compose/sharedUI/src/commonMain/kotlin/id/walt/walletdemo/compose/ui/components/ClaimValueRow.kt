@@ -64,11 +64,18 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            value.values.forEachIndexed { index, child ->
+            value.values.take(MaxListPreviewItems).forEachIndexed { index, child ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${index + 1}.", style = MaterialTheme.typography.bodyMedium)
                     ClaimValue(child, path.indexedChild(index), Modifier.weight(1f))
                 }
+            }
+            if (value.values.size > MaxListPreviewItems) {
+                Text(
+                    "Showing first $MaxListPreviewItems of ${value.values.size} items",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         DisplayValue.NullValue -> Text(
@@ -103,6 +110,8 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         )
     }
 }
+
+private const val MaxListPreviewItems = 25
 
 @Composable
 private fun ImageValue(value: DisplayValue.Image, path: ClaimItemPath, modifier: Modifier = Modifier) {
