@@ -43,11 +43,12 @@ class ClaimValueRowAndroidTest {
     }
 
     @Test
-    fun qrEncoderPreservesCompactVdsBytes() {
-        val payload = byteArrayOf(0xDC.toByte(), 0x03, 0x00, 0xFF.toByte(), 0x7F)
+    fun qrEncoderPreservesSignedIcaoVdsBytes() {
+        val payload = SignedIcaoVdsFixture.bytes()
 
         val decoded = decode(encodeQrCode(QrCodePayload.Binary(payload)))
 
+        assertEquals(SignedIcaoVdsFixture.BYTE_COUNT, payload.size)
         assertEquals(1, decoded.byteSegments?.size)
         assertContentEquals(payload, decoded.byteSegments?.single())
         assertEquals(1, decoded.symbologyModifier) // QR byte segment without ECI.

@@ -39,11 +39,12 @@ class QrCodeEncoderIosTest {
     }
 
     @Test
-    fun roundTripsBinaryPayloadWithoutTextConversion() {
-        val payload = byteArrayOf(0xDC.toByte(), 0x03, 0x00, 0xFF.toByte(), 0x41)
+    fun roundTripsSignedIcaoVdsWithoutTextConversion() {
+        val payload = SignedIcaoVdsFixture.bytes()
 
         val decoded = roundTrip(QrCodePayload.Binary(payload))
 
+        assertEquals(SignedIcaoVdsFixture.BYTE_COUNT, payload.size)
         assertContentEquals(payload, decoded.bytes)
         assertTrue(decoded.hasECI)
     }
