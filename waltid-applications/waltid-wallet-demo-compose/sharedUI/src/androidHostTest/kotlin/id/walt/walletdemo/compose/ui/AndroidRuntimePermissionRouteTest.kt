@@ -1,7 +1,10 @@
 package id.walt.walletdemo.compose.ui
 
+import android.Manifest
+import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class AndroidRuntimePermissionRouteTest {
     private val permissions = listOf("scan", "connect", "advertise")
@@ -48,6 +51,19 @@ class AndroidRuntimePermissionRouteTest {
                 rationale = setOf("connect"),
             ),
         )
+    }
+
+    @Test
+    fun `Wi-Fi permission actions use the shared runtime permission policy`() {
+        assertEquals(
+            listOf(Manifest.permission.NEARBY_WIFI_DEVICES),
+            runtimePermissionsFor(MobileWalletProximityRemediationAction.RequestNearbyWifiPermission)?.toList(),
+        )
+        assertEquals(
+            listOf("android.permission.ACCESS_LOCAL_NETWORK"),
+            runtimePermissionsFor(MobileWalletProximityRemediationAction.RequestLocalNetworkPermission)?.toList(),
+        )
+        assertNull(runtimePermissionsFor(MobileWalletProximityRemediationAction.EnableWifi))
     }
 
     private fun route(
