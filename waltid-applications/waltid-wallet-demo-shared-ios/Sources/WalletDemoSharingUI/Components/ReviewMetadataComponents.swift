@@ -171,16 +171,16 @@ public struct MetadataIdentityView: View {
                     AsyncImage(url: logoURL) { phase in
                         switch phase {
                         case let .success(image):
-                            image.resizable().scaledToFit()
-                        case .empty:
-                            ProgressView()
-                        case .failure:
-                            MetadataLogoFallback(name: name)
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .accessibilityLabel(display?.logoAltText ?? "\(name) logo")
+                        case .empty, .failure:
+                            EmptyView()
                         @unknown default:
-                            MetadataLogoFallback(name: name)
+                            EmptyView()
                         }
                     }
-                    .accessibilityLabel(display?.logoAltText ?? "\(name) logo")
                 } else {
                     MetadataLogoFallback(name: name)
                 }
