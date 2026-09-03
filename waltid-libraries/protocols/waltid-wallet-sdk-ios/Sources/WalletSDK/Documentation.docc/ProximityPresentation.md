@@ -71,6 +71,13 @@ authorization does not create a usable or validly signed HCE build. Capability
 checks remain fail-closed when `CardSession` is unsupported or ineligible, and
 physical card emulation cannot be exercised in the iOS Simulator.
 
+The SDK requests Apple's optional `NFCPresentmentIntentAssertion` when the user
+starts the NFC presentation. The assertion suppresses interference from the
+default contactless app while it remains valid, but its documented 15-second
+lifetime is not treated as CardSession availability. The SDK holds a successful
+assertion without renewing it automatically and continues the explicitly started
+CardSession if assertion acquisition fails or the assertion later expires.
+
 Device signature is the default holder-authentication policy. Configure
 ``ProximityDeviceAuthenticationPolicy/macOnly``,
 ``ProximityDeviceAuthenticationPolicy/preferSignature``, or

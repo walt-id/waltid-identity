@@ -107,12 +107,18 @@ The common wire behavior is deterministic and testable without NFC hardware, bot
 the same state machines, and platform APIs do not leak into common code or the public Wallet SDK
 contract.
 
+Apple's presentment-intent assertion is an optional, short-lived suppression of the default
+contactless app, not an HCE capability prerequisite. The Swift adapter attempts to acquire it only
+for the user-started presentation, holds it while valid, never renews it without a fresh user action,
+and keeps the eligible `CardSession` independent of assertion failure or expiry.
+
 Physical Android evidence proves conventional Negotiated Handover into a reader-selected BLE bearer,
 review and consent, response delivery, and deterministic completion. Provisional NFCv2 remains
 host-tested until a compatible physical reader run is recorded. Positive iOS card-emulation evidence
-remains gated by Apple's managed entitlement, AID approval, provisioning, and an eligible signed
-device environment.
+remains gated by regenerated provisioning profiles containing Apple's newly approved HCE capability
+and AIDs, followed by an eligible signed-device run with NFC reader hardware.
 
-This ADR does not claim final ISO or platform conformance. Final qualification requires the missing
-authoritative source reconciliation, the remaining interoperability matrix, and separately approved
-positive iOS evidence.
+This ADR does not claim final ISO or platform conformance. Final qualification requires reconciling
+the now-public ISO/IEC TS 18013-6:2025 test appendices while preserving the still-missing normative
+TS text boundary, completing the remaining interoperability matrix, and recording positive iOS
+evidence.
