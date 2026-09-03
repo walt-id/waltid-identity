@@ -424,14 +424,14 @@ class ProviderCredentialIssuanceTest {
                 request, configuration, legacyIssuer, "https://issuer.example", batch,
                 dataMapping = mapping, selectiveDisclosure = null, x5Chain = null, display = null,
                 w3cVersion = null, mDocNameSpacesDataMappingConfig = null, authorizedTransactionDataTypes = null,
-                validFrom = null, validUntil = null,
+                validFrom = null, validUntil = null, expectedUpdate = null,
             )
         } else {
             handler.sign(
                 request, configuration, Crypto2CredentialSigningKey.select(issuer, configuration), "https://issuer.example", batch,
                 dataMapping = mapping, selectiveDisclosure = null, x5Chain = null, display = null,
                 w3cVersion = null, mDocNameSpacesDataMappingConfig = null, authorizedTransactionDataTypes = null,
-                validFrom = null, validUntil = null,
+                validFrom = null, validUntil = null, expectedUpdate = null,
             )
         }
         assertEquals(if (round && mapping != null) 1 else 0, clockReads)
