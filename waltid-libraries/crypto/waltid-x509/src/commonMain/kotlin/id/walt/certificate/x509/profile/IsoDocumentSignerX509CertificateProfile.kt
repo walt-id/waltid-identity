@@ -189,22 +189,9 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
         subjectKey: Crypto1Key,
         subjectDn: String,
     ) {
+        profileDocumentSignerCertificate()
         this.subjectDn = subjectDn
-        val now = Clock.System.now()
-        validity = X509Certificate.Validity(
-            notBefore = now,
-            notAfter = now + maxValidityTime
-        )
         subjectPublicKey(subjectKey)
-        extensionSubjectKeyIdentifier()
-        extensionKeyUsage {
-            critical = true
-            addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
-        }
-        extensionExtendedKeyUsage {
-            critical = true
-            addKeyUsage(ExtendedKeyUsageExtension.KeyUsage.mdlDS)
-        }
         extensionIssuerAltName {
             require(issuerEmailAddress != null || issuerUri != null) { "Either issuerEmailAddress or issuerUri must be set" }
             if (issuerEmailAddress != null) {
@@ -225,6 +212,24 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
             )
         }
     }
+
+    fun X509CertificateDataBuilder.profileDocumentSignerCertificate() {
+        val now = Clock.System.now()
+        validity = X509Certificate.Validity(
+            notBefore = now,
+            notAfter = now + maxValidityTime
+        )
+        extensionSubjectKeyIdentifier()
+        extensionKeyUsage {
+            critical = true
+            addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
+        }
+        extensionExtendedKeyUsage {
+            critical = true
+            addKeyUsage(ExtendedKeyUsageExtension.KeyUsage.mdlDS)
+        }
+    }
+
 
     override suspend fun validate(
         context: ValidationContext,

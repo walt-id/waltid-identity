@@ -109,7 +109,16 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         issuerEmailAddress: String?,
         issuerUri: String?
     ) {
+        profileIaCaRootCertificate()
         this.subjectDn = issuerDn
+        require(issuerEmailAddress?.isNotBlank() == true || issuerUri?.isNotBlank() == true) { "Issuer email address or issuer uri is required" }
+        extensionIssuerAltName {
+            issuerEmailAddress?.also { addEmail(it) }
+            issuerUri?.also { addUri(it) }
+        }
+    }
+
+    fun X509CertificateDataBuilder.profileIaCaRootCertificate() {
         subjectPublicKeySelfSigned()
         val now = Clock.System.now()
         validity = X509Certificate.Validity(
@@ -127,11 +136,6 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
             addKeyUsage(KeyUsageExtension.KeyUsage.cRLSign)
         }
         extensionSubjectKeyIdentifier()
-        require(issuerEmailAddress?.isNotBlank() == true || issuerUri?.isNotBlank() == true) { "Issuer email address or issuer uri is required" }
-        extensionIssuerAltName {
-            issuerEmailAddress?.also { addEmail(it) }
-            issuerUri?.also { addUri(it) }
-        }
     }
 
     override suspend fun validate(
