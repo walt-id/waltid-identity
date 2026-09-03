@@ -842,6 +842,48 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun rendersHexEncodedIcaoCompactVdsAsBinaryQrCode() {
+        val expected = byteArrayOf(0xDC.toByte(), 0x03, 0x00, 0xFF.toByte(), 0x41)
+
+        listOf("dc0300ff41", "DC0300FF41").forEach { encoded ->
+            val details = CredentialDisplayNormalizer.toDetails(
+                CredentialSummary(
+                    id = "cred-1",
+                    format = "dc+sd-jwt",
+                    issuer = null,
+                    label = "PoC eID",
+                    credentialDataJson = """{"qr_data":"$encoded"}""",
+                )
+            )
+
+            val payload = assertIs<QrCodePayload.Binary>(
+                assertIs<DisplayValue.QrCode>(details.groups.single().items.single().value).payload
+            )
+            assertTrue(payload.bytes.contentEquals(expected))
+        }
+    }
+
+    @Test
+    fun keepsMalformedOrNonVdsHexQrDataAsLiteralText() {
+        listOf("dc0", "dc0z", "db0300ff41").forEach { encoded ->
+            val details = CredentialDisplayNormalizer.toDetails(
+                CredentialSummary(
+                    id = "cred-1",
+                    format = "dc+sd-jwt",
+                    issuer = null,
+                    label = "PoC eID",
+                    credentialDataJson = """{"qr_data":"$encoded"}""",
+                )
+            )
+
+            assertEquals(
+                DisplayValue.QrCode(QrCodePayload.Text(encoded)),
+                details.groups.single().items.single().value,
+            )
+        }
+    }
+
+    @Test
     fun rendersDataUriEncodedIcaoCompactVdsAsBinaryQrCode() {
         val vdsBytes = byteArrayOf(
             0xDC.toByte(), 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,

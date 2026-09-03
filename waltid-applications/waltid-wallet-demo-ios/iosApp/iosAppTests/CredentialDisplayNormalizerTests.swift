@@ -1173,6 +1173,42 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertNotNil(QRCodeRenderer.image(payload: .binary(vds)))
     }
 
+    func testRendersHexEncodedICAOCompactVDSAsBinaryQRCode() throws {
+        let expected = Data([0xDC, 0x03, 0x00, 0xFF, 0x41])
+
+        for encoded in ["dc0300ff41", "DC0300FF41"] {
+            let details = CredentialDisplayNormalizer.details(
+                id: "credential-1",
+                title: "PoC eID",
+                issuer: nil,
+                subject: nil,
+                format: "dc+sd-jwt",
+                addedAt: nil,
+                credentialDataJSON: #"{"qr_data":"\#(encoded)"}"#
+            )
+
+            let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
+            XCTAssertEqual(claim.value, .qrCode(.binary(expected)))
+        }
+    }
+
+    func testKeepsMalformedOrNonVDSHexQRDataAsLiteralText() throws {
+        for encoded in ["dc0", "dc0z", "db0300ff41"] {
+            let details = CredentialDisplayNormalizer.details(
+                id: "credential-1",
+                title: "PoC eID",
+                issuer: nil,
+                subject: nil,
+                format: "dc+sd-jwt",
+                addedAt: nil,
+                credentialDataJSON: #"{"qr_data":"\#(encoded)"}"#
+            )
+
+            let claim = try XCTUnwrap(details.groups.flatMap(\.items).first)
+            XCTAssertEqual(claim.value, .qrCode(.text(encoded)))
+        }
+    }
+
     func testAppleQRCodeRendererRoundTripsSignedICAOVDSPayload() throws {
         let vds = try XCTUnwrap(Data(base64Encoded: signedICAOVDSFixtureBase64))
         let image = try XCTUnwrap(QRCodeRenderer.image(payload: .binary(vds)))

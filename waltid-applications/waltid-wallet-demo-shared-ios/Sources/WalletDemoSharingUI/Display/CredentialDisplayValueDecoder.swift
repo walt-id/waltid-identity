@@ -32,10 +32,12 @@ public enum CredentialDisplayValueDecoder {
     }
 
     public static func qrCodeDisplayValue(for encodedValue: String) -> DisplayValue? {
-        guard let data = EncodedPayload.parse(encodedValue)?.base64.decode(),
-              IcaoCompactVDS.hasSupportedHeader(data) else {
-            return nil
+        let normalized = encodedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let data = HexPayload.decode(normalized), IcaoCompactVDS.hasSupportedHeader(data) {
+            return .qrCode(.binary(data))
         }
+        guard let data = EncodedPayload.parse(normalized)?.base64.decode(),
+              IcaoCompactVDS.hasSupportedHeader(data) else { return nil }
         return .qrCode(.binary(data))
     }
 
@@ -90,6 +92,31 @@ private enum IcaoCompactVDS {
     private static let versionOffset = 1
     private static let magic: UInt8 = 0xDC
     private static let supportedVersionIdentifiers: Set<UInt8> = [0x02, 0x03]
+}
+
+private enum HexPayload {
+    static func decode(_ value: String) -> Data? {
+        let characters = Array(value.utf8)
+        guard !characters.isEmpty, characters.count.isMultiple(of: 2) else { return nil }
+
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(characters.count / 2)
+        for index in stride(from: 0, to: characters.count, by: 2) {
+            guard let high = nibble(characters[index]),
+                  let low = nibble(characters[index + 1]) else { return nil }
+            bytes.append((high << 4) | low)
+        }
+        return Data(bytes)
+    }
+
+    private static func nibble(_ character: UInt8) -> UInt8? {
+        switch character {
+        case 48...57: return character - 48
+        case 65...70: return character - 55
+        case 97...102: return character - 87
+        default: return nil
+        }
+    }
 }
 
 private struct EncodedPayload {

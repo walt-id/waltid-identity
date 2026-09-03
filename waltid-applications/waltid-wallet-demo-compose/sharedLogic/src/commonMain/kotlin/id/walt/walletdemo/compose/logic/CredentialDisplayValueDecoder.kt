@@ -32,8 +32,9 @@ internal class CredentialDisplayValueDecoder(
     }
 
     fun qrCodeFromEncodedString(value: String): DisplayValue.QrCode? {
-        val bytes = EncodedPayload.parse(value)?.base64?.decode() ?: return null
-        return bytes.toIcaoCompactVdsQrCode()
+        val normalized = value.trim()
+        return normalized.decodeHexOrNull()?.toIcaoCompactVdsQrCode()
+            ?: EncodedPayload.parse(normalized)?.base64?.decode()?.toIcaoCompactVdsQrCode()
     }
 
     fun qrCodeFromByteArray(value: JsonArray, roles: Set<ClaimRole>): DisplayValue.QrCode? {
@@ -70,6 +71,11 @@ internal class CredentialDisplayValueDecoder(
 private fun ByteArray.toIcaoCompactVdsQrCode(): DisplayValue.QrCode? =
     takeIf(IcaoCompactVds::hasSupportedHeader)
         ?.let { bytes -> DisplayValue.QrCode(QrCodePayload.Binary(bytes)) }
+
+private fun String.decodeHexOrNull(): ByteArray? {
+    if (isEmpty() || length % 2 != 0) return null
+    return runCatching { hexToByteArray() }.getOrNull()
+}
 
 private object IcaoCompactVds {
     // ICAO Doc 9303, Part 13 uses version identifiers 0x02 and 0x03 for specification versions 3 and 4.
