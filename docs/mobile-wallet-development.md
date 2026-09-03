@@ -184,6 +184,7 @@ Android:
 iOS (Compose):
 
 ```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true
 cd waltid-applications/waltid-wallet-demo-compose/iosApp
 open iosApp.xcodeproj
 xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppUITests/PublicDemoBackendE2ETests -parallel-testing-enabled NO
@@ -192,11 +193,17 @@ xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=
 iOS (Native)
 
 ```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true
 cd waltid-applications/waltid-wallet-demo-ios/iosApp
 open iosApp.xcodeproj
 xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppTests/MobileWalletIntegrationTests -parallel-testing-enabled NO
 xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppUITests/PublicDemoBackendE2ETests -parallel-testing-enabled NO
 ```
+
+If you get errors regarding missing packages, try this in Xcode:
+File → Packages → Reset Package Caches
+File → Packages → Resolve Package Versions
+Close the project and reopen that iosApp.xcodeproj (not an old CocoaPods workspace under Pods/)
 
 The public mobile integration tests run through the normal Gradle Android
 instrumentation and Xcode XCTest entry points. The Android commands above run

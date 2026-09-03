@@ -1031,6 +1031,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
         XCTAssertEqual(display?.name, "Personal ID")
         XCTAssertEqual(display?.logoURI, "https://issuer.example/pid.png")
+        XCTAssertEqual(display?.logoAltText, "PID logo")
         XCTAssertEqual(display?.backgroundColor, "#12107c")
         XCTAssertEqual(display?.backgroundImageURI, "https://issuer.example/pid-bg.png")
         XCTAssertEqual(display?.textColor, "#FFFFFF")
@@ -1053,7 +1054,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
               "credentialDisplay": [
                 {
                   "name": "Personal ID",
-                  "logo": { "uri": "https://issuer.example/pid.png" },
+                  "logo": { "uri": "https://issuer.example/pid.png", "alt_text": "PID logo" },
                   "background_color": "#12107c",
                   "text_color": "#FFFFFF"
                 }
@@ -1066,6 +1067,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.credentialDisplay?.name, "Personal ID")
         XCTAssertEqual(details.cardSummary.backgroundColor, "#12107c")
         XCTAssertEqual(details.cardSummary.logoURI, "https://issuer.example/pid.png")
+        XCTAssertEqual(details.cardSummary.logoAltText, "PID logo")
         XCTAssertEqual(details.cardSummary.title, "Personal ID")
     }
 

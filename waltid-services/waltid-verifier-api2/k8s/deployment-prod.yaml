@@ -7,7 +7,8 @@ data:
     webHost = "0.0.0.0"
     webPort = 3000
   verifier-service.conf: |
-    clientMetadata: {}
+    clientId: "x509_hash:OPpTDyXlg6WRu2-Qn4rpQcA9uVqSrNExCS8kCYUe09A"
+    clientMetadata: {client_name: "Verifier2",logo_uri: "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"}
     urlPrefix: "https://verifier2.demo.walt.id/verification-session"
     urlHost: "openid4vp://authorize"
     key: {"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}

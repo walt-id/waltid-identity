@@ -50,6 +50,8 @@ struct ContentView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ContentView(viewModel: WalletViewModel.mockForUITests())
 }
+#endif
