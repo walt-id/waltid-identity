@@ -17,7 +17,7 @@ final class IOSNfcHostPlatformAdapterTests: XCTestCase {
                 capability as? Waltid_mdoc_proximity_mobileNfcHostAvailabilityUnavailable
             )
             XCTAssertEqual(unavailable.code, expectedCode)
-            XCTAssertEqual(environment.reservationCount, 0)
+            XCTAssertEqual(environment.presentmentIntentCount, 0)
             XCTAssertEqual(environment.sessionCount, 0)
         }
     }
@@ -32,7 +32,7 @@ final class IOSNfcHostPlatformAdapterTests: XCTestCase {
             capability as? Waltid_mdoc_proximity_mobileNfcHostAvailabilityUnavailable
         )
         XCTAssertEqual(unavailable.code, "nfc_system_ineligible")
-        XCTAssertEqual(environment.reservationCount, 0)
+        XCTAssertEqual(environment.presentmentIntentCount, 0)
         XCTAssertEqual(environment.sessionCount, 0)
     }
 
@@ -284,11 +284,7 @@ final class IOSNfcHostPlatformAdapterTests: XCTestCase {
     func testCoordinatorPreservesKnownPreparationFailureCodes() async throws {
         let scenarios: [(FakeNfcEnvironment, CardSessionNfcHostError)] = [
             (
-                FakeNfcEnvironment(reservationFailure: TestFailure.failed),
-                .couldNotReserveContactlessInterface
-            ),
-            (
-                FakeNfcEnvironment(reservationFailure: IOSNfcCardSessionFailure.accessNotAccepted),
+                FakeNfcEnvironment(sessionFailure: IOSNfcCardSessionFailure.accessNotAccepted),
                 .accessNotAccepted
             ),
             (
@@ -310,34 +306,43 @@ final class IOSNfcHostPlatformAdapterTests: XCTestCase {
         }
     }
 
-    func testInvalidPresentmentReservationFailsBeforeCardSessionCreation() async throws {
-        let environment = FakeNfcEnvironment(reservationValid: false)
+    func testPresentmentIntentFailureDoesNotBlockCardSessionCreation() async throws {
+        let environment = FakeNfcEnvironment(presentmentIntentFailure: TestFailure.failed)
         let coordinator = CardSessionNfcHostCoordinator(environment: environment)
 
-        do {
-            _ = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
-            XCTFail("Preparation unexpectedly succeeded")
-        } catch let failure as CardSessionNfcHostError {
-            XCTAssertEqual(failure, .systemUnavailable)
-        }
+        let session = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
 
-        XCTAssertEqual(environment.reservationCount, 1)
-        XCTAssertEqual(environment.sessionCount, 0)
+        XCTAssertEqual(environment.presentmentIntentCount, 1)
+        XCTAssertEqual(environment.sessionCount, 1)
+        await session.close(reason: .cancelled)
     }
 
-    func testExpiredPresentmentReservationRejectsReaderDetection() async throws {
+    func testMissingPresentmentIntentDoesNotBlockCardSessionCreation() async throws {
+        let environment = FakeNfcEnvironment(presentmentIntentAvailable: false)
+        let coordinator = CardSessionNfcHostCoordinator(environment: environment)
+
+        let session = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
+
+        XCTAssertEqual(environment.presentmentIntentCount, 1)
+        XCTAssertEqual(environment.sessionCount, 1)
+        await session.close(reason: .cancelled)
+    }
+
+    func testExpiredPresentmentIntentDoesNotBlockReaderDetection() async throws {
         let session = FakeNfcCardSession()
         let environment = FakeNfcEnvironment(session: session)
         let router = FakeNfcRouter(response: Data([0x90, 0x00]))
         let core = IOSCardSessionCore(generation: 1, environment: environment, router: router)
 
         try await core.prepare()
-        environment.invalidateReservation()
+        environment.invalidatePresentmentIntent()
         session.emit(.readerDetected)
 
-        await assertEventually { await router.deactivations == [.platformUnavailable] }
-        XCTAssertEqual(session.startCount, 0)
-        XCTAssertEqual(session.invalidateCount, 1)
+        await assertEventually { session.startCount == 1 }
+        let deactivations = await router.deactivations
+        XCTAssertEqual(deactivations, [])
+        XCTAssertEqual(session.invalidateCount, 0)
+        await core.close(reason: .cancelled)
     }
 
     func testCoordinatorRejectsConcurrentSessionAndReleasesClosedGeneration() async throws {
@@ -355,7 +360,7 @@ final class IOSNfcHostPlatformAdapterTests: XCTestCase {
 
         await first.close(reason: .completed)
         _ = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
-        XCTAssertEqual(environment.reservationCount, 2)
+        XCTAssertEqual(environment.presentmentIntentCount, 2)
         XCTAssertEqual(environment.sessionCount, 2)
     }
 
@@ -376,7 +381,7 @@ private enum TestFailure: Error {
     case failed
 }
 
-private final class FakeNfcReservation: IOSNfcPresentmentReservation, @unchecked Sendable {
+private final class FakeNfcPresentmentIntent: IOSNfcPresentmentIntent, @unchecked Sendable {
     private let lock = NSLock()
     private var valid: Bool
 
@@ -397,10 +402,10 @@ private final class FakeNfcEnvironment: IOSNfcCardSessionEnvironment, @unchecked
     private let supported: Bool
     private let eligible: Bool
     private let session: any IOSNfcCardSession
-    private let reservation: FakeNfcReservation
-    private let reservationFailure: Error?
+    private let presentmentIntent: FakeNfcPresentmentIntent?
+    private let presentmentIntentFailure: Error?
     private let sessionFailure: Error?
-    private var storedReservationCount = 0
+    private var storedPresentmentIntentCount = 0
     private var storedSessionCount = 0
 
     init(
@@ -408,34 +413,34 @@ private final class FakeNfcEnvironment: IOSNfcCardSessionEnvironment, @unchecked
         supported: Bool = true,
         eligible: Bool = true,
         session: any IOSNfcCardSession = FakeNfcCardSession(),
-        reservationValid: Bool = true,
-        reservationFailure: Error? = nil,
+        presentmentIntentAvailable: Bool = true,
+        presentmentIntentFailure: Error? = nil,
         sessionFailure: Error? = nil
     ) {
         self.reading = reading
         self.supported = supported
         self.eligible = eligible
         self.session = session
-        reservation = FakeNfcReservation(valid: reservationValid)
-        self.reservationFailure = reservationFailure
+        presentmentIntent = presentmentIntentAvailable ? FakeNfcPresentmentIntent() : nil
+        self.presentmentIntentFailure = presentmentIntentFailure
         self.sessionFailure = sessionFailure
     }
 
-    var reservationCount: Int { lock.withLock { storedReservationCount } }
+    var presentmentIntentCount: Int { lock.withLock { storedPresentmentIntentCount } }
     var sessionCount: Int { lock.withLock { storedSessionCount } }
 
-    func invalidateReservation() {
-        reservation.invalidate()
+    func invalidatePresentmentIntent() {
+        presentmentIntent?.invalidate()
     }
 
     func readingAvailable() -> Bool { reading }
     func cardSessionSupported() -> Bool { supported }
     func cardSessionEligible() async -> Bool { eligible }
 
-    func reserveContactlessInterface() async throws -> any IOSNfcPresentmentReservation {
-        lock.withLock { storedReservationCount += 1 }
-        if let reservationFailure { throw reservationFailure }
-        return reservation
+    func acquirePresentmentIntent() async throws -> (any IOSNfcPresentmentIntent)? {
+        lock.withLock { storedPresentmentIntentCount += 1 }
+        if let presentmentIntentFailure { throw presentmentIntentFailure }
+        return presentmentIntent
     }
 
     func makeCardSession() async throws -> any IOSNfcCardSession {
