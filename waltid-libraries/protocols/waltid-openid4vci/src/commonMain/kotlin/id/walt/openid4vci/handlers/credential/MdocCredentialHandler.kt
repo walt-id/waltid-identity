@@ -128,7 +128,7 @@ class MdocCredentialHandler : CredentialEndpointHandler {
                 issuerCertificate = issuerCertificateChain,
                 docType = docType,
                 validFrom = validFrom,
-                validUntil = resolveValidUntil(request, validUntil),
+                validUntil = resolveValidUntil(validUntil),
                 expectedUpdate = expectedUpdate,
                 status = credentialStatus,
                 mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
@@ -143,14 +143,7 @@ class MdocCredentialHandler : CredentialEndpointHandler {
         )
     }
 
-    private fun resolveValidUntil(
-        request: CredentialRequest,
-        configuredValidUntil: Instant?,
-    ): Instant =
-        request.requestForm["validUntil"]
-            ?.firstOrNull()
-            ?.toLongOrNull()
-            ?.let(Instant::fromEpochMilliseconds)
-            ?: configuredValidUntil
-            ?: Clock.System.now().plus(365.days)
+    // Issuer/session policy is authoritative; holder requestForm["validUntil"] is ignored.
+    private fun resolveValidUntil(configuredValidUntil: Instant?): Instant =
+        configuredValidUntil ?: Clock.System.now().plus(365.days)
 }

@@ -22,20 +22,25 @@ object MsoValidityResolver {
     suspend fun resolve(
         msoData: MsoData?,
         signed: Instant = Clock.System.now(),
+        fallbackValidUntil: Instant? = null,
     ): ResolvedMsoValidity {
-        val validFrom = resolveInstant(msoData?.validFrom, "validFrom")
-        val validUntil = resolveInstant(msoData?.validUntil, "validUntil")
-            ?: signed.plus(365.days)
-        val expectedUpdate = resolveInstant(msoData?.expectedUpdate, "expectedUpdate")
+        val signedTDate = signed.asTDate()
+        val validFrom = resolveInstant(msoData?.validFrom, "validFrom")?.asTDate()
+        val validUntil = (
+            resolveInstant(msoData?.validUntil, "validUntil")
+                ?: fallbackValidUntil
+                ?: signed.plus(365.days)
+            ).asTDate()
+        val expectedUpdate = resolveInstant(msoData?.expectedUpdate, "expectedUpdate")?.asTDate()
 
-        if (validFrom != null && validFrom < signed) {
+        if (validFrom != null && validFrom < signedTDate) {
             throw IllegalArgumentException("msoData.validFrom cannot be before the MSO signed time")
         }
-        if (validUntil <= (validFrom ?: signed)) {
+        if (validUntil <= (validFrom ?: signedTDate)) {
             throw IllegalArgumentException("msoData.validUntil must be after validFrom")
         }
         if (expectedUpdate != null) {
-            val windowStart = validFrom ?: signed
+            val windowStart = validFrom ?: signedTDate
             if (expectedUpdate < windowStart) {
                 throw IllegalArgumentException("msoData.expectedUpdate cannot be before validFrom")
             }
@@ -50,6 +55,8 @@ object MsoValidityResolver {
             expectedUpdate = expectedUpdate,
         )
     }
+
+    private fun Instant.asTDate(): Instant = Instant.fromEpochSeconds(epochSeconds)
 
     private suspend fun resolveInstant(raw: String?, fieldName: String): Instant? {
         if (raw.isNullOrBlank()) return null

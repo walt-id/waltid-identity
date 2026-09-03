@@ -86,7 +86,11 @@ object MdocIssuer {
                 // ISO 18013-5 MSO tdate fields must not include fractional seconds
                 validUntil = Instant.fromEpochSeconds(validUntil.epochSeconds),
                 expectedUpdate = expectedUpdate?.let { Instant.fromEpochSeconds(it.epochSeconds) },
-            ),
+            ).also { info ->
+                require(info.validUntil > info.validFrom) {
+                    "validUntil must be after validFrom after tdate second-normalization"
+                }
+            },
             status = status
         )
 

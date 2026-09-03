@@ -584,6 +584,7 @@ class OpenId4VciProtocolService(
             selectiveDisclosure = selectiveDisclosure,
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            msoData = msoData,
             x5Chain = x5Chain,
             issuerDid = issuerDid,
             authorizationRequest = authorizationRequest,

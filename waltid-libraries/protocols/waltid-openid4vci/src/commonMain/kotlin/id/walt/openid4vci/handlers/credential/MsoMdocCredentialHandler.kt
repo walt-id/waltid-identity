@@ -87,6 +87,9 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                 holderKey = holderKey,
                 issuerKey = issuerKey,
                 x5Chain = x5Chain,
+                validFrom = validFrom,
+                validUntil = validUntil,
+                expectedUpdate = expectedUpdate,
                 validityDays = 365,
             )
 
@@ -117,7 +120,10 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
      * @param holderKey the holder's public key for device key binding
      * @param issuerKey the issuer's signing key
      * @param x5Chain optional certificate chain for the issuer key
-     * @param validityDays validity period in days
+     * @param validFrom resolved MSO validFrom, or null to use the signed time
+     * @param validUntil resolved MSO validUntil, or null to derive from [validityDays]
+     * @param expectedUpdate resolved MSO expectedUpdate, or null to omit
+     * @param validityDays fallback validity period in days when [validUntil] is null
      * @return base64url-encoded IssuerSigned structure (OID4VCI mso_mdoc response format)
      */
     abstract suspend fun issueMdoc(
@@ -126,6 +132,9 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         holderKey: Key,
         issuerKey: Key,
         x5Chain: List<CertificateDer>?,
-        validityDays: Int,
+        validFrom: Instant? = null,
+        validUntil: Instant? = null,
+        expectedUpdate: Instant? = null,
+        validityDays: Int = 365,
     ): String
 }
