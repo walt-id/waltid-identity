@@ -88,6 +88,7 @@ public enum CredentialDisplayVocabulary {
         ClaimDescriptor("picture", roles: [.image], displayOrder: 72),
         ClaimDescriptor("image", roles: [.image], displayOrder: 73),
         ClaimDescriptor("logo", roles: [.image], displayOrder: 74),
+        ClaimDescriptor("qr_data", label: "QR code", displayOrder: 90),
         ClaimDescriptor(
             "signature_usual_mark",
             label: "Signature or usual mark",

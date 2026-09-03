@@ -205,22 +205,25 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("Street address").performScrollTo().assertIsDisplayed()
         onNodeWithText("Main Street 1").performScrollTo().assertIsDisplayed()
         onNodeWithText("Portrait").performScrollTo().assertIsDisplayed()
-        onNodeWithContentDescription("Credential image").performScrollTo().assertIsDisplayed()
-        onNodeWithText("image/png").performScrollTo().assertIsDisplayed()
-        val portraitPath = "portrait.elementValue"
-        onNodeWithTag(WalletUiTestTags.claimImage(portraitPath))
+        onNodeWithTag(WalletUiTestTags.claimImage("portrait.elementValue"))
+            .performScrollTo()
+            .assertIsDisplayed()
+        onAllNodesWithText("image/png").assertCountEquals(2)
+        onNodeWithText("QR code").performScrollTo().assertIsDisplayed()
+        val qrDataPath = "qr_data"
+        onNodeWithTag(WalletUiTestTags.claimImage(qrDataPath))
             .performScrollTo()
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()
-        onNodeWithTag(WalletUiTestTags.claimImageViewer(portraitPath)).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImageViewer(qrDataPath)).assertIsDisplayed()
         onNodeWithContentDescription("Full-screen credential image").assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claimImageViewerClose(portraitPath))
+        onNodeWithTag(WalletUiTestTags.claimImageViewerClose(qrDataPath))
             .assertIsDisplayed()
             .performClick()
-        onAllNodesWithTag(WalletUiTestTags.claimImageViewer(portraitPath)).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.claimImageViewer(qrDataPath)).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claimImage(portraitPath)).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage(qrDataPath)).assertIsDisplayed()
         onAllNodesWithText("Raw credential data").assertCountEquals(0)
         onNodeWithTag("wallet.detailsBack").performClick()
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
@@ -1252,7 +1255,8 @@ class WalletDemoAppTestScenarios {
                   },
                   "portrait": {
                     "elementValue": [-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]
-                  }
+                  },
+                  "qr_data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
                 }
             """.trimIndent(),
         )

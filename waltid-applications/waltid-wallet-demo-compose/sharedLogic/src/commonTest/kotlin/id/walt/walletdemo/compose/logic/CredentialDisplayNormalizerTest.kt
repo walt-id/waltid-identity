@@ -748,6 +748,25 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun rendersQrDataPngDataUriAsImage() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "vc+sd-jwt",
+                issuer = null,
+                label = "vc+sd-jwt",
+                credentialDataJson = """{"qr_data":"data:image/png;base64,$onePixelPngBase64"}""",
+            )
+        )
+
+        val claim = details.groups.flatMap { it.items }.first { it.path.id == "qr_data" }
+        assertEquals("QR code", claim.label)
+        val image = assertIs<DisplayValue.Image>(claim.value)
+        assertEquals("image/png", image.mimeType)
+        assertTrue(image.bytes.contentEquals(Base64.Default.decode(onePixelPngBase64)))
+    }
+
+    @Test
     fun classifiesPortraitByteArrayDataAsImageAndUsesItForCards() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(

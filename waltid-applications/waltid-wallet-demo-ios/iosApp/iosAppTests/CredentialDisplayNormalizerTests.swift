@@ -674,6 +674,28 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(mimeType, "image/png")
     }
 
+    func testRendersQrDataPNGDataURIAsImage() {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "vc+sd-jwt",
+            issuer: nil,
+            subject: nil,
+            format: "vc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: #"{"qr_data":"data:image/png;base64,\#(Self.onePixelPNGBase64)"}"#
+        )
+
+        let claim = details.groups
+            .flatMap(\.items)
+            .first(where: { $0.path.id == "qr_data" })
+        XCTAssertEqual(claim?.label, "QR code")
+        guard case .image(_, let data, let mimeType, _) = claim?.value else {
+            return XCTFail("Expected qr_data PNG data URI to render as an image")
+        }
+        XCTAssertEqual(mimeType, "image/png")
+        XCTAssertEqual(data, onePixelPNGData)
+    }
+
     func testPresentationCredentialOptionPrependsRequestedDisclosures() throws {
         let option = PresentationCredentialOption(
             queryID: "pid",

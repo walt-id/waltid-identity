@@ -75,6 +75,7 @@ internal object CredentialDisplayVocabulary {
         ClaimDescriptor("picture", roles = setOf(ClaimRole.Image), displayOrder = 72),
         ClaimDescriptor("image", roles = setOf(ClaimRole.Image), displayOrder = 73),
         ClaimDescriptor("logo", roles = setOf(ClaimRole.Image), displayOrder = 74),
+        ClaimDescriptor("qr_data", label = "QR code", displayOrder = 90),
         ClaimDescriptor(
             "signature_usual_mark",
             label = "Signature or usual mark",

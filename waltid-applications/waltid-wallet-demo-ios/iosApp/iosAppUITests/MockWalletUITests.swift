@@ -517,14 +517,15 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(card.isHittable)
         card.tap()
         ui.assertExists(identifier: "wallet.credentialDetailsScreen", timeout: 10)
-        ui.assertExists(identifierPrefix: "wallet.claimImage.", timeout: 10)
-        ui.tapElement(identifierPrefix: "wallet.claimImage.")
+        let qrImageIdentifier = ui.claimImageIdentifier(path: "qr_data")
+        ui.assertExists(identifier: qrImageIdentifier, timeout: 10)
+        ui.tapElement(identifier: qrImageIdentifier)
         ui.assertExists(identifierPrefix: "wallet.claimImageViewer.", timeout: 10)
         XCTAssertTrue(app.images["Full-screen credential image"].waitForExistence(timeout: 10))
         ui.tapElement(identifierPrefix: "wallet.claimImageViewerClose.")
         XCTAssertFalse(app.images["Full-screen credential image"].waitForExistence(timeout: 1))
         ui.assertExists(identifier: "wallet.credentialDetailsScreen", timeout: 10)
-        ui.assertExists(identifierPrefix: "wallet.claimImage.", timeout: 10)
+        ui.assertExists(identifier: qrImageIdentifier, timeout: 10)
     }
 
     func testTabbedReceiveAndPresentFlowUsesMockWallet() {
