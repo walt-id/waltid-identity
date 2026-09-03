@@ -118,7 +118,7 @@ class MdocCredentialValidityTest {
                 dataMapping = null, selectiveDisclosure = null, x5Chain = listOf(certificate),
                 display = null, w3cVersion = null, mDocNameSpacesDataMappingConfig = null,
                 authorizedTransactionDataTypes = null,
-                validFrom = validFrom, validUntil = validUntil,
+                validFrom = validFrom, validUntil = validUntil, expectedUpdate = null,
             )
             val response = assertIs<CredentialResponseResult.Success>(result).response
             val credentials = assertNotNull(response.credentials)
