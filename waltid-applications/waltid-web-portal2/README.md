@@ -94,9 +94,30 @@ NUXT_PUBLIC_WALLET_URL=http://localhost:7101
 NUXT_PUBLIC_VERIFIER_KEY_JWK=
 NUXT_PUBLIC_VERIFIER_X5C=
 NUXT_PUBLIC_VERIFIER_CLIENT_ID=
+NUXT_VERIFIER_PROXY_TARGET=
+
+NUXT_PID_GERMAN_KEY_JWK=
+NUXT_PID_GERMAN_X5C=
+NUXT_PID_GERMAN_CLIENT_ID=
+NUXT_PID_GERMAN_VERIFIER_INFO=
+NUXT_PID_FRANCE_KEY_JWK=
+NUXT_PID_FRANCE_X5C=
+NUXT_PID_FRANCE_CLIENT_ID=
+NUXT_PID_EUDI_REF_KEY_JWK=
+NUXT_PID_EUDI_REF_X5C=
+NUXT_PID_EUDI_REF_CLIENT_ID=
 ```
 
-The optional verifier values pre-populate the advanced verification security section. `NUXT_PUBLIC_VERIFIER_KEY_JWK` accepts the verifier signing key as a raw JWK or as `{ "type": "jwk", "jwk": ... }`, `NUXT_PUBLIC_VERIFIER_X5C` accepts a JSON array, comma-separated list, or newline-separated list of base64 DER certificates, and `NUXT_PUBLIC_VERIFIER_CLIENT_ID` accepts any supported client ID such as `x509_hash:<hash>`, `x509_san_dns:<dns>`, `redirect_uri:<url>`, `decentralized_identifier:<did>`, `verifier_attestation:<value>`, or an unprefixed pre-registered ID.
+The optional `NUXT_PUBLIC_VERIFIER_*` values pre-populate the advanced verification security section. `NUXT_PUBLIC_VERIFIER_KEY_JWK` accepts the verifier signing key as a raw JWK or as `{ "type": "jwk", "jwk": ... }`, `NUXT_PUBLIC_VERIFIER_X5C` accepts a JSON array, comma-separated list, or newline-separated list of base64 DER certificates, and `NUXT_PUBLIC_VERIFIER_CLIENT_ID` accepts any supported client ID such as `x509_hash:<hash>`, `x509_san_dns:<dns>`, `redirect_uri:<url>`, `decentralized_identifier:<did>`, `verifier_attestation:<value>`, or an unprefixed pre-registered ID. Those values stay in the browser and may be posted directly to verifier2.
+
+Simple PID wallet presets do **not** ship keys or certificates to the browser. Portal2 injects them on the server from the `NUXT_PID_*` variables:
+
+- `NUXT_PID_*_KEY_JWK`: raw JWK or `{ "type": "jwk", "jwk": ... }`
+- `NUXT_PID_*_X5C`: JSON array of certificates, or a single certificate
+- `NUXT_PID_*_CLIENT_ID`: wallet-specific client ID
+- `NUXT_PID_GERMAN_VERIFIER_INFO`: JSON array of verifier metadata
+
+Keep those values in local `.env` or a Kubernetes secret. Do not commit live key material. `NUXT_VERIFIER_PROXY_TARGET` is optional; if unset, the PID create route forwards to `NUXT_PUBLIC_VERIFIER_BASE` when that value is an absolute URL.
 
 ### Development
 
