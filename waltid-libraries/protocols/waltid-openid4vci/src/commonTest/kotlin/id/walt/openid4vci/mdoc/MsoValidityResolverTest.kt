@@ -9,6 +9,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 class MsoValidityResolverTest {
 
@@ -118,5 +119,46 @@ class MsoValidityResolverTest {
                 signed,
             )
         }
+    }
+
+    @Test
+    fun `rejects sub-second window that collapses to equal tdates`() = runTest {
+        val signed = Instant.parse("2026-09-03T12:00:00Z")
+        assertFailsWith<IllegalArgumentException> {
+            MsoValidityResolver.resolve(
+                MsoData(
+                    validFrom = "2026-09-03T12:00:00.100Z",
+                    validUntil = "2026-09-03T12:00:00.900Z",
+                ),
+                signed,
+            )
+        }
+    }
+
+    @Test
+    fun `uses fallback validUntil when msoData omits it`() = runTest {
+        val signed = Instant.parse("2026-09-03T12:00:00Z")
+        val fallback = Instant.parse("2026-12-01T00:00:00Z")
+        val resolved = MsoValidityResolver.resolve(
+            msoData = null,
+            signed = signed,
+            fallbackValidUntil = fallback,
+        )
+
+        assertEquals(fallback.epochSeconds, resolved.validUntil.epochSeconds)
+    }
+
+    @Test
+    fun `explicit msoData validUntil wins over fallback`() = runTest {
+        val signed = Instant.parse("2026-09-03T12:00:00Z")
+        val fallback = Instant.parse("2026-12-01T00:00:00Z")
+        val explicit = Instant.parse("2027-09-03T12:00:00Z")
+        val resolved = MsoValidityResolver.resolve(
+            msoData = MsoData(validUntil = explicit.toString()),
+            signed = signed,
+            fallbackValidUntil = fallback,
+        )
+
+        assertEquals(explicit.epochSeconds, resolved.validUntil.epochSeconds)
     }
 }

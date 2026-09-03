@@ -173,15 +173,11 @@ class MdocCredentialHandler(
         }
         val issuerCertificateChain = certificates.map { CoseCertificate(it.encodedDer.toByteArray()) }
 
-        val requestedValidUntil = request.requestForm["validUntil"]
-            ?.firstOrNull()
-            ?.toLongOrNull()
-            ?.let(Instant::fromEpochMilliseconds)
-            ?: validUntil
+        // Issuer/session policy is authoritative; holder requestForm["validUntil"] is ignored.
         val roundedValidity = if (roundValidityToTwelveHours) {
-            roundedMdocValidity(now(), certificates.first().data.validity, validFrom, requestedValidUntil)
+            roundedMdocValidity(now(), certificates.first().data.validity, validFrom, validUntil)
         } else null
-        val effectiveValidUntil = roundedValidity?.validUntil ?: requestedValidUntil ?: now().plus(365.days)
+        val effectiveValidUntil = roundedValidity?.validUntil ?: resolveValidUntil(validUntil)
         return issuanceBatch.signEach { instance ->
             val credentialData = instance.input.credentialData
             val namespaceIdentifiers = credentialData.keys
@@ -205,4 +201,6 @@ class MdocCredentialHandler(
         }
     }
 
+    private fun resolveValidUntil(configuredValidUntil: Instant?): Instant =
+        configuredValidUntil ?: Clock.System.now().plus(365.days)
 }
