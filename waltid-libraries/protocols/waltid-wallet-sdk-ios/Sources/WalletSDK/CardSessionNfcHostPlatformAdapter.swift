@@ -20,9 +20,7 @@ enum IOSNfcEmulationStatus: Sendable, Equatable {
     case failure
 }
 
-protocol IOSNfcPresentmentReservation: Sendable {
-    var isValid: Bool { get }
-}
+protocol IOSNfcPresentmentIntent: Sendable {}
 
 protocol IOSNfcCardSessionAPDU: Sendable {
     var payload: Data { get }
@@ -50,7 +48,7 @@ protocol IOSNfcCardSessionEnvironment: Sendable {
     func readingAvailable() -> Bool
     func cardSessionSupported() -> Bool
     func cardSessionEligible() async -> Bool
-    func reserveContactlessInterface() async throws -> any IOSNfcPresentmentReservation
+    func acquirePresentmentIntent() async throws -> (any IOSNfcPresentmentIntent)?
     func makeCardSession() async throws -> any IOSNfcCardSession
 }
 
@@ -351,7 +349,6 @@ private extension IOSNfcHostBridgeCloseReason {
 
 enum CardSessionNfcHostError: LocalizedError, Sendable, Equatable {
     case sessionAlreadyActive
-    case couldNotReserveContactlessInterface
     case accessNotAccepted
     case radioDisabled
     case systemIneligible
@@ -379,8 +376,6 @@ enum CardSessionNfcHostError: LocalizedError, Sendable, Equatable {
         switch self {
         case .sessionAlreadyActive:
             return "nfc_session_already_active"
-        case .couldNotReserveContactlessInterface:
-            return "nfc_contactless_reservation_failed"
         case .accessNotAccepted:
             return "nfc_access_not_accepted"
         case .radioDisabled:
@@ -396,8 +391,6 @@ enum CardSessionNfcHostError: LocalizedError, Sendable, Equatable {
         switch self {
         case .sessionAlreadyActive:
             return "An NFC card presentation is already active"
-        case .couldNotReserveContactlessInterface:
-            return "The contactless interface could not be reserved"
         case .accessNotAccepted:
             return "NFC card presentation access has not been accepted"
         case .radioDisabled:
@@ -484,7 +477,7 @@ actor IOSCardSessionCore {
     private let environment: any IOSNfcCardSessionEnvironment
     private let router: any IOSNfcHostApduRouting
     private let onClose: @Sendable (UInt64) async -> Void
-    private var reservation: (any IOSNfcPresentmentReservation)?
+    private var presentmentIntent: (any IOSNfcPresentmentIntent)?
     private var cardSession: (any IOSNfcCardSession)?
     private var eventTask: Task<Void, Never>?
     private var apduTask: Task<Void, Never>?
@@ -508,22 +501,21 @@ actor IOSCardSessionCore {
         guard !closed, cardSession == nil else {
             throw CardSessionNfcHostError.sessionAlreadyActive
         }
+        // Apple documents the presentment-intent assertion as an optional, 15-second suppression
+        // of the default contactless app. Hold it when acquisition succeeds, but do not make
+        // CardSession availability depend on it and do not renew it without a fresh user action.
         do {
-            reservation = try await environment.reserveContactlessInterface()
-        } catch let failure as IOSNfcCardSessionFailure {
-            throw failure
+            presentmentIntent = try await environment.acquirePresentmentIntent()
+        } catch let error as CancellationError {
+            throw error
         } catch {
-            throw CardSessionNfcHostError.couldNotReserveContactlessInterface
-        }
-        guard reservation?.isValid == true else {
-            reservation = nil
-            throw CardSessionNfcHostError.systemUnavailable
+            presentmentIntent = nil
         }
 
         do {
             cardSession = try await environment.makeCardSession()
         } catch {
-            reservation = nil
+            presentmentIntent = nil
             throw error
         }
 
@@ -546,17 +538,9 @@ actor IOSCardSessionCore {
                 case .sessionStarted:
                     cardSession.setAlertMessage(String(localized: "Ready to present credential"))
                 case .readerDetected:
-                    guard reservation?.isValid == true else {
-                        await finish(reason: .platformUnavailable, emulationStatus: .failure, invalidate: true)
-                        return
-                    }
                     try await cardSession.startEmulation()
                     cardSession.setAlertMessage(String(localized: "Presenting credential to nearby reader"))
                 case let .received(apdu):
-                    guard reservation?.isValid == true else {
-                        await finish(reason: .platformUnavailable, emulationStatus: .failure, invalidate: true)
-                        return
-                    }
                     if !startProcessing(apdu: apdu) {
                         await respondIgnoringFailure(Self.conditionsNotSatisfied, to: apdu)
                     }
@@ -663,7 +647,7 @@ actor IOSCardSessionCore {
             }
         }
         cardSession = nil
-        reservation = nil
+        presentmentIntent = nil
         await onClose(generation)
     }
 
@@ -719,14 +703,13 @@ actor IOSCardSessionCore {
 }
 
 @available(iOS 17.4, *)
-private final class CoreNfcPresentmentReservation: IOSNfcPresentmentReservation, @unchecked Sendable {
+private final class CoreNfcPresentmentIntent: IOSNfcPresentmentIntent, @unchecked Sendable {
     let assertion: NFCPresentmentIntentAssertion
 
     init(assertion: NFCPresentmentIntentAssertion) {
         self.assertion = assertion
     }
 
-    var isValid: Bool { assertion.isValid }
 }
 
 private final class CoreNfcCardSessionEnvironment: IOSNfcCardSessionEnvironment, @unchecked Sendable {
@@ -744,19 +727,11 @@ private final class CoreNfcCardSessionEnvironment: IOSNfcCardSessionEnvironment,
         return await CardSession.isEligible
     }
 
-    func reserveContactlessInterface() async throws -> any IOSNfcPresentmentReservation {
-        guard #available(iOS 17.4, *) else {
-            throw IOSNfcCardSessionFailure.systemUnavailable
-        }
-        do {
-            return CoreNfcPresentmentReservation(
-                assertion: try await NFCPresentmentIntentAssertion.acquire()
-            )
-        } catch NFCPresentmentIntentAssertion.Error.systemEligibilityFailed {
-            throw IOSNfcCardSessionFailure.systemIneligible
-        } catch {
-            throw IOSNfcCardSessionFailure.systemUnavailable
-        }
+    func acquirePresentmentIntent() async throws -> (any IOSNfcPresentmentIntent)? {
+        guard #available(iOS 17.4, *) else { return nil }
+        return CoreNfcPresentmentIntent(
+            assertion: try await NFCPresentmentIntentAssertion.acquire()
+        )
     }
 
     func makeCardSession() async throws -> any IOSNfcCardSession {
