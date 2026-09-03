@@ -1460,6 +1460,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             authorizedTransactionDataTypes = authorizedTransactionDataTypes,
+            msoData = msoData,
             x5Chain = x5Chain,
             issuerDid = issuerDid,
             authorizationRequest = authorizationRequest,

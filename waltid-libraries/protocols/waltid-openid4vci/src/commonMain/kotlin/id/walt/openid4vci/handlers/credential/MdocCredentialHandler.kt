@@ -189,7 +189,8 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         }.map { CoseCertificate(it.encodedDer.toByteArray()) }
 
         // Issues one credential per verified proof, or a single credential bound to the request proof.
-        val effectiveValidUntil = resolveValidUntil(request, validUntil)
+        // Issuer/session policy is authoritative; holder requestForm["validUntil"] is ignored.
+        val effectiveValidUntil = resolveValidUntil(validUntil)
         val issuedCredentials = verifiedProofs.ifEmpty { listOf(null) }.map { verifiedProof ->
             issue(issuerCertificateChain, docType, effectiveValidUntil, verifiedProof)
         }
@@ -201,15 +202,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         )
     }
 
-    private fun resolveValidUntil(
-        request: CredentialRequest,
-        configuredValidUntil: Instant?,
-    ): Instant =
-        request.requestForm["validUntil"]
-            ?.firstOrNull()
-            ?.toLongOrNull()
-            ?.let(Instant::fromEpochMilliseconds)
-            ?: configuredValidUntil
-            ?: Clock.System.now().plus(365.days)
+    private fun resolveValidUntil(configuredValidUntil: Instant?): Instant =
+        configuredValidUntil ?: Clock.System.now().plus(365.days)
 
 }
