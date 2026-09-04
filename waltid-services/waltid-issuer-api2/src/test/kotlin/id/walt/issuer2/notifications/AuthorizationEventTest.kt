@@ -7,6 +7,7 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialProfileService
@@ -417,12 +418,17 @@ class AuthorizationEventTest {
         idTokenClaimsMapping: Map<String, String>? = null,
     ) = IssuanceSession(
         sessionId = sessionId,
-        profileId = "test-profile",
         authenticationMethod = AuthenticationMethod.AUTHORIZED,
-        credentialConfigurationId = "identity_credential",
-        issuerKey = JsonObject(emptyMap()),
-        credentialData = buildJsonObject { },
-        idTokenClaimsMapping = idTokenClaimsMapping,
+        issuanceRequests = listOf(
+            IssuanceRequest(
+                credentialIdentifier = "credential",
+                profileId = "test-profile",
+                credentialConfigurationId = "identity_credential",
+                issuerKey = JsonObject(emptyMap()),
+                credentialData = buildJsonObject { },
+                idTokenClaimsMapping = idTokenClaimsMapping,
+            )
+        ),
         expiresAt = Clock.System.now() + 1.hours,
         externalAuthorizationState = externalState,
         authorizationRequest = mapOf(

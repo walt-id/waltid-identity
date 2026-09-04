@@ -205,8 +205,9 @@ class Issuer2CredentialOfferEndpointTest {
         // read from this later instead of re-reading mutable profile config.
         val session = client.getSession(response.offerId)
         assertEquals(response.offerId, session.sessionId)
-        assertEquals(profile.profileId, session.profileId)
-        assertEquals(profile.credentialConfigurationId, session.credentialConfigurationId)
+        val issuanceRequest = session.issuanceRequests.single()
+        assertEquals(profile.profileId, issuanceRequest.profileId)
+        assertEquals(profile.credentialConfigurationId, issuanceRequest.credentialConfigurationId)
         assertEquals(AuthenticationMethod.PRE_AUTHORIZED, session.authenticationMethod)
         assertEquals(IssuanceSessionStatus.ACTIVE, session.status)
         assertEquals(response.expiresAt, session.expiresAt.toEpochMilliseconds())
@@ -258,15 +259,16 @@ class Issuer2CredentialOfferEndpointTest {
         // Runtime overrides are offer-scoped; they must be copied into the stored session
         // without changing the configured profile.
         val session = client.getSession(response.offerId)
-        assertEquals("did:example:issuer-override", session.issuerDid)
-        assertEquals(issuerKeyOverride, session.issuerKey)
-        assertEquals("Jane", session.credentialData["given_name"]?.jsonPrimitive?.content)
-        assertEquals("<timestamp>", session.mapping?.get("iat")?.jsonPrimitive?.content)
-        val sessionSelectiveDisclosure = assertNotNull(session.selectiveDisclosure)
+        val issuanceRequest = session.issuanceRequests.single()
+        assertEquals("did:example:issuer-override", issuanceRequest.issuerDid)
+        assertEquals(issuerKeyOverride, issuanceRequest.issuerKey)
+        assertEquals("Jane", issuanceRequest.credentialData["given_name"]?.jsonPrimitive?.content)
+        assertEquals("<timestamp>", issuanceRequest.mapping?.get("iat")?.jsonPrimitive?.content)
+        val sessionSelectiveDisclosure = assertNotNull(issuanceRequest.selectiveDisclosure)
         assertNotNull(sessionSelectiveDisclosure["given_name"])
         assertNotNull(sessionSelectiveDisclosure["family_name"])
-        assertEquals("$.given_name", session.idTokenClaimsMapping?.get("$.given_name"))
-        assertEquals(listOf("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"), session.x5Chain)
+        assertEquals("$.given_name", issuanceRequest.idTokenClaimsMapping?.get("$.given_name"))
+        assertEquals(listOf("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"), issuanceRequest.x5Chain)
         assertEquals("https://issuer.example/webhooks/issuer2", session.notifications?.webhook?.url)
 
         val unchangedProfile = client.getProfile(profile.profileId)
@@ -303,7 +305,10 @@ class Issuer2CredentialOfferEndpointTest {
         )
 
         val session = client.getSession(response.offerId)
-        assertEquals(listOf(SCA_PAYMENT_TRANSACTION_DATA_TYPE), session.authorizedTransactionDataTypes)
+        assertEquals(
+            listOf(SCA_PAYMENT_TRANSACTION_DATA_TYPE),
+            session.issuanceRequests.single().authorizedTransactionDataTypes,
+        )
         assertNull(client.getProfile(profile.profileId).authorizedTransactionDataTypes)
     }
 
@@ -332,12 +337,13 @@ class Issuer2CredentialOfferEndpointTest {
         // credentialData runtime overrides patch the configured profile data. This lets an
         // issuer change one claim for a session without sending a full credential payload.
         val session = client.getSession(response.offerId)
-        assertEquals("Alice", session.credentialData["given_name"]?.jsonPrimitive?.content)
-        assertEquals(profile.credentialData["family_name"], session.credentialData["family_name"])
-        assertEquals(profile.credentialData["email"], session.credentialData["email"])
+        val issuanceRequest = session.issuanceRequests.single()
+        assertEquals("Alice", issuanceRequest.credentialData["given_name"]?.jsonPrimitive?.content)
+        assertEquals(profile.credentialData["family_name"], issuanceRequest.credentialData["family_name"])
+        assertEquals(profile.credentialData["email"], issuanceRequest.credentialData["email"])
 
         val configuredAddress = assertNotNull(profile.credentialData["address"]?.jsonObject)
-        val sessionAddress = assertNotNull(session.credentialData["address"]?.jsonObject)
+        val sessionAddress = assertNotNull(issuanceRequest.credentialData["address"]?.jsonObject)
         assertEquals("Override City", sessionAddress["locality"]?.jsonPrimitive?.content)
         assertEquals(configuredAddress["street_address"], sessionAddress["street_address"])
         assertEquals(configuredAddress["region"], sessionAddress["region"])
@@ -358,11 +364,11 @@ class Issuer2CredentialOfferEndpointTest {
         // is configured before the credential is encoded as CBOR.
         val session = client.getSession(response.offerId)
         val commonNamespace = assertNotNull(
-            session.credentialData[ISO_PHOTO_ID_COMMON_NAMESPACE_ID]?.jsonObject,
+            session.issuanceRequests.single().credentialData[ISO_PHOTO_ID_COMMON_NAMESPACE_ID]?.jsonObject,
             "Expected Photo ID common namespace override data",
         )
         val photoIdNamespace = assertNotNull(
-            session.credentialData[ISO_PHOTO_ID_CONFIGURATION_ID]?.jsonObject,
+            session.issuanceRequests.single().credentialData[ISO_PHOTO_ID_CONFIGURATION_ID]?.jsonObject,
             "Expected Photo ID extension namespace override data",
         )
 
@@ -379,7 +385,7 @@ class Issuer2CredentialOfferEndpointTest {
         assertEquals("654321", photoIdNamespace["administrative_number"]?.jsonPrimitive?.content)
 
         val commonNamespaceMapping = assertNotNull(
-            session.mDocNameSpacesDataMappingConfig
+            session.issuanceRequests.single().mDocNameSpacesDataMappingConfig
                 ?.get(ISO_PHOTO_ID_COMMON_NAMESPACE_ID)
                 ?.entriesConfigMap,
             "Expected Photo ID common namespace mDOC mapping",
@@ -592,10 +598,11 @@ class Issuer2CredentialOfferEndpointTest {
         )
 
         val session = client.get("/issuer2/sessions/${response.offerId}").body<IssuanceSession>()
-        assertEquals("Jane", session.credentialData["credentialSubject"]?.jsonObject?.get("givenName")?.jsonPrimitive?.content)
-        assertEquals("did:example:holder", session.credentialData["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.content)
+        val issuanceRequest = session.issuanceRequests.single()
+        assertEquals("Jane", issuanceRequest.credentialData["credentialSubject"]?.jsonObject?.get("givenName")?.jsonPrimitive?.content)
+        assertEquals("did:example:holder", issuanceRequest.credentialData["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.content)
         assertEquals("https://issuer.example/webhooks/issuance", session.notifications?.webhook?.url)
-        assertNotNull(session.selectiveDisclosure?.get("credentialSubject"))
+        assertNotNull(issuanceRequest.selectiveDisclosure?.get("credentialSubject"))
     }
 
     private suspend fun assertConfiguredProfileCanCreateOffer(
@@ -617,8 +624,8 @@ class Issuer2CredentialOfferEndpointTest {
         assertNotNull(offer.grants?.preAuthorizedCode?.preAuthorizedCode)
 
         val session = client.getSession(response.offerId)
-        assertEquals(profile.profileId, session.profileId)
-        assertEquals(profile.credentialConfigurationId, session.credentialConfigurationId)
+        assertEquals(profile.profileId, session.issuanceRequests.single().profileId)
+        assertEquals(profile.credentialConfigurationId, session.issuanceRequests.single().credentialConfigurationId)
     }
 
     private suspend fun assertConfiguredOfferMode(

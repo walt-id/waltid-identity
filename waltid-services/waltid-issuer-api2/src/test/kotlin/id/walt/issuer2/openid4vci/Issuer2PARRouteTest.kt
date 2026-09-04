@@ -7,6 +7,7 @@ import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.controller.OpenId4VciController
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
@@ -523,11 +524,16 @@ class Issuer2PARRouteTest {
 
     private fun authorizedSession(sessionId: String) = IssuanceSession(
         sessionId = sessionId,
-        profileId = "identity-profile",
         authenticationMethod = AuthenticationMethod.AUTHORIZED,
-        credentialConfigurationId = "identity_credential",
-        issuerKey = buildJsonObject { put("type", "jwk") },
-        credentialData = buildJsonObject {},
+        issuanceRequests = listOf(
+            IssuanceRequest(
+                credentialIdentifier = "credential",
+                profileId = "identity-profile",
+                credentialConfigurationId = "identity_credential",
+                issuerKey = buildJsonObject { put("type", "jwk") },
+                credentialData = buildJsonObject {},
+            )
+        ),
         expiresAt = Instant.DISTANT_FUTURE,
     )
 

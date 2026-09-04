@@ -68,6 +68,20 @@ class Issuer2ServiceConfigTest {
     }
 
     @Test
+    fun `service config decodes batch credential issuance`() {
+        val config = loadServiceConfig(
+            """
+                baseUrl = "http://localhost:7002"
+                batchCredentialIssuance {
+                    batchSize = 4
+                }
+            """.trimIndent(),
+        )
+
+        assertEquals(4, config.batchCredentialIssuance?.batchSize)
+    }
+
+    @Test
     fun `startup loads preferred token StoredKey without rewriting config`() = kotlinx.coroutines.test.runTest {
         val legacyKey = JWKKey.generate(KeyType.secp256r1)
         val storedKey = V1KeyMigration().migrate(

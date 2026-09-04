@@ -63,6 +63,16 @@ The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Upd
 
 `ciTokenStoredKey` optionally carries an encoded crypto2 `StoredKey` sidecar for `ciTokenKey` and takes precedence at startup. The service validates that both values identify the same signing and verification key. If the sidecar is absent, a legacy JWK is migrated only in memory; the configuration file is never rewritten. A malformed or mismatched sidecar fails startup without falling back to `ciTokenKey`.
 
+Batch credential issuance is opt-in. Configure and advertise the maximum accepted proof count in `issuer-service.conf`:
+
+```hocon
+batchCredentialIssuance {
+  batchSize = 10
+}
+```
+
+The initial OSS implementation issues the same credential configuration and dataset once for each holder proof. Holder keys may repeat; using distinct cryptographic data is recommended by OpenID4VCI, not required. Sessions containing one preconfigured credential-status entry remain single-issuance only because every batched credential requires its own status entry.
+
 ## API Endpoints
 
 ### Management API

@@ -13,6 +13,7 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationMethodConfig
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
+import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -62,6 +63,15 @@ class Issuer2MetadataServiceTest {
         ).getCredentialIssuerMetadata()
 
         assertCredentialEncryptionMetadata(metadata)
+    }
+
+    @Test
+    fun `credential issuer metadata advertises configured batch size`() {
+        val metadata = metadataService(
+            batchCredentialIssuance = BatchCredentialIssuance(batchSize = 5),
+        ).getCredentialIssuerMetadata()
+
+        assertEquals(5, metadata.batchCredentialIssuance?.batchSize)
     }
 
     @Test
@@ -162,6 +172,7 @@ class Issuer2MetadataServiceTest {
         clientAuthenticationConfig: ClientAuthenticationConfig? = null,
         preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
         credentialEncryptionKey: String? = null,
+        batchCredentialIssuance: BatchCredentialIssuance? = null,
     ): MetadataService {
         val metadataConfig = Issuer2MetadataConfig()
         val serviceConfig = Issuer2ServiceConfig(
@@ -169,6 +180,7 @@ class Issuer2MetadataServiceTest {
             credentialEncryptionKey = credentialEncryptionKey,
             enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
             clientAuthenticationConfig = clientAuthenticationConfig,
+            batchCredentialIssuance = batchCredentialIssuance,
         )
         return MetadataService(
             serviceConfig = serviceConfig,

@@ -77,6 +77,7 @@ class Issuer2WalletFlowDriver(
     suspend fun exchangePreAuthorizedCode(
         resolvedOffer: ResolvedCredentialOffer,
         txCode: String?,
+        additionalParameters: Map<String, String> = emptyMap(),
     ): TokenRequestBuilder.TokenResponse {
         val preAuthorizedCode = requireNotNull(resolvedOffer.offer.grants?.preAuthorizedCode?.preAuthorizedCode)
         val attestationHeaders = buildAttestationHeaders(resolvedOffer)
@@ -84,6 +85,7 @@ class Issuer2WalletFlowDriver(
             tokenEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint),
             preAuthorizedCode = preAuthorizedCode,
             txCode = txCode,
+            additionalParameters = additionalParameters,
             attestationHeaders = attestationHeaders,
             anonymous = attestationHeaders == null &&
                 resolvedOffer.authorizationServerMetadata.preAuthorizedGrantAnonymousAccessSupported == true,
@@ -244,6 +246,7 @@ class Issuer2WalletFlowDriver(
         resolvedOffer: ResolvedCredentialOffer,
         accessToken: String,
         credentialConfigurationId: String = resolvedOffer.offer.credentialConfigurationIds.single(),
+        credentialIdentifier: String? = null,
         includeDidInProof: Boolean? = null,
     ): JsonObject {
         val proofs = buildJwtProofs(
@@ -255,10 +258,12 @@ class Issuer2WalletFlowDriver(
             bearerAuth(accessToken)
             contentType(ContentType.Application.Json)
             setBody(
-                credentialRequest(
+                credentialIdentifier?.let { identifier ->
+                    credentialRequestByIdentifier(identifier, proofs)
+                } ?: credentialRequest(
                     credentialConfigurationId = credentialConfigurationId,
                     proofs = proofs,
-                )
+                ),
             )
         }
         assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())

@@ -2,6 +2,7 @@ package id.walt.openid4vci.proofs
 
 import id.walt.crypto2.keys.Key
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import kotlinx.serialization.json.JsonObject
@@ -19,6 +20,7 @@ data class CredentialProofValidationContext(
     val clientId: String? = null,
     val anonymousPreAuthorizedAccess: Boolean = false,
     val nonceValidation: CredentialNonceValidationContext? = null,
+    val batchCredentialIssuance: BatchCredentialIssuance? = null,
 ) {
     init {
         require(credentialIssuer.isNotBlank()) { "credentialIssuer must not be blank" }

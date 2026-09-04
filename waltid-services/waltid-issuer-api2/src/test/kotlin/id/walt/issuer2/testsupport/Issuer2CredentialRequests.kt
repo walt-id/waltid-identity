@@ -12,3 +12,11 @@ fun credentialRequest(
     put("credential_configuration_id", credentialConfigurationId)
     put("proofs", issuer2TestJson.encodeToJsonElement(Proofs.serializer(), proofs))
 }
+
+fun credentialRequestByIdentifier(
+    credentialIdentifier: String,
+    proofs: Proofs,
+): JsonObject = buildJsonObject {
+    put("credential_identifier", credentialIdentifier)
+    put("proofs", issuer2TestJson.encodeToJsonElement(Proofs.serializer(), proofs))
+}
