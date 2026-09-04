@@ -6,6 +6,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.repository.IssuanceSessionCrypto2Keys
 import id.walt.openid4vci.offers.AuthenticationMethod
 import kotlinx.coroutines.test.runTest
