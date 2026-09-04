@@ -16,7 +16,6 @@ import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.sdjwt.SDMap
-import id.walt.mdoc.objects.mso.Status
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 
