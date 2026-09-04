@@ -88,6 +88,41 @@ public enum CredentialDisplayVocabulary {
         ClaimDescriptor("picture", roles: [.image], displayOrder: 72),
         ClaimDescriptor("image", roles: [.image], displayOrder: 73),
         ClaimDescriptor("logo", roles: [.image], displayOrder: 74),
+        ClaimDescriptor(
+            "signature_usual_mark",
+            label: "Signature or usual mark",
+            group: .personal,
+            roles: [.image],
+            displayOrder: 75
+        ),
+        ClaimDescriptor(
+            "biometric_template_face",
+            label: "Biometric template face",
+            group: .personal,
+            roles: [.image],
+            displayOrder: 76
+        ),
+        ClaimDescriptor(
+            "biometric_template_finger",
+            label: "Biometric template finger",
+            group: .personal,
+            roles: [.image],
+            displayOrder: 77
+        ),
+        ClaimDescriptor(
+            "biometric_template_signature_sign",
+            label: "Biometric template signature or sign",
+            group: .personal,
+            roles: [.image],
+            displayOrder: 78
+        ),
+        ClaimDescriptor(
+            "biometric_template_iris",
+            label: "Biometric template iris",
+            group: .personal,
+            roles: [.image],
+            displayOrder: 79
+        ),
         ClaimDescriptor("age", group: .personal, displayOrder: 80),
         ClaimDescriptor("age_over_18", label: "Age over 18", group: .personal, displayOrder: 81),
         ClaimDescriptor("resident_address", label: "Resident address", group: .address, displayOrder: 100),

@@ -2,10 +2,8 @@ package id.walt.verifier2
 
 import id.walt.commons.config.WaltConfig
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
-@Serializable
 data class OSSVerifier2ServiceConfig(
     /** When omitted, unsigned cross-device sessions use `redirect_uri:<response_uri>`. Signed requests require an explicit value. */
     val clientId: String? = null,
