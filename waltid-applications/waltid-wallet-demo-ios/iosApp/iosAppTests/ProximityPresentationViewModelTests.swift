@@ -1,13 +1,69 @@
 import Foundation
+import SwiftUI
 import XCTest
 import WalletDemoSharingUI
 import ZXingCpp
 @testable import iosApp
+import WalletDemoIdentityDocumentSupport
 @testable import WalletSDK
 
 final class ProximityPresentationViewModelTests: XCTestCase {
+    func testLifecyclePolicyPreservesTransientInactiveStateAndInterruptsOnBackground() {
+        XCTAssertFalse(ProximityPresentationLifecyclePolicy.shouldInterrupt(for: .active))
+        XCTAssertFalse(ProximityPresentationLifecyclePolicy.shouldInterrupt(for: .inactive))
+        XCTAssertTrue(ProximityPresentationLifecyclePolicy.shouldInterrupt(for: .background))
+    }
+
     @MainActor
-    func testStartObservesSessionAndLifecycleCancelsActiveExchange() async throws {
+    func testStartPreflightsAndRequestsBluetoothBeforeCreatingSession() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(
+            session: session,
+            capabilityResults: [
+                makeProximityCapabilities(
+                    bluetoothAvailable: false,
+                    bluetoothRemediation: [.requestBluetoothPermission]
+                ),
+                makeProximityCapabilities(),
+            ]
+        )
+        let hostActions = FakeProximityHostActionExecutor()
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: hostActions)
+
+        viewModel.start()
+        try await waitUntil {
+            client.capabilityCallCount == 2 && client.startCount == 1
+        }
+
+        XCTAssertEqual(hostActions.actions, [.requestBluetoothPermission])
+        XCTAssertEqual(client.startCount, 1)
+    }
+
+    @MainActor
+    func testStartDoesNotAdvertiseBLEWhileItsPermissionIsDenied() async throws {
+        let session = FakeProximitySession()
+        let capabilities = makeProximityCapabilities(
+            bluetoothAvailable: false,
+            bluetoothRemediation: [.openApplicationSettings]
+        )
+        let client = FakeProximityWalletClient(
+            session: session,
+            capabilityResults: [capabilities]
+        )
+        let viewModel = ProximityPresentationViewModel(
+            client: client,
+            hostActions: FakeProximityHostActionExecutor()
+        )
+
+        viewModel.start()
+        try await waitUntil { client.capabilityCallCount == 1 }
+
+        XCTAssertEqual(client.startCount, 0)
+        XCTAssertEqual(viewModel.sessionState, .checkingPrerequisites(capabilities))
+    }
+
+    @MainActor
+    func testNfcSystemPresentationBackgroundDoesNotCancelActiveExchange() async throws {
         let session = FakeProximitySession()
         let client = FakeProximityWalletClient(session: session)
         let viewModel = ProximityPresentationViewModel(
@@ -21,7 +77,39 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         try await waitUntil { viewModel.qrPayload == "mdoc:device-engagement" }
 
         XCTAssertEqual(client.startCount, 1)
+        let configuration = try XCTUnwrap(client.lastConfiguration)
+        guard case .qrAndNFC(.negotiatedHandover) = configuration.engagement else {
+            return XCTFail("The demo must prepare QR and NFC Negotiated Handover")
+        }
+        guard case let .conventional(retrieval) = configuration.retrieval,
+              retrieval.bluetoothLowEnergy != nil,
+              retrieval.nfc != nil else {
+            return XCTFail("The demo must prepare BLE and conventional NFC retrieval")
+        }
         XCTAssertTrue(viewModel.active)
+
+        viewModel.handleLifecycleInterruption()
+        let actions = await session.actions
+        XCTAssertEqual(actions, [])
+
+        viewModel.dismiss()
+        try await waitUntilAsync { await session.closeCount == 1 }
+    }
+
+    @MainActor
+    func testQrOnlyLifecycleBackgroundCancelsActiveExchange() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let viewModel = ProximityPresentationViewModel(
+            client: client,
+            configurationProvider: { ProximityPresentationConfiguration() },
+            hostActions: FakeProximityHostActionExecutor()
+        )
+
+        viewModel.start()
+        await session.emit(.preparing(profile: .iso180135Edition2DIS2026))
+        await session.emit(.engagementReady([.qr(payload: "mdoc:device-engagement")]))
+        try await waitUntil { viewModel.qrPayload == "mdoc:device-engagement" }
 
         viewModel.handleLifecycleInterruption()
         try await waitUntilAsync { await session.actions == [.cancel] }
@@ -171,6 +259,129 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         XCTAssertEqual(resolutionCount, 2)
         XCTAssertEqual(client.configurations.last?.readerPolicy, .requireTrusted)
     }
+
+    @MainActor
+    func testConfigurationProviderCombinesTransportAndReaderSettings() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        var profile = WalletDemoProximityTransportProfile.provisionalNfcV2Direct
+        var policy = ProximityStoredReaderPolicy.requireTrusted
+        let viewModel = ProximityPresentationViewModel(
+            client: client,
+            configurationProvider: {
+                ProximityReaderTrustSettings(readerPolicy: policy).applying(
+                    to: profile.configuration
+                )
+            },
+            hostActions: FakeProximityHostActionExecutor()
+        )
+
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        let first = try XCTUnwrap(client.lastConfiguration)
+        guard case .nfcOnly(.provisionalV2) = first.engagement else {
+            return XCTFail("The selected transport profile must be preserved")
+        }
+        XCTAssertEqual(first.readerPolicy, .requireTrusted)
+
+        profile = .defaultProfile
+        policy = .allowAnonymousOrUntrusted
+        XCTAssertEqual(client.configurations.count, 1)
+
+        viewModel.dismiss()
+        try await waitUntilAsync { await session.closeCount == 1 }
+        viewModel.start()
+        try await waitUntil { client.startCount == 2 }
+        let second = try XCTUnwrap(client.lastConfiguration)
+        guard case .qrAndNFC(.negotiatedHandover) = second.engagement else {
+            return XCTFail("The next session must use the newly selected transport profile")
+        }
+        XCTAssertEqual(second.readerPolicy, .allowAnonymousOrUntrusted)
+    }
+
+    func testNativeProfilesResolveToTheSameTransportConfigurationsAsCompose() throws {
+        let defaultConfiguration = WalletDemoProximityTransportProfile.defaultProfile.configuration
+        guard case .qrAndNFC(.negotiatedHandover) = defaultConfiguration.engagement,
+              case let .conventional(defaultRetrieval) = defaultConfiguration.retrieval else {
+            return XCTFail("The default profile must use negotiated QR/NFC engagement")
+        }
+        XCTAssertNotNil(defaultRetrieval.bluetoothLowEnergy)
+        XCTAssertNotNil(defaultRetrieval.nfc)
+
+        let hybridConfiguration = WalletDemoProximityTransportProfile
+            .provisionalNfcV2Hybrid.configuration
+        guard case .nfcOnly(.provisionalV2) = hybridConfiguration.engagement,
+              case let .provisionalNFCV2(hybridRetrieval) = hybridConfiguration.retrieval else {
+            return XCTFail("The hybrid profile must use NFCv2 engagement and retrieval")
+        }
+        XCTAssertEqual(hybridRetrieval.bluetoothLowEnergy?.roles, .centralClient)
+        XCTAssertEqual(hybridRetrieval.bluetoothLowEnergy?.bearerPolicy, .gattOnly)
+        XCTAssertNil(hybridRetrieval.qrNFC)
+
+        let directConfiguration = WalletDemoProximityTransportProfile
+            .provisionalNfcV2Direct.configuration
+        guard case .nfcOnly(.provisionalV2) = directConfiguration.engagement,
+              case let .provisionalNFCV2(directRetrieval) = directConfiguration.retrieval else {
+            return XCTFail("The direct profile must use NFCv2 engagement and retrieval")
+        }
+        XCTAssertNil(directRetrieval.bluetoothLowEnergy)
+        XCTAssertNil(directRetrieval.qrNFC)
+    }
+
+    func testNativeProfilePersistenceUsesStableComposeValuesAndFallsBackSafely() {
+        let suiteName = "id.walt.walletdemo.tests.\(UUID().uuidString)"
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertEqual(
+            DemoSharingSettings.proximityTransportProfile(appGroupIdentifier: suiteName),
+            .defaultProfile
+        )
+        DemoSharingSettings.setProximityTransportProfile(
+            .provisionalNfcV2Hybrid,
+            appGroupIdentifier: suiteName
+        )
+        XCTAssertEqual(
+            DemoSharingSettings.proximityTransportProfile(appGroupIdentifier: suiteName),
+            .provisionalNfcV2Hybrid
+        )
+        XCTAssertEqual(
+            UserDefaults(suiteName: suiteName)?
+                .string(forKey: DemoSharingSettings.proximityTransportProfileKey),
+            "provisional_nfc_v2_hybrid"
+        )
+
+        UserDefaults(suiteName: suiteName)?
+            .set("unknown_future_profile", forKey: DemoSharingSettings.proximityTransportProfileKey)
+        XCTAssertEqual(
+            DemoSharingSettings.proximityTransportProfile(appGroupIdentifier: suiteName),
+            .defaultProfile
+        )
+    }
+
+    @MainActor
+    func testStartSnapshotsTheSelectedNativeProfileBeforeLaunchingTheSession() async throws {
+        var selectedProfile = WalletDemoProximityTransportProfile.defaultProfile
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session, suspendStart: true)
+        let viewModel = ProximityPresentationViewModel(
+            client: client,
+            configurationProvider: { selectedProfile.configuration },
+            hostActions: FakeProximityHostActionExecutor()
+        )
+
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        selectedProfile = .provisionalNfcV2Direct
+
+        let startedConfiguration = try XCTUnwrap(client.lastConfiguration)
+        guard case .qrAndNFC(.negotiatedHandover) = startedConfiguration.engagement else {
+            return XCTFail("The active session must retain the profile selected at start")
+        }
+
+        viewModel.cancel()
+        client.resumeStart()
+        try await waitUntilAsync { await session.closeCount == 1 }
+    }
 }
 
 private func combinedProximityReview(exchange: Int = 1) -> ProximityPresentationReview {
@@ -229,13 +440,29 @@ private func combinedProximityReview(exchange: Int = 1) -> ProximityPresentation
 private final class FakeProximityWalletClient: ProximityWalletClient {
     private let session: any DemoProximityPresentationSession
     private let suspendStart: Bool
+    private let capabilityResults: [ProximityPresentationCapabilities]
     private var startContinuation: CheckedContinuation<Void, Never>?
+    private(set) var capabilityCallCount = 0
     private(set) var startCount = 0
     private(set) var configurations: [ProximityPresentationConfiguration] = []
+    var lastConfiguration: ProximityPresentationConfiguration? { configurations.last }
 
-    init(session: any DemoProximityPresentationSession, suspendStart: Bool = false) {
+    init(
+        session: any DemoProximityPresentationSession,
+        suspendStart: Bool = false,
+        capabilityResults: [ProximityPresentationCapabilities] = [makeProximityCapabilities()]
+    ) {
         self.session = session
         self.suspendStart = suspendStart
+        self.capabilityResults = capabilityResults
+    }
+
+    func proximityPresentationCapabilities(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> ProximityPresentationCapabilities {
+        let index = min(capabilityCallCount, capabilityResults.count - 1)
+        capabilityCallCount += 1
+        return capabilityResults[index]
     }
 
     func startProximityPresentation(
@@ -289,11 +516,53 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
 
 @MainActor
 private final class FakeProximityHostActionExecutor: ProximityHostActionExecutor {
+    private(set) var actions: [ProximityPresentationRemediationAction] = []
+
     func perform(
         _ action: ProximityPresentationRemediationAction
     ) async -> ProximityPresentationHostActionResult {
-        .completed
+        actions.append(action)
+        return .completed
     }
+}
+
+private func makeProximityCapabilities(
+    bluetoothAvailable: Bool = true,
+    bluetoothRemediation: [ProximityPresentationRemediationAction] = []
+) -> ProximityPresentationCapabilities {
+    func capability(
+        available: Bool,
+        selected: Bool,
+        remediation: [ProximityPresentationRemediationAction] = []
+    ) -> ProximityPresentationTransportCapability {
+        ProximityPresentationTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtimeAvailable: available,
+            selected: selected,
+            unavailable: available ? nil : ProximityPresentationError(
+                category: .capability,
+                code: "test_unavailable",
+                message: "The selected test capability is unavailable",
+                recoverable: !remediation.isEmpty
+            ),
+            remediationActions: remediation
+        )
+    }
+
+    return ProximityPresentationCapabilities(
+        profile: .iso180135Edition2DIS2026,
+        qrEngagement: capability(available: true, selected: true),
+        nfcEngagement: capability(available: true, selected: true),
+        bluetoothLowEnergy: capability(
+            available: bluetoothAvailable,
+            selected: true,
+            remediation: bluetoothRemediation
+        ),
+        nfcRetrieval: capability(available: true, selected: true),
+        nfcV2Retrieval: capability(available: false, selected: false),
+        wifiAwareRetrieval: capability(available: false, selected: false)
+    )
 }
 
 @MainActor

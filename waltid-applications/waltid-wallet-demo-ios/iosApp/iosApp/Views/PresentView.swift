@@ -3,6 +3,12 @@ import WalletDemoSharingUI
 import WebKit
 import WalletSDK
 
+enum ProximityPresentationLifecyclePolicy {
+    static func shouldInterrupt(for phase: ScenePhase) -> Bool {
+        phase == .background
+    }
+}
+
 struct PresentView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
@@ -72,7 +78,9 @@ struct PresentView: View {
         }
         .onChange(of: scenePhase) { phase in
             updateProximityScreenPolicy()
-            if phase != .active { proximityPresentation.handleLifecycleInterruption() }
+            if ProximityPresentationLifecyclePolicy.shouldInterrupt(for: phase) {
+                proximityPresentation.handleLifecycleInterruption()
+            }
         }
     }
 
@@ -122,7 +130,7 @@ struct PresentView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("In-person presentation")
                         .font(.headline)
-                    Text("Show a device engagement QR code and present an mdoc to a nearby reader over Bluetooth.")
+                    Text("Show a QR code or hold this iPhone near a compatible reader to present an mdoc.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button("Present to nearby reader") {

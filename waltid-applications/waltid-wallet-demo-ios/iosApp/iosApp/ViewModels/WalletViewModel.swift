@@ -151,6 +151,17 @@ class WalletViewModel: ObservableObject {
             )
         }
     }
+    @Published var proximityTransportProfile: WalletDemoProximityTransportProfile =
+        DemoSharingSettings.proximityTransportProfile(
+            appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+        ) {
+            didSet {
+                DemoSharingSettings.setProximityTransportProfile(
+                    proximityTransportProfile,
+                    appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+                )
+            }
+        }
     @Published var pinError: String?
     @Published var isAuthenticating = false
     @Published private(set) var pendingPresentationContinuationURL: URL?
@@ -632,7 +643,11 @@ class WalletViewModel: ObservableObject {
                 ?? (resolvedWalletClient as? any ProximityWalletClient)
                 ?? UnavailableProximityWalletClient(),
             configurationProvider: {
-                readerTrustSettings.sessionSnapshot().applying()
+                readerTrustSettings.sessionSnapshot().applying(
+                    to: DemoSharingSettings.proximityTransportProfile(
+                        appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+                    ).configuration
+                )
             }
         )
         self.identityDocumentRegistrationUpdate = identityDocumentRegistrationUpdate ?? {

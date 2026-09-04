@@ -2,6 +2,10 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.ui.window.ComposeUIViewController
 import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
+import id.walt.mdoc.proximity.mobile.NfcHostAvailability
+import id.walt.mdoc.proximity.mobile.NfcHostPreparation
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.PreparedNfcHostSession
 import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
@@ -10,7 +14,6 @@ import id.walt.walletdemo.compose.logic.createIosDemoWallet
 import id.walt.walletdemo.compose.logic.createIosDemoPinStore
 import id.walt.walletdemo.compose.logic.createIosDemoSharingSettingsStore
 import id.walt.walletdemo.compose.logic.createIosDemoReaderTrustSettingsStore
-import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.walletdemo.compose.logic.createIosDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.createIosDemoSigningProtectionStore
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
@@ -21,6 +24,24 @@ private var iosProximityController: WalletDemoProximityController? = null
 private var pendingDeepLink: String? = null
 
 /**
+ * Constructs Compose-framework NFC host results without re-exporting the mobile wallet dependency.
+ *
+ * Kotlin/Native assigns the same Kotlin declarations different Swift identities in independently
+ * linked frameworks. These factories keep the concrete sealed result construction in the framework
+ * that owns those identities while the Swift adapter performs only byte and enum conversion.
+ */
+fun composeNfcHostAvailable(): NfcHostAvailability = NfcHostAvailability.Available
+
+fun composeNfcHostUnavailable(code: String, message: String): NfcHostAvailability =
+    NfcHostAvailability.Unavailable(code, message)
+
+fun composeNfcHostReady(session: PreparedNfcHostSession): NfcHostPreparation =
+    NfcHostPreparation.Ready(session)
+
+fun composeNfcHostUnavailablePreparation(code: String, message: String): NfcHostPreparation =
+    NfcHostPreparation.Unavailable(NfcHostAvailability.Unavailable(code, message))
+
+/**
  * Hosts the Compose demo in a `UIViewController` for the SwiftUI app.
  *
  * @param appGroupIdentifier App Group holding the encrypted wallet database, shared with the
@@ -28,6 +49,8 @@ private var pendingDeepLink: String? = null
  * @param keychainAccessGroup Build-expanded shared Keychain access group. Without it the wallet's
  * signing key lands in a group the extension cannot read, so the extension would see the credential
  * and then fail to sign for it.
+ * @param nfcHostPlatformAdapter Swift-owned Core NFC adapter retained by the wallet for the
+ * proximity-session lifetime.
  * @param onDigitalCredentialRegistryChanged Called from Kotlin whenever the wallet's credential set
  * changed and its desired Apple registration state was re-published. The host reconciles Apple's
  * `IdentityDocumentProviderRegistrationStore` here; the wallet cannot, since only the app process may
@@ -45,6 +68,7 @@ private var pendingDeepLink: String? = null
 fun walletDemoViewController(
     appGroupIdentifier: String,
     keychainAccessGroup: String,
+    nfcHostPlatformAdapter: NfcHostPlatformAdapter,
     onDigitalCredentialRegistryChanged: () -> Unit,
     walletId: String = "default",
     attestationBaseUrl: String = "",
@@ -77,26 +101,25 @@ fun walletDemoViewController(
     val wallet = createIosDemoWallet(
         config = config,
         crossProcessAccess = crossProcessAccess,
+        nfcHostPlatformAdapter = nfcHostPlatformAdapter,
         onDigitalCredentialRegistryChanged = { onDigitalCredentialRegistryChanged() },
     )
+    val sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier)
     val controller = WalletDemoController(
         wallet = wallet,
         pinStore = createIosDemoPinStore(config.walletId),
         biometricAuthenticator = createIosDemoBiometricAuthenticator(),
         signingProtectionMode = parsedSigningProtectionMode,
         signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
-        sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier),
+        sharingSettings = sharingSettings,
     )
     val readerTrustSettingsController = DemoReaderTrustSettingsController(
         createIosDemoReaderTrustSettingsStore(appGroupIdentifier)
     )
     val proximityController = WalletDemoProximityController(
         wallet = wallet,
-        configurationProvider = {
-            readerTrustSettingsController.sessionSnapshot().applyTo(
-                MobileWalletProximityConfiguration()
-            )
-        },
+        profileProvider = sharingSettings::proximityTransportProfile,
+        readerTrustSettingsProvider = readerTrustSettingsController::sessionSnapshot,
     )
     iosController = controller
     iosProximityController?.dismiss()

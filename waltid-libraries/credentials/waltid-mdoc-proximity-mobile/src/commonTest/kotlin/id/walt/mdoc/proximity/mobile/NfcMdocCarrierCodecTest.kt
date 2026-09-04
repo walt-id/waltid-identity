@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class NfcMdocCarrierCodecTest {
     @Test
@@ -171,5 +172,31 @@ class NfcMdocCarrierCodecTest {
         assertFailsWith<IllegalArgumentException> {
             NfcMdocCarrierCodec.decode(duplicate.carriers.single(), NfcMdocActor.HOLDER)
         }
+    }
+
+    @Test
+    fun `Multipaz reader handover offer preserves its central endpoint and L2CAP PSM`() {
+        val encodedRequest = """
+            91020a487215d10204616301013000
+            1c1e060a69736f2e6f72673a31383031333a726561646572656e676167656d656e74
+            6d646f63726561646572a10063312e30
+            5a201d016170706c69636174696f6e2f766e642e626c7565746f6f74682e6c652e6f6f62
+            30021c001107781cb4a9de25e397924b465dd48f8c1c071601ffa1001882
+        """.filterNot(Char::isWhitespace).hexToByteArray()
+
+        val request = NfcHandoverCodec.validateRequest(encodedRequest)
+        val offer = assertIs<ReaderSelectedTransportOffer.Method>(
+            NfcMdocCarrierCodec.decodeReaderOffer(request.carriers.single()),
+        )
+        val ble = assertIs<DeviceRetrievalMethod.Ble>(offer.value)
+
+        assertContentEquals(
+            "1c8c8fd45d464b9297e325dea9b41c78".hexToByteArray(),
+            ble.centralMode?.uuid,
+        )
+        assertEquals(
+            130u,
+            assertIs<BlePeripheralEndpoint.Reader>(ble.peripheralEndpoint).options.psm,
+        )
     }
 }
