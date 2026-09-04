@@ -3,7 +3,6 @@ package id.walt.openid4vci.handlers.credential
 import id.walt.certificate.x509.X509Certificate
 import id.walt.cose.CoseCertificate
 import id.walt.crypto.keys.Key
-import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
