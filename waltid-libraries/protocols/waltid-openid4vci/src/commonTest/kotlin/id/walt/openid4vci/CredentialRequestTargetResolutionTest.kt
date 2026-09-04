@@ -2,6 +2,8 @@ package id.walt.openid4vci
 
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.requests.credential.CredentialRequestTargetResolution
+import id.walt.openid4vci.requests.credential.CredentialAuthorization
+import id.walt.openid4vci.requests.credential.CredentialAuthorizationResolution
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.requests.credential.resolveCredentialConfigurationId
 import kotlin.test.Test
