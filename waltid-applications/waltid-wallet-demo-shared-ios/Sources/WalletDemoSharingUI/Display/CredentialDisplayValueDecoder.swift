@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 
 enum CredentialDisplayValueDecoder {
     static func decodedValue(
@@ -7,12 +8,16 @@ enum CredentialDisplayValueDecoder {
         imagePolicy: ImageDecodingPolicy,
         renderJSON: (CredentialDisplayJSONValue, DisplayClaimPath) -> DisplayValue
     ) -> DisplayValue? {
-        guard let payload = EncodedPayload.parse(value),
-              let bytes = payload.base64.decode() else {
+        guard let payload = EncodedPayload.parse(
+            value,
+            maxImageBytes: imagePolicy.requiresDecodableContent ? maxFallbackImageBytes : nil
+        ) else { return nil }
+        guard let bytes = payload.base64.decode() else {
             return nil
         }
         if imagePolicy.accepts(payload.kind),
-           let mimeType = ImageBytes.mimeType(for: bytes) {
+           let mimeType = ImageBytes.mimeType(for: bytes),
+           (!imagePolicy.requiresDecodableContent || ImageBytes.isDecodable(bytes, maxPixelCount: maxFallbackImagePixels)) {
             return imageValue(for: bytes, mimeType: mimeType, encoded: payload.base64.value)
         }
         guard let decoded = String(data: bytes, encoding: .utf8), decoded.isMostlyReadable else {
@@ -65,6 +70,10 @@ enum ImageDecodingPolicy {
 }
 
 private extension ImageDecodingPolicy {
+    var requiresDecodableContent: Bool {
+        self == .dataURLFallback
+    }
+
     func accepts(_ payloadKind: EncodedPayloadKind) -> Bool {
         switch self {
         case .schemaImage:
@@ -81,7 +90,7 @@ private struct EncodedPayload {
     let kind: EncodedPayloadKind
     let base64: Base64Payload
 
-    static func parse(_ rawValue: String) -> EncodedPayload? {
+    static func parse(_ rawValue: String, maxImageBytes: Int? = nil) -> EncodedPayload? {
         let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let prefixRange = value.range(of: schemePrefix, options: [.anchored, .caseInsensitive]) else {
             return Base64Payload(value).map {
@@ -93,11 +102,18 @@ private struct EncodedPayload {
         }
 
         let metadata = String(value[prefixRange.upperBound..<markerRange.lowerBound])
-        guard let base64 = Base64Payload(String(value[markerRange.upperBound...])) else {
+        let kind: EncodedPayloadKind = MediaTypeHint.isImage(metadata) ? .imageDataURL : .otherDataURL
+        let encodedValue = value[markerRange.upperBound...]
+        if kind == .imageDataURL,
+           let maxImageBytes,
+           !Base64Payload.fitsDecodedByteLimit(encodedValue, limit: maxImageBytes) {
+            return nil
+        }
+        guard let base64 = Base64Payload(String(encodedValue)) else {
             return nil
         }
         return EncodedPayload(
-            kind: MediaTypeHint.isImage(metadata) ? .imageDataURL : .otherDataURL,
+            kind: kind,
             base64: base64
         )
     }
@@ -149,6 +165,13 @@ private struct Base64Payload {
         return Data(base64Encoded: padded)
     }
 
+    static func fitsDecodedByteLimit(_ value: Substring, limit: Int) -> Bool {
+        let encodedLength = UInt64(value.utf8.count)
+        let padding = min(UInt64(value.reversed().prefix { $0 == "=" }.count), 2)
+        let decodedSizeUpperBound = ((encodedLength + UInt64(Self.base64BlockSize) - 1) / UInt64(Self.base64BlockSize)) * 3 - padding
+        return decodedSizeUpperBound <= UInt64(limit)
+    }
+
     private static func looksValid(_ value: String) -> Bool {
         guard value.count >= minimumPayloadLength, value.count % base64BlockSize != invalidBase64Remainder else { return false }
         return value.allSatisfy { character in
@@ -169,6 +192,24 @@ private enum ImageMime {
 }
 
 private enum ImageBytes {
+    static func isDecodable(_ data: Data, maxPixelCount: Int) -> Bool {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return false }
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+              let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue,
+              width > 0,
+              height > 0,
+              width <= maxPixelCount / height else {
+            return false
+        }
+        let options = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: validationImageSize,
+        ] as CFDictionary
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options) != nil
+    }
+
     static func mimeType(for data: Data) -> String? {
         let bytes = [UInt8](data.prefix(12))
         let detected: String?
@@ -191,6 +232,10 @@ private enum ImageBytes {
         return detected
     }
 }
+
+private let maxFallbackImageBytes = 2_000_000
+private let maxFallbackImagePixels = 2_048 * 2_048
+private let validationImageSize = 64
 
 private extension String {
     var isMostlyReadable: Bool {

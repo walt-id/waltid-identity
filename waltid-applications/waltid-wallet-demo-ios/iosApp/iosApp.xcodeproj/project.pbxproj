@@ -52,6 +52,8 @@
 		E2E00015AAAA000100000015 /* synthetic-portrait.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E2E00005AAAA000000000005 /* synthetic-portrait.jpg */; };
 		E2E00016AAAA000100000016 /* synthetic-signature.png in Resources */ = {isa = PBXBuildFile; fileRef = E2E00006AAAA000000000006 /* synthetic-signature.png */; };
 		E2E00017AAAA000100000017 /* synthetic-verification-document.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E2E00007AAAA000000000007 /* synthetic-verification-document.jpg */; };
+		E2E00018AAAA000100000018 /* synthetic-verification-document.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E2E00007AAAA000000000007 /* synthetic-verification-document.jpg */; };
+		E2E00019AAAA000100000019 /* synthetic-signature.png in Resources */ = {isa = PBXBuildFile; fileRef = E2E00006AAAA000000000006 /* synthetic-signature.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -592,6 +594,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E2E00018AAAA000100000018 /* synthetic-verification-document.jpg in Resources */,
+				E2E00019AAAA000100000019 /* synthetic-signature.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

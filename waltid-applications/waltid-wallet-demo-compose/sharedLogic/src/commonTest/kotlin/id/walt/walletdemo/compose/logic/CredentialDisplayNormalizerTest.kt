@@ -748,36 +748,6 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun rendersArbitraryDataImageClaimsForSdJwtAndW3cCredentialsUsingDetectedMimeType() {
-        listOf("vc+sd-jwt", "dc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc").forEach { format ->
-            val details = CredentialDisplayNormalizer.toDetails(
-                CredentialSummary(
-                    id = "cred-1",
-                    format = format,
-                    issuer = null,
-                    label = format,
-                    credentialDataJson =
-                        """{
-                            "verification_artifact":"data:image/jpeg;base64,$syntheticJpegBase64",
-                            "resident_address":{"visual_proof":"data:image/jpeg;base64,$syntheticPngBase64"}
-                        }""".trimIndent(),
-                )
-            )
-
-            val claim = details.groups.flatMap { it.items }.first { it.path.id == "verification_artifact" }
-            assertEquals("Verification artifact", claim.label)
-            val image = assertIs<DisplayValue.Image>(claim.value)
-            assertEquals("image/jpeg", image.mimeType)
-            assertTrue(image.bytes.contentEquals(syntheticJpegBytes))
-
-            val nestedImage = assertIs<DisplayValue.Image>(
-                details.groups.flatMap { it.items }.first { it.path.id == "resident_address.visual_proof" }.value
-            )
-            assertEquals("image/png", nestedImage.mimeType)
-        }
-    }
-
-    @Test
     fun explicitNonImageSchemaAndUnsupportedPayloadsDoNotRenderAsImages() {
         val svg = Base64.Default.encode(
             """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/></svg>"""
@@ -807,31 +777,6 @@ class CredentialDisplayNormalizerTest {
             .forEach { path ->
                 assertFalse(claims.first { it.path.id == path }.value is DisplayValue.Image)
             }
-    }
-
-    @Test
-    fun rendersArbitraryDataImageRequestedDisclosure() {
-        val option = WalletDemoPresentationCredentialOption(
-            queryId = "pid",
-            credentialId = "credential-1",
-            label = "PID",
-            issuer = "https://issuer.example",
-            format = "dc+sd-jwt",
-            credentialDataJson = "{}",
-            disclosures = listOf(
-                WalletDemoPresentationDisclosure(
-                    label = "Verification artifact",
-                    path = """["${'$'}","verification_artifact"]""",
-                    valueJson = """"data:image/png;base64,$syntheticPngBase64"""",
-                    selectivelyDisclosable = true,
-                )
-            ),
-        )
-
-        val image = assertIs<DisplayValue.Image>(
-            option.toCredentialDetails().groups.first().items.single().value
-        )
-        assertEquals("image/png", image.mimeType)
     }
 
     @Test

@@ -19,11 +19,16 @@ internal class CredentialDisplayValueDecoder(
         format: String?,
         imagePolicy: ImageDecodingPolicy,
     ): DisplayValue? {
-        val payload = EncodedPayload.parse(value) ?: return null
+        val payload = EncodedPayload.parse(
+            rawValue = value,
+            maxImageBytes = maxFallbackImageBytes.takeIf { imagePolicy.requiresDecodableContent },
+        ) ?: return null
         val bytes = payload.base64.decode() ?: return null
         if (imagePolicy.accepts(payload.kind)) {
             ImageBytes.detectMime(bytes)?.let { mime ->
-                return bytes.toImageValue(mime, encoded = payload.base64.value)
+                if (!imagePolicy.requiresDecodableContent || platformCanDecodeImage(bytes, maxFallbackImagePixels)) {
+                    return bytes.toImageValue(mime, encoded = payload.base64.value)
+                }
             }
         }
 
@@ -78,6 +83,9 @@ private fun ImageDecodingPolicy.accepts(payloadKind: EncodedPayloadKind): Boolea
         ImageDecodingPolicy.Disabled -> false
     }
 
+private val ImageDecodingPolicy.requiresDecodableContent: Boolean
+    get() = this == ImageDecodingPolicy.DataUrlFallback
+
 private data class EncodedPayload(
     val kind: EncodedPayloadKind,
     val base64: Base64Payload,
@@ -86,7 +94,7 @@ private data class EncodedPayload(
         private const val schemePrefix = "data:"
         private const val base64Marker = ";base64,"
 
-        fun parse(rawValue: String): EncodedPayload? {
+        fun parse(rawValue: String, maxImageBytes: Int? = null): EncodedPayload? {
             val value = rawValue.trim()
             if (!value.startsWith(schemePrefix, ignoreCase = true)) {
                 return Base64Payload.parse(value)?.let { base64 ->
@@ -103,14 +111,27 @@ private data class EncodedPayload(
             }
 
             val metadata = value.substring(schemePrefix.length, markerIndex)
-            val base64 = Base64Payload.parse(value.substring(markerIndex + base64Marker.length))
+            val kind = if (MediaTypeHint.isImage(metadata)) {
+                EncodedPayloadKind.ImageDataUrl
+            } else {
+                EncodedPayloadKind.OtherDataUrl
+            }
+            val payloadStart = markerIndex + base64Marker.length
+            if (
+                kind == EncodedPayloadKind.ImageDataUrl &&
+                maxImageBytes != null &&
+                !Base64Payload.fitsDecodedByteLimit(
+                    encodedLength = value.length - payloadStart,
+                    padding = value.trailingBase64Padding(),
+                    limit = maxImageBytes,
+                )
+            ) {
+                return null
+            }
+            val base64 = Base64Payload.parse(value.substring(payloadStart))
                 ?: return null
             return EncodedPayload(
-                kind = if (MediaTypeHint.isImage(metadata)) {
-                    EncodedPayloadKind.ImageDataUrl
-                } else {
-                    EncodedPayloadKind.OtherDataUrl
-                },
+                kind = kind,
                 base64 = base64,
             )
         }
@@ -144,6 +165,12 @@ private class Base64Payload private constructor(val value: String) {
             return Base64Payload(value).takeIf { looksValid(value) }
         }
 
+        fun fitsDecodedByteLimit(encodedLength: Int, padding: Int, limit: Int): Boolean {
+            val length = encodedLength.toLong()
+            val decodedSizeUpperBound = ((length + base64BlockSize - 1) / base64BlockSize) * 3 - padding
+            return decodedSizeUpperBound <= limit
+        }
+
         private fun looksValid(value: String): Boolean {
             if (value.length < minimumPayloadLength || value.any { it.isWhitespace() }) return false
             val allowed = value.all { it.isLetterOrDigit() || it == '+' || it == '/' || it == '-' || it == '_' || it == '=' }
@@ -164,6 +191,13 @@ private class Base64Payload private constructor(val value: String) {
     override fun hashCode(): Int =
         value.hashCode()
 }
+
+private fun String.trailingBase64Padding(): Int =
+    when {
+        endsWith("==") -> 2
+        endsWith('=') -> 1
+        else -> 0
+    }
 
 private object ImageMime {
     const val Png = "image/png"
@@ -196,3 +230,5 @@ private fun String.isMostlyReadable(): Boolean =
             count { it == '\n' || it == '\r' || it == '\t' || !it.isISOControl() } >= length * readableCharacterRatio
 
 private const val readableCharacterRatio = 0.9
+private const val maxFallbackImageBytes = 2_000_000
+private const val maxFallbackImagePixels = 2_048L * 2_048L
