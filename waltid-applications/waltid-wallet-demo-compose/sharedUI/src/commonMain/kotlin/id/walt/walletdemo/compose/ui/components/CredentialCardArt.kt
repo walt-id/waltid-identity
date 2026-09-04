@@ -78,7 +78,7 @@ internal sealed interface CredentialCardLogoSource {
 }
 
 internal fun credentialCardLogoSource(uri: String?): CredentialCardLogoSource =
-    uri?.takeIf(::isHttpsUrl)
+    uri?.takeIf(RasterImageSupport::isHttpsDisplayImageUrl)
         ?.let(CredentialCardLogoSource::Metadata)
         ?: CredentialCardLogoSource.BundledWalt
 
@@ -94,7 +94,7 @@ internal fun CredentialCardArt(
     val shape = RoundedCornerShape(if (compact) 10.dp else 14.dp)
     val constructedColor = parseCssColor(art.backgroundColor) ?: DefaultWaltCardBlue
     val labelColor = parseCssColor(art.textColor) ?: Color.White
-    val backgroundImageUri = art.backgroundImageUri?.takeIf(::isHttpsUrl)
+    val backgroundImageUri = art.backgroundImageUri?.takeIf(RasterImageSupport::isHttpsDisplayImageUrl)
     val logoSource = credentialCardLogoSource(art.logoUri)
     var metadataArtState by remember(backgroundImageUri) {
         mutableStateOf(
@@ -222,5 +222,3 @@ internal fun parseCssColor(value: String?): Color? {
     )
 }
 
-private fun isHttpsUrl(value: String): Boolean =
-    value.trim().startsWith("https://", ignoreCase = true)

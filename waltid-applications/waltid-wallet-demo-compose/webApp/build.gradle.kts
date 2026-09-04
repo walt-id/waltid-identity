@@ -26,6 +26,7 @@ kotlin {
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.material3)
             implementation(identityLibs.kotlinx.coroutines.core)
+            implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.ktor.client.js)
         }
     }

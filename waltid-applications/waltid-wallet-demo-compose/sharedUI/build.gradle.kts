@@ -44,7 +44,9 @@ kotlin {
             implementation(identityLibs.compose.navigation3.ui)
             implementation(identityLibs.coil.compose)
             implementation(identityLibs.coil.network.ktor3)
+            implementation(identityLibs.coil.svg)
             implementation(compose.components.resources)
+            implementation(identityLibs.kotlinx.serialization.json)
         }
 
         if (enableAndroidBuild || enableIosBuild) {
@@ -77,6 +79,13 @@ kotlin {
                         implementation(identityLibs.zxing.cpp.kotlin.native)
                     }
                 }
+            }
+        }
+
+        if (enableWalletDemoComposeWeb) {
+            getByName("wasmJsMain").dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
+                implementation(identityLibs.kotlinx.coroutines.core)
             }
         }
 

@@ -56,6 +56,11 @@
     reverse_proxy http://web-portal2:{$WEB_PORTAL2_PORT}
 }
 
+# Compose Web Wallet
+:{$WALLET_DEMO_COMPOSE_WEB_PORT} {
+    reverse_proxy http://wallet-demo-compose-web:80
+}
+
 # VC Repo
 :{$VC_REPO_PORT} {
     reverse_proxy http://vc-repo:{$VC_REPO_PORT}

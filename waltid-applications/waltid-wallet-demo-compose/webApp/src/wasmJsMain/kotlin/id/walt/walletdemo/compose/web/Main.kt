@@ -18,6 +18,7 @@ import id.walt.walletdemo.compose.logic.walletapi2.createWalletApi2DemoWallet
 import id.walt.walletdemo.compose.logic.walletapi2.establishWalletApi2Session
 import id.walt.walletdemo.compose.logic.walletapi2.webIssuanceRedirectUri
 import id.walt.walletdemo.compose.ui.WalletDemoApp
+import id.walt.walletdemo.compose.ui.WalletDemoBranding
 import id.walt.walletdemo.compose.ui.WalletDemoTheme
 import id.walt.walletdemo.compose.ui.screens.AccountAuthScreen
 import kotlinx.browser.document
@@ -28,14 +29,17 @@ import kotlin.js.ExperimentalWasmJsInterop
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     ComposeViewport(document.body!!) {
-        WalletDemoTheme {
-            WebWalletRoot()
+        var branding by remember { mutableStateOf<WalletDemoBranding?>(null) }
+        LaunchedEffect(Unit) { branding = loadWebBranding() }
+        val currentBranding = branding ?: return@ComposeViewport
+        WalletDemoTheme(currentBranding) {
+            WebWalletRoot(branding = currentBranding)
         }
     }
 }
 
 @Composable
-private fun WebWalletRoot() {
+private fun WebWalletRoot(branding: WalletDemoBranding) {
     var session by remember { mutableStateOf(WalletApi2BrowserSessionStore.load()) }
     var isBusy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -72,6 +76,7 @@ private fun WebWalletRoot() {
 
     WebWalletSession(
         session = current,
+        branding = branding,
         onSignOut = {
                 scope.launch {
                     WalletApi2BrowserSessionStore.signOut(current)
@@ -84,6 +89,7 @@ private fun WebWalletRoot() {
 @Composable
 private fun WebWalletSession(
     session: WalletApi2Session,
+    branding: WalletDemoBranding,
     onSignOut: () -> Unit,
 ) {
     val redirectUri = remember { webIssuanceRedirectUri() }
@@ -111,7 +117,7 @@ private fun WebWalletSession(
         }
     }
 
-    WalletDemoApp(controller, onSignOut = onSignOut)
+    WalletDemoApp(controller, branding = branding, onSignOut = onSignOut)
 }
 
 @OptIn(ExperimentalWasmJsInterop::class)
