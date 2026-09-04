@@ -575,7 +575,7 @@ class DefaultOAuth2Provider(
         configuration: CredentialConfiguration,
         issuerKey: Key,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceInputData: CredentialIssuanceInputProvider,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
