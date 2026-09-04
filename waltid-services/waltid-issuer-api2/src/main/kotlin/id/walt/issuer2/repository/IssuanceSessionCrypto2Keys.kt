@@ -12,6 +12,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonPrimitive
 
