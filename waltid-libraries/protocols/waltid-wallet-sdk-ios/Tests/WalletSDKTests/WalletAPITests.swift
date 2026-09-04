@@ -342,6 +342,36 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(updated.maximumMessageBytes, configuration.maximumMessageBytes)
     }
 
+    func testProximityConfigurationRepresentsWifiAwareWithoutEnablingBLE() {
+        let wifiAware = ProximityPresentationWifiAwareConfiguration(securityPolicy: .ncsSK128)
+        let conventional = ProximityPresentationConventionalRetrievalConfiguration(
+            bluetoothLowEnergy: nil,
+            wifiAware: wifiAware
+        )
+        let provisionalNFCV2 = ProximityPresentationNFCV2RetrievalConfiguration(
+            wifiAware: wifiAware
+        )
+
+        XCTAssertNil(conventional.bluetoothLowEnergy)
+        XCTAssertEqual(conventional.wifiAware, wifiAware)
+        XCTAssertNil(provisionalNFCV2.bluetoothLowEnergy)
+        XCTAssertEqual(provisionalNFCV2.wifiAware, wifiAware)
+        let remediations: [ProximityPresentationRemediationAction] = [
+            .requestNearbyWifiPermission,
+            .requestLocalNetworkPermission,
+            .enableWifi,
+        ]
+        let unavailable = ProximityPresentationTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtimeAvailable: false,
+            selected: true,
+            unavailable: nil,
+            remediationActions: remediations
+        )
+        XCTAssertEqual(unavailable.remediationActions, remediations)
+    }
+
     func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() {
         let evidence = ProximityReaderEvidence(
             scope: .wholeRequest,

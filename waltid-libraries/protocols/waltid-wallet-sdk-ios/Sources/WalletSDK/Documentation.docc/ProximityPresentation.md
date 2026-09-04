@@ -43,6 +43,22 @@ availability, and selection separate for QR, NFC, BLE, and Wi-Fi Aware. A
 selected unavailable method prevents preparation rather than being silently
 substituted.
 
+Wi-Fi Aware is a typed conventional retrieval option:
+
+```swift
+let wifiAwareConfiguration = ProximityPresentationConfiguration(
+    engagement: .qrAndNFC(.negotiatedHandover),
+    retrieval: .conventional(.init(nfc: .init(), wifiAware: .init()))
+)
+```
+
+The current public iOS API reports this option as unimplemented because it
+requires prior device pairing and a statically declared DNS-SD service name;
+those constraints cannot represent ISO's fresh 32-character transaction service
+name. The capability remains selected and visible, but a selected BLE or NFC path
+may still start. Do not present this as iOS Wi-Fi Aware support or substitute an
+infrastructure/local-network transport.
+
 Select NFC through the typed engagement and retrieval contracts. Conventional
 NFC retrieval lengths and provisional NFCv2 engagement lengths are intentionally
 different types:

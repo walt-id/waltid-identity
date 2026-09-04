@@ -152,11 +152,30 @@ session.state.collect { state ->
 }
 ```
 
-The default configuration selects QR engagement and BLE retrieval. NFC and
-Wi-Fi Aware are represented in the capability contract but currently report
-precise unavailable results until their platform adapters are installed. A
-selected unavailable method prevents session preparation; it is never silently
-dropped.
+The default configuration selects QR engagement and BLE retrieval. NFC is
+available through the installed platform host adapter. Android also installs a
+Wi-Fi Aware NCS-SK-128 holder adapter on eligible API 33+ devices; iOS reports a
+precise `implemented = false` result because its public paired/static service
+model cannot express ISO's transaction-derived service. Configure Wi-Fi Aware
+explicitly and inspect its independent capability:
+
+```kotlin
+val configuration = MobileWalletProximityConfiguration(
+    engagement = MobileWalletProximityEngagementConfiguration.QrAndNfc(
+        MobileWalletProximityNfcEngagementMode.Negotiated,
+    ),
+    retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(
+        nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+        wifiAware = MobileWalletProximityWifiAwareConfiguration(),
+    ),
+)
+val wifiAware = wallet.proximityPresentationCapabilities(configuration).wifiAwareRetrieval
+```
+
+An unavailable selected alternative is not instantiated when another selected
+engagement/retrieval path can start. A configuration with no viable path remains
+in prerequisite state and reports its exact remediation; no method is silently
+substituted or advertised before preparation succeeds.
 
 Device signature is the default holder-authentication policy. Applications may
 require MAC or choose an explicit pre-review preference with
@@ -173,6 +192,13 @@ trust, status, disclosure, and application-profile state before sending.
 Multiple reader-authentication statements retain their independent
 `authenticationIndex`, and holder-key authorization is reported per document
 request so mixed signature/MAC responses cannot be collapsed into one prompt.
+
+Android Wi-Fi Aware remediation distinguishes nearby-Wi-Fi permission,
+target-37 local-network permission, Wi-Fi/radio state, exhausted resources, and
+unsupported API/feature/cipher states. This draft implements only NCS-SK-128 and
+the mandatory 2.4 GHz NAN baseline. NCS-PK-2WDH-128, optional 5 GHz advertisement,
+and physical independent-reader qualification remain explicit follow-ups; this
+transport adds no server-retrieval or internet path.
 
 Reader authentication validity does not establish reader trust. To require a
 trusted reader, provision Reader CA certificates out of band and pass the shared

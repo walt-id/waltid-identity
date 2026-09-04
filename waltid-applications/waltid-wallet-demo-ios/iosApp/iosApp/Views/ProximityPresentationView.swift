@@ -699,8 +699,11 @@ private extension ProximityPresentationRemediationAction {
     var label: String {
         switch self {
         case .requestBluetoothPermission: String(localized: "Allow Bluetooth")
+        case .requestNearbyWifiPermission: String(localized: "Allow nearby Wi-Fi")
+        case .requestLocalNetworkPermission: String(localized: "Allow local network")
         case .openApplicationSettings: String(localized: "Open app settings")
         case .enableBluetooth: String(localized: "Enable Bluetooth")
+        case .enableWifi: String(localized: "Open Wi-Fi settings")
         case .enableNFC: String(localized: "Enable NFC")
         case .useSupportedDevice: String(localized: "Use a supported device")
         case .retry: String(localized: "Check again")

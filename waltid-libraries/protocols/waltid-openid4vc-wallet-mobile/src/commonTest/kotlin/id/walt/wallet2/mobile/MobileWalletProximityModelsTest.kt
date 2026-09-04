@@ -146,6 +146,10 @@ class MobileWalletProximityModelsTest {
                 nfc = null,
             )
         }
+        MobileWalletProximityRetrievalConfiguration.Conventional(
+            bluetoothLowEnergy = null,
+            wifiAware = MobileWalletProximityWifiAwareConfiguration(),
+        )
         assertFailsWith<IllegalArgumentException> {
             MobileWalletProximityConfiguration(
                 engagement = MobileWalletProximityEngagementConfiguration.NfcOnly(

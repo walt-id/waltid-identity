@@ -62,6 +62,22 @@ public data class MobileWalletProximityNfcRetrievalConfiguration(
     }
 }
 
+/** Wi-Fi Aware NAN data-path security selected for one proximity session. */
+public enum class MobileWalletProximityWifiAwareSecurityPolicy {
+    /** Mandatory ISO holder baseline using NAN Cipher Suite NCS-SK-128. */
+    NcsSk128,
+}
+
+/**
+ * Complete Wi-Fi Aware retrieval configuration.
+ *
+ * @property securityPolicy NAN data-path security required for the prepared transport.
+ */
+public data class MobileWalletProximityWifiAwareConfiguration(
+    public val securityPolicy: MobileWalletProximityWifiAwareSecurityPolicy =
+        MobileWalletProximityWifiAwareSecurityPolicy.NcsSk128,
+)
+
 /**
  * Retrieval configuration whose variant is tied to the selected NFC engagement family.
  *
@@ -71,19 +87,21 @@ public data class MobileWalletProximityNfcRetrievalConfiguration(
  */
 public sealed interface MobileWalletProximityRetrievalConfiguration {
     /**
-     * One or both conventional retrieval methods used by QR, Static Handover, or Negotiated Handover.
+     * One or more conventional retrieval methods used by QR, Static Handover, or Negotiated Handover.
      *
      * @property bluetoothLowEnergy Optional BLE role and bearer policy.
      * @property nfc Optional conventional NFC command/response contract.
+     * @property wifiAware Optional Wi-Fi Aware holder-publisher contract.
      */
     public data class Conventional(
         public val bluetoothLowEnergy: MobileWalletProximityBleConfiguration? =
             MobileWalletProximityBleConfiguration(),
         public val nfc: MobileWalletProximityNfcRetrievalConfiguration? = null,
+        public val wifiAware: MobileWalletProximityWifiAwareConfiguration? = null,
     ) : MobileWalletProximityRetrievalConfiguration {
         init {
-            require(bluetoothLowEnergy != null || nfc != null) {
-                "Conventional proximity retrieval requires BLE, NFC, or both"
+            require(bluetoothLowEnergy != null || nfc != null || wifiAware != null) {
+                "Conventional proximity retrieval requires BLE, NFC, Wi-Fi Aware, or a combination"
             }
         }
     }
@@ -97,10 +115,12 @@ public sealed interface MobileWalletProximityRetrievalConfiguration {
      *
      * @property bluetoothLowEnergy Optional NFCv2 alternate BLE bearer and QR BLE bearer.
      * @property qrNfc Optional conventional NFC retrieval for a concurrently prepared QR path.
+     * @property wifiAware Optional NFCv2 alternate and QR Wi-Fi Aware bearer.
      */
     public data class ProvisionalNfcV2(
         public val bluetoothLowEnergy: MobileWalletProximityBleConfiguration? = null,
         public val qrNfc: MobileWalletProximityNfcRetrievalConfiguration? = null,
+        public val wifiAware: MobileWalletProximityWifiAwareConfiguration? = null,
     ) : MobileWalletProximityRetrievalConfiguration
 }
 
@@ -311,8 +331,11 @@ public enum class MobileWalletProximityErrorCategory {
 /** Normalized host remediation suggested by a side-effect-free prerequisite check. */
 public enum class MobileWalletProximityRemediationAction {
     RequestBluetoothPermission,
+    RequestNearbyWifiPermission,
+    RequestLocalNetworkPermission,
     OpenApplicationSettings,
     EnableBluetooth,
+    EnableWifi,
     EnableNfc,
     UseSupportedDevice,
     Retry,

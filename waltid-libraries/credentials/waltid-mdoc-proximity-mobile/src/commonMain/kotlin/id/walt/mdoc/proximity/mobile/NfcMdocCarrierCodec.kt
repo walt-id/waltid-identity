@@ -25,6 +25,7 @@ internal enum class NfcMdocActor { HOLDER, READER }
 /** ISO mdoc NFC and Bluetooth LE carrier-record conversion without platform types. */
 internal object NfcMdocCarrierCodec {
     private val BLE_MIME_TYPE = ImmutableBytes.of("application/vnd.bluetooth.le.oob".encodeToByteArray())
+    private val WIFI_AWARE_MIME_TYPE = ImmutableBytes.of("application/vnd.wfa.nan".encodeToByteArray())
     private val NFC_EXTERNAL_TYPE = ImmutableBytes.of("iso.org:18013:nfc".encodeToByteArray())
 
     /** Converts a supported method into one carrier plus its exact auxiliary references. */
@@ -39,8 +40,8 @@ internal object NfcMdocCarrierCodec {
         val record = when (method) {
             is DeviceRetrievalMethod.Ble -> encodeBle(method, carrierReference, actor, omitBleUuid)
             is DeviceRetrievalMethod.Nfc -> encodeNfc(method, carrierReference)
+            is DeviceRetrievalMethod.WifiAware -> encodeWifiAware(method, carrierReference)
             is DeviceRetrievalMethod.NfcV2 -> throw IllegalArgumentException("NFCv2 is never encoded as an NDEF carrier")
-            is DeviceRetrievalMethod.WifiAware,
             is DeviceRetrievalMethod.Unknown -> throw IllegalArgumentException(
                 "The retrieval method has no supported conventional NFC carrier encoding",
             )
@@ -56,6 +57,8 @@ internal object NfcMdocCarrierCodec {
     ): DeviceRetrievalMethod? = when {
         carrier.carrierRecord.typeNameFormat == NdefTypeNameFormat.MIME_MEDIA &&
             carrier.carrierRecord.type == BLE_MIME_TYPE -> decodeBle(carrier.carrierRecord, actor, fallbackBleUuid)
+        carrier.carrierRecord.typeNameFormat == NdefTypeNameFormat.MIME_MEDIA &&
+            carrier.carrierRecord.type == WIFI_AWARE_MIME_TYPE -> decodeWifiAware(carrier.carrierRecord)
         carrier.carrierRecord.typeNameFormat == NdefTypeNameFormat.EXTERNAL &&
             carrier.carrierRecord.type == NFC_EXTERNAL_TYPE -> decodeNfc(carrier.carrierRecord)
         else -> null
@@ -90,7 +93,130 @@ internal object NfcMdocCarrierCodec {
         carrier.carrierRecord.typeNameFormat == NdefTypeNameFormat.EXTERNAL &&
             carrier.carrierRecord.type == NFC_EXTERNAL_TYPE ->
             ReaderSelectedTransportOffer.Method(decodeNfc(carrier.carrierRecord))
+        carrier.carrierRecord.typeNameFormat == NdefTypeNameFormat.MIME_MEDIA &&
+            carrier.carrierRecord.type == WIFI_AWARE_MIME_TYPE -> {
+            val decoded = parseWifiAware(carrier.carrierRecord)
+            if (WIFI_AWARE_NCS_SK_128 !in decoded.cipherSuites) return null
+            require(decoded.passphrase == null) {
+                "A Wi-Fi Aware Handover Request must not select the holder passphrase"
+            }
+            ReaderSelectedTransportOffer.Method(decoded.toMethod())
+        }
         else -> null
+    }
+
+    private fun encodeWifiAware(
+        method: DeviceRetrievalMethod.WifiAware,
+        reference: ImmutableBytes,
+    ): NdefRecord {
+        val passphrase = requireNotNull(method.passphraseInfo) {
+            "An NFC Wi-Fi Aware carrier must explicitly transfer its passphrase"
+        }
+        WifiAwareProtocol.requireValidPassphrase(passphrase)
+        val bands = WifiAwareSupportedBands.fromBytes(method.supportedBands).encoded()
+        val operatingClass = method.operatingClass
+        val channelNumber = method.channelNumber
+        require((operatingClass == null) == (channelNumber == null)) {
+            "Wi-Fi Aware operating class and channel number must be present together"
+        }
+        val bytes = MutableBytes()
+        bytes.addAd(WIFI_AWARE_CIPHER_SUITE_INFO, byteArrayOf(WIFI_AWARE_NCS_SK_128.toByte()))
+        bytes.addAd(WIFI_AWARE_PASSPHRASE_INFO, passphrase.encodeToByteArray())
+        bytes.addAd(WIFI_AWARE_BAND_INFO, bands)
+        if (operatingClass != null && channelNumber != null) {
+            require(operatingClass <= UByte.MAX_VALUE.toUInt() && channelNumber <= UByte.MAX_VALUE.toUInt()) {
+                "Wi-Fi Aware channel information must fit one byte per value"
+            }
+            bytes.addAd(
+                WIFI_AWARE_CHANNEL_INFO,
+                byteArrayOf(operatingClass.toByte(), channelNumber.toByte()),
+            )
+        }
+        return NdefRecord(
+            typeNameFormat = NdefTypeNameFormat.MIME_MEDIA,
+            type = WIFI_AWARE_MIME_TYPE,
+            identifier = reference,
+            payload = ImmutableBytes.of(bytes.toByteArray()),
+        )
+    }
+
+    private fun decodeWifiAware(record: NdefRecord): DeviceRetrievalMethod.WifiAware {
+        val decoded = parseWifiAware(record)
+        require(decoded.cipherSuites == setOf(WIFI_AWARE_NCS_SK_128)) {
+            "Wi-Fi Aware Handover Select must choose NCS-SK-128"
+        }
+        require(decoded.passphrase != null) {
+            "NCS-SK-128 Handover Select must explicitly transfer its passphrase"
+        }
+        return decoded.toMethod()
+    }
+
+    private fun parseWifiAware(record: NdefRecord): DecodedWifiAwareCarrier {
+        val cursor = Cursor(record.payload.copy())
+        var cipherSuites: Set<Int>? = null
+        var passphrase: String? = null
+        var bands: ByteArray? = null
+        var operatingClass: UInt? = null
+        var channelNumber: UInt? = null
+        while (!cursor.exhausted) {
+            val data = cursor.readAd()
+            when (data.type) {
+                WIFI_AWARE_CIPHER_SUITE_INFO -> {
+                    require(cipherSuites == null && data.value.isNotEmpty()) {
+                        "Wi-Fi Aware carrier must contain one nonempty Cipher Suite Info field"
+                    }
+                    val exact = data.value.map { it.toInt() and 0xff }
+                    require(exact.distinct().size == exact.size) {
+                        "Wi-Fi Aware carrier contains duplicate cipher suites"
+                    }
+                    cipherSuites = exact.toSet()
+                }
+                WIFI_AWARE_DH_INFO -> {
+                    // NCS-PK-2WDH-128 remains gated on the canonical NAN 3.1 carrier contract.
+                    require(data.value.isNotEmpty()) { "Wi-Fi Aware DH Info must not be empty" }
+                }
+                WIFI_AWARE_PASSPHRASE_INFO -> {
+                    require(passphrase == null && data.value.isNotEmpty()) {
+                        "Wi-Fi Aware carrier must contain at most one nonempty Pass-phrase Info field"
+                    }
+                    val value = data.value.decodeToString(throwOnInvalidSequence = true)
+                    passphrase = WifiAwareProtocol.requireValidPassphrase(value)
+                }
+                WIFI_AWARE_BAND_INFO -> {
+                    require(bands == null) { "Wi-Fi Aware carrier must contain at most one Band Info field" }
+                    bands = WifiAwareSupportedBands.fromBytes(data.value).encoded()
+                }
+                WIFI_AWARE_CHANNEL_INFO -> {
+                    require(operatingClass == null && data.value.size == 2) {
+                        "Wi-Fi Aware carrier must contain at most one two-byte Channel Info field"
+                    }
+                    operatingClass = (data.value[0].toInt() and 0xff).toUInt()
+                    channelNumber = (data.value[1].toInt() and 0xff).toUInt()
+                }
+            }
+        }
+        return DecodedWifiAwareCarrier(
+            cipherSuites = requireNotNull(cipherSuites) { "Wi-Fi Aware carrier is missing Cipher Suite Info" },
+            passphrase = passphrase,
+            supportedBands = requireNotNull(bands) { "Wi-Fi Aware carrier is missing Band Info" },
+            operatingClass = operatingClass,
+            channelNumber = channelNumber,
+        )
+    }
+
+    private data class DecodedWifiAwareCarrier(
+        val cipherSuites: Set<Int>,
+        val passphrase: String?,
+        val supportedBands: ByteArray,
+        val operatingClass: UInt?,
+        val channelNumber: UInt?,
+    ) {
+        fun toMethod(): DeviceRetrievalMethod.WifiAware = DeviceRetrievalMethod.WifiAware(
+            passphraseInfo = passphrase,
+            operatingClass = operatingClass,
+            channelNumber = channelNumber,
+            supportedBands = supportedBands.copyOf(),
+        )
     }
 
     private fun encodeNfc(method: DeviceRetrievalMethod.Nfc, reference: ImmutableBytes): NdefRecord {
@@ -290,7 +416,7 @@ internal object NfcMdocCarrierCodec {
             add(encoded)
         }
         fun addAd(type: Int, value: ByteArray) {
-            require(value.size in 1..254) { "BLE advertising data value must contain 1..254 bytes" }
+            require(value.size in 1..254) { "Carrier data value must contain 1..254 bytes" }
             add(value.size + 1)
             add(type)
             add(value)
@@ -320,7 +446,7 @@ internal object NfcMdocCarrierCodec {
         }
         fun readAd(): AdvertisingData {
             val length = readByte()
-            require(length >= 1 && length <= bytes.size - offset) { "Truncated BLE advertising data" }
+            require(length >= 1 && length <= bytes.size - offset) { "Truncated carrier data field" }
             val type = readByte()
             val valueLength = length - 1
             return AdvertisingData(type, bytes.copyOfRange(offset, offset + valueLength)).also {
@@ -342,4 +468,10 @@ internal object NfcMdocCarrierCodec {
     private const val BLE_ROLE_ORIGINATOR_DUAL_CENTRAL_PREFERRED = 0x03
     // Provisional interoperability value; the available DIS still contains XXXX.
     private const val BLE_SERVICE_DATA_UUID = 0xff01
+    private const val WIFI_AWARE_CIPHER_SUITE_INFO = 0x01
+    private const val WIFI_AWARE_DH_INFO = 0x02
+    private const val WIFI_AWARE_PASSPHRASE_INFO = 0x03
+    private const val WIFI_AWARE_BAND_INFO = 0x04
+    private const val WIFI_AWARE_CHANNEL_INFO = 0x05
+    private const val WIFI_AWARE_NCS_SK_128 = 0x01
 }

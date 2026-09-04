@@ -71,6 +71,24 @@ public struct ProximityPresentationNFCRetrievalConfiguration: Sendable, Hashable
     }
 }
 
+/// Wi-Fi Aware NAN data-path security selected for one proximity session.
+public enum ProximityPresentationWifiAwareSecurityPolicy: Sendable, Hashable {
+    /// Mandatory ISO holder baseline using NAN Cipher Suite NCS-SK-128.
+    case ncsSK128
+}
+
+/// Complete Wi-Fi Aware retrieval configuration.
+public struct ProximityPresentationWifiAwareConfiguration: Sendable, Hashable {
+    /// NAN data-path security policy.
+    public let securityPolicy: ProximityPresentationWifiAwareSecurityPolicy
+
+    /// Creates a complete Wi-Fi Aware retrieval configuration.
+    /// - Parameter securityPolicy: NAN data-path security policy.
+    public init(securityPolicy: ProximityPresentationWifiAwareSecurityPolicy = .ncsSK128) {
+        self.securityPolicy = securityPolicy
+    }
+}
+
 /// NFC Engagement v2 APDU contract kept separate from conventional NFC retrieval lengths.
 public struct ProximityPresentationNFCV2Configuration: Sendable, Hashable {
     /// Maximum command-data length accepted by the provisional NFCv2 holder application.
@@ -84,24 +102,29 @@ public struct ProximityPresentationNFCV2Configuration: Sendable, Hashable {
     }
 }
 
-/// One or both conventional retrieval methods used by QR, Static Handover, or Negotiated Handover.
+/// One or more conventional retrieval methods used by QR, Static Handover, or Negotiated Handover.
 public struct ProximityPresentationConventionalRetrievalConfiguration: Sendable, Hashable {
     /// Optional BLE role and bearer policy.
     public let bluetoothLowEnergy: ProximityPresentationBLEConfiguration?
     /// Optional conventional NFC command/response contract.
     public let nfc: ProximityPresentationNFCRetrievalConfiguration?
+    /// Optional Wi-Fi Aware holder-publisher contract.
+    public let wifiAware: ProximityPresentationWifiAwareConfiguration?
 
     /// Creates a nonempty conventional retrieval configuration.
     /// - Parameters:
     ///   - bluetoothLowEnergy: Optional BLE role and bearer configuration.
     ///   - nfc: Optional conventional NFC command/response configuration.
+    ///   - wifiAware: Optional Wi-Fi Aware configuration.
     public init(
         bluetoothLowEnergy: ProximityPresentationBLEConfiguration? = .init(),
-        nfc: ProximityPresentationNFCRetrievalConfiguration? = nil
+        nfc: ProximityPresentationNFCRetrievalConfiguration? = nil,
+        wifiAware: ProximityPresentationWifiAwareConfiguration? = nil
     ) {
-        precondition(bluetoothLowEnergy != nil || nfc != nil)
+        precondition(bluetoothLowEnergy != nil || nfc != nil || wifiAware != nil)
         self.bluetoothLowEnergy = bluetoothLowEnergy
         self.nfc = nfc
+        self.wifiAware = wifiAware
     }
 }
 
@@ -111,17 +134,22 @@ public struct ProximityPresentationNFCV2RetrievalConfiguration: Sendable, Hashab
     public let bluetoothLowEnergy: ProximityPresentationBLEConfiguration?
     /// Optional conventional NFC retrieval for a concurrently prepared QR path.
     public let qrNFC: ProximityPresentationNFCRetrievalConfiguration?
+    /// Optional NFCv2 alternate and QR Wi-Fi Aware bearer.
+    public let wifiAware: ProximityPresentationWifiAwareConfiguration?
 
     /// Creates an NFCv2 retrieval configuration. The same NFCv2 APDU channel is always selected.
     /// - Parameters:
     ///   - bluetoothLowEnergy: Optional alternate BLE bearer for NFCv2 and QR engagement.
     ///   - qrNFC: Optional conventional NFC retrieval prepared for a concurrent QR path.
+    ///   - wifiAware: Optional Wi-Fi Aware alternate bearer.
     public init(
         bluetoothLowEnergy: ProximityPresentationBLEConfiguration? = nil,
-        qrNFC: ProximityPresentationNFCRetrievalConfiguration? = nil
+        qrNFC: ProximityPresentationNFCRetrievalConfiguration? = nil,
+        wifiAware: ProximityPresentationWifiAwareConfiguration? = nil
     ) {
         self.bluetoothLowEnergy = bluetoothLowEnergy
         self.qrNFC = qrNFC
+        self.wifiAware = wifiAware
     }
 }
 
@@ -881,7 +909,8 @@ public struct ProximityPresentationConfiguration: Sendable {
             if engagement.includesQR {
                 precondition(
                     provisionalNFCV2Retrieval.bluetoothLowEnergy != nil ||
-                        provisionalNFCV2Retrieval.qrNFC != nil,
+                        provisionalNFCV2Retrieval.qrNFC != nil ||
+                        provisionalNFCV2Retrieval.wifiAware != nil,
                     "A combined QR/NFCv2 session requires a QR-compatible retrieval method"
                 )
             } else {
@@ -949,10 +978,16 @@ public struct ProximityPresentationError: Error, Sendable, Equatable {
 public enum ProximityPresentationRemediationAction: Sendable, Hashable {
     /// Request Bluetooth permission using the platform system surface.
     case requestBluetoothPermission
+    /// Request Nearby Wi-Fi devices permission using the platform system surface.
+    case requestNearbyWifiPermission
+    /// Request local-network permission using the platform system surface.
+    case requestLocalNetworkPermission
     /// Open application settings using the platform system surface.
     case openApplicationSettings
     /// Ask the user to enable Bluetooth through the platform-owned surface.
     case enableBluetooth
+    /// Ask the user to enable Wi-Fi through the platform-owned surface.
+    case enableWifi
     /// Ask the user to enable NFC through the platform-owned surface.
     case enableNFC
     /// Explain that the selected capability requires another device.

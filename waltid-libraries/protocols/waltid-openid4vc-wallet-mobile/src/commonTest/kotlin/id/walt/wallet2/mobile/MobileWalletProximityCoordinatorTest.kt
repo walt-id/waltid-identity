@@ -19,6 +19,10 @@ import id.walt.mdoc.proximity.mobile.NfcHostAvailability
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.mdoc.proximity.mobile.NfcHostPreparation
 import id.walt.mdoc.proximity.mobile.PreparedNfcHostSession
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityAvailability
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportConfiguration
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
+import id.walt.mdoc.proximity.mobile.WifiAwareSecurityPolicy
 import id.walt.wallet2.data.Wallet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -186,6 +190,62 @@ class MobileWalletProximityCoordinatorTest {
         assertEquals(1, ble.configurations.size)
         assertEquals(0, nfc.prepareCalls)
         assertEquals(1, engagements.size)
+        assertIs<MobileWalletProximityEngagement.Qr>(engagements.single())
+        session.close()
+    }
+
+    @Test
+    fun `unimplemented Wi-Fi Aware remains truthful without blocking or instantiating BLE fallback`() = runTest {
+        val ble = RecordingTransportFactory(BleProximityAvailability.Available)
+        val wifiAware = RecordingWifiAwareTransportFactory(
+            WifiAwareProximityAvailability.Unavailable(
+                implemented = false,
+                code = "wifi_aware_ios_api_unsupported",
+                message = "Wi-Fi Aware is unavailable through public iOS APIs",
+            )
+        )
+        val coordinator = MobileWalletProximityCoordinator(
+            wallet = Wallet("wifi-aware-ios-fallback"),
+            bleTransportFactory = ble,
+            wifiAwareTransportFactory = wifiAware,
+        )
+        val session = coordinator.start(
+            MobileWalletProximityConfiguration(
+                retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(
+                    wifiAware = MobileWalletProximityWifiAwareConfiguration(),
+                )
+            )
+        )
+
+        val engagements = session.awaitEngagements()
+        val capabilities = wifiAware.capabilities.single()
+        assertEquals(WifiAwareSecurityPolicy.NcsSk128, capabilities)
+        assertTrue(ble.configurations.isNotEmpty())
+        assertTrue(wifiAware.configurations.isEmpty())
+        assertTrue(engagements.any { it is MobileWalletProximityEngagement.Qr })
+        session.close()
+    }
+
+    @Test
+    fun `Wi-Fi Aware can be the only QR retrieval and receives session-bound key bytes`() = runTest {
+        val wifiAware = RecordingWifiAwareTransportFactory(WifiAwareProximityAvailability.Available)
+        val coordinator = MobileWalletProximityCoordinator(
+            wallet = Wallet("wifi-aware-only"),
+            bleTransportFactory = null,
+            wifiAwareTransportFactory = wifiAware,
+        )
+        val session = coordinator.start(
+            MobileWalletProximityConfiguration(
+                retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(
+                    bluetoothLowEnergy = null,
+                    wifiAware = MobileWalletProximityWifiAwareConfiguration(),
+                )
+            )
+        )
+
+        val engagements = session.awaitEngagements()
+        assertEquals(1, wifiAware.configurations.size)
+        assertTrue(wifiAware.configurations.single().eDeviceKeyBytes.size > 0)
         assertIs<MobileWalletProximityEngagement.Qr>(engagements.single())
         session.close()
     }
@@ -401,6 +461,33 @@ class MobileWalletProximityCoordinatorTest {
                     )
                 },
                 connection = loopback.holder,
+            )
+        }
+    }
+
+    private class RecordingWifiAwareTransportFactory(
+        var availability: WifiAwareProximityAvailability,
+    ) : WifiAwareProximityTransportFactory {
+        val capabilities = mutableListOf<WifiAwareSecurityPolicy>()
+        val configurations = mutableListOf<WifiAwareProximityTransportConfiguration>()
+
+        override suspend fun capability(
+            securityPolicy: WifiAwareSecurityPolicy,
+        ): WifiAwareProximityAvailability {
+            capabilities += securityPolicy
+            return availability
+        }
+
+        override fun create(
+            configuration: WifiAwareProximityTransportConfiguration,
+        ): ReaderSelectedTransportProvider {
+            configurations += configuration
+            return FakeTransportProvider(
+                method = DeviceRetrievalMethod.WifiAware(
+                    passphraseInfo = null,
+                    supportedBands = byteArrayOf(0x04),
+                ),
+                connection = FakeProximityLoopback.create().holder,
             )
         }
     }

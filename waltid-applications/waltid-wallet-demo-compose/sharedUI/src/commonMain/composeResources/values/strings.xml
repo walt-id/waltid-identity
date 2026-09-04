@@ -3,6 +3,8 @@
     <string name="proximity_action_needed">Action needed</string>
     <string name="proximity_action_failed">Action could not be completed</string>
     <string name="proximity_allow_bluetooth">Allow Bluetooth access</string>
+    <string name="proximity_allow_local_network">Allow local network access</string>
+    <string name="proximity_allow_nearby_wifi">Allow nearby Wi-Fi access</string>
     <string name="proximity_approve">Share</string>
     <string name="proximity_applies_to">Applies to</string>
     <string name="proximity_auth_absent">Absent</string>
@@ -36,6 +38,7 @@
     <string name="proximity_document_request">Document request %1$d</string>
     <string name="proximity_document_scope">Document: %1$s</string>
     <string name="proximity_enable_bluetooth">Turn on Bluetooth</string>
+    <string name="proximity_enable_wifi">Open Wi-Fi settings</string>
     <string name="proximity_enable_nfc">Turn on NFC</string>
     <string name="proximity_failed_title">Presentation failed</string>
     <string name="proximity_generic_credential">Wallet credential</string>
