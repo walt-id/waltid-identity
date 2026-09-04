@@ -1,4 +1,4 @@
-name: Issuer conformance eligibility
+name: Conformance eligibility
 
 on:
   workflow_call:
@@ -33,7 +33,7 @@ on:
         default: false
     outputs:
       should-run:
-        description: "Whether issuer conformance jobs should run"
+        description: "Whether live OpenID conformance jobs should run"
         value: ${{ jobs.decide.outputs.should-run }}
       reason:
         description: "Human-readable decision reason"
@@ -53,15 +53,16 @@ jobs:
       pr-head-repo: ${{ inputs.pr-head-repo }}
       pr-labels: ${{ inputs.pr-labels }}
       pr-draft: ${{ inputs.pr-draft }}
-      platform-name: Issuer conformance
-      platform-label: ci:issuer-conformance
-      # Keep this aligned with Issuer2/OpenID4VCI conformance-sensitive implementation dependencies;
-      # intentionally not a complete transitive Gradle dependency closure.
+      additional-labels: '["ci:issuer-conformance"]'
+      platform-name: Conformance
+      platform-label: ci:conformance
+      # Live OpenID4VP verifier/wallet and OpenID4VCI issuer/wallet suites. Not a
+      # complete transitive Gradle dependency closure.
       path-patterns: |
         [
           ".github/workflows/build.yml",
           ".github/workflows/gradle.yml",
-          ".github/workflows/issuer-conformance-eligibility.yml",
+          ".github/workflows/conformance-eligibility.yml",
           ".github/workflows/platform-eligibility.yml",
           ".github/actions/checkout-repos/*",
           ".github/actions/gradle-setup-action/*",
@@ -72,9 +73,13 @@ jobs:
           "gradle/*",
           "gradlew",
           "waltid-services/waltid-issuer-api2/*",
+          "waltid-services/waltid-verifier-api2/*",
+          "waltid-services/waltid-wallet-api2/*",
           "waltid-services/waltid-openid4vp-conformance-runners/*",
           "waltid-services/waltid-service-commons/*",
+          "waltid-libraries/protocols/waltid-openid4vc*/*",
           "waltid-libraries/protocols/waltid-openid4vci*/*",
+          "waltid-libraries/protocols/waltid-openid4vp*/*",
           "waltid-libraries/crypto/waltid-crypto*/*",
           "waltid-libraries/crypto/waltid-cose/*",
           "waltid-libraries/crypto/waltid-jose/*",
