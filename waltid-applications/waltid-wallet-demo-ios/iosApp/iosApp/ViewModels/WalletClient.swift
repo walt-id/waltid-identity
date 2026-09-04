@@ -113,9 +113,12 @@ final class SDKWalletClient: WalletClient {
 
 @MainActor
 extension SDKWalletClient: ProximityWalletClient {
-    func proximityPresentationCapabilities(configuration: ProximityConfiguration) async throws -> ProximityCapabilities {
+    func proximityPresentationCapabilities(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> ProximityPresentationCapabilities {
         try await wallet().proximityPresentationCapabilities(configuration: configuration)
     }
+
     func startProximityPresentation(
         configuration: ProximityConfiguration
     ) async throws -> any DemoProximityPresentationSession {

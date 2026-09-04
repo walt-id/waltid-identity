@@ -14,7 +14,10 @@ extension ProximitySession: DemoProximityPresentationSession {}
 
 @MainActor
 protocol ProximityWalletClient: AnyObject {
-    func proximityPresentationCapabilities(configuration: ProximityConfiguration) async throws -> ProximityCapabilities
+    func proximityPresentationCapabilities(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> ProximityPresentationCapabilities
+
     func startProximityPresentation(
         configuration: ProximityConfiguration
     ) async throws -> any DemoProximityPresentationSession
@@ -42,16 +45,15 @@ final class ProximityPresentationViewModel: ObservableObject {
     @Published private(set) var hostActionInProgress: ProximityRemediationAction?
     @Published private(set) var actionErrorMessage: String?
     @Published private(set) var startupFailed = false
-    @Published private(set) var pendingReviewID: ProximityReviewID?
 
     private let client: any ProximityWalletClient
     private let configurationProvider: @MainActor () throws -> ProximityConfiguration
     private let hostActions: any ProximityHostActionExecutor
     private var session: (any DemoProximityPresentationSession)?
-    private var cleanupTask: Task<Void, Never>?
-    private var pendingConfiguration: ProximityConfiguration?
     private var observationTask: Task<Void, Never>?
     private var hostActionTask: Task<Void, Never>?
+    private var pendingConfiguration: ProximityPresentationConfiguration?
+    private var systemNfcPresentationActive = false
     private var sessionGeneration: UInt64 = 0
 
     init(
@@ -75,7 +77,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     var canApprove: Bool {
-        guard pendingReviewID == nil, let review else { return false }
+        guard let review else { return false }
         return Set(selections.map(\.requestIndex)) == Set(review.documents.map(\.requestIndex))
             && selections.allSatisfy { !$0.disclosedElements.isEmpty }
     }
@@ -109,31 +111,38 @@ final class ProximityPresentationViewModel: ObservableObject {
             actionErrorMessage = error.localizedDescription
             return
         }
+        systemNfcPresentationActive = configuration.engagement.usesSystemNfcPresentation
         pendingConfiguration = configuration
         checkPrerequisitesAndStart(configuration, generation: generation)
     }
 
     private func checkPrerequisitesAndStart(
-        _ configuration: ProximityConfiguration,
+        _ configuration: ProximityPresentationConfiguration,
         generation: UInt64,
         automaticPermissionAttempted: Bool = false
     ) {
         observationTask?.cancel()
-        observationTask = Task { [weak self, cleanupTask] in
+        observationTask = Task { [weak self] in
             guard let self else { return }
             do {
-                await cleanupTask?.value
-                try Task.checkCancellation()
-                guard active, sessionGeneration == generation else { return }
                 let capabilities = try await client.proximityPresentationCapabilities(
                     configuration: configuration
                 )
                 guard active, sessionGeneration == generation else { return }
-                publish(.checkingPrerequisites(capabilities))
-                guard active, sessionGeneration == generation else { return }
-                if !automaticPermissionAttempted,
-                   capabilities.remediationActions.contains(.requestBluetoothPermission) { return }
-                guard capabilities.mayStart else { return }
+                sessionState = .checkingPrerequisites(capabilities)
+                if capabilities.bluetoothLowEnergy.selected,
+                   !capabilities.bluetoothLowEnergy.runtimeAvailable {
+                    if !automaticPermissionAttempted,
+                       capabilities.bluetoothLowEnergy.remediationActions
+                           .contains(.requestBluetoothPermission) {
+                        await remediateBeforeSession(
+                            .requestBluetoothPermission,
+                            configuration: configuration,
+                            generation: generation
+                        )
+                    }
+                    return
+                }
                 let started = try await client.startProximityPresentation(configuration: configuration)
                 guard active, sessionGeneration == generation else {
                     await started.close()
@@ -158,8 +167,8 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     private func remediateBeforeSession(
-        _ action: ProximityRemediationAction,
-        configuration: ProximityConfiguration,
+        _ action: ProximityPresentationRemediationAction,
+        configuration: ProximityPresentationConfiguration,
         generation: UInt64
     ) async {
         hostActionInProgress = action
@@ -258,32 +267,38 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func retryPrerequisites() {
-        if session == nil, let pendingConfiguration, hostActionInProgress == nil {
+        if session == nil, let pendingConfiguration {
             checkPrerequisitesAndStart(pendingConfiguration, generation: sessionGeneration)
-        } else { dispatch(.retryPrerequisites) }
+        } else {
+            dispatch(.retryPrerequisites)
+        }
     }
 
     func remediate(_ action: ProximityRemediationAction) {
         guard case .checkingPrerequisites(let capabilities) = sessionState,
               capabilities.remediationActions.contains(action),
-              hostActionInProgress == nil else {
-            return
-        }
-        let generation = sessionGeneration
-        guard let session else {
-            guard let pendingConfiguration else { return }
-            hostActionTask = Task { [weak self] in
-                await self?.remediateBeforeSession(action, configuration: pendingConfiguration, generation: generation)
-            }
+              hostActionInProgress == nil,
+              session != nil || pendingConfiguration != nil else {
             return
         }
         hostActionInProgress = action
         actionErrorMessage = nil
+        let generation = sessionGeneration
         hostActionTask = Task { [weak self] in
             guard let self else { return }
             let outcome = await hostActions.perform(action)
             guard !Task.isCancelled, active, sessionGeneration == generation else { return }
-            let result: ProximityActionResult
+            if session == nil, let pendingConfiguration {
+                hostActionInProgress = nil
+                checkPrerequisitesAndStart(
+                    pendingConfiguration,
+                    generation: generation,
+                    automaticPermissionAttempted: true
+                )
+                return
+            }
+            guard let session else { return }
+            let result: ProximityPresentationActionResult
             do {
                 result = try await session.dispatch(.reportRemediation(action, outcome))
             } catch {
@@ -301,7 +316,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func cancel() {
-        guard session != nil, sessionState != nil else {
+        guard session != nil else {
             dismiss()
             return
         }
@@ -311,42 +326,35 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     func handleLifecycleInterruption() {
         guard hostActionInProgress == nil else { return }
+        // CardSession presents system UI in a separate full-screen process. That transition can
+        // background the host application while HCE is active, so the protocol session must stay
+        // alive until CardSession, the reader, the user, or the protocol timeout closes it.
+        guard !systemNfcPresentationActive else { return }
         guard case .checkingPrerequisites = sessionState else {
             cancel()
             return
         }
     }
 
-    func closeAndAwait() async {
-        dismiss()
-        await cleanupTask?.value
-    }
-
     func dismiss() {
         sessionGeneration &+= 1
-        let starting = observationTask
-        let hostAction = hostActionTask
-        starting?.cancel()
-        hostAction?.cancel()
+        observationTask?.cancel()
         observationTask = nil
+        hostActionTask?.cancel()
         hostActionTask = nil
         let closing = session
         session = nil
         pendingConfiguration = nil
+        systemNfcPresentationActive = false
         active = false
         sessionState = nil
         selections = []
         continueAfterResponse = false
-        pendingReviewID = nil
         hostActionInProgress = nil
         actionErrorMessage = nil
         startupFailed = false
-        let previous = cleanupTask
-        cleanupTask = Task {
-            await previous?.value
-            await starting?.value
-            await hostAction?.value
-            await closing?.close()
+        if let closing {
+            Task { await closing.close() }
         }
     }
 
@@ -358,29 +366,22 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     private func dispatch(_ action: ProximityAction) {
         guard let session else { return }
-        let reviewID: ProximityReviewID?
-        switch action {
-        case let .approve(id, _), let .decline(id): reviewID = id
-        default: reviewID = nil
-        }
-        if reviewID != nil, pendingReviewID != nil { return }
-        if let reviewID { pendingReviewID = reviewID }
         actionErrorMessage = nil
         let generation = sessionGeneration
         Task { [weak self] in
+            let result: ProximityActionResult
             do {
-                let result = try await session.dispatch(action)
-                guard let self, active, sessionGeneration == generation else { return }
-                guard reviewID == nil || review?.reviewID == reviewID else { return }
-                if case .rejected(let error) = result {
-                    pendingReviewID = nil
-                    actionErrorMessage = error.message
-                }
+                result = try await session.dispatch(action)
             } catch {
-                guard let self, active, sessionGeneration == generation else { return }
-                guard reviewID == nil || review?.reviewID == reviewID else { return }
-                pendingReviewID = nil
+                guard let self else { return }
+                guard active, sessionGeneration == generation else { return }
                 actionErrorMessage = Self.demoSessionFailureMessage
+                return
+            }
+            guard let self else { return }
+            guard active, sessionGeneration == generation else { return }
+            if case .rejected(let error) = result {
+                actionErrorMessage = error.message
             }
         }
     }
@@ -388,7 +389,6 @@ final class ProximityPresentationViewModel: ObservableObject {
     private func publish(_ state: ProximityState) {
         let previousReviewID = review?.reviewID
         sessionState = state
-        if review?.reviewID != pendingReviewID { pendingReviewID = nil }
         actionErrorMessage = nil
         if case .reviewRequired(let review) = state, previousReviewID != review.reviewID {
             do {
@@ -402,7 +402,6 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     private func replaceSelection(_ selection: ProximityDocumentSelection) {
-        guard pendingReviewID == nil else { return }
         selections = (selections.filter { $0.requestIndex != selection.requestIndex } + [selection])
             .sorted { $0.requestIndex < $1.requestIndex }
         actionErrorMessage = nil
@@ -413,11 +412,20 @@ final class ProximityPresentationViewModel: ObservableObject {
     )
 }
 
+private extension ProximityPresentationEngagementConfiguration {
+    var usesSystemNfcPresentation: Bool {
+        switch self {
+        case .qrOnly:
+            return false
+        case .nfcOnly, .qrAndNFC:
+            return true
+        }
+    }
+}
+
 @MainActor
 private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActionExecutor,
     @preconcurrency CBCentralManagerDelegate {
-    private var settingsContinuation: CheckedContinuation<ProximityHostActionResult, Never>?
-    private var settingsObserver: NSObjectProtocol?
     private var bluetoothManager: CBCentralManager?
     private var bluetoothContinuation: CheckedContinuation<ProximityHostActionResult, Never>?
 
@@ -428,7 +436,8 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
         case .requestBluetoothPermission:
             return await requestBluetoothPermission()
         case .openApplicationSettings, .enableBluetooth:
-            return await openSettingsAndWaitForReturn()
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return .failed }
+            return await UIApplication.shared.open(url) ? .completed : .failed
         case .enableNFC:
             // iOS does not expose an app-addressable NFC power control.
             return .cancelled
@@ -437,33 +446,6 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
         case .useSupportedDevice:
             return .cancelled
         }
-    }
-
-    private func openSettingsAndWaitForReturn() async -> ProximityHostActionResult {
-        guard settingsContinuation == nil, let url = URL(string: UIApplication.openSettingsURLString) else { return .failed }
-        return await withTaskCancellationHandler {
-            await withCheckedContinuation { continuation in
-                settingsContinuation = continuation
-                settingsObserver = NotificationCenter.default.addObserver(
-                    forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
-                ) { [weak self] _ in
-                    Task { @MainActor in self?.finishSettings(.completed) }
-                }
-                Task { @MainActor [weak self] in
-                    if !(await UIApplication.shared.open(url)) { self?.finishSettings(.failed) }
-                }
-            }
-        } onCancel: {
-            Task { @MainActor [weak self] in self?.finishSettings(.cancelled) }
-        }
-    }
-
-    private func finishSettings(_ result: ProximityHostActionResult) {
-        if let settingsObserver { NotificationCenter.default.removeObserver(settingsObserver) }
-        settingsObserver = nil
-        let continuation = settingsContinuation
-        settingsContinuation = nil
-        continuation?.resume(returning: result)
     }
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
@@ -505,9 +487,12 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
 
 @MainActor
 final class UnavailableProximityWalletClient: ProximityWalletClient {
-    func proximityPresentationCapabilities(configuration: ProximityConfiguration) async throws -> ProximityCapabilities {
+    func proximityPresentationCapabilities(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> ProximityPresentationCapabilities {
         throw ProximityPresentationUnavailable()
     }
+
     func startProximityPresentation(
         configuration: ProximityConfiguration
     ) async throws -> any DemoProximityPresentationSession {

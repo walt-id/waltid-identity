@@ -4,7 +4,9 @@ import WebKit
 import WalletSDK
 
 enum ProximityPresentationLifecyclePolicy {
-    static func shouldInterrupt(for phase: ScenePhase) -> Bool { phase == .background }
+    static func shouldInterrupt(for phase: ScenePhase) -> Bool {
+        phase == .background
+    }
 }
 
 struct PresentView: View {
@@ -12,13 +14,11 @@ struct PresentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.walletDemoBranding) private var branding
     @ObservedObject var viewModel: WalletViewModel
-    @ObservedObject private var readerTrustSettings: DemoReaderTrustSettingsController
     @ObservedObject private var proximityPresentation: ProximityPresentationViewModel
     @StateObject private var proximityScreenPolicy = ProximityScreenPolicy()
 
     init(viewModel: WalletViewModel) {
         _viewModel = ObservedObject(wrappedValue: viewModel)
-        _readerTrustSettings = ObservedObject(wrappedValue: viewModel.readerTrustSettings)
         _proximityPresentation = ObservedObject(wrappedValue: viewModel.proximityPresentation)
     }
 
@@ -61,7 +61,6 @@ struct PresentView: View {
             }
         }
         .onAppear(perform: updateProximityScreenPolicy)
-        .onDisappear { proximityScreenPolicy.restore() }
         .onChange(of: proximityPresentation.qrPayload != nil) { _ in
             updateProximityScreenPolicy()
         }
@@ -79,7 +78,9 @@ struct PresentView: View {
         }
         .onChange(of: scenePhase) { phase in
             updateProximityScreenPolicy()
-            if ProximityPresentationLifecyclePolicy.shouldInterrupt(for: phase) { proximityPresentation.handleLifecycleInterruption() }
+            if ProximityPresentationLifecyclePolicy.shouldInterrupt(for: phase) {
+                proximityPresentation.handleLifecycleInterruption()
+            }
         }
     }
 
@@ -139,7 +140,7 @@ struct PresentView: View {
                     .tint(branding.primary)
                     .disabled(
                         !viewModel.isReady || viewModel.isLoading || viewModel.credentials.isEmpty
-                            || viewModel.presentationReview != nil || readerTrustSettings.loading
+                            || viewModel.presentationReview != nil
                     )
                     .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
                 }
@@ -213,7 +214,7 @@ struct PresentView: View {
             if proximityPresentation.review != nil {
                 ReviewActions(
                     selectionComplete: proximityPresentation.canApprove,
-                    isLoading: proximityPresentation.pendingReviewID != nil,
+                    isLoading: false,
                     onSubmit: { proximityPresentation.approve() },
                     onReject: proximityPresentation.decline,
                     onCancel: proximityPresentation.cancel,
