@@ -206,7 +206,7 @@ class OpenId4VpPresentationServiceTest {
         )
         val requestObject = unsecuredJwt(
             AuthorizationRequest(
-                clientId = "verifier2",
+                clientId = "redirect_uri:https://verifier.example/response",
                 responseMode = OpenID4VPResponseMode.DIRECT_POST,
                 responseUri = "https://verifier.example/response",
                 nonce = "nonce-123",
@@ -280,7 +280,7 @@ class OpenId4VpPresentationServiceTest {
         }
 
         assertEquals(
-            "Unsigned AuthorizationRequest object (alg=none) is not allowed",
+            "Unsigned Authorization Request is only allowed for the redirect_uri client identifier prefix",
             error.message,
         )
     }
@@ -484,7 +484,7 @@ class OpenId4VpPresentationServiceTest {
                 unsignedRequestObject(
                     """
                     {
-                      "client_id":"verifier2",
+                      "client_id":"redirect_uri:https://verifier.example/response",
                       "response_type":"vp_token",
                       "response_mode":"direct_post",
                       "response_uri":"https://verifier.example/response",
@@ -563,7 +563,7 @@ class OpenId4VpPresentationServiceTest {
     fun `normalized request URL preserves signed request objects fetched from request_uri`() {
         val requestObject = unsecuredJwt(
             AuthorizationRequest(
-                clientId = "verifier2",
+                clientId = "redirect_uri:https://verifier.example/response",
                 responseMode = OpenID4VPResponseMode.DIRECT_POST,
                 responseUri = "https://verifier.example/response",
                 nonce = "nonce-123",

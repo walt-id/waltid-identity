@@ -367,8 +367,8 @@ object WalletPresentFunctionality2 {
      *
      * @param presentationRequestUrl The openid4vp:// or https:// URL containing or
      *   referencing the authorization request.
-     * @param unsignedRequestObjectPolicy Whether to accept unsigned (alg=none) JWTs.
-     *   Defaults to [AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED].
+     * @param unsignedRequestObjectPolicy Whether to accept unsigned JSON / `alg=none` Request
+     *   Objects with `redirect_uri`. Defaults to [AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED].
      * @param legacyFallbackCallback Optional fallback for requests carrying explicit legacy
      *   `presentation_definition` or `presentation_definition_uri` parameters. Only consulted after
      *   strict resolution has failed.
@@ -378,7 +378,7 @@ object WalletPresentFunctionality2 {
     suspend fun resolveAuthorizationRequest(
         presentationRequestUrl: Url,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
     ): AuthorizationRequest = resolveAuthorizationRequest(
         presentationRequestUrl,
@@ -392,11 +392,15 @@ object WalletPresentFunctionality2 {
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        requestUriPostWalletMetadata: String? = null,
     ): AuthorizationRequest = resolveAndValidateAuthorizationRequest(
         presentationRequestUrl = presentationRequestUrl,
         unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
         clientIdTrustConfiguration = clientIdTrustConfiguration,
+        expectedRequestObjectAudience = expectedRequestObjectAudience,
         legacyFallbackCallback = legacyFallbackCallback,
+        requestUriPostWalletMetadata = requestUriPostWalletMetadata,
     ).authorizationRequest
 
     private fun validateAuthorizationRequest(request: AuthorizationRequest) {
@@ -708,20 +712,21 @@ object WalletPresentFunctionality2 {
         presentationRequestUrl: Url,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        expectedRequestObjectAudience: String,
+        requestUriPostWalletMetadata: String?,
     ): ResolvedAuthorizationRequest =
         AuthorizationRequestResolver.resolve(
             requestUrl = presentationRequestUrl,
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             trustConfiguration = clientIdTrustConfiguration,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
             fetchRequestUri = { requestUri, requestUriMethod ->
                 AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                     webResolveAuthReq = webResolveAuthReq,
                     requestUri = requestUri,
                     requestUriMethod = requestUriMethod,
-                    // Optional wallet metadata is omitted until the caller explicitly profiles
-                    // its values. Some Final-compliant verifier endpoints reject unsupported
-                    // capability members, while wallet_nonce remains mandatory for this flow.
-                    sendWalletMetadata = false,
+                    requestUriPostWalletMetadata = requestUriPostWalletMetadata,
+                    sendWalletMetadata = true,
                 )
             },
         )
@@ -737,12 +742,16 @@ object WalletPresentFunctionality2 {
         presentationRequestUrl: Url,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        expectedRequestObjectAudience: String,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)?,
+        requestUriPostWalletMetadata: String?,
     ): ResolvedAuthorizationRequest = try {
         resolveAuthorizationRequestObject(
             presentationRequestUrl,
             unsignedRequestObjectPolicy,
             clientIdTrustConfiguration,
+            expectedRequestObjectAudience,
+            requestUriPostWalletMetadata,
         ).also { validateAuthorizationRequest(it.authorizationRequest) }
     } catch (cause: CancellationException) {
         throw cause
@@ -808,7 +817,7 @@ object WalletPresentFunctionality2 {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
@@ -840,12 +849,13 @@ object WalletPresentFunctionality2 {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         holderCrypto2Key: Crypto2Key?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): Result<WalletPresentResult> = walletPresentHandlingWithKey(
         holderKey,
         holderDid,
@@ -861,6 +871,7 @@ object WalletPresentFunctionality2 {
         clientIdTrustConfiguration,
         beforeCredentialsUsed,
         mdocHolderKeyResolver,
+        expectedRequestObjectAudience,
     )
 
     suspend fun walletPresentHandling(
@@ -873,11 +884,12 @@ object WalletPresentFunctionality2 {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): Result<WalletPresentResult> = walletPresentHandlingWithKey(
         null,
         holderDid,
@@ -893,6 +905,7 @@ object WalletPresentFunctionality2 {
         clientIdTrustConfiguration,
         beforeCredentialsUsed,
         mdocHolderKeyResolver,
+        expectedRequestObjectAudience,
     )
 
     private suspend fun walletPresentHandlingWithKey(
@@ -918,6 +931,7 @@ object WalletPresentFunctionality2 {
         /** Invoked with the credential count before the credentials are used, for usage metering. */
         beforeCredentialsUsed: suspend (Int) -> Unit,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)?,
+        expectedRequestObjectAudience: String,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
         log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
@@ -925,11 +939,21 @@ object WalletPresentFunctionality2 {
         // Step 1: Resolve AuthorizationRequest. The strict resolver is always the primary path; the
         // legacy fallback is only reached from inside it, after resolution has failed.
         val resolvedRequest = resolvedAuthorizationRequest ?: try {
+            val exactCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeys(
+                keys = listOfNotNull(holderCrypto2Key),
+                fallbackKeyTypes = setOfNotNull(holderKey?.keyType.takeIf { holderCrypto2Key == null }),
+            )
+            val exactWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                vpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(exactCapabilities),
+                trustConfiguration = clientIdTrustConfiguration,
+            )
             resolveAndValidateAuthorizationRequest(
                 presentationRequestUrl,
                 unsignedRequestObjectPolicy,
                 clientIdTrustConfiguration,
+                expectedRequestObjectAudience,
                 legacyFallbackCallback,
+                exactWalletMetadata,
             )
         } catch (fallback: LegacyFallbackException) {
             return Result.success(

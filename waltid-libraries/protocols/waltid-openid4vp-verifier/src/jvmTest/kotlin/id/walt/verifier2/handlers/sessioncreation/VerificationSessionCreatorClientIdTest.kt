@@ -77,6 +77,43 @@ class VerificationSessionCreatorClientIdTest {
     }
 
     @Test
+    fun `explicit redirect_uri clientId on unsigned session is preserved`() = runTest {
+        val session = VerificationSessionCreator.createVerificationSession(
+            setup = unsignedCrossDevice(),
+            clientId = "redirect_uri:https://verifier.example/response",
+            urlPrefix = "https://verifier.example.com/verification-session",
+            urlHost = "openid4vp://authorize",
+        )
+
+        assertEquals("redirect_uri:https://verifier.example/response", session.authorizationRequest.clientId)
+        assertEquals("redirect_uri:https://verifier.example/response", session.bootstrapAuthorizationRequest?.clientId)
+    }
+
+    @Test
+    fun `signed request preserves explicit signable clientId`() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val session = VerificationSessionCreator.createVerificationSession(
+            setup = CrossDeviceFlowSetup(
+                core = GeneralFlowConfig(
+                    signedRequest = true,
+                    dcqlQuery = DcqlQuery(
+                        credentials = listOf(
+                            CredentialQuery("pid", CredentialFormat.DC_SD_JWT, meta = NoMeta)
+                        )
+                    )
+                )
+            ),
+            clientId = "x509_san_dns:verifier.example.com",
+            urlPrefix = "https://verifier.example.com/verification-session",
+            urlHost = "openid4vp://authorize",
+            key = key,
+        )
+
+        assertEquals("x509_san_dns:verifier.example.com", session.authorizationRequest.clientId)
+        assertEquals("x509_san_dns:verifier.example.com", session.bootstrapAuthorizationRequest?.clientId)
+    }
+
+    @Test
     fun `signed request without clientId is rejected`() = runTest {
         val key = JWKKey.generate(KeyType.secp256r1)
         val error = assertFailsWith<IllegalArgumentException> {
