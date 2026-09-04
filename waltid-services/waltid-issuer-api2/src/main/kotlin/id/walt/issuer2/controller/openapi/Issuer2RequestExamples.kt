@@ -2,6 +2,8 @@ package id.walt.issuer2.controller.openapi
 
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.models.CredentialOfferCredential
+import id.walt.issuer2.models.CredentialOfferCredentialResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
