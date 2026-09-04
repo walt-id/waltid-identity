@@ -265,6 +265,26 @@ public actor Wallet {
     public func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         try await bridge.discardPresentationPreview(previewHandle)
     }
+
+    /// Checks the selected proximity prerequisites without creating keys, UUIDs, or radio resources.
+    /// - Parameter configuration: Capability dimensions and policy to evaluate.
+    /// - Returns: A truthful capability report for every modeled dimension.
+    public func proximityPresentationCapabilities(
+        configuration: ProximityPresentationConfiguration = .init()
+    ) async throws -> ProximityPresentationCapabilities {
+        try await bridge.proximityPresentationCapabilities(configuration: configuration)
+    }
+
+    /// Starts one single-use in-person proximity presentation session.
+    /// - Parameter configuration: Immutable configuration for this session.
+    /// - Returns: A session whose state stream drives all host presentation and actions.
+    public func startProximityPresentation(
+        configuration: ProximityPresentationConfiguration = .init()
+    ) async throws -> ProximityPresentationSession {
+        ProximityPresentationSession(
+            bridge: try await bridge.startProximityPresentation(configuration: configuration)
+        )
+    }
     /// Returns the current IdentityDocumentServices capability snapshot.
     public func digitalCredentialCapabilities() async -> DigitalCredentialCapabilities {
         #if canImport(WalletCore) && os(iOS)
