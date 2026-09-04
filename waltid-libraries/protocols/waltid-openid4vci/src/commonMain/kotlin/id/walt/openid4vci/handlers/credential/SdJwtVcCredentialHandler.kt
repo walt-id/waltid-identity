@@ -4,6 +4,8 @@ import id.walt.certificate.x509.X509Certificate
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInstance
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
