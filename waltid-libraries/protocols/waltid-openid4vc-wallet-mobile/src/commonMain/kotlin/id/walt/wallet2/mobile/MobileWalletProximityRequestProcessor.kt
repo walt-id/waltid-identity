@@ -59,6 +59,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.cbor.CborBoolean
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -456,6 +457,13 @@ internal class MobileWalletProximityRequestProcessor(
         availableElements = document.issuerSigned.namespaces.orEmpty().flatMap { (namespace, values) ->
             values.entries.map { ElementReference(namespace, it.value.elementIdentifier) }
         },
+        booleanElements = document.issuerSigned.namespaces.orEmpty().flatMap { (namespace, values) ->
+            values.entries.mapNotNull { item ->
+                (item.value.elementValue as? CborBoolean)?.value?.let { value ->
+                    ElementReference(namespace, item.value.elementIdentifier) to value
+                }
+            }
+        }.toMap(),
     )
 
     private suspend fun evaluateApplicationProfiles(
@@ -659,6 +667,11 @@ internal class MobileWalletProximityRequestProcessor(
                 ElementReference(it.namespace, it.elementIdentifier)
             }.toSet()
             require(disclosed.all { it in offered }) { "Submission selected an element outside the current review" }
+            val effectiveDisclosures = if (MDL_PORTRAIT in offered && MDL_PORTRAIT !in disclosed) {
+                emptySet()
+            } else {
+                disclosed
+            }
             val deviceNamespaces = snapshot.applicationProfiles
                 .flatMap(ApplicationProfileSnapshot::decodedDeviceElements)
                 .filter { (element, _) -> element.credentialId == submitted.credentialId }
@@ -672,7 +685,7 @@ internal class MobileWalletProximityRequestProcessor(
             presentations += submitted.requestIndex to MdocDocumentPresentation(
                 source = inventory.document,
                 holderKey = inventory.holderKey.keyMaterial.requireCrypto2Key(),
-                selectedIssuerElements = disclosed,
+                selectedIssuerElements = effectiveDisclosures,
                 deviceNameSpaces = deviceNamespaces,
                 authentication = when (inventory.deviceAuthentication) {
                     MobileWalletProximityDeviceAuthenticationMethod.Signature ->
@@ -854,6 +867,8 @@ internal class MobileWalletProximityRequestProcessor(
         return ImmutableBytes.of(SHA256().digest(material))
     }
 }
+
+private val MDL_PORTRAIT = ElementReference("org.iso.18013.5.1", "portrait")
 
 private fun ReaderAuthenticationScope.toPublic(): MobileWalletProximityReaderAuthenticationScope = when (this) {
     ReaderAuthenticationScope.DOCUMENT -> MobileWalletProximityReaderAuthenticationScope.Document
