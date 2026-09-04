@@ -1,6 +1,7 @@
 package id.walt.issuer2.notifications
 
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.ktornotifications.SseNotifier
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.openid4vci.offers.AuthenticationMethod
