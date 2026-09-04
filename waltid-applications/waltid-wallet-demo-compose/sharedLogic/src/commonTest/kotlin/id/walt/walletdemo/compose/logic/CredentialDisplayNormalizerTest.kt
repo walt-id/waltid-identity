@@ -244,7 +244,7 @@ class CredentialDisplayNormalizerTest {
                 label = "PID",
                 credentialDataJson = """
                     {
-                      "portrait": "data:image/png;base64,$syntheticQrPngBase64",
+                      "portrait": "data:image/png;base64,$syntheticPngBase64",
                       "nationalities": ["AT", "CH"],
                       "place_of_birth": {
                         "region": "Vienna",
@@ -423,7 +423,7 @@ class CredentialDisplayNormalizerTest {
                       "credentialSubject": {
                         "given_name": "Ada",
                         "family_name": "Lovelace",
-                        "portrait": "data:image/png;base64,$syntheticQrPngBase64"
+                        "portrait": "data:image/png;base64,$syntheticPngBase64"
                       }
                     }
                 """.trimIndent(),
@@ -735,7 +735,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "json_note": "data:image/png;base64,$encodedJson",
                       "plain_note": "data:image/webp;base64,$encodedText",
-                      "portrait": "data:image/png;base64,$syntheticQrPngBase64"
+                      "portrait": "data:image/png;base64,$syntheticPngBase64"
                     }
                 """.trimIndent(),
             )
@@ -758,8 +758,8 @@ class CredentialDisplayNormalizerTest {
                     label = format,
                     credentialDataJson =
                         """{
-                            "verification_artifact":"data:image/jpeg;base64,$syntheticQrPngBase64",
-                            "resident_address":{"visual_proof":"data:image/png;base64,$syntheticQrPngBase64"}
+                            "verification_artifact":"data:image/jpeg;base64,$syntheticJpegBase64",
+                            "resident_address":{"visual_proof":"data:image/jpeg;base64,$syntheticPngBase64"}
                         }""".trimIndent(),
                 )
             )
@@ -767,8 +767,8 @@ class CredentialDisplayNormalizerTest {
             val claim = details.groups.flatMap { it.items }.first { it.path.id == "verification_artifact" }
             assertEquals("Verification artifact", claim.label)
             val image = assertIs<DisplayValue.Image>(claim.value)
-            assertEquals("image/png", image.mimeType)
-            assertTrue(image.bytes.contentEquals(Base64.Default.decode(syntheticQrPngBase64)))
+            assertEquals("image/jpeg", image.mimeType)
+            assertTrue(image.bytes.contentEquals(syntheticJpegBytes))
 
             val nestedImage = assertIs<DisplayValue.Image>(
                 details.groups.flatMap { it.items }.first { it.path.id == "resident_address.visual_proof" }.value
@@ -783,7 +783,7 @@ class CredentialDisplayNormalizerTest {
             """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/></svg>"""
                 .encodeToByteArray()
         )
-        val dataImage = "data:image/png;base64,$syntheticQrPngBase64"
+        val dataImage = "data:image/png;base64,$syntheticPngBase64"
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
                 id = "cred-1",
@@ -795,8 +795,8 @@ class CredentialDisplayNormalizerTest {
                       "given_name": "$dataImage",
                       "invalid_image": "data:image/png;base64,not-base64!",
                       "unsupported_image": "data:image/svg+xml;base64,$svg",
-                      "non_image_data_url": "data:text/plain;base64,$syntheticQrPngBase64",
-                      "plain_base64": "$syntheticQrPngBase64"
+                      "non_image_data_url": "data:text/plain;base64,$syntheticPngBase64",
+                      "plain_base64": "$syntheticPngBase64"
                     }
                 """.trimIndent(),
             )
@@ -822,7 +822,7 @@ class CredentialDisplayNormalizerTest {
                 WalletDemoPresentationDisclosure(
                     label = "Verification artifact",
                     path = """["${'$'}","verification_artifact"]""",
-                    valueJson = """"data:image/png;base64,$syntheticQrPngBase64"""",
+                    valueJson = """"data:image/png;base64,$syntheticPngBase64"""",
                     selectivelyDisclosable = true,
                 )
             ),
@@ -842,7 +842,7 @@ class CredentialDisplayNormalizerTest {
                 format = "mso_mdoc",
                 issuer = null,
                 label = "mso_mdoc",
-                credentialDataJson = """{"portrait":{"elementValue":${syntheticQrPngByteArrayJson()}}}""",
+                credentialDataJson = """{"portrait":{"elementValue":${syntheticPngByteArrayJson()}}}""",
             )
         )
 
@@ -853,7 +853,7 @@ class CredentialDisplayNormalizerTest {
         val image = assertIs<DisplayValue.Image>(portrait.value)
 
         assertEquals("image/png", image.mimeType)
-        assertTrue(image.bytes.contentEquals(Base64.Default.decode(syntheticQrPngBase64)))
+        assertTrue(image.bytes.contentEquals(Base64.Default.decode(syntheticPngBase64)))
         assertEquals(image, details.toCardDisplayData().portrait)
     }
 
@@ -869,7 +869,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "eu.europa.ec.eudi.pid.1": {
                         "portrait": {
-                          "elementValue": ${syntheticQrPngByteArrayJson()}
+                          "elementValue": ${syntheticPngByteArrayJson()}
                         }
                       }
                     }
@@ -896,7 +896,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "org.iso.18013.5.1": {
                         "signature_usual_mark": {
-                          "elementValue": ${syntheticQrPngByteArrayJson()}
+                          "elementValue": ${syntheticPngByteArrayJson()}
                         }
                       }
                     }
@@ -922,10 +922,10 @@ class CredentialDisplayNormalizerTest {
                 credentialDataJson = """
                     {
                       "org.iso.18013.5.1": {
-                        "biometric_template_face": ${syntheticQrPngByteArrayJson()},
-                        "biometric_template_finger": ${syntheticQrPngByteArrayJson()},
-                        "biometric_template_signature_sign": ${syntheticQrPngByteArrayJson()},
-                        "biometric_template_iris": ${syntheticQrPngByteArrayJson()}
+                        "biometric_template_face": ${syntheticPngByteArrayJson()},
+                        "biometric_template_finger": ${syntheticPngByteArrayJson()},
+                        "biometric_template_signature_sign": ${syntheticPngByteArrayJson()},
+                        "biometric_template_iris": ${syntheticPngByteArrayJson()}
                       }
                     }
                 """.trimIndent(),
@@ -974,7 +974,7 @@ class CredentialDisplayNormalizerTest {
                 WalletDemoPresentationDisclosure(
                     label = CredentialDisplayVocabulary.disclosureLabel("portrait", """["eu.europa.ec.eudi.pid.1","portrait"]"""),
                     path = """["eu.europa.ec.eudi.pid.1","portrait"]""",
-                    valueJson = syntheticQrPngByteArrayJson(),
+                    valueJson = syntheticPngByteArrayJson(),
                     displayValue = null,
                     selectivelyDisclosable = true,
                     required = false,
@@ -1218,14 +1218,19 @@ class CredentialDisplayNormalizerTest {
         assertEquals("Country", claims.first { it.path.id == "place_of_birth.country" }.label)
     }
 
-    private fun syntheticQrPngByteArrayJson(): String =
-        Base64.Default.decode(syntheticQrPngBase64).joinToString(prefix = "[", postfix = "]") { byte ->
+    private fun syntheticPngByteArrayJson(): String =
+        syntheticPngBytes.joinToString(prefix = "[", postfix = "]") { byte ->
             (byte.toInt() and 0xFF).toString()
         }
 
     private companion object {
-        // Deterministic 370 x 370 QR PNG generated from synthetic text; contains no third-party artwork.
-        const val syntheticQrPngBase64 =
-            "iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQMAAADS6sNKAAAABlBMVEUAAAD///+l2Z/dAAAAAnRSTlP//8i138cAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAG4SURBVHic7dpNbsMgEAVgpBzAR/LVORIHsEScecwwIa7aqt0867HAP3xkYxiPIaX/rhR5eXl5eXn5f/JllEe3qvfml3vztl2e1+Oivfx2ntSz/Twcp2qPnok8p389dmur2zFiAM7aGCPyt/CoMOm7/O28TXVrG1Nd/hbeDhNsEcq/if/yFH4Un++58jZ5Xj/L7NmRj63t8oTeHjuy7PcsDPO9bscyfuS5vLUZrcXj+XhLH8U/r+RZ/cjCIoDvaRSM4SHP7GNap6WQSMpsjWR5X8szecRzdCpezR9KRZ7Rz7k9BgBWrkt8bS3va3k2j9yrpLc0Vq5RLuK/PJHHw67IwgpoiXI2fMRzeSaPO5jldjYzb4T3j3xbnsu/nnvk1j7Vc4yXJ/b5sykqGwV1WfmSZ/T2qh6T3kN5/qG+xnN5Lo+I3Xw900L53IpImZk8pZ/XeyyFxCrIRfyXp/L+3N8SMGTZc41Tntfjwtqsu28wLZU8q49diNkJPUsMBfkb+Dzz8c9ajwHy9/Cm4g8A1Xpf7jfJE3k7tPyqHjtPm3eSJ/ZzluO23/tq/1Geyv+8yMvLy8vLy//dPwFtb0ghu7+d2gAAAABJRU5ErkJggg=="
+        val syntheticPngBytes = byteArrayOf(
+            0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        )
+        val syntheticJpegBytes = byteArrayOf(
+            0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46,
+        )
+        val syntheticPngBase64 = Base64.Default.encode(syntheticPngBytes)
+        val syntheticJpegBase64 = Base64.Default.encode(syntheticJpegBytes)
     }
 }

@@ -17,6 +17,8 @@ actor MockWalletClient: WalletClient {
     private let rejectionResult: PresentationResult
     private let responseEncryptionRequired: Bool
     private let mdocMetadata: Bool
+    private let sampleCredentialDataJSON: String?
+    private let samplePortraitDisclosureValueJSON: String?
     private let deleteLocalDataDelayNanoseconds: UInt64
     private let deleteLocalDataError: Error?
     private(set) var rejectedPresentationPreviewHandles: [PresentationPreviewHandle] = []
@@ -33,6 +35,8 @@ actor MockWalletClient: WalletClient {
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
         responseEncryptionRequired: Bool = true,
         mdocMetadata: Bool = false,
+        sampleCredentialDataJSON: String? = nil,
+        samplePortraitDisclosureValueJSON: String? = nil,
         deleteLocalDataDelayMilliseconds: UInt64 = 0,
         deleteLocalDataError: Error? = nil
     ) {
@@ -46,6 +50,8 @@ actor MockWalletClient: WalletClient {
         self.rejectionResult = rejectionResult
         self.responseEncryptionRequired = responseEncryptionRequired
         self.mdocMetadata = mdocMetadata
+        self.sampleCredentialDataJSON = sampleCredentialDataJSON
+        self.samplePortraitDisclosureValueJSON = samplePortraitDisclosureValueJSON
         self.deleteLocalDataDelayNanoseconds = deleteLocalDataDelayMilliseconds * 1_000_000
         self.deleteLocalDataError = deleteLocalDataError
     }
@@ -109,7 +115,7 @@ actor MockWalletClient: WalletClient {
 
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome {
         try await delayOperation()
-        storedCredentials = [mdocMetadata ? Self.photoIDCredential : Self.sampleCredential]
+        storedCredentials = [mdocMetadata ? Self.photoIDCredential : sampleCredential]
         return .stored(sessionID: sessionID, credentialIDs: storedCredentials.map(\.id))
     }
 
@@ -141,7 +147,7 @@ actor MockWalletClient: WalletClient {
             PresentationPreview(
                 previewHandle: PresentationPreviewHandle(value: "mock-presentation-preview"),
                 request: previewRequestInfo,
-                credentialOptions: duplicatePresentationOptions ? Self.duplicateOptions : [Self.defaultOption],
+                credentialOptions: duplicatePresentationOptions ? duplicateOptions : [defaultOption],
                 credentialRequirements: [
                     PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
                 ]
@@ -244,8 +250,6 @@ actor MockWalletClient: WalletClient {
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
-    private static let samplePortraitDisclosureValueJSON = "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
-
     private static let paymentAuthorizationTransactionData = PresentationTransactionData(
         type: "org.waltid.transaction-data.payment-authorization",
         displayName: "Payment Authorization",
@@ -270,75 +274,84 @@ actor MockWalletClient: WalletClient {
         """
     )
 
-    private static let defaultOption = PresentationCredentialOption(
-        queryID: "pid",
-        credentialID: sampleCredential.id,
-        format: sampleCredential.format,
-        issuer: sampleCredential.issuer,
-        subject: sampleCredential.subject,
-        label: sampleCredential.label,
-        credentialDataJSON: sampleCredential.credentialDataJSON,
-        disclosures: [
+    private var defaultOption: PresentationCredentialOption {
+        var disclosures = [
             PresentationDisclosure(
                 path: "$.given_name",
                 name: "given_name",
                 valueJSON: "\"Ada\"",
                 displayValue: "Ada",
                 selectivelyDisclosable: true
-            ),
-            PresentationDisclosure(
+            )
+        ]
+        if let samplePortraitDisclosureValueJSON {
+            disclosures.append(PresentationDisclosure(
                 path: "$.portrait",
                 name: nil,
                 valueJSON: samplePortraitDisclosureValueJSON,
                 displayValue: nil,
                 selectivelyDisclosable: true
-            )
-        ]
-    )
-
-    private static let duplicateOptions = [
-        defaultOption.with(queryID: "identity", disclosures: [
-            PresentationDisclosure(
-                path: "$.given_name",
-                name: "Identity disclosure",
-                valueJSON: "\"Ada\"",
-                displayValue: "Ada",
-                selectivelyDisclosable: true
-            )
-        ]),
-        defaultOption.with(queryID: "age", disclosures: [
-            PresentationDisclosure(
-                path: "$.age_over_18",
-                name: "Age disclosure",
-                valueJSON: "\"Over 18\"",
-                displayValue: "Over 18",
-                selectivelyDisclosable: true
-            )
-        ])
-    ]
-
-    private static let sampleCredential = Credential(
-        id: "cred-1",
-        format: "jwt_vc_json",
-        issuer: "Example Issuer",
-        subject: nil,
-        label: "Example Credential",
-        addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
-        credentialDataJSON: """
-        {
-          "vct": "https://issuer.example/credential-types/mobile-driving-licence",
-          "given_name": "Ada",
-          "family_name": "Lovelace",
-          "valid_to": 1781654400,
-          "resident_address": {
-            "street_address": "Main Street 1",
-            "locality": "Vienna"
-          },
-          "portrait": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQMAAADS6sNKAAAABlBMVEUAAAD///+l2Z/dAAAAAnRSTlP//8i138cAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAG4SURBVHic7dpNbsMgEAVgpBzAR/LVORIHsEScecwwIa7aqt0867HAP3xkYxiPIaX/rhR5eXl5eXn5f/JllEe3qvfml3vztl2e1+Oivfx2ntSz/Twcp2qPnok8p389dmur2zFiAM7aGCPyt/CoMOm7/O28TXVrG1Nd/hbeDhNsEcq/if/yFH4Un++58jZ5Xj/L7NmRj63t8oTeHjuy7PcsDPO9bscyfuS5vLUZrcXj+XhLH8U/r+RZ/cjCIoDvaRSM4SHP7GNap6WQSMpsjWR5X8szecRzdCpezR9KRZ7Rz7k9BgBWrkt8bS3va3k2j9yrpLc0Vq5RLuK/PJHHw67IwgpoiXI2fMRzeSaPO5jldjYzb4T3j3xbnsu/nnvk1j7Vc4yXJ/b5sykqGwV1WfmSZ/T2qh6T3kN5/qG+xnN5Lo+I3Xw900L53IpImZk8pZ/XeyyFxCrIRfyXp/L+3N8SMGTZc41Tntfjwtqsu28wLZU8q49diNkJPUsMBfkb+Dzz8c9ajwHy9/Cm4g8A1Xpf7jfJE3k7tPyqHjtPm3eSJ/ZzluO23/tq/1Geyv+8yMvLy8vLy//dPwFtb0ghu7+d2gAAAABJRU5ErkJggg==",
-          "verification_artifact": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQMAAADS6sNKAAAABlBMVEUAAAD///+l2Z/dAAAAAnRSTlP//8i138cAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAG4SURBVHic7dpNbsMgEAVgpBzAR/LVORIHsEScecwwIa7aqt0867HAP3xkYxiPIaX/rhR5eXl5eXn5f/JllEe3qvfml3vztl2e1+Oivfx2ntSz/Twcp2qPnok8p389dmur2zFiAM7aGCPyt/CoMOm7/O28TXVrG1Nd/hbeDhNsEcq/if/yFH4Un++58jZ5Xj/L7NmRj63t8oTeHjuy7PcsDPO9bscyfuS5vLUZrcXj+XhLH8U/r+RZ/cjCIoDvaRSM4SHP7GNap6WQSMpsjWR5X8szecRzdCpezR9KRZ7Rz7k9BgBWrkt8bS3va3k2j9yrpLc0Vq5RLuK/PJHHw67IwgpoiXI2fMRzeSaPO5jldjYzb4T3j3xbnsu/nnvk1j7Vc4yXJ/b5sykqGwV1WfmSZ/T2qh6T3kN5/qG+xnN5Lo+I3Xw900L53IpImZk8pZ/XeyyFxCrIRfyXp/L+3N8SMGTZc41Tntfjwtqsu28wLZU8q49diNkJPUsMBfkb+Dzz8c9ajwHy9/Cm4g8A1Xpf7jfJE3k7tPyqHjtPm3eSJ/ZzluO23/tq/1Geyv+8yMvLy8vLy//dPwFtb0ghu7+d2gAAAABJRU5ErkJggg=="
+            ))
         }
-        """
-    )
+        return PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: sampleCredential.id,
+            format: sampleCredential.format,
+            issuer: sampleCredential.issuer,
+            subject: sampleCredential.subject,
+            label: sampleCredential.label,
+            credentialDataJSON: sampleCredential.credentialDataJSON,
+            disclosures: disclosures
+        )
+    }
+
+    private var duplicateOptions: [PresentationCredentialOption] {
+        [
+            defaultOption.with(queryID: "identity", disclosures: [
+                PresentationDisclosure(
+                    path: "$.given_name",
+                    name: "Identity disclosure",
+                    valueJSON: "\"Ada\"",
+                    displayValue: "Ada",
+                    selectivelyDisclosable: true
+                )
+            ]),
+            defaultOption.with(queryID: "age", disclosures: [
+                PresentationDisclosure(
+                    path: "$.age_over_18",
+                    name: "Age disclosure",
+                    valueJSON: "\"Over 18\"",
+                    displayValue: "Over 18",
+                    selectivelyDisclosable: true
+                )
+            ])
+        ]
+    }
+
+    private var sampleCredential: Credential {
+        Credential(
+            id: "cred-1",
+            format: "jwt_vc_json",
+            issuer: "Example Issuer",
+            subject: nil,
+            label: "Example Credential",
+            addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
+            credentialDataJSON: sampleCredentialDataJSON ?? Self.defaultSampleCredentialDataJSON
+        )
+    }
+
+    private static let defaultSampleCredentialDataJSON = """
+    {
+      "vct": "https://issuer.example/credential-types/mobile-driving-licence",
+      "given_name": "Ada",
+      "family_name": "Lovelace",
+      "valid_to": 1781654400,
+      "resident_address": {
+        "street_address": "Main Street 1",
+        "locality": "Vienna"
+      }
+    }
+    """
 
     private static let photoIDCredential = Credential(
         id: "photo-id-1",

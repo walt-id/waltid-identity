@@ -49,6 +49,9 @@
 		E2E00002AAAA000100000002 /* PublicDemoBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00002AAAA000000000002 /* PublicDemoBackendE2ETests.swift */; };
 		E2E00003AAAA000100000003 /* WalletE2EHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */; };
 		E2E00014AAAA000100000014 /* MockWalletUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00014AAAA000000000014 /* MockWalletUITests.swift */; };
+		E2E00015AAAA000100000015 /* synthetic-portrait.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E2E00005AAAA000000000005 /* synthetic-portrait.jpg */; };
+		E2E00016AAAA000100000016 /* synthetic-signature.png in Resources */ = {isa = PBXBuildFile; fileRef = E2E00006AAAA000000000006 /* synthetic-signature.png */; };
+		E2E00017AAAA000100000017 /* synthetic-verification-document.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E2E00007AAAA000000000007 /* synthetic-verification-document.jpg */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -143,6 +146,9 @@
 		E2E00002AAAA000000000002 /* PublicDemoBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicDemoBackendE2ETests.swift; sourceTree = "<group>"; };
 		E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EHelpers.swift; sourceTree = "<group>"; };
 		E2E00004AAAA000000000004 /* iosAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2E00005AAAA000000000005 /* synthetic-portrait.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "synthetic-portrait.jpg"; sourceTree = "<group>"; };
+		E2E00006AAAA000000000006 /* synthetic-signature.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "synthetic-signature.png"; sourceTree = "<group>"; };
+		E2E00007AAAA000000000007 /* synthetic-verification-document.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "synthetic-verification-document.jpg"; sourceTree = "<group>"; };
 		E2E00014AAAA000000000014 /* MockWalletUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWalletUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -281,6 +287,7 @@
 				B33B17E82C2C394F001A32F7 /* iosApp */,
 				A75200000000000000000001 /* IdentityDocumentProvider */,
 				E2E00010AAAA000000000010 /* iosAppUITests */,
+				E2E00011AAAA000000000011 /* Credential image test fixtures */,
 				D6B7A34B2FD94CC3009C69E7 /* iosAppTests */,
 				71E100062FDAE00000000006 /* iosAppEnterpriseTests */,
 				D690444B2FDAA5D2009AB1FB /* ../../mobile-e2e-fixtures/ios/TestHelpers */,
@@ -327,6 +334,17 @@
 				E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */,
 			);
 			path = iosAppUITests;
+			sourceTree = "<group>";
+		};
+		E2E00011AAAA000000000011 /* Credential image test fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				E2E00005AAAA000000000005 /* synthetic-portrait.jpg */,
+				E2E00006AAAA000000000006 /* synthetic-signature.png */,
+				E2E00007AAAA000000000007 /* synthetic-verification-document.jpg */,
+			);
+			name = "Credential image test fixtures";
+			path = "../../waltid-wallet-demo-test-fixtures/resources/files";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -467,6 +485,7 @@
 			buildPhases = (
 				E2E00020AAAA000000000020 /* Sources */,
 				D69044572FDAA6D7009AB1FB /* Frameworks */,
+				E2E00021AAAA000000000021 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -573,6 +592,16 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2E00021AAAA000000000021 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E2E00015AAAA000100000015 /* synthetic-portrait.jpg in Resources */,
+				E2E00016AAAA000100000016 /* synthetic-signature.png in Resources */,
+				E2E00017AAAA000100000017 /* synthetic-verification-document.jpg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

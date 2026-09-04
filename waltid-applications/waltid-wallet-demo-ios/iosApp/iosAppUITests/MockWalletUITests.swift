@@ -517,6 +517,8 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(card.isHittable)
         card.tap()
         ui.assertExists(identifier: "wallet.credentialDetailsScreen", timeout: 10)
+        ui.assertExists(identifier: ui.claimImageIdentifier(path: "portrait"), timeout: 10)
+        ui.assertExists(identifier: ui.claimImageIdentifier(path: "signature_usual_mark"), timeout: 10)
         let artifactImageIdentifier = ui.claimImageIdentifier(path: "verification_artifact")
         ui.assertExists(identifier: artifactImageIdentifier, timeout: 10)
         ui.tapElement(identifier: artifactImageIdentifier)

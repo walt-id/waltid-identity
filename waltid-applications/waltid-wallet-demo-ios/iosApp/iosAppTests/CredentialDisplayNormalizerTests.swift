@@ -161,7 +161,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             addedAt: nil,
             credentialDataJSON: """
             {
-              "portrait": "data:image/png;base64,\(Self.syntheticQRPNGBase64)",
+              "portrait": "data:image/png;base64,\(Self.syntheticPNGBase64)",
               "nationalities": ["AT", "CH"],
               "place_of_birth": {
                 "region": "Vienna",
@@ -203,7 +203,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             {
               "eu.europa.ec.eudi.pid.1": {
                 "portrait": {
-                  "elementValue": \(syntheticQRPNGByteArrayJSON())
+                  "elementValue": \(syntheticPNGByteArrayJSON())
                 }
               }
             }
@@ -218,8 +218,8 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             return XCTFail("Expected portrait to decode as image")
         }
         XCTAssertEqual(mimeType, "image/png")
-        XCTAssertEqual(byteCount, syntheticQRPNGData.count)
-        XCTAssertEqual(data, syntheticQRPNGData)
+        XCTAssertEqual(byteCount, syntheticPNGData.count)
+        XCTAssertEqual(data, syntheticPNGData)
     }
 
     func testRendersSdJwtProtocolDataAsReadableMetadataAndKeepsClaimsGrouped() throws {
@@ -358,7 +358,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   "credentialSubject": {
                     "given_name": "Ada",
                     "family_name": "Lovelace",
-                    "portrait": "data:image/png;base64,\(Self.syntheticQRPNGBase64)"
+                    "portrait": "data:image/png;base64,\(Self.syntheticPNGBase64)"
                   }
                 }
                 """,
@@ -639,10 +639,10 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             subject: nil,
             format: "mso_mdoc",
             addedAt: nil,
-            credentialDataJSON: #"{"portrait":{"elementValue":\#(syntheticQRPNGByteArrayJSON())}}"#
+            credentialDataJSON: #"{"portrait":{"elementValue":\#(syntheticPNGByteArrayJSON())}}"#
         )
 
-        XCTAssertEqual(details.cardSummary.portraitData, syntheticQRPNGData)
+        XCTAssertEqual(details.cardSummary.portraitData, syntheticPNGData)
         XCTAssertEqual(details.cardSummary.portraitMimeType, "image/png")
     }
 
@@ -660,7 +660,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             {
               "json_note": "data:image/png;base64,\(encodedJSON)",
               "plain_note": "data:image/webp;base64,\(encodedText)",
-              "portrait": "data:image/png;base64,\(Self.syntheticQRPNGBase64)"
+              "portrait": "data:image/png;base64,\(Self.syntheticPNGBase64)"
             }
             """
         )
@@ -683,8 +683,14 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 subject: nil,
                 format: format,
                 addedAt: nil,
-                credentialDataJSON:
-                    #"{"verification_artifact":"data:image/jpeg;base64,\#(Self.syntheticQRPNGBase64)","resident_address":{"visual_proof":"data:image/png;base64,\#(Self.syntheticQRPNGBase64)"}}"#
+                credentialDataJSON: #"""
+                {
+                  "verification_artifact": "data:image/jpeg;base64,\#(Self.syntheticJPEGBase64)",
+                  "resident_address": {
+                    "visual_proof": "data:image/jpeg;base64,\#(Self.syntheticPNGBase64)"
+                  }
+                }
+                """#
             )
 
             let claim = details.groups
@@ -695,8 +701,8 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 XCTFail("Expected a valid data image claim to render for \(format)")
                 continue
             }
-            XCTAssertEqual(mimeType, "image/png")
-            XCTAssertEqual(data, syntheticQRPNGData)
+            XCTAssertEqual(mimeType, "image/jpeg")
+            XCTAssertEqual(data, Self.syntheticJPEGData)
 
             guard case .image(_, _, let nestedMimeType, _) = details.groups
                 .flatMap(\.items)
@@ -713,7 +719,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             #"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/></svg>"#
                 .data(using: .utf8)?.base64EncodedString()
         )
-        let dataImage = "data:image/png;base64,\(Self.syntheticQRPNGBase64)"
+        let dataImage = "data:image/png;base64,\(Self.syntheticPNGBase64)"
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",
             title: "vc+sd-jwt",
@@ -726,8 +732,8 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
               "given_name": "\(dataImage)",
               "invalid_image": "data:image/png;base64,not-base64!",
               "unsupported_image": "data:image/svg+xml;base64,\(svg)",
-              "non_image_data_url": "data:text/plain;base64,\(Self.syntheticQRPNGBase64)",
-              "plain_base64": "\(Self.syntheticQRPNGBase64)"
+              "non_image_data_url": "data:text/plain;base64,\(Self.syntheticPNGBase64)",
+              "plain_base64": "\(Self.syntheticPNGBase64)"
             }
             """
         )
@@ -757,7 +763,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 PresentationDisclosure(
                     path: #"["$","verification_artifact"]"#,
                     name: "verification_artifact",
-                    valueJSON: #""data:image/png;base64,\#(Self.syntheticQRPNGBase64)""#,
+                    valueJSON: #""data:image/png;base64,\#(Self.syntheticPNGBase64)""#,
                     displayValue: nil,
                     selectivelyDisclosable: true,
                     required: false,
@@ -800,7 +806,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 PresentationDisclosure(
                     path: #"["eu.europa.ec.eudi.pid.1","portrait"]"#,
                     name: "portrait",
-                    valueJSON: syntheticQRPNGByteArrayJSON(),
+                    valueJSON: syntheticPNGByteArrayJSON(),
                     displayValue: nil,
                     selectivelyDisclosable: true,
                     required: false,
@@ -820,7 +826,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             return XCTFail("Expected requested portrait disclosure to render as an image")
         }
         XCTAssertEqual(mimeType, "image/png")
-        XCTAssertEqual(byteCount, syntheticQRPNGData.count)
+        XCTAssertEqual(byteCount, syntheticPNGData.count)
 
         let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
         XCTAssertEqual(personal.items.map(\.label), ["Given name", "Family name"])
@@ -903,7 +909,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             {
               "org.iso.18013.5.1": {
                 "signature_usual_mark": {
-                  "elementValue": \(syntheticQRPNGByteArrayJSON())
+                  "elementValue": \(syntheticPNGByteArrayJSON())
                 }
               }
             }
@@ -922,7 +928,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     }
 
     func testRecognizesStandardMdocBiometricImageBytes() throws {
-        let imageBytes = syntheticQRPNGByteArrayJSON()
+        let imageBytes = syntheticPNGByteArrayJSON()
         let details = CredentialDisplayNormalizer.details(
             id: "credential-1",
             title: "Mobile driving licence",
@@ -1170,17 +1176,22 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.cardSummary.title, "Personal ID")
     }
 
-    private func syntheticQRPNGByteArrayJSON() -> String {
-        "[" + syntheticQRPNGData.map { String($0) }.joined(separator: ",") + "]"
+    private func syntheticPNGByteArrayJSON() -> String {
+        "[" + syntheticPNGData.map { String($0) }.joined(separator: ",") + "]"
     }
 
-    private var syntheticQRPNGData: Data {
-        Data(base64Encoded: Self.syntheticQRPNGBase64)!
+    private var syntheticPNGData: Data {
+        Self.syntheticPNGBytes
     }
 
-    // Deterministic 370 x 370 QR PNG generated from synthetic text; contains no third-party artwork.
-    private static let syntheticQRPNGBase64 =
-        "iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQMAAADS6sNKAAAABlBMVEUAAAD///+l2Z/dAAAAAnRSTlP//8i138cAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAG4SURBVHic7dpNbsMgEAVgpBzAR/LVORIHsEScecwwIa7aqt0867HAP3xkYxiPIaX/rhR5eXl5eXn5f/JllEe3qvfml3vztl2e1+Oivfx2ntSz/Twcp2qPnok8p389dmur2zFiAM7aGCPyt/CoMOm7/O28TXVrG1Nd/hbeDhNsEcq/if/yFH4Un++58jZ5Xj/L7NmRj63t8oTeHjuy7PcsDPO9bscyfuS5vLUZrcXj+XhLH8U/r+RZ/cjCIoDvaRSM4SHP7GNap6WQSMpsjWR5X8szecRzdCpezR9KRZ7Rz7k9BgBWrkt8bS3va3k2j9yrpLc0Vq5RLuK/PJHHw67IwgpoiXI2fMRzeSaPO5jldjYzb4T3j3xbnsu/nnvk1j7Vc4yXJ/b5sykqGwV1WfmSZ/T2qh6T3kN5/qG+xnN5Lo+I3Xw900L53IpImZk8pZ/XeyyFxCrIRfyXp/L+3N8SMGTZc41Tntfjwtqsu28wLZU8q49diNkJPUsMBfkb+Dzz8c9ajwHy9/Cm4g8A1Xpf7jfJE3k7tPyqHjtPm3eSJ/ZzluO23/tq/1Geyv+8yMvLy8vLy//dPwFtb0ghu7+d2gAAAABJRU5ErkJggg=="
+    private static let syntheticPNGBytes = Data([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+    ])
+    private static let syntheticJPEGData = Data([
+        0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46,
+    ])
+    private static let syntheticPNGBase64 = syntheticPNGBytes.base64EncodedString()
+    private static let syntheticJPEGBase64 = syntheticJPEGData.base64EncodedString()
 
     private static let isoDateFormatter: DateFormatter = {
         let formatter = DateFormatter()

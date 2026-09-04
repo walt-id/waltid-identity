@@ -208,7 +208,12 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.claimImage("portrait"))
             .performScrollTo()
             .assertIsDisplayed()
-        onAllNodesWithText("image/png").assertCountEquals(2)
+        onNodeWithText("Signature or usual mark").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage("signature_usual_mark"))
+            .performScrollTo()
+            .assertIsDisplayed()
+        onAllNodesWithText("image/jpeg").assertCountEquals(2)
+        onAllNodesWithText("image/png").assertCountEquals(1)
         onNodeWithText("Verification artifact").performScrollTo().assertIsDisplayed()
         val artifactPath = "verification_artifact"
         onNodeWithTag(WalletUiTestTags.claimImage(artifactPath))
@@ -1237,107 +1242,117 @@ class WalletDemoAppTestScenarios {
     }
 
     companion object {
-        val sampleCredential = WalletDemoCredential(
-            id = "cred-1",
-            format = "jwt_vc_json",
-            issuer = "Example Issuer",
-            label = "Example Credential",
-            addedAt = "2026-07-09",
-            credentialDataJson = """
-                {
-                  "vct": "https://issuer.example/credential-types/mobile-driving-licence",
-                  "given_name": "Ada",
-                  "family_name": "Lovelace",
-                  "valid_to": 1781654400,
-                  "resident_address": {
-                    "street_address": "Main Street 1",
-                    "locality": "Vienna"
-                  },
-                  "portrait": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQMAAADS6sNKAAAABlBMVEUAAAD///+l2Z/dAAAAAnRSTlP//8i138cAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAG4SURBVHic7dpNbsMgEAVgpBzAR/LVORIHsEScecwwIa7aqt0867HAP3xkYxiPIaX/rhR5eXl5eXn5f/JllEe3qvfml3vztl2e1+Oivfx2ntSz/Twcp2qPnok8p389dmur2zFiAM7aGCPyt/CoMOm7/O28TXVrG1Nd/hbeDhNsEcq/if/yFH4Un++58jZ5Xj/L7NmRj63t8oTeHjuy7PcsDPO9bscyfuS5vLUZrcXj+XhLH8U/r+RZ/cjCIoDvaRSM4SHP7GNap6WQSMpsjWR5X8szecRzdCpezR9KRZ7Rz7k9BgBWrkt8bS3va3k2j9yrpLc0Vq5RLuK/PJHHw67IwgpoiXI2fMRzeSaPO5jldjYzb4T3j3xbnsu/nnvk1j7Vc4yXJ/b5sykqGwV1WfmSZ/T2qh6T3kN5/qG+xnN5Lo+I3Xw900L53IpImZk8pZ/XeyyFxCrIRfyXp/L+3N8SMGTZc41Tntfjwtqsu28wLZU8q49diNkJPUsMBfkb+Dzz8c9ajwHy9/Cm4g8A1Xpf7jfJE3k7tPyqHjtPm3eSJ/ZzluO23/tq/1Geyv+8yMvLy8vLy//dPwFtb0ghu7+d2gAAAABJRU5ErkJggg==",
-                  "verification_artifact": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQMAAADS6sNKAAAABlBMVEUAAAD///+l2Z/dAAAAAnRSTlP//8i138cAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAG4SURBVHic7dpNbsMgEAVgpBzAR/LVORIHsEScecwwIa7aqt0867HAP3xkYxiPIaX/rhR5eXl5eXn5f/JllEe3qvfml3vztl2e1+Oivfx2ntSz/Twcp2qPnok8p389dmur2zFiAM7aGCPyt/CoMOm7/O28TXVrG1Nd/hbeDhNsEcq/if/yFH4Un++58jZ5Xj/L7NmRj63t8oTeHjuy7PcsDPO9bscyfuS5vLUZrcXj+XhLH8U/r+RZ/cjCIoDvaRSM4SHP7GNap6WQSMpsjWR5X8szecRzdCpezR9KRZ7Rz7k9BgBWrkt8bS3va3k2j9yrpLc0Vq5RLuK/PJHHw67IwgpoiXI2fMRzeSaPO5jldjYzb4T3j3xbnsu/nnvk1j7Vc4yXJ/b5sykqGwV1WfmSZ/T2qh6T3kN5/qG+xnN5Lo+I3Xw900L53IpImZk8pZ/XeyyFxCrIRfyXp/L+3N8SMGTZc41Tntfjwtqsu28wLZU8q49diNkJPUsMBfkb+Dzz8c9ajwHy9/Cm4g8A1Xpf7jfJE3k7tPyqHjtPm3eSJ/ZzluO23/tq/1Geyv+8yMvLy8vLy//dPwFtb0ghu7+d2gAAAABJRU5ErkJggg=="
-                }
-            """.trimIndent(),
-        )
+        private val samplePortraitDisclosureValueJson by lazy {
+            SyntheticCredentialImageFixtures.portraitByteArrayJson
+        }
 
-        val samplePresentationPreview = WalletDemoPresentationPreview(
-            previewHandle = WalletDemoPresentationPreviewHandle("sample-presentation-preview"),
-            verifierMetadata = WalletDemoVerifierMetadata(
-                display = WalletDemoMetadataDisplay(
-                    name = "Example Verifier",
-                    logoUri = null,
-                    logoAltText = null,
+        val sampleCredential by lazy {
+            WalletDemoCredential(
+                id = "cred-1",
+                format = "jwt_vc_json",
+                issuer = "Example Issuer",
+                label = "Example Credential",
+                addedAt = "2026-07-09",
+                credentialDataJson = """
+                    {
+                      "vct": "https://issuer.example/credential-types/mobile-driving-licence",
+                      "given_name": "Ada",
+                      "family_name": "Lovelace",
+                      "valid_to": 1781654400,
+                      "resident_address": {
+                        "street_address": "Main Street 1",
+                        "locality": "Vienna"
+                      },
+                      "portrait": "${SyntheticCredentialImageFixtures.portraitDataUrl}",
+                      "signature_usual_mark": "${SyntheticCredentialImageFixtures.signatureDataUrl}",
+                      "verification_artifact": "${SyntheticCredentialImageFixtures.verificationDocumentDataUrl}"
+                    }
+                """.trimIndent(),
+            )
+        }
+
+        val samplePresentationPreview by lazy {
+            WalletDemoPresentationPreview(
+                previewHandle = WalletDemoPresentationPreviewHandle("sample-presentation-preview"),
+                verifierMetadata = WalletDemoVerifierMetadata(
+                    display = WalletDemoMetadataDisplay(
+                        name = "Example Verifier",
+                        logoUri = null,
+                        logoAltText = null,
+                    ),
+                    clientUri = "https://verifier.example",
+                    policyUri = "https://verifier.example/privacy",
+                    termsOfServiceUri = "https://verifier.example/terms",
                 ),
-                clientUri = "https://verifier.example",
-                policyUri = "https://verifier.example/privacy",
-                termsOfServiceUri = "https://verifier.example/terms",
-            ),
-            clientId = "https://verifier.example/client",
-            responseUri = "https://verifier.example/response",
-            state = "state-123",
-            nonce = "nonce-456",
-            responseEncryption = WalletDemoResponseEncryption.Required(
-                keyManagementAlgorithm = "ECDH-ES",
-                contentEncryptionAlgorithm = "A256GCM",
-                verifierKeyId = "verifier-key-1",
-                verifierKeyThumbprint = "thumbprint-1",
-            ),
-            credentialOptions = listOf(
-                WalletDemoPresentationCredentialOption(
-                    queryId = "pid",
-                    credentialId = "cred-1",
-                    label = "Example Credential",
-                    issuer = "Example Issuer",
-                    format = "jwt_vc_json",
-                    credentialDataJson = checkNotNull(sampleCredential.credentialDataJson),
-                    disclosures = (1..7).map { index ->
-                        WalletDemoPresentationDisclosure(
-                            label = "Disclosure $index",
-                            valueJson = "\"Value $index\"",
-                            displayValue = "Value $index",
+                clientId = "https://verifier.example/client",
+                responseUri = "https://verifier.example/response",
+                state = "state-123",
+                nonce = "nonce-456",
+                responseEncryption = WalletDemoResponseEncryption.Required(
+                    keyManagementAlgorithm = "ECDH-ES",
+                    contentEncryptionAlgorithm = "A256GCM",
+                    verifierKeyId = "verifier-key-1",
+                    verifierKeyThumbprint = "thumbprint-1",
+                ),
+                credentialOptions = listOf(
+                    WalletDemoPresentationCredentialOption(
+                        queryId = "pid",
+                        credentialId = "cred-1",
+                        label = "Example Credential",
+                        issuer = "Example Issuer",
+                        format = "jwt_vc_json",
+                        credentialDataJson = checkNotNull(sampleCredential.credentialDataJson),
+                        disclosures = (1..7).map { index ->
+                            WalletDemoPresentationDisclosure(
+                                label = "Disclosure $index",
+                                valueJson = "\"Value $index\"",
+                                displayValue = "Value $index",
+                                selectivelyDisclosable = true,
+                            )
+                        } + WalletDemoPresentationDisclosure(
+                            label = "Portrait",
+                            path = "$.portrait",
+                            valueJson = samplePortraitDisclosureValueJson,
+                            displayValue = null,
                             selectivelyDisclosable = true,
-                        )
-                    } + WalletDemoPresentationDisclosure(
+                        ),
+                    )
+                ),
+                credentialRequirements = listOf(
+                    WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
+                ),
+            )
+        }
+
+        val compactPresentationPreview by lazy {
+            samplePresentationPreview.copy(
+                credentialOptions = listOf(
+                    samplePresentationPreview.credentialOptions.single().copy(disclosures = emptyList()),
+                ),
+            )
+        }
+
+        val pathOnlyPortraitDisclosureCredentialOption by lazy {
+            WalletDemoPresentationCredentialOption(
+                queryId = "pid",
+                credentialId = "cred-1",
+                label = "Example Credential",
+                issuer = "Example Issuer",
+                format = "jwt_vc_json",
+                credentialDataJson = checkNotNull(sampleCredential.credentialDataJson),
+                disclosures = listOf(
+                    WalletDemoPresentationDisclosure(
                         label = "Portrait",
                         path = "$.portrait",
                         valueJson = samplePortraitDisclosureValueJson,
                         displayValue = null,
                         selectivelyDisclosable = true,
-                    ),
-                )
-            ),
-            credentialRequirements = listOf(
-                WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
-            ),
-        )
-
-        val compactPresentationPreview = samplePresentationPreview.copy(
-            credentialOptions = listOf(
-                samplePresentationPreview.credentialOptions.single().copy(disclosures = emptyList()),
-            ),
-        )
-
-        val pathOnlyPortraitDisclosureCredentialOption = WalletDemoPresentationCredentialOption(
-            queryId = "pid",
-            credentialId = "cred-1",
-            label = "Example Credential",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = checkNotNull(sampleCredential.credentialDataJson),
-            disclosures = listOf(
-                WalletDemoPresentationDisclosure(
-                    label = "Portrait",
-                    path = "$.portrait",
-                    valueJson = samplePortraitDisclosureValueJson,
-                    displayValue = null,
-                    selectivelyDisclosable = true,
-                )
-            ),
-        )
+                    )
+                ),
+            )
+        }
 
         const val sampleDidClientId = "decentralized_identifier:did:jwk:abc"
-        private const val samplePortraitDisclosureValueJson =
-            "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
-
         private val samplePresentationCredentialOption: WalletDemoPresentationCredentialOption
             get() = samplePresentationPreview.credentialOptions.single()
     }
