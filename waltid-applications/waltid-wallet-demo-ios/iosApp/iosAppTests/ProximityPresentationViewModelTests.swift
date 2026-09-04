@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import XCTest
 import WalletDemoSharingUI
 import ZXingCpp
@@ -7,8 +8,62 @@ import WalletDemoIdentityDocumentSupport
 @testable import WalletSDK
 
 final class ProximityPresentationViewModelTests: XCTestCase {
+    func testLifecyclePolicyPreservesTransientInactiveStateAndInterruptsOnBackground() {
+        XCTAssertFalse(ProximityPresentationLifecyclePolicy.shouldInterrupt(for: .active))
+        XCTAssertFalse(ProximityPresentationLifecyclePolicy.shouldInterrupt(for: .inactive))
+        XCTAssertTrue(ProximityPresentationLifecyclePolicy.shouldInterrupt(for: .background))
+    }
+
     @MainActor
-    func testStartObservesSessionAndLifecycleCancelsActiveExchange() async throws {
+    func testStartPreflightsAndRequestsBluetoothBeforeCreatingSession() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(
+            session: session,
+            capabilityResults: [
+                makeProximityCapabilities(
+                    bluetoothAvailable: false,
+                    bluetoothRemediation: [.requestBluetoothPermission]
+                ),
+                makeProximityCapabilities(),
+            ]
+        )
+        let hostActions = FakeProximityHostActionExecutor()
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: hostActions)
+
+        viewModel.start()
+        try await waitUntil {
+            client.capabilityCallCount == 2 && client.startCount == 1
+        }
+
+        XCTAssertEqual(hostActions.actions, [.requestBluetoothPermission])
+        XCTAssertEqual(client.startCount, 1)
+    }
+
+    @MainActor
+    func testStartDoesNotAdvertiseBLEWhileItsPermissionIsDenied() async throws {
+        let session = FakeProximitySession()
+        let capabilities = makeProximityCapabilities(
+            bluetoothAvailable: false,
+            bluetoothRemediation: [.openApplicationSettings]
+        )
+        let client = FakeProximityWalletClient(
+            session: session,
+            capabilityResults: [capabilities]
+        )
+        let viewModel = ProximityPresentationViewModel(
+            client: client,
+            hostActions: FakeProximityHostActionExecutor()
+        )
+
+        viewModel.start()
+        try await waitUntil { client.capabilityCallCount == 1 }
+
+        XCTAssertEqual(client.startCount, 0)
+        XCTAssertEqual(viewModel.sessionState, .checkingPrerequisites(capabilities))
+    }
+
+    @MainActor
+    func testNfcSystemPresentationBackgroundDoesNotCancelActiveExchange() async throws {
         let session = FakeProximitySession()
         let client = FakeProximityWalletClient(session: session)
         let viewModel = ProximityPresentationViewModel(
@@ -32,6 +87,29 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             return XCTFail("The demo must prepare BLE and conventional NFC retrieval")
         }
         XCTAssertTrue(viewModel.active)
+
+        viewModel.handleLifecycleInterruption()
+        let actions = await session.actions
+        XCTAssertEqual(actions, [])
+
+        viewModel.dismiss()
+        try await waitUntilAsync { await session.closeCount == 1 }
+    }
+
+    @MainActor
+    func testQrOnlyLifecycleBackgroundCancelsActiveExchange() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let viewModel = ProximityPresentationViewModel(
+            client: client,
+            configurationProvider: { ProximityPresentationConfiguration() },
+            hostActions: FakeProximityHostActionExecutor()
+        )
+
+        viewModel.start()
+        await session.emit(.preparing(profile: .iso180135Edition2DIS2026))
+        await session.emit(.engagementReady([.qr(payload: "mdoc:device-engagement")]))
+        try await waitUntil { viewModel.qrPayload == "mdoc:device-engagement" }
 
         viewModel.handleLifecycleInterruption()
         try await waitUntilAsync { await session.actions == [.cancel] }
@@ -362,14 +440,29 @@ private func combinedProximityReview(exchange: Int = 1) -> ProximityPresentation
 private final class FakeProximityWalletClient: ProximityWalletClient {
     private let session: any DemoProximityPresentationSession
     private let suspendStart: Bool
+    private let capabilityResults: [ProximityPresentationCapabilities]
     private var startContinuation: CheckedContinuation<Void, Never>?
+    private(set) var capabilityCallCount = 0
     private(set) var startCount = 0
     private(set) var configurations: [ProximityPresentationConfiguration] = []
     var lastConfiguration: ProximityPresentationConfiguration? { configurations.last }
 
-    init(session: any DemoProximityPresentationSession, suspendStart: Bool = false) {
+    init(
+        session: any DemoProximityPresentationSession,
+        suspendStart: Bool = false,
+        capabilityResults: [ProximityPresentationCapabilities] = [makeProximityCapabilities()]
+    ) {
         self.session = session
         self.suspendStart = suspendStart
+        self.capabilityResults = capabilityResults
+    }
+
+    func proximityPresentationCapabilities(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> ProximityPresentationCapabilities {
+        let index = min(capabilityCallCount, capabilityResults.count - 1)
+        capabilityCallCount += 1
+        return capabilityResults[index]
     }
 
     func startProximityPresentation(
@@ -423,11 +516,53 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
 
 @MainActor
 private final class FakeProximityHostActionExecutor: ProximityHostActionExecutor {
+    private(set) var actions: [ProximityPresentationRemediationAction] = []
+
     func perform(
         _ action: ProximityPresentationRemediationAction
     ) async -> ProximityPresentationHostActionResult {
-        .completed
+        actions.append(action)
+        return .completed
     }
+}
+
+private func makeProximityCapabilities(
+    bluetoothAvailable: Bool = true,
+    bluetoothRemediation: [ProximityPresentationRemediationAction] = []
+) -> ProximityPresentationCapabilities {
+    func capability(
+        available: Bool,
+        selected: Bool,
+        remediation: [ProximityPresentationRemediationAction] = []
+    ) -> ProximityPresentationTransportCapability {
+        ProximityPresentationTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtimeAvailable: available,
+            selected: selected,
+            unavailable: available ? nil : ProximityPresentationError(
+                category: .capability,
+                code: "test_unavailable",
+                message: "The selected test capability is unavailable",
+                recoverable: !remediation.isEmpty
+            ),
+            remediationActions: remediation
+        )
+    }
+
+    return ProximityPresentationCapabilities(
+        profile: .iso180135Edition2DIS2026,
+        qrEngagement: capability(available: true, selected: true),
+        nfcEngagement: capability(available: true, selected: true),
+        bluetoothLowEnergy: capability(
+            available: bluetoothAvailable,
+            selected: true,
+            remediation: bluetoothRemediation
+        ),
+        nfcRetrieval: capability(available: true, selected: true),
+        nfcV2Retrieval: capability(available: false, selected: false),
+        wifiAwareRetrieval: capability(available: false, selected: false)
+    )
 }
 
 @MainActor

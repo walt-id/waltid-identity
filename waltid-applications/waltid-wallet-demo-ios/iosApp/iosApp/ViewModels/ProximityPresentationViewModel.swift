@@ -14,6 +14,10 @@ extension ProximityPresentationSession: DemoProximityPresentationSession {}
 
 @MainActor
 protocol ProximityWalletClient: AnyObject {
+    func proximityPresentationCapabilities(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> ProximityPresentationCapabilities
+
     func startProximityPresentation(
         configuration: ProximityPresentationConfiguration
     ) async throws -> any DemoProximityPresentationSession
@@ -48,6 +52,8 @@ final class ProximityPresentationViewModel: ObservableObject {
     private var session: (any DemoProximityPresentationSession)?
     private var observationTask: Task<Void, Never>?
     private var hostActionTask: Task<Void, Never>?
+    private var pendingConfiguration: ProximityPresentationConfiguration?
+    private var systemNfcPresentationActive = false
     private var sessionGeneration: UInt64 = 0
 
     init(
@@ -98,14 +104,44 @@ final class ProximityPresentationViewModel: ObservableObject {
         sessionGeneration &+= 1
         let generation = sessionGeneration
         let configuration = configurationProvider()
+        systemNfcPresentationActive = configuration.engagement.usesSystemNfcPresentation
+        pendingConfiguration = configuration
+        checkPrerequisitesAndStart(configuration, generation: generation)
+    }
+
+    private func checkPrerequisitesAndStart(
+        _ configuration: ProximityPresentationConfiguration,
+        generation: UInt64,
+        automaticPermissionAttempted: Bool = false
+    ) {
+        observationTask?.cancel()
         observationTask = Task { [weak self] in
             guard let self else { return }
             do {
+                let capabilities = try await client.proximityPresentationCapabilities(
+                    configuration: configuration
+                )
+                guard active, sessionGeneration == generation else { return }
+                sessionState = .checkingPrerequisites(capabilities)
+                if capabilities.bluetoothLowEnergy.selected,
+                   !capabilities.bluetoothLowEnergy.runtimeAvailable {
+                    if !automaticPermissionAttempted,
+                       capabilities.bluetoothLowEnergy.remediationActions
+                           .contains(.requestBluetoothPermission) {
+                        await remediateBeforeSession(
+                            .requestBluetoothPermission,
+                            configuration: configuration,
+                            generation: generation
+                        )
+                    }
+                    return
+                }
                 let started = try await client.startProximityPresentation(configuration: configuration)
                 guard active, sessionGeneration == generation else {
                     await started.close()
                     return
                 }
+                pendingConfiguration = nil
                 session = started
                 for await state in started.states {
                     try Task.checkCancellation()
@@ -121,6 +157,22 @@ final class ProximityPresentationViewModel: ObservableObject {
                 actionErrorMessage = Self.demoSessionFailureMessage
             }
         }
+    }
+
+    private func remediateBeforeSession(
+        _ action: ProximityPresentationRemediationAction,
+        configuration: ProximityPresentationConfiguration,
+        generation: UInt64
+    ) async {
+        hostActionInProgress = action
+        _ = await hostActions.perform(action)
+        guard !Task.isCancelled, active, sessionGeneration == generation else { return }
+        hostActionInProgress = nil
+        checkPrerequisitesAndStart(
+            configuration,
+            generation: generation,
+            automaticPermissionAttempted: true
+        )
     }
 
     func selectCredential(requestIndex: Int, credentialID: String) {
@@ -198,14 +250,18 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func retryPrerequisites() {
-        dispatch(.retryPrerequisites)
+        if session == nil, let pendingConfiguration {
+            checkPrerequisitesAndStart(pendingConfiguration, generation: sessionGeneration)
+        } else {
+            dispatch(.retryPrerequisites)
+        }
     }
 
     func remediate(_ action: ProximityPresentationRemediationAction) {
         guard case .checkingPrerequisites(let capabilities) = sessionState,
               capabilities.remediationActions.contains(action),
               hostActionInProgress == nil,
-              let session else {
+              session != nil || pendingConfiguration != nil else {
             return
         }
         hostActionInProgress = action
@@ -215,6 +271,16 @@ final class ProximityPresentationViewModel: ObservableObject {
             guard let self else { return }
             let outcome = await hostActions.perform(action)
             guard !Task.isCancelled, active, sessionGeneration == generation else { return }
+            if session == nil, let pendingConfiguration {
+                hostActionInProgress = nil
+                checkPrerequisitesAndStart(
+                    pendingConfiguration,
+                    generation: generation,
+                    automaticPermissionAttempted: true
+                )
+                return
+            }
+            guard let session else { return }
             let result: ProximityPresentationActionResult
             do {
                 result = try await session.dispatch(.reportRemediation(action, outcome))
@@ -233,7 +299,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func cancel() {
-        guard sessionState != nil else {
+        guard session != nil else {
             dismiss()
             return
         }
@@ -243,6 +309,10 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     func handleLifecycleInterruption() {
         guard hostActionInProgress == nil else { return }
+        // CardSession presents system UI in a separate full-screen process. That transition can
+        // background the host application while HCE is active, so the protocol session must stay
+        // alive until CardSession, the reader, the user, or the protocol timeout closes it.
+        guard !systemNfcPresentationActive else { return }
         guard case .checkingPrerequisites = sessionState else {
             cancel()
             return
@@ -257,6 +327,8 @@ final class ProximityPresentationViewModel: ObservableObject {
         hostActionTask = nil
         let closing = session
         session = nil
+        pendingConfiguration = nil
+        systemNfcPresentationActive = false
         active = false
         sessionState = nil
         selections = []
@@ -316,6 +388,17 @@ final class ProximityPresentationViewModel: ObservableObject {
     private static let demoSessionFailureMessage = String(
         localized: "The in-person presentation could not be started"
     )
+}
+
+private extension ProximityPresentationEngagementConfiguration {
+    var usesSystemNfcPresentation: Bool {
+        switch self {
+        case .qrOnly:
+            return false
+        case .nfcOnly, .qrAndNFC:
+            return true
+        }
+    }
 }
 
 @MainActor
@@ -382,6 +465,12 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
 
 @MainActor
 final class UnavailableProximityWalletClient: ProximityWalletClient {
+    func proximityPresentationCapabilities(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> ProximityPresentationCapabilities {
+        throw ProximityPresentationUnavailable()
+    }
+
     func startProximityPresentation(
         configuration: ProximityPresentationConfiguration
     ) async throws -> any DemoProximityPresentationSession {

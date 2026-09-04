@@ -174,7 +174,7 @@ private struct ProximityEngagementContent: View {
             .multilineTextAlignment(.center)
             if let payload = qrPayload {
                 ProximityQRCode(payload: payload)
-                    .frame(maxWidth: 320, maxHeight: 320)
+                    .frame(width: 280, height: 280)
                     .accessibilityIdentifier(WalletAccessibilityID.proximityQRCode)
             }
             if connecting {
@@ -648,7 +648,6 @@ private struct ProximityQRCode: View {
                     .foregroundStyle(.red)
             }
         }
-        .padding(20)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
         .accessibilityLabel("Device engagement QR code")
     }
