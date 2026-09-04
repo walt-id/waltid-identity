@@ -34,6 +34,16 @@ data class CredentialOfferRuntimeOverrides(
 @Serializable
 data class CredentialOfferCredential(
     val profileId: String,
+    val runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
+) {
+    init {
+        require(profileId.isNotBlank()) { "profileId must not be blank" }
+    }
+}
+
+@Serializable
+data class CredentialOfferCreateRequest(
+    val credentials: List<CredentialOfferCredential>,
     val authMethod: AuthenticationMethod,
     val issuerStateMode: IssuerStateMode? = null,
     val valueMode: CredentialOfferValueMode = CredentialOfferValueMode.BY_REFERENCE,
