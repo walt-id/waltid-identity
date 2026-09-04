@@ -20,6 +20,7 @@ data class CredentialProofValidationContext(
     val clientId: String? = null,
     val anonymousPreAuthorizedAccess: Boolean = false,
     val nonceValidation: CredentialNonceValidationContext? = null,
+    val batchCredentialIssuance: BatchCredentialIssuance? = null,
 ) {
     init {
         require(credentialIssuer.isNotBlank()) { "credentialIssuer must not be blank" }
