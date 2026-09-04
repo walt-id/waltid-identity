@@ -36,9 +36,27 @@ The UI stays focused on the production default. Non-default persistence options,
 
 ## Whitelabel branding
 
-Edit `WalletDemoBranding` in `sharedUI` to change the in-app wallet title and Material3 colours (`primary`, `secondary`, `primaryContainer`, and their on-colours). Hosts can also pass a custom instance into `WalletDemoApp`.
+The in-app title and Material3 colours (`primary`, `secondary`, `primaryContainer`, and their on-colours) live on `WalletDemoBranding` in `sharedUI`. Mobile hosts can pass a custom instance into `WalletDemoApp`. The web host uses the same tokens.
 
 Launcher names stay in platform manifests: Android `app_name` in `androidApp/src/main/res/values/strings.xml`, and iOS `CFBundleDisplayName` in the app and document-provider `Info.plist` files.
+
+### Web (built artefact)
+
+A production or docker image reads `branding.json` next to `index.html` at runtime, so you can rebrand without rebuilding Wasm:
+
+```json
+{
+  "appTitle": "walt.id Wallet",
+  "primary": "#0573F0",
+  "onPrimary": "#FFFFFF",
+  "secondary": "#ADC6FF",
+  "onSecondary": "#002E69",
+  "primaryContainer": "#D8E2FF",
+  "onPrimaryContainer": "#002E69"
+}
+```
+
+Replace that file in the dist folder, or set the matching `WALLET_BRAND_*` environment variables on `wallet-demo-compose-web`. For local experiments, `localStorage.setItem("waltid.wallet.branding", '{ "appTitle": "Acme Wallet", "primary": "#112233" }')` overlays the same fields.
 
 ## Public demo backend defaults
 
@@ -58,15 +76,34 @@ Android builds can override it with `-PtransactionDataProfiles.url=...`. Compose
 
 ## Web demo (wallet-api2)
 
-Enable the Wasm host, start wallet-api2 with `auth` on, then run the Compose web app:
+The identity docker-compose profile serves the Compose web wallet at `http://localhost:7106` (Caddy) against
+wallet-api2 on port 7006. Build the UI image locally, then start the stack:
+
+```bash
+cd docker-compose
+docker compose build wallet-demo-compose-web
+docker compose up
+```
+
+For a no-Docker Gradle host, enable the Wasm module and run the webpack dev server:
 
 ```bash
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDevelopmentRun -PenableWalletDemoComposeWeb=true
 ```
 
-The host talks to `http://localhost:7006` by default. Override the base URL in the browser with `localStorage.setItem("waltid.wallet2.baseUrl", "https://your-wallet-api2")`.
+The host talks to `http://localhost:7006` by default. Override the base URL with the `waltid-wallet-api2` meta tag
+(docker does this from `WALLET_API2_PUBLIC_URL`) or in the browser with
+`localStorage.setItem("waltid.wallet2.baseUrl", "https://your-wallet-api2")`.
 
-Register or log in with email and password. The JWT is stored in `localStorage`; the wallet id is stored in `localStorage` and a `waltid_wallet_id` cookie. After login the wallet opens unlocked (no PIN). Authorization-code issuance uses the current page origin as `redirect_uri` and restores the pending session after the issuer redirect.
+Rebrand the built UI by editing `branding.json` or setting `WALLET_BRAND_APP_TITLE` / `WALLET_BRAND_PRIMARY` (and the other `WALLET_BRAND_*` colour variables) on the compose service. See [Whitelabel branding](#whitelabel-branding).
+
+A production static bundle is:
+
+```bash
+./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDistribution -PenableWalletDemoComposeWeb=true
+```
+
+Register or log in with email and password. The JWT is stored in `localStorage`; the wallet id is stored in `localStorage` and a `waltid_wallet_id` cookie. After login the wallet opens unlocked (no PIN). Authorization-code issuance navigates the current tab to the issuer and returns to the same page (`redirect_uri` is the current origin).
 
 QR scanning, Digital Credentials API, and hardware-backed keys are not available on web. Paste offer and presentation URLs instead.
 

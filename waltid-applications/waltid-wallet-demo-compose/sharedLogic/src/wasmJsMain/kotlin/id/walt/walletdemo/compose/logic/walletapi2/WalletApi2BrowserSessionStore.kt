@@ -5,6 +5,7 @@ import kotlinx.browser.localStorage
 import kotlinx.browser.sessionStorage
 import kotlinx.browser.window
 import kotlinx.serialization.encodeToString
+import org.w3c.dom.HTMLMetaElement
 
 private const val TokenKey = "waltid.wallet2.token"
 private const val WalletIdKey = "waltid.wallet2.walletId"
@@ -40,16 +41,21 @@ object WalletApi2BrowserSessionStore {
     }
 
     internal fun savePendingIssuance(session: PersistedAuthorizationIssuance) {
-        sessionStorage.setItem(PendingIssuanceKey, walletApi2Json.encodeToString(session))
+        val encoded = walletApi2Json.encodeToString(session)
+        localStorage.setItem(PendingIssuanceKey, encoded)
+        sessionStorage.setItem(PendingIssuanceKey, encoded)
     }
 
     internal fun loadPendingIssuance(): PersistedAuthorizationIssuance? {
-        val raw = sessionStorage.getItem(PendingIssuanceKey)?.takeIf { it.isNotBlank() } ?: return null
+        val raw = sessionStorage.getItem(PendingIssuanceKey)?.takeIf { it.isNotBlank() }
+            ?: localStorage.getItem(PendingIssuanceKey)?.takeIf { it.isNotBlank() }
+            ?: return null
         return runCatching { walletApi2Json.decodeFromString<PersistedAuthorizationIssuance>(raw) }.getOrNull()
     }
 
     internal fun clearPendingIssuance() {
         sessionStorage.removeItem(PendingIssuanceKey)
+        localStorage.removeItem(PendingIssuanceKey)
     }
 
     fun clear() {
@@ -66,9 +72,20 @@ object WalletApi2BrowserSessionStore {
     }
 }
 
+private const val WalletApi2BaseUrlPlaceholder = "__WALLET_API2_BASE_URL__"
+private const val DefaultWalletApi2BaseUrl = "http://localhost:7006"
+
 fun walletApi2BaseUrl(): String =
     localStorage.getItem("waltid.wallet2.baseUrl")?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
-        ?: "http://localhost:7006"
+        ?: configuredWalletApi2BaseUrl()
+        ?: DefaultWalletApi2BaseUrl
+
+private fun configuredWalletApi2BaseUrl(): String? {
+    val meta = document.querySelector("meta[name='waltid-wallet-api2']") as? HTMLMetaElement ?: return null
+    val content = meta.content.trim().trimEnd('/')
+    if (content.isBlank() || content == WalletApi2BaseUrlPlaceholder) return null
+    return content
+}
 
 fun webIssuanceRedirectUri(): String {
     val origin = window.location.origin

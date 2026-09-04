@@ -192,11 +192,37 @@ services:
     environment:
       NUXT_PUBLIC_ISSUER_BASE: "http://$PUBLIC_SERVICE_HOST:$ISSUER_API2_PORT"
       NUXT_PUBLIC_VERIFIER_BASE: "http://$PUBLIC_SERVICE_HOST:$VERIFIER_API2_PORT"
-      NUXT_PUBLIC_WALLET_URL: "http://$PUBLIC_SERVICE_HOST:$DEMO_WALLET_FRONTEND_PORT"
+      NUXT_PUBLIC_WALLET_URL: "http://$PUBLIC_SERVICE_HOST:$WALLET_DEMO_COMPOSE_WEB_PORT"
       NUXT_PUBLIC_VERIFIER_KEY_JWK: "$WEB_PORTAL2_VERIFIER_KEY_JWK"
       NUXT_PUBLIC_VERIFIER_X5C: "$WEB_PORTAL2_VERIFIER_X5C"
       NUXT_PUBLIC_VERIFIER_CLIENT_ID: "$WEB_PORTAL2_VERIFIER_CLIENT_ID"
       PORT: $WEB_PORTAL2_PORT
+
+  wallet-demo-compose-web:
+    image: ${IMAGE_PREFIX}waltid/wallet-demo-compose-web:${VERSION_TAG:-latest}
+    profiles:
+      - apps
+      - identity
+      - all
+    pull_policy: missing
+    build:
+      context: ../
+      dockerfile: waltid-applications/waltid-wallet-demo-compose/webApp/Dockerfile
+    depends_on:
+      wallet-api2:
+        condition: service_started
+        required: false
+      caddy:
+        condition: service_started
+    environment:
+      WALLET_API2_PUBLIC_URL: "http://$PUBLIC_SERVICE_HOST:$WALLET_API2_PORT"
+      WALLET_BRAND_APP_TITLE: "$WALLET_BRAND_APP_TITLE"
+      WALLET_BRAND_PRIMARY: "$WALLET_BRAND_PRIMARY"
+      WALLET_BRAND_ON_PRIMARY: "$WALLET_BRAND_ON_PRIMARY"
+      WALLET_BRAND_SECONDARY: "$WALLET_BRAND_SECONDARY"
+      WALLET_BRAND_ON_SECONDARY: "$WALLET_BRAND_ON_SECONDARY"
+      WALLET_BRAND_PRIMARY_CONTAINER: "$WALLET_BRAND_PRIMARY_CONTAINER"
+      WALLET_BRAND_ON_PRIMARY_CONTAINER: "$WALLET_BRAND_ON_PRIMARY_CONTAINER"
 
   vc-repo:
     platform: linux/amd64
@@ -356,6 +382,11 @@ services:
 
       - target: "$WEB_PORTAL2_PORT"
         published: $WEB_PORTAL2_PORT # web-portal2
+        protocol: tcp
+        mode: host
+
+      - target: "$WALLET_DEMO_COMPOSE_WEB_PORT"
+        published: $WALLET_DEMO_COMPOSE_WEB_PORT # wallet-demo-compose-web
         protocol: tcp
         mode: host
 

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="waltid-wallet-api2" content="__WALLET_API2_BASE_URL__">
     <title>walt.id Wallet Demo</title>
     <style>
         html, body {
@@ -12,6 +13,23 @@
             padding: 0;
         }
     </style>
+    <script>
+        (function () {
+            function stopComposeFromBlockingBrowserMenu(event) {
+                if (event.type === "contextmenu" || event.button === 2) {
+                    event.stopImmediatePropagation();
+                }
+            }
+            document.addEventListener("contextmenu", stopComposeFromBlockingBrowserMenu, true);
+            document.addEventListener("pointerdown", stopComposeFromBlockingBrowserMenu, true);
+            document.addEventListener("pointerup", stopComposeFromBlockingBrowserMenu, true);
+            document.addEventListener("mousedown", stopComposeFromBlockingBrowserMenu, true);
+            document.addEventListener("mouseup", stopComposeFromBlockingBrowserMenu, true);
+            if (window.location.search.indexOf("code=") !== -1 && window.opener && !window.opener.closed) {
+                window.opener.close();
+            }
+        })();
+    </script>
 </head>
 <body>
 <script src="webApp.js"></script>
