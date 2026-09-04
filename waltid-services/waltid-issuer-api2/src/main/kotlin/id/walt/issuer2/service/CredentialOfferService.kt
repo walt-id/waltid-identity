@@ -36,7 +36,40 @@ class CredentialOfferService(
         request: CredentialOfferCreateRequest,
         requestId: String,
     ): CredentialOfferCreateResponse {
-        val profile = profileService.resolveProfile(request.profileId)
+        val resolvedCredentials = request.credentials.map { credential ->
+            val profile = profileService.resolveProfile(credential.profileId)
+            val overrides = credential.runtimeOverrides
+            val issuerKey = overrides?.issuerKey ?: profile.issuerKey
+            require(issuerKey.isNotEmpty()) { "issuerKey must not be empty" }
+            require(issuerKey["type"] != null) { "issuerKey must contain a key type" }
+            val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
+            val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
+            idTokenClaimsMapping?.let { mapping ->
+                JsonObjectPathMapper.validateJsonObjectContainsPaths(
+                    jsonObject = credentialData,
+                    jsonPathList = mapping.values.toList(),
+                )
+            }
+            val issuanceRequest = IssuanceRequest(
+                credentialIdentifier = UUID.randomUUID().toString(),
+                profileId = profile.profileId,
+                credentialConfigurationId = profile.credentialConfigurationId,
+                issuerKey = issuerKey,
+                expectedCredentialProofKeyJwks = overrides?.expectedCredentialProofKeyJwk?.let(::listOf),
+                credentialData = credentialData,
+                mapping = overrides?.mapping ?: profile.mapping,
+                selectiveDisclosure = overrides?.selectiveDisclosure ?: profile.selectiveDisclosure,
+                idTokenClaimsMapping = idTokenClaimsMapping,
+                mDocNameSpacesDataMappingConfig =
+                    overrides?.mDocNameSpacesDataMappingConfig ?: profile.mDocNameSpacesDataMappingConfig,
+                authorizedTransactionDataTypes = overrides?.authorizedTransactionDataTypes
+                    ?: profile.authorizedTransactionDataTypes,
+                x5Chain = overrides?.x5Chain ?: profile.x5Chain,
+                issuerDid = overrides?.issuerDid ?: profile.issuerDid,
+                credentialStatus = overrides?.credentialStatus ?: profile.credentialStatus,
+            )
+            Triple(profile, issuanceRequest, overrides?.notifications ?: profile.notifications)
+        }
         val sessionId = request.sessionId ?: UUID.randomUUID().toString()
         val expiresAt = expirationTimestamp(request.expiresInSeconds)
         val overrides = request.runtimeOverrides
