@@ -43,7 +43,7 @@ object Issuer2RequestExamples {
     }
 
     val PROFILE_PRE_AUTHORIZED_OFFER = CredentialOfferCreateRequest(
-        profileId = W3C_PROFILE_ID,
+        credentials = listOf(CredentialOfferCredential(W3C_PROFILE_ID)),
         authMethod = AuthenticationMethod.PRE_AUTHORIZED,
     )
 
