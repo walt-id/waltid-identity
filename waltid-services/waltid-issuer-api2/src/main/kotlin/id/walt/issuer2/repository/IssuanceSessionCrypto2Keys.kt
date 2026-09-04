@@ -17,8 +17,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Rebuilds the in-memory crypto2 issuer key that [IssuanceSession.crypto2IssuerStoredKey]
- * cannot carry through JSON persistence (`@Transient`).
+ * Rebuilds the per-request in-memory crypto2 issuer keys that cannot be carried through
+ * issuance-session JSON persistence (`@Transient`).
  *
  * Issuer-api2 keeps that material in a sidecar store. Durable
  * documents only have the legacy JWK, so they reconstruct the crypto2 key on load.
