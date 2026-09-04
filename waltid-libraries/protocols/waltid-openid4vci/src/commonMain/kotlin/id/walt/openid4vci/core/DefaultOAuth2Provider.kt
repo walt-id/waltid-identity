@@ -50,7 +50,8 @@ import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
-import id.walt.mdoc.objects.mso.Status
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.tokens.access.dpopJwkThumbprint
