@@ -60,12 +60,28 @@ open class TransformingSerializerTemplate<ValueT, EncodedT>
     }
 }
 
-/** De-/serializes Base64Url strings to/from [ByteArray] */
-object ByteArrayBase64UrlSerializer : TransformingSerializerTemplate<ByteArray, String>(
-    parent = String.serializer(),
-    encodeAs = { it.encodeToBase64Url() },
-    decodeAs = { it.base64UrlDecode() }
-)
+/**
+ * Serializes [ByteArray] values as base64url strings in text formats and as native byte strings in CBOR.
+ */
+object ByteArrayBase64UrlSerializer : KSerializer<ByteArray> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ByteArrayBase64Url", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: ByteArray) {
+        if (encoder is CborEncoder) {
+            encoder.encodeSerializableValue(ByteArraySerializer(), value)
+        } else {
+            encoder.encodeString(value.encodeToBase64Url())
+        }
+    }
+
+    override fun deserialize(decoder: Decoder): ByteArray =
+        if (decoder is CborDecoder) {
+            decoder.decodeSerializableValue(ByteArraySerializer())
+        } else {
+            decoder.decodeString().base64UrlDecode()
+        }
+}
 
 sealed class ListSerializerTemplate<ValueT>(
     using: KSerializer<ValueT>, serialName: String = ""
@@ -103,6 +119,38 @@ class ByteStringWrapper<T>(
 
     override fun toString(): String {
         return "ByteStringWrapper(value=$value, serialized=${serialized.contentToString()})"
+    }
+}
+
+/**
+ * Pairs a decoded value with an immutable snapshot of the exact top-level CBOR bytes it came from.
+ *
+ * Exact bytes participate in equality because protocol transcripts and signatures can distinguish
+ * semantically equivalent CBOR encodings. The byte array is never exposed without a defensive copy.
+ */
+class ExactCbor<T> private constructor(
+    val value: T,
+    bytes: ByteArray,
+) {
+    private val encodedBytes = bytes.copyOf()
+
+    val size: Int
+        get() = encodedBytes.size
+
+    fun encodedCopy(): ByteArray = encodedBytes.copyOf()
+
+    override fun equals(other: Any?): Boolean =
+        other is ExactCbor<*> && value == other.value && encodedBytes.contentEquals(other.encodedBytes)
+
+    override fun hashCode(): Int = 31 * (value?.hashCode() ?: 0) + encodedBytes.contentHashCode()
+
+    override fun toString(): String = "ExactCbor(value=$value, encodedSize=${encodedBytes.size})"
+
+    companion object {
+        fun <T> of(value: T, bytes: ByteArray): ExactCbor<T> {
+            require(bytes.isNotEmpty()) { "Exact CBOR bytes must not be empty" }
+            return ExactCbor(value, bytes)
+        }
     }
 }
 

@@ -210,7 +210,7 @@ data class Mdl(
                     "height" to uint,
                     "weight" to uint,
                     "portrait_capture_date" to localDate,
-                    "age_in_year" to uint,
+                    "age_in_years" to uint,
                     "age_birth_year" to uint,
                     "signature_usual_mark" to ByteArraySerializer(),
                     "age_over_12" to boolean,

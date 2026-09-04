@@ -1459,6 +1459,7 @@ class MobileWalletTest {
         // request keeps the original reader's valid signature while changing what was requested.
         assertRejected(
             signedRequest.copy(
+                version = DeviceRequest.VERSION_WITH_SIGNING,
                 deviceRequestInfo = ByteStringWrapper(
                     DeviceRequestInfo(
                         useCases = listOf(UseCase(mandatory = true, documentSets = listOf(listOf(0u)))),
@@ -1561,8 +1562,8 @@ class MobileWalletTest {
     }
 
     /**
-     * Reader authentication must be restricted to the algorithms ISO 18013-5 §9.1.3.4 permits, read from
-     * the *protected* header where they are signed over.
+     * Reader authentication must be restricted to the active profile's algorithms, read from the
+     * *protected* header where they are signed over.
      *
      * `ESP256` is the sharp case: a legitimate, fully-specified P-256 ECDSA identifier the allowlist
      * excludes, so a wallet trusting `alg` blindly would verify it. The assertion walks the cause chain

@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.objects.document
 
 import id.walt.certificate.x509.X509CertificateUtil
@@ -10,6 +12,12 @@ import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.objects.MdocsCborSerializer
+import id.walt.mdoc.encoding.decodeTextMap
+import id.walt.mdoc.encoding.encodeTextMap
+import id.walt.mdoc.encoding.extensionsExcluding
+import id.walt.mdoc.encoding.fromCborElement
+import id.walt.mdoc.encoding.requireNoExtensionCollisions
+import id.walt.mdoc.encoding.toCborElement
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.elements.NamespacedIssuerSignedListSerializer
@@ -17,6 +25,10 @@ import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.*
+import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -33,24 +45,29 @@ import id.walt.crypto2.keys.Key as Crypto2Key
  * It holds the namespaces with the signed data items and the `issuerAuth` COSE structure,
  * which contains the Mobile Security Object (MSO) and the issuer's signature over it.
  *
- * @see ISO/IEC 18013-5:xxxx(E), 8.3.2.1.2.3 (Device retrieval mdoc response)
+ * @see ISO/IEC 18013-5, IssuerSigned CDDL
  *
  * @property namespaces A map where the key is a namespace identifier (e.g., "org.iso.18013.5.1") and
  * the value is a list of all issuer-signed items for that namespace. This field is optional.
  * @property issuerAuth The `COSE_Sign1` structure that contains the MSO as its payload. The MSO holds the
  * digests of all data elements, validity information, and the device's public key. The COSE signature
  * on the MSO is the root of trust for all issuer-signed data.
+ * @property extensions Unrecognized IssuerSigned fields retained for wire round trips.
  */
 @ConsistentCopyVisibility
-@Serializable
-data class IssuerSigned private constructor(
+@Serializable(with = IssuerSignedSerializer::class)
+data class IssuerSigned internal constructor(
     @SerialName("nameSpaces")
     @Serializable(with = NamespacedIssuerSignedListSerializer::class)
     val namespaces: Map<String, @Contextual IssuerSignedList>? = null,
 
     @SerialName("issuerAuth")
-    val issuerAuth: CoseSign1 // MobileSecurityObject
+    val issuerAuth: CoseSign1, // MobileSecurityObject
+    val extensions: Map<String, CborElement> = emptyMap(),
 ) {
+    init {
+        requireNoExtensionCollisions(extensions, ISSUER_SIGNED_FIELDS, "IssuerSigned")
+    }
 
     /**
      * A convenience function to decode the CBOR payload of the `issuerAuth` signature
@@ -162,11 +179,13 @@ data class IssuerSigned private constructor(
         fun fromIssuerSignedItems(
             namespacedItems: Map<String, List<IssuerSignedItem>>,
             issuerAuth: CoseSign1, // MobileSecurityObject
+            extensions: Map<String, CborElement> = emptyMap(),
         ): IssuerSigned = IssuerSigned(
             namespaces = namespacedItems.map { (namespace, value) ->
                 namespace to IssuerSignedList.fromIssuerSignedItems(value, namespace)
             }.toMap(),
-            issuerAuth = issuerAuth
+            issuerAuth = issuerAuth,
+            extensions = extensions,
         )
 
         /**
@@ -176,6 +195,37 @@ data class IssuerSigned private constructor(
         fun fromIssuerSignedLists(
             namespaces: Map<String, IssuerSignedList>,
             issuerAuth: CoseSign1,
-        ): IssuerSigned = IssuerSigned(namespaces = namespaces, issuerAuth = issuerAuth)
+            extensions: Map<String, CborElement> = emptyMap(),
+        ): IssuerSigned = IssuerSigned(
+            namespaces = namespaces.takeIf { it.isNotEmpty() },
+            issuerAuth = issuerAuth,
+            extensions = extensions,
+        )
     }
 }
+
+object IssuerSignedSerializer : KSerializer<IssuerSigned> {
+    override val descriptor: SerialDescriptor = CborElement.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: IssuerSigned) {
+        val fields = linkedMapOf<String, CborElement>()
+        value.namespaces?.let {
+            fields["nameSpaces"] = it.toCborElement(NamespacedIssuerSignedListSerializer)
+        }
+        fields["issuerAuth"] = value.issuerAuth.toCborElement(CoseSign1.serializer())
+        fields.putAll(value.extensions)
+        encoder.encodeTextMap(fields)
+    }
+
+    override fun deserialize(decoder: Decoder): IssuerSigned {
+        val fields = decoder.decodeTextMap("IssuerSigned")
+        return IssuerSigned(
+            namespaces = fields["nameSpaces"]?.fromCborElement(NamespacedIssuerSignedListSerializer),
+            issuerAuth = fields["issuerAuth"]?.fromCborElement(CoseSign1.serializer())
+                ?: throw SerializationException("IssuerSigned issuerAuth is required"),
+            extensions = fields.extensionsExcluding(ISSUER_SIGNED_FIELDS),
+        )
+    }
+}
+
+private val ISSUER_SIGNED_FIELDS = setOf("nameSpaces", "issuerAuth")
