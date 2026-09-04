@@ -19,11 +19,17 @@ internal class CredentialDisplayValueDecoder(
         format: String?,
         imagePolicy: ImageDecodingPolicy,
     ): DisplayValue? {
-        val payload = EncodedPayload.parse(
+        val payload = when (val result = EncodedPayload.parse(
             rawValue = value,
             maxImageBytes = maxFallbackImageBytes.takeIf { imagePolicy.requiresDecodableContent },
-        ) ?: return null
-        val bytes = payload.base64.decode() ?: return null
+        )) {
+            is EncodedPayloadParseResult.Parsed -> result.payload
+            EncodedPayloadParseResult.RejectedImageDataUrl ->
+                return unavailableImageValue.takeIf { imagePolicy.requiresDecodableContent }
+            EncodedPayloadParseResult.Invalid -> return null
+        }
+        val isFallbackImage = imagePolicy.requiresDecodableContent && payload.kind == EncodedPayloadKind.ImageDataUrl
+        val bytes = payload.base64.decode() ?: return unavailableImageValue.takeIf { isFallbackImage }
         if (imagePolicy.accepts(payload.kind)) {
             ImageBytes.detectMime(bytes)?.let { mime ->
                 if (!imagePolicy.requiresDecodableContent || platformCanDecodeImage(bytes, maxFallbackImagePixels)) {
@@ -34,7 +40,7 @@ internal class CredentialDisplayValueDecoder(
 
         val decodedText = runCatching { bytes.decodeToString() }.getOrNull()
             ?.takeIf { it.isMostlyReadable() }
-            ?: return null
+            ?: return unavailableImageValue.takeIf { isFallbackImage }
 
         val decodedJson = runCatching { json.parseToJsonElement(decodedText) }.getOrNull()
         if (decodedJson != null) {
@@ -94,20 +100,29 @@ private data class EncodedPayload(
         private const val schemePrefix = "data:"
         private const val base64Marker = ";base64,"
 
-        fun parse(rawValue: String, maxImageBytes: Int? = null): EncodedPayload? {
+        fun parse(rawValue: String, maxImageBytes: Int? = null): EncodedPayloadParseResult {
             val value = rawValue.trim()
             if (!value.startsWith(schemePrefix, ignoreCase = true)) {
-                return Base64Payload.parse(value)?.let { base64 ->
+                val base64 = Base64Payload.parse(value) ?: return EncodedPayloadParseResult.Invalid
+                return EncodedPayloadParseResult.Parsed(
                     EncodedPayload(
                         kind = EncodedPayloadKind.PlainBase64,
                         base64 = base64,
                     )
-                }
+                )
             }
 
             val markerIndex = value.indexOf(base64Marker, ignoreCase = true)
             if (markerIndex < 0) {
-                return null
+                val metadataEnd = value.indexOf(',')
+                return if (
+                    metadataEnd >= 0 &&
+                    MediaTypeHint.isImage(value.substring(schemePrefix.length, metadataEnd))
+                ) {
+                    EncodedPayloadParseResult.RejectedImageDataUrl
+                } else {
+                    EncodedPayloadParseResult.Invalid
+                }
             }
 
             val metadata = value.substring(schemePrefix.length, markerIndex)
@@ -126,16 +141,23 @@ private data class EncodedPayload(
                     limit = maxImageBytes,
                 )
             ) {
-                return null
+                return EncodedPayloadParseResult.RejectedImageDataUrl
             }
             val base64 = Base64Payload.parse(value.substring(payloadStart))
-                ?: return null
-            return EncodedPayload(
-                kind = kind,
-                base64 = base64,
-            )
+                ?: return if (kind == EncodedPayloadKind.ImageDataUrl) {
+                    EncodedPayloadParseResult.RejectedImageDataUrl
+                } else {
+                    EncodedPayloadParseResult.Invalid
+                }
+            return EncodedPayloadParseResult.Parsed(EncodedPayload(kind = kind, base64 = base64))
         }
     }
+}
+
+private sealed interface EncodedPayloadParseResult {
+    data class Parsed(val payload: EncodedPayload) : EncodedPayloadParseResult
+    data object RejectedImageDataUrl : EncodedPayloadParseResult
+    data object Invalid : EncodedPayloadParseResult
 }
 
 private enum class EncodedPayloadKind {
@@ -232,3 +254,4 @@ private fun String.isMostlyReadable(): Boolean =
 private const val readableCharacterRatio = 0.9
 private const val maxFallbackImageBytes = 2_000_000
 private const val maxFallbackImagePixels = 2_048L * 2_048L
+private val unavailableImageValue = DisplayValue.Text(CredentialDisplayText.ImageUnavailable)

@@ -777,6 +777,9 @@ class CredentialDisplayNormalizerTest {
             .forEach { path ->
                 assertFalse(claims.first { it.path.id == path }.value is DisplayValue.Image)
             }
+        val invalidImage = claims.first { it.path.id == "invalid_image" }
+        assertEquals(DisplayValue.Text(CredentialDisplayText.ImageUnavailable), invalidImage.value)
+        assertTrue(invalidImage.rawValue?.contains("not-base64!") == true)
     }
 
     @Test

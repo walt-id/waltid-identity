@@ -748,9 +748,12 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 XCTFail("Unexpected image rendering at \(path)")
             }
         }
+        let invalidImage = claims.first { $0.path.id == "invalid_image" }
+        XCTAssertEqual(invalidImage?.value, .text(CredentialDisplayText.imageUnavailable))
+        XCTAssertTrue(invalidImage?.rawValue?.contains("not-base64!") == true)
     }
 
-    func testTruncatedImageSignaturesFallBackToOrdinaryClaimValues() {
+    func testTruncatedImageSignaturesDisplayUnavailableValue() {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",
             title: "vc+sd-jwt",
@@ -767,13 +770,11 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         )
 
         for claim in details.groups.flatMap(\.items) {
-            if case .image = claim.value {
-                XCTFail("Unexpected image rendering at \(claim.path.id)")
-            }
+            XCTAssertEqual(claim.value, .text(CredentialDisplayText.imageUnavailable))
         }
     }
 
-    func testOversizedDataImageFallsBackWithoutDecoding() {
+    func testOversizedDataImageDisplaysUnavailableValueWithoutDecoding() {
         var oversizedPNG = Self.validPNGData
         oversizedPNG.append(Data(count: Self.oversizedImageByteCount - oversizedPNG.count))
         let details = CredentialDisplayNormalizer.details(
@@ -786,12 +787,11 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             credentialDataJSON: #"{"visual_proof":"data:image/png;base64,\#(oversizedPNG.base64EncodedString())"}"#
         )
 
-        guard let value = details.groups.flatMap(\.items).first?.value else {
+        guard let claim = details.groups.flatMap(\.items).first else {
             return XCTFail("Missing oversized image claim")
         }
-        if case .image = value {
-            XCTFail("Oversized image data unexpectedly rendered as an image")
-        }
+        XCTAssertEqual(claim.value, .text(CredentialDisplayText.imageUnavailable))
+        XCTAssertTrue(claim.rawValue?.contains("data:image/png;base64,") == true)
     }
 
     func testRendersArbitraryDataImageRequestedDisclosure() {

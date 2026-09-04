@@ -8,12 +8,21 @@ enum CredentialDisplayValueDecoder {
         imagePolicy: ImageDecodingPolicy,
         renderJSON: (CredentialDisplayJSONValue, DisplayClaimPath) -> DisplayValue
     ) -> DisplayValue? {
-        guard let payload = EncodedPayload.parse(
+        let payload: EncodedPayload
+        switch EncodedPayload.parse(
             value,
             maxImageBytes: imagePolicy.requiresDecodableContent ? maxFallbackImageBytes : nil
-        ) else { return nil }
-        guard let bytes = payload.base64.decode() else {
+        ) {
+        case .parsed(let parsedPayload):
+            payload = parsedPayload
+        case .rejectedImageDataURL:
+            return imagePolicy.requiresDecodableContent ? unavailableImageValue : nil
+        case .invalid:
             return nil
+        }
+        let isFallbackImage = imagePolicy.requiresDecodableContent && payload.kind == .imageDataURL
+        guard let bytes = payload.base64.decode() else {
+            return isFallbackImage ? unavailableImageValue : nil
         }
         if imagePolicy.accepts(payload.kind),
            let mimeType = ImageBytes.mimeType(for: bytes),
@@ -21,7 +30,7 @@ enum CredentialDisplayValueDecoder {
             return imageValue(for: bytes, mimeType: mimeType, encoded: payload.base64.value)
         }
         guard let decoded = String(data: bytes, encoding: .utf8), decoded.isMostlyReadable else {
-            return nil
+            return isFallbackImage ? unavailableImageValue : nil
         }
         if let json = CredentialDisplayJSONParser.parse(decoded) {
             return renderJSON(json, path)
@@ -90,15 +99,16 @@ private struct EncodedPayload {
     let kind: EncodedPayloadKind
     let base64: Base64Payload
 
-    static func parse(_ rawValue: String, maxImageBytes: Int? = nil) -> EncodedPayload? {
+    static func parse(_ rawValue: String, maxImageBytes: Int? = nil) -> EncodedPayloadParseResult {
         let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let prefixRange = value.range(of: schemePrefix, options: [.anchored, .caseInsensitive]) else {
-            return Base64Payload(value).map {
-                EncodedPayload(kind: .plainBase64, base64: $0)
-            }
+            guard let base64 = Base64Payload(value) else { return .invalid }
+            return .parsed(EncodedPayload(kind: .plainBase64, base64: base64))
         }
         guard let markerRange = value.range(of: base64Marker, options: .caseInsensitive) else {
-            return nil
+            guard let metadataEnd = value.firstIndex(of: ",") else { return .invalid }
+            let metadata = String(value[prefixRange.upperBound..<metadataEnd])
+            return MediaTypeHint.isImage(metadata) ? .rejectedImageDataURL : .invalid
         }
 
         let metadata = String(value[prefixRange.upperBound..<markerRange.lowerBound])
@@ -107,19 +117,22 @@ private struct EncodedPayload {
         if kind == .imageDataURL,
            let maxImageBytes,
            !Base64Payload.fitsDecodedByteLimit(encodedValue, limit: maxImageBytes) {
-            return nil
+            return .rejectedImageDataURL
         }
         guard let base64 = Base64Payload(String(encodedValue)) else {
-            return nil
+            return kind == .imageDataURL ? .rejectedImageDataURL : .invalid
         }
-        return EncodedPayload(
-            kind: kind,
-            base64: base64
-        )
+        return .parsed(EncodedPayload(kind: kind, base64: base64))
     }
 
     private static let schemePrefix = "data:"
     private static let base64Marker = ";base64,"
+}
+
+private enum EncodedPayloadParseResult {
+    case parsed(EncodedPayload)
+    case rejectedImageDataURL
+    case invalid
 }
 
 private enum EncodedPayloadKind {
@@ -236,6 +249,7 @@ private enum ImageBytes {
 private let maxFallbackImageBytes = 2_000_000
 private let maxFallbackImagePixels = 2_048 * 2_048
 private let validationImageSize = 64
+private let unavailableImageValue = DisplayValue.text(CredentialDisplayText.imageUnavailable)
 
 private extension String {
     var isMostlyReadable: Bool {

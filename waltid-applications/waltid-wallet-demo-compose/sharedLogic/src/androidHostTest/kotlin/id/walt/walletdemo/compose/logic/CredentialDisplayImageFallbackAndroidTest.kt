@@ -5,7 +5,6 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import org.junit.runner.RunWith
@@ -73,7 +72,7 @@ class CredentialDisplayImageFallbackAndroidTest {
     }
 
     @Test
-    fun truncatedImageSignaturesFallBackToOrdinaryClaimValues() {
+    fun truncatedImageSignaturesDisplayUnavailableValue() {
         val details = details(
             format = "vc+sd-jwt",
             credentialDataJson =
@@ -84,12 +83,12 @@ class CredentialDisplayImageFallbackAndroidTest {
         )
 
         details.groups.flatMap { it.items }.forEach { claim ->
-            assertFalse(claim.value is DisplayValue.Image)
+            assertEquals(DisplayValue.Text(CredentialDisplayText.ImageUnavailable), claim.value)
         }
     }
 
     @Test
-    fun oversizedDataImageFallsBackWithoutDecoding() {
+    fun oversizedDataImageDisplaysUnavailableValueWithoutDecoding() {
         val png = fixture("synthetic-signature.png")
         val oversizedPng = png + ByteArray(oversizedImageByteCount - png.size)
         val details = details(
@@ -97,8 +96,9 @@ class CredentialDisplayImageFallbackAndroidTest {
             credentialDataJson = """{"visual_proof":"${dataUrl("image/png", oversizedPng)}"}""",
         )
 
-        val value = details.groups.flatMap { it.items }.single().value
-        assertFalse(value is DisplayValue.Image)
+        val claim = details.groups.flatMap { it.items }.single()
+        assertEquals(DisplayValue.Text(CredentialDisplayText.ImageUnavailable), claim.value)
+        assertTrue(claim.rawValue?.contains("data:image/png;base64,") == true)
     }
 
     private fun details(format: String, credentialDataJson: String): CredentialDetails =
