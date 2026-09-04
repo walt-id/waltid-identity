@@ -48,7 +48,7 @@ class ConfiguredIssuanceSessionRepositoryTest {
         try {
             val saved = repository.save(session)
 
-            assertNotNull(saved.crypto2IssuerStoredKey)
+            assertNotNull(saved.issuanceRequests.single().crypto2IssuerStoredKey)
             assertEquals(saved, ConfiguredIssuanceSessionRepository(sessionPersistence, sidecarPersistence).get(session.sessionId))
             assertTrue(repository.list().any { it.sessionId == session.sessionId })
             assertFalse(Json.encodeToString(IssuanceSession.serializer(), saved).contains("crypto2IssuerStoredKey"))
