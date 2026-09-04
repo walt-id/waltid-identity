@@ -41,6 +41,7 @@ class MetadataService(
     private val baseUrl = serviceConfig.openId4VciBaseUrl()
     private val tokenSigningKeyConfig = serviceConfig.ciTokenKey
     private val credentialEncryptionKeyConfig = serviceConfig.credentialEncryptionKey
+    private val batchCredentialIssuance = serviceConfig.batchCredentialIssuance
     private val enforcePushedAuthorizationRequests = serviceConfig.enforcePushedAuthorizationRequests
     private val supportsClientAttestation = serviceConfig.clientAttestationConfig() != null
 
