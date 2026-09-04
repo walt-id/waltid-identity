@@ -31,7 +31,6 @@ class IssuanceSessionService(
         sessionId: String,
         status: IssuanceSessionStatus,
         reason: String? = null,
-        issuedCredentialFormat: String? = null,
         close: Boolean = false,
         failure: IssuanceSessionFailure? = null,
     ): IssuanceSession {
