@@ -570,7 +570,6 @@ class DefaultOAuth2Provider(
         }
     }
 
-    @Deprecated("Use the Crypto2CredentialSigningKey overload")
     override suspend fun createCredentialResponse(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
