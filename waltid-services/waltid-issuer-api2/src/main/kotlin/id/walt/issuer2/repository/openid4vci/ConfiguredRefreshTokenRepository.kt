@@ -85,6 +85,7 @@ private data class StoredAccessTokenRequest(
     val grantedScopes: Set<String>,
     val requestedAudience: Set<String>,
     val grantedAudience: Set<String>,
+    val authorizationDetails: List<AuthorizationDetail> = emptyList(),
     val requestForm: Map<String, List<String>>,
     val session: StoredSession?,
     val issClaim: String?,
