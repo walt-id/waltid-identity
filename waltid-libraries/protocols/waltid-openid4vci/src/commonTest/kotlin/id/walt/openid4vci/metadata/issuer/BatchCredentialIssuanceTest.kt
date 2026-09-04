@@ -1,6 +1,7 @@
 package id.walt.openid4vci.metadata.issuer
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class BatchCredentialIssuanceTest {
