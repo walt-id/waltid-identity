@@ -174,7 +174,17 @@ object OpenId4VciRoutesDocs {
 
     fun credential(): RouteConfig.() -> Unit = {
         summary = "Credential endpoint"
-        description = "The credential endpoint. Accepts plaintext JSON requests and encrypted JWT requests."
+        description = """
+            Issue one or more credentials for a single credential target. Plaintext JSON and encrypted
+            JWT requests are accepted.
+
+            For batch issuance, provide multiple proof JWTs in `proofs.jwt`. Credentials returned by one
+            request share the Credential Format and Credential Dataset selected by either
+            `credential_identifier` or `credential_configuration_id`; each proof supplies the cryptographic
+            binding data for one issued credential. Use separate Credential Endpoint requests for different
+            formats or datasets. The maximum accepted batch size is advertised as
+            `batch_credential_issuance.batch_size` in Credential Issuer metadata.
+        """.trimIndent()
         request {
             headerParameter<String>("Authorization") {
                 required = true
@@ -187,6 +197,12 @@ object OpenId4VciRoutesDocs {
             body<JsonObject> {
                 description = "Credential request"
                 mediaTypes(ContentType.Application.Json)
+                example("[batch][credential_configuration_id][two JWT proofs]") {
+                    value = Issuer2RequestExamples.BATCH_CREDENTIAL_REQUEST_BY_CONFIGURATION_ID
+                }
+                example("[batch][credential_identifier][two JWT proofs]") {
+                    value = Issuer2RequestExamples.BATCH_CREDENTIAL_REQUEST_BY_CREDENTIAL_IDENTIFIER
+                }
             }
             body<String> {
                 description = "Encrypted Credential Request as compact JWE"
@@ -196,7 +212,11 @@ object OpenId4VciRoutesDocs {
         response {
             HttpStatusCode.OK to {
                 description = "Credential response"
-                body<JsonObject>()
+                body<JsonObject> {
+                    example("Batch credential response") {
+                        value = Issuer2RequestExamples.BATCH_CREDENTIAL_RESPONSE
+                    }
+                }
                 body<String> {
                     mediaTypes(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
                 }

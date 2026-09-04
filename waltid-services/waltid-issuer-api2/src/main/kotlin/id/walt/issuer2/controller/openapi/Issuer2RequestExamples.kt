@@ -12,6 +12,7 @@ import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.offers.TxCode
 import id.walt.sdjwt.SDMap
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -53,6 +54,15 @@ object Issuer2RequestExamples {
 
     val PROFILE_PRE_AUTHORIZED_OFFER_BY_VALUE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_VALUE,
+    )
+
+    val PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER = CredentialOfferCreateRequest(
+        credentials = listOf(
+            CredentialOfferCredential(W3C_PROFILE_ID),
+            CredentialOfferCredential(MDOC_PHOTO_ID_PROFILE_ID),
+        ),
+        authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+        valueMode = CredentialOfferValueMode.BY_REFERENCE,
     )
 
     val PROFILE_PRE_AUTHORIZED_OFFER_WITH_PROVIDED_TX_CODE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
@@ -255,6 +265,37 @@ object Issuer2RequestExamples {
     val PRE_AUTHORIZED_CREDENTIAL_OFFER = PROFILE_PRE_AUTHORIZED_OFFER_WITH_PROVIDED_TX_CODE
     val AUTHORIZED_CREDENTIAL_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE
 
+    val BATCH_CREDENTIAL_REQUEST_BY_CONFIGURATION_ID = buildJsonObject {
+        put("credential_configuration_id", W3C_CREDENTIAL_CONFIGURATION_ID)
+        putJsonObject("proofs") {
+            putJsonArray("jwt") {
+                add(EXAMPLE_PROOF_JWT_1)
+                add(EXAMPLE_PROOF_JWT_2)
+            }
+        }
+    }
+
+    val BATCH_CREDENTIAL_REQUEST_BY_CREDENTIAL_IDENTIFIER = buildJsonObject {
+        put("credential_identifier", EXAMPLE_CREDENTIAL_IDENTIFIER)
+        putJsonObject("proofs") {
+            putJsonArray("jwt") {
+                add(EXAMPLE_PROOF_JWT_1)
+                add(EXAMPLE_PROOF_JWT_2)
+            }
+        }
+    }
+
+    val BATCH_CREDENTIAL_RESPONSE = buildJsonObject {
+        putJsonArray("credentials") {
+            addJsonObject {
+                put("credential", EXAMPLE_ISSUED_CREDENTIAL_1)
+            }
+            addJsonObject {
+                put("credential", EXAMPLE_ISSUED_CREDENTIAL_2)
+            }
+        }
+    }
+
     private fun responseCredentials() = listOf(
         CredentialOfferCredentialResponse(W3C_PROFILE_ID, W3C_CREDENTIAL_CONFIGURATION_ID)
     )
@@ -283,4 +324,11 @@ object Issuer2RequestExamples {
     private const val EXAMPLE_OFFER_ID = "018f8d6e-8df4-7b73-9f3d-f3df21a4374a"
     private const val EXAMPLE_EXPIRES_AT = 1_739_000_000_000
     private const val PROVIDED_TX_CODE_VALUE = "123456"
+    private const val EXAMPLE_CREDENTIAL_IDENTIFIER = "credential-identifier-from-token-response"
+    private const val EXAMPLE_PROOF_JWT_1 =
+        "eyJhbGciOiJFUzI1NiIsInR5cCI6Im9wZW5pZDR2Y2ktcHJvb2Yrand0In0.proof-payload-1.proof-signature-1"
+    private const val EXAMPLE_PROOF_JWT_2 =
+        "eyJhbGciOiJFUzI1NiIsInR5cCI6Im9wZW5pZDR2Y2ktcHJvb2Yrand0In0.proof-payload-2.proof-signature-2"
+    private const val EXAMPLE_ISSUED_CREDENTIAL_1 = "eyJhbGciOiJFUzI1NiJ9.credential-payload-1.credential-signature-1"
+    private const val EXAMPLE_ISSUED_CREDENTIAL_2 = "eyJhbGciOiJFUzI1NiJ9.credential-payload-2.credential-signature-2"
 }

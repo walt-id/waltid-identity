@@ -66,8 +66,9 @@ object Issuer2ManagementRoutesDocs {
         description = """
             Create a profile-derived OpenID4VCI credential offer URL and the backing issuance session.
 
-            Supports pre-authorized and authorization-code issuance flows. The offer can be returned
-            by reference or by value. Runtime overrides can be applied for one offer only. Supported
+            Supports pre-authorized and authorization-code issuance flows. The offer can contain one
+            or more credential profiles and can be returned by reference or by value. Runtime overrides can
+            be applied per credential for one offer only. Supported
             override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
             idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, authorizedTransactionDataTypes,
             x5Chain, and notifications.
@@ -92,6 +93,9 @@ object Issuer2ManagementRoutesDocs {
                 }
                 example("[pre-authorized][by-reference]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE
+                }
+                example("[pre-authorized][by-reference][multiple credentials]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER
                 }
                 example("[pre-authorized][by-value]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_VALUE
