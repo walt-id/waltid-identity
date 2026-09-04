@@ -159,6 +159,67 @@ class MobileWalletProximityRequestProcessorTest {
     }
 
     @Test
+    fun `domestic namespace request returns every approved element exactly once`() = runTest {
+        withFixture { fixture ->
+            val request = DeviceRequest(
+                version = DeviceRequest.VERSION,
+                docRequests = listOf(
+                    DocRequest.fromValues(
+                        docType = "org.iso.18013.5.1.mDL",
+                        requestedElements = mapOf(DOMESTIC_NAMESPACE to DOMESTIC_ELEMENTS),
+                        intentToRetain = false,
+                    )
+                ),
+            )
+            val context = requestContext(request, transcript(), fixture.readerEphemeralKey)
+            val processor = MobileWalletProximityRequestProcessor(
+                wallet = fixture.wallet,
+                configuration = MobileWalletProximityConfiguration(),
+                readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
+            )
+            val preview = processor.preview(context)
+            val prompt = MdocConsentPrompt(
+                bindingToken = ImmutableBytes.of(ByteArray(32) { 22 }),
+                exchange = context.exchange,
+                preview = preview,
+            )
+            val review = processor.review(prompt)
+            val option = review.documents.single().credentialOptions.first()
+            assertEquals(
+                DOMESTIC_ELEMENTS.toSet(),
+                option.requestedElements.mapTo(linkedSetOf()) { it.elementIdentifier },
+                "UC_DOMESTIC_DATA:review",
+            )
+            val submission = MobileWalletProximitySubmission(
+                documents = listOf(
+                    MobileWalletProximityDocumentSubmission(
+                        requestIndex = 0,
+                        credentialId = option.credentialId,
+                        disclosedElements = option.requestedElements.mapTo(linkedSetOf()) {
+                            MobileWalletProximityElementReference(it.namespace, it.elementIdentifier)
+                        },
+                    )
+                )
+            )
+
+            assertEquals(null, processor.accept(prompt, submission), "UC_DOMESTIC_DATA:consent")
+            val resolution = assertIs<MdocResponseResolution.Send>(processor.resolve(context, preview))
+            val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.copy())
+            val namespaces = response.documents.orEmpty().single().issuerSigned.namespaces.orEmpty()
+            val returnedIdentifiers = namespaces.getValue(DOMESTIC_NAMESPACE).entries
+                .map { it.value.elementIdentifier }
+
+            assertEquals(setOf(DOMESTIC_NAMESPACE), namespaces.keys, "UC_DOMESTIC_DATA:namespaces")
+            assertEquals(DOMESTIC_ELEMENTS.toSet(), returnedIdentifiers.toSet(), "UC_DOMESTIC_DATA:elements")
+            assertEquals(
+                returnedIdentifiers.size,
+                returnedIdentifiers.distinct().size,
+                "UC_DOMESTIC_DATA:no duplicate identifier within namespace",
+            )
+        }
+    }
+
+    @Test
     fun `multiple DocRequests are independently reviewed authorized and returned`() = runTest {
         withFixture { fixture ->
             val request = DeviceRequest(
@@ -613,7 +674,13 @@ class MobileWalletProximityRequestProcessorTest {
                             "family_name" to JsonPrimitive(if (id == "mdl-1") "Lovelace" else "Hopper"),
                             "portrait" to JsonPrimitive("AQID"),
                         )
-                    )
+                    ),
+                    DOMESTIC_NAMESPACE to JsonObject(
+                        mapOf(
+                            DOMESTIC_ELEMENTS[0] to JsonPrimitive("AT-9-001"),
+                            DOMESTIC_ELEMENTS[1] to JsonPrimitive("resident"),
+                        )
+                    ),
                 )
             ),
         )
@@ -778,6 +845,11 @@ class MobileWalletProximityRequestProcessorTest {
                 .withPadding(Base64.PaddingOption.ABSENT)
                 .encode(ByteArray(32) { 4 }),
         )
+
+    private companion object {
+        const val DOMESTIC_NAMESPACE = "org.iso.18013.5.1.AT"
+        val DOMESTIC_ELEMENTS = listOf("domestic_admin_code", "domestic_resident_status")
+    }
 
     private class Fixture(
         val wallet: Wallet,
