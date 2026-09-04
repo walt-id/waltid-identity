@@ -459,7 +459,7 @@ class Wallet2AdditionalUseCasesTest {
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
-                        credentialData = buildJsonObject {
+                        issuanceInputData = testIssuanceInputData(buildJsonObject {
                             put("given_name", "Bob"); put("family_name", "Builder"); put(
                             "age_over_18",
                             true
