@@ -36,6 +36,7 @@ data class WalletDemoUiState(
     val proximityTransportProfile: WalletDemoProximityTransportProfile =
         WalletDemoProximityTransportProfile.Default,
     val proximityApprovalMode: WalletDemoProximityApprovalMode = WalletDemoProximityApprovalMode.AskEachTime,
+    val pinLockEnabled: Boolean = true,
 ) {
     val presentationPreview: WalletDemoPresentationPreview?
         get() = (presentationReview as? WalletDemoPresentationPreviewResult.Ready)?.preview

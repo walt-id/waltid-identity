@@ -18,7 +18,6 @@ kotlin {
     if (enableWalletDemoComposeWeb) {
         wasmJs {
             browser()
-            binaries.executable()
         }
     }
 
@@ -28,6 +27,9 @@ kotlin {
             implementation(identityLibs.kotlinx.datetime)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.ktor.http)
+            implementation(identityLibs.ktor.client.core)
+            implementation(identityLibs.ktor.client.content.negotiation)
+            implementation(identityLibs.ktor.serialization.kotlinx.json)
         }
 
         if (enableMobileWallet) {
@@ -78,6 +80,13 @@ kotlin {
                 iosMain.dependencies {
                     implementation(identityLibs.ktor.client.darwin)
                 }
+            }
+        }
+
+        if (enableWalletDemoComposeWeb) {
+            getByName("wasmJsMain").dependencies {
+                implementation(identityLibs.ktor.client.js)
+                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
             }
         }
 

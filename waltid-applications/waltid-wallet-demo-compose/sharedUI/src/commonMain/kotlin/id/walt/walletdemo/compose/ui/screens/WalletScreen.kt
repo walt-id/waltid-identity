@@ -24,6 +24,7 @@ internal fun WalletScreen(
     sharingSettingsContent: (@Composable () -> Unit)? = null,
     onOpenSettings: () -> Unit = {},
     onResetWallet: () -> Unit = { controller.resetWallet() },
+    onSignOut: (() -> Unit)? = null,
 ) {
     val uriHandler = LocalUriHandler.current
     var showingSettings by remember { mutableStateOf(false) }
@@ -46,6 +47,7 @@ internal fun WalletScreen(
             onBack = { showingSettings = false },
             onLock = controller::lock,
             onResetWallet = onResetWallet,
+            onSignOut = onSignOut,
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,

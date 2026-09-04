@@ -21,7 +21,6 @@ kotlin {
     if (enableWalletDemoComposeWeb) {
         wasmJs {
             browser()
-            binaries.executable()
         }
     }
 
@@ -37,7 +36,6 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedLogic"))
-            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(identityLibs.compose.runtime)
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.ui)

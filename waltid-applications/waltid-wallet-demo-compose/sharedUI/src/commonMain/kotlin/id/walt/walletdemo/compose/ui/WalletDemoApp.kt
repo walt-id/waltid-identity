@@ -31,10 +31,12 @@ fun WalletDemoApp(
     controller: WalletDemoController,
     branding: WalletDemoBranding = WalletDemoBranding(),
     onStartProximityPresentation: (() -> Unit)? = null,
+    onSignOut: (() -> Unit)? = null,
 ) = WalletDemoAppHost(
     controller = controller,
     branding = branding,
     onStartProximityPresentation = onStartProximityPresentation,
+    onSignOut = onSignOut,
 )
 
 /** Wallet shell with an internal slot for transport-specific presentation journey content. */
@@ -47,6 +49,7 @@ internal fun WalletDemoAppHost(
     sharingSettingsContent: (@Composable () -> Unit)? = null,
     onOpenSettings: () -> Unit = {},
     onResetWallet: () -> Unit = { controller.resetWallet() },
+    onSignOut: (() -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
@@ -103,6 +106,7 @@ internal fun WalletDemoAppHost(
                         sharingSettingsContent = sharingSettingsContent,
                         onOpenSettings = onOpenSettings,
                         onResetWallet = onResetWallet,
+                        onSignOut = onSignOut,
                     )
                 }
             }

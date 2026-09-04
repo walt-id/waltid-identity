@@ -132,7 +132,9 @@ will start automatically:
 profiles to start the services for. The services are available with the following profiles:
 
 - **identity** - the current stack implementing the final v1 protocols (issuer-api2, verifier-api2, wallet-api2,
-  web-portal2)
+  web-portal2). wallet-api2 has the `auth` feature enabled (email/password JWT; see `wallet-api2/config/auth.conf`).
+  The published `stable` tag (0.23.0) cannot load that auth config; use `latest` or a locally built
+  `1.0.0-SNAPSHOT` image for wallet-api2 when auth is on.
 - **identity-old** - the original stack implementing the draft protocols (wallet-api, issuer-api, verifier-api,
   waltid-demo-wallet, waltid-dev-wallet, web-portal, vc-repo)
 - **services** - for API services of both stacks (wallet-api, issuer-api, verifier-api, vc-repo, issuer-api2,
@@ -217,7 +219,7 @@ Each API service reads the configuration files mounted from its own directory:
 - verifier API: `verifier-api/config`
 - issuer API2: `issuer-api2/config`
 - verifier API2: `verifier-api2/config`
-- wallet API2: `wallet-api2/config`
+- wallet API2: `wallet-api2/config` (including `_features.conf` and `auth.conf` when `auth` is enabled)
 - ingress: `Caddyfile`
 
 ## How to
