@@ -1,6 +1,7 @@
 @file:OptIn(
     kotlinx.serialization.ExperimentalSerializationApi::class,
     kotlinx.coroutines.ExperimentalCoroutinesApi::class,
+    kotlin.ExperimentalUnsignedTypes::class,
 )
 
 package id.walt.mdoc.proximity
@@ -8,8 +9,8 @@ package id.walt.mdoc.proximity
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
-import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.encoding.ExactCbor
@@ -35,6 +36,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborElement
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
@@ -62,14 +64,14 @@ data class MdocEngagement(
 )
 
 class MdocDeviceEngagementFactory {
-    /**
-     * Encodes the exact public COSE_Key bytes embedded in Device Engagement as EDeviceKeyBytes.
-     *
-     * Transport bindings such as BLE Ident derivation must use this same encoding instead of
-     * independently exporting or re-encoding the ephemeral session key.
-     */
+    /** Encodes the complete `EDeviceKeyBytes = #6.24(bstr .cbor EDeviceKey)` value. */
     suspend fun encodeEDeviceKeyBytes(eDeviceKey: Key): ImmutableBytes =
-        ImmutableBytes.of(encodePublicDeviceKey(eDeviceKey).encoded)
+        ImmutableBytes.of(
+            coseCompliantCbor.encodeToByteArray(
+                CborElement.serializer(),
+                CborByteString(encodePublicDeviceKey(eDeviceKey).encoded, 24u),
+            )
+        )
 
     suspend fun create(
         eDeviceKey: Key,
@@ -104,8 +106,9 @@ class MdocDeviceEngagementFactory {
 
     private suspend fun encodePublicDeviceKey(eDeviceKey: Key): EncodedDeviceKey {
         MdocSessionKeyValidator.requireSupportedLocalKey(eDeviceKey)
-        val publicJwk = eDeviceKey.capabilities.publicKeyExporter?.exportPublicKey() as? EncodedKey.Jwk
-            ?: throw IllegalArgumentException("Ephemeral device key cannot export a public JWK")
+        val publicJwk = requireNotNull(eDeviceKey.capabilities.publicKeyExporter) {
+            "Ephemeral device key cannot export public material"
+        }.exportPublicKey().toPublicJwk(eDeviceKey.spec)
         val publicCose = publicJwk.toCoseKey()
         return EncodedDeviceKey(
             publicCose,

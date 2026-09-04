@@ -45,6 +45,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.cbor.CborString
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
@@ -58,6 +61,34 @@ import kotlin.time.Duration.Companion.seconds
 
 class HolderProtocolEngineTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+
+    @Test
+    fun `EDeviceKeyBytes encoder accepts SPKI public keys and retains the complete tagged value`() = runTest {
+        val deviceKey = agreementKey("edevice-key-bytes").withSpkiPublicExport()
+        val context = EngagementContext(
+            MdocProximityProfile.ISO_18013_5_ED2_DIS_2026,
+            1_048_576,
+            MdocEngagementMode.Qr,
+        )
+        val capabilities = MdocSessionCapabilities.forSession(context.profile, deviceKey, emptySet())
+        val factory = MdocDeviceEngagementFactory()
+        val engagement = factory.create(
+            eDeviceKey = deviceKey,
+            methods = listOf(DeviceRetrievalMethod.Nfc(1_024u, 1_024u)),
+            context = context,
+            capabilities = capabilities,
+        )
+        val engagementMap = assertIs<CborMap>(
+            coseCompliantCbor.decodeFromByteArray<CborElement>(engagement.engagement.encodedCopy())
+        )
+        val security = assertIs<CborArray>(engagementMap.getValue(1))
+        val exactEDeviceKeyBytes = coseCompliantCbor.encodeToByteArray(
+            CborElement.serializer(),
+            security[1],
+        )
+
+        assertContentEquals(exactEDeviceKeyBytes, factory.encodeEDeviceKeyBytes(deviceKey).copy())
+    }
 
     @Test
     fun `fake reader completes repeated signature and MAC response exchanges`() = realDispatcherTest {
@@ -820,10 +851,6 @@ class HolderProtocolEngineTest {
             methods = listOf(method),
             context = context,
             capabilities = capabilities,
-        )
-        assertContentEquals(
-            MdocDeviceEngagementFactory().encodeEDeviceKeyBytes(deviceKey).copy(),
-            engagement.engagement.value.security.eDeviceKey.serialized,
         )
         val readerCose =
             (readerKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey()
