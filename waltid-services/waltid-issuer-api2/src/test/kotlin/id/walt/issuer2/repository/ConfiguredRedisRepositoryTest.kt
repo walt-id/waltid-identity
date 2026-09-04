@@ -9,6 +9,7 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPARRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
