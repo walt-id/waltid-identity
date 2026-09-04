@@ -58,6 +58,23 @@ class MdocSessionCipherTest {
     }
 
     @Test
+    fun `ciphertext mutation matrix rejects tampering across the authenticated message`() = runTest {
+        val keys = ByteArray(32) { (it + 48).toByte() }
+        val canonicalReader = MdocSessionCipher.fromDerivedKeys(MdocSessionRole.READER, keys, keys)
+        val encrypted = canonicalReader.encrypt("authenticated-session-data".encodeToByteArray())
+
+        MdocWireMutationMatrix.bitFlips(encrypted).forEach { mutation ->
+            val holder = MdocSessionCipher.fromDerivedKeys(MdocSessionRole.HOLDER, keys, keys)
+            assertFailsWith<MdocSessionCryptoException>("SM_SESSION_DATA:${mutation.id}") {
+                holder.decrypt(mutation.bytes)
+            }
+            assertFailsWith<IllegalStateException>("SM_SESSION_DATA:${mutation.id}:closed") {
+                holder.decrypt(encrypted)
+            }
+        }
+    }
+
+    @Test
     fun `a successfully decrypted ciphertext cannot be replayed at the next counter`() = runTest {
         val keys = ByteArray(32) { (it + 96).toByte() }
         val holder = MdocSessionCipher.fromDerivedKeys(MdocSessionRole.HOLDER, keys, keys)

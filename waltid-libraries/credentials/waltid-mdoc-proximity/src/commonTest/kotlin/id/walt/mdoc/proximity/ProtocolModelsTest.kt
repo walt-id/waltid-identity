@@ -243,6 +243,13 @@ class ProtocolModelsTest {
         assertFailsWith<MdocCborValidationException> {
             MdocCborGuard.validate(byteArrayOf(0x9f.toByte(), 0x01, 0xff.toByte()), 32, 100)
         }
+
+        val canonical = byteArrayOf(0xa1.toByte(), 0x61, 0x61, 0x01)
+        MdocWireMutationMatrix.structuralMutations(canonical).forEach { mutation ->
+            assertFailsWith<MdocCborValidationException>("MS_DEVICE_ENGAGEMENT:${mutation.id}") {
+                MdocCborGuard.validate(mutation.bytes, 32, 100)
+            }
+        }
     }
 
     @Test
