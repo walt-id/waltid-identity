@@ -289,7 +289,6 @@ class TokenEventTest {
 
     private fun issuanceSession(sessionId: String) = IssuanceSession(
         sessionId = sessionId,
-        profileId = "test-profile",
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
         credentialConfigurationId = "identity_credential",
         issuerKey = JsonObject(emptyMap()),
