@@ -4,6 +4,10 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
+import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofType
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
