@@ -43,6 +43,41 @@ availability, and selection separate for QR, NFC, BLE, and Wi-Fi Aware. A
 selected unavailable method prevents preparation rather than being silently
 substituted.
 
+Select NFC through the typed engagement and retrieval contracts. Conventional
+NFC retrieval lengths and provisional NFCv2 engagement lengths are intentionally
+different types:
+
+```swift
+let nfcConfiguration = ProximityPresentationConfiguration(
+    engagement: .qrAndNFC(.negotiatedHandover),
+    retrieval: .conventional(.init(nfc: .init()))
+)
+```
+
+On iOS, the SDK installs its `CardSession` adapter automatically, but the host
+app must also be approved and provisioned by Apple for HCE. The package includes
+`HCE.entitlements.example` as a ready-to-copy template for the three ISO
+applications used by this flow:
+
+- `D2760000850101` — NFC Forum Type 4 Tag/NDEF engagement;
+- `A0000002480400` — conventional mdoc device retrieval;
+- `A0000002480401` — provisional NFC Engagement v2.
+
+The example is deliberately not selected by any build configuration. After the
+Apple capability and provisioning profile are available, copy its keys into the
+host app's entitlements and select that file through the app target's Code
+Signing Entitlements setting. Adding these keys without the corresponding Apple
+authorization does not create a usable or validly signed HCE build. Capability
+checks remain fail-closed when `CardSession` is unsupported or ineligible, and
+physical card emulation cannot be exercised in the iOS Simulator.
+
+The SDK requests Apple's optional `NFCPresentmentIntentAssertion` when the user
+starts the NFC presentation. The assertion suppresses interference from the
+default contactless app while it remains valid, but its documented 15-second
+lifetime is not treated as CardSession availability. The SDK holds a successful
+assertion without renewing it automatically and continues the explicitly started
+CardSession if assertion acquisition fails or the assertion later expires.
+
 Device signature is the default holder-authentication policy. Configure
 ``ProximityDeviceAuthenticationPolicy/macOnly``,
 ``ProximityDeviceAuthenticationPolicy/preferSignature``, or

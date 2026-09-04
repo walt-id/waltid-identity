@@ -122,6 +122,13 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
                             setCurrent = { systemSurface = it },
                             launch = systemSurfaceLauncher::launch,
                         )
+                    MobileWalletProximityRemediationAction.EnableNfc ->
+                        launchSystemSurface(
+                            Intent(Settings.ACTION_NFC_SETTINGS),
+                            current = { systemSurface },
+                            setCurrent = { systemSurface = it },
+                            launch = systemSurfaceLauncher::launch,
+                        )
                     MobileWalletProximityRemediationAction.Retry ->
                         MobileWalletProximityHostActionResult.Completed
                     MobileWalletProximityRemediationAction.UseSupportedDevice ->

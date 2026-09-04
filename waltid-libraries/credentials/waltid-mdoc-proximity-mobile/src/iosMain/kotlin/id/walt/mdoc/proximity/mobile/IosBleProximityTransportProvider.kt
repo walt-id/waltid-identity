@@ -2,7 +2,7 @@
 
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ProximityTransportProvider
+import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -28,7 +28,7 @@ import kotlin.time.Duration.Companion.seconds
  */
 internal class IosBleProximityTransportProvider(
     configuration: BleProximityTransportConfiguration,
-) : ProximityTransportProvider by DefaultBleProximityTransportProvider(
+) : ReaderSelectedTransportProvider by DefaultBleProximityTransportProvider(
     configuration,
     IosBlePlatformAdapter(),
 )
@@ -40,7 +40,7 @@ public class IosBleProximityTransportFactory : BleProximityTransportFactory {
         IosBlePlatformAdapter().capability()
 
     /** Creates a session-configured provider without starting BLE operations. */
-    override fun create(configuration: BleProximityTransportConfiguration): ProximityTransportProvider =
+    override fun create(configuration: BleProximityTransportConfiguration): ReaderSelectedTransportProvider =
         IosBleProximityTransportProvider(configuration)
 }
 

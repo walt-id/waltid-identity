@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ProximityTransportProvider
+import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 
 /** BLE role set whose runtime prerequisites are evaluated before creating a session. */
 public enum class BleMdocRoleSelection {
@@ -32,14 +32,17 @@ public sealed interface BleProximityAvailability {
  * Platform BLE entry point used to check prerequisites before generating transaction material.
  *
  * [capability] does not create listeners, scanners, advertisers, keys, or transaction UUIDs.
- * [create] only constructs a provider; radio resources remain owned by its later `prepare` call.
+ * [create] only constructs a provider; radio resources remain owned by its later `prepare` or
+ * `prepareReaderSelected` call. Factory-created providers expose both holder-selected and
+ * reader-selected handover entry points; configured roles and runtime availability still determine
+ * which path can be prepared.
  */
 public interface BleProximityTransportFactory {
     /** Reports runtime availability for exactly the roles a future session would select. */
     public suspend fun capability(roles: BleMdocRoleSelection): BleProximityAvailability
 
-    /** Creates a configured provider without preparing radio resources. */
-    public fun create(configuration: BleProximityTransportConfiguration): ProximityTransportProvider
+    /** Creates a configured provider for holder-selected or reader-selected BLE handover. */
+    public fun create(configuration: BleProximityTransportConfiguration): ReaderSelectedTransportProvider
 }
 
 internal val BleMdocRoles.selection: BleMdocRoleSelection

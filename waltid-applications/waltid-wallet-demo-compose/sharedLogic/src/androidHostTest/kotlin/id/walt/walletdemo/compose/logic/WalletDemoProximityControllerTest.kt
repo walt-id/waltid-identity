@@ -476,6 +476,7 @@ private val readyCapabilities = MobileWalletProximityCapabilities(
     nfcEngagement = availableUnselected,
     bluetoothLowEnergy = availableSelected,
     nfcRetrieval = availableUnselected,
+    nfcV2Retrieval = availableUnselected,
     wifiAwareRetrieval = availableUnselected,
 )
 

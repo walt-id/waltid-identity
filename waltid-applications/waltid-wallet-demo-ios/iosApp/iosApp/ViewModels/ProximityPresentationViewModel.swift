@@ -330,6 +330,9 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
         case .openApplicationSettings, .enableBluetooth:
             guard let url = URL(string: UIApplication.openSettingsURLString) else { return .failed }
             return await UIApplication.shared.open(url) ? .completed : .failed
+        case .enableNFC:
+            // iOS does not expose an app-addressable NFC power control.
+            return .cancelled
         case .retry:
             return .completed
         case .useSupportedDevice:

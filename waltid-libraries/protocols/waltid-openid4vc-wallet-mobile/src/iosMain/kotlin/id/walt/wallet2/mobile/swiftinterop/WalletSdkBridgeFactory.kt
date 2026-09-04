@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletEvent
@@ -10,9 +11,11 @@ import kotlinx.coroutines.flow.emptyFlow
 /**
  * Factory for creating [WalletSdkBridge] instances with iOS storage and key dependencies.
  */
-public class WalletSdkBridgeFactory() {
+public class WalletSdkBridgeFactory(
+    private val nfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+) {
     private var createDependencies: suspend (MobileWalletConfig, ClientIdTrustConfiguration) -> WalletSdkBridgeDependencies = { config, trustConfiguration ->
-        val wallet = MobileWalletFactory().create(config, trustConfiguration)
+        val wallet = MobileWalletFactory(nfcHostPlatformAdapter).create(config, trustConfiguration)
         WalletSdkBridgeDependencies(
             operations = MobileWalletSdkBridgeOperations(wallet),
             eventFlow = wallet.events,

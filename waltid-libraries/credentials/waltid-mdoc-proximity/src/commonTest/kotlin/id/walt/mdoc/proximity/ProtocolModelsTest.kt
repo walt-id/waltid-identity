@@ -34,12 +34,17 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.IssuerSignedItem
+import id.walt.mdoc.objects.engagement.BleCentralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
 import id.walt.mdoc.objects.engagement.BlePeripheralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceEngagementCapabilities
 import id.walt.mdoc.objects.engagement.DeviceEngagementSecurity
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
+import id.walt.mdoc.objects.engagement.DeviceRetrievalMethodCodec
 import id.walt.mdoc.objects.session.SessionData
+import id.walt.mdoc.objects.session.SessionEstablishment
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborElement
@@ -97,6 +102,77 @@ class ProtocolModelsTest {
         assertContentEquals(encodedKey, decoded.security.eDeviceKey.serialized)
         assertEquals(CborString("private"), decoded.extensions[-1L])
         assertContentEquals(encoded, coseCompliantCbor.encodeToByteArray(DeviceEngagement.serializer(), decoded))
+    }
+
+    @Test
+    fun `BLE peripheral endpoint ownership is explicit and context safe`() {
+        val readerMethod = DeviceRetrievalMethod.Ble(
+            centralMode = BleCentralMode(ByteArray(16) { it.toByte() }),
+            peripheralEndpoint = BlePeripheralEndpoint.Reader(
+                BlePeripheralServerOptions(
+                    deviceAddress = byteArrayOf(1, 2, 3, 4, 5, 6),
+                    psm = 0x81u,
+                ),
+            ),
+        )
+        val encodedReaderMethod = DeviceRetrievalMethodCodec.encodeReaderEngagement(readerMethod)
+
+        assertEquals(readerMethod, DeviceRetrievalMethodCodec.decodeReaderEngagement(encodedReaderMethod))
+        assertEquals(readerMethod, DeviceRetrievalMethodCodec.decode(DeviceRetrievalMethodCodec.encode(readerMethod)))
+        val provisionalEngagement = DeviceEngagement(
+            DeviceEngagement.VERSION_1_0,
+            DeviceEngagementSecurity(
+                1u,
+                ByteStringWrapper(
+                    publicKey,
+                    coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicKey),
+                ),
+            ),
+            deviceRetrievalMethods = listOf(readerMethod),
+        )
+        assertEquals(
+            provisionalEngagement,
+            coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(
+                coseCompliantCbor.encodeToByteArray(DeviceEngagement.serializer(), provisionalEngagement),
+            ),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            DeviceRetrievalMethod.Ble(
+                centralMode = BleCentralMode(ByteArray(16)),
+                peripheralEndpoint = BlePeripheralEndpoint.Mdoc(BlePeripheralServerOptions(psm = 1u)),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            DeviceRetrievalMethod.Ble(
+                peripheralMode = BlePeripheralMode(ByteArray(16)),
+                peripheralEndpoint = BlePeripheralEndpoint.Reader(BlePeripheralServerOptions(psm = 1u)),
+            )
+        }
+        val dualReaderOffer = DeviceRetrievalMethod.Ble(
+            peripheralMode = BlePeripheralMode(ByteArray(16)),
+            centralMode = BleCentralMode(ByteArray(16) { (it + 1).toByte() }),
+            peripheralEndpoint = BlePeripheralEndpoint.Reader(BlePeripheralServerOptions(psm = 1u)),
+        )
+        val encodedReaderOffer = DeviceRetrievalMethodCodec.encodeReaderEngagement(dualReaderOffer)
+        assertEquals(dualReaderOffer, DeviceRetrievalMethodCodec.decodeReaderEngagement(encodedReaderOffer))
+        assertFailsWith<IllegalArgumentException> { DeviceRetrievalMethodCodec.encode(dualReaderOffer) }
+        assertFailsWith<IllegalArgumentException> {
+            DeviceEngagement(
+                DeviceEngagement.VERSION_1_0,
+                DeviceEngagementSecurity(
+                    1u,
+                    ByteStringWrapper(
+                        publicKey,
+                        coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicKey),
+                    ),
+                ),
+                deviceRetrievalMethods = listOf(dualReaderOffer),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> { BlePeripheralServerOptions() }
+        assertFailsWith<IllegalArgumentException> {
+            BlePeripheralServerOptions(deviceAddress = ByteArray(5))
+        }
     }
 
     @Test
@@ -179,10 +255,21 @@ class ProtocolModelsTest {
             coseCompliantCbor.decodeFromByteArray<DeviceAuth>(noMethodBytes)
         }
         assertFailsWith<IllegalArgumentException> { DeviceRetrievalMethod.Ble() }
-        assertFailsWith<IllegalArgumentException> { BlePeripheralMode(ByteArray(16), psm = 0u) }
+        assertFailsWith<IllegalArgumentException> { BlePeripheralServerOptions(psm = 0u) }
+        assertFailsWith<IllegalArgumentException> { BlePeripheralServerOptions(psm = 65_536u) }
         assertFailsWith<IllegalArgumentException> {
             DeviceRetrievalMethod.Unknown(2u, 1u, CborMap(emptyMap()))
         }
+        assertFailsWith<IllegalArgumentException> { DeviceRetrievalMethod.Nfc(254u, 256u) }
+        assertFailsWith<IllegalArgumentException> { DeviceRetrievalMethod.Nfc(255u, 257u + 65_280u) }
+        assertEquals(
+            DeviceRetrievalMethod.NfcV2,
+            DeviceRetrievalMethodCodec.decode("830501a0".hexToByteArray()),
+        )
+        assertEquals(
+            DeviceRetrievalMethod.NfcV2,
+            DeviceRetrievalMethodCodec.decode("830501a10001".hexToByteArray()),
+        )
 
         val items = ItemsRequest(
             docType = "org.example.document",
@@ -559,6 +646,69 @@ class ProtocolModelsTest {
         )
         val dataMap = coseCompliantCbor.decodeFromByteArray<CborMap>(dataEncoded)
         assertIs<CborByteString>(dataMap[CborString("data")])
+    }
+
+    @Test
+    fun `conventional and provisional NFC methods have distinct wire contracts`() {
+        val conventional = DeviceRetrievalMethod.Nfc(255u, 65_536u)
+        val nfcV2 = DeviceRetrievalMethod.NfcV2
+        val encodedKey = coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicKey)
+        val engagement = DeviceEngagement(
+            version = DeviceEngagement.VERSION_1_0,
+            security = DeviceEngagementSecurity(1u, ByteStringWrapper(publicKey, encodedKey)),
+            deviceRetrievalMethods = listOf(conventional, nfcV2),
+        )
+
+        val encoded = coseCompliantCbor.encodeToByteArray(DeviceEngagement.serializer(), engagement)
+        val decoded = coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(encoded)
+
+        assertEquals(conventional, decoded.deviceRetrievalMethods!![0])
+        assertEquals(nfcV2, decoded.deviceRetrievalMethods!![1])
+        assertContentEquals(
+            "830501a0".hexToByteArray(),
+            DeviceRetrievalMethodCodec.encode(nfcV2),
+        )
+        assertContentEquals(encoded, coseCompliantCbor.encodeToByteArray(DeviceEngagement.serializer(), decoded))
+    }
+
+    @Test
+    fun `session sequence numbers are explicit fields and conventional messages remain unchanged`() {
+        val conventional = coseCompliantCbor.encodeToByteArray(SessionData.serializer(), SessionData(status = 20u))
+        assertContentEquals("a16673746174757314".hexToByteArray(), conventional)
+
+        val sequenced = SessionData(status = 20u, seq = 0u)
+        val sequencedBytes = coseCompliantCbor.encodeToByteArray(SessionData.serializer(), sequenced)
+        val sequencedMap = coseCompliantCbor.decodeFromByteArray<CborMap>(sequencedBytes)
+        assertEquals(CborInteger(0), sequencedMap[CborString("seq")])
+        assertEquals(sequenced, coseCompliantCbor.decodeFromByteArray<SessionData>(sequencedBytes))
+
+        val establishment = SessionEstablishment(
+            eReaderKey = ByteStringWrapper(
+                publicKey,
+                coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicKey),
+            ),
+            data = ByteArray(16),
+            seq = UInt.MAX_VALUE,
+        )
+        val establishmentBytes = coseCompliantCbor.encodeToByteArray(SessionEstablishment.serializer(), establishment)
+        assertEquals(
+            CborInteger(UInt.MAX_VALUE.toULong()),
+            coseCompliantCbor.decodeFromByteArray<CborMap>(establishmentBytes)[CborString("seq")],
+        )
+        assertEquals(establishment, coseCompliantCbor.decodeFromByteArray(establishmentBytes))
+
+        val malformedSequence = coseCompliantCbor.encodeToByteArray(
+            CborElement.serializer(),
+            CborMap(
+                mapOf(
+                    CborString("status") to CborInteger(20),
+                    CborString("seq") to CborString("not-an-unsigned-integer"),
+                )
+            ),
+        )
+        assertFailsWith<kotlinx.serialization.SerializationException> {
+            coseCompliantCbor.decodeFromByteArray<SessionData>(malformedSequence)
+        }
     }
 
     private fun ByteArray.indexOfSubsequence(needle: ByteArray): Int {
