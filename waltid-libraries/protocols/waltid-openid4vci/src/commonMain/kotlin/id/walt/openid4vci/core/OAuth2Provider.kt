@@ -133,7 +133,6 @@ interface OAuth2Provider {
         accessTokenContext: CredentialAccessTokenContext? = null,
     ): CredentialRequestResult
 
-    @Deprecated("Use the Crypto2CredentialSigningKey overload")
     suspend fun createCredentialResponse(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
