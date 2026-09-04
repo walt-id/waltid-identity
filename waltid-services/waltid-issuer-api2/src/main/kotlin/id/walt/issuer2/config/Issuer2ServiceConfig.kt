@@ -6,6 +6,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
+import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import kotlinx.coroutines.runBlocking
 
 data class Issuer2ServiceConfig(
