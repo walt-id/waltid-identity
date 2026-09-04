@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -138,11 +139,19 @@ internal fun MetadataIdentityRow(
             if (logoUri != null) {
                 SubcomposeAsyncImage(
                     model = logoUri,
-                    contentDescription = display.logoAltText ?: "$name logo",
+                    contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,
-                    loading = { MetadataLogoFallback(name) },
-                    error = { MetadataLogoFallback(name) },
+                    success = { state ->
+                        Image(
+                            painter = state.painter,
+                            contentDescription = display.logoAltText ?: "$name logo",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
+                    },
+                    loading = {},
+                    error = {},
                 )
             } else {
                 MetadataLogoFallback(name)

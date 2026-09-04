@@ -1,0 +1,610 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
+package id.walt.wallet2.data
+
+import id.walt.credentials.formats.MdocsCredential
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toPublicJwk
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlin.time.Clock
+import kotlin.time.Instant
+
+/** Versioned record connecting a stored credential to the key that can present it. */
+@Serializable
+data class HolderKeyBinding(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
+    /**
+     * Provider-qualified opaque reference interpreted only by the wallet key resolver.
+     * A configured key-store slot is part of that resolver namespace; persisted wallets must keep
+     * their provider order stable. The public-key thumbprint makes accidental reordering fail closed.
+     */
+    val keyReference: String,
+    /** Semantic public-key identity used to detect stale or changed provider references. */
+    val publicKeyThumbprint: PublicKeyThumbprint,
+    val origin: HolderKeyBindingOrigin,
+    val createdAt: Instant,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    val extractorVersion: Int = CURRENT_EXTRACTOR_VERSION,
+) {
+    init {
+        require(schemaVersion > 0) { "Holder-key binding schema version must be positive" }
+        require(keyReference.isNotBlank()) { "Holder-key reference must not be blank" }
+        require(extractorVersion > 0) { "Holder-key extractor version must be positive" }
+    }
+
+    companion object {
+        const val CURRENT_SCHEMA_VERSION: Int = 1
+        const val CURRENT_EXTRACTOR_VERSION: Int = 1
+    }
+}
+
+/** Algorithm-qualified public-key identity. */
+@Serializable
+data class PublicKeyThumbprint(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    val algorithm: String = RFC7638_SHA256,
+    val value: String,
+) {
+    init {
+        require(algorithm.isNotBlank()) { "Public-key thumbprint algorithm must not be blank" }
+        require(value.isNotBlank()) { "Public-key thumbprint value must not be blank" }
+    }
+
+    companion object {
+        const val RFC7638_SHA256: String = "rfc7638-sha256"
+    }
+}
+
+@Serializable
+enum class HolderKeyBindingOrigin {
+    @SerialName("issuance")
+    ISSUANCE,
+
+    @SerialName("import")
+    IMPORT,
+}
+
+/** Stable machine-readable reason why an mdoc cannot use a holder key. */
+@Serializable
+enum class HolderKeyBindingErrorCode {
+    NOT_AN_MDOC,
+    UNSUPPORTED_BINDING_VERSION,
+    UNSUPPORTED_THUMBPRINT_ALGORITHM,
+    CREDENTIAL_KEY_EXTRACTION_FAILED,
+    CREDENTIAL_NOT_FOUND,
+    BINDING_MISSING,
+    BINDING_INVALID,
+    BINDING_DOES_NOT_MATCH_CREDENTIAL,
+    KEY_REFERENCE_INVALID,
+    KEY_NOT_FOUND,
+    KEY_DOES_NOT_MATCH_BINDING,
+    KEY_PUBLIC_MATERIAL_UNAVAILABLE,
+    KEY_USAGE_UNSUPPORTED,
+    KEY_PROVIDER_UNAVAILABLE,
+    NO_MATCHING_LOCAL_KEY,
+    MULTIPLE_MATCHING_LOCAL_KEYS,
+}
+
+class HolderKeyBindingException(
+    val code: HolderKeyBindingErrorCode,
+    val credentialId: String,
+    message: String,
+    cause: Throwable? = null,
+) : IllegalStateException(message, cause)
+
+data class ResolvedHolderKey(
+    val keyMaterial: WalletKeyStoreEntry,
+    val binding: HolderKeyBinding,
+)
+
+private const val WALLET_KEY_REFERENCE_PREFIX = "urn:waltid:wallet-key:v1:"
+private sealed interface WalletKeyLocation {
+    val keyId: String
+
+    data class Store(val index: Int, override val keyId: String) : WalletKeyLocation
+    data class Static(override val keyId: String) : WalletKeyLocation
+}
+
+private data class WalletKeyCandidate(
+    val material: WalletKeyStoreEntry,
+    val thumbprint: PublicKeyThumbprint,
+)
+
+/**
+ * Resolves the exact Crypto2 key bound to [credential]. Bindings are created during issuance or
+ * import; unbound mdocs are never repaired implicitly during presentation. [requiredUsages]
+ * selects the operation being authorized; signature and device-MAC presentations deliberately
+ * resolve the same durable binding with different usage requirements.
+ */
+suspend fun Wallet.resolveHolderKey(
+    credential: StoredCredential,
+    requiredUsages: Set<KeyUsage>,
+): ResolvedHolderKey {
+    require(requiredUsages.isNotEmpty()) { "At least one holder-key usage is required" }
+    val mdoc = credential.credential as? MdocsCredential
+        ?: throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.NOT_AN_MDOC,
+            "Credential '${credential.id}' is not an mdoc and has no MSO DeviceKey",
+        )
+    val credentialThumbprint = try {
+        mdoc.holderKeyThumbprint()
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: Exception) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.CREDENTIAL_KEY_EXTRACTION_FAILED,
+            "Could not extract the MSO DeviceKey for credential '${credential.id}'",
+            cause,
+        )
+    }
+    val existing = credential.holderKeyBinding ?: throw bindingError(
+        credential,
+        HolderKeyBindingErrorCode.BINDING_MISSING,
+        "Credential '${credential.id}' has no holder-key binding",
+    )
+    validateBindingContract(credential, existing, credentialThumbprint)
+    val candidate = resolveReferencedCandidate(credential, existing.keyReference, requiredUsages)
+    if (candidate.thumbprint != existing.publicKeyThumbprint) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.KEY_DOES_NOT_MATCH_BINDING,
+            "The key referenced by credential '${credential.id}' no longer matches its holder-key binding",
+        )
+    }
+    candidate.material.requireUsages(credential, requiredUsages)
+    return ResolvedHolderKey(candidate.material, existing)
+}
+
+suspend fun Wallet.resolveHolderKey(
+    credentialId: String,
+    requiredUsages: Set<KeyUsage>,
+): ResolvedHolderKey = resolveHolderKey(
+    credential = findCredential(credentialId)
+        ?: throw HolderKeyBindingException(
+            HolderKeyBindingErrorCode.CREDENTIAL_NOT_FOUND,
+            credentialId,
+            "Credential '$credentialId' is no longer available",
+        ),
+    requiredUsages = requiredUsages,
+)
+
+/** Adds a verified issuance binding when [keyMaterial] is a durably resolvable mdoc presentation key. */
+suspend fun Wallet.withVerifiedIssuanceHolderKeyBinding(
+    credential: StoredCredential,
+    keyMaterial: WalletKeyStoreEntry,
+    createdAt: Instant = Clock.System.now(),
+): StoredCredential {
+    val mdoc = credential.credential as? MdocsCredential
+        ?: return credential.copy(holderKeyBinding = null)
+    val credentialThumbprint = try {
+        mdoc.holderKeyThumbprint()
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: Exception) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.CREDENTIAL_KEY_EXTRACTION_FAILED,
+            "Could not extract the MSO DeviceKey for credential '${credential.id}'",
+            cause,
+        )
+    }
+    val suppliedThumbprint = try {
+        keyMaterial.publicKeyThumbprint()
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: Exception) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.KEY_PUBLIC_MATERIAL_UNAVAILABLE,
+            "The issuance key for credential '${credential.id}' has no usable public material",
+            cause,
+        )
+    }
+    if (credentialThumbprint != suppliedThumbprint) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.BINDING_DOES_NOT_MATCH_CREDENTIAL,
+            "Issued mdoc '${credential.id}' MSO DeviceKey does not match its proof-of-possession key",
+        )
+    }
+    val candidate = keyMaterial.keyReference?.let { reference ->
+        val resolved = resolveReferencedCandidateForAnyUsage(
+            credential,
+            reference,
+            MDOC_PRESENTATION_USAGE_ALTERNATIVES,
+        )
+        if (resolved.thumbprint != suppliedThumbprint) {
+            throw bindingError(
+                credential,
+                HolderKeyBindingErrorCode.KEY_DOES_NOT_MATCH_BINDING,
+                "The issuance key reference for credential '${credential.id}' resolves to different key material",
+            )
+        }
+        resolved
+    } ?: requiringAnyUsageSet(
+        candidates = allKeyCandidates(credential)
+            .filter { it.material.keyId == keyMaterial.keyId && it.thumbprint == suppliedThumbprint },
+        credential = credential,
+        usageAlternatives = MDOC_PRESENTATION_USAGE_ALTERNATIVES,
+    )
+        .let { matching ->
+            when (matching.size) {
+                0 -> throw bindingError(
+                    credential,
+                    HolderKeyBindingErrorCode.NO_MATCHING_LOCAL_KEY,
+                    "The issuance key for credential '${credential.id}' is not durably available in this wallet",
+                )
+
+                1 -> matching.single()
+                else -> throw bindingError(
+                    credential,
+                    HolderKeyBindingErrorCode.MULTIPLE_MATCHING_LOCAL_KEYS,
+                    "The issuance key for credential '${credential.id}' is ambiguous across wallet key providers",
+                )
+            }
+        }
+    return credential.copy(holderKeyBinding = candidate.binding(HolderKeyBindingOrigin.ISSUANCE, createdAt))
+}
+
+/**
+ * Binds an imported mdoc only when one unambiguous matching local presentation key exists.
+ *
+ * Any incoming holder-key binding is discarded first because bindings belong to the importing
+ * wallet's provider namespace. An mdoc with no unique usable local key remains explicitly unbound.
+ */
+suspend fun Wallet.withImportedHolderKeyBinding(credential: StoredCredential): StoredCredential {
+    val unbound = credential.copy(holderKeyBinding = null)
+    if (unbound.credential !is MdocsCredential) return unbound
+    return try {
+        withRequiredImportedHolderKeyBinding(unbound)
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: HolderKeyBindingException) {
+        when (cause.code) {
+            HolderKeyBindingErrorCode.NO_MATCHING_LOCAL_KEY,
+            HolderKeyBindingErrorCode.MULTIPLE_MATCHING_LOCAL_KEYS,
+            HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
+            -> unbound
+
+            else -> throw cause
+        }
+    }
+}
+
+/** Adds an import binding or throws unless exactly one usable local presentation key matches. */
+internal suspend fun Wallet.withRequiredImportedHolderKeyBinding(credential: StoredCredential): StoredCredential {
+    val mdoc = credential.credential as? MdocsCredential ?: return credential
+    val thumbprint = try {
+        mdoc.holderKeyThumbprint()
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: Exception) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.CREDENTIAL_KEY_EXTRACTION_FAILED,
+            "Could not extract the MSO DeviceKey for credential '${credential.id}'",
+            cause,
+        )
+    }
+    val matching = requiringAnyUsageSet(
+        candidates = allKeyCandidates(credential)
+            .filter { it.thumbprint == thumbprint },
+        credential = credential,
+        usageAlternatives = MDOC_PRESENTATION_USAGE_ALTERNATIVES,
+    )
+    val candidate = when (matching.size) {
+        0 -> throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.NO_MATCHING_LOCAL_KEY,
+            "No local key matches the MSO DeviceKey for credential '${credential.id}'",
+        )
+
+        1 -> matching.single()
+        else -> throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.MULTIPLE_MATCHING_LOCAL_KEYS,
+            "More than one local key matches the MSO DeviceKey for credential '${credential.id}'",
+        )
+    }
+    return credential.copy(holderKeyBinding = candidate.binding(HolderKeyBindingOrigin.IMPORT))
+}
+
+private fun validateBindingContract(
+    credential: StoredCredential,
+    binding: HolderKeyBinding,
+    credentialThumbprint: PublicKeyThumbprint,
+) {
+    if (
+        binding.schemaVersion != HolderKeyBinding.CURRENT_SCHEMA_VERSION ||
+        binding.extractorVersion != HolderKeyBinding.CURRENT_EXTRACTOR_VERSION
+    ) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.UNSUPPORTED_BINDING_VERSION,
+            "Credential '${credential.id}' uses an unsupported holder-key binding version",
+        )
+    }
+    if (binding.publicKeyThumbprint.algorithm != PublicKeyThumbprint.RFC7638_SHA256) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.UNSUPPORTED_THUMBPRINT_ALGORITHM,
+            "Credential '${credential.id}' uses an unsupported holder-key thumbprint algorithm",
+        )
+    }
+    if (binding.publicKeyThumbprint != credentialThumbprint) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.BINDING_DOES_NOT_MATCH_CREDENTIAL,
+            "Credential '${credential.id}' holder-key binding does not match its MSO DeviceKey",
+        )
+    }
+}
+
+private suspend fun Wallet.resolveReferencedCandidate(
+    credential: StoredCredential,
+    reference: String,
+    requiredUsages: Set<KeyUsage>,
+): WalletKeyCandidate {
+    val location = reference.decodeWalletKeyReference()
+        ?: throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.KEY_REFERENCE_INVALID,
+            "Credential '${credential.id}' has an unsupported holder-key reference",
+        )
+    val material = try {
+        when (location) {
+            is WalletKeyLocation.Store -> keyStores.getOrNull(location.index)
+                ?.getKeyMaterial(location.keyId, requiredUsages)
+                ?.copy(keyReference = reference)
+
+            is WalletKeyLocation.Static -> attachedStaticCrypto2Key()
+                ?.takeIf { it.id.value == location.keyId }
+                ?.let { crypto2Key ->
+                    WalletKeyStoreEntry(
+                        keyId = location.keyId,
+                        legacyKey = null,
+                        crypto2Key = crypto2Key,
+                        keyReference = reference,
+                    )
+                }
+        }
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: WalletKeyUsageUnsupportedException) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
+            "The holder key for credential '${credential.id}' does not permit $requiredUsages",
+            cause,
+        )
+    } catch (cause: Exception) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.KEY_PROVIDER_UNAVAILABLE,
+            "The holder-key provider for credential '${credential.id}' is unavailable",
+            cause,
+        )
+    } ?: throw bindingError(
+        credential,
+        HolderKeyBindingErrorCode.KEY_NOT_FOUND,
+        "The holder key for credential '${credential.id}' is no longer available",
+    )
+    return candidate(credential, material)
+}
+
+private suspend fun Wallet.allKeyCandidates(
+    credential: StoredCredential,
+): List<WalletKeyCandidate> = buildList {
+    keyStores.forEachIndexed { index, store ->
+        val ids = try {
+            store.listKeys().toList().map { it.keyId }
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (cause: Exception) {
+            throw bindingError(
+                credential,
+                HolderKeyBindingErrorCode.KEY_PROVIDER_UNAVAILABLE,
+                "A wallet key provider is unavailable while resolving credential '${credential.id}'",
+                cause,
+            )
+        }
+        ids.forEach { keyId ->
+            val publicKey = try {
+                // Public identity discovery is deliberately separate from operational lookup. This
+                // returns immutable JWK material rather than an operational private-key handle.
+                store.getPublicKeyMaterial(keyId)
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (cause: Exception) {
+                throw bindingError(
+                    credential,
+                    HolderKeyBindingErrorCode.KEY_PROVIDER_UNAVAILABLE,
+                    "A wallet key provider is unavailable while resolving credential '${credential.id}'",
+                    cause,
+                )
+            } ?: return@forEach
+            add(
+                WalletKeyCandidate(
+                    WalletKeyStoreEntry(
+                        keyId = keyId,
+                        legacyKey = null,
+                        crypto2Key = null,
+                        keyReference = walletStoreKeyReference(index, keyId),
+                    ),
+                    publicKey.publicKeyThumbprint(),
+                )
+            )
+        }
+    }
+    attachedStaticCrypto2Key()?.let { crypto2Key ->
+        val keyId = crypto2Key.id.value
+        add(
+            candidate(
+                credential,
+                WalletKeyStoreEntry(
+                    keyId = keyId,
+                    legacyKey = null,
+                    crypto2Key = crypto2Key,
+                    keyReference = staticWalletKeyReference(keyId),
+                ),
+            )
+        )
+    }
+}
+
+private suspend fun Wallet.requiringAnyUsageSet(
+    candidates: List<WalletKeyCandidate>,
+    credential: StoredCredential,
+    usageAlternatives: List<Set<KeyUsage>>,
+): List<WalletKeyCandidate> {
+    require(usageAlternatives.isNotEmpty() && usageAlternatives.none { it.isEmpty() })
+    val eligible = candidates.mapNotNull { publicCandidate ->
+        val reference = requireNotNull(publicCandidate.material.keyReference)
+        val operationalCandidate = try {
+            resolveReferencedCandidateForAnyUsage(credential, reference, usageAlternatives)
+        } catch (cause: HolderKeyBindingException) {
+            if (cause.code == HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED) return@mapNotNull null
+            throw cause
+        }
+        if (operationalCandidate.thumbprint != publicCandidate.thumbprint) {
+            throw bindingError(
+                credential,
+                HolderKeyBindingErrorCode.KEY_DOES_NOT_MATCH_BINDING,
+                "Wallet key '${publicCandidate.material.keyId}' changed during holder-key discovery",
+            )
+        }
+        operationalCandidate
+    }
+    if (candidates.isNotEmpty() && eligible.isEmpty()) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
+            "The local key matching credential '${credential.id}' cannot perform mdoc presentation",
+        )
+    }
+    return eligible
+}
+
+private suspend fun Wallet.resolveReferencedCandidateForAnyUsage(
+    credential: StoredCredential,
+    reference: String,
+    usageAlternatives: List<Set<KeyUsage>>,
+): WalletKeyCandidate = usageAlternatives.firstNotNullOfOrNull { usages ->
+    try {
+        resolveReferencedCandidate(credential, reference, usages)
+    } catch (cause: HolderKeyBindingException) {
+        if (cause.code == HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED) null else throw cause
+    }
+} ?: throw bindingError(
+    credential,
+    HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
+    "The holder key for credential '${credential.id}' cannot perform mdoc presentation",
+)
+
+private suspend fun candidate(
+    credential: StoredCredential,
+    material: WalletKeyStoreEntry,
+): WalletKeyCandidate = try {
+    WalletKeyCandidate(material, material.publicKeyThumbprint())
+} catch (cause: CancellationException) {
+    throw cause
+} catch (cause: Exception) {
+    throw bindingError(
+        credential,
+        HolderKeyBindingErrorCode.KEY_PUBLIC_MATERIAL_UNAVAILABLE,
+        "Wallet key '${material.keyId}' has no consistent public material",
+        cause,
+    )
+}
+
+private fun WalletKeyCandidate.binding(
+    origin: HolderKeyBindingOrigin,
+    createdAt: Instant = Clock.System.now(),
+): HolderKeyBinding = HolderKeyBinding(
+    keyReference = requireNotNull(material.keyReference),
+    publicKeyThumbprint = thumbprint,
+    origin = origin,
+    createdAt = createdAt,
+)
+
+private fun WalletKeyStoreEntry.requireUsages(
+    credential: StoredCredential,
+    requiredUsages: Set<KeyUsage>,
+) {
+    val supported = crypto2Key?.let { requiredUsages.all(it.usages::contains) } == true
+    if (!supported) {
+        throw bindingError(
+            credential,
+            HolderKeyBindingErrorCode.KEY_USAGE_UNSUPPORTED,
+            "The holder key for credential '${credential.id}' does not permit $requiredUsages",
+        )
+    }
+}
+
+private suspend fun MdocsCredential.holderKeyThumbprint(): PublicKeyThumbprint =
+    getHolderCrypto2Key().publicKeyThumbprint()
+
+private suspend fun WalletKeyStoreEntry.publicKeyThumbprint(): PublicKeyThumbprint {
+    return requireNotNull(crypto2Key) { "Key '$keyId' is not available through crypto2" }
+        .publicKeyThumbprint()
+}
+
+private suspend fun id.walt.crypto2.keys.Key.publicKeyThumbprint(): PublicKeyThumbprint {
+    val exported = requireNotNull(capabilities.publicKeyExporter) {
+        "Key '${id.value}' does not export public material"
+    }.exportPublicKey().toPublicJwk(spec)
+    return PublicKeyThumbprint(value = Jwk.sha256Thumbprint(exported))
+}
+
+private suspend fun WalletPublicKeyMaterial.publicKeyThumbprint(): PublicKeyThumbprint =
+    PublicKeyThumbprint(value = Jwk.sha256Thumbprint(publicJwk))
+
+internal fun walletStoreKeyReference(storeIndex: Int, keyId: String): String =
+    "$WALLET_KEY_REFERENCE_PREFIX" + "store:$storeIndex:${keyId.encodeToByteArray().encodeToBase64Url()}"
+
+internal fun staticWalletKeyReference(keyId: String): String =
+    "$WALLET_KEY_REFERENCE_PREFIX" + "static:${keyId.encodeToByteArray().encodeToBase64Url()}"
+
+private fun String.decodeWalletKeyReference(): WalletKeyLocation? = runCatching {
+    if (!startsWith(WALLET_KEY_REFERENCE_PREFIX)) return@runCatching null
+    val value = removePrefix(WALLET_KEY_REFERENCE_PREFIX)
+    when {
+        value.startsWith("store:") -> {
+            val parts = value.removePrefix("store:").split(':', limit = 2)
+            val index = parts.getOrNull(0)?.toIntOrNull()?.takeIf { it >= 0 } ?: return@runCatching null
+            val keyId = parts.getOrNull(1)?.decodeFromBase64Url()?.decodeToString()?.takeIf { it.isNotBlank() }
+                ?: return@runCatching null
+            WalletKeyLocation.Store(index, keyId)
+        }
+
+        value.startsWith("static:") -> {
+            val keyId = value.removePrefix("static:").decodeFromBase64Url().decodeToString().takeIf { it.isNotBlank() }
+                ?: return@runCatching null
+            WalletKeyLocation.Static(keyId)
+        }
+
+        else -> null
+    }
+}.getOrNull()
+
+private val MDOC_PRESENTATION_USAGE_ALTERNATIVES = listOf(
+    setOf(KeyUsage.SIGN),
+    setOf(KeyUsage.KEY_AGREEMENT),
+)
+
+private fun bindingError(
+    credential: StoredCredential,
+    code: HolderKeyBindingErrorCode,
+    message: String,
+    cause: Throwable? = null,
+) = HolderKeyBindingException(code, credential.id, message, cause)
