@@ -5,6 +5,7 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.openid4vci.offers.AuthenticationMethod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
