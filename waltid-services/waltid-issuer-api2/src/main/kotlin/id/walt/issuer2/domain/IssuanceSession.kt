@@ -21,8 +21,8 @@ enum class IssuanceSessionStatus {
 }
 
 @Serializable
-data class IssuanceSession(
-    val sessionId: String,
+data class IssuanceRequest(
+    val credentialIdentifier: String,
     val profileId: String,
     val authenticationMethod: AuthenticationMethod,
     val credentialConfigurationId: String,
