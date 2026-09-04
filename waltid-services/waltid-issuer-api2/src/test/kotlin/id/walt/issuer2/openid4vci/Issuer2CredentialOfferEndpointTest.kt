@@ -259,11 +259,12 @@ class Issuer2CredentialOfferEndpointTest {
         // Runtime overrides are offer-scoped; they must be copied into the stored session
         // without changing the configured profile.
         val session = client.getSession(response.offerId)
-        assertEquals("did:example:issuer-override", session.issuerDid)
-        assertEquals(issuerKeyOverride, session.issuerKey)
-        assertEquals("Jane", session.credentialData["given_name"]?.jsonPrimitive?.content)
-        assertEquals("<timestamp>", session.mapping?.get("iat")?.jsonPrimitive?.content)
-        val sessionSelectiveDisclosure = assertNotNull(session.selectiveDisclosure)
+        val issuanceRequest = session.issuanceRequests.single()
+        assertEquals("did:example:issuer-override", issuanceRequest.issuerDid)
+        assertEquals(issuerKeyOverride, issuanceRequest.issuerKey)
+        assertEquals("Jane", issuanceRequest.credentialData["given_name"]?.jsonPrimitive?.content)
+        assertEquals("<timestamp>", issuanceRequest.mapping?.get("iat")?.jsonPrimitive?.content)
+        val sessionSelectiveDisclosure = assertNotNull(issuanceRequest.selectiveDisclosure)
         assertNotNull(sessionSelectiveDisclosure["given_name"])
         assertNotNull(sessionSelectiveDisclosure["family_name"])
         assertEquals("$.given_name", session.idTokenClaimsMapping?.get("$.given_name"))
