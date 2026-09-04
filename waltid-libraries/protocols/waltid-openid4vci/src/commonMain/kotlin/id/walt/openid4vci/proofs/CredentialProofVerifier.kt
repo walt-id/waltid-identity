@@ -2,6 +2,7 @@ package id.walt.openid4vci.proofs
 
 import id.walt.crypto2.keys.Key
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import kotlinx.serialization.json.JsonObject
