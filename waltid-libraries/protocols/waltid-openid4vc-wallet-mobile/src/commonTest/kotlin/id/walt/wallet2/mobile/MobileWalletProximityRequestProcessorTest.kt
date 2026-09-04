@@ -64,6 +64,158 @@ import kotlin.test.assertTrue
 
 class MobileWalletProximityRequestProcessorTest {
     @Test
+    fun `Appendix holder use-case matrix preserves request consent portrait and offline boundaries`() = runTest {
+        data class Scenario(
+            val id: String,
+            val requested: List<String>,
+            val disclosed: Set<String>,
+            val expected: Set<String>,
+        )
+
+        val scenarios = listOf(
+            Scenario(
+                id = "UC_APPROVE_ALL_OFFLINE",
+                requested = listOf("given_name", "family_name"),
+                disclosed = setOf("given_name", "family_name"),
+                expected = setOf("given_name", "family_name"),
+            ),
+            Scenario(
+                id = "UC_REQUESTED_ONLY",
+                requested = listOf("given_name"),
+                disclosed = setOf("given_name"),
+                expected = setOf("given_name"),
+            ),
+            Scenario(
+                id = "UC_SELECTIVE_DENIAL",
+                requested = listOf("given_name", "family_name"),
+                disclosed = setOf("given_name"),
+                expected = setOf("given_name"),
+            ),
+            Scenario(
+                id = "UC_PORTRAIT_DENIAL",
+                requested = listOf("portrait", "given_name"),
+                disclosed = setOf("given_name"),
+                expected = emptySet(),
+            ),
+        )
+
+        withFixture { fixture ->
+            scenarios.forEachIndexed { index, scenario ->
+                val request = DeviceRequest(
+                    version = DeviceRequest.VERSION,
+                    docRequests = listOf(
+                        DocRequest.fromValues(
+                            docType = "org.iso.18013.5.1.mDL",
+                            requestedElements = mapOf("org.iso.18013.5.1" to scenario.requested),
+                            intentToRetain = false,
+                        )
+                    ),
+                )
+                val context = requestContext(request, transcript(), fixture.readerEphemeralKey)
+                val processor = MobileWalletProximityRequestProcessor(
+                    wallet = fixture.wallet,
+                    configuration = MobileWalletProximityConfiguration(),
+                    readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
+                )
+                val preview = processor.preview(context)
+                val prompt = MdocConsentPrompt(
+                    bindingToken = ImmutableBytes.of(ByteArray(32) { (index + 16).toByte() }),
+                    exchange = context.exchange,
+                    preview = preview,
+                )
+                val review = processor.review(prompt)
+                val option = review.documents.single().credentialOptions.first()
+                assertEquals(
+                    scenario.requested.toSet(),
+                    option.requestedElements.map { it.elementIdentifier }.toSet(),
+                    scenario.id,
+                )
+                val submission = MobileWalletProximitySubmission(
+                    documents = listOf(
+                        MobileWalletProximityDocumentSubmission(
+                            requestIndex = 0,
+                            credentialId = option.credentialId,
+                            disclosedElements = scenario.disclosed.mapTo(linkedSetOf()) {
+                                MobileWalletProximityElementReference("org.iso.18013.5.1", it)
+                            },
+                        )
+                    )
+                )
+
+                assertEquals(null, processor.accept(prompt, submission), scenario.id)
+                val resolution = assertIs<MdocResponseResolution.Send>(
+                    processor.resolve(context, preview),
+                    scenario.id,
+                )
+                val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.copy())
+                val returned = response.documents.orEmpty().single().issuerSigned.namespaces.orEmpty()
+                    .values
+                    .flatMap { it.entries }
+                    .mapTo(linkedSetOf()) { it.value.elementIdentifier }
+
+                assertEquals(scenario.expected, returned, scenario.id)
+            }
+        }
+    }
+
+    @Test
+    fun `multiple DocRequests are independently reviewed authorized and returned`() = runTest {
+        withFixture { fixture ->
+            val request = DeviceRequest(
+                version = DeviceRequest.VERSION,
+                docRequests = listOf("given_name", "family_name").map { identifier ->
+                    DocRequest.fromValues(
+                        docType = "org.iso.18013.5.1.mDL",
+                        requestedElements = mapOf("org.iso.18013.5.1" to listOf(identifier)),
+                        intentToRetain = false,
+                    )
+                },
+            )
+            val context = requestContext(request, transcript(), fixture.readerEphemeralKey)
+            val processor = MobileWalletProximityRequestProcessor(
+                wallet = fixture.wallet,
+                configuration = MobileWalletProximityConfiguration(),
+                readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
+            )
+            val preview = processor.preview(context)
+            val prompt = MdocConsentPrompt(
+                bindingToken = ImmutableBytes.of(ByteArray(32) { 21 }),
+                exchange = context.exchange,
+                preview = preview,
+            )
+            val review = processor.review(prompt)
+            val submission = MobileWalletProximitySubmission(
+                documents = review.documents.map { document ->
+                    val option = document.credentialOptions.first()
+                    MobileWalletProximityDocumentSubmission(
+                        requestIndex = document.requestIndex,
+                        credentialId = option.credentialId,
+                        disclosedElements = option.requestedElements.mapTo(linkedSetOf()) {
+                            MobileWalletProximityElementReference(it.namespace, it.elementIdentifier)
+                        },
+                    )
+                }
+            )
+
+            assertEquals(null, processor.accept(prompt, submission))
+            val resolution = assertIs<MdocResponseResolution.Send>(processor.resolve(context, preview))
+            val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.copy())
+
+            assertEquals(2, review.documents.size, "UC_MULTIPLE_REQUESTS:review")
+            assertEquals(2, response.documents.orEmpty().size, "UC_MULTIPLE_REQUESTS:response")
+            assertEquals(
+                setOf(setOf("given_name"), setOf("family_name")),
+                response.documents.orEmpty().mapTo(linkedSetOf()) { document ->
+                    document.issuerSigned.namespaces.orEmpty().values
+                        .flatMap { it.entries }
+                        .mapTo(linkedSetOf()) { it.value.elementIdentifier }
+                },
+                "UC_MULTIPLE_REQUESTS:elements",
+            )
+        }
+    }
+
+    @Test
     fun `review binds exact request profile constraint holder choice and response`() = runTest {
         withFixture { fixture ->
             val profile = RecordingProfile(compatibleCredentialId = "mdl-2")
@@ -456,7 +608,11 @@ class MobileWalletProximityRequestProcessorTest {
             data = MdocIssuer.MdocUniversalIssuanceData(
                 namespaces = mapOf(
                     "org.iso.18013.5.1" to JsonObject(
-                        mapOf("given_name" to JsonPrimitive(if (id == "mdl-1") "Ada" else "Grace"))
+                        mapOf(
+                            "given_name" to JsonPrimitive(if (id == "mdl-1") "Ada" else "Grace"),
+                            "family_name" to JsonPrimitive(if (id == "mdl-1") "Lovelace" else "Hopper"),
+                            "portrait" to JsonPrimitive("AQID"),
+                        )
                     )
                 )
             ),
