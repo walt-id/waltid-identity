@@ -2,6 +2,7 @@ package id.walt.issuer2.domain
 
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
+import id.walt.openid4vci.mdoc.MsoData
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -21,6 +22,7 @@ data class CredentialProfile(
     val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
     /** OpenID4VP transaction_data types the issued key may sign, embedded in the mdoc MSO. */
     val authorizedTransactionDataTypes: List<String>? = null,
+    val msoData: MsoData? = null,
     val x5Chain: List<String>? = null,
     val notifications: IssuanceNotifications? = null,
     val credentialStatus: JsonElement? = null,

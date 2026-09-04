@@ -2,6 +2,7 @@ package id.walt.issuer2.domain
 
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
+import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.sdjwt.SDMap
@@ -35,6 +36,7 @@ data class IssuanceSession(
     val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
     /** OpenID4VP transaction_data types the issued key may sign, embedded in the mdoc MSO. */
     val authorizedTransactionDataTypes: List<String>? = null,
+    val msoData: MsoData? = null,
     val x5Chain: List<String>? = null,
     val issuerDid: String? = null,
     val credentialOffer: CredentialOffer? = null,
