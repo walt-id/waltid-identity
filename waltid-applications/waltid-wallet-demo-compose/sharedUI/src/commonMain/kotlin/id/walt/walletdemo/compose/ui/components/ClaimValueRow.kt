@@ -161,9 +161,7 @@ private fun ImageValue(value: DisplayValue.Image, path: ClaimItemPath, modifier:
             fontWeight = FontWeight.Medium,
         )
         Text(
-            listOfNotNull(
-                "${value.byteCount} bytes",
-            ).joinToString(" • "),
+            "${value.byteCount} bytes",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

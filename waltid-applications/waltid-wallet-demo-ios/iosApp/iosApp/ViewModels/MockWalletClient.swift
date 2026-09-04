@@ -334,10 +334,8 @@ actor MockWalletClient: WalletClient {
             "street_address": "Main Street 1",
             "locality": "Vienna"
           },
-          "portrait": {
-            "elementValue": [-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]
-          },
-          "qr_data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+          "portrait": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQMAAADS6sNKAAAABlBMVEUAAAD///+l2Z/dAAAAAnRSTlP//8i138cAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAG4SURBVHic7dpNbsMgEAVgpBzAR/LVORIHsEScecwwIa7aqt0867HAP3xkYxiPIaX/rhR5eXl5eXn5f/JllEe3qvfml3vztl2e1+Oivfx2ntSz/Twcp2qPnok8p389dmur2zFiAM7aGCPyt/CoMOm7/O28TXVrG1Nd/hbeDhNsEcq/if/yFH4Un++58jZ5Xj/L7NmRj63t8oTeHjuy7PcsDPO9bscyfuS5vLUZrcXj+XhLH8U/r+RZ/cjCIoDvaRSM4SHP7GNap6WQSMpsjWR5X8szecRzdCpezR9KRZ7Rz7k9BgBWrkt8bS3va3k2j9yrpLc0Vq5RLuK/PJHHw67IwgpoiXI2fMRzeSaPO5jldjYzb4T3j3xbnsu/nnvk1j7Vc4yXJ/b5sykqGwV1WfmSZ/T2qh6T3kN5/qG+xnN5Lo+I3Xw900L53IpImZk8pZ/XeyyFxCrIRfyXp/L+3N8SMGTZc41Tntfjwtqsu28wLZU8q49diNkJPUsMBfkb+Dzz8c9ajwHy9/Cm4g8A1Xpf7jfJE3k7tPyqHjtPm3eSJ/ZzluO23/tq/1Geyv+8yMvLy8vLy//dPwFtb0ghu7+d2gAAAABJRU5ErkJggg==",
+          "verification_artifact": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQMAAADS6sNKAAAABlBMVEUAAAD///+l2Z/dAAAAAnRSTlP//8i138cAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAG4SURBVHic7dpNbsMgEAVgpBzAR/LVORIHsEScecwwIa7aqt0867HAP3xkYxiPIaX/rhR5eXl5eXn5f/JllEe3qvfml3vztl2e1+Oivfx2ntSz/Twcp2qPnok8p389dmur2zFiAM7aGCPyt/CoMOm7/O28TXVrG1Nd/hbeDhNsEcq/if/yFH4Un++58jZ5Xj/L7NmRj63t8oTeHjuy7PcsDPO9bscyfuS5vLUZrcXj+XhLH8U/r+RZ/cjCIoDvaRSM4SHP7GNap6WQSMpsjWR5X8szecRzdCpezR9KRZ7Rz7k9BgBWrkt8bS3va3k2j9yrpLc0Vq5RLuK/PJHHw67IwgpoiXI2fMRzeSaPO5jldjYzb4T3j3xbnsu/nnvk1j7Vc4yXJ/b5sykqGwV1WfmSZ/T2qh6T3kN5/qG+xnN5Lo+I3Xw900L53IpImZk8pZ/XeyyFxCrIRfyXp/L+3N8SMGTZc41Tntfjwtqsu28wLZU8q49diNkJPUsMBfkb+Dzz8c9ajwHy9/Cm4g8A1Xpf7jfJE3k7tPyqHjtPm3eSJ/ZzluO23/tq/1Geyv+8yMvLy8vLy//dPwFtb0ghu7+d2gAAAABJRU5ErkJggg=="
         }
         """
     )

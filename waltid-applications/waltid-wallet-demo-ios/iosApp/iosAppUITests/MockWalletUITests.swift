@@ -486,7 +486,7 @@ final class MockWalletUITests: XCTestCase {
         )
     }
 
-    func testCredentialCardsExposeStableTappableButtonIdentifier() {
+    func testCredentialImageOpensAndClosesFullScreenViewer() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
@@ -517,15 +517,15 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(card.isHittable)
         card.tap()
         ui.assertExists(identifier: "wallet.credentialDetailsScreen", timeout: 10)
-        let qrImageIdentifier = ui.claimImageIdentifier(path: "qr_data")
-        ui.assertExists(identifier: qrImageIdentifier, timeout: 10)
-        ui.tapElement(identifier: qrImageIdentifier)
+        let artifactImageIdentifier = ui.claimImageIdentifier(path: "verification_artifact")
+        ui.assertExists(identifier: artifactImageIdentifier, timeout: 10)
+        ui.tapElement(identifier: artifactImageIdentifier)
         ui.assertExists(identifierPrefix: "wallet.claimImageViewer.", timeout: 10)
         XCTAssertTrue(app.images["Full-screen credential image"].waitForExistence(timeout: 10))
         ui.tapElement(identifierPrefix: "wallet.claimImageViewerClose.")
         XCTAssertFalse(app.images["Full-screen credential image"].waitForExistence(timeout: 1))
         ui.assertExists(identifier: "wallet.credentialDetailsScreen", timeout: 10)
-        ui.assertExists(identifier: qrImageIdentifier, timeout: 10)
+        ui.assertExists(identifier: artifactImageIdentifier, timeout: 10)
     }
 
     func testTabbedReceiveAndPresentFlowUsesMockWallet() {

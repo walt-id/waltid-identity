@@ -88,7 +88,6 @@ public enum CredentialDisplayVocabulary {
         ClaimDescriptor("picture", roles: [.image], displayOrder: 72),
         ClaimDescriptor("image", roles: [.image], displayOrder: 73),
         ClaimDescriptor("logo", roles: [.image], displayOrder: 74),
-        ClaimDescriptor("qr_data", label: "QR code", displayOrder: 90),
         ClaimDescriptor(
             "signature_usual_mark",
             label: "Signature or usual mark",
@@ -263,6 +262,10 @@ public enum CredentialDisplayVocabulary {
 
     public static func roles(for components: [String]) -> Set<ClaimRole> {
         roles(for: ClaimPath(components: components))
+    }
+
+    static func hasLeafDescriptor(for components: [String]) -> Bool {
+        components.last.map { descriptor(for: $0) != nil } ?? false
     }
 
     public static func claimPathCompare(_ lhs: [String], _ rhs: [String], format: String? = nil) -> ComparisonResult {

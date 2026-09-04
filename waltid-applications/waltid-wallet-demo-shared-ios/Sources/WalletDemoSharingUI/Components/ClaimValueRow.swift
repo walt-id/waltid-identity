@@ -92,11 +92,7 @@ private struct ImageValue: View {
     @State private var viewerOpen = false
 
     var body: some View {
-        if let image {
-            content(image: image)
-        } else {
-            content(image: nil)
-        }
+        content(image: image)
     }
 
     private func content(image: UIImage?) -> some View {
@@ -123,7 +119,7 @@ private struct ImageValue: View {
             }
             Text(mimeType)
                 .font(.caption.weight(.medium))
-            Text(metadata)
+            Text("\(byteCount) bytes")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -140,11 +136,7 @@ private struct ImageValue: View {
     }
 
     private var image: UIImage? {
-        return UIImage(data: data)
-    }
-
-    private var metadata: String {
-        "\(byteCount) bytes"
+        UIImage(data: data)
     }
 }
 

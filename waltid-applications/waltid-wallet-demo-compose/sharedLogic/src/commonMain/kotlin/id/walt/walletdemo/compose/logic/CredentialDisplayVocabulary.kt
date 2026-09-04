@@ -75,7 +75,6 @@ internal object CredentialDisplayVocabulary {
         ClaimDescriptor("picture", roles = setOf(ClaimRole.Image), displayOrder = 72),
         ClaimDescriptor("image", roles = setOf(ClaimRole.Image), displayOrder = 73),
         ClaimDescriptor("logo", roles = setOf(ClaimRole.Image), displayOrder = 74),
-        ClaimDescriptor("qr_data", label = "QR code", displayOrder = 90),
         ClaimDescriptor(
             "signature_usual_mark",
             label = "Signature or usual mark",
@@ -282,6 +281,9 @@ internal object CredentialDisplayVocabulary {
 
     fun hasRole(path: ClaimPath, role: ClaimRole): Boolean =
         role in roles(path = path)
+
+    fun hasLeafDescriptor(path: ClaimPath): Boolean =
+        descriptorFor(path.leaf) != null
 
     fun isGenericCredentialType(value: String): Boolean =
         CredentialTypeIdentifier.token(value)?.equals(GenericVerifiableCredentialType, ignoreCase = true) == true

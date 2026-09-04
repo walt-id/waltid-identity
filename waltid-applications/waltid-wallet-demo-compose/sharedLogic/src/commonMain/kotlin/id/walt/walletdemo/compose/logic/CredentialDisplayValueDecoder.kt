@@ -11,13 +11,20 @@ import kotlinx.serialization.json.contentOrNull
 
 internal class CredentialDisplayValueDecoder(
     private val json: Json,
-    private val renderJson: (JsonElement, ClaimPath) -> DisplayValue,
+    private val renderJson: (JsonElement, ClaimPath, String?) -> DisplayValue,
 ) {
-    fun decodedString(value: String, path: ClaimPath): DisplayValue? {
+    fun decodedString(
+        value: String,
+        path: ClaimPath,
+        format: String?,
+        imagePolicy: ImageDecodingPolicy,
+    ): DisplayValue? {
         val payload = EncodedPayload.parse(value) ?: return null
         val bytes = payload.base64.decode() ?: return null
-        ImageBytes.detectMime(bytes, payload.imageMimeTypeHint)?.let { mime ->
-            return bytes.toImageValue(mime, encoded = payload.base64.value)
+        if (imagePolicy.accepts(payload.kind)) {
+            ImageBytes.detectMime(bytes)?.let { mime ->
+                return bytes.toImageValue(mime, encoded = payload.base64.value)
+            }
         }
 
         val decodedText = runCatching { bytes.decodeToString() }.getOrNull()
@@ -26,7 +33,7 @@ internal class CredentialDisplayValueDecoder(
 
         val decodedJson = runCatching { json.parseToJsonElement(decodedText) }.getOrNull()
         if (decodedJson != null) {
-            return renderJson(decodedJson, path)
+            return renderJson(decodedJson, path, format)
         }
 
         return DisplayValue.DecodedText(decodedText)
@@ -35,7 +42,7 @@ internal class CredentialDisplayValueDecoder(
     fun imageFromByteArray(value: JsonArray, roles: Set<ClaimRole>): DisplayValue.Image? {
         if (ClaimRole.Image !in roles) return null
         val bytes = value.toByteArrayOrNull() ?: return null
-        val mime = ImageBytes.detectMime(bytes, mimeHint = null) ?: return null
+        val mime = ImageBytes.detectMime(bytes) ?: return null
         return bytes.toImageValue(mime)
     }
 
@@ -58,8 +65,21 @@ internal class CredentialDisplayValueDecoder(
     }
 }
 
+internal enum class ImageDecodingPolicy {
+    SchemaImage,
+    DataUrlFallback,
+    Disabled,
+}
+
+private fun ImageDecodingPolicy.accepts(payloadKind: EncodedPayloadKind): Boolean =
+    when (this) {
+        ImageDecodingPolicy.SchemaImage -> true
+        ImageDecodingPolicy.DataUrlFallback -> payloadKind == EncodedPayloadKind.ImageDataUrl
+        ImageDecodingPolicy.Disabled -> false
+    }
+
 private data class EncodedPayload(
-    val imageMimeTypeHint: String?,
+    val kind: EncodedPayloadKind,
     val base64: Base64Payload,
 ) {
     companion object {
@@ -68,37 +88,47 @@ private data class EncodedPayload(
 
         fun parse(rawValue: String): EncodedPayload? {
             val value = rawValue.trim()
-            val plainPayload = { payload: String ->
-                Base64Payload.parse(payload)?.let { base64 ->
-                    EncodedPayload(imageMimeTypeHint = null, base64 = base64)
-                }
-            }
-
             if (!value.startsWith(schemePrefix, ignoreCase = true)) {
-                return plainPayload(value)
+                return Base64Payload.parse(value)?.let { base64 ->
+                    EncodedPayload(
+                        kind = EncodedPayloadKind.PlainBase64,
+                        base64 = base64,
+                    )
+                }
             }
 
             val markerIndex = value.indexOf(base64Marker, ignoreCase = true)
             if (markerIndex < 0) {
-                return plainPayload(value)
+                return null
             }
 
             val metadata = value.substring(schemePrefix.length, markerIndex)
             val base64 = Base64Payload.parse(value.substring(markerIndex + base64Marker.length))
                 ?: return null
             return EncodedPayload(
-                imageMimeTypeHint = MediaTypeHint.imageType(metadata),
+                kind = if (MediaTypeHint.isImage(metadata)) {
+                    EncodedPayloadKind.ImageDataUrl
+                } else {
+                    EncodedPayloadKind.OtherDataUrl
+                },
                 base64 = base64,
             )
         }
     }
 }
 
+private enum class EncodedPayloadKind {
+    PlainBase64,
+    ImageDataUrl,
+    OtherDataUrl,
+}
+
 private object MediaTypeHint {
-    fun imageType(metadata: String): String? {
-        val mediaType = metadata.substringBefore(';').trim().lowercase()
-        return mediaType.takeIf { ImageMime.isSupported(it) }
-    }
+    fun isImage(metadata: String): Boolean =
+        mediaType(metadata).startsWith("image/", ignoreCase = true)
+
+    private fun mediaType(metadata: String): String =
+        metadata.substringBefore(';').trim()
 }
 
 private class Base64Payload private constructor(val value: String) {
@@ -141,21 +171,17 @@ private object ImageMime {
     const val Gif = "image/gif"
     const val Webp = "image/webp"
 
-    fun isSupported(mimeType: String): Boolean =
-        mimeType in setOf(Png, Jpeg, Gif, Webp)
 }
 
 private object ImageBytes {
-    fun detectMime(bytes: ByteArray, mimeHint: String?): String? {
-        val detected = when {
+    fun detectMime(bytes: ByteArray): String? =
+        when {
             bytes.startsWith(0x89, 0x50, 0x4E, 0x47) -> ImageMime.Png
             bytes.startsWith(0xFF, 0xD8, 0xFF) -> ImageMime.Jpeg
             bytes.startsWithAscii("GIF87a") || bytes.startsWithAscii("GIF89a") -> ImageMime.Gif
             bytes.size >= 12 && bytes.startsWithAscii("RIFF") && bytes.copyOfRange(8, 12).decodeToString() == "WEBP" -> ImageMime.Webp
             else -> null
         }
-        return detected?.let { mimeHint.takeIf { it == detected } ?: detected }
-    }
 
     private fun ByteArray.startsWith(vararg prefix: Int): Boolean =
         size >= prefix.size && prefix.indices.all { this[it].toInt() and 0xFF == prefix[it] }

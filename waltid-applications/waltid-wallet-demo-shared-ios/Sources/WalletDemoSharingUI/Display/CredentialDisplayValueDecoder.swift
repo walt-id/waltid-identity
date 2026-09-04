@@ -1,16 +1,18 @@
 import Foundation
 
-public enum CredentialDisplayValueDecoder {
-    public static func decodedValue(
+enum CredentialDisplayValueDecoder {
+    static func decodedValue(
         for value: String,
         path: DisplayClaimPath,
+        imagePolicy: ImageDecodingPolicy,
         renderJSON: (CredentialDisplayJSONValue, DisplayClaimPath) -> DisplayValue
     ) -> DisplayValue? {
         guard let payload = EncodedPayload.parse(value),
               let bytes = payload.base64.decode() else {
             return nil
         }
-        if let mimeType = ImageBytes.mimeType(for: bytes, hint: payload.imageMimeTypeHint) {
+        if imagePolicy.accepts(payload.kind),
+           let mimeType = ImageBytes.mimeType(for: bytes) {
             return imageValue(for: bytes, mimeType: mimeType, encoded: payload.base64.value)
         }
         guard let decoded = String(data: bytes, encoding: .utf8), decoded.isMostlyReadable else {
@@ -22,10 +24,10 @@ public enum CredentialDisplayValueDecoder {
         return .decodedText(decoded)
     }
 
-    public static func imageDisplayValue(for list: [CredentialDisplayJSONValue], roles: Set<ClaimRole>) -> DisplayValue? {
+    static func imageDisplayValue(for list: [CredentialDisplayJSONValue], roles: Set<ClaimRole>) -> DisplayValue? {
         guard roles.contains(.image),
               let data = byteArrayData(from: list),
-              let mimeType = ImageBytes.mimeType(for: data, hint: nil) else {
+              let mimeType = ImageBytes.mimeType(for: data) else {
             return nil
         }
         return imageValue(for: data, mimeType: mimeType)
@@ -56,17 +58,38 @@ public enum CredentialDisplayValueDecoder {
     }
 }
 
+enum ImageDecodingPolicy {
+    case schemaImage
+    case dataURLFallback
+    case disabled
+}
+
+private extension ImageDecodingPolicy {
+    func accepts(_ payloadKind: EncodedPayloadKind) -> Bool {
+        switch self {
+        case .schemaImage:
+            return true
+        case .dataURLFallback:
+            return payloadKind == .imageDataURL
+        case .disabled:
+            return false
+        }
+    }
+}
+
 private struct EncodedPayload {
-    let imageMimeTypeHint: String?
+    let kind: EncodedPayloadKind
     let base64: Base64Payload
 
     static func parse(_ rawValue: String) -> EncodedPayload? {
         let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let prefixRange = value.range(of: schemePrefix, options: [.anchored, .caseInsensitive]),
-              let markerRange = value.range(of: base64Marker, options: .caseInsensitive) else {
+        guard let prefixRange = value.range(of: schemePrefix, options: [.anchored, .caseInsensitive]) else {
             return Base64Payload(value).map {
-                EncodedPayload(imageMimeTypeHint: nil, base64: $0)
+                EncodedPayload(kind: .plainBase64, base64: $0)
             }
+        }
+        guard let markerRange = value.range(of: base64Marker, options: .caseInsensitive) else {
+            return nil
         }
 
         let metadata = String(value[prefixRange.upperBound..<markerRange.lowerBound])
@@ -74,7 +97,7 @@ private struct EncodedPayload {
             return nil
         }
         return EncodedPayload(
-            imageMimeTypeHint: MediaTypeHint.imageType(from: metadata),
+            kind: MediaTypeHint.isImage(metadata) ? .imageDataURL : .otherDataURL,
             base64: base64
         )
     }
@@ -83,17 +106,23 @@ private struct EncodedPayload {
     private static let base64Marker = ";base64,"
 }
 
+private enum EncodedPayloadKind {
+    case plainBase64
+    case imageDataURL
+    case otherDataURL
+}
+
 private enum MediaTypeHint {
-    static func imageType(from metadata: String) -> String? {
-        guard let rawMediaType = metadata
+    static func isImage(_ metadata: String) -> Bool {
+        mediaType(from: metadata).hasPrefix("image/")
+    }
+
+    private static func mediaType(from metadata: String) -> String {
+        metadata
             .split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
             .first?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased(),
-            ImageMime.isSupported(rawMediaType) else {
-            return nil
-        }
-        return rawMediaType
+            .lowercased() ?? ""
     }
 }
 
@@ -137,14 +166,10 @@ private enum ImageMime {
     static let jpeg = "image/jpeg"
     static let gif = "image/gif"
     static let webp = "image/webp"
-
-    static func isSupported(_ mimeType: String) -> Bool {
-        [png, jpeg, gif, webp].contains(mimeType)
-    }
 }
 
 private enum ImageBytes {
-    static func mimeType(for data: Data, hint: String?) -> String? {
+    static func mimeType(for data: Data) -> String? {
         let bytes = [UInt8](data.prefix(12))
         let detected: String?
         if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
@@ -163,11 +188,7 @@ private enum ImageBytes {
             detected = nil
         }
 
-        guard let detected else {
-            return nil
-        }
-
-        return hint == detected ? hint : detected
+        return detected
     }
 }
 

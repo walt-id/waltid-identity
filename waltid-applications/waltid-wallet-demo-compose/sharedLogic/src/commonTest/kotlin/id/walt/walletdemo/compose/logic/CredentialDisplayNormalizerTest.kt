@@ -244,7 +244,7 @@ class CredentialDisplayNormalizerTest {
                 label = "PID",
                 credentialDataJson = """
                     {
-                      "portrait": "data:image/png;base64,$onePixelPngBase64",
+                      "portrait": "data:image/png;base64,$syntheticQrPngBase64",
                       "nationalities": ["AT", "CH"],
                       "place_of_birth": {
                         "region": "Vienna",
@@ -423,7 +423,7 @@ class CredentialDisplayNormalizerTest {
                       "credentialSubject": {
                         "given_name": "Ada",
                         "family_name": "Lovelace",
-                        "portrait": "data:image/png;base64,$onePixelPngBase64"
+                        "portrait": "data:image/png;base64,$syntheticQrPngBase64"
                       }
                     }
                 """.trimIndent(),
@@ -722,7 +722,7 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun validatesDataUriImageBytesBeforeUsingMimeHint() {
+    fun usesDetectedImageTypeInsteadOfDeclaredDataUrlType() {
         val encodedJson = Base64.Default.encode("""{"purpose":"age proof"}""".encodeToByteArray())
         val encodedText = Base64.Default.encode("Hello, wallet".encodeToByteArray())
         val details = CredentialDisplayNormalizer.toDetails(
@@ -735,7 +735,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "json_note": "data:image/png;base64,$encodedJson",
                       "plain_note": "data:image/webp;base64,$encodedText",
-                      "portrait": "data:image/png;base64,$onePixelPngBase64"
+                      "portrait": "data:image/png;base64,$syntheticQrPngBase64"
                     }
                 """.trimIndent(),
             )
@@ -748,22 +748,90 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun rendersQrDataPngDataUriAsImage() {
+    fun rendersArbitraryDataImageClaimsForSdJwtAndW3cCredentialsUsingDetectedMimeType() {
+        listOf("vc+sd-jwt", "dc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc").forEach { format ->
+            val details = CredentialDisplayNormalizer.toDetails(
+                CredentialSummary(
+                    id = "cred-1",
+                    format = format,
+                    issuer = null,
+                    label = format,
+                    credentialDataJson =
+                        """{
+                            "verification_artifact":"data:image/jpeg;base64,$syntheticQrPngBase64",
+                            "resident_address":{"visual_proof":"data:image/png;base64,$syntheticQrPngBase64"}
+                        }""".trimIndent(),
+                )
+            )
+
+            val claim = details.groups.flatMap { it.items }.first { it.path.id == "verification_artifact" }
+            assertEquals("Verification artifact", claim.label)
+            val image = assertIs<DisplayValue.Image>(claim.value)
+            assertEquals("image/png", image.mimeType)
+            assertTrue(image.bytes.contentEquals(Base64.Default.decode(syntheticQrPngBase64)))
+
+            val nestedImage = assertIs<DisplayValue.Image>(
+                details.groups.flatMap { it.items }.first { it.path.id == "resident_address.visual_proof" }.value
+            )
+            assertEquals("image/png", nestedImage.mimeType)
+        }
+    }
+
+    @Test
+    fun explicitNonImageSchemaAndUnsupportedPayloadsDoNotRenderAsImages() {
+        val svg = Base64.Default.encode(
+            """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/></svg>"""
+                .encodeToByteArray()
+        )
+        val dataImage = "data:image/png;base64,$syntheticQrPngBase64"
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
                 id = "cred-1",
                 format = "vc+sd-jwt",
                 issuer = null,
                 label = "vc+sd-jwt",
-                credentialDataJson = """{"qr_data":"data:image/png;base64,$onePixelPngBase64"}""",
+                credentialDataJson = """
+                    {
+                      "given_name": "$dataImage",
+                      "invalid_image": "data:image/png;base64,not-base64!",
+                      "unsupported_image": "data:image/svg+xml;base64,$svg",
+                      "non_image_data_url": "data:text/plain;base64,$syntheticQrPngBase64",
+                      "plain_base64": "$syntheticQrPngBase64"
+                    }
+                """.trimIndent(),
             )
         )
 
-        val claim = details.groups.flatMap { it.items }.first { it.path.id == "qr_data" }
-        assertEquals("QR code", claim.label)
-        val image = assertIs<DisplayValue.Image>(claim.value)
+        val claims = details.groups.flatMap { it.items }
+        listOf("given_name", "invalid_image", "unsupported_image", "non_image_data_url", "plain_base64")
+            .forEach { path ->
+                assertFalse(claims.first { it.path.id == path }.value is DisplayValue.Image)
+            }
+    }
+
+    @Test
+    fun rendersArbitraryDataImageRequestedDisclosure() {
+        val option = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "credential-1",
+            label = "PID",
+            issuer = "https://issuer.example",
+            format = "dc+sd-jwt",
+            credentialDataJson = "{}",
+            disclosures = listOf(
+                WalletDemoPresentationDisclosure(
+                    label = "Verification artifact",
+                    path = """["${'$'}","verification_artifact"]""",
+                    valueJson = """"data:image/png;base64,$syntheticQrPngBase64"""",
+                    selectivelyDisclosable = true,
+                )
+            ),
+        )
+
+        val image = assertIs<DisplayValue.Image>(
+            option.toCredentialDetails().groups.first().items.single().value
+        )
         assertEquals("image/png", image.mimeType)
-        assertTrue(image.bytes.contentEquals(Base64.Default.decode(onePixelPngBase64)))
     }
 
     @Test
@@ -774,7 +842,7 @@ class CredentialDisplayNormalizerTest {
                 format = "mso_mdoc",
                 issuer = null,
                 label = "mso_mdoc",
-                credentialDataJson = """{"portrait":{"elementValue":${onePixelPngByteArrayJson()}}}""",
+                credentialDataJson = """{"portrait":{"elementValue":${syntheticQrPngByteArrayJson()}}}""",
             )
         )
 
@@ -785,7 +853,7 @@ class CredentialDisplayNormalizerTest {
         val image = assertIs<DisplayValue.Image>(portrait.value)
 
         assertEquals("image/png", image.mimeType)
-        assertTrue(image.bytes.contentEquals(Base64.Default.decode(onePixelPngBase64)))
+        assertTrue(image.bytes.contentEquals(Base64.Default.decode(syntheticQrPngBase64)))
         assertEquals(image, details.toCardDisplayData().portrait)
     }
 
@@ -801,7 +869,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "eu.europa.ec.eudi.pid.1": {
                         "portrait": {
-                          "elementValue": ${onePixelPngByteArrayJson()}
+                          "elementValue": ${syntheticQrPngByteArrayJson()}
                         }
                       }
                     }
@@ -828,7 +896,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "org.iso.18013.5.1": {
                         "signature_usual_mark": {
-                          "elementValue": ${onePixelPngByteArrayJson()}
+                          "elementValue": ${syntheticQrPngByteArrayJson()}
                         }
                       }
                     }
@@ -854,10 +922,10 @@ class CredentialDisplayNormalizerTest {
                 credentialDataJson = """
                     {
                       "org.iso.18013.5.1": {
-                        "biometric_template_face": ${onePixelPngByteArrayJson()},
-                        "biometric_template_finger": ${onePixelPngByteArrayJson()},
-                        "biometric_template_signature_sign": ${onePixelPngByteArrayJson()},
-                        "biometric_template_iris": ${onePixelPngByteArrayJson()}
+                        "biometric_template_face": ${syntheticQrPngByteArrayJson()},
+                        "biometric_template_finger": ${syntheticQrPngByteArrayJson()},
+                        "biometric_template_signature_sign": ${syntheticQrPngByteArrayJson()},
+                        "biometric_template_iris": ${syntheticQrPngByteArrayJson()}
                       }
                     }
                 """.trimIndent(),
@@ -906,7 +974,7 @@ class CredentialDisplayNormalizerTest {
                 WalletDemoPresentationDisclosure(
                     label = CredentialDisplayVocabulary.disclosureLabel("portrait", """["eu.europa.ec.eudi.pid.1","portrait"]"""),
                     path = """["eu.europa.ec.eudi.pid.1","portrait"]""",
-                    valueJson = onePixelPngByteArrayJson(),
+                    valueJson = syntheticQrPngByteArrayJson(),
                     displayValue = null,
                     selectivelyDisclosable = true,
                     required = false,
@@ -1150,14 +1218,14 @@ class CredentialDisplayNormalizerTest {
         assertEquals("Country", claims.first { it.path.id == "place_of_birth.country" }.label)
     }
 
-    private fun onePixelPngByteArrayJson(): String =
-        Base64.Default.decode(onePixelPngBase64).joinToString(prefix = "[", postfix = "]") { byte ->
+    private fun syntheticQrPngByteArrayJson(): String =
+        Base64.Default.decode(syntheticQrPngBase64).joinToString(prefix = "[", postfix = "]") { byte ->
             (byte.toInt() and 0xFF).toString()
         }
 
     private companion object {
-        // Deterministic 1 x 1 PNG fixture containing no third-party artwork.
-        const val onePixelPngBase64 =
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+        // Deterministic 370 x 370 QR PNG generated from synthetic text; contains no third-party artwork.
+        const val syntheticQrPngBase64 =
+            "iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQMAAADS6sNKAAAABlBMVEUAAAD///+l2Z/dAAAAAnRSTlP//8i138cAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAG4SURBVHic7dpNbsMgEAVgpBzAR/LVORIHsEScecwwIa7aqt0867HAP3xkYxiPIaX/rhR5eXl5eXn5f/JllEe3qvfml3vztl2e1+Oivfx2ntSz/Twcp2qPnok8p389dmur2zFiAM7aGCPyt/CoMOm7/O28TXVrG1Nd/hbeDhNsEcq/if/yFH4Un++58jZ5Xj/L7NmRj63t8oTeHjuy7PcsDPO9bscyfuS5vLUZrcXj+XhLH8U/r+RZ/cjCIoDvaRSM4SHP7GNap6WQSMpsjWR5X8szecRzdCpezR9KRZ7Rz7k9BgBWrkt8bS3va3k2j9yrpLc0Vq5RLuK/PJHHw67IwgpoiXI2fMRzeSaPO5jldjYzb4T3j3xbnsu/nnvk1j7Vc4yXJ/b5sykqGwV1WfmSZ/T2qh6T3kN5/qG+xnN5Lo+I3Xw900L53IpImZk8pZ/XeyyFxCrIRfyXp/L+3N8SMGTZc41Tntfjwtqsu28wLZU8q49diNkJPUsMBfkb+Dzz8c9ajwHy9/Cm4g8A1Xpf7jfJE3k7tPyqHjtPm3eSJ/ZzluO23/tq/1Geyv+8yMvLy8vLy//dPwFtb0ghu7+d2gAAAABJRU5ErkJggg=="
     }
 }
