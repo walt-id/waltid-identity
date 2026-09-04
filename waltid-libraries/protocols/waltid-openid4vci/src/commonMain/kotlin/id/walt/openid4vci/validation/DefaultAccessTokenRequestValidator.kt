@@ -5,6 +5,7 @@ import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.serialization.SerializationException
