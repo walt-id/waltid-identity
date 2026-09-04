@@ -205,8 +205,9 @@ class Issuer2CredentialOfferEndpointTest {
         // read from this later instead of re-reading mutable profile config.
         val session = client.getSession(response.offerId)
         assertEquals(response.offerId, session.sessionId)
-        assertEquals(profile.profileId, session.profileId)
-        assertEquals(profile.credentialConfigurationId, session.credentialConfigurationId)
+        val issuanceRequest = session.issuanceRequests.single()
+        assertEquals(profile.profileId, issuanceRequest.profileId)
+        assertEquals(profile.credentialConfigurationId, issuanceRequest.credentialConfigurationId)
         assertEquals(AuthenticationMethod.PRE_AUTHORIZED, session.authenticationMethod)
         assertEquals(IssuanceSessionStatus.ACTIVE, session.status)
         assertEquals(response.expiresAt, session.expiresAt.toEpochMilliseconds())
