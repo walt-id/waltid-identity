@@ -8,6 +8,7 @@ import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.testsupport.KTOR_TEST_APPLICATION_BASE_URL
 import id.walt.issuer2.testsupport.Issuer2TestNotificationServer
