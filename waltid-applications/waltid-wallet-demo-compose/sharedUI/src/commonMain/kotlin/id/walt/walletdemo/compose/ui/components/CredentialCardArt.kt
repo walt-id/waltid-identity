@@ -29,7 +29,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.SubcomposeAsyncImage
-import id.walt.credentials.display.CssColors
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
@@ -214,7 +213,7 @@ internal fun showConstructedCardArtOverlay(state: CredentialCardMetadataArtState
 internal expect fun DefaultWaltLogo(modifier: Modifier)
 
 internal fun parseCssColor(value: String?): Color? {
-    val parsed = CssColors.parse(value) ?: return null
+    val parsed = CssColorParser.parse(value) ?: return null
     return Color(
         red = parsed.red,
         green = parsed.green,

@@ -53,8 +53,22 @@ Android builds can override it with `-PtransactionDataProfiles.url=...`. Compose
 ## Target status
 
 - Android and iOS are the supported mobile demo targets for wallet SDK issuance, presentation, platform-backed keys, and persistence.
-- Web/Wasm is currently a mock UI preview wired to `createMockDemoWallet()`. It does not exercise the mobile wallet SDK, platform key storage, SQLDelight persistence, EUDI flows, or Enterprise flows.
-- Production web wallet support is expected to live outside this mobile demo app. If a shared web UI is needed later, the shared UI module may need to move or split around the final web architecture.
+- Web/Wasm is a custodial demo against **wallet-api2 with the `auth` feature enabled**. It uses email/password JWT auth (`POST /auth/register`, `POST /auth/emailpass`) and isolated wallet-api2 HTTP routes for receive/present. It does not run the mobile wallet SDK, platform keys, SQLDelight, DC API, BLE/NFC, or PIN/biometrics.
+- Production web wallet support still lives in `waltid-web-wallet` (wallet-api v1). This Compose web host is a no-install demo of the shared wallet UI.
+
+## Web demo (wallet-api2)
+
+Enable the Wasm host, start wallet-api2 with `auth` on, then run the Compose web app:
+
+```bash
+./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDevelopmentRun -PenableWalletDemoComposeWeb=true
+```
+
+The host talks to `http://localhost:7006` by default. Override the base URL in the browser with `localStorage.setItem("waltid.wallet2.baseUrl", "https://your-wallet-api2")`.
+
+Register or log in with email and password. The JWT is stored in `localStorage`; the wallet id is stored in `localStorage` and a `waltid_wallet_id` cookie. After login the wallet opens unlocked (no PIN). Authorization-code issuance uses the current page origin as `redirect_uri` and restores the pending session after the issuer redirect.
+
+QR scanning, Digital Credentials API, and hardware-backed keys are not available on web. Paste offer and presentation URLs instead.
 
 ## Release APK
 

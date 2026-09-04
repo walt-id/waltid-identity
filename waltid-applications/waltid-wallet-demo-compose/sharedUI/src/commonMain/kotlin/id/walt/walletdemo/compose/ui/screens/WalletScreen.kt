@@ -17,7 +17,11 @@ import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
 
 @Composable
-internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
+internal fun WalletScreen(
+    controller: WalletDemoController,
+    state: WalletDemoUiState,
+    onSignOut: (() -> Unit)? = null,
+) {
     val ready = state.session as? WalletSessionState.Ready
     val credentials = ready?.credentials.orEmpty()
     val uriHandler = LocalUriHandler.current
@@ -38,6 +42,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             onBack = { showingSettings = false },
             onLock = controller::lock,
             onResetWallet = controller::resetWallet,
+            onSignOut = onSignOut,
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,

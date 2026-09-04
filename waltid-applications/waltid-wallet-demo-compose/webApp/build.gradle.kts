@@ -23,6 +23,10 @@ kotlin {
             implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedUI"))
             implementation(identityLibs.compose.runtime)
             implementation(identityLibs.compose.ui)
+            implementation(identityLibs.compose.foundation)
+            implementation(identityLibs.compose.material3)
+            implementation(identityLibs.kotlinx.coroutines.core)
+            implementation(identityLibs.ktor.client.js)
         }
     }
 }
