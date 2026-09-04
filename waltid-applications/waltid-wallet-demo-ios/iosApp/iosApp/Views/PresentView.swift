@@ -3,6 +3,12 @@ import WalletDemoSharingUI
 import WebKit
 import WalletSDK
 
+enum ProximityPresentationLifecyclePolicy {
+    static func shouldInterrupt(for phase: ScenePhase) -> Bool {
+        phase == .background
+    }
+}
+
 struct PresentView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
@@ -72,7 +78,9 @@ struct PresentView: View {
         }
         .onChange(of: scenePhase) { phase in
             updateProximityScreenPolicy()
-            if phase != .active { proximityPresentation.handleLifecycleInterruption() }
+            if ProximityPresentationLifecyclePolicy.shouldInterrupt(for: phase) {
+                proximityPresentation.handleLifecycleInterruption()
+            }
         }
     }
 
