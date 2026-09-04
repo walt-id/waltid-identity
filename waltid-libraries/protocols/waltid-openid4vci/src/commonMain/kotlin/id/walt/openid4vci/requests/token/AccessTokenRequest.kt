@@ -3,6 +3,7 @@ package id.walt.openid4vci.requests.token
 import id.walt.openid4vci.Client
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.clientauth.AuthenticatedClient
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import kotlin.time.Instant
 
 /**
@@ -19,6 +20,7 @@ interface AccessTokenRequest {
     val grantedScopes: Set<String>
     val requestedAudience: Set<String>
     val grantedAudience: Set<String>
+    val authorizationDetails: List<AuthorizationDetail>
     val requestForm: Map<String, List<String>>
     val session: Session?
     val issClaim: String?

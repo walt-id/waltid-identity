@@ -524,11 +524,16 @@ class Issuer2PARRouteTest {
 
     private fun authorizedSession(sessionId: String) = IssuanceSession(
         sessionId = sessionId,
-        profileId = "identity-profile",
         authenticationMethod = AuthenticationMethod.AUTHORIZED,
-        credentialConfigurationId = "identity_credential",
-        issuerKey = buildJsonObject { put("type", "jwk") },
-        credentialData = buildJsonObject {},
+        issuanceRequests = listOf(
+            IssuanceRequest(
+                credentialIdentifier = "credential",
+                profileId = "identity-profile",
+                credentialConfigurationId = "identity_credential",
+                issuerKey = buildJsonObject { put("type", "jwk") },
+                credentialData = buildJsonObject {},
+            )
+        ),
         expiresAt = Instant.DISTANT_FUTURE,
     )
 

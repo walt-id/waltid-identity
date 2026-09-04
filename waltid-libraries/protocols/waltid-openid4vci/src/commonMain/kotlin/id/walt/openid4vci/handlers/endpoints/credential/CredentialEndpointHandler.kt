@@ -28,7 +28,7 @@ fun interface CredentialEndpointHandler {
         configuration: CredentialConfiguration,
         issuerKey: Key,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceBatch: CredentialIssuanceBatch,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
@@ -36,10 +36,8 @@ fun interface CredentialEndpointHandler {
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult
 }
 
@@ -157,7 +155,7 @@ fun interface Crypto2CredentialEndpointHandler {
         configuration: CredentialConfiguration,
         issuerKey: Crypto2CredentialSigningKey,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceBatch: CredentialIssuanceBatch,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
@@ -165,9 +163,7 @@ fun interface Crypto2CredentialEndpointHandler {
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult
 }

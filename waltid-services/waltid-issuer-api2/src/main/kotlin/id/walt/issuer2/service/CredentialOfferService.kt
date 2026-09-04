@@ -72,21 +72,19 @@ class CredentialOfferService(
         }
         val sessionId = request.sessionId ?: UUID.randomUUID().toString()
         val expiresAt = expirationTimestamp(request.expiresInSeconds)
-        val overrides = request.runtimeOverrides
-        val issuerKey = overrides?.issuerKey ?: profile.issuerKey
-        val issuerDid = overrides?.issuerDid ?: profile.issuerDid
-        val notifications = overrides?.notifications ?: profile.notifications
-        val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
-        val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
+        val notifications = resolvedCredentials.map { it.third }.distinct().singleOrNull()
+        require(resolvedCredentials.all { it.third == notifications }) {
+            "All credentials in an issuance session must resolve to the same notification configuration"
+        }
 
         val issuerStateMode = when (request.authMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> null
             AuthenticationMethod.AUTHORIZED -> request.issuerStateMode ?: IssuerStateMode.INCLUDE
         }
-        require(issuerKey.isNotEmpty()) { "issuerKey must not be empty" }
-        require(issuerKey["type"] != null) { "issuerKey must contain a key type" }
-
         var resolvedTxCodeValue: String? = null
+        val credentialConfigurationIds = resolvedCredentials
+            .map { it.second.credentialConfigurationId }
+            .distinct()
         val credentialOffer = when (request.authMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> {
                 val oauthSession = DefaultSession(subject = sessionId)
@@ -104,7 +102,7 @@ class CredentialOfferService(
                 resolvedTxCodeValue = preAuthorizedCode.txCodeValue
                 CredentialOffer.withPreAuthorizedCodeGrant(
                     credentialIssuer = issuerBaseUrl(),
-                    credentialConfigurationIds = listOf(profile.credentialConfigurationId),
+                    credentialConfigurationIds = credentialConfigurationIds,
                     preAuthorizedCode = preAuthorizedCode.code,
                     txCode = request.txCode,
                 )
@@ -113,39 +111,18 @@ class CredentialOfferService(
             AuthenticationMethod.AUTHORIZED ->
                 CredentialOffer.withAuthorizationCodeGrant(
                     credentialIssuer = issuerBaseUrl(),
-                    credentialConfigurationIds = listOf(profile.credentialConfigurationId),
+                    credentialConfigurationIds = credentialConfigurationIds,
                     issuerState = sessionId.takeIf { issuerStateMode == IssuerStateMode.INCLUDE },
                 )
         }
 
-        idTokenClaimsMapping?.let { mapping ->
-            JsonObjectPathMapper.validateJsonObjectContainsPaths(
-                jsonObject = credentialData,
-                jsonPathList = mapping.values.toList(),
-            )
-        }
-
         val session = IssuanceSession(
             sessionId = sessionId,
-            profileId = profile.profileId,
             authenticationMethod = request.authMethod,
-            credentialConfigurationId = profile.credentialConfigurationId,
-            issuerKey = issuerKey,
-            expectedCredentialProofKeyJwk = overrides?.expectedCredentialProofKeyJwk,
-            credentialData = credentialData,
-            mapping = overrides?.mapping ?: profile.mapping,
-            selectiveDisclosure = overrides?.selectiveDisclosure ?: profile.selectiveDisclosure,
-            idTokenClaimsMapping = idTokenClaimsMapping,
-            mDocNameSpacesDataMappingConfig =
-                overrides?.mDocNameSpacesDataMappingConfig ?: profile.mDocNameSpacesDataMappingConfig,
-            authorizedTransactionDataTypes = overrides?.authorizedTransactionDataTypes
-                ?: profile.authorizedTransactionDataTypes,
-            x5Chain = overrides?.x5Chain ?: profile.x5Chain,
-            issuerDid = issuerDid,
+            issuanceRequests = resolvedCredentials.map { it.second },
             credentialOffer = credentialOffer,
             expiresAt = expiresAt,
             notifications = notifications,
-            credentialStatus = overrides?.credentialStatus ?: profile.credentialStatus,
         )
         sessionService.createSession(session)
         // BY_VALUE offers are never dereferenced, so this is their only offer-stage event.
@@ -164,7 +141,12 @@ class CredentialOfferService(
 
         return CredentialOfferCreateResponse(
             offerId = sessionId,
-            profileId = profile.profileId,
+            credentials = resolvedCredentials.map { (profile, issuanceRequest) ->
+                CredentialOfferCredentialResponse(
+                    profileId = profile.profileId,
+                    credentialConfigurationId = issuanceRequest.credentialConfigurationId,
+                )
+            },
             authMethod = request.authMethod,
             issuerStateMode = issuerStateMode,
             expiresAt = expiresAt.toEpochMilliseconds(),

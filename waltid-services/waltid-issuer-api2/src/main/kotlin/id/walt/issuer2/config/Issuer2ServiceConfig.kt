@@ -18,6 +18,8 @@ data class Issuer2ServiceConfig(
     val clientAuthenticationConfig: ClientAuthenticationConfig? = null,
     /** Preferred encoded crypto2 StoredKey. Invalid or mismatched values fail startup. */
     val ciTokenStoredKey: String? = null,
+    /** Enables batch credential issuance and defines the maximum accepted batch size. */
+    val batchCredentialIssuance: BatchCredentialIssuance? = null,
 ) : WaltConfig() {
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(
@@ -32,6 +34,7 @@ data class Issuer2ServiceConfig(
         credentialEncryptionKey,
         enforcePushedAuthorizationRequests,
         clientAuthenticationConfig,
+        null,
         null,
     )
 

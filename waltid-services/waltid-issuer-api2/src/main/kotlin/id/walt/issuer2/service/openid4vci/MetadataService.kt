@@ -62,6 +62,7 @@ class MetadataService(
                 baseUrl = baseUrl,
                 credentialConfigurationsSupported = credentialConfigurations,
                 credentialRequestEncryption = credentialRequestEncryption,
+                batchCredentialIssuance = batchCredentialIssuance,
                 display = issuerDisplay,
             )
         }
@@ -139,7 +140,9 @@ class MetadataService(
     suspend fun listJwks(): JsonObject {
         val configuredKeys = listOf(tokenSigningKeyConfig) +
                 profileService.listProfiles().map { profile -> profile.issuerKey.toString() } +
-                sessionService.listSessions().map { session -> session.issuerKey.toString() }
+                sessionService.listSessions().flatMap { session ->
+                    session.issuanceRequests.map { it.issuerKey.toString() }
+                }
 
         return buildJsonObject {
             put("keys", buildJsonArray {

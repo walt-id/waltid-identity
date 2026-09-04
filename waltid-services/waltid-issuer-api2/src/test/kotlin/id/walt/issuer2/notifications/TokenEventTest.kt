@@ -290,9 +290,15 @@ class TokenEventTest {
     private fun issuanceSession(sessionId: String) = IssuanceSession(
         sessionId = sessionId,
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
-        credentialConfigurationId = "identity_credential",
-        issuerKey = JsonObject(emptyMap()),
-        credentialData = JsonObject(emptyMap()),
+        issuanceRequests = listOf(
+            IssuanceRequest(
+                credentialIdentifier = "credential",
+                profileId = "test-profile",
+                credentialConfigurationId = "identity_credential",
+                issuerKey = JsonObject(emptyMap()),
+                credentialData = JsonObject(emptyMap()),
+            )
+        ),
         expiresAt = Clock.System.now() + 1.hours,
     )
 

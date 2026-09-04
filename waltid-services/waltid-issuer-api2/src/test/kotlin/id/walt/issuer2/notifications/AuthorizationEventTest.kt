@@ -418,12 +418,17 @@ class AuthorizationEventTest {
         idTokenClaimsMapping: Map<String, String>? = null,
     ) = IssuanceSession(
         sessionId = sessionId,
-        profileId = "test-profile",
         authenticationMethod = AuthenticationMethod.AUTHORIZED,
-        credentialConfigurationId = "identity_credential",
-        issuerKey = JsonObject(emptyMap()),
-        credentialData = buildJsonObject { },
-        idTokenClaimsMapping = idTokenClaimsMapping,
+        issuanceRequests = listOf(
+            IssuanceRequest(
+                credentialIdentifier = "credential",
+                profileId = "test-profile",
+                credentialConfigurationId = "identity_credential",
+                issuerKey = JsonObject(emptyMap()),
+                credentialData = buildJsonObject { },
+                idTokenClaimsMapping = idTokenClaimsMapping,
+            )
+        ),
         expiresAt = Clock.System.now() + 1.hours,
         externalAuthorizationState = externalState,
         authorizationRequest = mapOf(

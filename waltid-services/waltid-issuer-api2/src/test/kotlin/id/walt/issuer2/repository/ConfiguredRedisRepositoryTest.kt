@@ -126,13 +126,19 @@ class ConfiguredRedisRepositoryTest {
     private suspend fun testSession(suffix: String) = IssuanceSession(
         sessionId = "redis-session-$suffix",
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
-        credentialConfigurationId = "identity_credential",
-        issuerKey = KeySerialization.serializeKeyToJson(JWKKey.generate(KeyType.secp256r1)).jsonObject,
-        credentialData = buildJsonObject {
-            put("given_name", "Jane")
-            put("family_name", "Doe")
-        },
-        issuerDid = "did:web:issuer.example",
+        issuanceRequests = listOf(
+            IssuanceRequest(
+                credentialIdentifier = "credential-$suffix",
+                profileId = "profile-id",
+                credentialConfigurationId = "identity_credential",
+                issuerKey = KeySerialization.serializeKeyToJson(JWKKey.generate(KeyType.secp256r1)).jsonObject,
+                credentialData = buildJsonObject {
+                    put("given_name", "Jane")
+                    put("family_name", "Doe")
+                },
+                issuerDid = "did:web:issuer.example",
+            )
+        ),
         expiresAt = Clock.System.now().plus(5.minutes),
     )
 

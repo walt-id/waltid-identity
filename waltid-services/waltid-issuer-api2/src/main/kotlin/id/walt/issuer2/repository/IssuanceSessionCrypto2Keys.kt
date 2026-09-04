@@ -27,31 +27,64 @@ object IssuanceSessionCrypto2Keys {
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val migration = V1KeyMigration()
 
-    suspend fun attachFromIssuerKey(session: IssuanceSession): IssuanceSession {
-        session.crypto2IssuerStoredKey?.let { encoded ->
-            if (sidecarMatchesSession(session, encoded)) return session
+    suspend fun attachFromIssuerKeys(session: IssuanceSession): IssuanceSession =
+        session.copy(
+            issuanceRequests = session.issuanceRequests.map { request ->
+                request.crypto2IssuerStoredKey?.let { encoded ->
+                    if (sidecarMatchesRequest(request, encoded)) return@map request
+                }
+                request.copy(crypto2IssuerStoredKey = migrateLegacyKey(request))
+            }
+        )
+
+    suspend fun migrateLegacyKeys(session: IssuanceSession): Map<String, String> =
+        session.issuanceRequests.mapNotNull { request ->
+            (request.crypto2IssuerStoredKey ?: migrateLegacyKey(request))
+                ?.let { request.credentialIdentifier to it }
+        }.toMap()
+
+    suspend fun attachStoredKeys(
+        session: IssuanceSession,
+        storedKeys: Map<String, String>,
+    ): IssuanceSession = session.copy(
+        issuanceRequests = session.issuanceRequests.map { request ->
+            val stored = storedKeys[request.credentialIdentifier]
+            when {
+                stored != null && sidecarMatchesRequest(request, stored) ->
+                    request.copy(crypto2IssuerStoredKey = stored)
+                else -> request.copy(crypto2IssuerStoredKey = migrateLegacyKey(request))
+            }
         }
-        val migrated = migrateLegacyKey(session) ?: return session
-        return session.copy(crypto2IssuerStoredKey = migrated)
+    )
+
+    suspend fun validateStoredKeys(session: IssuanceSession, storedKeys: Map<String, String>) {
+        storedKeys.forEach { (credentialIdentifier, encoded) ->
+            val request = requireNotNull(session.issuanceRequests.find {
+                it.credentialIdentifier == credentialIdentifier
+            }) { "Issuer2 crypto2 sidecar references an unknown credential identifier" }
+            require(sidecarMatchesRequest(request, encoded)) {
+                "Issuer2 crypto2 sidecar does not match the issuance request key"
+            }
+        }
     }
 
-    suspend fun migrateLegacyKey(session: IssuanceSession): String? {
-        if (session.issuerKey["type"]?.jsonPrimitive?.content != "jwk") return null
-        val legacyKey = KeyManager.resolveSerializedKey(session.issuerKey)
+    suspend fun migrateLegacyKey(request: IssuanceRequest): String? {
+        if (request.issuerKey["type"]?.jsonPrimitive?.content != "jwk") return null
+        val legacyKey = KeyManager.resolveSerializedKey(request.issuerKey)
         val stored = migration.migrate(
             recordId = KeyId(legacyKey.getKeyId()),
-            serialized = session.issuerKey,
+            serialized = request.issuerKey,
             usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
         )
         crypto2Runtime.restore(stored)
         return StoredKeyCodec.encodeToString(stored)
     }
 
-    suspend fun sidecarMatchesSession(session: IssuanceSession, encoded: String): Boolean {
+    suspend fun sidecarMatchesRequest(request: IssuanceRequest, encoded: String): Boolean {
         val stored = StoredKeyCodec.decodeFromString(encoded)
         val crypto2Key = crypto2Runtime.restore(stored)
         require(KeyUsage.SIGN in stored.usages) { "Issuer2 crypto2 sidecar key does not permit signing" }
-        val legacyKey = KeyManager.resolveSerializedKey(session.issuerKey)
+        val legacyKey = KeyManager.resolveSerializedKey(request.issuerKey)
         if (stored.id.value != legacyKey.getKeyId()) return false
         val legacyPublicJwk = EncodedKey.Jwk(
             data = BinaryData(Json.encodeToString(legacyKey.getPublicKey().exportJWKObject()).encodeToByteArray()),

@@ -583,35 +583,26 @@ class DefaultOAuth2Provider(
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
         val verifiedProofs = when (
-            val proofResult = verifyCredentialProofs(
-                request = request,
-                configuration = configuration,
-                proofValidationContext = proofValidationContext,
-            )
+            val proofResult = verifyCredentialProofs(request, configuration, proofValidationContext)
         ) {
             is CredentialProofVerification.Success -> proofResult.proofs
             is CredentialProofVerification.Failure -> return CredentialResponseResult.Failure(proofResult.error)
         }
-
         val handler = config.credentialEndpointHandlers.get(configuration.format)
-            ?: return CredentialResponseResult.Failure(
-                CredentialError(
-                    error = CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
-                    description = "No handler for format ${configuration.format.value}"
-                )
-            )
+            ?: return missingCredentialHandler(configuration)
+        val issuanceBatch = createCredentialIssuanceBatch(verifiedProofs, issuanceInputData)
+
         return handler.sign(
             request = request,
             configuration = configuration,
             issuerKey = issuerKey,
             issuerId = issuerId,
-            credentialData = credentialData,
+            issuanceBatch = issuanceBatch,
             dataMapping = dataMapping,
             selectiveDisclosure = selectiveDisclosure,
             x5Chain = x5Chain,
@@ -619,10 +610,8 @@ class DefaultOAuth2Provider(
             w3cVersion = w3cVersion,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             authorizedTransactionDataTypes = authorizedTransactionDataTypes,
-            credentialStatus = credentialStatus,
             validFrom = validFrom,
             validUntil = validUntil,
-            verifiedProofs = verifiedProofs,
         )
     }
 
@@ -631,7 +620,7 @@ class DefaultOAuth2Provider(
         configuration: CredentialConfiguration,
         issuerKey: Crypto2CredentialSigningKey,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceInputData: CredentialIssuanceInputProvider,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
@@ -639,43 +628,33 @@ class DefaultOAuth2Provider(
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
         val verifiedProofs = when (
-            val proofResult = verifyCredentialProofs(
-                request = request,
-                configuration = configuration,
-                proofValidationContext = proofValidationContext,
-            )
+            val proofResult = verifyCredentialProofs(request, configuration, proofValidationContext)
         ) {
             is CredentialProofVerification.Success -> proofResult.proofs
             is CredentialProofVerification.Failure -> return CredentialResponseResult.Failure(proofResult.error)
         }
-
-        val handler = config.credentialEndpointHandlers.get(configuration.format)
+        val registeredHandler = config.credentialEndpointHandlers.get(configuration.format)
+            ?: return missingCredentialHandler(configuration)
+        val handler = registeredHandler as? Crypto2CredentialEndpointHandler
             ?: return CredentialResponseResult.Failure(
-                CredentialError(
-                    error = CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
-                    description = "No handler for format ${configuration.format.value}",
-                )
-            )
-        if (handler !is Crypto2CredentialEndpointHandler) {
-            return CredentialResponseResult.Failure(
                 CredentialError(
                     error = CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
                     description = "Handler for format ${configuration.format.value} does not support crypto2 signing",
                 )
             )
-        }
+        val issuanceBatch = createCredentialIssuanceBatch(verifiedProofs, issuanceInputData)
+
         return handler.sign(
             request = request,
             configuration = configuration,
             issuerKey = issuerKey,
             issuerId = issuerId,
-            credentialData = credentialData,
+            issuanceBatch = issuanceBatch,
             dataMapping = dataMapping,
             selectiveDisclosure = selectiveDisclosure,
             x5Chain = x5Chain,
@@ -683,10 +662,8 @@ class DefaultOAuth2Provider(
             w3cVersion = w3cVersion,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             authorizedTransactionDataTypes = authorizedTransactionDataTypes,
-            credentialStatus = credentialStatus,
             validFrom = validFrom,
             validUntil = validUntil,
-            verifiedProofs = verifiedProofs,
         )
     }
 
@@ -782,6 +759,9 @@ class DefaultOAuth2Provider(
         configuration: CredentialConfiguration,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialProofVerification {
+        validateCredentialProofBatch(request, proofValidationContext)?.let {
+            return CredentialProofVerification.Failure(it)
+        }
         val shouldVerifyProofs = configuration.proofTypesSupported != null ||
             (proofValidationContext != null && request.proofs != null)
         if (!shouldVerifyProofs) return CredentialProofVerification.Success(emptyList())
@@ -796,13 +776,19 @@ class DefaultOAuth2Provider(
             )
 
         return try {
-            CredentialProofVerification.Success(
-                verifier.verify(
-                    credentialRequest = request,
-                    credentialConfiguration = configuration,
-                    context = context,
-                )
+            val verifiedProofs = verifier.verify(
+                credentialRequest = request,
+                credentialConfiguration = configuration,
+                context = context,
             )
+            val submittedProofCount = request.credentialProofCount()
+            if (submittedProofCount > 0 && verifiedProofs.size != submittedProofCount) {
+                throw CredentialProofValidationException(
+                    CredentialErrorCodes.INVALID_PROOF,
+                    "Credential proof verification result does not match the submitted proof count",
+                )
+            }
+            CredentialProofVerification.Success(verifiedProofs)
         } catch (e: CancellationException) {
             throw e
         } catch (e: CredentialProofValidationException) {
@@ -813,6 +799,53 @@ class DefaultOAuth2Provider(
             )
         }
     }
+
+    private fun validateCredentialProofBatch(
+        request: CredentialRequest,
+        context: CredentialProofValidationContext?,
+    ): CredentialError? {
+        val proofCount = request.credentialProofCount()
+        if (proofCount <= 1) return null
+        val batch = context?.batchCredentialIssuance
+            ?: return CredentialError(
+                CredentialErrorCodes.INVALID_PROOF,
+                "Batch credential issuance is not enabled",
+            )
+        return if (proofCount > batch.batchSize) {
+            CredentialError(
+                CredentialErrorCodes.INVALID_PROOF,
+                "Credential proof count $proofCount exceeds the maximum batch size ${batch.batchSize}",
+            )
+        } else {
+            null
+        }
+    }
+
+    private fun CredentialRequest.credentialProofCount(): Int = proofs?.let { proofCollection ->
+        (proofCollection.jwt?.size ?: 0) +
+            (proofCollection.diVp?.size ?: 0) +
+            (proofCollection.attestation?.size ?: 0)
+    } ?: 0
+
+    private suspend fun createCredentialIssuanceBatch(
+        verifiedProofs: List<VerifiedCredentialProof>,
+        issuanceInputData: CredentialIssuanceInputProvider,
+    ): CredentialIssuanceBatch {
+        val expectedCount = verifiedProofs.size.coerceAtLeast(1)
+        val inputs = issuanceInputData.provide(expectedCount)
+        check(inputs.size == expectedCount) {
+            "Credential issuance input data returned ${inputs.size} inputs; expected $expectedCount"
+        }
+        return CredentialIssuanceBatch(inputs, verifiedProofs)
+    }
+
+    private fun missingCredentialHandler(configuration: CredentialConfiguration) =
+        CredentialResponseResult.Failure(
+            CredentialError(
+                error = CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
+                description = "No handler for format ${configuration.format.value}",
+            )
+        )
 
     private suspend fun verifyCredentialAccessTokenBinding(
         context: CredentialAccessTokenContext,
@@ -874,7 +907,7 @@ class DefaultOAuth2Provider(
     }
 
     private sealed class CredentialProofVerification {
-        data class Success(val proofs: List<id.walt.openid4vci.proofs.VerifiedCredentialProof>) :
+        data class Success(val proofs: List<VerifiedCredentialProof>) :
             CredentialProofVerification()
 
         data class Failure(val error: CredentialError) : CredentialProofVerification()

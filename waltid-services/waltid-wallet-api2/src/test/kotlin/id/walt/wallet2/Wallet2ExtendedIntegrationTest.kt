@@ -479,7 +479,7 @@ class Wallet2ExtendedIntegrationTest {
                         issuanceInputData = testIssuanceInputData(buildJsonObject {
                             put("given_name", "Alice"); put("family_name", "Wonder")
                             put("issuing_country", "DE")
-                        },
+                        }),
                         selectiveDisclosure = null,
                         proofValidationContext = proofSupport.validationContext(request)
                     )

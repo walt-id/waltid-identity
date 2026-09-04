@@ -184,10 +184,15 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                 )
                 assertBearerAccessToken(tokenResponse)
                 assertRefreshToken(tokenResponse)
+                val credentialIdentifier = assertNotNull(
+                    tokenResponse.authorization_details,
+                ).single().credentialIdentifiers?.single()
+                assertNotNull(credentialIdentifier)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
                     accessToken = tokenResponse.access_token,
+                    credentialIdentifier = credentialIdentifier,
                     includeDidInProof = false,
                 )
                 assertSdJwtVcCredentialPayload(
@@ -255,10 +260,15 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                 )
                 assertBearerAccessToken(tokenResponse)
                 assertRefreshToken(tokenResponse)
+                val credentialIdentifier = assertNotNull(
+                    tokenResponse.authorization_details,
+                ).single().credentialIdentifiers?.single()
+                assertNotNull(credentialIdentifier)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
                     accessToken = tokenResponse.access_token,
+                    credentialIdentifier = credentialIdentifier,
                     includeDidInProof = false,
                 )
                 assertIsoMdlCredentialPayload(
@@ -322,13 +332,16 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         assertTrue(externalLoginRedirect.contains("/openid4vci/external_login/"))
 
         val authorizationSession = client.listSessions().single { session ->
-            session.profileId == scenario.profileId &&
+            session.issuanceRequests.single().profileId == scenario.profileId &&
                     session.sessionId != createdOffer.offerId &&
                     session.authorizationRequest != null
         }
         assertNotEquals(createdOffer.offerId, authorizationSession.sessionId)
         assertEquals(AuthenticationMethod.AUTHORIZED, authorizationSession.authenticationMethod)
-        assertEquals(scenario.credentialConfigurationId, authorizationSession.credentialConfigurationId)
+        assertEquals(
+            scenario.credentialConfigurationId,
+            authorizationSession.issuanceRequests.single().credentialConfigurationId,
+        )
         assertNotNull(authorizationSession.authorizationRequest?.get("authorization_details"))
     }
 
@@ -356,11 +369,14 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         assertEquals(listOf(walletRedirectUri), authorizationRequestParameters["redirect_uri"])
 
         val authorizationSession = client.listSessions().single { session ->
-            session.profileId == scenario.profileId &&
+            session.issuanceRequests.single().profileId == scenario.profileId &&
                     session.authorizationRequest != null
         }
         assertEquals(AuthenticationMethod.AUTHORIZED, authorizationSession.authenticationMethod)
-        assertEquals(scenario.credentialConfigurationId, authorizationSession.credentialConfigurationId)
+        assertEquals(
+            scenario.credentialConfigurationId,
+            authorizationSession.issuanceRequests.single().credentialConfigurationId,
+        )
         assertEquals(
             listOf(scenario.credentialConfigurationId),
             authorizationSession.authorizationRequest?.get("scope"),

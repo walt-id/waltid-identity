@@ -12,11 +12,9 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
-import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.sdjwt.SDMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Instant
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
@@ -29,7 +27,7 @@ import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdoc
  * dependencies (BouncyCastle, cose-java, etc.). Instead, integrators subclass this
  * handler and implement [issueMdoc] to perform the actual signing.
  *
- * The [credentialData] passed to [sign] is interpreted as a namespace map:
+ * Each credential data object passed to [sign] is interpreted as a namespace map:
  * each top-level key is a namespace string and its value is a [JsonObject] of
  * data element identifier → value pairs. The [CredentialConfiguration.doctype]
  * provides the document type.
@@ -41,7 +39,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         configuration: CredentialConfiguration,
         issuerKey: Key,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceBatch: CredentialIssuanceBatch,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
@@ -49,10 +47,8 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult {
         return try {
             val docType = configuration.doctype
@@ -63,40 +59,29 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                     )
                 )
 
-            val namespaceData = credentialData.entries
-                .mapNotNull { (namespace, value) ->
-                    (value as? JsonObject)?.let { namespace to it }
-                }
-                .toMap()
+            issuanceBatch.signEach { instance ->
+                val namespaceData = instance.input.credentialData.entries
+                    .mapNotNull { (namespace, value) ->
+                        (value as? JsonObject)?.let { namespace to it }
+                    }
+                    .toMap()
 
-            if (namespaceData.isEmpty()) {
-                return CredentialResponseResult.Failure(
-                    CredentialError(
-                        CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
-                        "credentialData must contain at least one namespace for mso_mdoc",
-                    )
+                require(namespaceData.isNotEmpty()) {
+                    "credentialData must contain at least one namespace for mso_mdoc"
+                }
+
+                val holderKey = extractHolderKey(request, listOfNotNull(instance.verifiedProof))
+                    ?: throw IllegalArgumentException("Could not extract holder key from proof")
+
+                issueMdoc(
+                    docType = docType,
+                    namespaceData = namespaceData,
+                    holderKey = holderKey,
+                    issuerKey = issuerKey,
+                    x5Chain = x5Chain,
+                    validityDays = 365,
                 )
             }
-
-            val holderKey = extractHolderKey(request, verifiedProofs)
-                ?: return CredentialResponseResult.Failure(
-                    CredentialError(CredentialErrorCodes.INVALID_PROOF, "Could not extract holder key from proof")
-                )
-
-            val issued = issueMdoc(
-                docType = docType,
-                namespaceData = namespaceData,
-                holderKey = holderKey,
-                issuerKey = issuerKey,
-                x5Chain = x5Chain,
-                validityDays = 365,
-            )
-
-            CredentialResponseResult.Success(
-                CredentialResponse(
-                    credentials = listOf(IssuedCredential(credential = JsonPrimitive(issued))),
-                )
-            )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

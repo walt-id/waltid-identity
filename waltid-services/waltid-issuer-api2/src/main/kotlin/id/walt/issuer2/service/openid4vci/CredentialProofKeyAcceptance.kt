@@ -5,12 +5,12 @@ import kotlinx.serialization.json.JsonObject
 
 /** Accepts the ordered public keys from all validated credential proofs before credentials are constructed. */
 fun interface CredentialProofKeyAcceptance {
-    suspend fun accept(session: IssuanceSession, proofPublicKeyJwk: JsonObject): Boolean
+    suspend fun accept(session: IssuanceSession, proofPublicKeyJwks: List<JsonObject>): Boolean
 }
 
-/** Commits proof-key side effects only after credential construction succeeds. */
+/** Atomically commits proof-key side effects only after the complete credential batch was constructed. */
 fun interface CredentialProofKeyCommitment {
-    suspend fun commit(session: IssuanceSession, proofPublicKeyJwk: JsonObject): Boolean
+    suspend fun commit(session: IssuanceSession, proofPublicKeyJwks: List<JsonObject>): Boolean
 }
 
 class CredentialProofKeyAcceptanceException(

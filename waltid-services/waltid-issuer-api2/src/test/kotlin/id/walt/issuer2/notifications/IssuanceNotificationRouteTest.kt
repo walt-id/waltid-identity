@@ -73,6 +73,12 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
 class IssuanceNotificationRouteTest {
+    private fun CredentialOfferCreateRequest.withRuntimeOverrides(
+        runtimeOverrides: CredentialOfferRuntimeOverrides,
+    ): CredentialOfferCreateRequest = copy(
+        credentials = credentials.map { it.copy(runtimeOverrides = runtimeOverrides) }
+    )
+
 
     @AfterEach
     fun clearConfig() {
@@ -88,7 +94,7 @@ class IssuanceNotificationRouteTest {
             installIssuer2WithConfigFiles()
             val client = apiClient()
             val createdOffer = client.createCredentialOffer(
-                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
                     runtimeOverrides = CredentialOfferRuntimeOverrides(
                         notifications = IssuanceNotifications(
                             webhook = IssuanceNotifications.WebhookNotification(
@@ -120,14 +126,28 @@ class IssuanceNotificationRouteTest {
                     .session
             )
             assertEquals(createdOffer.offerId, tokenRequest["sessionId"]?.jsonPrimitive?.contentOrNull)
-            assertEquals("OpenBadgeCredential_jwt_vc_json", tokenRequest["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
+            val tokenIssuanceRequest = assertNotNull(tokenRequest["issuanceRequests"])
+                .jsonArray
+                .single()
+                .jsonObject
+            assertEquals(
+                "OpenBadgeCredential_jwt_vc_json",
+                tokenIssuanceRequest["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull,
+            )
 
             val credentialSuccess = receivedUpdates.first {
                 it.event == IssuanceSessionEvent.CREDENTIAL_REQUEST_W3C_VC_SUCCEEDED.value
             }
             assertEquals(createdOffer.offerId, credentialSuccess.session["sessionId"]?.jsonPrimitive?.contentOrNull)
             assertEquals("SUCCESSFUL", credentialSuccess.session["status"]?.jsonPrimitive?.contentOrNull)
-            assertEquals("redacted", credentialSuccess.session["issuerKey"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull)
+            val credentialSuccessIssuanceRequest = assertNotNull(credentialSuccess.session["issuanceRequests"])
+                .jsonArray
+                .single()
+                .jsonObject
+            assertEquals(
+                "redacted",
+                credentialSuccessIssuanceRequest["issuerKey"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull,
+            )
 
             val status = receivedUpdates.first { it.event == IssuanceSessionEvent.ISSUANCE_STATUS_CHANGED.value }
             assertEquals("SUCCESSFUL", status.session["status"]?.jsonPrimitive?.contentOrNull)
@@ -146,7 +166,7 @@ class IssuanceNotificationRouteTest {
             installIssuer2WithConfigFiles()
             val client = apiClient()
             val createdOffer = client.createCredentialOffer(
-                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PROVIDED_TX_CODE.copy(
+                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PROVIDED_TX_CODE.withRuntimeOverrides(
                     runtimeOverrides = CredentialOfferRuntimeOverrides(
                         notifications = IssuanceNotifications(
                             webhook = IssuanceNotifications.WebhookNotification(notificationServer.webhookUrl()),
@@ -203,7 +223,7 @@ class IssuanceNotificationRouteTest {
             installIssuer2WithConfigFiles()
             val client = apiClient()
             val createdOffer = client.createCredentialOffer(
-                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
                     runtimeOverrides = CredentialOfferRuntimeOverrides(
                         notifications = IssuanceNotifications(
                             webhook = IssuanceNotifications.WebhookNotification(notificationServer.webhookUrl()),
@@ -304,7 +324,7 @@ class IssuanceNotificationRouteTest {
                 attestationAssembler = clientAttestation.attestationAssembler,
             )
             val createdOffer = client.createCredentialOffer(
-                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
                     runtimeOverrides = CredentialOfferRuntimeOverrides(
                         notifications = IssuanceNotifications(
                             webhook = IssuanceNotifications.WebhookNotification(notificationServer.webhookUrl()),
@@ -350,7 +370,7 @@ class IssuanceNotificationRouteTest {
             installIssuer2WithConfigFiles()
             val client = apiClient()
             val createdOffer = client.createCredentialOffer(
-                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
                     runtimeOverrides = CredentialOfferRuntimeOverrides(
                         notifications = IssuanceNotifications(
                             webhook = IssuanceNotifications.WebhookNotification(notificationServer.webhookUrl()),
@@ -401,15 +421,16 @@ class IssuanceNotificationRouteTest {
     }
 
     @Test
-    fun terminalCredentialFailureIsPersistedBeforeItsEvents() = testApplication {
+    fun unknownCredentialConfigurationDoesNotCloseIssuanceSession() = testApplication {
         val notificationServer = Issuer2TestNotificationServer()
         notificationServer.startServer()
 
         try {
             installIssuer2WithConfigFiles()
             val client = apiClient()
+            val walletFlow = Issuer2WalletFlowDriver(client, walletClientConfig)
             val createdOffer = client.createCredentialOffer(
-                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
                     runtimeOverrides = CredentialOfferRuntimeOverrides(
                         notifications = IssuanceNotifications(
                             webhook = IssuanceNotifications.WebhookNotification(notificationServer.webhookUrl()),
@@ -417,47 +438,51 @@ class IssuanceNotificationRouteTest {
                     ),
                 )
             )
-            val resolvedOffer = createdOffer.resolveOffer(client)
-            val preAuthorizedCode = assertNotNull(resolvedOffer.grants?.preAuthorizedCode?.preAuthorizedCode)
-            val tokenResponse = TokenRequestBuilder(walletClientConfig, client).exchangePreAuthorizedCode(
-                tokenEndpoint = "/openid4vci/token",
-                preAuthorizedCode = preAuthorizedCode,
-                txCode = null,
-                anonymous = true,
-            )
+            val resolvedOffer = walletFlow.resolve(createdOffer)
+            val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
 
-            val requestId = "credential-terminal-failure"
+            val requestId = "credential-unknown-configuration"
             val credentialResponse = client.post("/openid4vci/credential") {
                 header(HttpHeaders.XRequestId, requestId)
                 bearerAuth(tokenResponse.access_token)
                 contentType(ContentType.Application.Json)
-                setBody(buildJsonObject { put("credential_configuration_id", "identity_credential") })
+                setBody(buildJsonObject { put("credential_configuration_id", "unknown_credential_configuration") })
             }
             assertEquals(HttpStatusCode.BadRequest, credentialResponse.status)
             val errorBody = credentialResponse.body<JsonObject>()
 
             val failureEvent = notificationServer.awaitEvent(
                 createdOffer.offerId,
-                IssuanceSessionEvent.CREDENTIAL_REQUEST_W3C_VC_FAILED,
+                IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED,
             )
-            val statusEvent = notificationServer.awaitEvent(
-                createdOffer.offerId,
-                IssuanceSessionEvent.ISSUANCE_STATUS_CHANGED,
-            )
-            assertEquals("UNSUCCESSFUL", failureEvent.session["status"]?.jsonPrimitive?.contentOrNull)
-            assertEquals("true", failureEvent.session["isClosed"]?.jsonPrimitive?.contentOrNull)
             assertEquals(requestId, failureEvent.requestId)
-            assertEquals(requestId, statusEvent.requestId)
+            assertEquals("unknown_credential_configuration", failureEvent.error)
             assertEquals(errorBody["error"]?.jsonPrimitive?.contentOrNull, failureEvent.error)
             assertEquals(
                 errorBody["error_description"]?.jsonPrimitive?.contentOrNull,
                 failureEvent.errorDescription,
             )
+            assertNull(
+                notificationServer.getReceivedUpdates().singleOrNull {
+                    it.target == createdOffer.offerId &&
+                        it.event == IssuanceSessionEvent.ISSUANCE_STATUS_CHANGED.value
+                },
+            )
 
             val storedSession = client.get("/issuer2/sessions/${createdOffer.offerId}").body<IssuanceSession>()
-            assertEquals(IssuanceSessionStatus.UNSUCCESSFUL, storedSession.status)
-            assertEquals(true, storedSession.isClosed)
-            assertEquals("invalid_credential_request", storedSession.failure?.error)
+            assertEquals(IssuanceSessionStatus.ACTIVE, storedSession.status)
+            assertEquals(false, storedSession.isClosed)
+            assertNull(storedSession.failure)
+
+            val credentialPayload = walletFlow.requestCredential(
+                resolvedOffer = resolvedOffer,
+                accessToken = tokenResponse.access_token,
+            )
+            assertJwtVcJsonCredentialPayload(credentialPayload)
+            notificationServer.awaitEvent(
+                createdOffer.offerId,
+                IssuanceSessionEvent.CREDENTIAL_REQUEST_W3C_VC_SUCCEEDED,
+            )
         } finally {
             notificationServer.stopServer()
         }
@@ -475,7 +500,7 @@ class IssuanceNotificationRouteTest {
             }
             val client = apiClient()
             val createdOffer = client.createCredentialOffer(
-                Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+                Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
                     runtimeOverrides = CredentialOfferRuntimeOverrides(
                         notifications = IssuanceNotifications(
                             webhook = IssuanceNotifications.WebhookNotification(notificationServer.webhookUrl()),
@@ -553,7 +578,7 @@ class IssuanceNotificationRouteTest {
             }
             val client = apiClient()
             val createdOffer = client.createCredentialOffer(
-                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
                     runtimeOverrides = CredentialOfferRuntimeOverrides(
                         notifications = IssuanceNotifications(
                             webhook = IssuanceNotifications.WebhookNotification(notificationServer.webhookUrl()),
@@ -626,7 +651,14 @@ class IssuanceNotificationRouteTest {
         assertEquals(createdOffer.offerId, update.target)
         assertEquals(IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED.value, update.event)
         assertEquals(createdOffer.offerId, update.session["sessionId"]?.jsonPrimitive?.contentOrNull)
-        assertEquals("OpenBadgeCredential_jwt_vc_json", update.session["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
+        val issuanceRequest = assertNotNull(update.session["issuanceRequests"])
+            .jsonArray
+            .single()
+            .jsonObject
+        assertEquals(
+            "OpenBadgeCredential_jwt_vc_json",
+            issuanceRequest["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull,
+        )
         assertEquals(
             resolvedOfferCredentialIssuer,
             update.session["credentialOffer"]?.jsonObject?.get("credential_issuer")?.jsonPrimitive?.contentOrNull,

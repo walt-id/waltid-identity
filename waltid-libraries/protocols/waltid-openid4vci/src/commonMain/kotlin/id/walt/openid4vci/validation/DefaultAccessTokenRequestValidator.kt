@@ -45,6 +45,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
     private fun validateAuthorizationCodeGrant(
         parameters: Map<String, List<String>>,
         session: Session,
+        authorizationDetails: List<AuthorizationDetail>,
     ): AccessTokenRequestResult {
         // RFC6749 §4.1.3: client_id is optional; required only if client auth is not used.
         val clientId = parameters.optionalSingle("client_id")?.takeIf { it.isNotBlank() }
@@ -78,6 +79,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             requestedScopes = requestedScopes.toSet(),
             requestedAudience = emptySet(),
             grantedAudience = emptySet(),
+            authorizationDetails = authorizationDetails,
             requestForm = parameters.toMap(),
             session = session,
         )
@@ -88,6 +90,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
     private fun validatePreAuthorizedCodeGrant(
         parameters: Map<String, List<String>>,
         session: Session,
+        authorizationDetails: List<AuthorizationDetail>,
     ): AccessTokenRequestResult {
         // OpenID4VCI (Pre-Authorized Code Flow): pre-authorized_code is required and must be single-valued.
         val code = parameters.requireSingle("pre-authorized_code").takeIf { it.isNotBlank() }
@@ -117,6 +120,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             requestedScopes = requestedScopes.toSet(),
             requestedAudience = emptySet(),
             grantedAudience = emptySet(),
+            authorizationDetails = authorizationDetails,
             requestForm = parameters.toMap(),
             session = session,
         )

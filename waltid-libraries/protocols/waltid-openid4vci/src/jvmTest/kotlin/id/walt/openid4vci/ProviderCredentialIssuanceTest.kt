@@ -56,7 +56,9 @@ class ProviderCredentialIssuanceTest {
             configuration = CredentialConfiguration(format = CredentialFormat.LDP_VC),
             issuerKey = JWKKey.generate(KeyType.Ed25519),
             issuerId = "did:example:issuer",
-            credentialData = buildJsonObject { put("given_name", "Alice") },
+            issuanceInputData = issuanceInputs(
+                buildJsonObject { put("given_name", "Alice") },
+            ),
         )
 
         assertTrue(responseResult is CredentialResponseResult.Failure)
@@ -203,7 +205,7 @@ class ProviderCredentialIssuanceTest {
             configuration = configuration,
             issuerKey = Crypto2CredentialSigningKey.select(issuerKey, configuration),
             issuerId = issuerId,
-            credentialData = credentialData,
+            issuanceInputData = issuanceInputs(credentialData),
         )
 
         assertTrue(credentialResponse is CredentialResponseResult.Success)
@@ -290,9 +292,9 @@ class ProviderCredentialIssuanceTest {
             ),
             issuerKey = JWKKey.generate(KeyType.Ed25519),
             issuerId = issuerId,
-            credentialData = buildJsonObject {
-                put("given_name", "Alice")
-            },
+            issuanceInputData = issuanceInputs(
+                buildJsonObject { put("given_name", "Alice") },
+            ),
         )
 
         assertTrue(credentialResponseResult is CredentialResponseResult.Failure)
@@ -301,4 +303,9 @@ class ProviderCredentialIssuanceTest {
         assertEquals(400, http.status)
         assertEquals(CredentialErrorCodes.INVALID_PROOF, http.payload["error"]?.jsonPrimitive?.content)
     }
+
+    private fun issuanceInputs(credentialData: JsonObject) =
+        CredentialIssuanceInputProvider { credentialCount ->
+            List(credentialCount) { CredentialIssuanceInput(credentialData) }
+        }
 }

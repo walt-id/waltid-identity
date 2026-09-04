@@ -66,6 +66,15 @@ class Issuer2MetadataServiceTest {
     }
 
     @Test
+    fun `credential issuer metadata advertises configured batch size`() {
+        val metadata = metadataService(
+            batchCredentialIssuance = BatchCredentialIssuance(batchSize = 5),
+        ).getCredentialIssuerMetadata()
+
+        assertEquals(5, metadata.batchCredentialIssuance?.batchSize)
+    }
+
+    @Test
     fun `authorization server metadata uses pre-authorized anonymous access capability`() {
         val metadata = metadataService(preAuthorizedGrantAnonymousAccessSupported = false)
             .getAuthorizationServerMetadata()
@@ -163,6 +172,7 @@ class Issuer2MetadataServiceTest {
         clientAuthenticationConfig: ClientAuthenticationConfig? = null,
         preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
         credentialEncryptionKey: String? = null,
+        batchCredentialIssuance: BatchCredentialIssuance? = null,
     ): MetadataService {
         val metadataConfig = Issuer2MetadataConfig()
         val serviceConfig = Issuer2ServiceConfig(
@@ -170,6 +180,7 @@ class Issuer2MetadataServiceTest {
             credentialEncryptionKey = credentialEncryptionKey,
             enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
             clientAuthenticationConfig = clientAuthenticationConfig,
+            batchCredentialIssuance = batchCredentialIssuance,
         )
         return MetadataService(
             serviceConfig = serviceConfig,
