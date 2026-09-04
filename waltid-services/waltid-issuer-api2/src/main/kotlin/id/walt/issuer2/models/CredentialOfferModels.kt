@@ -32,7 +32,7 @@ data class CredentialOfferRuntimeOverrides(
 )
 
 @Serializable
-data class CredentialOfferCreateRequest(
+data class CredentialOfferCredential(
     val profileId: String,
     val authMethod: AuthenticationMethod,
     val issuerStateMode: IssuerStateMode? = null,
