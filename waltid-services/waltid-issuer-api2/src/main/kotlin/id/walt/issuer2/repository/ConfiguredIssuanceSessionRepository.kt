@@ -26,13 +26,9 @@ class ConfiguredIssuanceSessionRepository(
     override suspend fun save(session: IssuanceSession): IssuanceSession {
         val ttl = ttlUntil(session.expiresAt)
         val existingSidecar = crypto2Keys[session.sessionId]
-        val sidecar = session.crypto2IssuerStoredKey ?: IssuanceSessionCrypto2Keys.migrateLegacyKey(session)
-        sidecar?.let {
-            require(IssuanceSessionCrypto2Keys.sidecarMatchesSession(session, it)) {
-                "Issuer2 crypto2 sidecar does not match the legacy session key"
-            }
-        }
-        sidecar?.let { crypto2Keys.set(session.sessionId, it, ttl) }
+        val sidecars = IssuanceSessionCrypto2Keys.migrateLegacyKeys(session)
+        IssuanceSessionCrypto2Keys.validateStoredKeys(session, sidecars)
+        persistSidecars(session.sessionId, sidecars, ttl)
         try {
             sessions.set(session.sessionId, session, ttl)
         } catch (cause: Exception) {
