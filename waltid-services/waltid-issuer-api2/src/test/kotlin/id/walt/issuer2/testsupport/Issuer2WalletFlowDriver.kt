@@ -77,6 +77,7 @@ class Issuer2WalletFlowDriver(
     suspend fun exchangePreAuthorizedCode(
         resolvedOffer: ResolvedCredentialOffer,
         txCode: String?,
+        additionalParameters: Map<String, String> = emptyMap(),
     ): TokenRequestBuilder.TokenResponse {
         val preAuthorizedCode = requireNotNull(resolvedOffer.offer.grants?.preAuthorizedCode?.preAuthorizedCode)
         val attestationHeaders = buildAttestationHeaders(resolvedOffer)
