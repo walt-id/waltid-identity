@@ -8,6 +8,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInstance
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
+import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
