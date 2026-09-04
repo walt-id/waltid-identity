@@ -125,6 +125,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
                     accessToken = refreshedTokenResponse.access_token,
+                    credentialIdentifier = credentialIdentifier,
                 )
                 assertJwtVcJsonCredentialPayload(credentialPayload)
                 assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
