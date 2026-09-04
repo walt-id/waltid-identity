@@ -24,7 +24,6 @@ enum class IssuanceSessionStatus {
 data class IssuanceRequest(
     val credentialIdentifier: String,
     val profileId: String,
-    val authenticationMethod: AuthenticationMethod,
     val credentialConfigurationId: String,
     val issuerKey: JsonObject,
     val expectedCredentialProofKeyJwk: JsonObject? = null,
