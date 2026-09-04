@@ -2,6 +2,9 @@ package id.walt.issuer2.openid4vci
 
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.CredentialOfferCredential
+import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
