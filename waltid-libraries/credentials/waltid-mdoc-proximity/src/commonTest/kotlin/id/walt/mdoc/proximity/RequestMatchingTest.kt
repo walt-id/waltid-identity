@@ -163,6 +163,52 @@ class RequestMatchingTest {
         assertEquals(purpose, result.selection.useCases.first().purposeHints)
     }
 
+    @Test
+    fun `mDL age attestations select the closest privacy preserving proof or omit it`() = runTest {
+        data class Scenario(
+            val id: String,
+            val requested: String,
+            val values: Map<String, Boolean>,
+            val expected: String?,
+        )
+
+        val scenarios = listOf(
+            Scenario("nearest-true", "age_over_17", mapOf("age_over_18" to true, "age_over_21" to true), "age_over_18"),
+            Scenario("higher-true", "age_over_19", mapOf("age_over_18" to true, "age_over_21" to true), "age_over_21"),
+            Scenario("unprovable-gap", "age_over_22", mapOf("age_over_18" to true, "age_over_25" to false), null),
+            Scenario("nearest-false", "age_over_63", mapOf("age_over_60" to false, "age_over_62" to false), "age_over_62"),
+            Scenario("lower-false", "age_over_68", mapOf("age_over_60" to false, "age_over_65" to false), "age_over_65"),
+        )
+        val namespace = "org.iso.18013.5.1"
+
+        scenarios.forEach { scenario ->
+            val requested = ElementReference(namespace, scenario.requested)
+            val values = scenario.values.mapKeys { (identifier, _) -> ElementReference(namespace, identifier) }
+            val candidate = MdocCredentialCandidate(
+                id = "mdl",
+                docType = "org.iso.18013.5.1.mDL",
+                issuerAuthorityKeyIdentifiers = emptyList(),
+                availableElements = values.keys,
+                booleanElements = values,
+            )
+            val result = assertIs<MdocRequestMatchResult.Matched>(
+                MdocRequestMatcher().match(
+                    DeviceRequest(DeviceRequest.VERSION, listOf(docRequest(candidate.docType, requested))),
+                    listOf(candidate),
+                ),
+                "DM_AGE_POLICY:${scenario.id}",
+            )
+            val selected = result.selection.documents.single().elements.singleOrNull()
+
+            assertEquals(scenario.expected, selected?.reference?.elementIdentifier, "DM_AGE_POLICY:${scenario.id}")
+            assertEquals(
+                scenario.expected?.let { setOf(requested) }.orEmpty(),
+                selected?.satisfiesAlternativesFor.orEmpty(),
+                "DM_AGE_POLICY:${scenario.id}:binding",
+            )
+        }
+    }
+
     private fun docRequest(
         docType: String,
         element: ElementReference,
