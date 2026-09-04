@@ -31,6 +31,7 @@ import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
+import id.walt.mdoc.objects.handover.NFCHandover
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -135,6 +136,85 @@ class MdocResponseBuilderTest {
                 macSource.issuerSigned.decodeMobileSecurityObject().deviceKeyInfo.deviceKey,
             )
         )
+    }
+
+    @Test
+    fun `signature and MAC authentication bind QR static NFC and negotiated NFC transcripts`() = runTest {
+        val signatureHolderKey = key("handover-signature-holder", setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+        val macHolderKey = key("handover-mac-holder", setOf(KeyUsage.KEY_AGREEMENT))
+        val readerKey = key("handover-reader", setOf(KeyUsage.KEY_AGREEMENT))
+        val signatureSource = issue(signatureHolderKey)
+        val macSource = issue(macHolderKey)
+        val readerPublic = (readerKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey()
+        val selection = setOf(ElementReference("org.example", "given_name"))
+        val transcripts = linkedMapOf(
+            "SM_DEVICE_AUTH_QR" to SessionTranscript.forQr(byteArrayOf(1, 2), byteArrayOf(3, 4)),
+            "SM_DEVICE_AUTH_NFC_STATIC" to SessionTranscript.forNfc(
+                byteArrayOf(1, 2),
+                byteArrayOf(3, 4),
+                NFCHandover(handoverSelect = byteArrayOf(5), handoverRequest = null),
+            ),
+            "SM_DEVICE_AUTH_NFC_NEGOTIATED" to SessionTranscript.forNfc(
+                byteArrayOf(1, 2),
+                byteArrayOf(3, 4),
+                NFCHandover(handoverSelect = byteArrayOf(5), handoverRequest = byteArrayOf(6)),
+            ),
+        )
+        val builder = MdocResponseBuilder()
+
+        transcripts.forEach { (scenario, transcript) ->
+            val signatureDocument = builder.buildDocument(
+                MdocDocumentPresentation(
+                    signatureSource,
+                    signatureHolderKey,
+                    selection,
+                    authentication = MdocAuthenticationMethod.Signature(),
+                ),
+                transcript,
+            )
+            val signaturePayload = MdocCryptoHelper.buildDeviceAuthenticationBytes(
+                transcript,
+                signatureDocument.docType,
+                signatureDocument.deviceSigned!!.namespaces,
+            )
+            val devicePublic = MdocCrypto.coseKeyToCrypto2Key(
+                signatureSource.issuerSigned.decodeMobileSecurityObject().deviceKeyInfo.deviceKey
+            )
+            assertTrue(
+                MdocCrypto.verifyDeviceSignature(
+                    signaturePayload,
+                    assertIs<DeviceAuth.Signature>(signatureDocument.deviceSigned!!.deviceAuth).signature,
+                    devicePublic,
+                    setOf(Cose.Algorithm.ES256),
+                ),
+                "$scenario:signature",
+            )
+
+            val macDocument = builder.buildDocument(
+                MdocDocumentPresentation(
+                    macSource,
+                    macHolderKey,
+                    selection,
+                    authentication = MdocAuthenticationMethod.Mac(readerPublic),
+                ),
+                transcript,
+            )
+            val macPayload = MdocCryptoHelper.buildDeviceAuthenticationBytes(
+                transcript,
+                macDocument.docType,
+                macDocument.deviceSigned!!.namespaces,
+            )
+            assertTrue(
+                MdocCrypto.verifyDeviceMac(
+                    macPayload,
+                    assertIs<DeviceAuth.Mac>(macDocument.deviceSigned!!.deviceAuth).mac,
+                    MdocCryptoHelper.buildSessionTranscriptBytes(transcript),
+                    readerKey,
+                    macSource.issuerSigned.decodeMobileSecurityObject().deviceKeyInfo.deviceKey,
+                ),
+                "$scenario:MAC",
+            )
+        }
     }
 
     @Test
