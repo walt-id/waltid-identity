@@ -125,7 +125,6 @@ class ConfiguredRedisRepositoryTest {
 
     private suspend fun testSession(suffix: String) = IssuanceSession(
         sessionId = "redis-session-$suffix",
-        profileId = "profile-id",
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
         credentialConfigurationId = "identity_credential",
         issuerKey = KeySerialization.serializeKeyToJson(JWKKey.generate(KeyType.secp256r1)).jsonObject,
