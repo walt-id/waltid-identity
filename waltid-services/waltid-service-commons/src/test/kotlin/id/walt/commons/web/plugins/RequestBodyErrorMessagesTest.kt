@@ -5,12 +5,15 @@ package id.walt.commons.web.plugins
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.JsonConvertException
 import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.CannotTransformContentToTypeException
+import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.reflect.typeOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -122,5 +125,23 @@ class RequestBodyErrorMessagesTest {
         val json = exceptionMap(cause, HttpStatusCode.BadRequest)
         assertEquals("wallet id is required", json["message"]!!.jsonPrimitive.content)
         assertNull(json["details"])
+    }
+
+    @Test
+    fun `a body that cannot be deserialized is the caller's fault, not a server error`() {
+        // CannotTransformContentToTypeException extends IOException rather than BadRequestException, so it
+        // used to fall through to the catch-all and report 500 for a malformed request body.
+        assertEquals(
+            HttpStatusCode.BadRequest,
+            statusCodeForException(CannotTransformContentToTypeException(typeOf<String>())),
+        )
+    }
+
+    @Test
+    fun `server-side failures still report as server errors`() {
+        assertEquals(HttpStatusCode.InternalServerError, statusCodeForException(IllegalStateException("broken")))
+        assertEquals(HttpStatusCode.InternalServerError, statusCodeForException(RuntimeException("broken")))
+        assertEquals(HttpStatusCode.NotFound, statusCodeForException(NotFoundException("absent")))
+        assertEquals(HttpStatusCode.BadRequest, statusCodeForException(BadRequestException("bad")))
     }
 }
