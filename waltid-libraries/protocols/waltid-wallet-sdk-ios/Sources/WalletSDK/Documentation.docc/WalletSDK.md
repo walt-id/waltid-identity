@@ -131,6 +131,9 @@ reset; plaintext-to-encrypted migration is not performed.
 - ``StoredDid``
 - ``WalletBootstrapResult``
 - ``PresentationResult``
+- ``ProximityReaderTrustSettings``
+- ``ProximityReaderTrustSettingsCodec``
+- ``ProximityReaderTrustImportPreview``
 
 ### Events
 

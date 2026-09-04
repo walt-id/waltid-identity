@@ -3,13 +3,13 @@ package id.walt.walletdemo.compose.logic
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal class LazyDemoWallet(
-    private val createWallet: suspend () -> DemoWallet,
+internal open class LazyDemoWallet<Wallet : DemoWallet>(
+    private val createWallet: suspend () -> Wallet,
 ) : DemoWallet {
     private val mutex = Mutex()
-    private var wallet: DemoWallet? = null
+    private var wallet: Wallet? = null
 
-    private suspend fun wallet(): DemoWallet =
+    protected suspend fun wallet(): Wallet =
         wallet ?: mutex.withLock {
             wallet ?: createWallet().also { wallet = it }
         }

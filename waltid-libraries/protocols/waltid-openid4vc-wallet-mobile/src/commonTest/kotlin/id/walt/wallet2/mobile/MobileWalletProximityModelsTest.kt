@@ -121,7 +121,26 @@ class MobileWalletProximityModelsTest {
                 revocation = MobileWalletProximityReaderRevocationState.Revoked,
             )
         }
-
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityReaderTrustDecision(
+                state = MobileWalletProximityReaderTrustState.Trusted,
+                certificatePath = MobileWalletProximityReaderCertificatePathState.UnknownAuthority,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityReaderTrustDecision(
+                state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
+                certificatePath = MobileWalletProximityReaderCertificatePathState.Invalid,
+                revocation = MobileWalletProximityReaderRevocationState.Good,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityReaderTrustDecision(
+                state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
+                certificatePath = MobileWalletProximityReaderCertificatePathState.UnknownAuthority,
+                rical = MobileWalletProximityRicalState.Matched,
+            )
+        }
         val ricalEvidenceWithoutAutomaticTrust = MobileWalletProximityReaderTrustDecision(
             state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
             certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
@@ -133,6 +152,25 @@ class MobileWalletProximityModelsTest {
             MobileWalletProximityReaderTrustState.ValidButUntrusted,
             ricalEvidenceWithoutAutomaticTrust.state,
         )
+
+        val directTrustWithUnavailableRical = MobileWalletProximityReaderTrustDecision(
+            state = MobileWalletProximityReaderTrustState.Trusted,
+            certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
+            revocation = MobileWalletProximityReaderRevocationState.Good,
+            rical = MobileWalletProximityRicalState.Unavailable,
+        )
+        assertEquals(MobileWalletProximityReaderTrustState.Trusted, directTrustWithUnavailableRical.state)
+
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletProximityReaderAuthentication(
+                scope = MobileWalletProximityReaderAuthenticationScope.WholeRequest,
+                documentRequestIndex = null,
+                validity = MobileWalletProximityReaderAuthenticationValidity.Valid,
+                trust = MobileWalletProximityReaderTrustState.Trusted,
+                certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
+                revocation = MobileWalletProximityReaderRevocationState.Indeterminate,
+            )
+        }
     }
 
     @Test

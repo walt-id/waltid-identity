@@ -192,15 +192,22 @@ fun interface RicalConstraintEvaluator {
     suspend fun accepts(constraints: List<RicalTrustConstraint>, reader: ReaderAuthenticationEvidence): Boolean
 }
 
-enum class RicalReaderPathState { NO_MATCH, INVALID, REVOKED, VALID }
+sealed interface RicalReaderPathResult {
+    data object NoMatch : RicalReaderPathResult
+    data object Invalid : RicalReaderPathResult
+    data object Revoked : RicalReaderPathResult
+    data class Valid(val authority: RicalCertificateInfo) : RicalReaderPathResult
+}
 
-/** Profile-owned RFC 5280/path/revocation validation against the complete active RICAL. */
+/**
+ * Profile-owned RFC 5280/path/revocation validation against the complete active RICAL.
+ * A valid result contains only the bottom-most matching authority whose constraints apply.
+ */
 fun interface RicalReaderPathValidator {
     suspend fun validate(
         reader: ReaderAuthenticationEvidence,
         rical: Rical,
-        matchingCertificateInfo: RicalCertificateInfo,
-    ): RicalReaderPathState
+    ): RicalReaderPathResult
 }
 
 data class RicalPolicy(
@@ -266,52 +273,86 @@ class RicalReaderTrustEvaluator(
     private val now: () -> Instant,
     private val pathValidator: RicalReaderPathValidator,
 ) : ReaderTrustEvaluator {
-    override suspend fun evaluate(evidence: ReaderAuthenticationEvidence): ReaderTrustDecision {
+    override suspend fun evaluate(evidence: ReaderAuthenticationEvidence): ReaderTrustDecision =
+        evaluateDetailed(evidence).decision
+
+    suspend fun evaluateDetailed(evidence: ReaderAuthenticationEvidence): RicalReaderTrustResult {
         val signed = when (val result = provider.current()) {
             is RicalProviderResult.Available -> result.signed
-            is RicalProviderResult.Unavailable -> return ReaderTrustDecision(
-                ReaderTrustState.VALID_BUT_UNTRUSTED,
-                "RICAL provider is unavailable: ${result.reason}",
+            is RicalProviderResult.Unavailable -> return RicalReaderTrustResult(
+                RicalEvaluationState.UNAVAILABLE,
+                ReaderTrustDecision(
+                    ReaderTrustState.VALID_BUT_UNTRUSTED,
+                    "RICAL provider is unavailable: ${result.reason}",
+                ),
             )
-            is RicalProviderResult.Conflict -> return ReaderTrustDecision(
-                ReaderTrustState.VALID_BUT_UNTRUSTED,
-                "RICAL provider has conflicting active data: ${result.reason}",
+            is RicalProviderResult.Conflict -> return RicalReaderTrustResult(
+                RicalEvaluationState.INVALID,
+                ReaderTrustDecision(
+                    ReaderTrustState.VALID_BUT_UNTRUSTED,
+                    "RICAL provider has conflicting active data: ${result.reason}",
+                ),
             )
         }
         val rical = signed.rical
         if (rical.provider != policy.providerId || rical.type !in policy.acceptedTypes) {
-            return ReaderTrustDecision(ReaderTrustState.VALID_BUT_UNTRUSTED, "RICAL provider or type is not permitted")
+            return invalid("RICAL provider or type is not permitted")
         }
         val current = now()
         if (rical.date > current || rical.notAfter?.let { current >= it } == true) {
-            return ReaderTrustDecision(ReaderTrustState.VALID_BUT_UNTRUSTED, "RICAL is not currently fresh")
+            return invalid("RICAL is not currently fresh")
         }
         if (!signatureValidator.validate(signed, policy.trustedProviderRootsDer)) {
-            return ReaderTrustDecision(ReaderTrustState.VALID_BUT_UNTRUSTED, "RICAL signature or provider path is invalid")
+            return invalid("RICAL signature or provider path is invalid")
         }
-        var authority: RicalCertificateInfo? = null
-        for (info in rical.certificateInfos) {
-            when (pathValidator.validate(evidence, rical, info)) {
-                RicalReaderPathState.NO_MATCH, RicalReaderPathState.INVALID -> Unit
-                RicalReaderPathState.REVOKED -> return ReaderTrustDecision(
+        val authority = when (val path = pathValidator.validate(evidence, rical)) {
+            RicalReaderPathResult.NoMatch -> return noMatchingAuthority()
+            RicalReaderPathResult.Invalid -> return invalid("Reader certificate path through the RICAL is invalid")
+            RicalReaderPathResult.Revoked -> return RicalReaderTrustResult(
+                RicalEvaluationState.MATCHED,
+                ReaderTrustDecision(
                     ReaderTrustState.REVOKED,
                     "Reader authentication certificate is revoked",
-                )
-                RicalReaderPathState.VALID -> if (constraintEvaluator.accepts(info.trustConstraints, evidence)) {
-                    authority = info
-                    break
-                }
-            }
+                ),
+            )
+            is RicalReaderPathResult.Valid -> path.authority.takeIf { it in rical.certificateInfos }
+                ?: return invalid("Reader path selected an authority outside the active RICAL")
         }
-        authority ?: return ReaderTrustDecision(
-            ReaderTrustState.VALID_BUT_UNTRUSTED,
-            "Reader does not satisfy a RICAL authority and its constraints",
-        )
-        return if (policy.establishReaderTrust) ReaderTrustDecision(ReaderTrustState.TRUSTED, displayName = authority.name)
-        else ReaderTrustDecision(
-            ReaderTrustState.VALID_BUT_UNTRUSTED,
-            "RICAL evidence is valid but the active policy does not establish reader trust",
-            authority.name,
+        if (!constraintEvaluator.accepts(authority.trustConstraints, evidence)) {
+            return noMatchingAuthority()
+        }
+        val decision = if (policy.establishReaderTrust) {
+            ReaderTrustDecision(ReaderTrustState.TRUSTED, displayName = authority.name)
+        } else {
+            ReaderTrustDecision(
+                ReaderTrustState.VALID_BUT_UNTRUSTED,
+                "RICAL evidence is valid but the active policy does not establish reader trust",
+                authority.name,
+            )
+        }
+        return RicalReaderTrustResult(
+            RicalEvaluationState.MATCHED,
+            decision,
         )
     }
+
+    private fun invalid(reason: String): RicalReaderTrustResult = RicalReaderTrustResult(
+        RicalEvaluationState.INVALID,
+        ReaderTrustDecision(ReaderTrustState.VALID_BUT_UNTRUSTED, reason),
+    )
+
+    private fun noMatchingAuthority(): RicalReaderTrustResult = RicalReaderTrustResult(
+        RicalEvaluationState.NO_MATCHING_AUTHORITY,
+        ReaderTrustDecision(
+            ReaderTrustState.VALID_BUT_UNTRUSTED,
+            "Reader does not satisfy a RICAL authority and its constraints",
+        ),
+    )
 }
+
+enum class RicalEvaluationState { UNAVAILABLE, INVALID, NO_MATCHING_AUTHORITY, MATCHED }
+
+data class RicalReaderTrustResult(
+    val state: RicalEvaluationState,
+    val decision: ReaderTrustDecision,
+)

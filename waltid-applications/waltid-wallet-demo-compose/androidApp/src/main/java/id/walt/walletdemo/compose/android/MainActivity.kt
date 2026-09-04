@@ -11,13 +11,17 @@ import androidx.lifecycle.lifecycleScope
 import androidx.fragment.app.FragmentActivity
 import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletDemoProximityController
+import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
 import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
+import id.walt.walletdemo.compose.logic.createAndroidDemoReaderTrustSettingsStore
+import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
 import id.walt.walletdemo.compose.logic.createAndroidDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
-import id.walt.walletdemo.compose.ui.WalletDemoApp
+import id.walt.walletdemo.compose.ui.MobileWalletDemoApp
 import kotlinx.coroutines.launch
 
 const val WALLET_SIGNING_PROTECTION_MODE_EXTRA =
@@ -25,6 +29,8 @@ const val WALLET_SIGNING_PROTECTION_MODE_EXTRA =
 
 class MainActivity : FragmentActivity() {
     private lateinit var controller: WalletDemoController
+    private lateinit var proximityController: WalletDemoProximityController
+    private lateinit var readerTrustSettingsController: DemoReaderTrustSettingsController
     private lateinit var walletConfig: DemoWalletConfig
     private val onCredentialStoreChanged: () -> Unit = {
         if (::controller.isInitialized) {
@@ -45,23 +51,35 @@ class MainActivity : FragmentActivity() {
                 signingProtectionMode = WalletDemoSigningProtectionMode.parse(override),
             )
         }
+        val wallet = createAndroidDemoWallet(
+            context = applicationContext,
+            config = walletConfig,
+            interactionContextProvider = { this@MainActivity },
+        )
         controller = WalletDemoController(
-            wallet = createAndroidDemoWallet(
-                context = applicationContext,
-                config = walletConfig,
-                interactionContextProvider = { this@MainActivity },
-            ),
+            wallet = wallet,
             pinStore = createAndroidDemoPinStore(applicationContext, walletConfig.walletId),
             biometricAuthenticator = createAndroidDemoBiometricAuthenticator { this@MainActivity },
             signingProtectionMode = walletConfig.signingProtectionMode,
             signingProtectionStore = walletConfig.signingProtectionStore(applicationContext),
             sharingSettings = createAndroidDemoSharingSettingsStore(applicationContext),
         )
+        readerTrustSettingsController = DemoReaderTrustSettingsController(
+            createAndroidDemoReaderTrustSettingsStore(applicationContext)
+        )
+        proximityController = WalletDemoProximityController(
+            wallet = wallet,
+            configurationProvider = {
+                readerTrustSettingsController.sessionSnapshot().applyTo(
+                    MobileWalletProximityConfiguration()
+                )
+            },
+        )
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         handleIntent(intent)
 
         setContent {
-            WalletDemoApp(controller)
+            MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController)
         }
     }
 
@@ -81,6 +99,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         WalletDemoCredentialStoreNotifier.removeListener(onCredentialStoreChanged)
+        if (::proximityController.isInitialized) proximityController.dismiss()
         super.onDestroy()
     }
 

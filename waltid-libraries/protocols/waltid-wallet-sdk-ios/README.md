@@ -157,6 +157,45 @@ Bluetooth, COSE, or platform objects. Call `close()` when the journey ends;
 closing is idempotent and every new session rotates engagement identifiers and
 ephemeral key material.
 
+Reader authentication validity does not establish reader trust. Provision
+Reader CA certificates out of band and inject the shared evaluator when the
+integration requires a trusted reader:
+
+```swift
+let readerTrust = ProximityConfiguredReaderTrustEvaluator(
+    configuration: ProximityReaderTrustConfiguration(
+        trustAnchors: [
+            ProximityReaderTrustAnchor(
+                certificateDER: readerCA,
+                displayName: "Example reader authority"
+            )
+        ],
+        revocationPolicy: .check(applicationRevocationEvaluator)
+    )
+)
+let configuration = ProximityPresentationConfiguration(
+    readerPolicy: .requireTrusted,
+    readerTrustEvaluator: readerTrust
+)
+```
+
+The SDK validates the certificate profile, time, and path only against explicit
+application anchors. It performs no hidden network lookup and ships no reader
+trust list. Certificates sent by the reader are path inputs, never implicit
+anchors. Optional RICAL providers have separate explicit provider roots, signer
+policy, revocation, and constraint boundaries. Demo apps can inject a named
+test anchor through the same configuration initializer without making it a
+production default.
+
+For holder-managed configuration, use `ProximityReaderTrustSettingsCodec` to
+validate and preview public Reader CA or versioned walt.id trust-bundle files
+before persisting the returned `ProximityReaderTrustSettings`. The importer
+accepts DER and certificate-only PEM Reader CAs plus static signed RICAL bundle
+entries. It rejects private keys, PKCS#12/PFX, unknown bundle semantics,
+duplicates, invalid or expired trust material, and files larger than 1 MiB.
+Apply one immutable snapshot to a new session with `settings.applying(to:)`;
+changes made while a session is active apply only to the next session.
+
 ## Protected keys
 
 New signing keys default to `.biometricCurrentSet`. Select `.none` explicitly

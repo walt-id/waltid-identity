@@ -15,6 +15,18 @@ public enum WalletAccessibilityID {
     public static let settingsPublicJwkCopy = identifier("settingsPublicJwkCopy")
     public static let settingsCredentialSharing = identifier("settingsCredentialSharing")
     public static let settingsShowDcApiPreview = identifier("settingsShowDcApiPreview")
+    public static let settingsReaderAuthentication = identifier("settingsReaderAuthentication")
+    public static let readerTrustPolicy = identifier("readerTrustPolicy")
+    public static let readerTrustAllowUntrusted = identifier("readerTrustAllowUntrusted")
+    public static let readerTrustRequireTrusted = identifier("readerTrustRequireTrusted")
+    public static let readerTrustImport = identifier("readerTrustImport")
+    public static let readerTrustImportProgress = identifier("readerTrustImportProgress")
+    public static let readerTrustImportReview = identifier("readerTrustImportReview")
+    public static let readerTrustImportConfirm = identifier("readerTrustImportConfirm")
+    public static let readerTrustImportCancel = identifier("readerTrustImportCancel")
+    public static let readerTrustReset = identifier("readerTrustReset")
+    public static let readerTrustResetConfirm = identifier("readerTrustResetConfirm")
+    public static let readerTrustError = identifier("readerTrustError")
     public static let settingsLock = identifier("settingsLock")
     public static let settingsReset = identifier("settingsReset")
     public static let settingsResetConfirm = identifier("settingsResetConfirm")
@@ -78,6 +90,21 @@ public enum WalletAccessibilityID {
     public static let presentationTechnicalDetailsSection = identifier("presentationTechnicalDetailsSection")
     public static let verifierTechnicalDetailsToggle = identifier("verifierTechnicalDetailsToggle")
     public static let verifierTechnicalDetails = identifier("verifierTechnicalDetails")
+    public static let proximityStartButton = identifier("proximityStartButton")
+    public static let proximityScreen = identifier("proximityScreen")
+    public static let proximityStatus = identifier("proximityStatus")
+    public static let proximityQRCode = identifier("proximityQRCode")
+    public static let proximityReview = identifier("proximityReview")
+    public static let proximityReaderSection = identifier("proximityReaderSection")
+    public static let proximityReaderDetailsToggle = identifier("proximityReaderDetailsToggle")
+    public static let proximityReaderDetails = identifier("proximityReaderDetails")
+    public static let proximityContinueAfterResponse = identifier("proximityContinueAfterResponse")
+    public static let proximityApproveButton = identifier("proximityApproveButton")
+    public static let proximityDeclineButton = identifier("proximityDeclineButton")
+    public static let proximityCancelButton = identifier("proximityCancelButton")
+    public static let proximityDoneButton = identifier("proximityDoneButton")
+    public static let proximityRetryButton = identifier("proximityRetryButton")
+    public static let proximityError = identifier("proximityError")
 
     public static func claim(_ path: String) -> String {
         dynamicIdentifier("claim", path)
@@ -117,6 +144,22 @@ public enum WalletAccessibilityID {
 
     public static func presentationDisclosureToggle(_ id: String) -> String {
         identifier("presentationDisclosureToggle", id)
+    }
+
+    public static func proximityCredential(requestIndex: Int, credentialID: String) -> String {
+        identifier("proximityCredential", String(requestIndex), credentialID.identifierSegment)
+    }
+
+    public static func proximityElement(
+        requestIndex: Int,
+        namespace: String,
+        elementIdentifier: String
+    ) -> String {
+        identifier(
+            "proximityElement",
+            String(requestIndex),
+            "\(namespace).\(elementIdentifier)".identifierSegment
+        )
     }
 
     private static func identifier(_ segments: String...) -> String {

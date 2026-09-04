@@ -88,6 +88,64 @@ statement index. During protected-key work,
 ``ProximityHolderAuthorizationRequest`` per approved document so a mixed
 signature/MAC response cannot be collapsed into a global authorization method.
 
+### Configure reader trust
+
+Cryptographic reader-authentication validity does not establish application
+trust. Provision Reader CA certificates through an out-of-band application
+channel and inject `ProximityConfiguredReaderTrustEvaluator` when the wallet
+requires a trusted reader:
+
+```swift
+let readerTrust = ProximityConfiguredReaderTrustEvaluator(
+    configuration: ProximityReaderTrustConfiguration(
+        trustAnchors: [
+            ProximityReaderTrustAnchor(
+                certificateDER: readerCA,
+                displayName: "Example reader authority"
+            )
+        ],
+        revocationPolicy: .check(applicationRevocationEvaluator)
+    )
+)
+let configuration = ProximityPresentationConfiguration(
+    readerPolicy: .requireTrusted,
+    readerTrustEvaluator: readerTrust
+)
+```
+
+The shared evaluator validates the ISO certificate profile, time, and path only
+against explicit application anchors. It performs no hidden network request and
+ships no reader trust list. Certificates carried by the reader are path inputs,
+not implicit anchors. Optional RICAL configuration similarly requires explicit
+provider roots and application-owned signer-revocation and constraint policies.
+A demo can pass a named test anchor through this same initializer; do not ship
+test anchors as production defaults.
+
+For holder-managed settings, validate and preview public trust material before
+persisting it:
+
+```swift
+let current = ProximityReaderTrustSettings()
+let preview = try await ProximityReaderTrustSettingsCodec.prepareImport(
+    sourceName: selectedURL.lastPathComponent,
+    data: selectedData,
+    existing: current
+)
+showImportReview(preview)
+
+// Only after explicit holder confirmation:
+let encoded = try ProximityReaderTrustSettingsCodec.encode(preview.resultingSettings)
+saveInAppPrivateStorage(encoded)
+```
+
+The importer accepts DER or certificate-only PEM Reader CAs and versioned
+walt.id JSON trust bundles with static signed RICAL configuration. It rejects
+private keys, PKCS#12/PFX, unknown bundle fields or versions, duplicates,
+non-current or invalid trust material, and files larger than 1 MiB. It performs
+no persistence or network request. Load one immutable settings snapshot when a
+new session starts and call ``ProximityReaderTrustSettings/applying(to:)`` so a
+settings change cannot mutate an active session.
+
 ### Lifecycle
 
 Only one proximity session can be active per wallet. Cancellation is available

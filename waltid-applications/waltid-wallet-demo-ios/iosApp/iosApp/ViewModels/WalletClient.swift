@@ -110,3 +110,12 @@ final class SDKWalletClient: WalletClient {
         return wallet
     }
 }
+
+@MainActor
+extension SDKWalletClient: ProximityWalletClient {
+    func startProximityPresentation(
+        configuration: ProximityPresentationConfiguration
+    ) async throws -> any DemoProximityPresentationSession {
+        try await wallet().startProximityPresentation(configuration: configuration)
+    }
+}
