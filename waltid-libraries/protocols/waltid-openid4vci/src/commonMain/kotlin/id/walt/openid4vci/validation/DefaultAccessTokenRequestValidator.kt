@@ -19,9 +19,12 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             val grantType = GrantType.fromValue(grantTypeRaw)
 
             when (grantType) {
-                GrantType.AuthorizationCode -> validateAuthorizationCodeGrant(parameters, session)
-                GrantType.PreAuthorizedCode -> validatePreAuthorizedCodeGrant(parameters, session)
-                GrantType.RefreshToken -> validateRefreshTokenGrant(parameters, session)
+                GrantType.AuthorizationCode ->
+                    validateAuthorizationCodeGrant(parameters, session, parameters.optionalAuthorizationDetails())
+                GrantType.PreAuthorizedCode ->
+                    validatePreAuthorizedCodeGrant(parameters, session, parameters.optionalAuthorizationDetails())
+                GrantType.RefreshToken ->
+                    validateRefreshTokenGrant(parameters, session)
                 else -> AccessTokenRequestResult.Failure(
                     OAuthError(
                         error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_GRANT_TYPE,
