@@ -10,8 +10,6 @@ import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpoin
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import id.walt.openid4vci.responses.credential.CredentialResponse
-import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.errors.CredentialErrorCodes
