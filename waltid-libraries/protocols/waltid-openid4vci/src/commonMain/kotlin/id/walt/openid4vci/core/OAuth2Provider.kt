@@ -28,7 +28,6 @@ import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
 import id.walt.crypto.keys.Key
-import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
