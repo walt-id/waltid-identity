@@ -28,7 +28,7 @@ class OpenId4VciProtocolServiceCrypto2KeyTest {
     @Test
     fun `JWK session without validated sidecar cannot downgrade to v1`() = runTest {
         assertFailsWith<IllegalArgumentException> {
-            restoreSessionIssuerCrypto2Key(session(), runtime)
+            restoreSessionIssuerCrypto2Key(session().issuanceRequests.single(), runtime)
         }
     }
 
