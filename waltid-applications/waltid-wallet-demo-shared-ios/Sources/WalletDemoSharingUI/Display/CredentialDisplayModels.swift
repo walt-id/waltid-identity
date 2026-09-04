@@ -221,6 +221,7 @@ public enum ClaimRole: Hashable {
 
 public enum CredentialDisplayText {
     public static let unknown = "Unknown"
+    static let imageUnavailable = "Image unavailable or unsupported"
 
     public static func expires(_ date: String) -> String { "Expires \(date)" }
     public static func added(_ date: String) -> String { "Added \(date)" }

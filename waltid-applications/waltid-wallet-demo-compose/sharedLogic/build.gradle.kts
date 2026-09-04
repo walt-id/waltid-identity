@@ -91,6 +91,10 @@ kotlin {
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     if (name == "testAndroidHostTest") {
         useJUnit()
+        systemProperty(
+            "walletDemoImageFixturesDir",
+            layout.projectDirectory.dir("../../waltid-wallet-demo-test-fixtures/resources/files").asFile.absolutePath,
+        )
     }
 }
 

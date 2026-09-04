@@ -89,44 +89,115 @@ private struct ImageValue: View {
     let mimeType: String
     let byteCount: Int
     let path: ClaimItemPath
+    @State private var viewerOpen = false
 
     var body: some View {
-        if let image {
-            content(image: image)
-                .accessibilityIdentifier(WalletAccessibilityID.claimImage(path.id))
-        } else {
-            content(image: nil)
-        }
+        content(image: image)
     }
 
     private func content(image: UIImage?) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 112, height: 112)
-                    .background(Color(.systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color(.separator), lineWidth: 1)
-                    )
-                    .accessibilityLabel("Credential image")
+                Button {
+                    viewerOpen = true
+                } label: {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 112, height: 112)
+                        .background(Color(.systemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(.separator), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Credential image")
+                .accessibilityHint("Opens the image full screen")
+                .accessibilityIdentifier(WalletAccessibilityID.claimImage(path.id))
             }
             Text(mimeType)
                 .font(.caption.weight(.medium))
-            Text(metadata)
+            Text("\(byteCount) bytes")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+        }
+        .fullScreenCover(isPresented: $viewerOpen) {
+            if let image {
+                CredentialImageViewer(
+                    image: image,
+                    path: path,
+                    onDismiss: { viewerOpen = false }
+                )
+                .transparentPresentationBackground()
+            }
         }
     }
 
     private var image: UIImage? {
-        return UIImage(data: data)
+        UIImage(data: data)
+    }
+}
+
+private struct CredentialImageViewer: View {
+    let image: UIImage
+    let path: ClaimItemPath
+    let onDismiss: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.72)
+                .ignoresSafeArea()
+                .accessibilityLabel("Credential image viewer")
+                .accessibilityIdentifier(WalletAccessibilityID.claimImageViewer(path.id))
+
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .padding(.horizontal, 24)
+                .padding(.vertical, 64)
+                .accessibilityLabel("Full-screen credential image")
+
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.black.opacity(0.48), in: Circle())
+                    }
+                    .accessibilityLabel("Close full-screen credential image")
+                    .accessibilityIdentifier(WalletAccessibilityID.claimImageViewerClose(path.id))
+                }
+                Spacer()
+            }
+            .padding(16)
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func transparentPresentationBackground() -> some View {
+        if #available(iOS 16.4, *) {
+            presentationBackground(.clear)
+        } else {
+            background(TransparentPresentationBackground())
+        }
+    }
+}
+
+private struct TransparentPresentationBackground: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        DispatchQueue.main.async {
+            view.superview?.superview?.backgroundColor = .clear
+        }
+        return view
     }
 
-    private var metadata: String {
-        "\(byteCount) bytes"
-    }
+    func updateUIView(_ uiView: UIView, context: Context) {}
 }

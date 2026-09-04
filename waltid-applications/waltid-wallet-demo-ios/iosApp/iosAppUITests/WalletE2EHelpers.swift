@@ -21,8 +21,36 @@ final class WalletE2EUI {
         for (key, value) in environment {
             app.launchEnvironment[key] = value
         }
+        if app.launchEnvironment["E2E_MOCK_WALLET"] == "1" {
+            addCredentialImageFixtures()
+        }
         app.launch()
         unlockWallet()
+    }
+
+    private func addCredentialImageFixtures() {
+        let fixtures = [
+            ("E2E_MOCK_PORTRAIT_DATA_URL", "synthetic-portrait", "jpg", "image/jpeg"),
+            ("E2E_MOCK_SIGNATURE_DATA_URL", "synthetic-signature", "png", "image/png"),
+            (
+                "E2E_MOCK_VERIFICATION_DOCUMENT_DATA_URL",
+                "synthetic-verification-document",
+                "jpg",
+                "image/jpeg"
+            ),
+        ]
+
+        for (environmentKey, resourceName, resourceExtension, mimeType) in fixtures
+            where app.launchEnvironment[environmentKey] == nil {
+            guard let url = Bundle(for: WalletE2EUI.self).url(
+                forResource: resourceName,
+                withExtension: resourceExtension
+            ), let data = try? Data(contentsOf: url) else {
+                XCTFail("Missing credential image fixture: \(resourceName).\(resourceExtension)")
+                continue
+            }
+            app.launchEnvironment[environmentKey] = "data:\(mimeType);base64,\(data.base64EncodedString())"
+        }
     }
 
     func waitForStatus(prefixes: [String], timeout: TimeInterval) -> String? {
