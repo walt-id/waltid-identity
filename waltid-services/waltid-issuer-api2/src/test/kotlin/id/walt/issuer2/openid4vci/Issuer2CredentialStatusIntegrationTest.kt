@@ -11,6 +11,8 @@ import id.walt.issuer2.testsupport.createCredentialOffer
 import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.openid4vci.handlers.credential.JwtUtils
+import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.sdjwt.SDJwt
