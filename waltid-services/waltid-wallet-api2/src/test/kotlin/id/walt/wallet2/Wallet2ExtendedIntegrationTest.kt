@@ -476,7 +476,7 @@ class Wallet2ExtendedIntegrationTest {
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
-                        credentialData = buildJsonObject {
+                        issuanceInputData = testIssuanceInputData(buildJsonObject {
                             put("given_name", "Alice"); put("family_name", "Wonder")
                             put("issuing_country", "DE")
                         },
