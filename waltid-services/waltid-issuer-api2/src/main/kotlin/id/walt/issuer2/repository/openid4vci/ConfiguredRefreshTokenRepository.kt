@@ -10,6 +10,7 @@ import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.refresh.DefaultRefreshTokenRecord
 import id.walt.openid4vci.repository.refresh.RefreshTokenRecord
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.serialization.Serializable
