@@ -1,6 +1,7 @@
 package id.walt.certificate.x509
 
 import id.walt.certificate.x509.PemUtil.normalizePem
+import id.walt.certificate.x509.X509SigningAlgorithmInfo.Companion.requireCompatibleWith
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
@@ -31,6 +32,18 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         services.certificateParser.parseCertificateDerEncoded(derEncoded)
 
     suspend fun createCsr(
+        holderKey: Key,
+        signatureAlgorithm: SignatureAlgorithm,
+        block: suspend Pkcs10CertificateSigningRequestBuilder.() -> Unit
+    ): Pkcs10CertificateSigningRequest {
+        signatureAlgorithm.requireCompatibleWith(holderKey)
+        val builder = Pkcs10CertificateSigningRequestBuilder("DN=client, O=Walt.id")
+        builder.block()
+        return services.csrSigner.signCsr(holderKey, signatureAlgorithm, builder)
+    }
+
+    @Deprecated("Use crypto2 key method instead")
+    suspend fun createCsr(
         holderKey: Crypt1Key,
         block: suspend Pkcs10CertificateSigningRequestBuilder.() -> Unit
     ): Pkcs10CertificateSigningRequest {
@@ -44,13 +57,14 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         signatureAlgorithm: SignatureAlgorithm,
         block: suspend X509CertificateDataBuilder.() -> Unit
     ): X509Certificate {
+        signatureAlgorithm.requireCompatibleWith(issuerKey)
         if (signatureAlgorithm is SignatureAlgorithm.Ecdsa) {
             require(signatureAlgorithm.encoding == EcdsaSignatureEncoding.DER) { "Certificates must use signature DER encoding" }
         }
         val builder = X509CertificateDataBuilder(
             serialNumberGenerator = services.serialNumberGenerator,
             issuerDnRaw = ByteString(),
-            subjectDn = "OU=CA,DC=test,O=Walt.id",
+            subjectDn = "OU=CA,DC=test,O=Walt.id"
         )
         builder.extensionBasicConstraints {
             cA = true
@@ -87,16 +101,21 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         signatureAlgorithm: SignatureAlgorithm,
         block: suspend X509CertificateDataBuilder.() -> Unit
     ): X509Certificate {
+        signatureAlgorithm.requireCompatibleWith(issuerKey)
         val builder = X509CertificateDataBuilder(
             serialNumberGenerator = services.serialNumberGenerator,
             issuerDnRaw = issuerCert.data.subjectDnRaw,
-            subjectDn = "OU=issuer, DC=test, O=Walt.id"
+            subjectDn = "OU=issuer, DC=test, O=Walt.id",
         )
         block.invoke(builder)
         builder.issuerDnRaw = issuerCert.data.subjectDnRaw
-        requireNotNull((builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).key) {
+
+        val subjectPublicKeyInfo =
+            builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder
+        require(subjectPublicKeyInfo.key != null || subjectPublicKeyInfo.spki != null) {
             "Certificate subject public key missing"
         }
+        require(subjectPublicKeyInfo.crypto1key == null) { "For subject public key info key or SPKI must be set" }
         builder.extensionAuthorityKeyIdentifier()
         issuerCert.data.extensionSubjectKeyIdentifier?.let { subjectKeyId ->
             val issuerPublicKeyInfo = services.certificateSigner.convertKeyToPublicKeyInfo(issuerKey)
@@ -116,12 +135,15 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         val builder = X509CertificateDataBuilder(
             serialNumberGenerator = services.serialNumberGenerator,
             issuerDnRaw = issuerCert.data.subjectDnRaw,
-            subjectDn = "OU=issuer, DC=test, O=Walt.id"
+            subjectDn = "OU=issuer, DC=test, O=Walt.id",
         )
         block.invoke(builder)
-        requireNotNull((builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).crypto1key) {
+        val subjectPublicKeyInfo =
+            builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder
+        require(subjectPublicKeyInfo.crypto1key != null || subjectPublicKeyInfo.spki != null) {
             "Certificate subject public key missing"
         }
+        require(subjectPublicKeyInfo.key == null) { "For subject public key info Crypto1Key or SPKI must be set" }
         builder.extensionAuthorityKeyIdentifier()
         issuerCert.data.extensionSubjectKeyIdentifier?.let { subjectKeyId ->
             val issuerPublicKeyInfo = services.certificateSigner.convertKeyToPublicKeyInfo(issuerKey)

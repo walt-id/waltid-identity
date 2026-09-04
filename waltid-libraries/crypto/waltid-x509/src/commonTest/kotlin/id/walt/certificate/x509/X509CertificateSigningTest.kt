@@ -218,6 +218,32 @@ class X509CertificateSigningTest {
         }
     }
 
+    @Test
+    fun shouldBuildAndSignLeafCertificateFromCsr() = runTest {
+        withCertificateTestKey(KeyType.secp256r1) { caKey ->
+            val intermediateKey = TestKeyUtil.genEcKey("ec-key", EcCurve.P256)
+            val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+
+            val caCert = X509CertificateUtil.createSelfSignedCertificate(caKey) {
+                subjectDn = "CN=Root CA,OU=waltid"
+            }
+
+            val csr = X509CertificateUtil.createCsr(intermediateKey, sigAlg) {
+                requestedCertificate.subjectDn = "CN=Leaf from CSR,OU=walt.id,C=AT"
+            }
+
+            val intermediateCert = X509CertificateUtil.createCertificate(caKey, caCert) {
+                subjectDnRaw = csr.requestedCertificate.subjectDnRaw
+                subjectPublicKey(csr.requestedCertificate.subjectPublicKeyInfo)
+                extensionSubjectKeyIdentifier()
+            }
+
+            assertEquals("CN=Leaf from CSR,OU=walt.id,C=AT", intermediateCert.data.subjectDn)
+            assertEquals(csr.requestedCertificate.subjectDnRaw, intermediateCert.data.subjectDnRaw)
+            verifyPemChain(intermediateCert.encodedPem, caCert.encodedPem)
+        }
+    }
+
     companion object {
         val caTool = X509CertificateUtil {
             addValidators(X509CertificateBasicConstraintsValidator(leafCanBeCa = true))
