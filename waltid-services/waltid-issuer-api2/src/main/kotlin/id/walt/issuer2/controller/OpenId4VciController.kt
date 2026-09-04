@@ -12,6 +12,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.responses.credential.CredentialResponseBody
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
+import id.walt.openid4vci.responses.notification.NotificationResponseHttp
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -218,6 +219,20 @@ class OpenId4VciController(
                     }
                 call.respondCredentialResponse(response)
             }
+
+
+            if (metadataService.walletNotificationEndpointEnabled()) {
+                post("notification", OpenId4VciRoutesDocs.notification()) {
+                    val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
+                    val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
+                    val response = protocolService.processNotificationRequest(
+                        authorizationHeaders = authorizationHeaders,
+                        dpopProofHeaderValues = dpopProofHeaderValues,
+                        requestBody = call.receiveText(),
+                    )
+                    call.respondNotificationResponse(response)
+                }
+            }
         }
     }
 
@@ -260,6 +275,18 @@ class OpenId4VciController(
                     contentType = ContentType.parse(body.contentType),
                     status = status,
                 )
+        }
+    }
+
+    private suspend fun ApplicationCall.respondNotificationResponse(response: NotificationResponseHttp) {
+        response.headers.forEach { (name, value) -> this.response.headers.append(name, value) }
+        val status = HttpStatusCode.fromValue(response.status)
+        val payload = response.payload
+
+        if (payload == null) {
+            respond(status)
+        } else {
+            respond(status, payload)
         }
     }
 }

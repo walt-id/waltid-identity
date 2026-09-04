@@ -59,11 +59,11 @@
 ./gradlew :waltid-services:waltid-wallet-api2:run
 ```
 
-The service starts on **port 7005** by default (configured in `config/web.conf`).
+The service starts on **port 7006** by default (configured in `config/web.conf`).
 
 ```bash
 # Verify it's running
-curl http://localhost:7005/wallet
+curl http://localhost:7006/wallet
 # → []
 ```
 
@@ -106,12 +106,12 @@ The service needs its `config/` directory mounted because it contains the requir
 
 ```bash
 docker run --rm \
-  -p 7005:7005 \
+  -p 7006:7006 \
   -v "$(pwd)/waltid-services/waltid-wallet-api2/config:/waltid-wallet-api2/config" \
   waltid/wallet-api2:latest
 ```
 
-> **Port note:** `web.conf` sets `webPort = 7005`. The Ktor plugin's Docker port mapping is 4000→4000 (used for `runDocker`); when running manually with `docker run` use `-p 7005:7005` to match `web.conf`.
+> **Port note:** `web.conf` sets `webPort = 7006`. The Ktor plugin's Docker port mapping is 4000→4000 (used for `runDocker`); when running manually with `docker run` use `-p 7006:7006` to match `web.conf`.
 
 #### With SQLite persistence
 
@@ -121,7 +121,7 @@ The default `config/_features.conf` already enables `wallet2-persistence`. Mount
 mkdir -p wallet2-data
 
 docker run --rm \
-  -p 7005:7005 \
+  -p 7006:7006 \
   -v "$(pwd)/waltid-services/waltid-wallet-api2/config:/waltid-wallet-api2/config" \
   -v "$(pwd)/wallet2-data:/waltid-wallet-api2/data" \
   waltid/wallet-api2:latest
@@ -140,7 +140,7 @@ wallet2-persistence {
 
 ```bash
 docker run --rm \
-  -p 7005:7005 \
+  -p 7006:7006 \
   -v "$(pwd)/my-config:/waltid-wallet-api2/config" \
   --network my-net \
   waltid/wallet-api2:latest
@@ -182,83 +182,94 @@ of the two is required.
 
 ## Usage examples
 
-All examples assume the service is running on `localhost:7005`.
+All examples assume the service is running on `localhost:7006`.
 
 ### Wallet lifecycle
 
 ```bash
 # Create a wallet (auto-creates one in-memory key, credential, and DID store)
-curl -s -X POST http://localhost:7005/wallet \
+curl -s -X POST http://localhost:7006/wallet \
   -H "Content-Type: application/json" -d '{}'
 # → {"walletId":"9bbbc42d-..."}
 
 WALLET_ID="9bbbc42d-..."
 
 # List all wallets
-curl http://localhost:7005/wallet
+curl http://localhost:7006/wallet
 # → ["9bbbc42d-..."]
 
 # Get wallet info (shows attached store counts)
-curl http://localhost:7005/wallet/$WALLET_ID
+curl http://localhost:7006/wallet/$WALLET_ID
 # → {"walletId":"...","keyStoreCount":1,"credentialStoreCount":1,"hasDidStore":true,...}
 
 # Delete a wallet
-curl -X DELETE http://localhost:7005/wallet/$WALLET_ID
+curl -X DELETE http://localhost:7006/wallet/$WALLET_ID
 ```
 
 ### Key management
 
 ```bash
 # Generate an Ed25519 key
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/keys/generate \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/keys/generate \
   -H "Content-Type: application/json" -d '{"keyType":"Ed25519"}'
 # → {"keyId":"v_CW0x...","keyType":"Ed25519"}
 
 KEY_ID="v_CW0x..."
 
 # Generate a P-256 key
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/keys/generate \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/keys/generate \
   -H "Content-Type: application/json" -d '{"keyType":"secp256r1"}'
 
 # Import a key from waltid JWK format {"type":"jwk","jwk":{...}}
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/keys/import \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/keys/import \
   -H "Content-Type: application/json" \
   -d '{"key":{"type":"jwk","jwk":{"kty":"OKP","crv":"Ed25519","x":"...","d":"..."}}}'
 
 # List keys
-curl http://localhost:7005/wallet/$WALLET_ID/keys
+curl http://localhost:7006/wallet/$WALLET_ID/keys
 
 # Delete a key
-curl -X DELETE http://localhost:7005/wallet/$WALLET_ID/keys/$KEY_ID
+curl -X DELETE http://localhost:7006/wallet/$WALLET_ID/keys/$KEY_ID
 ```
 
 ### DID management
 
 ```bash
 # Create a did:key from an existing key
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/dids/create \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/dids/create \
   -H "Content-Type: application/json" \
   -d "{\"method\":\"key\",\"keyId\":\"$KEY_ID\"}"
 # → {"did":"did:key:z6Mk...","document":{...}}
 
 # Create a did:jwk
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/dids/create \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/dids/create \
   -H "Content-Type: application/json" \
   -d '{"method":"jwk"}'
 
 # List DIDs
-curl http://localhost:7005/wallet/$WALLET_ID/dids
+curl http://localhost:7006/wallet/$WALLET_ID/dids
 ```
 
 ### Receive credentials (OID4VCI 1.0)
 
 #### Full flow - one call
 
+When issuer metadata advertises `notification_endpoint` and the Credential
+Response contains `notification_id`, this flow sends `credential_accepted`
+after successful storage or `credential_failure` after a parsing or storage
+failure. The issuer acknowledgement is best-effort: a delivery failure does
+not undo stored credentials, and no separate Wallet2 route is required.
+
+The current implementation covers immediate responses in the full
+pre-authorized flow and wallet-aware isolated credential fetching when
+`storeInWallet` is enabled. No explicit user-rejection flow emits
+`credential_deleted`, and failed delivery is not persisted for retry.
+
 ```bash
 # offerUrl from a QR code / deep link
 OFFER_URL="openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example.com%2Foffer%2Fabc"
 
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive \
   -H "Content-Type: application/json" \
   -d "{\"offerUrl\":\"$OFFER_URL\"}"
 # → {"credentialIds":["3f2a..."],"deferredTransactionIds":{}}
@@ -267,7 +278,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive \
 Or supply the offer JSON directly (no network fetch):
 
 ```bash
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive \
   -H "Content-Type: application/json" \
   -d '{
     "offerJson": {
@@ -284,14 +295,21 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive \
 
 #### Step-by-step (isolated steps)
 
+These endpoints expose the issuance steps independently. The wallet-aware
+`fetch-credential` endpoint sends an issuer notification after storage when
+`storeInWallet` is true and `credentialIssuerBaseUrl` allows issuer metadata
+to be resolved. Stateless fetches return `notificationId` without notifying,
+allowing the caller to inspect the Credential Response and call the issuer
+Notification Endpoint manually.
+
 ```bash
 # Step 1: Resolve the offer - returns grant/endpoints plus issuer display and offered-credential metadata
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/resolve-offer \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive/resolve-offer \
   -H "Content-Type: application/json" \
   -d "{\"offerUrl\":\"$OFFER_URL\"}"
 
 # Step 2: Request an access token
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/request-token \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive/request-token \
   -H "Content-Type: application/json" \
   -d '{
     "tokenEndpoint": "https://issuer.example.com/token",
@@ -302,27 +320,29 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/requ
 ACCESS_TOKEN="..."
 
 # Step 3 (only when nonceEndpoint is advertised): obtain a fresh proof nonce
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/request-nonce \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive/request-nonce \
   -H "Content-Type: application/json" \
   -d '{"credentialIssuer":"https://issuer.example.com"}'
 
 C_NONCE="..."
 
 # Step 4: Sign a proof of possession; omit nonce when request-nonce returned null
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/sign-proof \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive/sign-proof \
   -H "Content-Type: application/json" \
-  -d "{\"issuerUrl\":\"https://issuer.example.com\",\"nonce\":\"$C_NONCE\",\"keyId\":\"$KEY_ID\"}"
+  -d "{\"issuerUrl\":\"https://issuer.example.com\",\"credentialConfigurationId\":\"pid_sd_jwt\",\"nonce\":\"$C_NONCE\",\"keyId\":\"$KEY_ID\"}"
 
 PROOF_JWT="..."
 
 # Step 5: Fetch the credential
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/fetch-credential \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive/fetch-credential \
   -H "Content-Type: application/json" \
   -d "{
     \"credentialEndpoint\": \"https://issuer.example.com/credential\",
     \"accessToken\": \"$ACCESS_TOKEN\",
     \"credentialConfigurationId\": \"pid_sd_jwt\",
-    \"proofJwt\": \"$PROOF_JWT\"
+    \"proofJwt\": \"$PROOF_JWT\",
+    \"storeInWallet\": true,
+    \"credentialIssuerBaseUrl\": \"https://issuer.example.com\"
   }"
 ```
 
@@ -330,7 +350,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/fetc
 
 ```bash
 # Step 1: Generate the authorization redirect URL (PKCE is recommended)
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/authorization-url \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive/authorization-url \
   -H "Content-Type: application/json" \
   -d "{\"offerUrl\":\"$OFFER_URL\",\"usePkce\":true}"
 # → {"authorizationUrl":"https://issuer.example.com/authorize?...","codeVerifier":"...","state":"...","credentialIssuerBaseUrl":"https://issuer.example.com"}
@@ -338,7 +358,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/auth
 # (User follows authorizationUrl in a browser, then is redirected back with ?code=...)
 
 # Step 2: Exchange the authorization code for an access token
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/exchange-code \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive/exchange-code \
   -H "Content-Type: application/json" \
   -d '{
     "credentialIssuerBaseUrl": "https://issuer.example.com",
@@ -349,7 +369,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/exch
 # → {"accessToken":"..."}
 
 # Step 3 (only when nonceEndpoint is advertised): obtain a fresh proof nonce
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/request-nonce \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/receive/request-nonce \
   -H "Content-Type: application/json" \
   -d '{"credentialIssuer":"https://issuer.example.com"}'
 # → {"nonce":"..."}; when no endpoint is advertised, proof JWTs omit the nonce claim
@@ -362,7 +382,7 @@ REQUEST_URL="openid4vp://authorize?client_id=verifier&request_uri=..."
 HOLDER_DID="did:key:z6Mk..."
 
 # Full flow - one call
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/present \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/present \
   -H "Content-Type: application/json" \
   -d "{\"requestUrl\":\"$REQUEST_URL\",\"did\":\"$HOLDER_DID\"}"
 ```
@@ -371,7 +391,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/present \
 
 ```bash
 # Find which stored credentials match a DCQL query (useful for wallet picker UIs)
-curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/present/match-credentials-from-store \
+curl -s -X POST http://localhost:7006/wallet/$WALLET_ID/credentials/present/match-credentials-from-store \
   -H "Content-Type: application/json" \
   -d '{
     "dcqlQuery": {
@@ -390,14 +410,14 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/present/matc
 
 ```bash
 # Create a shared credential store
-curl -s -X POST http://localhost:7005/stores/credentials/shared-store
+curl -s -X POST http://localhost:7006/stores/credentials/shared-store
 
 # Create two wallets that share it
-WALLET_A=$(curl -s -X POST http://localhost:7005/wallet \
+WALLET_A=$(curl -s -X POST http://localhost:7006/wallet \
   -H "Content-Type: application/json" \
   -d '{"credentialStoreIds":["shared-store"]}' | python3 -c "import sys,json; print(json.load(sys.stdin)['walletId'])")
 
-WALLET_B=$(curl -s -X POST http://localhost:7005/wallet \
+WALLET_B=$(curl -s -X POST http://localhost:7006/wallet \
   -H "Content-Type: application/json" \
   -d '{"credentialStoreIds":["shared-store"]}' | python3 -c "import sys,json; print(json.load(sys.stdin)['walletId'])")
 
@@ -408,21 +428,21 @@ WALLET_B=$(curl -s -X POST http://localhost:7005/wallet \
 
 ```bash
 # Register
-curl -s -X POST http://localhost:7005/auth/register \
+curl -s -X POST http://localhost:7006/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"alice@example.com","password":"hunter2"}'
 
 # Login
-TOKEN=$(curl -s -X POST http://localhost:7005/auth/emailpass \
+TOKEN=$(curl -s -X POST http://localhost:7006/auth/emailpass \
   -H "Content-Type: application/json" \
   -d '{"email":"alice@example.com","password":"hunter2"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
 # All wallet routes require the token when auth is enabled
-curl -H "Authorization: Bearer $TOKEN" http://localhost:7005/wallet
+curl -H "Authorization: Bearer $TOKEN" http://localhost:7006/wallet
 
 # Wallets created while authenticated are owned by the account
-curl -s -X POST http://localhost:7005/wallet \
+curl -s -X POST http://localhost:7006/wallet \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" -d '{}'
 ```
@@ -439,7 +459,7 @@ All configuration files live in `config/` and are loaded automatically at startu
 | `dev-mode.conf`            | Development-mode settings, including DID Web HTTP resolver support |
 | `wallet-service.conf`      | `publicBaseUrl` - the external URL of this service (required) |
 | `wallet2-persistence.conf` | JDBC URL + driver for SQLite or Postgres                      |
-| `web.conf`                 | `webHost` + `webPort` (default `0.0.0.0:7005`)                |
+| `web.conf`                 | `webHost` + `webPort` (default `0.0.0.0:7006`)                |
 
 ### Feature flags
 
@@ -481,7 +501,7 @@ The route handlers and core logic live in the **library** layer, not in this ser
 
 ## API reference
 
-Full interactive OpenAPI docs are available at **`http://localhost:7005/swagger/index.html`** when the service is running.
+Full interactive OpenAPI docs are available at **`http://localhost:7006/swagger/index.html`** when the service is running.
 
 Key endpoint groups:
 

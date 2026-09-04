@@ -4,6 +4,7 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import io.ktor.server.plugins.NotFoundException
 
 class IssuanceSessionService(
@@ -42,6 +43,31 @@ class IssuanceSessionService(
             issuedCredentialFormat = issuedCredentialFormat ?: existing.issuedCredentialFormat,
             isClosed = existing.isClosed || close,
             failure = failure ?: existing.failure,
+        )
+        return repository.save(updated)
+    }
+
+    suspend fun updateWalletNotificationEvent(
+        sessionId: String,
+        notificationId: String,
+        event: NotificationEvent,
+        eventDescription: String? = null,
+    ): IssuanceSession? {
+        val existing = getSessionOrNull(sessionId) ?: return null
+        if (existing.walletNotificationId != notificationId) {
+            return null
+        }
+
+        if (
+            existing.walletNotificationEvent == event &&
+            existing.walletNotificationEventDescription == eventDescription
+        ) {
+            return existing
+        }
+
+        val updated = existing.copy(
+            walletNotificationEvent = event,
+            walletNotificationEventDescription = eventDescription,
         )
         return repository.save(updated)
     }
