@@ -11,13 +11,18 @@ class MdocCredentialCandidate(
     val docType: String,
     issuerAuthorityKeyIdentifiers: Collection<ImmutableBytes>,
     availableElements: Collection<ElementReference>,
+    booleanElements: Map<ElementReference, Boolean> = emptyMap(),
 ) {
     val issuerAuthorityKeyIdentifiers: Set<ImmutableBytes> = issuerAuthorityKeyIdentifiers.toSet()
     val availableElements: Set<ElementReference> = availableElements.toSet()
+    val booleanElements: Map<ElementReference, Boolean> = booleanElements.toMap()
 
     init {
         require(id.isNotBlank() && docType.isNotBlank())
         require(availableElements.isNotEmpty()) { "An mdoc candidate must expose at least one data element" }
+        require(this.booleanElements.keys.all { it in this.availableElements }) {
+            "Boolean candidate values must belong to available data elements"
+        }
     }
 }
 
@@ -180,13 +185,45 @@ class MdocRequestMatcher(
                 } else {
                     val replacement = alternatives[reference]?.alternativeElementSets
                         ?.firstOrNull { set -> set.all { it in candidate.availableElements } }
-                        ?: return null
-                    replacement.forEach { include(it, item.value, reference) }
+                    when {
+                        replacement != null -> replacement.forEach { include(it, item.value, reference) }
+                        reference.mdlAgeThreshold() != null -> candidate.closestAgeAttestation(reference)
+                            ?.let { include(it, item.value, reference) }
+
+                        else -> return null
+                    }
                 }
             }
         }
         return selected.values.toSet()
     }
+
+    private fun MdocCredentialCandidate.closestAgeAttestation(
+        requested: ElementReference,
+    ): ElementReference? {
+        val requestedThreshold = requested.mdlAgeThreshold() ?: return null
+        val attestations = booleanElements.mapNotNull { (reference, value) ->
+            reference.mdlAgeThreshold()?.let { threshold -> Triple(reference, threshold, value) }
+        }
+        val nearestTrue = attestations
+            .filter { (_, threshold, value) -> value && threshold >= requestedThreshold }
+            .minByOrNull { (_, threshold) -> threshold }
+        val nearestFalse = attestations
+            .filter { (_, threshold, value) -> !value && threshold <= requestedThreshold }
+            .maxByOrNull { (_, threshold) -> threshold }
+        return when {
+            nearestTrue != null && nearestFalse != null -> null
+            nearestTrue != null -> nearestTrue.first
+            else -> nearestFalse?.first
+        }
+    }
+
+    private fun ElementReference.mdlAgeThreshold(): Int? =
+        takeIf { namespace == MDL_NAMESPACE }
+            ?.elementIdentifier
+            ?.removePrefix(AGE_OVER_PREFIX)
+            ?.takeIf { it.length == 2 && it.all(Char::isDigit) }
+            ?.toInt()
 
     private fun validateRequestReferences(request: DeviceRequest) {
         request.docRequests.forEach { docRequest ->
@@ -211,5 +248,10 @@ class MdocRequestMatcher(
                 "UseCase references a DocRequest outside the request"
             }
         }
+    }
+
+    private companion object {
+        const val MDL_NAMESPACE = "org.iso.18013.5.1"
+        const val AGE_OVER_PREFIX = "age_over_"
     }
 }
