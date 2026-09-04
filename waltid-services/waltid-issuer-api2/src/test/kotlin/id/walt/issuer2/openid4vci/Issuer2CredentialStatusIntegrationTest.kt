@@ -117,6 +117,59 @@ class Issuer2CredentialStatusIntegrationTest {
     }
 
     @Test
+    fun batchIssuanceRejectsReusingOneConfiguredCredentialStatus() = testApplication {
+        installIssuer2WithConfigFiles {
+            it.copy(batchCredentialIssuance = BatchCredentialIssuance(batchSize = 2))
+        }
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+        val offerRequest = CredentialOfferCreateRequest(
+            profileId = JWT_VC_PROFILE_ID,
+            authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            valueMode = CredentialOfferValueMode.BY_REFERENCE,
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                credentialStatus = buildJsonObject {
+                    put("id", "https://issuer.example.com/status/1#94567")
+                    put("type", "BitstringStatusListEntry")
+                    put("statusPurpose", "revocation")
+                    put("statusListIndex", "94567")
+                    put("statusListCredential", "https://issuer.example.com/status/1")
+                },
+            ),
+        )
+        val createdOffer = client.createCredentialOffer(offerRequest)
+        val resolvedOffer = walletFlow.resolve(createdOffer)
+        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+        val firstProofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
+        val secondProofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
+
+        val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
+            bearerAuth(tokenResponse.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(
+                credentialRequest(
+                    credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+                    proofs = firstProofs.copy(
+                        jwt = requireNotNull(firstProofs.jwt) + requireNotNull(secondProofs.jwt),
+                    ),
+                )
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        val body = response.body<JsonObject>()
+        assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, body["error"]?.jsonPrimitive?.content)
+        assertNull(body["credentials"])
+        assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
+    }
+
+    @Test
     fun issuedJwtVcCredentialShouldContainStatusList2021EntryWhenProvided() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
