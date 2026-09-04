@@ -12,6 +12,8 @@ import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.domain.IssuanceRequest
+import id.walt.issuer2.domain.IssuanceResult
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.CredentialProfileService
