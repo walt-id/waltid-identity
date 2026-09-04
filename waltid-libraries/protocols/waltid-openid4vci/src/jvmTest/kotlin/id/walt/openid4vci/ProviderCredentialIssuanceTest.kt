@@ -19,6 +19,8 @@ import id.walt.did.dids.DidService
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
