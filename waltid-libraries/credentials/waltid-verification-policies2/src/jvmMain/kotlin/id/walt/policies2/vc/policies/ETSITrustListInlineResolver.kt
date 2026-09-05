@@ -31,7 +31,8 @@ actual object ETSITrustListInlineResolver {
         allowStaleSource: Boolean,
         requireAuthenticated: Boolean,
         validateSignatures: Boolean,
-        trustedSourceSignerCertificates: List<String>
+        trustedSourceSignerCertificates: List<String>,
+        publicKeyJwk: String?
     ): Result<JsonElement> {
         // Create an ephemeral trust registry for this verification request
         val trustStore = InMemoryTrustStore()
@@ -93,12 +94,21 @@ actual object ETSITrustListInlineResolver {
             runCatching { TrustedEntityType.valueOf(it) }.getOrNull()
         }
         
-        val decision = trustService.resolveCertificateChain(
-            certificateChainPemOrDer = certificateChain,
-            instant = Clock.System.now(),
-            expectedEntityType = entityType,
-            expectedServiceType = expectedServiceType
-        )
+        val decision = if (publicKeyJwk != null) {
+            trustService.resolveByPublicKey(
+                jwk = publicKeyJwk,
+                instant = Clock.System.now(),
+                expectedEntityType = entityType,
+                expectedServiceType = expectedServiceType
+            )
+        } else {
+            trustService.resolveCertificateChain(
+                certificateChainPemOrDer = certificateChain,
+                instant = Clock.System.now(),
+                expectedEntityType = entityType,
+                expectedServiceType = expectedServiceType
+            )
+        }
         return evaluateAndBuildResult(decision, allowStaleSource, requireAuthenticated)
     }
     

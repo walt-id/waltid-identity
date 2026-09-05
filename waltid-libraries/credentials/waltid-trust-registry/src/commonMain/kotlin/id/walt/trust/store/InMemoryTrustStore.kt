@@ -120,6 +120,14 @@ class InMemoryTrustStore : TrustStore {
             }
         }
 
+    override suspend fun findIdentitiesByJwkThumbprint(sha256Thumbprint: String): Flow<ServiceIdentity> =
+        snapshotFlow {
+            identities.values.filter {
+                // RFC 7638 thumbprints are base64url-encoded and case-sensitive, unlike the hex identifiers.
+                it.publicKeyJwkThumbprint == sha256Thumbprint
+            }
+        }
+
     // ---------------------------------------------------------------------------
     // Entity queries
     // ---------------------------------------------------------------------------

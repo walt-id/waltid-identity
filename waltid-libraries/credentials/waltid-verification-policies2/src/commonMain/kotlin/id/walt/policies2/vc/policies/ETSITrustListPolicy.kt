@@ -2,10 +2,13 @@ package id.walt.policies2.vc.policies
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.JwtBasedSignature
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
+import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.toPublicJwk
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -134,9 +137,10 @@ data class ETSITrustListPolicy(
         log.debug { "Verifying credential with ETSI Trust List policy" }
 
         try {
-            // Extract the full certificate chain from credential
-            val certificateChain = extractCertificateChain(credential)
-            log.debug { "Certificate chain has ${certificateChain.size} certificate(s)" }
+            // Extract the issuer's certificate chain (x5c) or, when absent, resolve the
+            // issuer's public key (DID, HTTPS well-known metadata) for JWT-based credentials.
+            val trustMaterial = extractTrustMaterial(credential)
+            log.debug { "Extracted issuer trust material: $trustMaterial" }
 
             // Look up an injected TrustRegistryServiceResolver (e.g. provided by the enterprise verifier)
             val injectedResolver =
@@ -147,19 +151,19 @@ data class ETSITrustListPolicy(
                 // 1. Remote service mode (explicit URL takes precedence)
                 trustRegistryUrl != null -> {
                     log.debug { "Using remote trust registry: $trustRegistryUrl" }
-                    resolveViaRemoteService(certificateChain)
+                    resolveViaRemoteService(trustMaterial)
                 }
 
                 // 2. Inline trust lists mode
                 !trustLists.isNullOrEmpty() -> {
                     log.debug { "Using inline trust lists (${trustLists.size} sources)" }
-                    resolveViaInlineTrustLists(certificateChain)
+                    resolveViaInlineTrustLists(trustMaterial)
                 }
 
                 // 3. Injected resolver mode (supplied via PolicyExecutionContext by e.g. the enterprise verifier)
                 injectedResolver != null -> {
                     log.debug { "Using injected trust registry service resolver" }
-                    resolveViaInjectedResolver(certificateChain, injectedResolver)
+                    resolveViaInjectedResolver(trustMaterial, injectedResolver)
                 }
 
                 // 4. No trust source configured
@@ -187,8 +191,11 @@ data class ETSITrustListPolicy(
     // Resolution Mode: Remote Service
     // ---------------------------------------------------------------------------
 
-    private suspend fun resolveViaRemoteService(certificateChain: List<String>): Result<JsonElement> {
-        val decision = queryTrustRegistry(certificateChain, trustRegistryUrl!!)
+    private suspend fun resolveViaRemoteService(trustMaterial: IssuerTrustMaterial): Result<JsonElement> {
+        val decision = when (trustMaterial) {
+            is IssuerTrustMaterial.CertificateChain -> queryTrustRegistry(trustMaterial.pemChain, trustRegistryUrl!!)
+            is IssuerTrustMaterial.PublicKey -> queryTrustRegistryByPublicKey(trustMaterial.jwk, trustRegistryUrl!!)
+        }
         return evaluateDecision(decision)
     }
 
@@ -196,10 +203,11 @@ data class ETSITrustListPolicy(
     // Resolution Mode: Inline Trust Lists (JVM only - uses waltid-trust-registry lib)
     // ---------------------------------------------------------------------------
 
-    private suspend fun resolveViaInlineTrustLists(certificateChain: List<String>): Result<JsonElement> {
+    private suspend fun resolveViaInlineTrustLists(trustMaterial: IssuerTrustMaterial): Result<JsonElement> {
         // This uses expect/actual to delegate to JVM implementation
         return ETSITrustListInlineResolver.resolve(
-            certificateChain = certificateChain,
+            certificateChain = (trustMaterial as? IssuerTrustMaterial.CertificateChain)?.pemChain ?: emptyList(),
+            publicKeyJwk = (trustMaterial as? IssuerTrustMaterial.PublicKey)?.jwk,
             trustLists = trustLists!!,
             expectedEntityType = expectedEntityType,
             expectedServiceType = expectedServiceType,
@@ -215,30 +223,37 @@ data class ETSITrustListPolicy(
     // ---------------------------------------------------------------------------
 
     private suspend fun resolveViaInjectedResolver(
-        certificateChain: List<String>,
+        trustMaterial: IssuerTrustMaterial,
         resolver: TrustRegistryServiceResolver
     ): Result<JsonElement> {
-        val decision = resolver.resolveCertificateChain(
-            certificateChainPem = certificateChain,
-            expectedEntityType = expectedEntityType,
-            expectedServiceType = expectedServiceType
-        )
+        val decision = when (trustMaterial) {
+            is IssuerTrustMaterial.CertificateChain -> resolver.resolveCertificateChain(
+                certificateChainPem = trustMaterial.pemChain,
+                expectedEntityType = expectedEntityType,
+                expectedServiceType = expectedServiceType
+            )
+            is IssuerTrustMaterial.PublicKey -> resolver.resolveByPublicKey(
+                publicKeyJwk = trustMaterial.jwk,
+                expectedEntityType = expectedEntityType,
+                expectedServiceType = expectedServiceType
+            )
+        }
         return evaluateDecision(decision)
     }
 
     // ---------------------------------------------------------------------------
-    // Certificate Extraction
+    // Issuer Trust Material Extraction
     // ---------------------------------------------------------------------------
 
-    private suspend fun extractCertificateChain(credential: DigitalCredential): List<String> {
+    private suspend fun extractTrustMaterial(credential: DigitalCredential): IssuerTrustMaterial {
         val signature = credential.signature
-        
+
         return when {
             credential is MdocsCredential && signature is CoseCredentialSignature -> {
-                extractChainFromCoseSignature(signature)
+                IssuerTrustMaterial.CertificateChain(extractChainFromCoseSignature(signature))
             }
             signature is JwtBasedSignature -> {
-                extractChainFromJwtHeader(signature.jwtHeader)
+                extractJwtTrustMaterial(signature, credential.credentialData)
             }
             else -> {
                 throw ETSITrustListPolicyException(
@@ -264,29 +279,72 @@ data class ETSITrustListPolicy(
         }
     }
 
-    private fun extractChainFromJwtHeader(jwtHeader: JsonObject?): List<String> {
-        if (jwtHeader == null) {
-            throw ETSITrustListPolicyException("JWT credential has no header")
-        }
-        
+    /**
+     * Extracts trust material for a JWT-based credential (SD-JWT VC, JWT VC).
+     *
+     * When the JWT header carries an `x5c` certificate chain, that chain is used as before.
+     * Otherwise — e.g. an issuer that signs with a `did:web` DID and identifies its signing
+     * key only via `kid` + `iss` — the issuer's public key is resolved via [Crypto2JwtKeyResolver]
+     * (DID resolution, or HTTPS well-known JWT VC issuer metadata) and matched against the trust
+     * list by JWK thumbprint instead. An inline `jwk` header is intentionally not trusted here
+     * (`allowInlineJwk = false`): it is self-asserted and establishes no issuer identity on its own.
+     *
+     * Signer binding: this trust check is only sound if it resolves the *same* key that the base
+     * `signature` policy verified the credential against — otherwise an attacker could sign with a
+     * self-asserted key while trust is matched against a different, trust-listed key. That binding
+     * holds structurally rather than by convention: for both W3C JWT VCs and SD-JWT VCs, the base
+     * signature policy resolves its verification key via
+     * `JwsSignatureScheme.getIssuerCrypto2KeyInfo(compact)`, whose default `resolver` parameter is
+     * `Crypto2JwtKeyResolver()` — the same class, with the same `allowInlineJwk = false` default, run
+     * over the same JWT header/payload as [keyResolver] here. Given identical (deterministic) inputs
+     * and an identical resolver configuration, both policies always resolve to the same key.
+     */
+    private suspend fun extractJwtTrustMaterial(
+        signature: JwtBasedSignature,
+        credentialData: JsonObject
+    ): IssuerTrustMaterial {
+        val jwtHeader = signature.jwtHeader
+            ?: throw ETSITrustListPolicyException("JWT credential has no header")
+
         val x5cElement = jwtHeader["x5c"]
-            ?: throw ETSITrustListPolicyException(
-                "JWT has no x5c certificate chain in header. " +
-                "ETSI Trust List verification requires an x5c header with the issuer's certificate chain."
+        if (x5cElement != null) {
+            val x5cArray = x5cElement.jsonArray
+            if (x5cArray.isEmpty()) {
+                throw ETSITrustListPolicyException("JWT x5c header is empty")
+            }
+            log.debug { "Extracted ${x5cArray.size} certificate(s) from JWT x5c header" }
+            return IssuerTrustMaterial.CertificateChain(
+                x5cArray.map { certElement ->
+                    val derBytes = certElement.jsonPrimitive.content.decodeFromBase64()
+                    buildPemCertificate(derBytes)
+                }
             )
-        
-        val x5cArray = x5cElement.jsonArray
-        if (x5cArray.isEmpty()) {
-            throw ETSITrustListPolicyException("JWT x5c header is empty")
         }
-        
-        log.debug { "Extracted ${x5cArray.size} certificate(s) from JWT x5c header" }
-        
-        return x5cArray.map { certElement ->
-            val certBase64 = certElement.jsonPrimitive.content
-            val derBytes = certBase64.decodeFromBase64()
-            buildPemCertificate(derBytes)
-        }
+
+        val resolved = runCatching {
+            signature.getCrypto2JwtBasedIssuer(credentialData, keyResolver)
+        }.getOrElse { cause ->
+            throw ETSITrustListPolicyException(
+                "JWT has no x5c certificate chain in header, and the issuer's public key could not be " +
+                "resolved: ${cause.message}. ETSI Trust List verification requires either an x5c header " +
+                "or a resolvable issuer key (DID or HTTPS well-known JWT VC issuer metadata).",
+                cause
+            )
+        } ?: throw ETSITrustListPolicyException(
+            "JWT has no x5c certificate chain in header, and the issuer's public key could not be resolved " +
+            "(no DID or HTTPS issuer identifier found). ETSI Trust List verification requires either an " +
+            "x5c header or a resolvable issuer key."
+        )
+
+        log.debug { "Resolved issuer public key via ${resolved.source} for trust list matching" }
+        return IssuerTrustMaterial.PublicKey(exportIssuerJwk(resolved.key))
+    }
+
+    private suspend fun exportIssuerJwk(key: Key): String {
+        val exporter = key.capabilities.publicKeyExporter
+            ?: throw ETSITrustListPolicyException("Resolved issuer key does not support public key export")
+        val jwk = exporter.exportPublicKey().toPublicJwk(key.spec)
+        return jwk.data.toByteArray().decodeToString()
     }
 
     // ---------------------------------------------------------------------------
@@ -302,6 +360,29 @@ data class ETSITrustListPolicy(
             contentType(ContentType.Application.Json)
             setBody(TrustResolveChainRequest(
                 certificateChainPemOrDer = certificateChain,
+                expectedEntityType = expectedEntityType,
+                expectedServiceType = expectedServiceType
+            ))
+        }
+
+        if (!response.status.isSuccess()) {
+            throw ETSITrustListPolicyException(
+                "Trust registry returned HTTP ${response.status.value}: ${response.status.description}"
+            )
+        }
+
+        return response.body()
+    }
+
+    private suspend fun queryTrustRegistryByPublicKey(jwk: String, baseUrl: String): TrustDecisionResponse {
+        val url = "${baseUrl.trimEnd('/')}/trust-registry/resolve/public-key"
+
+        log.debug { "Querying trust registry (public key) at: $url" }
+
+        val response = sharedHttpClient.post(url) {
+            contentType(ContentType.Application.Json)
+            setBody(TrustResolvePublicKeyRequest(
+                publicKeyJwk = jwk,
                 expectedEntityType = expectedEntityType,
                 expectedServiceType = expectedServiceType
             ))
@@ -460,6 +541,14 @@ data class ETSITrustListPolicy(
     )
 
     @Serializable
+    data class TrustResolvePublicKeyRequest(
+        val publicKeyJwk: String,
+        val instant: String? = null,
+        val expectedEntityType: String? = null,
+        val expectedServiceType: String? = null
+    )
+
+    @Serializable
     data class TrustDecisionResponse(
         val decision: String,
         val sourceFreshness: String = "UNKNOWN",
@@ -535,7 +624,25 @@ data class ETSITrustListPolicy(
                 }
             }
         }
+
+        /**
+         * Resolves the issuer's public key from a JWT header/payload that has no x5c chain
+         * (DID, or HTTPS well-known JWT VC issuer metadata). Inline `jwk` headers are not
+         * trusted for trust-list matching, as they are self-asserted.
+         */
+        private val keyResolver: Crypto2JwtKeyResolver by lazy { Crypto2JwtKeyResolver(allowInlineJwk = false) }
     }
+}
+
+/**
+ * The issuer credential material extracted from a [DigitalCredential], used to resolve trust
+ * against an ETSI trust list — either an X.509 certificate chain (`x5c`), or a public key
+ * (JWK) resolved for issuers that identify their signing key via a DID or HTTPS issuer
+ * metadata instead of a certificate.
+ */
+private sealed class IssuerTrustMaterial {
+    data class CertificateChain(val pemChain: List<String>) : IssuerTrustMaterial()
+    data class PublicKey(val jwk: String) : IssuerTrustMaterial()
 }
 
 /**
@@ -551,6 +658,17 @@ data class ETSITrustListPolicy(
 interface TrustRegistryServiceResolver {
     suspend fun resolveCertificateChain(
         certificateChainPem: List<String>,
+        expectedEntityType: String?,
+        expectedServiceType: String?
+    ): ETSITrustListPolicy.TrustDecisionResponse
+
+    /**
+     * Resolves trust for an issuer identified only by its public key JWK — no certificate
+     * chain is available (e.g. a DID-based issuer registered in the trust list by public
+     * key alone, per ETSI TS 119 602).
+     */
+    suspend fun resolveByPublicKey(
+        publicKeyJwk: String,
         expectedEntityType: String?,
         expectedServiceType: String?
     ): ETSITrustListPolicy.TrustDecisionResponse
@@ -577,7 +695,8 @@ expect object ETSITrustListInlineResolver {
         allowStaleSource: Boolean,
         requireAuthenticated: Boolean,
         validateSignatures: Boolean,
-        trustedSourceSignerCertificates: List<String>
+        trustedSourceSignerCertificates: List<String>,
+        publicKeyJwk: String? = null
     ): Result<JsonElement>
 }
 
