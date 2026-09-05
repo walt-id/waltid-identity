@@ -21,6 +21,7 @@ import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import org.slf4j.event.Level
+import kotlin.uuid.Uuid
 
 suspend fun main(args: Array<String>) {
     // Register custom decoder for ClientMetadata before config loading
@@ -86,6 +87,11 @@ fun Application.configureMonitoring() {
     }
     install(CallId) {
         header(HttpHeaders.XRequestId)
+        // Without a generator, a request that arrives without X-Request-ID has no call id at all.
+        // Handlers that require one - the OpenID4VCI endpoints served by issuer-api2, which this
+        // monitoring setup is also reused by - then reject the request with 400 "Missing call ID"
+        // before the request is ever processed. Public OAuth clients do not send the header.
+        generate { Uuid.random().toString() }
         verify { callId: String ->
             callId.isNotEmpty()
         }
