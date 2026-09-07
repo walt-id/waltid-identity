@@ -28,7 +28,6 @@ import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
 import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
 import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthentication
 import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthenticationScope
-import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthenticationValidity
 import id.walt.wallet2.mobile.MobileWalletProximityReaderCertificatePathState
 import id.walt.wallet2.mobile.MobileWalletProximityReaderRevocationState
 import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustState
