@@ -41,9 +41,9 @@ for await state in session.states {
 
 The default configuration selects QR engagement and Bluetooth Low Energy
 retrieval. Capabilities keep implementation, profile permission, runtime
-availability, and selection separate for QR, NFC, BLE, and Wi-Fi Aware. A
-selected unavailable method prevents preparation rather than being silently
-substituted.
+observation, and selection separate for QR, NFC, BLE, and Wi-Fi Aware. An
+unprobed method reports `notChecked`. Hosts derive startability from the viable
+selected routes; an unavailable optional route does not block a usable route.
 
 Device signature is the default holder-authentication policy. Configure
 ``ProximityDeviceAuthenticationPolicy/macOnly``,
@@ -79,10 +79,17 @@ trust facts, document requests, retention intent, eligible credentials,
 disclosure alternatives, use-case and purpose assertions, and any recognized
 application authorization. These are protocol facts, not UI-derived state.
 
-Build ``ProximitySubmission`` only from the current review. The SDK
-binds and revalidates credential, holder-key, reader-trust, status, disclosure,
+Build ``ProximityPresentationSubmission`` only from the current review and dispatch
+`.approve(reviewID: review.reviewID, submission: submission)` or
+`.decline(reviewID: review.reviewID)`. A valid decision consumes that identity once;
+invalid submissions leave the review available for correction. Acceptance records
+the holder's decision, while signing and transmission may still fail.
+
+The SDK owns accepted values and detaches host projections. It binds and revalidates credential, holder-key, reader-trust, status, disclosure,
 and application-profile state before it sends a response. A stale or changed
-selection returns a typed rejection and does not disclose data.
+selection returns a typed rejection and does not disclose data. Recovery distinguishes
+retrying prerequisites in the active session from starting a new session after a
+terminal failure.
 
 Reader-authentication statements remain distinct by scope, document index, and
 statement index. During protected-key work,
