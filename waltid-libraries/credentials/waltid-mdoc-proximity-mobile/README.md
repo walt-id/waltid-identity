@@ -23,6 +23,13 @@ closes them. The radio-independent engine owns the advertised engagement lifetim
 code cannot outlive its BLE retrieval path; the BLE module still bounds radio setup and
 post-connection inactivity.
 
+Both native central adapters use the same ordered Ident, bearer-selection, subscription and START
+handshake. Native discovery and resource ownership remain in their platform adapters. GATT callback
+payload queues are bounded on both roles and platforms: a live overflow discards queued fragments,
+closes the bearer and reports `ble_receive_overflow`; callbacks after closure are ignored. Android
+blocking socket operations register cancellation-driven closure before entering native I/O, including
+pending L2CAP connect/accept and active reads/writes.
+
 Android applications need the merged manifest permissions plus runtime grants for the selected
 role. Apple applications need `NSBluetoothAlwaysUsageDescription`; the provider uses CoreBluetooth
 on its main queue and does not request authorization itself.

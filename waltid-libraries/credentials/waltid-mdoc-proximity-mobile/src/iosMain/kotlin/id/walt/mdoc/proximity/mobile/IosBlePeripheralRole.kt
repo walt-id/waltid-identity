@@ -266,7 +266,7 @@ internal class IosBlePeripheralRole private constructor(
                 result.accepted
             }
             clientToServerCharacteristic -> activeConnection.value?.bearer == BleRawBearer.GATT &&
-                incomingGatt.trySend(bytes).isSuccess
+                incomingGatt.offerBlePacket(bytes) { close(ProximityCloseReason.CANCELLED) }
             else -> false
         }
         manager.respondToRequest(request, if (accepted) CBATTErrorSuccess else CBATTErrorRequestNotSupported)

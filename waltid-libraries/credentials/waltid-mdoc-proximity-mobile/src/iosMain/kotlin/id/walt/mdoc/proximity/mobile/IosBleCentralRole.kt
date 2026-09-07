@@ -52,23 +52,26 @@ internal class IosBleCentralRole(
         check(started.compareAndSet(false, true)) { "A prepared BLE central-client role can be awaited only once" }
         try {
             val characteristics = session.connectAndDiscover()
-            val ident = session.read(characteristics.ident)
-            if (!BleIdent.matches(expectedIdent, ident)) throw ProximityException(
-                ProximityError.Security("ble_ident_mismatch", "The reader BLEIdent does not match EDeviceKeyBytes")
-            )
-            if (preferL2cap && characteristics.psm != null) {
-                val psm = BlePsmCodec.decode(session.read(characteristics.psm)).toUShort()
-                session.openL2cap(psm)?.let { channel ->
-                    return@withContext IosL2capConnection(channel, sessionScope, session::close).also { connection = it }
+            establishBleCentralBearer(
+                characteristics, expectedIdent, preferL2cap,
+                read = session::read,
+                subscribe = session::subscribe,
+                write = session::write,
+                openL2cap = { psm ->
+                    session.openL2cap(psm.toUShort())?.let { channel ->
+                        IosL2capConnection(channel, sessionScope, session::close)
+                    }
+                },
+                gatt = { IosCentralGattConnection(session, characteristics.state, characteristics.clientToServer) },
+            ).also {
+                connection = it
+                if (closed.value) {
+                    it.close(ProximityCloseReason.CANCELLED)
+                    throw CancellationException("BLE role is closed")
                 }
             }
-            session.subscribe(characteristics.state)
-            session.subscribe(characteristics.serverToClient)
-            session.write(characteristics.state, byteArrayOf(BLE_STATE_START))
-            IosCentralGattConnection(session, characteristics.state, characteristics.clientToServer).also {
-                connection = it
-            }
         } catch (cancelled: CancellationException) {
+            close(ProximityCloseReason.CANCELLED)
             throw cancelled
         } catch (failure: Throwable) {
             close(ProximityCloseReason.CANCELLED)
@@ -82,14 +85,6 @@ internal class IosBleCentralRole(
         connection?.close(reason) ?: session.close()
     }
 }
-
-private data class IosReaderCharacteristics(
-    val state: CBCharacteristic,
-    val clientToServer: CBCharacteristic,
-    val serverToClient: CBCharacteristic,
-    val ident: CBCharacteristic,
-    val psm: CBCharacteristic?,
-)
 
 private sealed interface IosCentralEvent {
     data class State(val value: Long) : IosCentralEvent
@@ -107,7 +102,9 @@ private sealed interface IosCentralEvent {
 
 private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
     val incoming = Channel<ByteArray>(Channel.BUFFERED)
-    private val events = Channel<IosCentralEvent>(Channel.UNLIMITED)
+    private val events = Channel<IosCentralEvent>(Channel.UNLIMITED, onUndeliveredElement = { event ->
+        (event as? IosCentralEvent.L2cap)?.channel?.closeStreams()
+    })
     private val closed = atomic(false)
     private var peripheral: CBPeripheral? = null
     private val central: CBCentralManager
@@ -146,7 +143,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
             when (uuid) {
                 BleGattUuid.READER_SERVER_TO_CLIENT -> {
                     if (error != null) incoming.close(error.asFailure("BLE notification failed"))
-                    else incoming.trySend(didUpdateValueForCharacteristic.value?.toByteArray() ?: ByteArray(0))
+                    else incoming.offerBlePacket(didUpdateValueForCharacteristic.value?.toByteArray() ?: ByteArray(0), ::close)
                 }
                 BleGattUuid.READER_STATE -> {
                     when {
@@ -169,7 +166,9 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
         }
 
         override fun peripheral(peripheral: CBPeripheral, didOpenL2CAPChannel: CBL2CAPChannel?, error: NSError?) {
-            events.trySend(IosCentralEvent.L2cap(didOpenL2CAPChannel, error))
+            if (events.trySend(IosCentralEvent.L2cap(didOpenL2CAPChannel, error)).isFailure) {
+                didOpenL2CAPChannel?.closeStreams()
+            }
         }
 
         override fun peripheral(peripheral: CBPeripheral, didModifyServices: List<*>) {
@@ -239,7 +238,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
         central = CBCentralManager(delegate = centralDelegate, queue = null, options = null)
     }
 
-    suspend fun connectAndDiscover(): IosReaderCharacteristics {
+    suspend fun connectAndDiscover(): BleReaderCharacteristics<CBCharacteristic> {
         awaitPoweredOn()
         central.scanForPeripheralsWithServices(
             listOf(CBUUID.UUIDWithString(serviceUuid.platformString())),
@@ -269,7 +268,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
             BLE_MAX_GATT_PACKET_BYTES,
             discovered.maximumWriteValueLengthForType(CBCharacteristicWriteWithoutResponse).toInt(),
         ).coerceAtLeast(2)
-        return IosReaderCharacteristics(
+        return BleReaderCharacteristics(
             state = required(BleGattUuid.READER_STATE),
             clientToServer = required(BleGattUuid.READER_CLIENT_TO_SERVER),
             serverToClient = required(BleGattUuid.READER_SERVER_TO_CLIENT),
@@ -309,7 +308,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
         val peer = peripheral ?: return null
         peer.openL2CAPChannel(psm)
         val event = awaitEvent<IosCentralEvent.L2cap>()
-        return if (event.error == null) event.channel else null
+        return if (event.error == null) event.channel else null.also { event.channel?.closeStreams() }
     }
 
     fun close() {
@@ -320,7 +319,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
             peripheral?.delegate = null
             central.delegate = null
         }
-        events.close()
+        events.cancel()
         incoming.close()
     }
 
@@ -349,7 +348,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
                         "CoreBluetooth became unavailable in state ${event.value}",
                     )
                 }
-                else -> Unit
+                else -> (event as? IosCentralEvent.L2cap)?.channel?.closeStreams()
             }
         }
     }
@@ -383,3 +382,8 @@ private fun NSError.asFailure(message: String) = iosTransportFailure(
     "core_bluetooth_error",
     "$message: $localizedDescription",
 )
+
+private fun CBL2CAPChannel.closeStreams() = runOnIosBleQueue {
+    inputStream?.close()
+    outputStream?.close()
+}
