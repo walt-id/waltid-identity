@@ -18,6 +18,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
@@ -30,6 +31,30 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class MobileWalletProximityCoordinatorTest {
+    @Test
+    fun `closing or cancelling before the worker starts releases the wallet for a fresh session`() = runTest {
+        for (dispatchCancel in listOf(false, true)) {
+            val factory = RecordingTransportFactory(
+                BleProximityAvailability.Unavailable("ble_powered_off", "Bluetooth is off"),
+            )
+            val coordinator = MobileWalletProximityCoordinator(
+                Wallet("cancel-before-worker-$dispatchCancel"), factory,
+                sessionDispatcher = StandardTestDispatcher(testScheduler),
+            )
+            val first = coordinator.start(MobileWalletProximityConfiguration())
+            if (dispatchCancel) {
+                assertEquals(MobileWalletProximityActionResult.Accepted, first.dispatch(MobileWalletProximityAction.Cancel))
+            } else {
+                first.close()
+            }
+            assertIs<MobileWalletProximityState.Cancelled>(first.state.value)
+            val restarted = coordinator.start(MobileWalletProximityConfiguration())
+            assertIs<MobileWalletProximityState.CheckingPrerequisites>(restarted.state.value)
+            restarted.close()
+            assertTrue(factory.configurations.isEmpty())
+        }
+    }
+
     @Test
     fun `capability preflight is side effect free and maps remediation`() = runTest {
         val factory = RecordingTransportFactory(

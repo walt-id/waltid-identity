@@ -28,6 +28,11 @@ import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.BleServiceUuid
 import id.walt.wallet2.data.Wallet
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -46,6 +51,7 @@ import kotlin.uuid.Uuid
 internal class MobileWalletProximityCoordinator(
     private val wallet: Wallet,
     private val transportFactory: BleProximityTransportFactory?,
+    private val sessionDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val activeMutex = Mutex()
     private var active: MobileWalletProximitySessionImpl? = null
@@ -109,6 +115,7 @@ internal class MobileWalletProximityCoordinator(
                 transportFactory = transportFactory,
                 capabilityCheck = { capabilities(owned) },
                 initialCapabilities = initialCapabilities,
+                sessionDispatcher = sessionDispatcher,
                 onTerminal = { completed ->
                     activeMutex.withLock {
                         if (active === completed) active = null
@@ -128,10 +135,11 @@ private class MobileWalletProximitySessionImpl(
     private val transportFactory: BleProximityTransportFactory?,
     private val capabilityCheck: suspend () -> MobileWalletProximityCapabilities,
     initialCapabilities: MobileWalletProximityCapabilities,
+    sessionDispatcher: CoroutineDispatcher,
     private val onTerminal: suspend (MobileWalletProximitySessionImpl) -> Unit,
 ) : MobileWalletProximitySession {
     private val lifecycleJob = SupervisorJob()
-    private val scope = CoroutineScope(lifecycleJob + Dispatchers.Default)
+    private val scope = CoroutineScope(lifecycleJob + sessionDispatcher)
     private val prerequisiteRetry = Channel<Unit>(Channel.CONFLATED)
     private val owner = MobileWalletProximitySessionOwner(
         MobileWalletProximityState.CheckingPrerequisites(initialCapabilities), prerequisiteRetry,
@@ -140,8 +148,10 @@ private class MobileWalletProximitySessionImpl(
     override val state: StateFlow<MobileWalletProximityState> = owner.state
     private lateinit var sessionJob: Job
 
+    @OptIn(DelicateCoroutinesApi::class)
     fun start() {
-        sessionJob = scope.launch { runSession() }
+        // Admission already belongs to this session. Enter its finally block even if cancelled before dispatch.
+        sessionJob = scope.launch(start = CoroutineStart.ATOMIC) { runSession() }
     }
 
     override suspend fun dispatch(action: MobileWalletProximityAction): MobileWalletProximityActionResult {
@@ -161,6 +171,7 @@ private class MobileWalletProximitySessionImpl(
         var runtime: CryptoRuntime? = null
         var eDeviceKey: Key? = null
         try {
+            currentCoroutineContext().ensureActive()
             var prerequisites = initialCapabilities
             while (!prerequisites.mayStart) {
                 owner.publish(MobileWalletProximityState.CheckingPrerequisites(prerequisites))
