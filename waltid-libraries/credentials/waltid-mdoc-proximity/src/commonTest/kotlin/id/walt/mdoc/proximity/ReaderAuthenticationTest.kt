@@ -34,7 +34,7 @@ class ReaderAuthenticationTest {
     fun `reader authentication separates absence malformed invalid validity and trust`() = runTest {
         val unsigned = DeviceRequest("org.example.mdoc", mapOf("org.example" to listOf("given_name")))
         val absent = verifier(ReaderTrustState.TRUSTED).verify(unsigned, transcript)
-        assertIs<ReaderAuthenticationValidity.Absent>(absent.documents.single().validity)
+        assertIs<ReaderAuthenticationResult.Absent>(absent.documents.single())
         assertEquals(emptyList(), absent.wholeRequest)
 
         val malformedRequest = unsigned.copy(
@@ -44,8 +44,8 @@ class ReaderAuthenticationTest {
                 )
             )
         )
-        assertIs<ReaderAuthenticationValidity.Malformed>(
-            verifier(ReaderTrustState.TRUSTED).verify(malformedRequest, transcript).documents.single().validity
+        assertIs<ReaderAuthenticationResult.Malformed>(
+            verifier(ReaderTrustState.TRUSTED).verify(malformedRequest, transcript).documents.single()
         )
 
         val signed = signedRequest(unsigned, document = true, whole = false)
@@ -53,8 +53,8 @@ class ReaderAuthenticationTest {
             signature.copy(signature = signature.signature.copyOf().also { it[it.lastIndex] = (it.last() + 1).toByte() })
         }
         val invalid = signed.copy(docRequests = listOf(signed.docRequests.single().copy(readerAuth = tamperedSignature)))
-        assertIs<ReaderAuthenticationValidity.Invalid>(
-            verifier(ReaderTrustState.TRUSTED).verify(invalid, transcript).documents.single().validity
+        assertIs<ReaderAuthenticationResult.Invalid>(
+            verifier(ReaderTrustState.TRUSTED).verify(invalid, transcript).documents.single()
         )
 
         listOf(
@@ -63,11 +63,10 @@ class ReaderAuthenticationTest {
             ReaderTrustState.TRUSTED,
         ).forEach { trustState ->
             val result = verifier(trustState).verify(signed, transcript).documents.single()
-            val validity = assertIs<ReaderAuthenticationValidity.Valid>(result.validity)
-            assertEquals(ReaderAuthenticationScope.DOCUMENT, validity.evidence.scope)
-            assertEquals(0, validity.evidence.documentRequestIndex)
+            val validity = assertIs<ReaderAuthenticationResult.Valid>(result)
+            assertEquals(ReaderAuthenticationScope.Document(0), validity.evidence.scope)
             assertEquals(0, validity.evidence.authenticationIndex)
-            assertEquals(trustState, result.trust.state)
+            assertEquals(trustState, validity.trust.state)
         }
     }
 
@@ -77,10 +76,9 @@ class ReaderAuthenticationTest {
         val signed = signedRequest(unsigned, document = false, whole = true)
         val verified = verifier(ReaderTrustState.TRUSTED).verify(signed, transcript)
 
-        assertIs<ReaderAuthenticationValidity.Absent>(verified.documents.single().validity)
-        val whole = assertIs<ReaderAuthenticationValidity.Valid>(verified.wholeRequest.single().validity)
-        assertEquals(ReaderAuthenticationScope.WHOLE_REQUEST, whole.evidence.scope)
-        assertEquals(null, whole.evidence.documentRequestIndex)
+        assertIs<ReaderAuthenticationResult.Absent>(verified.documents.single())
+        val whole = assertIs<ReaderAuthenticationResult.Valid>(verified.wholeRequest.single())
+        assertEquals(ReaderAuthenticationScope.WholeRequest, whole.evidence.scope)
         assertEquals(0, whole.evidence.authenticationIndex)
 
         val changedItems = DeviceRequest("org.example.mdoc", mapOf("org.example" to listOf("family_name")))
@@ -88,8 +86,8 @@ class ReaderAuthenticationTest {
         val changed = signed.copy(
             docRequests = listOf(signed.docRequests.single().copy(itemsRequest = changedItems)),
         )
-        assertIs<ReaderAuthenticationValidity.Invalid>(
-            verifier(ReaderTrustState.TRUSTED).verify(changed, transcript).wholeRequest.single().validity
+        assertIs<ReaderAuthenticationResult.Invalid>(
+            verifier(ReaderTrustState.TRUSTED).verify(changed, transcript).wholeRequest.single()
         )
     }
 
@@ -105,7 +103,7 @@ class ReaderAuthenticationTest {
         )
 
         assertEquals(listOf(0, 1), verified.wholeRequest.map {
-            assertIs<ReaderAuthenticationValidity.Valid>(it.validity).evidence.authenticationIndex
+            assertIs<ReaderAuthenticationResult.Valid>(it).evidence.authenticationIndex
         })
         assertEquals(listOf(0, 1), verified.toDisplaySafe().wholeRequest.map { it.authenticationIndex })
     }

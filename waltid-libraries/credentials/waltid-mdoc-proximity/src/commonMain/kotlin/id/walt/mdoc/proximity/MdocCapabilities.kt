@@ -59,8 +59,10 @@ class MdocSessionCapabilities private constructor(
     featureStates: Map<MdocProtocolFeature, MdocCapabilityState>,
     curveStates: Map<MdocSessionCurve, MdocCapabilityState>,
 ) {
-    val features: Map<MdocProtocolFeature, MdocCapabilityState> = featureStates.toMap()
-    val curves: Map<MdocSessionCurve, MdocCapabilityState> = curveStates.toMap()
+    private val ownedFeatures: Map<MdocProtocolFeature, MdocCapabilityState> = featureStates.toMap()
+    val features: Map<MdocProtocolFeature, MdocCapabilityState> get() = ownedFeatures.toMap()
+    private val ownedCurves: Map<MdocSessionCurve, MdocCapabilityState> = curveStates.toMap()
+    val curves: Map<MdocSessionCurve, MdocCapabilityState> get() = ownedCurves.toMap()
 
     val selectedCurve: MdocSessionCurve = curves.entries.single { it.value.sessionSelected }.key
 

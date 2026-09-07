@@ -209,6 +209,39 @@ class RequestMatchingTest {
         }
     }
 
+    @Test
+    fun `age substitution requires the exact mDL identifier grammar`() = runTest {
+        val namespace = "org.iso.18013.5.1"
+        val proof = ElementReference(namespace, "age_over_21")
+        val candidate = MdocCredentialCandidate("mdl", "mdl", emptyList(), listOf(proof), mapOf(proof to true))
+        val invalid = listOf("18", "age_over_1", "age_over_018", "age_over_١٨", "age_over_１８", "Age_over_18")
+        invalid.forEach { identifier ->
+            assertIs<MdocRequestMatchResult.Unsatisfied>(
+                MdocRequestMatcher().match(
+                    DeviceRequest(DeviceRequest.VERSION, listOf(docRequest("mdl", ElementReference(namespace, identifier)))),
+                    listOf(candidate),
+                ),
+                identifier,
+            )
+        }
+        assertIs<MdocRequestMatchResult.Unsatisfied>(
+            MdocRequestMatcher().match(
+                DeviceRequest(DeviceRequest.VERSION, listOf(docRequest("mdl", ElementReference("other", "age_over_18")))),
+                listOf(candidate),
+            )
+        )
+        listOf("21", "age_over_٢١", "age_over_021").forEach { identifier ->
+            val malformed = ElementReference(namespace, identifier)
+            val result = assertIs<MdocRequestMatchResult.Matched>(
+                MdocRequestMatcher().match(
+                    DeviceRequest(DeviceRequest.VERSION, listOf(docRequest("mdl", ElementReference(namespace, "age_over_18")))),
+                    listOf(MdocCredentialCandidate("mdl", "mdl", emptyList(), listOf(malformed), mapOf(malformed to true))),
+                )
+            )
+            assertEquals(emptySet(), result.selection.documents.single().elements, identifier)
+        }
+    }
+
     private fun docRequest(
         docType: String,
         element: ElementReference,
