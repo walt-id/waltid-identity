@@ -30,6 +30,8 @@ import id.walt.mdoc.proximity.RicalCertificateInfo
 import id.walt.mdoc.proximity.RicalReaderPathResult
 import id.walt.mdoc.proximity.X509RicalReaderPathValidator
 import id.walt.x509.MdocReaderAuthenticationEkuOid
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -59,6 +61,41 @@ class MobileWalletProximityReaderTrustTest {
             assertEquals(MobileWalletProximityReaderTrustState.ValidButUntrusted, unknown.state)
             assertEquals(MobileWalletProximityReaderCertificatePathState.UnknownAuthority, unknown.certificatePath)
             assertEquals(null, unknown.displayName)
+        }
+    }
+
+    @Test
+    fun `trust policy and evidence remain owned while revocation is suspended`() = runTest {
+        withCertificates { certificates ->
+            val anchors = mutableListOf(
+                MobileWalletProximityReaderTrustAnchor(certificates.root.base64Url()),
+                MobileWalletProximityReaderTrustAnchor(certificates.createRoot("Other root").base64Url()),
+            )
+            val entered = CompletableDeferred<Unit>()
+            val resume = CompletableDeferred<Unit>()
+            val expected = certificates.evidence(includeRoot = true).certificateChainDerBase64Url
+            val evaluator = MobileWalletProximityConfiguredReaderTrustEvaluator(
+                MobileWalletProximityReaderTrustConfiguration(
+                    trustAnchors = anchors,
+                    revocationPolicy = MobileWalletProximityReaderRevocationPolicy.Check(
+                        MobileWalletProximityReaderRevocationEvaluator { evidence ->
+                            entered.complete(Unit)
+                            resume.await()
+                            assertEquals(expected, evidence.certificateChainDerBase64Url)
+                            MobileWalletProximityCertificateRevocationResult.Good
+                        },
+                    ),
+                ),
+            )
+            val input = expected.toMutableList()
+            val pending = async { evaluator.evaluate(certificates.evidence().copy(certificateChainDerBase64Url = input)) }
+            entered.await()
+            anchors.clear()
+            input.clear()
+            (evaluator.configuration.trustAnchors as MutableList).clear()
+            resume.complete(Unit)
+            assertEquals(MobileWalletProximityReaderTrustState.Trusted, pending.await().state)
+            assertEquals(MobileWalletProximityReaderTrustState.Trusted, evaluator.evaluate(certificates.evidence(includeRoot = true)).state)
         }
     }
 
@@ -235,7 +272,7 @@ class MobileWalletProximityReaderTrustTest {
 
             val result = X509RicalReaderPathValidator().validate(
                 ReaderAuthenticationEvidence(
-                    scope = ReaderAuthenticationScope.WHOLE_REQUEST,
+                    scope = ReaderAuthenticationScope.WholeRequest,
                     certificateChainDer = listOf(reader, subCa).map {
                         ImmutableBytes.of(it.encodedDer.toByteArray())
                     },

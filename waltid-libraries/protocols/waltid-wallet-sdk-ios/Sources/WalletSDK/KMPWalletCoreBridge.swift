@@ -622,7 +622,6 @@ private extension ProximityReaderEvidence {
     func toKMPEvidence() -> MobileWalletProximityReaderEvidence {
         MobileWalletProximityReaderEvidence(
             scope: scope.toKMPScope(),
-
             authenticationIndex: Int32(authenticationIndex),
             certificateChainDerBase64Url: certificateChainDER.map { $0.base64URLEncodedString() }
         )
@@ -633,7 +632,6 @@ private extension MobileWalletProximityReaderEvidence {
     func toSwiftEvidence() throws -> ProximityReaderEvidence {
         ProximityReaderEvidence(
             scope: scope.toSwiftScope(),
-
             authenticationIndex: Int(authenticationIndex),
             certificateChainDER: try certificateChainDerBase64Url.map {
                 try decodedBase64URL($0, context: "reader certificate evidence")
@@ -1886,8 +1884,8 @@ private extension WalletCore.ProximityReaderAuthenticationScope {
 private extension ProximityReaderAuthenticationScope {
     func toKMPScope() -> MobileWalletProximityReaderAuthenticationScope {
         switch self {
-        case .document: return .document
-        case .wholeRequest: return .wholeRequest
+        case .document(let index): return MobileWalletProximityReaderAuthenticationScopeDocument(index: Int32(index.value))
+        case .wholeRequest: return MobileWalletProximityReaderAuthenticationScopeWholeRequest.shared
         }
     }
 }

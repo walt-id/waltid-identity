@@ -262,10 +262,14 @@ public data class MobileWalletProximityReaderTrustConfiguration(
 
 /** Shared standards-profile, path, revocation, RICAL, and product-trust evaluator. */
 public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constructor(
-    /** Immutable application-provisioned trust policy evaluated by this instance. */
-    public val configuration: MobileWalletProximityReaderTrustConfiguration,
+    configuration: MobileWalletProximityReaderTrustConfiguration,
     private val now: () -> Instant,
 ) : MobileWalletProximityReaderTrustEvaluator {
+    private val ownedConfiguration = configuration.snapshot()
+
+    /** Detached view of the application-provisioned trust policy retained by this instance. */
+    public val configuration: MobileWalletProximityReaderTrustConfiguration get() = ownedConfiguration.snapshot()
+
     public constructor(
         configuration: MobileWalletProximityReaderTrustConfiguration,
     ) : this(configuration, { Clock.System.now() })
@@ -273,8 +277,9 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
     override suspend fun evaluate(
         evidence: MobileWalletProximityReaderEvidence,
     ): MobileWalletProximityReaderTrustDecision {
+        val ownedEvidence = evidence.snapshot()
         val evaluatedAt = now()
-        val chain = runCatching { evidence.certificateChainDerBase64Url.map(String::trustCertificateDer) }
+        val chain = runCatching { ownedEvidence.certificateChainDerBase64Url.map(String::trustCertificateDer) }
             .getOrElse { return invalidPathDecision() }
         val leaf = chain.first()
         val readerName = runCatching {
@@ -282,7 +287,7 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
             mdocReaderAuthenticationCommonName(leaf)
         }.getOrElse { return invalidPathDecision() }
 
-        configuration.trustAnchors.firstOrNull { anchor ->
+        ownedConfiguration.trustAnchors.firstOrNull { anchor ->
             runCatching {
                 validateMdocReaderAuthenticationCertificateChain(
                     leaf = leaf,
@@ -293,7 +298,7 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
             }.isSuccess
         }?.let { anchor ->
             return decisionForValidatedPath(
-                evidence = evidence,
+                evidence = ownedEvidence,
                 displayName = anchor.displayName ?: readerName,
                 rical = MobileWalletProximityRicalState.NotEvaluated,
                 establishesTrust = true,
@@ -301,8 +306,8 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
         }
 
         var fallback: RicalFallback? = null
-        for (rical in configuration.ricalProviders) {
-            val result = evaluateRical(rical, evidence, evaluatedAt)
+        for (rical in ownedConfiguration.ricalProviders) {
+            val result = evaluateRical(rical, ownedEvidence, evaluatedAt)
             result.matched?.let { matched ->
                 return when (matched) {
                     is RicalMatch.Revoked -> MobileWalletProximityReaderTrustDecision(
@@ -314,7 +319,7 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
                         reason = matched.reason ?: "Reader authentication certificate is revoked",
                     )
                     is RicalMatch.Valid -> decisionForValidatedPath(
-                        evidence = evidence,
+                        evidence = ownedEvidence,
                         displayName = matched.displayName ?: readerName,
                         rical = MobileWalletProximityRicalState.Matched,
                         establishesTrust = matched.establishesTrust,
@@ -362,7 +367,7 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
                 if (constraints.isEmpty()) true
                 else configuration.constraintEvaluator?.accepts(
                     constraints.map(RicalTrustConstraint::toPublic),
-                    evidence,
+                    evidence.snapshot(),
                 ) == true
             },
             now = { evaluatedAt },
@@ -477,11 +482,11 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
 
     private suspend fun evaluateRevocation(
         evidence: MobileWalletProximityReaderEvidence,
-    ): EvaluatedRevocation = when (val policy = configuration.revocationPolicy) {
+    ): EvaluatedRevocation = when (val policy = ownedConfiguration.revocationPolicy) {
         MobileWalletProximityReaderRevocationPolicy.NotChecked ->
             EvaluatedRevocation.Good(MobileWalletProximityReaderRevocationState.NotChecked)
         is MobileWalletProximityReaderRevocationPolicy.Check -> try {
-            when (val result = policy.evaluator.evaluate(evidence)) {
+            when (val result = policy.evaluator.evaluate(evidence.snapshot())) {
                 MobileWalletProximityCertificateRevocationResult.Good ->
                     EvaluatedRevocation.Good(MobileWalletProximityReaderRevocationState.Good)
                 is MobileWalletProximityCertificateRevocationResult.Revoked ->
@@ -540,13 +545,12 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
 
 private fun MobileWalletProximityReaderEvidence.toRicalEvidence(): ReaderAuthenticationEvidence =
     ReaderAuthenticationEvidence(
-        scope = when (scope) {
-            MobileWalletProximityReaderAuthenticationScope.Document ->
-                id.walt.mdoc.proximity.ReaderAuthenticationScope.DOCUMENT
+        scope = when (val scope = scope) {
+            is MobileWalletProximityReaderAuthenticationScope.Document ->
+                id.walt.mdoc.proximity.ReaderAuthenticationScope.Document(scope.index)
             MobileWalletProximityReaderAuthenticationScope.WholeRequest ->
-                id.walt.mdoc.proximity.ReaderAuthenticationScope.WHOLE_REQUEST
+                id.walt.mdoc.proximity.ReaderAuthenticationScope.WholeRequest
         },
-        documentRequestIndex = documentRequestIndex,
         authenticationIndex = authenticationIndex,
         certificateChainDer = certificateChainDerBase64Url.map {
             ImmutableBytes.of(it.decodeTrustBase64Url())
@@ -576,3 +580,18 @@ private fun ByteArray.encodeTrustBase64Url(): String =
 @OptIn(ExperimentalEncodingApi::class)
 private fun String.isTrustBase64Url(): Boolean =
     isNotBlank() && !contains('=') && runCatching { decodeTrustBase64Url().isNotEmpty() }.getOrDefault(false)
+
+private fun MobileWalletProximityReaderTrustConfiguration.snapshot() = copy(
+    trustAnchors = trustAnchors.toList(),
+    ricalProviders = ricalProviders.map { provider ->
+        provider.copy(
+            acceptedTypes = provider.acceptedTypes.toSet(),
+            providerTrustAnchors = provider.providerTrustAnchors.toList(),
+            acceptedSignerCertificatePolicyOids = provider.acceptedSignerCertificatePolicyOids.toSet(),
+        )
+    },
+)
+
+private fun MobileWalletProximityReaderEvidence.snapshot() = copy(
+    certificateChainDerBase64Url = certificateChainDerBase64Url.toList(),
+)
