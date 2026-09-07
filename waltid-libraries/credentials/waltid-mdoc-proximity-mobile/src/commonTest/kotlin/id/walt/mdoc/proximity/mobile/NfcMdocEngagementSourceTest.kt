@@ -23,6 +23,8 @@ import id.walt.mdoc.proximity.EngagementContext
 import id.walt.mdoc.proximity.FakeProximityLoopback
 import id.walt.mdoc.proximity.FakeTransportProvider
 import id.walt.mdoc.proximity.ImmutableBytes
+import id.walt.mdoc.proximity.MdocDeviceEngagementFactory
+import id.walt.mdoc.proximity.MdocEngagementCoordinator
 import id.walt.mdoc.proximity.MdocEngagementMode
 import id.walt.mdoc.proximity.MdocEngagementPreparationContext
 import id.walt.mdoc.proximity.MdocProximityLimits
@@ -35,29 +37,93 @@ import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ProximityTransportKind
+import id.walt.mdoc.proximity.ProximityTransportProvider
 import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
 import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborInteger
 import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertFailsWith
 
 class NfcMdocEngagementSourceTest {
+    @Test
+    fun `NFC configuration bytes cannot change while host capability is suspended`() = runTest {
+        withKey { key ->
+            val entered = CompletableDeferred<Unit>()
+            val resume = CompletableDeferred<Unit>()
+            val platform = object : NfcHostPlatformAdapter by FakeNfcPlatform() {
+                override suspend fun capability(): NfcHostAvailability {
+                    entered.complete(Unit)
+                    resume.await()
+                    return NfcHostAvailability.Available
+                }
+            }
+            val bytes = byteArrayOf(7)
+            val extensions = linkedMapOf<UInt, CborElement>(9u to CborByteString(bytes))
+            val source = NfcMdocEngagementSource(
+                NfcMdocEngagementConfiguration(NfcMdocEngagementScope.QrOnly,
+                    qrRetrieval = DeviceRetrievalMethod.Nfc(255u, 256u, extensions)),
+                platform, emptyList(),
+            )
+            val pending = async { source.prepare(context(key), this) }
+            entered.await()
+            bytes.fill(0)
+            extensions.clear()
+            resume.complete(Unit)
+            val prepared = pending.await()
+            val expected = MdocDeviceEngagementFactory().create(
+                key,
+                listOf(DeviceRetrievalMethod.Nfc(255u, 256u,
+                    mapOf(9u to CborByteString(byteArrayOf(7))))),
+                context(key).engagementContext.copy(engagementMode = MdocEngagementMode.Qr),
+                context(key).capabilities,
+            )
+            assertEquals(expected.qrPayload, prepared.readiness.qrPayload)
+            prepared.close(ProximityCloseReason.COMPLETED)
+        }
+    }
+
+    @Test
+    fun `optional QR provider failure retains the prepared direct NFC route`() = runTest {
+        withKey { key ->
+            val loopback = FakeProximityLoopback.create()
+            val failedQr = object : ProximityTransportProvider by FakeTransportProvider(
+                DeviceRetrievalMethod.Ble(centralMode = BleCentralMode(ByteArray(16))), loopback.holder,
+            ) {
+                override suspend fun prepare(context: EngagementContext, sessionScope: CoroutineScope): PreparedTransport {
+                    throw ProximityException(ProximityError.Capability("radio_lost", "Radio became unavailable"))
+                }
+            }
+            val source = NfcMdocEngagementSource(
+                NfcMdocEngagementConfiguration(NfcMdocEngagementScope.QrAndNfc(NfcMdocEngagementProfile.Static),
+                    conventionalRetrieval = DeviceRetrievalMethod.Nfc(255u, 256u)),
+                FakeNfcPlatform(), emptyList(), listOf(failedQr),
+            )
+            val prepared = MdocEngagementCoordinator().prepare(listOf(source), context(key), this)
+            assertEquals(setOf(MdocEngagementMode.Nfc), prepared.sources.single().modes)
+            assertNull(prepared.readiness.qrPayload)
+            assertEquals(setOf(ProximityTransportKind.NFC), prepared.readiness.availableTransports)
+            prepared.sources.single().close(ProximityCloseReason.COMPLETED)
+            loopback.holder.close(ProximityCloseReason.COMPLETED)
+        }
+    }
+
     @Test
     fun `NFC source retains both provider lists while platform capability is suspended`() = runTest {
         withKey { key ->
