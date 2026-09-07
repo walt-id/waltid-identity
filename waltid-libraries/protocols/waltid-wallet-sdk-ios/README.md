@@ -144,9 +144,12 @@ the iOS BLE and NFC platform adapters automatically. NFC runtime reporting is
 limited to the public device, support, eligibility, session, and callback facts
 Core NFC exposes; entitlement and provisioning are verified separately in the
 approved signed build environment. Wi-Fi Aware remains unavailable until its
-platform adapter is installed. The SDK never silently substitutes an unselected
-method. Perform a
-suggested permission or settings effect in app UI and report its privacy-safe
+platform adapter is installed. Use `ProximityPresentationConfiguration.session` to select `.qr`, conventional
+`.nfc`, or `.provisionalNFCV2` with its compatible retrieval plan. An optional
+`qrFallback` is a separate nonempty conventional plan. Shared BLE policy and
+conventional NFC length limits must match across routes. The SDK prepares only
+viable selected routes. Perform a suggested permission or settings effect in app
+UI and report its privacy-safe
 outcome with `.reportRemediation`. The SDK alone advances protocol state.
 
 NFC card presentation requires Apple's managed HCE capability and a matching

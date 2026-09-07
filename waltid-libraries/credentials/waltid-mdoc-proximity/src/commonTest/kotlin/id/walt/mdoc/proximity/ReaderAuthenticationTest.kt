@@ -178,8 +178,8 @@ class ReaderAuthenticationTest {
             algorithm = Cose.Algorithm.ESP256,
         )
 
-        assertIs<ReaderAuthenticationValidity.Valid>(
-            verifier(ReaderTrustState.TRUSTED).verify(signed, transcript).documents.single().validity
+        assertIs<ReaderAuthenticationResult.Valid>(
+            verifier(ReaderTrustState.TRUSTED).verify(signed, transcript).documents.single()
         )
     }
 

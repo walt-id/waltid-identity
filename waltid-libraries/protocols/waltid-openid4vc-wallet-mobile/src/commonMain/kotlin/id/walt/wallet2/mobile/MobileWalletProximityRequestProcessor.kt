@@ -313,8 +313,10 @@ internal class ProximityRequestProcessor(
         var eligible = selection.eligibleDocuments.filter { it.requestIndex in selectedRequestIndices }
         val readerDisplay = readerAuthentication.toPublicEntries()
         val selectedReaderDisplay = readerDisplay.filter { authentication ->
-            authentication.documentRequestIndex == null ||
-                authentication.documentRequestIndex in selectedRequestIndices
+            when (val scope = authentication.scope) {
+                MobileWalletProximityReaderAuthenticationScope.WholeRequest -> true
+                is MobileWalletProximityReaderAuthenticationScope.Document -> scope.index in selectedRequestIndices
+            }
         }
         val eligibleCredentialIds = eligible.map(SelectedDocument::credentialId).toSet()
         val profileSnapshots = evaluateApplicationProfiles(
@@ -393,9 +395,10 @@ internal class ProximityRequestProcessor(
             },
             purposeHints = useCases.flatMap { it.purposeHints }.associate { it.type to it.code },
             readerAuthentication = readerAuthentication.toDisplaySafe().let { display ->
-                display.copy(
+                id.walt.mdoc.proximity.DeviceRequestReaderAuthenticationDisplay(
+                    wholeRequest = display.wholeRequest,
                     documents = display.documents.filter { entry ->
-                        entry.documentRequestIndex in selectedRequestIndices
+                        (entry.scope as ReaderAuthenticationScope.Document).index in selectedRequestIndices
                     },
                 )
             },

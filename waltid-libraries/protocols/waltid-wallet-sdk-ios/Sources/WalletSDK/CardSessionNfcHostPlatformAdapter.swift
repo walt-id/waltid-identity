@@ -318,8 +318,6 @@ private extension Waltid_mdoc_proximityProximityCloseReason {
             return .protocolError
         case .platformUnavailable:
             return .platformUnavailable
-        default:
-            return .protocolError
         }
     }
 }
@@ -826,6 +824,8 @@ private extension CardSession.Event {
             return .readerDeselected
         case let .sessionInvalidated(reason):
             return .sessionInvalidated(reason: reason.walletFailure)
+        @unknown default:
+            return .sessionInvalidated(reason: .systemUnavailable)
         }
     }
 }
@@ -852,6 +852,8 @@ private extension CardSession.Error {
             return .emulationStopped
         case .radioDisabled:
             return .radioDisabled
+        @unknown default:
+            return .systemUnavailable
         }
     }
 }

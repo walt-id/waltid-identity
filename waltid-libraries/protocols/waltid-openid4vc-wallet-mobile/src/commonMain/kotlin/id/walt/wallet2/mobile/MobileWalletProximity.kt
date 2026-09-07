@@ -72,7 +72,7 @@ internal class ProximityCoordinator(
         configuration: ProximityConfiguration,
     ): ProximityCapabilities {
         val owned = configuration.snapshot()
-        val bleConfiguration = owned.retrieval.bleConfiguration
+        val bleConfiguration = owned.session.bleConfiguration
         val bleSelected = bleConfiguration != null
         val bleAvailability = if (bleSelected) {
             bleTransportFactory?.capability(bleConfiguration.roles.toTransportSelection())
@@ -81,10 +81,10 @@ internal class ProximityCoordinator(
                     message = "BLE proximity presentation is unavailable on this wallet platform",
                 )
         } else null
-        val nfcEngagementSelected = owned.engagement.includesNfc
-        val nfcRetrievalSelected = owned.retrieval.nfcConfiguration != null
+        val nfcEngagementSelected = owned.session !is MobileWalletProximitySessionConfiguration.Qr
+        val nfcRetrievalSelected = owned.session.nfcRetrieval?.nfc != null || owned.session.qrRetrieval?.nfc != null
         val nfcV2RetrievalSelected =
-            owned.retrieval is MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2
+            owned.session is MobileWalletProximitySessionConfiguration.ProvisionalNfcV2
         val nfcSelected = nfcEngagementSelected || nfcRetrievalSelected
         val nfcAvailability = if (nfcSelected) {
             nfcHostPlatformAdapter?.capability()
@@ -95,7 +95,8 @@ internal class ProximityCoordinator(
         } else null
         return MobileWalletProximityCapabilities(
             profile = owned.profile,
-            qrEngagement = availableCapability(owned.engagement.includesQr),
+            session = owned.session,
+            qrEngagement = availableCapability(owned.session.qrRetrieval != null),
             nfcEngagement = nfcCapability(
                 nfcEngagementSelected,
                 nfcHostPlatformAdapter != null,
@@ -245,7 +246,7 @@ private class ProximitySessionImpl(
                 engagementContext = EngagementContext(
                     profile = profile,
                     maximumMessageBytes = configuration.maximumMessageBytes,
-                    engagementMode = if (configuration.engagement.includesQr) {
+                    engagementMode = if (configuration.session.qrRetrieval != null) {
                         MdocEngagementMode.Qr
                     } else {
                         MdocEngagementMode.Nfc
@@ -299,91 +300,49 @@ private class ProximitySessionImpl(
         eDeviceKeyBytes: ImmutableBytes,
         engagementFactory: MdocDeviceEngagementFactory,
     ): List<id.walt.mdoc.proximity.MdocEngagementSource> {
-        val bleConfiguration = configuration.retrieval.bleConfiguration
-        fun newBleProviders(): List<ProximityTransportProvider> = bleConfiguration?.let { selected ->
-            val factory = requireNotNull(bleTransportFactory) {
-                "BLE retrieval passed prerequisites without a platform transport factory"
-            }
-            listOf(
-                factory.create(
+        val selected = configuration.session
+        fun newBleProviders(ble: MobileWalletProximityBleConfiguration?): List<ProximityTransportProvider> =
+            if (ble == null || !prerequisites.bluetoothLowEnergy.mayStart) emptyList() else listOf(
+                requireNotNull(bleTransportFactory).create(
                     BleProximityTransportConfiguration(
-                        roles = selected.roles.createTransactionRoles(),
-                        bearerPolicy = selected.bearerPolicy.toTransportPolicy(),
+                        roles = ble.roles.createTransactionRoles(),
+                        bearerPolicy = ble.bearerPolicy.toTransportPolicy(),
                         eDeviceKeyBytes = eDeviceKeyBytes,
                     )
                 )
             )
-        }.orEmpty()
-
-        val nfcRetrieval = configuration.retrieval.nfcConfiguration?.toTransportMethod()
-        val qrMayPrepare = prerequisites.qrEngagement.mayStart && listOf(
-            prerequisites.bluetoothLowEnergy,
-            prerequisites.nfcRetrieval,
-            prerequisites.wifiAwareRetrieval,
-        ).any { it.mayStart }
-        val nfcMayPrepare = prerequisites.nfcEngagement.mayStart && listOf(
-            prerequisites.bluetoothLowEnergy,
-            prerequisites.nfcRetrieval,
-            prerequisites.nfcV2Retrieval,
-            prerequisites.wifiAwareRetrieval,
-        ).any { it.mayStart }
-        fun nfcSource(
-            scope: NfcMdocEngagementScope,
-            qrProviders: List<ProximityTransportProvider>,
-            nfcProviders: List<ProximityTransportProvider>,
-        ): NfcMdocEngagementSource = NfcMdocEngagementSource(
-            configuration = NfcMdocEngagementConfiguration(scope, nfcRetrieval),
-            platform = requireNotNull(nfcHostPlatformAdapter) {
-                "NFC passed prerequisites without a host platform adapter"
-            },
-            alternateTransportProviders = nfcProviders,
-            qrTransportProviders = qrProviders,
+        val qrPlan = selected.qrRetrieval
+        val nfcDirect = selected.nfcRetrieval?.nfc?.takeIf { prerequisites.nfcRetrieval.mayStart }?.toTransportMethod()
+        val qrDirect = qrPlan?.nfc?.takeIf { prerequisites.nfcRetrieval.mayStart }?.toTransportMethod()
+        fun nfcSource(scope: NfcMdocEngagementScope): NfcMdocEngagementSource = NfcMdocEngagementSource(
+            configuration = NfcMdocEngagementConfiguration(
+                scope = scope,
+                conventionalRetrieval = nfcDirect.takeUnless { scope is NfcMdocEngagementScope.QrOnly },
+                qrRetrieval = qrDirect.takeUnless { scope is NfcMdocEngagementScope.NfcOnly },
+            ),
+            platform = requireNotNull(nfcHostPlatformAdapter),
+            alternateTransportProviders = if (scope is NfcMdocEngagementScope.QrOnly) emptyList() else newBleProviders(selected.nfcBle),
+            qrTransportProviders = if (scope is NfcMdocEngagementScope.NfcOnly) emptyList() else newBleProviders(qrPlan?.bluetoothLowEnergy),
             engagementFactory = engagementFactory,
         )
-
-        return when (val engagement = configuration.engagement) {
-            MobileWalletProximityEngagementConfiguration.QrOnly -> if (
-                prerequisites.nfcRetrieval.mayStart && nfcRetrieval != null
-            ) {
-                listOf(nfcSource(NfcMdocEngagementScope.QrOnly, newBleProviders(), emptyList()))
-            } else {
-                listOf(QrMdocEngagementSource(newBleProviders(), engagementFactory = engagementFactory))
+        val source = when {
+            prerequisites.nfcMayStart -> {
+                val profile = when (selected) {
+                    is MobileWalletProximitySessionConfiguration.Qr -> error("QR configuration cannot start NFC engagement")
+                    is MobileWalletProximitySessionConfiguration.ConventionalNfc -> when (selected.handover) {
+                        MobileWalletProximityNfcHandover.Static -> NfcMdocEngagementProfile.Static
+                        MobileWalletProximityNfcHandover.Negotiated -> NfcMdocEngagementProfile.Negotiated
+                    }
+                    is MobileWalletProximitySessionConfiguration.ProvisionalNfcV2 ->
+                        NfcMdocEngagementProfile.ProvisionalV2(NfcV2MaximumCommandDataLength(selected.maximumCommandDataLength))
+                }
+                nfcSource(if (prerequisites.qrMayStart) NfcMdocEngagementScope.QrAndNfc(profile) else NfcMdocEngagementScope.NfcOnly(profile))
             }
-            is MobileWalletProximityEngagementConfiguration.NfcOnly -> listOf(
-                nfcSource(
-                    NfcMdocEngagementScope.NfcOnly(engagement.mode.toTransportProfile()),
-                    qrProviders = emptyList(),
-                    nfcProviders = newBleProviders(),
-                )
-            )
-            is MobileWalletProximityEngagementConfiguration.QrAndNfc -> when {
-                qrMayPrepare && nfcMayPrepare -> listOf(
-                    nfcSource(
-                        NfcMdocEngagementScope.QrAndNfc(engagement.mode.toTransportProfile()),
-                        qrProviders = newBleProviders(),
-                        nfcProviders = newBleProviders(),
-                    )
-                )
-                nfcMayPrepare -> listOf(
-                    nfcSource(
-                        NfcMdocEngagementScope.NfcOnly(engagement.mode.toTransportProfile()),
-                        qrProviders = emptyList(),
-                        nfcProviders = newBleProviders(),
-                    )
-                )
-                qrMayPrepare && prerequisites.nfcRetrieval.mayStart && nfcRetrieval != null -> listOf(
-                    nfcSource(
-                        NfcMdocEngagementScope.QrOnly,
-                        qrProviders = newBleProviders(),
-                        nfcProviders = emptyList(),
-                    )
-                )
-                qrMayPrepare -> listOf(
-                    QrMdocEngagementSource(newBleProviders(), engagementFactory = engagementFactory)
-                )
-                else -> error("Proximity prerequisites passed without a viable engagement and retrieval path")
-            }
+            prerequisites.qrMayStart && qrDirect != null -> nfcSource(NfcMdocEngagementScope.QrOnly)
+            prerequisites.qrMayStart -> QrMdocEngagementSource(newBleProviders(qrPlan?.bluetoothLowEnergy), engagementFactory = engagementFactory)
+            else -> error("Proximity prerequisites passed without a viable selected route")
         }
+        return listOf(source)
     }
 
     private suspend fun publishEngineState(engineState: MdocHolderSessionState) {
@@ -447,30 +406,9 @@ private class ProximitySessionImpl(
     }
 }
 
-private val MobileWalletProximityRetrievalConfiguration.bleConfiguration:
-    MobileWalletProximityBleConfiguration?
-    get() = when (this) {
-        is MobileWalletProximityRetrievalConfiguration.Conventional -> bluetoothLowEnergy
-        is MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2 -> bluetoothLowEnergy
-    }
-
-private val MobileWalletProximityRetrievalConfiguration.nfcConfiguration:
-    MobileWalletProximityNfcRetrievalConfiguration?
-    get() = when (this) {
-        is MobileWalletProximityRetrievalConfiguration.Conventional -> nfc
-        is MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2 -> qrNfc
-    }
-
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 private fun MobileWalletProximityNfcRetrievalConfiguration.toTransportMethod(): DeviceRetrievalMethod.Nfc =
     DeviceRetrievalMethod.Nfc(maximumCommandDataLength.toUInt(), maximumResponseDataLength.toUInt())
-
-private fun MobileWalletProximityNfcEngagementMode.toTransportProfile(): NfcMdocEngagementProfile = when (this) {
-    MobileWalletProximityNfcEngagementMode.Static -> NfcMdocEngagementProfile.Static
-    MobileWalletProximityNfcEngagementMode.Negotiated -> NfcMdocEngagementProfile.Negotiated
-    is MobileWalletProximityNfcEngagementMode.ProvisionalV2 ->
-        NfcMdocEngagementProfile.ProvisionalV2(NfcV2MaximumCommandDataLength(maximumCommandDataLength))
-}
 
 private fun MobileWalletProximityBleBearerPolicy.toTransportPolicy(): BleBearerPolicy = when (this) {
     MobileWalletProximityBleBearerPolicy.GattOnly -> BleBearerPolicy.GattOnly

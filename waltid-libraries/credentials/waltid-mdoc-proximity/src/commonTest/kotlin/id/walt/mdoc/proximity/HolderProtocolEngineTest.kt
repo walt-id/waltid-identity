@@ -1220,7 +1220,7 @@ class HolderProtocolEngineTest {
             override val modes: Set<MdocEngagementMode> = this@NeverConnectingEngagementSource.modes
             override val readiness: MdocEngagementReadiness = MdocEngagementReadiness(
                 qrPayload = this@NeverConnectingEngagementSource.qrPayload,
-                availableTransports = setOf(ProximityTransportKind.FAKE),
+                availableTransports = setOf(ProximityTransportKind.BLE),
                 unavailableTransports = emptyMap(),
             )
 

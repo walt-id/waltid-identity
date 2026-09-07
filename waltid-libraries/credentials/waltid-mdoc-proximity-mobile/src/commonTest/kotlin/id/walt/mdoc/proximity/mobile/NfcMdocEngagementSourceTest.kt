@@ -37,6 +37,7 @@ import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ProximityTransportKind
 import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
 import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -58,11 +59,56 @@ import kotlin.test.assertFailsWith
 
 class NfcMdocEngagementSourceTest {
     @Test
+    fun `NFC source retains both provider lists while platform capability is suspended`() = runTest {
+        withKey { key ->
+            val native = FakeNfcPlatform()
+            val entered = CompletableDeferred<Unit>()
+            val resume = CompletableDeferred<Unit>()
+            val platform = object : NfcHostPlatformAdapter by native {
+                override suspend fun capability(): NfcHostAvailability {
+                    entered.complete(Unit)
+                    resume.await()
+                    return NfcHostAvailability.Available
+                }
+            }
+            val method = DeviceRetrievalMethod.Ble(centralMode = BleCentralMode("1234567812344abc92341234567890ab".hexToByteArray()))
+            val nfcLoopback = FakeProximityLoopback.create()
+            val qrLoopback = FakeProximityLoopback.create()
+            val nfcProviders = mutableListOf(FakeTransportProvider(method, nfcLoopback.holder))
+            val qrProviders = mutableListOf(FakeTransportProvider(method, qrLoopback.holder))
+            val source = NfcMdocEngagementSource(
+                NfcMdocEngagementConfiguration(NfcMdocEngagementScope.QrAndNfc(NfcMdocEngagementProfile.Static)),
+                platform, nfcProviders, qrProviders,
+            )
+            val pending = async { source.prepare(context(key), this) }
+            entered.await()
+            nfcProviders.clear()
+            qrProviders.clear()
+            (source.modes as MutableSet).clear()
+            resume.complete(Unit)
+            val prepared = pending.await()
+            assertEquals(setOf(MdocEngagementMode.Qr, MdocEngagementMode.Nfc), prepared.modes)
+            (prepared.modes as MutableSet).clear()
+            assertNotNull(prepared.readiness.qrPayload)
+            val engaged = prepared.awaitConnection()
+            assertEquals(MdocEngagementMode.Qr, engaged.engagementMode)
+            assertEquals(MdocSessionHandover.Qr, engaged.sessionHandover)
+            assertEquals(qrLoopback.holder, engaged.connection)
+            assertNull(nfcLoopback.reader.receive())
+            prepared.close(ProximityCloseReason.COMPLETED)
+            assertNull(qrLoopback.reader.receive())
+        }
+    }
+
+    @Test
     fun `NFC processors use the narrower protocol session-message limit`() = runTest {
         withKey { key ->
             val platform = FakeNfcPlatform()
             val prepared = NfcMdocEngagementSource(
-                NfcMdocEngagementConfiguration(NfcMdocEngagementScope.QrOnly),
+                NfcMdocEngagementConfiguration(
+                    NfcMdocEngagementScope.QrOnly,
+                    qrRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
+                ),
                 platform,
                 alternateTransportProviders = emptyList(),
             ).prepare(
@@ -91,6 +137,7 @@ class NfcMdocEngagementSourceTest {
             val source = NfcMdocEngagementSource(
                 NfcMdocEngagementConfiguration(
                     NfcMdocEngagementScope.NfcOnly(NfcMdocEngagementProfile.Negotiated),
+                    conventionalRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
                 ),
                 platform,
                 alternateTransportProviders = emptyList(),
@@ -123,7 +170,8 @@ class NfcMdocEngagementSourceTest {
             val platform = FakeNfcPlatform()
             val prepared = NfcMdocEngagementSource(
                 NfcMdocEngagementConfiguration(
-                    NfcMdocEngagementScope.NfcOnly(NfcMdocEngagementProfile.Static)
+                    NfcMdocEngagementScope.NfcOnly(NfcMdocEngagementProfile.Static),
+                    conventionalRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
                 ),
                 platform,
                 emptyList(),
@@ -146,7 +194,8 @@ class NfcMdocEngagementSourceTest {
             val platform = FakeNfcPlatform()
             val prepared = NfcMdocEngagementSource(
                 NfcMdocEngagementConfiguration(
-                    NfcMdocEngagementScope.NfcOnly(NfcMdocEngagementProfile.Static)
+                    NfcMdocEngagementScope.NfcOnly(NfcMdocEngagementProfile.Static),
+                    conventionalRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
                 ),
                 platform,
                 emptyList(),
@@ -172,7 +221,9 @@ class NfcMdocEngagementSourceTest {
             val platform = FakeNfcPlatform()
             val source = NfcMdocEngagementSource(
                 NfcMdocEngagementConfiguration(
-                    NfcMdocEngagementScope.QrAndNfc(NfcMdocEngagementProfile.Static)
+                    NfcMdocEngagementScope.QrAndNfc(NfcMdocEngagementProfile.Static),
+                    conventionalRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
+                    qrRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
                 ),
                 platform,
                 alternateTransportProviders = emptyList(),
@@ -216,6 +267,8 @@ class NfcMdocEngagementSourceTest {
             val prepared = NfcMdocEngagementSource(
                 NfcMdocEngagementConfiguration(
                     NfcMdocEngagementScope.QrAndNfc(NfcMdocEngagementProfile.Static),
+                    conventionalRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
+                    qrRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
                 ),
                 FakeNfcPlatform(),
                 alternateTransportProviders = listOf(
@@ -236,10 +289,10 @@ class NfcMdocEngagementSourceTest {
             ).prepare(context(key), this)
 
             assertEquals(
-                setOf(ProximityTransportKind.NFC, ProximityTransportKind.FAKE),
+                setOf(ProximityTransportKind.NFC, ProximityTransportKind.BLE),
                 prepared.readiness.availableTransports,
             )
-            assertNull(prepared.readiness.unavailableTransports[ProximityTransportKind.FAKE])
+            assertNull(prepared.readiness.unavailableTransports[ProximityTransportKind.BLE])
 
             prepared.close(ProximityCloseReason.CANCELLED)
             assertNull(availableLoopback.reader.receive())
@@ -252,7 +305,9 @@ class NfcMdocEngagementSourceTest {
             val platform = FakeNfcPlatform()
             val source = NfcMdocEngagementSource(
                 NfcMdocEngagementConfiguration(
-                    NfcMdocEngagementScope.QrAndNfc(NfcMdocEngagementProfile.Static)
+                    NfcMdocEngagementScope.QrAndNfc(NfcMdocEngagementProfile.Static),
+                    conventionalRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
+                    qrRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
                 ),
                 platform,
                 alternateTransportProviders = emptyList(),
@@ -287,7 +342,8 @@ class NfcMdocEngagementSourceTest {
             val platform = FakeNfcPlatform()
             val source = NfcMdocEngagementSource(
                 NfcMdocEngagementConfiguration(
-                    NfcMdocEngagementScope.NfcOnly(NfcMdocEngagementProfile.Static)
+                    NfcMdocEngagementScope.NfcOnly(NfcMdocEngagementProfile.Static),
+                    conventionalRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
                 ),
                 platform,
                 emptyList(),
@@ -319,7 +375,7 @@ class NfcMdocEngagementSourceTest {
                 NfcMdocEngagementConfiguration(
                     NfcMdocEngagementScope.NfcOnly(
                         NfcMdocEngagementProfile.ProvisionalV2(NfcV2MaximumCommandDataLength(65_536))
-                    )
+                    ),
                 ),
                 platform,
                 emptyList(),
@@ -370,14 +426,14 @@ class NfcMdocEngagementSourceTest {
                 NfcMdocEngagementConfiguration(
                     NfcMdocEngagementScope.NfcOnly(
                         NfcMdocEngagementProfile.ProvisionalV2(NfcV2MaximumCommandDataLength(65_536))
-                    )
+                    ),
                 ),
                 platform,
                 listOf(FakeTransportProvider(readerMethod, loopback.holder)),
             )
             val prepared = source.prepare(context(key), this)
             assertEquals(
-                setOf(ProximityTransportKind.NFC, ProximityTransportKind.FAKE),
+                setOf(ProximityTransportKind.NFC, ProximityTransportKind.BLE),
                 prepared.readiness.availableTransports,
             )
 
@@ -386,7 +442,7 @@ class NfcMdocEngagementSourceTest {
             val response = platform.router.process(envelope(NfcDo53.encode(exactRequest)))
             val engaged = prepared.awaitConnection()
 
-            assertEquals(ProximityTransportKind.FAKE, engaged.connection.kind)
+            assertEquals(ProximityTransportKind.BLE, engaged.connection.kind)
             assertEquals(emptyList(), platform.closeReasons)
             val handover = assertIs<MdocSessionHandover.ProvisionalNfcV2>(engaged.sessionHandover)
             assertContentEquals(exactRequest, handover.handoverRequest.copy())
@@ -528,6 +584,7 @@ class NfcMdocEngagementSourceTest {
             val source = NfcMdocEngagementSource(
                 NfcMdocEngagementConfiguration(
                     NfcMdocEngagementScope.NfcOnly(NfcMdocEngagementProfile.Negotiated),
+                    conventionalRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
                 ),
                 platform,
                 listOf(HangingReaderSelectedProvider(readerMethod)),
@@ -585,7 +642,7 @@ class NfcMdocEngagementSourceTest {
                 NfcMdocEngagementConfiguration(
                     NfcMdocEngagementScope.NfcOnly(
                         NfcMdocEngagementProfile.ProvisionalV2(NfcV2MaximumCommandDataLength(65_536))
-                    )
+                    ),
                 ),
                 platform,
                 listOf(HangingReaderSelectedProvider(readerMethod)),
@@ -621,8 +678,9 @@ class NfcMdocEngagementSourceTest {
     fun `platform capability and preparation failures are normalized without raw diagnostics`() = runTest {
         withKey { key ->
             val configuration = NfcMdocEngagementConfiguration(
-                NfcMdocEngagementScope.NfcOnly(NfcMdocEngagementProfile.Static)
-            )
+                    NfcMdocEngagementScope.NfcOnly(NfcMdocEngagementProfile.Static),
+                    conventionalRetrieval = DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
+                )
             val capabilityFailure = assertFailsWith<ProximityException> {
                 NfcMdocEngagementSource(
                     configuration,
@@ -819,7 +877,7 @@ class NfcMdocEngagementSourceTest {
     private class HangingReaderSelectedProvider(
         private val method: DeviceRetrievalMethod,
     ) : ReaderSelectedTransportProvider {
-        override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+        override val kind: ProximityTransportKind = ProximityTransportKind.BLE
 
         override suspend fun capability(context: EngagementContext): ProximityCapability =
             ProximityCapability(true, true, true, sessionSelected = true)

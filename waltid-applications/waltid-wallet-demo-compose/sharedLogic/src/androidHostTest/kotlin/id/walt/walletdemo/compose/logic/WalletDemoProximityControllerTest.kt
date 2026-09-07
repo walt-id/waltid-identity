@@ -482,8 +482,9 @@ private val availableSelected = ProximityTransportCapability(
 
 private val availableUnselected = availableSelected.copy(selected = false)
 
-private val readyCapabilities = ProximityCapabilities(
-    profile = ProximityProfile.Iso180135Edition2Dis2026,
+private val readyCapabilities = MobileWalletProximityCapabilities(
+    session = id.walt.wallet2.mobile.MobileWalletProximitySessionConfiguration.Qr(),
+    profile = MobileWalletProximityProfile.Iso180135Edition2Dis2026,
     qrEngagement = availableSelected,
     nfcEngagement = availableUnselected,
     bluetoothLowEnergy = availableSelected,
@@ -509,6 +510,13 @@ private val blockedCapabilities = readyCapabilities.copy(
 )
 
 private val fallbackCapabilities = blockedCapabilities.copy(
+    session = id.walt.wallet2.mobile.MobileWalletProximitySessionConfiguration.ConventionalNfc(
+        handover = id.walt.wallet2.mobile.MobileWalletProximityNfcHandover.Static,
+        retrieval = id.walt.wallet2.mobile.MobileWalletProximityConventionalRetrievalConfiguration(
+            nfc = id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration(),
+        ),
+        qrFallback = id.walt.wallet2.mobile.MobileWalletProximityConventionalRetrievalConfiguration(),
+    ),
     nfcEngagement = availableSelected,
     nfcRetrieval = availableSelected,
 )

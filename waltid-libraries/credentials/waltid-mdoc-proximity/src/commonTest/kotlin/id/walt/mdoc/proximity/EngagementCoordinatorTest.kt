@@ -20,6 +20,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class EngagementCoordinatorTest {
     @Test
@@ -77,8 +78,8 @@ class EngagementCoordinatorTest {
 
         selection.cancelAndJoin()
 
-        assertEquals(listOf(ProximityCloseReason.LOST_RACE), qr.closeReasons)
-        assertEquals(listOf(ProximityCloseReason.LOST_RACE), nfc.closeReasons)
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), qr.closeReasons)
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), nfc.closeReasons)
     }
 
     @Test
@@ -284,6 +285,153 @@ class EngagementCoordinatorTest {
         } finally {
             key.capabilities.deleter?.delete()
             runtime.close()
+        }
+    }
+
+    @Test
+    fun `prepared sources and advertised transport facts own input and exported collections`() = runTest {
+        val available = linkedSetOf(ProximityTransportKind.NFC, ProximityTransportKind.BLE)
+        val unavailable = linkedMapOf(ProximityTransportKind.WIFI_AWARE to ProximityError.Capability("offline", "Offline"))
+        val readiness = MdocEngagementReadiness(null, available, unavailable)
+        available.clear()
+        unavailable.clear()
+        (readiness.availableTransports as MutableSet).clear()
+        val winner = TrackingEngagement(
+            MdocEngagementMode.Nfc,
+            result = MdocEngagedConnection(
+                MdocEngagementMode.Nfc, ImmutableBytes.of(byteArrayOf(7)),
+                MdocSessionHandover.NfcConnection(ImmutableBytes.of(byteArrayOf(8))),
+                TrackingConnection(ProximityTransportKind.NFC),
+            ),
+        )
+        val loser = TrackingEngagement(MdocEngagementMode.Qr, waitForever = true)
+        val sources = mutableListOf<PreparedMdocEngagement>(winner, loser)
+        val owned = PreparedMdocEngagements(sources, readiness)
+        sources.clear()
+        (owned.sources as MutableList).clear()
+        assertSame(winner, MdocEngagementCoordinator().awaitWinner(owned).source)
+        assertEquals(listOf(ProximityCloseReason.LOST_RACE), loser.closeReasons)
+        assertEquals(setOf(ProximityTransportKind.NFC, ProximityTransportKind.BLE), readiness.availableTransports)
+        assertEquals(setOf(ProximityTransportKind.WIFI_AWARE), readiness.unavailableTransports.keys)
+    }
+
+    @Test
+    fun `source list and mode ownership are fixed before suspended preparation`() = runTest {
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        val key = runtime.generateMdocTestKey("owned-engagement-source", setOf(KeyUsage.KEY_AGREEMENT))
+        val entered = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        val modes = linkedSetOf<MdocEngagementMode>(MdocEngagementMode.Nfc)
+        val candidate = TrackingEngagement(MdocEngagementMode.Nfc, waitForever = true)
+        val source = object : MdocEngagementSource {
+            override val modes: Set<MdocEngagementMode> = modes
+            override suspend fun prepare(
+                context: MdocEngagementPreparationContext, sessionScope: CoroutineScope,
+            ): PreparedMdocEngagement {
+                entered.complete(Unit)
+                resume.await()
+                return candidate
+            }
+        }
+        val sources = mutableListOf<MdocEngagementSource>(source)
+        val profile = MdocProximityProfile.ISO_18013_5_ED2_DIS_2026
+        try {
+            val pending = async {
+                MdocEngagementCoordinator().prepare(
+                    sources,
+                    MdocEngagementPreparationContext(
+                        key, EngagementContext(profile, 4096, MdocEngagementMode.Nfc),
+                        MdocSessionCapabilities.forSession(profile, key, emptySet()), MdocProximityLimits(),
+                    ),
+                    this,
+                )
+            }
+            entered.await()
+            sources.clear()
+            modes.clear()
+            resume.complete(Unit)
+            val prepared = pending.await()
+            assertEquals(listOf(candidate), prepared.sources)
+            prepared.sources.single().close(ProximityCloseReason.COMPLETED)
+        } finally {
+            key.capabilities.deleter?.delete()
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `invalid prepared readiness closes the newly acquired source`() = runTest {
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        val key = runtime.generateMdocTestKey("invalid-engagement-readiness", setOf(KeyUsage.KEY_AGREEMENT))
+        val candidate = TrackingEngagement(MdocEngagementMode.Qr, waitForever = true) // Missing QR payload.
+        val source = object : MdocEngagementSource {
+            override val modes = candidate.modes
+            override suspend fun prepare(
+                context: MdocEngagementPreparationContext, sessionScope: CoroutineScope,
+            ): PreparedMdocEngagement = candidate
+        }
+        val profile = MdocProximityProfile.ISO_18013_5_ED2_DIS_2026
+        try {
+            assertFailsWith<IllegalArgumentException> {
+                MdocEngagementCoordinator().prepare(
+                    listOf(source),
+                    MdocEngagementPreparationContext(
+                        key, EngagementContext(profile, 4096, MdocEngagementMode.Qr),
+                        MdocSessionCapabilities.forSession(profile, key, emptySet()), MdocProximityLimits(),
+                    ),
+                    this,
+                )
+            }
+            assertEquals(listOf(ProximityCloseReason.CANCELLED), candidate.closeReasons)
+        } finally {
+            key.capabilities.deleter?.delete()
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `closing a losing or cancelled engagement unblocks its worker before joining`() = runTest {
+        for (cancel in listOf(false, true)) {
+            val release = CompletableDeferred<Unit>()
+            val closeReasons = mutableListOf<ProximityCloseReason>()
+            val blocked = object : PreparedMdocEngagement {
+                override val modes = setOf(MdocEngagementMode.Nfc)
+                override val readiness = MdocEngagementReadiness(null, setOf(ProximityTransportKind.NFC), emptyMap())
+                override suspend fun awaitConnection(): MdocEngagedConnection = withContext(NonCancellable) {
+                    release.await()
+                    throw IllegalStateException("Native engagement was closed")
+                }
+                override suspend fun close(reason: ProximityCloseReason) {
+                    if (closeReasons.isEmpty()) closeReasons += reason
+                    release.complete(Unit)
+                }
+            }
+            val connection = TrackingConnection(ProximityTransportKind.BLE)
+            val winner = TrackingEngagement(
+                MdocEngagementMode.Qr,
+                result = MdocEngagedConnection(
+                    MdocEngagementMode.Qr, ImmutableBytes.of(byteArrayOf(1)), MdocSessionHandover.Qr, connection,
+                ),
+            )
+            val selection = async {
+                MdocEngagementCoordinator().awaitWinner(if (cancel) prepared(blocked) else prepared(blocked, winner))
+            }
+            try {
+                runCurrent()
+                if (cancel) {
+                    selection.cancel()
+                    runCurrent()
+                }
+                assertTrue(selection.isCompleted, "Resource closure must unblock a worker before joining it")
+                if (!cancel) assertSame(connection, selection.await().engaged.connection)
+                assertEquals(
+                    listOf(if (cancel) ProximityCloseReason.CANCELLED else ProximityCloseReason.LOST_RACE),
+                    closeReasons,
+                )
+            } finally {
+                release.complete(Unit)
+                selection.cancelAndJoin()
+            }
         }
     }
 

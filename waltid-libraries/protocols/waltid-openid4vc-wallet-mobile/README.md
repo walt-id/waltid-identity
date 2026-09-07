@@ -159,20 +159,31 @@ try {
 }
 ```
 
-The `show*` functions are application UI callbacks. Collect in a screen-owned
-coroutine and cancel it on leaving the screen; the `finally` block releases the
-session even during cancellation. Import `NonCancellable` and `withContext` from
-`kotlinx.coroutines`. Handle the capability snapshot before starting; remediations
-and protected-key authorization remain explicit host actions. A `StateFlow` does
-not complete automatically on a terminal state.
+The default configuration selects QR engagement and BLE retrieval. NFC supports
+conventional static/negotiated handover, conventional retrieval, and the explicit
+provisional NFCv2 session variant. Wi-Fi Aware remains unimplemented at this
+layer. Runtime observations distinguish `NotChecked`, `Available`, and
+`Unavailable`; selection is independent. Startability follows each selected
+route's own retrieval plan, so an unavailable optional bearer cannot block a
+usable route or lend an unrelated bearer to another route.
 
-Kotlin and Swift proximity types use the `Proximity` prefix.
+```kotlin
+val nfcConfiguration = MobileWalletProximityConfiguration(
+    session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
+        handover = MobileWalletProximityNfcHandover.Negotiated,
+        retrieval = MobileWalletProximityConventionalRetrievalConfiguration(
+            nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+        ),
+        qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(),
+    ),
+)
+```
 
-The default configuration selects QR engagement and BLE retrieval. NFC and
-Wi-Fi Aware are represented in the capability contract as unimplemented in this
-build. Runtime observations distinguish `NotChecked`, `Available`, and
-`Unavailable`; session selection is independent. A session can start when a
-selected engagement and a compatible selected retrieval route are viable.
+The session variant owns engagement and compatible retrieval together. Optional
+QR fallback requires a nonempty conventional plan. Shared BLE role/policy and
+conventional NFC length limits must match across routes. The provisional NFCv2
+variant always includes same-channel retrieval and owns its distinct command
+limit; the ISO/IEC 18013-5:2021 profile rejects that variant.
 
 Device signature is the default holder-authentication policy. Applications may
 require MAC or choose an explicit pre-review preference with

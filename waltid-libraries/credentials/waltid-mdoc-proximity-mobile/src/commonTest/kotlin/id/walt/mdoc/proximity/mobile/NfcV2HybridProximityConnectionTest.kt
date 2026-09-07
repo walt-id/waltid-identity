@@ -251,7 +251,7 @@ class NfcV2HybridProximityConnectionTest {
 
     private class DeferredPreparedTransport : PreparedTransport {
         private val connection = CompletableDeferred<ProximityConnection>()
-        override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+        override val kind: ProximityTransportKind = ProximityTransportKind.BLE
         override val connectionMethod: DeviceRetrievalMethod = DeviceRetrievalMethod.Ble(
             centralMode = BleCentralMode(ByteArray(16)),
         )
@@ -271,7 +271,7 @@ class NfcV2HybridProximityConnectionTest {
     private class FailingPreparedTransport(
         private val failure: CancellationException,
     ) : PreparedTransport {
-        override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+        override val kind: ProximityTransportKind = ProximityTransportKind.BLE
         override val connectionMethod: DeviceRetrievalMethod = DeviceRetrievalMethod.Ble(
             centralMode = BleCentralMode(ByteArray(16)),
         )
@@ -304,7 +304,7 @@ class NfcV2HybridProximityConnectionTest {
             private set
         private var closed = false
 
-        override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+        override val kind: ProximityTransportKind = ProximityTransportKind.BLE
         override val connectionMethod: DeviceRetrievalMethod = DeviceRetrievalMethod.Ble(
             centralMode = BleCentralMode(ByteArray(16)),
         )
@@ -326,7 +326,7 @@ class NfcV2HybridProximityConnectionTest {
     private class CloseUnblocksReceiveConnection(
         private val released: CompletableDeferred<Unit>,
     ) : ProximityConnection {
-        override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+        override val kind: ProximityTransportKind = ProximityTransportKind.BLE
         var closeCalls = 0
             private set
         private var closed = false
