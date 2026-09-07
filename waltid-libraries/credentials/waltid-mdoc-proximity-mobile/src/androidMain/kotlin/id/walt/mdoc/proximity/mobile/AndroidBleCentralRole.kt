@@ -10,6 +10,7 @@ import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattService
+import android.bluetooth.BluetoothSocket
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
@@ -45,7 +46,7 @@ internal class AndroidBleCentralRole(
 ) : BlePreparedPlatformRole {
     override val role: BlePlatformRole = BlePlatformRole.CENTRAL_CLIENT
     override val l2capPsm: UInt? = null
-    private val pendingSocket = AtomicReference<BlockingSocket<android.bluetooth.BluetoothSocket>?>(null)
+    private val pendingSocket = AtomicReference<BlockingSocket<BluetoothSocket>?>(null)
     private val started = AtomicBoolean(false)
     private val closed = AtomicBoolean(false)
     @Volatile private var scanCallback: ScanCallback? = null
@@ -141,7 +142,7 @@ internal class AndroidBleCentralRole(
         )
     }
 
-    private suspend fun openL2cap(device: BluetoothDevice, psm: Int): BlockingSocket<android.bluetooth.BluetoothSocket>? {
+    private suspend fun openL2cap(device: BluetoothDevice, psm: Int): BlockingSocket<BluetoothSocket>? {
         val socket = runCatching { BlockingSocket(device.createInsecureL2capChannel(psm)) }.getOrNull() ?: return null
         pendingSocket.set(socket)
         try {

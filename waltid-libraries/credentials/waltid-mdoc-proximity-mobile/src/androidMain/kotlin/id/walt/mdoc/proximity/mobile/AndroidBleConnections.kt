@@ -5,7 +5,6 @@ import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattServer
-import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothSocket
 import android.bluetooth.BluetoothStatusCodes
 import android.os.Build
