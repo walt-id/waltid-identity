@@ -91,9 +91,10 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         viewModel.approve()
         try await waitUntilAsync { await session.actions.count == 1 }
         let actions = await session.actions
-        guard case .approve(let submission) = try XCTUnwrap(actions.first) else {
+        guard case .approve(let reviewID, let submission) = try XCTUnwrap(actions.first) else {
             return XCTFail("Expected an approval action")
         }
+        XCTAssertEqual(reviewID, review.reviewID)
         XCTAssertEqual(submission.documents.count, 2)
         XCTAssertTrue(submission.continueAfterResponse)
         XCTAssertEqual(
@@ -115,6 +116,12 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             viewModel.selections.first(where: { $0.requestIndex == 0 })?.credentialID,
             "payment-a"
         )
+        let nextReviewID = try XCTUnwrap(viewModel.review?.reviewID)
+        XCTAssertNotEqual(nextReviewID, review.reviewID)
+        viewModel.decline()
+        try await waitUntilAsync { await session.actions.count == 2 }
+        let laterActions = await session.actions
+        XCTAssertEqual(laterActions.last, .decline(reviewID: nextReviewID))
     }
 
     func testQRCodeRendererRoundTripsRealisticLongDeviceEngagementPayload() throws {
@@ -201,6 +208,7 @@ private func combinedProximityReview(exchange: Int = 1) -> ProximityPresentation
         )
     }
     return ProximityPresentationReview(
+        reviewID: ProximityReviewID(value: UUID().uuidString),
         exchange: exchange,
         documents: [
             ProximityDocumentReview(

@@ -87,7 +87,7 @@ struct ProximityPresentationView: View {
             case .failed(let error):
                 ProximityFailureContent(
                     message: error.message,
-                    recoverable: error.recoverable,
+                    recoverable: error.recovery == .startNewSession,
                     onRetry: viewModel.restart,
                     onDismiss: viewModel.dismiss
                 )
@@ -380,10 +380,8 @@ private struct ProximityReaderMetadataCard: View {
         switch authentication.scope {
         case .wholeRequest:
             return String(localized: "Whole request")
-        case .document:
-            guard let requestIndex = authentication.documentRequestIndex else {
-                return String(localized: "Document request")
-            }
+        case .document(let index):
+            let requestIndex = index.value
             if let document = documents.first(where: { $0.requestIndex == requestIndex }) {
                 let displayName = document.credentialOptions.compactMap { option in
                     credentialDetailsByID[option.credentialID]?.cardSummary.title

@@ -12,6 +12,7 @@ import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
 import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
 import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
 import id.walt.wallet2.mobile.MobileWalletProximityReview
+import id.walt.wallet2.mobile.MobileWalletProximityRecovery
 import id.walt.wallet2.mobile.MobileWalletProximitySession
 import id.walt.wallet2.mobile.MobileWalletProximityState
 import id.walt.wallet2.mobile.MobileWalletProximitySubmission
@@ -119,8 +120,7 @@ class WalletDemoProximityController(
                 val capabilities = wallet.proximityPresentationCapabilities(configuration)
                 if (!isCurrent(startGeneration)) return@launch
                 publish(MobileWalletProximityState.CheckingPrerequisites(capabilities))
-                // Runtime dialogs belong to the app host. Do not let another viable transport
-                // silently bypass a permission required by the selected demo configuration.
+                // Request permission only when no selected route can start without it.
                 if (capabilities.automaticPermissionActions.isNotEmpty()) return@launch
 
                 val started = wallet.startProximityPresentation(configuration)
@@ -195,7 +195,8 @@ class WalletDemoProximityController(
         if (!current.canApprove) return
         dispatch(
             MobileWalletProximityAction.Approve(
-                MobileWalletProximitySubmission(
+                reviewId = review.reviewId,
+                submission = MobileWalletProximitySubmission(
                     documents = review.documents.map { document ->
                         val selection = current.selections.single { it.requestIndex == document.requestIndex }
                         MobileWalletProximityDocumentSubmission(
@@ -210,7 +211,10 @@ class WalletDemoProximityController(
         )
     }
 
-    fun decline() = dispatch(MobileWalletProximityAction.Decline)
+    fun decline() {
+        val review = mutableState.value.review ?: return
+        dispatch(MobileWalletProximityAction.Decline(review.reviewId))
+    }
 
     fun retryPrerequisites() {
         val configuration = pendingConfiguration
@@ -332,7 +336,7 @@ class WalletDemoProximityController(
         mutableState.update { current ->
             val reviewForNewExchange = (sessionState as? MobileWalletProximityState.ReviewRequired)
                 ?.review
-                ?.takeIf { current.review?.exchange != it.exchange }
+                ?.takeIf { current.review?.reviewId != it.reviewId }
             current.copy(
                 sessionState = sessionState,
                 selections = reviewForNewExchange?.defaultSelections() ?: current.selections,
@@ -355,7 +359,7 @@ class WalletDemoProximityController(
 
 private val MobileWalletProximityCapabilities.automaticPermissionActions:
     List<MobileWalletProximityRemediationAction>
-    get() = remediationActions.filter {
+    get() = if (mayStart) emptyList() else remediationActions.filter {
         it == MobileWalletProximityRemediationAction.RequestBluetoothPermission
     }
 
@@ -382,5 +386,5 @@ private val demoSessionFailure = MobileWalletProximityError(
     category = MobileWalletProximityErrorCategory.Internal,
     code = "demo_session_failed",
     message = "The in-person presentation could not be started",
-    recoverable = true,
+    recovery = MobileWalletProximityRecovery.StartNewSession,
 )

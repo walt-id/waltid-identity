@@ -182,7 +182,8 @@ final class ProximityPresentationViewModel: ObservableObject {
         guard documents.count == review.documents.count else { return }
         dispatch(
             .approve(
-                ProximityPresentationSubmission(
+                reviewID: review.reviewID,
+                submission: ProximityPresentationSubmission(
                     documents: documents,
                     continueAfterResponse: continueAfterResponse
                 )
@@ -191,7 +192,8 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func decline() {
-        dispatch(.decline)
+        guard let review else { return }
+        dispatch(.decline(reviewID: review.reviewID))
     }
 
     func retryPrerequisites() {
@@ -295,9 +297,9 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     private func publish(_ state: ProximityPresentationState) {
-        let previousExchange = review?.exchange
+        let previousReviewID = review?.reviewID
         sessionState = state
-        if case .reviewRequired(let review) = state, previousExchange != review.exchange {
+        if case .reviewRequired(let review) = state, previousReviewID != review.reviewID {
             selections = review.defaultSelections
             continueAfterResponse = false
         }
