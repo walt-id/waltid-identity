@@ -10,9 +10,6 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.proximity.EngagementContext
-import id.walt.mdoc.proximity.MdocConsentDecision
-import id.walt.mdoc.proximity.MdocConsentHandler
-import id.walt.mdoc.proximity.MdocConsentPrompt
 import id.walt.mdoc.proximity.MdocDeviceEngagementFactory
 import id.walt.mdoc.proximity.MdocEngagementMode
 import id.walt.mdoc.proximity.MdocHolderProtocolEngine
@@ -31,15 +28,14 @@ import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.BleServiceUuid
 import id.walt.wallet2.data.Wallet
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
@@ -57,76 +53,72 @@ internal class MobileWalletProximityCoordinator(
     suspend fun capabilities(
         configuration: MobileWalletProximityConfiguration,
     ): MobileWalletProximityCapabilities {
-        val availability = transportFactory?.capability(configuration.bleRoles.toTransportSelection())
+        val owned = configuration.snapshot()
+        val availability = transportFactory?.capability(owned.bleRoles.toTransportSelection())
             ?: BleProximityAvailability.Unavailable(
                 code = "ble_transport_unavailable",
                 message = "BLE proximity presentation is unavailable on this wallet platform",
             )
         return MobileWalletProximityCapabilities(
-            profile = configuration.profile,
+            profile = owned.profile,
             qrEngagement = MobileWalletProximityTransportCapability(
                 implemented = true,
                 profilePermitted = true,
-                runtimeAvailable = true,
-                selected = MobileWalletProximityEngagementMethod.Qr in configuration.engagementMethods,
+                runtime = MobileWalletProximityRuntimeObservation.Available,
+                selected = MobileWalletProximityEngagementMethod.Qr in owned.engagementMethods,
             ),
             nfcEngagement = unavailableCapability(
-                selected = MobileWalletProximityEngagementMethod.Nfc in configuration.engagementMethods,
-                code = "nfc_engagement_not_implemented",
-                message = "NFC engagement is not implemented by this wallet build",
+                selected = MobileWalletProximityEngagementMethod.Nfc in owned.engagementMethods,
             ),
             bluetoothLowEnergy = MobileWalletProximityTransportCapability(
                 implemented = transportFactory != null,
                 profilePermitted = true,
-                runtimeAvailable = availability is BleProximityAvailability.Available,
-                selected = MobileWalletProximityRetrievalMethod.BluetoothLowEnergy in
-                    configuration.retrievalMethods,
-                unavailable = (availability as? BleProximityAvailability.Unavailable)?.let {
-                    MobileWalletProximityError(
-                        category = MobileWalletProximityErrorCategory.Capability,
-                        code = it.code,
-                        message = it.message,
-                        recoverable = true,
+                runtime = when (availability) {
+                    BleProximityAvailability.Available -> MobileWalletProximityRuntimeObservation.Available
+                    is BleProximityAvailability.Unavailable -> MobileWalletProximityRuntimeObservation.Unavailable(
+                        error = MobileWalletProximityError(
+                            category = MobileWalletProximityErrorCategory.Capability,
+                            code = availability.code,
+                            message = availability.message,
+                            recovery = MobileWalletProximityRecovery.RetryPrerequisites,
+                        ),
+                        remediationActions = availability.code.toRemediationActions(),
                     )
                 },
-                remediationActions = (availability as? BleProximityAvailability.Unavailable)
-                    ?.code
-                    ?.toRemediationActions()
-                    .orEmpty(),
+                selected = MobileWalletProximityRetrievalMethod.BluetoothLowEnergy in owned.retrievalMethods,
             ),
             nfcRetrieval = unavailableCapability(
-                selected = MobileWalletProximityRetrievalMethod.Nfc in configuration.retrievalMethods,
-                code = "nfc_retrieval_not_implemented",
-                message = "NFC retrieval is not implemented by this wallet build",
+                selected = MobileWalletProximityRetrievalMethod.Nfc in owned.retrievalMethods,
             ),
             wifiAwareRetrieval = unavailableCapability(
-                selected = MobileWalletProximityRetrievalMethod.WifiAware in configuration.retrievalMethods,
-                code = "wifi_aware_not_implemented",
-                message = "Wi-Fi Aware retrieval is not implemented by this wallet build",
+                selected = MobileWalletProximityRetrievalMethod.WifiAware in owned.retrievalMethods,
             ),
         )
     }
 
     suspend fun start(
         configuration: MobileWalletProximityConfiguration,
-    ): MobileWalletProximitySession = activeMutex.withLock {
-        check(active == null) { "A proximity presentation session is already active for this wallet" }
-        val initialCapabilities = capabilities(configuration)
-        val session = MobileWalletProximitySessionImpl(
-            wallet = wallet,
-            configuration = configuration,
-            transportFactory = transportFactory,
-            capabilityCheck = { capabilities(configuration) },
-            initialCapabilities = initialCapabilities,
-            onTerminal = { completed ->
-                activeMutex.withLock {
-                    if (active === completed) active = null
-                }
-            },
-        )
-        active = session
-        session.start()
-        session
+    ): MobileWalletProximitySession {
+        val owned = configuration.snapshot()
+        return activeMutex.withLock {
+            check(active == null) { "A proximity presentation session is already active for this wallet" }
+            val initialCapabilities = capabilities(owned)
+            val session = MobileWalletProximitySessionImpl(
+                wallet = wallet,
+                configuration = owned,
+                transportFactory = transportFactory,
+                capabilityCheck = { capabilities(owned) },
+                initialCapabilities = initialCapabilities,
+                onTerminal = { completed ->
+                    activeMutex.withLock {
+                        if (active === completed) active = null
+                    }
+                },
+            )
+            active = session
+            session.start()
+            session
+        }
     }
 }
 
@@ -138,62 +130,30 @@ private class MobileWalletProximitySessionImpl(
     initialCapabilities: MobileWalletProximityCapabilities,
     private val onTerminal: suspend (MobileWalletProximitySessionImpl) -> Unit,
 ) : MobileWalletProximitySession {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val mutableState = MutableStateFlow<MobileWalletProximityState>(
-        MobileWalletProximityState.CheckingPrerequisites(initialCapabilities)
-    )
-    override val state: StateFlow<MobileWalletProximityState> = mutableState.asStateFlow()
-    private val actionMutex = Mutex()
-    private lateinit var sessionJob: Job
-    private var consentGate: MobileWalletProximityConsentGate? = null
+    private val lifecycleJob = SupervisorJob()
+    private val scope = CoroutineScope(lifecycleJob + Dispatchers.Default)
     private val prerequisiteRetry = Channel<Unit>(Channel.CONFLATED)
+    private val owner = MobileWalletProximitySessionOwner(
+        MobileWalletProximityState.CheckingPrerequisites(initialCapabilities), prerequisiteRetry,
+    )
+    private val initialCapabilities = initialCapabilities
+    override val state: StateFlow<MobileWalletProximityState> = owner.state
+    private lateinit var sessionJob: Job
 
     fun start() {
         sessionJob = scope.launch { runSession() }
     }
 
-    override suspend fun dispatch(
-        action: MobileWalletProximityAction,
-    ): MobileWalletProximityActionResult = actionMutex.withLock {
-        if (action is MobileWalletProximityAction.Cancel) {
-            if (mutableState.value.legalActions.contains(MobileWalletProximityActionType.Cancel)) {
-                sessionJob.cancelAndJoin()
-                return@withLock MobileWalletProximityActionResult.Accepted
-            }
-            return@withLock rejectedAction("cancel_not_allowed", "Cancellation is not allowed in the current state")
+    override suspend fun dispatch(action: MobileWalletProximityAction): MobileWalletProximityActionResult {
+        val result = owner.dispatch(action)
+        if (action is MobileWalletProximityAction.Cancel && result is MobileWalletProximityActionResult.Accepted) {
+            sessionJob.cancelAndJoin()
         }
-        if (action is MobileWalletProximityAction.RetryPrerequisites) {
-            if (mutableState.value is MobileWalletProximityState.CheckingPrerequisites) {
-                prerequisiteRetry.trySend(Unit)
-                return@withLock MobileWalletProximityActionResult.Accepted
-            }
-            return@withLock rejectedAction(
-                "prerequisite_retry_not_allowed",
-                "Prerequisites can only be retried while they are unavailable",
-            )
-        }
-        if (action is MobileWalletProximityAction.ReportRemediation) {
-            val current = mutableState.value as? MobileWalletProximityState.CheckingPrerequisites
-                ?: return@withLock rejectedAction(
-                    "remediation_result_not_allowed",
-                    "A remediation result is not expected in the current state",
-                )
-            if (action.action !in current.capabilities.remediationActions) {
-                return@withLock rejectedAction(
-                    "unexpected_remediation_result",
-                    "The reported remediation was not requested by the current prerequisites",
-                )
-            }
-            if (action.result == MobileWalletProximityHostActionResult.Completed) {
-                prerequisiteRetry.trySend(Unit)
-            }
-            return@withLock MobileWalletProximityActionResult.Accepted
-        }
-        consentGate?.dispatch(action)
-            ?: rejectedAction("action_not_allowed", "The action does not belong to the current review")
+        return result
     }
 
     override suspend fun close() {
+        owner.cancel()
         if (::sessionJob.isInitialized) sessionJob.cancelAndJoin()
     }
 
@@ -201,12 +161,13 @@ private class MobileWalletProximitySessionImpl(
         var runtime: CryptoRuntime? = null
         var eDeviceKey: Key? = null
         try {
-            var prerequisites = (mutableState.value as MobileWalletProximityState.CheckingPrerequisites).capabilities
+            var prerequisites = initialCapabilities
             while (!prerequisites.mayStart) {
-                mutableState.value = MobileWalletProximityState.CheckingPrerequisites(prerequisites)
+                owner.publish(MobileWalletProximityState.CheckingPrerequisites(prerequisites))
                 prerequisiteRetry.receive()
                 prerequisites = capabilityCheck()
             }
+            owner.publish(MobileWalletProximityState.Preparing(configuration.profile))
             val factory = requireNotNull(transportFactory)
             runtime = CryptoRuntime(defaultSoftwareKeyProviders())
             eDeviceKey = runtime.generateSoftwareKey(
@@ -246,16 +207,12 @@ private class MobileWalletProximitySessionImpl(
                 configuration = configuration,
                 readerAuthenticationAlgorithms = READER_AUTHENTICATION_ALGORITHMS,
             )
-            val gate = MobileWalletProximityConsentGate(
-                processor = processor,
-                publishState = { mutableState.value = it },
-            )
-            consentGate = gate
+            owner.attach(processor)
             val engine = MdocHolderProtocolEngine(
                 eDeviceKey = eDeviceKey,
                 transportProviders = listOf(transport),
                 requestProcessor = processor,
-                consentHandler = gate,
+                consentHandler = owner,
                 engagementContext = EngagementContext(
                     profile = profile,
                     maximumMessageBytes = configuration.maximumMessageBytes,
@@ -270,39 +227,42 @@ private class MobileWalletProximitySessionImpl(
             val result = try {
                 engine.run()
             } finally {
-                stateCollector.cancelAndJoin()
-                gate.cancel()
+                withContext(NonCancellable) { stateCollector.cancelAndJoin() }
             }
             when (result) {
-                is MdocHolderSessionResult.Completed -> mutableState.value =
-                    MobileWalletProximityState.Completed(result.exchanges, declined = false)
-                is MdocHolderSessionResult.Declined -> mutableState.value =
-                    MobileWalletProximityState.Completed(result.exchange, declined = true)
-                is MdocHolderSessionResult.Failed -> mutableState.value =
-                    MobileWalletProximityState.Failed(result.error.toWalletError())
+                is MdocHolderSessionResult.Completed -> owner.publish(
+                    MobileWalletProximityState.Completed(result.exchanges, declined = false))
+                is MdocHolderSessionResult.Declined -> owner.publish(
+                    MobileWalletProximityState.Completed(result.exchange, declined = true))
+                is MdocHolderSessionResult.Failed -> owner.publish(
+                    MobileWalletProximityState.Failed(result.error.toWalletError()))
             }
         } catch (cancelled: CancellationException) {
-            mutableState.value = MobileWalletProximityState.Cancelled
+            withContext(NonCancellable) { owner.cancel() }
             throw cancelled
         } catch (_: Throwable) {
-            mutableState.value = MobileWalletProximityState.Failed(
+            owner.publish(MobileWalletProximityState.Failed(
                 MobileWalletProximityError(
                     category = MobileWalletProximityErrorCategory.Internal,
                     code = "session_failed",
                     message = "The proximity presentation session failed",
-                    recoverable = true,
+                    recovery = MobileWalletProximityRecovery.StartNewSession,
                 )
-            )
+            ))
         } finally {
-            consentGate = null
-            eDeviceKey?.capabilities?.deleter?.let { deleter -> runCatching { deleter.delete() } }
-            runtime?.let { runCatching { it.close() } }
-            onTerminal(this)
+            withContext(NonCancellable) {
+                owner.cancel()
+                eDeviceKey?.capabilities?.deleter?.let { deleter -> runCatching { deleter.delete() } }
+                runtime?.let { runCatching { it.close() } }
+                prerequisiteRetry.close()
+                onTerminal(this@MobileWalletProximitySessionImpl)
+                lifecycleJob.complete()
+            }
         }
     }
 
-    private fun publishEngineState(engineState: MdocHolderSessionState) {
-        mutableState.value = when (engineState) {
+    private suspend fun publishEngineState(engineState: MdocHolderSessionState) {
+        val next = when (engineState) {
             MdocHolderSessionState.Idle -> return
             is MdocHolderSessionState.Preparing -> MobileWalletProximityState.Preparing(configuration.profile)
             is MdocHolderSessionState.EngagementReady -> MobileWalletProximityState.EngagementReady(
@@ -335,6 +295,7 @@ private class MobileWalletProximitySessionImpl(
             is MdocHolderSessionState.Failed -> MobileWalletProximityState.Failed(engineState.error.toWalletError())
             MdocHolderSessionState.Cancelled -> MobileWalletProximityState.Cancelled
         }
+        owner.publish(next)
     }
 
     private companion object {
@@ -344,69 +305,6 @@ private class MobileWalletProximitySessionImpl(
             Cose.Algorithm.ES512,
             Cose.Algorithm.EdDSA,
         )
-    }
-}
-
-private class MobileWalletProximityConsentGate(
-    private val processor: MobileWalletProximityRequestProcessor,
-    private val publishState: (MobileWalletProximityState) -> Unit,
-) : MdocConsentHandler {
-    private data class Pending(
-        val prompt: MdocConsentPrompt,
-        val decision: CompletableDeferred<MdocConsentDecision>,
-    )
-
-    private val mutex = Mutex()
-    private var pending: Pending? = null
-
-    override suspend fun decide(prompt: MdocConsentPrompt): MdocConsentDecision {
-        val current = Pending(prompt, CompletableDeferred())
-        mutex.withLock {
-            check(pending == null) { "A previous proximity consent request is still pending" }
-            pending = current
-        }
-        publishState(MobileWalletProximityState.ReviewRequired(processor.review(prompt)))
-        return try {
-            current.decision.await()
-        } finally {
-            mutex.withLock { if (pending === current) pending = null }
-        }
-    }
-
-    suspend fun dispatch(action: MobileWalletProximityAction): MobileWalletProximityActionResult = mutex.withLock {
-        val current = pending
-            ?: return@withLock rejectedAction("stale_action", "No proximity review is awaiting this action")
-        when (action) {
-            is MobileWalletProximityAction.Approve -> {
-                processor.accept(current.prompt, action.submission)?.let {
-                    return@withLock MobileWalletProximityActionResult.Rejected(it)
-                }
-                publishState(
-                    MobileWalletProximityState.AuthorizingHolderKey(
-                        processor.holderAuthorization(current.prompt, action.submission)
-                    )
-                )
-                current.decision.complete(MdocConsentDecision.Approve(current.prompt.bindingToken))
-            }
-            MobileWalletProximityAction.Decline ->
-                current.decision.complete(MdocConsentDecision.Deny(current.prompt.bindingToken))
-            MobileWalletProximityAction.Cancel ->
-                return@withLock rejectedAction("cancel_routing_error", "Cancellation must be routed through the session")
-            MobileWalletProximityAction.RetryPrerequisites,
-            is MobileWalletProximityAction.ReportRemediation ->
-                return@withLock rejectedAction(
-                    "prerequisite_routing_error",
-                    "Prerequisite actions must be routed through the session",
-                )
-        }
-        MobileWalletProximityActionResult.Accepted
-    }
-
-    suspend fun cancel() {
-        mutex.withLock {
-            pending?.decision?.cancel()
-            pending = null
-        }
     }
 }
 
@@ -431,19 +329,11 @@ private fun transactionUuid(): BleServiceUuid = BleServiceUuid.parse(Uuid.random
 
 private fun unavailableCapability(
     selected: Boolean,
-    code: String,
-    message: String,
 ): MobileWalletProximityTransportCapability = MobileWalletProximityTransportCapability(
     implemented = false,
     profilePermitted = true,
-    runtimeAvailable = false,
     selected = selected,
-    unavailable = MobileWalletProximityError(
-        category = MobileWalletProximityErrorCategory.Capability,
-        code = code,
-        message = message,
-        recoverable = false,
-    ),
+    runtime = MobileWalletProximityRuntimeObservation.NotChecked,
 )
 
 private fun String.toRemediationActions(): List<MobileWalletProximityRemediationAction> = when (this) {
@@ -489,17 +379,19 @@ internal fun ProximityError.toWalletError(): MobileWalletProximityError = Mobile
     },
     code = code,
     message = message,
-    recoverable = this is ProximityError.Capability ||
-        this is ProximityError.Transport ||
-        code in setOf("changed_submission", "stale_consent", "stale_submission"),
+    recovery = if (this is ProximityError.Transport || code in setOf("changed_submission", "stale_consent", "stale_submission")) {
+        MobileWalletProximityRecovery.StartNewSession
+    } else {
+        MobileWalletProximityRecovery.None
+    },
 )
 
-private fun rejectedAction(code: String, message: String): MobileWalletProximityActionResult.Rejected =
+internal fun rejectedAction(code: String, message: String): MobileWalletProximityActionResult.Rejected =
     MobileWalletProximityActionResult.Rejected(
         MobileWalletProximityError(
             MobileWalletProximityErrorCategory.Policy,
             code,
             message,
-            recoverable = true,
+            recovery = MobileWalletProximityRecovery.None,
         )
     )

@@ -64,6 +64,9 @@ kotlin {
             implementation(identityLibs.kotlincrypto.hash.sha2)
             implementation(identityLibs.ktor.client.core)
         }
+        commonTest {
+            kotlin.srcDir("../../credentials/waltid-mdoc-proximity/src/commonTestFixtures/kotlin")
+        }
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
