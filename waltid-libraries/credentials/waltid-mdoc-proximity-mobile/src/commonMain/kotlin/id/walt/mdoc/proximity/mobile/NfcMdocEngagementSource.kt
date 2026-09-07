@@ -115,13 +115,21 @@ public data class NfcMdocEngagementConfiguration(
  * arming a second HCE/CardSession router.
  */
 public class NfcMdocEngagementSource(
-    private val configuration: NfcMdocEngagementConfiguration,
+    configuration: NfcMdocEngagementConfiguration,
     private val platform: NfcHostPlatformAdapter,
     alternateTransportProviders: List<ProximityTransportProvider>,
     qrTransportProviders: List<ProximityTransportProvider> = emptyList(),
     private val transportCoordinator: TransportCoordinator = TransportCoordinator(),
     private val engagementFactory: MdocDeviceEngagementFactory = MdocDeviceEngagementFactory(),
 ) : MdocEngagementSource {
+    private val configuration = configuration.copy(
+        conventionalRetrieval = configuration.conventionalRetrieval?.let {
+            ReaderSelectedTransportOffer.Method(it).value as DeviceRetrievalMethod.Nfc
+        },
+        qrRetrieval = configuration.qrRetrieval?.let {
+            ReaderSelectedTransportOffer.Method(it).value as DeviceRetrievalMethod.Nfc
+        },
+    )
     private val alternateTransportProviders = alternateTransportProviders.toList()
     private val qrTransportProviders = qrTransportProviders.toList()
 
@@ -230,11 +238,17 @@ public class NfcMdocEngagementSource(
                 val qrDirect = configuration.qrRetrieval?.let {
                     PreparedNfcApduTransport(PreparedTransportId("qr-nfc-retrieval"), it)
                 }
-                val qrTransports = prepareProviders(
-                    providers + listOfNotNull(qrDirect).map(::PreparedTransportProvider),
-                    qrContext,
-                    sessionScope,
-                ).also { qrResources.registerAll(it.transports) }
+                val qrTransports = try {
+                    prepareProviders(
+                        providers + listOfNotNull(qrDirect).map(::PreparedTransportProvider),
+                        qrContext,
+                        sessionScope,
+                    )
+                } catch (failure: ProximityException) {
+                    if (nfcProfile == null || failure.error !is ProximityError.Capability) throw failure
+                    // QR is optional when a configured NFC route has already been prepared.
+                    return@let null
+                }.also { qrResources.registerAll(it.transports) }
                 val qrCandidates = PreparedTransports.of(qrTransports.transports, qrTransports.unavailable)
                 val qrEngagement = engagementFactory.create(
                     context.eDeviceKey,
@@ -271,8 +285,8 @@ public class NfcMdocEngagementSource(
             val exactStaticSelect = if (nfcProfile is NfcMdocEngagementProfile.Static) {
                 ImmutableBytes.of(
                     NfcHandoverCodec.encodeSelect(
-                        requireNotNull(nfcCandidates).transports.mapIndexed { index, transport ->
-                            carrier(transport.connectionMethod, index, requireNotNull(deviceEngagementRecord))
+                        requireNotNull(nfcCandidates).connectionMethods.mapIndexed { index, method ->
+                            carrier(method, index, requireNotNull(deviceEngagementRecord))
                         },
                         ndefLimits,
                     )
@@ -451,7 +465,7 @@ public class NfcMdocEngagementSource(
             }
             preparedHost = host
             return PreparedNfcMdocEngagement(
-                modes = modes,
+                modes = modes.filterTo(mutableSetOf()) { it != MdocEngagementMode.Qr || qrPath != null },
                 nfcCandidates = nfcCandidates,
                 qrPath = qrPath,
                 readerSelectedKinds = readerSelectedAlternates.providers.map { it.kind }.toSet(),
@@ -575,7 +589,7 @@ public class NfcMdocEngagementSource(
             for (offer in offers) {
                 if (!provider.acceptsReaderOffer(offer)) continue
                 val prepared = try {
-                    provider.prepareReaderSelected(offer, context, sessionScope)
+                    provider.prepareReaderSelected(offer, context, sessionScope).withOwnedMethod()
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
@@ -1012,5 +1026,14 @@ private class PreparedTransportRegistry {
         withContext(NonCancellable) {
             owned.forEach { transport -> runCatching { transport.close(reason) } }
         }
+    }
+}
+
+/** Freeze the result once, while delegating native resource ownership to its original provider. */
+private fun PreparedTransport.withOwnedMethod(): PreparedTransport {
+    val original = this
+    val method = ReaderSelectedTransportOffer.Method(connectionMethod)
+    return object : PreparedTransport by original {
+        override val connectionMethod: DeviceRetrievalMethod get() = method.value
     }
 }

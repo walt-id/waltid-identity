@@ -9,6 +9,7 @@ import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.EngagementContext
 import id.walt.mdoc.proximity.ImmutableBytes
+import id.walt.mdoc.proximity.MdocEngagementMode
 import id.walt.mdoc.proximity.PreparedTransport
 import id.walt.mdoc.proximity.ProximityCapability
 import id.walt.mdoc.proximity.ProximityCloseReason
@@ -60,6 +61,10 @@ internal class DefaultBleProximityTransportProvider(
     }
 
     override suspend fun prepare(context: EngagementContext, sessionScope: CoroutineScope): PreparedTransport {
+        val dual = configuration.roles as? BleMdocRoles.Dual
+        require(context.engagementMode != MdocEngagementMode.Qr || dual == null || dual.readerServiceUuid != dual.mdocServiceUuid) {
+            "QR dual BLE roles use distinct transaction service UUIDs"
+        }
         val capability = capability(context)
         if (!capability.mayPrepare) throw ProximityException(
             capability.unavailableReason ?: ProximityError.Capability("ble_unavailable", "BLE is unavailable")

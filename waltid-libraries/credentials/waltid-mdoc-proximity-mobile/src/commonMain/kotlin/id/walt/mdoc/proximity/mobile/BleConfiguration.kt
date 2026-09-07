@@ -66,19 +66,13 @@ public sealed interface BleMdocRoles {
         public val mdocServiceUuid: BleServiceUuid,
     ) : BleMdocRoles
 
-    /** The holder prepares both roles with distinct transaction service UUIDs and keeps the first connection. */
+    /** The holder prepares both roles and keeps the first connection. Static NFC uses a shared carrier UUID. */
     public data class Dual(
         /** UUID advertised by the reader for the holder's central-client role. */
         public val readerServiceUuid: BleServiceUuid,
         /** UUID advertised by the holder for its peripheral-server role. */
         public val mdocServiceUuid: BleServiceUuid,
-    ) : BleMdocRoles {
-        init {
-            require(readerServiceUuid != mdocServiceUuid) {
-                "Dual BLE roles require distinct transaction service UUIDs"
-            }
-        }
-    }
+    ) : BleMdocRoles
 }
 
 /** Bearers the holder may select after a BLE peer is discovered. */
