@@ -13,3 +13,12 @@ and submission without interpreting application extensions or introducing applic
 Transport implementations exchange complete bounded messages through the walt-owned SPI. Platform
 adapters must treat the message bytes as opaque and keep ISO parsing, cryptography, credential choice,
 trust, and disclosure decisions in common code.
+
+Reader-authentication scope is either `Document(index)` or `WholeRequest`; only a valid authentication
+result carries verified evidence and an application trust decision. Consent previews, capability
+snapshots, and trust policy retain owned collections and return detached collection views. Request
+contexts reconstruct decoded projections from their original exact bytes, preserving signed and
+transcript encodings when a consumer modifies a projection.
+
+The deterministic loopback fixtures live in `src/commonTestFixtures/kotlin` and are included only by
+consumer test source sets. Production transport kinds describe actual supported bearers.

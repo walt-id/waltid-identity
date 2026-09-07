@@ -20,6 +20,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlincrypto.hash.sha2)
         }
+        commonTest { kotlin.srcDir("src/commonTestFixtures/kotlin") }
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)

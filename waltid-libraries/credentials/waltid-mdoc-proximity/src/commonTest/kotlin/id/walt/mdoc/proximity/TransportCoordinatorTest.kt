@@ -165,7 +165,7 @@ class TransportCoordinatorTest {
     }
 
     private class TrackingConnection : ProximityConnection {
-        override val kind = ProximityTransportKind.FAKE
+        override val kind = ProximityTransportKind.BLE
         val closeReasons = mutableListOf<ProximityCloseReason>()
         override suspend fun receive(): ImmutableBytes? = null
         override suspend fun send(message: ImmutableBytes) = Unit
