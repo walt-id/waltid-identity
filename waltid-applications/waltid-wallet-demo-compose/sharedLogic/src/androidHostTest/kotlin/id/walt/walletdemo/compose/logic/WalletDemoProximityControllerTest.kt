@@ -1,5 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.mobile.MobileWalletProximityReviewId
+import id.walt.wallet2.mobile.MobileWalletProximityRecovery
+import id.walt.wallet2.mobile.MobileWalletProximityRuntimeObservation
 import id.walt.wallet2.mobile.MobileWalletProximityAction
 import id.walt.wallet2.mobile.MobileWalletProximityActionResult
 import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
@@ -77,30 +80,19 @@ class WalletDemoProximityControllerTest {
     }
 
     @Test
-    fun `denied selected permission cannot silently fall back to another transport`() = runTest {
+    fun `optional BLE permission does not block a viable selected NFC route`() = runTest {
         assertTrue(fallbackCapabilities.mayStart)
         val session = FakeSession(
             MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026)
         )
         val backend = FakeBackend(session = session, capabilities = { fallbackCapabilities })
         val controller = controller(backend)
-
         controller.start()
         advanceUntilIdle()
-        assertEquals(0, backend.startCalls)
-
-        controller.remediate(
-            MobileWalletProximityRemediationAction.RequestBluetoothPermission,
-            WalletDemoProximityHostActionExecutor { MobileWalletProximityHostActionResult.Cancelled },
-        )
-        advanceUntilIdle()
-
-        assertEquals(2, backend.capabilityCalls)
-        assertEquals(0, backend.startCalls)
-        assertEquals(
-            MobileWalletProximityState.CheckingPrerequisites(fallbackCapabilities),
-            controller.state.value.sessionState,
-        )
+        assertEquals(1, backend.capabilityCalls)
+        assertEquals(1, backend.startCalls)
+        assertEquals(session.state.value, controller.state.value.sessionState)
+        assertNull(controller.state.value.automaticPermissionAction)
         controller.dismiss()
         advanceUntilIdle()
     }
@@ -161,6 +153,7 @@ class WalletDemoProximityControllerTest {
         advanceUntilIdle()
 
         val approval = session.actions.single() as MobileWalletProximityAction.Approve
+        assertEquals(controller.state.value.review?.reviewId, approval.reviewId)
         assertEquals(2, approval.submission.documents.size)
         val primary = approval.submission.documents.single { it.requestIndex == 0 }
         assertEquals("credential-b", primary.credentialId)
@@ -230,7 +223,7 @@ class WalletDemoProximityControllerTest {
             category = MobileWalletProximityErrorCategory.Capability,
             code = "bluetooth_still_unavailable",
             message = "Bluetooth is still unavailable",
-            recoverable = true,
+            recovery = MobileWalletProximityRecovery.RetryPrerequisites,
         )
         val session = FakeSession(
             initialState = MobileWalletProximityState.CheckingPrerequisites(blockedCapabilities),
@@ -422,6 +415,7 @@ private val eligibility = MobileWalletProximityElementReference("org.waltid.exam
 private val unoffered = MobileWalletProximityElementReference("org.iso.18013.5.1", "age_over_18")
 
 private fun review(): MobileWalletProximityReview = MobileWalletProximityReview(
+    reviewId = MobileWalletProximityReviewId(kotlin.uuid.Uuid.random().toString()),
     exchange = 1,
     documents = listOf(
         MobileWalletProximityDocumentReview(
@@ -462,11 +456,11 @@ private fun credential(
 )
 
 private val availableSelected = MobileWalletProximityTransportCapability(
-    implemented = true,
-    profilePermitted = true,
-    runtimeAvailable = true,
-    selected = true,
-)
+        implemented = true,
+        profilePermitted = true,
+        selected = true,
+        runtime = MobileWalletProximityRuntimeObservation.Available,
+    )
 
 private val availableUnselected = availableSelected.copy(selected = false)
 
@@ -483,17 +477,15 @@ private val bluetoothUnavailable = MobileWalletProximityError(
     category = MobileWalletProximityErrorCategory.Capability,
     code = "bluetooth_permission_required",
     message = "Bluetooth permission is required",
-    recoverable = true,
+    recovery = MobileWalletProximityRecovery.RetryPrerequisites,
 )
 
 private val blockedCapabilities = readyCapabilities.copy(
     bluetoothLowEnergy = MobileWalletProximityTransportCapability(
         implemented = true,
         profilePermitted = true,
-        runtimeAvailable = false,
         selected = true,
-        unavailable = bluetoothUnavailable,
-        remediationActions = listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission),
+        runtime = MobileWalletProximityRuntimeObservation.Unavailable(bluetoothUnavailable, listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission)),
     )
 )
 
