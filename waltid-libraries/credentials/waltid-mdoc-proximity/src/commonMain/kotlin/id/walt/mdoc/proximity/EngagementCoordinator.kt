@@ -61,6 +61,7 @@ data class MdocEngagedConnection(
 
 /** One session-scoped QR or NFC engagement source, including every retrieval resource it advertises. */
 interface PreparedMdocEngagement {
+    /** Nonempty subset of source modes that were successfully prepared. */
     val modes: Set<MdocEngagementMode>
     val readiness: MdocEngagementReadiness
 
@@ -129,7 +130,9 @@ class MdocEngagementCoordinator {
                     return@forEach
                 }
                 prepared += candidate
-                require(candidate.modes == modes) { "A prepared engagement must retain its source modes" }
+                require(candidate.modes.isNotEmpty() && modes.containsAll(candidate.modes)) {
+                    "A prepared engagement must retain a nonempty subset of its source modes"
+                }
                 require((MdocEngagementMode.Qr in candidate.modes) == (candidate.readiness.qrPayload != null)) {
                     "Only a prepared QR engagement may expose a QR payload"
                 }

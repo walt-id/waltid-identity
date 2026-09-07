@@ -65,7 +65,12 @@ interface ProximityTransportProvider {
 /** A validated method or capability offered by a reader during NFC handover. */
 sealed interface ReaderSelectedTransportOffer {
     /** A complete retrieval method, including reader-owned endpoint parameters when applicable. */
-    data class Method(val value: DeviceRetrievalMethod) : ReaderSelectedTransportOffer
+    class Method(value: DeviceRetrievalMethod) : ReaderSelectedTransportOffer {
+        private val owned = value.snapshot()
+        val value: DeviceRetrievalMethod get() = owned.snapshot()
+        override fun equals(other: Any?): Boolean = other is Method && owned == other.owned
+        override fun hashCode(): Int = owned.hashCode()
+    }
 
     /** Conventional Handover offer allowing the holder to publish its own BLE peripheral endpoint. */
     data object BlePeripheralServer : ReaderSelectedTransportOffer

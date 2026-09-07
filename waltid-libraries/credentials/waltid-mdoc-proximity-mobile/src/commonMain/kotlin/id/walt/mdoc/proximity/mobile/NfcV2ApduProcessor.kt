@@ -10,6 +10,7 @@ import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethodCodec
+import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
 import id.walt.mdoc.proximity.ImmutableBytes
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.cbor.CborArray
@@ -38,7 +39,8 @@ internal class NfcV2HandoverRequest(
     availableMethods: List<DeviceRetrievalMethod>,
 ) {
     public val exactBytes: ImmutableBytes = exactBytes
-    public val availableMethods: List<DeviceRetrievalMethod> = availableMethods.toList()
+    private val ownedMethods = availableMethods.map(ReaderSelectedTransportOffer::Method)
+    public val availableMethods: List<DeviceRetrievalMethod> get() = ownedMethods.map { it.value }
 
     init {
         require(availableMethods.isNotEmpty()) { "NFCv2 Handover Request must offer retrieval methods" }

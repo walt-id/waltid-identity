@@ -301,11 +301,11 @@ private class ProximitySessionImpl(
         engagementFactory: MdocDeviceEngagementFactory,
     ): List<id.walt.mdoc.proximity.MdocEngagementSource> {
         val selected = configuration.session
-        fun newBleProviders(ble: MobileWalletProximityBleConfiguration?): List<ProximityTransportProvider> =
+        fun newBleProviders(ble: MobileWalletProximityBleConfiguration?, sharedUuid: Boolean = false): List<ProximityTransportProvider> =
             if (ble == null || !prerequisites.bluetoothLowEnergy.mayStart) emptyList() else listOf(
                 requireNotNull(bleTransportFactory).create(
                     BleProximityTransportConfiguration(
-                        roles = ble.roles.createTransactionRoles(),
+                        roles = ble.roles.createTransactionRoles(sharedUuid),
                         bearerPolicy = ble.bearerPolicy.toTransportPolicy(),
                         eDeviceKeyBytes = eDeviceKeyBytes,
                     )
@@ -321,7 +321,11 @@ private class ProximitySessionImpl(
                 qrRetrieval = qrDirect.takeUnless { scope is NfcMdocEngagementScope.NfcOnly },
             ),
             platform = requireNotNull(nfcHostPlatformAdapter),
-            alternateTransportProviders = if (scope is NfcMdocEngagementScope.QrOnly) emptyList() else newBleProviders(selected.nfcBle),
+            alternateTransportProviders = if (scope is NfcMdocEngagementScope.QrOnly) emptyList() else newBleProviders(
+                selected.nfcBle,
+                sharedUuid = selected is MobileWalletProximitySessionConfiguration.ConventionalNfc &&
+                    selected.handover == MobileWalletProximityNfcHandover.Static,
+            ),
             qrTransportProviders = if (scope is NfcMdocEngagementScope.NfcOnly) emptyList() else newBleProviders(qrPlan?.bluetoothLowEnergy),
             engagementFactory = engagementFactory,
         )
@@ -421,13 +425,13 @@ private fun MobileWalletProximityBleRoles.toTransportSelection(): BleMdocRoleSel
     MobileWalletProximityBleRoles.Dual -> BleMdocRoleSelection.DUAL
 }
 
-private fun ProximityBleRoles.createTransactionRoles(): BleMdocRoles = when (this) {
-    ProximityBleRoles.CentralClient -> BleMdocRoles.CentralClient(transactionUuid())
-    ProximityBleRoles.PeripheralServer -> BleMdocRoles.PeripheralServer(transactionUuid())
-    ProximityBleRoles.Dual -> {
+private fun MobileWalletProximityBleRoles.createTransactionRoles(sharedUuid: Boolean): BleMdocRoles = when (this) {
+    MobileWalletProximityBleRoles.CentralClient -> BleMdocRoles.CentralClient(transactionUuid())
+    MobileWalletProximityBleRoles.PeripheralServer -> BleMdocRoles.PeripheralServer(transactionUuid())
+    MobileWalletProximityBleRoles.Dual -> {
         val reader = transactionUuid()
-        var holder = transactionUuid()
-        while (holder == reader) holder = transactionUuid()
+        var holder = if (sharedUuid) reader else transactionUuid()
+        while (!sharedUuid && holder == reader) holder = transactionUuid()
         BleMdocRoles.Dual(reader, holder)
     }
 }

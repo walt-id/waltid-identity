@@ -39,6 +39,28 @@ class NfcV2ApduProcessorTest {
     )
 
     @Test
+    fun `selection callback cannot rewrite the reader offered endpoint through a projection`() = runTest {
+        val offered = DeviceRetrievalMethod.Ble(
+            centralMode = BleCentralMode(ByteArray(16)),
+            peripheralEndpoint = BlePeripheralEndpoint.Reader(BlePeripheralServerOptions(psm = 37u)),
+        )
+        val processor = NfcV2ApduProcessor(
+            NfcV2MaximumCommandDataLength(4_096), 128 * 1_024,
+            select = { request ->
+                val projection = assertIs<DeviceRetrievalMethod.Ble>(request.availableMethods.last())
+                projection.centralMode!!.uuid.fill(7)
+                selection(projection)
+            },
+        )
+        processor.process(selectNfcV2())
+        val result = response(processor.process(
+            envelope(NfcDo53.encode(request(DeviceRetrievalMethod.NfcV2, offered)), 65_536),
+        ))
+        assertEquals(NfcStatusWord.WRONG_DATA, result.statusWord)
+        assertEquals(NfcV2State.DEACTIVATED, processor.state)
+    }
+
+    @Test
     fun `select and NFC-only handover match the pinned provisional shape`() = runTest {
         val nfcV2 = DeviceRetrievalMethod.NfcV2
         val exactRequest = request(nfcV2)

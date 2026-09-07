@@ -54,6 +54,16 @@ class BleTransportProviderTest {
     )
 
     @Test
+    fun `shared dual UUID is reserved for NFC while QR keeps independent services`() = runTest {
+        val roles = BleMdocRoles.Dual(centralUuid, centralUuid)
+        assertFailsWith<IllegalArgumentException> { provider(roles, FakePlatform()).prepare(context, this) }
+        val prepared = provider(roles, FakePlatform()).prepare(context.copy(engagementMode = MdocEngagementMode.Nfc), this)
+        val method = assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethod)
+        assertContentEquals(method.centralMode!!.uuid, method.peripheralMode!!.uuid)
+        prepared.close(ProximityCloseReason.COMPLETED)
+    }
+
+    @Test
     fun `capability keeps runtime failure separate from implemented profile support`() = runTest {
         val platform = FakePlatform(
             BleProximityAvailability.Unavailable("permission_missing", "Bluetooth permission is missing")

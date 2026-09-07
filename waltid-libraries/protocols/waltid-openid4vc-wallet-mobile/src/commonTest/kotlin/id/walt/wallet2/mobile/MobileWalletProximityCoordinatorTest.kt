@@ -250,6 +250,29 @@ class ProximityCoordinatorTest {
     }
 
     @Test
+    fun `static NFC dual-role BLE uses the shared carrier UUID while QR stays distinct`() = runTest {
+        val ble = RecordingTransportFactory(BleProximityAvailability.Available)
+        val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
+        val coordinator = MobileWalletProximityCoordinator(Wallet("static-dual-role"), ble, nfc)
+        val session = coordinator.start(MobileWalletProximityConfiguration(
+            session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
+                handover = MobileWalletProximityNfcHandover.Static,
+                retrieval = MobileWalletProximityConventionalRetrievalConfiguration(),
+                qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(),
+            ),
+        ))
+        try {
+            val engagements = session.awaitEngagements()
+            assertEquals(2, engagements.size)
+            assertEquals(1, nfc.prepareCalls)
+            val nfcRoles = assertIs<BleMdocRoles.Dual>(ble.configurations[0].roles)
+            val qrRoles = assertIs<BleMdocRoles.Dual>(ble.configurations[1].roles)
+            assertEquals(nfcRoles.readerServiceUuid, nfcRoles.mdocServiceUuid)
+            assertNotEquals(qrRoles.readerServiceUuid, qrRoles.mdocServiceUuid)
+        } finally { session.close() }
+    }
+
+    @Test
     fun `combined NFCv2 session omits an unusable QR path instead of failing preparation`() = runTest {
         val ble = RecordingTransportFactory(
             BleProximityAvailability.Unavailable("ble_powered_off", "Bluetooth is powered off")

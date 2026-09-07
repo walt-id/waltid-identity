@@ -32,13 +32,6 @@ class BleProtocolTest {
     }
 
     @Test
-    fun `dual roles reject one UUID reused for both advertised services`() {
-        val uuid = BleServiceUuid.parse("00112233-4455-6677-8899-aabbccddeeff")
-
-        assertFailsWith<IllegalArgumentException> { BleMdocRoles.Dual(uuid, uuid) }
-    }
-
-    @Test
     fun `Ident matches independent HKDF SHA-256 vector`() {
         val actual = BleIdent.derive(ImmutableBytes.of(ByteArray(32) { it.toByte() }))
 
