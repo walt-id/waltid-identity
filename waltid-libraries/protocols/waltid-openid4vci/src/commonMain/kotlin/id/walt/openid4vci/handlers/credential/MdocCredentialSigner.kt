@@ -13,7 +13,7 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.mdoc.dataelement.DataElement as LegacyMdocDataElement
-import id.walt.mdoc.dataelement.json.mapPortraitCaptureDate
+import id.walt.mdoc.encoding.mapPortraitCaptureDate
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.Status
@@ -143,7 +143,7 @@ object MdocCredentialSigner {
 
         val effectiveValueMappingFunction =
             { docTypeValue: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement ->
-                mapPortraitCaptureDate(namespace, elementIdentifier, elementValueJson)?.toKotlinxCborElement()
+                mapPortraitCaptureDate(namespace, elementIdentifier, elementValueJson)
                     ?: mDocNameSpacesDataMappingConfig
                     ?.get(namespace)
                     ?.entriesConfigMap

@@ -36,13 +36,14 @@ and reject non-midnight timestamp input instead of silently discarding it. Names
 readers accept both legacy dates and full timestamps; timestamp issuance normalizes
 offsets to UTC and truncates fractional seconds to whole-second precision.
 
-Shared server issuance and the legacy namespace builder normalize only the standard
+Shared issuer2 issuance normalizes only the standard
 mDL and Photo ID `portrait_capture_date` fields, including inputs with an existing
 `stringToFullDate` mapping. Stored profiles and pending issuance sessions remain
 readable and do not require a bulk database or profile rewrite. New profiles should
 use `stringToTDate` and timestamps, as the bundled examples do. Deploy the shared
-issuance library update with each server; the compatibility behavior requires that
+issuance library update with each issuer2 server; the compatibility behavior requires that
 code to be present. Other full-date fields, such as `birth_date`, are unchanged.
+This correction does not change the legacy mdoc library or legacy issuer services.
 
 Already signed credentials are not rewritten. Their authoritative issuer-signed
 bytes remain the basis for verification and presentation; an issuer must reissue a

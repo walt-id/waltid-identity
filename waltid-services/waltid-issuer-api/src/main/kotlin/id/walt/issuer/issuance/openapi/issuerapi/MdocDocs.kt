@@ -150,7 +150,7 @@ object MdocDocs {
                     put("hair_colour", "black".toJsonElement())
                     put("birth_place", "Vienna".toJsonElement())
                     put("resident_address", "Some Street 4".toJsonElement())
-                    put("portrait_capture_date", "2018-08-09T12:00:00Z".toJsonElement())
+                    put("portrait_capture_date", "2018-08-09".toJsonElement())
                     put("age_in_years", 33.toJsonElement())
                     put("age_birth_year", 1986.toJsonElement())
 

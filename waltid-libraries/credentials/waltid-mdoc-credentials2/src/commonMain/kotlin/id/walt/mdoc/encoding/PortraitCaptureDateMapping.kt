@@ -1,28 +1,26 @@
-package id.walt.mdoc.dataelement.json
+package id.walt.mdoc.encoding
 
-import id.walt.mdoc.dataelement.TDateElement
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Instant
 
 /**
- * Corrects portrait capture values at issuance without migrating saved profiles or sessions.
- * Legacy dates mean midnight UTC; timestamps retain their instant. Unrelated fields are untouched.
+ * Maps standard portrait capture values for issuer2 without rewriting saved profiles or sessions.
+ * Legacy date-only inputs mean midnight UTC; supplied timestamps retain their instant.
  */
-fun mapPortraitCaptureDate(namespace: String, elementIdentifier: String, value: JsonElement): TDateElement? {
+@OptIn(ExperimentalSerializationApi::class)
+fun mapPortraitCaptureDate(namespace: String, elementIdentifier: String, value: JsonElement): CborString? {
     if (elementIdentifier != "portrait_capture_date" || namespace !in portraitNamespaces) return null
     require(value is JsonPrimitive && value.isString) { "portrait_capture_date must be a date or timestamp string" }
     val instant = if (value.content.length == 10) {
         LocalDate.parse(value.content).atStartOfDayIn(TimeZone.UTC)
     } else Instant.parse(value.content)
-    val wholeSeconds = Instant.fromEpochSeconds(instant.epochSeconds)
-    require(wholeSeconds.toString().length == 20) {
-        "mdoc timestamps require a four-digit year"
-    }
-    return TDateElement(wholeSeconds)
+    return CborString(instant.toMdocTDateString(), 0u)
 }
 
 private val portraitNamespaces = setOf("org.iso.18013.5.1", "org.iso.23220.1", "org.iso.23220.photoid.1")
