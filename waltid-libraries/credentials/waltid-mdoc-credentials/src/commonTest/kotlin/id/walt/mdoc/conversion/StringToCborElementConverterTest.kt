@@ -38,6 +38,15 @@ class StringToCborElementConverterTest {
     }
 
     @Test
+    fun timestampConversionRejectsDateOnlyAndInvalidCalendarInput() {
+        for (invalid in listOf("2024-02-29", "2023-02-29T12:34:56Z", "2024-02-29T12:60:56Z")) {
+            assertFails("Invalid capture timestamp: $invalid") {
+                StringToCborElementConverter.convert(invalid, StringToCborTypeConversion.STRING_TO_T_DATE)
+            }
+        }
+    }
+
+    @Test
     fun testBase64StringToByteStringConversion() {
         val byteArray = byteArrayOf(0x00, 0x7F, 0x10, 0x20, 0xFF.toByte())
         val base64Str = "AH8QIP8="

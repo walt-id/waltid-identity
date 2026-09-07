@@ -2,14 +2,17 @@ package id.walt.mdoc.credsdata
 
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnum
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnumSerializer
+import id.walt.mdoc.encoding.MdocTDateInstantSerializer
 import id.walt.mdoc.encoding.ByteArrayBase64UrlSerializer
 import id.walt.mdoc.objects.MdocsCborSerializer
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.cbor.ValueTags
 import kotlinx.serialization.cbor.ByteString
 
 
@@ -81,7 +84,10 @@ data class PhotoId(
     val ageOver68: Boolean? = null,
 
     @SerialName("age_birth_year") val ageBirthYear: UInt? = null,
-    @SerialName("portrait_capture_date") val portraitCaptureDate: LocalDate? = null, // tdate
+    /** Capture instant; omitted when the capture time is unknown. Encoded at whole-second UTC precision. */
+    @ValueTags(0u)
+    @Serializable(with = MdocTDateInstantSerializer::class)
+    @SerialName("portrait_capture_date") val portraitCaptureDate: Instant? = null,
     @SerialName("birthplace") val birthPlace: String? = null,
     @SerialName("name_at_birth") val nameAtBirth: String? = null,
     @SerialName("resident_address_unicode") val residentAddressUnicode: String? = null,
@@ -288,7 +294,7 @@ data class PhotoId(
                     "expiry_date" to localDate,
                     "portrait" to byteArray,
                     "sex" to IsoSexEnumSerializer,
-                    "portrait_capture_date" to localDate,
+                    "portrait_capture_date" to MdocTDateInstantSerializer,
                     "age_in_year" to uint,
                     "age_birth_year" to uint,
                     "age_over_12" to boolean,
@@ -314,7 +320,7 @@ data class PhotoId(
                     "expiry_date" to localDate,
                     "portrait" to byteArray,
                     "sex" to IsoSexEnumSerializer,
-                    "portrait_capture_date" to localDate,
+                    "portrait_capture_date" to MdocTDateInstantSerializer,
                     "age_in_year" to uint,
                     "age_birth_year" to uint,
                     "age_over_12" to boolean,

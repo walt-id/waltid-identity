@@ -4,6 +4,7 @@ package id.walt.mdoc.credsdata
 
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnum
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnumSerializer
+import id.walt.mdoc.encoding.MdocTDateInstantSerializer
 import id.walt.mdoc.encoding.ByteArrayBase64UrlSerializer
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.datetime.LocalDate
@@ -51,7 +52,10 @@ data class Mdl(
     @SerialName("hair_colour") val hairColour: String? = null,
     @SerialName("birth_place") val birthPlace: String? = null,
     @SerialName("resident_address") val residentAddress: String? = null,
-    @SerialName("portrait_capture_date") val portraitCaptureDate: LocalDate? = null, // tdate
+    /** Capture instant; omitted when the capture time is unknown. Encoded at whole-second UTC precision. */
+    @ValueTags(0u)
+    @Serializable(with = MdocTDateInstantSerializer::class)
+    @SerialName("portrait_capture_date") val portraitCaptureDate: Instant? = null,
     @SerialName("age_in_years") val ageInYears: UInt? = null,
     @SerialName("age_birth_year") val ageBirthYear: UInt? = null,
 
@@ -209,7 +213,7 @@ data class Mdl(
                     "sex" to IsoSexEnumSerializer,
                     "height" to uint,
                     "weight" to uint,
-                    "portrait_capture_date" to localDate,
+                    "portrait_capture_date" to MdocTDateInstantSerializer,
                     "age_in_year" to uint,
                     "age_birth_year" to uint,
                     "signature_usual_mark" to ByteArraySerializer(),

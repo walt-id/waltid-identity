@@ -20,6 +20,26 @@
 
 ## Getting Started
 
+### Portrait capture timestamp migration
+
+`Mdl.portraitCaptureDate` and `PhotoId.portraitCaptureDate` use `kotlin.time.Instant?`.
+Supply the actual capture instant, for example `Instant.parse("2024-02-29T12:34:56Z")`.
+The JSON property remains `portrait_capture_date`; CBOR uses tag 0 and a UTC timestamp
+at whole-second precision. Fractional seconds are truncated during encoding.
+
+This is a source and binary API change from `LocalDate?`: consumers must update
+constructor/copy calls and property usage, then recompile against the new library.
+Publish this change only in a release that permits that API break. Issuer profiles
+must use `stringToTDate` and provide a timestamp, replacing `stringToFullDate`.
+The bundled times are synthetic examples, not a migration rule for stored values.
+
+A date alone does not identify a capture instant. Obtain the actual time from the
+issuer's source data or omit this optional field when it is unknown; do not assume
+midnight or the server's local time zone. Date-only model input is rejected.
+Do not re-encode an already signed credential to repair this field: its issuer
+must issue a replacement if correction is needed. Presentation continues to use
+the authoritative issuer-signed bytes.
+
 ## What is the mdoc library
 This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://www.iso.org/standard/69084.html), Personal identification -- ISO-compliant driving licence -- Part 5: Mobile driving licence (mDL) application.
 

@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.issuance
 
 import id.walt.certificate.x509.X509CertificateUtil
@@ -5,6 +7,7 @@ import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.toCoseKey
 import id.walt.cose.verify
+import id.walt.cose.coseCompliantCbor
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -16,16 +19,22 @@ import id.walt.mdoc.credsdata.DrivingPrivilege
 import id.walt.mdoc.credsdata.Mdl
 import id.walt.mdoc.crypto.MdocCrypto.getSharedSecret
 import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.verification.verifyIssuerAuthentication
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
+import kotlin.time.Instant
 
 class Crypto2MdocIssuerTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
@@ -91,6 +100,7 @@ class Crypto2MdocIssuerTest {
                 expiryDate = LocalDate(2036, 1, 1),
                 documentNumber = "DOC-1",
                 drivingPrivileges = listOf(DrivingPrivilege("B", issueDate)),
+                portraitCaptureDate = Instant.parse("2024-02-29T12:34:56.123Z"),
             ),
         )
         assertTrue(typesafeIssued.issuerAuth.verify(issuerKey, Cose.Algorithm.ES256))
@@ -98,6 +108,14 @@ class Crypto2MdocIssuerTest {
             "org.iso.18013.5.1.mDL",
             typesafeIssued.issuerAuth.decodeIsoPayload<MobileSecurityObject>().docType,
         )
+        val decoded = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(coseCompliantCbor.encodeToByteArray(typesafeIssued))
+        val portraitTimestamp = assertNotNull(decoded.namespaces)["org.iso.18013.5.1"]!!.entries
+            .single { it.value.elementIdentifier == "portrait_capture_date" }.value
+        assertContentEquals(
+            byteArrayOf(0xc0.toByte(), 0x74) + "2024-02-29T12:34:56Z".encodeToByteArray(),
+            coseCompliantCbor.encodeToByteArray(CborElement.serializer(), portraitTimestamp.elementValue),
+        )
+        assertTrue(decoded.issuerAuth.verify(issuerKey, Cose.Algorithm.ES256))
     }
 
     @Test

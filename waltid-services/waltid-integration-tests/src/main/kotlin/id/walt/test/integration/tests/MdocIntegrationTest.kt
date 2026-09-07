@@ -1064,7 +1064,7 @@ class MdocIntegrationTest : AbstractIntegrationTest() {
             "hair_colour" to "black".toJsonElement(),
             "birth_place" to "Vienna".toJsonElement(),
             "resident_address" to "Some Street 4".toJsonElement(),
-            "portrait_capture_date" to "2018-08-09".toJsonElement(),
+            "portrait_capture_date" to "2018-08-09T12:00:00Z".toJsonElement(),
             "age_in_years" to 33.toJsonElement(),
             "age_birth_year" to 1986.toJsonElement(),
             "issuing_jurisdiction" to "AT-9".toJsonElement(),

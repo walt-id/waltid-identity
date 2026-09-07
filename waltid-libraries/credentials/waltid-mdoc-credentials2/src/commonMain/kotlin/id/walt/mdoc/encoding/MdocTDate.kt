@@ -10,7 +10,9 @@ import kotlin.time.Instant
  * Fractional seconds are not permitted in mdoc date-time strings; values are truncated to whole seconds.
  */
 fun Instant.toMdocTDateString(): String =
-    Instant.fromEpochSeconds(epochSeconds).toString()
+    Instant.fromEpochSeconds(epochSeconds).toString().also {
+        require(it.length == 20) { "mdoc timestamps require a four-digit year" }
+    }
 
 /**
  * Normalizes an RFC 3339 date-time string to second-level precision without fractional seconds.
