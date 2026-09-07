@@ -16,7 +16,6 @@ import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.engagement.DeviceEngagement
-import id.walt.mdoc.objects.engagement.DeviceEngagementCapabilities
 import id.walt.mdoc.objects.engagement.DeviceEngagementSecurity
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.session.SessionData
@@ -131,8 +130,10 @@ class PreviewDocument(
     credentialIds: List<String>,
     elements: List<PreviewElement>,
 ) {
-    val credentialIds: List<String> = credentialIds.toList()
-    val elements: List<PreviewElement> = elements.toList()
+    private val ownedCredentialIds: List<String> = credentialIds.toList()
+    val credentialIds: List<String> get() = ownedCredentialIds.toList()
+    private val ownedElements: List<PreviewElement> = elements.toList()
+    val elements: List<PreviewElement> get() = ownedElements.toList()
 
     init {
         require(docType.isNotBlank() && this.credentialIds.isNotEmpty() && this.elements.isNotEmpty())
@@ -153,10 +154,13 @@ class MdocRequestPreview(
     val submissionBindingDigest: ImmutableBytes,
     applicationAuthorizations: List<MdocApplicationAuthorization> = emptyList(),
 ) {
-    val documents: List<PreviewDocument> = documents.toList()
-    val purposeHints: Map<String, Int> = purposeHints.toMap()
+    private val ownedDocuments: List<PreviewDocument> = documents.toList()
+    val documents: List<PreviewDocument> get() = ownedDocuments.toList()
+    private val ownedPurposeHints: Map<String, Int> = purposeHints.toMap()
+    val purposeHints: Map<String, Int> get() = ownedPurposeHints.toMap()
     /** Wallet-profile results already validated and normalized for display during holder consent. */
-    val applicationAuthorizations: List<MdocApplicationAuthorization> = applicationAuthorizations.toList()
+    private val ownedApplicationAuthorizations: List<MdocApplicationAuthorization> = applicationAuthorizations.toList()
+    val applicationAuthorizations: List<MdocApplicationAuthorization> get() = ownedApplicationAuthorizations.toList()
 
     init {
         require(this.documents.isNotEmpty()) { "A request preview must contain at least one document" }
@@ -166,16 +170,30 @@ class MdocRequestPreview(
     private companion object { const val SHA256_BYTES = 32 }
 }
 
-data class MdocHolderRequestContext(
-    val request: ExactCbor<DeviceRequest>,
-    val transcript: ExactCbor<SessionTranscript>,
-    /** Exact reader ephemeral COSE_Key from SessionEstablishment, available for device-MAC selection. */
-    val readerEphemeralKey: ExactCbor<CoseKey>,
+/** Exact protocol inputs remain owned even when a processor inspects or modifies a decoded projection. */
+class MdocHolderRequestContext(
+    request: ExactCbor<DeviceRequest>,
+    transcript: ExactCbor<SessionTranscript>,
+    readerEphemeralKey: ExactCbor<CoseKey>,
     val exchange: Int,
 ) {
-    init {
-        require(exchange > 0)
-    }
+    private val requestBytes = request.encodedCopy()
+    private val transcriptBytes = transcript.encodedCopy()
+    private val readerKeyBytes = readerEphemeralKey.encodedCopy()
+
+    val request: ExactCbor<DeviceRequest>
+        get() = ExactCbor.of(coseCompliantCbor.decodeFromByteArray(requestBytes), requestBytes)
+    /** Exact SessionTranscriptBytes, including the tag-24 byte-string wrapper. */
+    val transcript: ExactCbor<SessionTranscript>
+        get() = ExactCbor.of(
+            coseCompliantCbor.decodeFromByteArray(coseCompliantCbor.decodeFromByteArray<ByteArray>(transcriptBytes)),
+            transcriptBytes,
+        )
+    /** Exact reader ephemeral COSE_Key from SessionEstablishment, available for device-MAC selection. */
+    val readerEphemeralKey: ExactCbor<CoseKey>
+        get() = ExactCbor.of(coseCompliantCbor.decodeFromByteArray(readerKeyBytes), readerKeyBytes)
+
+    init { require(exchange > 0) }
 }
 
 enum class MdocSessionContinuation { CONTINUE, TERMINATE }
@@ -295,7 +313,7 @@ sealed interface MdocHolderSessionResult {
  */
 class MdocHolderProtocolEngine(
     private val eDeviceKey: Key,
-    private val transportProviders: List<ProximityTransportProvider>,
+    transportProviders: List<ProximityTransportProvider>,
     private val requestProcessor: MdocHolderRequestProcessor,
     private val consentHandler: MdocConsentHandler,
     private val engagementContext: EngagementContext,
@@ -305,6 +323,7 @@ class MdocHolderProtocolEngine(
     private val transportCoordinator: TransportCoordinator = TransportCoordinator(),
     private val engagementFactory: MdocDeviceEngagementFactory = MdocDeviceEngagementFactory(),
 ) {
+    private val transportProviders = transportProviders.toList()
     private val mutableState = MutableStateFlow<MdocHolderSessionState>(MdocHolderSessionState.Idle)
     val state: StateFlow<MdocHolderSessionState> = mutableState.asStateFlow()
     private val startMutex = Mutex()

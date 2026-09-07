@@ -34,7 +34,7 @@ class RicalTest {
         name = "Example reader authority",
     )
     private val evidence = ReaderAuthenticationEvidence(
-        ReaderAuthenticationScope.WHOLE_REQUEST,
+        ReaderAuthenticationScope.WholeRequest,
         certificateChainDer = listOf(ImmutableBytes.of(byteArrayOf(4))),
     )
 
@@ -73,6 +73,22 @@ class RicalTest {
 
         assertEquals(ReaderTrustState.VALID_BUT_UNTRUSTED, evaluate(false).state)
         assertEquals(ReaderTrustState.TRUSTED, evaluate(true).state)
+    }
+
+    @Test
+    fun `signed RICAL projections cannot change authenticated payload or signer membership`() {
+        val value = signed(Rical(
+            "1.0", "provider", Instant.parse("2026-01-01T00:00:00Z"),
+            certificateInfos = listOf(authority), type = "reader",
+        ))
+        val original = value.exactMessage
+        val projection = value.payload
+        (projection.value.certificateInfos as MutableList).clear()
+        value.signerChainDer.toMutableList().clear()
+        assertEquals(1, value.rical.certificateInfos.size)
+        assertEquals(1, value.signerChainDer.size)
+        assertEquals(original, value.exactMessage)
+        assertEquals("provider", value.payload.value.provider)
     }
 
     @Test

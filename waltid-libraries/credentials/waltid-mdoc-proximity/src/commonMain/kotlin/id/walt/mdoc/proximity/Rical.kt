@@ -113,11 +113,15 @@ data class RicalTrustConstraint(
 /** A COSE_Sign1 whose attached payload is decoded and retained as the exact RICAL bytes it authenticates. */
 class SignedRical private constructor(
     encodedMessage: ByteArray,
-    val payload: ExactCbor<Rical>,
+    payload: ExactCbor<Rical>,
     signerChainDer: List<ImmutableBytes>,
 ) {
     private val messageBytes = ImmutableBytes.of(encodedMessage)
-    val signerChainDer: List<ImmutableBytes> = signerChainDer.toList()
+    private val payloadBytes = payload.encodedCopy()
+    private val signerChain = signerChainDer.toList()
+    val signerChainDer: List<ImmutableBytes> get() = signerChain.toList()
+    val payload: ExactCbor<Rical>
+        get() = ExactCbor.of(coseCompliantCbor.decodeFromByteArray(payloadBytes), payloadBytes)
     val rical: Rical get() = payload.value
     val coseSign1: CoseSign1 get() = CoseSign1.fromTagged(messageBytes.copy())
     val exactMessage: ImmutableBytes get() = messageBytes
@@ -203,15 +207,20 @@ fun interface RicalReaderPathValidator {
     ): RicalReaderPathState
 }
 
-data class RicalPolicy(
+class RicalPolicy(
     val providerId: String,
-    val acceptedTypes: Set<String>,
-    val trustedProviderRootsDer: List<ImmutableBytes>,
+    acceptedTypes: Set<String>,
+    trustedProviderRootsDer: List<ImmutableBytes>,
     val establishReaderTrust: Boolean = false,
 ) {
+    private val types = acceptedTypes.toSet()
+    private val providerRoots = trustedProviderRootsDer.toList()
+    val acceptedTypes: Set<String> get() = types.toSet()
+    val trustedProviderRootsDer: List<ImmutableBytes> get() = providerRoots.toList()
+
     init {
-        require(providerId.isNotBlank() && acceptedTypes.isNotEmpty() && trustedProviderRootsDer.isNotEmpty())
-        require(acceptedTypes.none(String::isBlank))
+        require(providerId.isNotBlank() && types.isNotEmpty() && providerRoots.isNotEmpty())
+        require(types.none(String::isBlank))
     }
 }
 
@@ -291,13 +300,18 @@ class RicalReaderTrustEvaluator(
         }
         var authority: RicalCertificateInfo? = null
         for (info in rical.certificateInfos) {
-            when (pathValidator.validate(evidence, rical, info)) {
+            val pathRical = signed.rical
+            val pathInfo = pathRical.certificateInfos.single { it.subjectKeyIdentifier == info.subjectKeyIdentifier }
+            when (pathValidator.validate(evidence, pathRical, pathInfo)) {
                 RicalReaderPathState.NO_MATCH, RicalReaderPathState.INVALID -> Unit
                 RicalReaderPathState.REVOKED -> return ReaderTrustDecision(
                     ReaderTrustState.REVOKED,
                     "Reader authentication certificate is revoked",
                 )
-                RicalReaderPathState.VALID -> if (constraintEvaluator.accepts(info.trustConstraints, evidence)) {
+                RicalReaderPathState.VALID -> if (constraintEvaluator.accepts(
+                    signed.rical.certificateInfos.single { it.subjectKeyIdentifier == info.subjectKeyIdentifier }.trustConstraints,
+                    evidence,
+                )) {
                     authority = info
                     break
                 }

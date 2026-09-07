@@ -41,7 +41,8 @@ class MdocApplicationAuthorization(
     val resultBindingDigest: ImmutableBytes,
 ) {
     /** Ordered, display-safe values supplied by the wallet application profile. */
-    val details: List<MdocApplicationAuthorizationDetail> = details.toList()
+    private val ownedDetails: List<MdocApplicationAuthorizationDetail> = details.toList()
+    val details: List<MdocApplicationAuthorizationDetail> get() = ownedDetails.toList()
 
     init {
         require(profileId.isNotBlank()) { "Application profile id must not be blank" }
