@@ -968,7 +968,21 @@ public actor ProximityPresentationSession {
 
     init(bridge: any ProximityPresentationSessionBridge) {
         self.bridge = bridge
-        self.states = bridge.states
+        self.states = AsyncStream { continuation in
+            let task = Task {
+                for await state in bridge.states {
+                    continuation.yield(state)
+                    switch state {
+                    case .completed, .cancelled, .failed:
+                        continuation.finish()
+                        return
+                    default: break
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 
     /// Dispatches one host intent against the current session state.
