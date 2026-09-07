@@ -12,12 +12,12 @@ class FakeProximityLoopback private constructor(
     val reader: FakeProximityConnection,
 ) {
     companion object {
-        fun create(capacity: Int = Channel.UNLIMITED): FakeProximityLoopback {
+        fun create(capacity: Int = Channel.UNLIMITED, kind: ProximityTransportKind = ProximityTransportKind.BLE): FakeProximityLoopback {
             val holderInbound = Channel<ImmutableBytes>(capacity)
             val readerInbound = Channel<ImmutableBytes>(capacity)
             return FakeProximityLoopback(
-                holder = FakeProximityConnection(holderInbound, readerInbound),
-                reader = FakeProximityConnection(readerInbound, holderInbound),
+                holder = FakeProximityConnection(holderInbound, readerInbound, kind),
+                reader = FakeProximityConnection(readerInbound, holderInbound, kind),
             )
         }
     }
@@ -26,11 +26,11 @@ class FakeProximityLoopback private constructor(
 class FakeProximityConnection internal constructor(
     private val inbound: Channel<ImmutableBytes>,
     private val outbound: Channel<ImmutableBytes>,
+    override val kind: ProximityTransportKind,
 ) : ProximityConnection {
     private val stateMutex = Mutex()
     private val sendMutex = Mutex()
     private var terminal = false
-    override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
 
     override suspend fun receive(): ImmutableBytes? = inbound.receiveCatching().getOrNull()
 
@@ -53,7 +53,7 @@ class FakePreparedTransport(
     private val connection: ProximityConnection,
     override val sessionTranscriptFactory: SessionTranscriptFactory = QrSessionTranscriptFactory,
 ) : PreparedTransport {
-    override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+    override val kind: ProximityTransportKind = connection.kind
     private val mutex = Mutex()
     private var terminal = false
     override suspend fun awaitConnection(): ProximityConnection = mutex.withLock {
@@ -73,7 +73,7 @@ class FakeTransportProvider(
     private val connection: ProximityConnection,
     private val availability: ProximityCapability = ProximityCapability(true, true, true, sessionSelected = true),
 ) : ProximityTransportProvider {
-    override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+    override val kind: ProximityTransportKind = connection.kind
     override suspend fun capability(context: EngagementContext): ProximityCapability = availability
     override suspend fun prepare(context: EngagementContext, sessionScope: CoroutineScope): PreparedTransport {
         check(availability.mayPrepare) { "Fake transport is unavailable" }
