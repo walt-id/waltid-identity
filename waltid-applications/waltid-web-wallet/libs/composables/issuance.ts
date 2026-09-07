@@ -1,4 +1,4 @@
-import {createError, navigateTo, useLazyAsyncData} from "nuxt/app";
+import {createError, navigateTo, useLazyAsyncData, useRuntimeConfig} from "nuxt/app";
 import {useCurrentWallet} from "./accountWallet.ts";
 import {decodeRequest} from "./siop-requests.ts";
 import {type Ref, ref, watch} from "vue";
@@ -6,7 +6,8 @@ import {groupBy} from "./groupings.ts";
 
 export async function useIssuance(query: any) {
     const currentWallet = useCurrentWallet()
-    const { data: dids, pending: pendingDids } = await useLazyAsyncData<Array<{ did: string; default: boolean; }>>(() => $fetch(`/wallet-api/wallet/${currentWallet.value}/dids`));
+    const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
+    const { data: dids, pending: pendingDids } = await useLazyAsyncData<Array<{ did: string; default: boolean; }>>(() => $fetch(`${apiBase}/wallet-api/wallet/${currentWallet.value}/dids`, { credentials: 'include' }));
     const selectedDid: Ref<{ did: string; default: boolean; } | null> = ref(null);
 
     watch(dids, async (newDids) => {
@@ -20,9 +21,10 @@ export async function useIssuance(query: any) {
                 credential_issuer: string;
                 credential_configuration_ids: string[];
                 credentials: string[];
-            } = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveCredentialOffer`, {
+            } = await $fetch(`${apiBase}/wallet-api/wallet/${currentWallet.value}/exchange/resolveCredentialOffer`, {
                 method: "POST",
-                body: request
+                body: request,
+                credentials: 'include',
             });
             return response;
         } catch (e) {
@@ -51,7 +53,7 @@ export async function useIssuance(query: any) {
     const credential_issuer: {
         credential_configurations_supported: Array<{ types: Array<String>; }>; // Draft13
         credentials_supported?: Array<{ id: string; types: Array<String> }>; // Draft11
-    } = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveIssuerOpenIDMetadata?issuer=${issuer}`)
+    } = await $fetch(`${apiBase}/wallet-api/wallet/${currentWallet.value}/exchange/resolveIssuerOpenIDMetadata?issuer=${issuer}`, { credentials: 'include' })
 
 
     const credentialList = credentialOffer.credential_configuration_ids
@@ -83,7 +85,7 @@ export async function useIssuance(query: any) {
 
         if (typeof credentialListElement["vct"] !== 'undefined') {
 
-            const response = await fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveVctUrl?vct=${credentialListElement["vct"]}`);
+            const response = await fetch(`${apiBase}/wallet-api/wallet/${currentWallet.value}/exchange/resolveVctUrl?vct=${credentialListElement["vct"]}`, { credentials: 'include' });
 
             if (response.status < 200 || response.status >= 300) {
                 throw new Error(`VCT URL returns error: ${response.status}`);
@@ -111,9 +113,10 @@ export async function useIssuance(query: any) {
         if (did === null) { return; }
 
         try {
-            await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequest?did=${did}`, {
+            await $fetch(`${apiBase}/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequest?did=${did}`, {
                 method: "POST",
                 body: request,
+                credentials: 'include',
             });
             navigateTo(`/wallet/${currentWallet.value}`);
         } catch (e: any) {

@@ -517,9 +517,11 @@ async function register() {
     password: passwordInput,
     type: "email",
   };
-  await $fetch("/wallet-api/auth/register", {
+  const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
+  await $fetch(`${apiBase}/wallet-api/auth/register`, {
     method: "POST",
     body: user,
+    credentials: 'include',
   })
     .then((response) => {
       success.value = true;
