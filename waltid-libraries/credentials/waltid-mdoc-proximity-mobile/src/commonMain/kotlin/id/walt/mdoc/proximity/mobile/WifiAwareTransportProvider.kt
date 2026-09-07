@@ -17,13 +17,10 @@ import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.seconds
 
 internal class DefaultWifiAwareProximityTransportProvider(
@@ -31,11 +28,10 @@ internal class DefaultWifiAwareProximityTransportProvider(
     private val platform: WifiAwarePlatformAdapter,
 ) : ReaderSelectedTransportProvider {
     override val kind: ProximityTransportKind = ProximityTransportKind.WIFI_AWARE
-    private val prepareMutex = Mutex()
-    private var sharedPublication: SharedWifiAwarePublication? = null
+    private val prepared = atomic(false)
 
     override suspend fun capability(context: EngagementContext): ProximityCapability {
-        val availability = platform.capability(configuration.securityPolicy)
+        val availability = platform.capability()
         val unavailable = availability as? WifiAwareProximityAvailability.Unavailable
         return ProximityCapability(
             implemented = unavailable?.implemented ?: true,
@@ -63,6 +59,9 @@ internal class DefaultWifiAwareProximityTransportProvider(
         return runCatching {
             require(method.passphraseInfo == null) {
                 "A Wi-Fi Aware reader offer must not select the holder passphrase"
+            }
+            require(method.operatingClass == null && method.channelNumber == null && method.extensions.isEmpty()) {
+                "The Wi-Fi Aware platform does not support reader-selected channels or extensions"
             }
             WifiAwareSupportedBands.fromBytes(method.supportedBands)
         }.isSuccess
@@ -101,22 +100,20 @@ internal class DefaultWifiAwareProximityTransportProvider(
         }
         val serviceName = WifiAwareProtocol.deriveServiceName(configuration.eDeviceKeyBytes)
         val passphrase = WifiAwareProtocol.derivePassphrase(configuration.eDeviceKeyBytes)
+        check(prepared.compareAndSet(expect = false, update = true)) {
+            "A Wi-Fi Aware provider owns one engagement endpoint; use independent keys for concurrent engagements"
+        }
+        var acquired: WifiAwarePreparedPlatformPublisher? = null
         val publication = try {
-            prepareMutex.withLock {
-                sharedPublication ?: SharedWifiAwarePublication(
-                    platform = withTimeout(PREPARE_TIMEOUT) {
-                        platform.preparePublisher(
-                            serviceName = serviceName,
-                            passphrase = passphrase,
-                            securityPolicy = configuration.securityPolicy,
-                            sessionScope = sessionScope,
-                        )
-                    },
-                    maximumMessageBytes = context.maximumMessageBytes,
-                    sessionJob = sessionScope.coroutineContext[Job],
-                ).also { sharedPublication = it }
+            withTimeout(PREPARE_TIMEOUT) {
+                platform.preparePublisher(
+                    serviceName = serviceName,
+                    passphrase = passphrase,
+                    sessionScope = sessionScope,
+                ).also { acquired = it }
             }
         } catch (_: TimeoutCancellationException) {
+            acquired?.close(ProximityCloseReason.TIMEOUT)
             throw ProximityException(
                 ProximityError.Transport(
                     "wifi_aware_prepare_timeout",
@@ -124,6 +121,7 @@ internal class DefaultWifiAwareProximityTransportProvider(
                 )
             )
         } catch (cancelled: CancellationException) {
+            acquired?.close(ProximityCloseReason.CANCELLED)
             throw cancelled
         } catch (failure: ProximityException) {
             throw failure
@@ -142,9 +140,9 @@ internal class DefaultWifiAwareProximityTransportProvider(
                 passphraseInfo = passphrase.takeIf { context.engagementMode == MdocEngagementMode.Nfc },
                 supportedBands = bands.encoded(),
             )
-            return publication.acquire(method)
+            return PreparedWifiAwareTransport(publication, method, context.maximumMessageBytes)
         } catch (failure: Throwable) {
-            withContext(NonCancellable) { publication.forceClose(ProximityCloseReason.CANCELLED) }
+            withContext(NonCancellable) { publication.close(ProximityCloseReason.CANCELLED) }
             throw failure
         }
     }
@@ -154,99 +152,60 @@ internal class DefaultWifiAwareProximityTransportProvider(
     }
 }
 
-private class SharedWifiAwarePublication(
+/** One publisher and one accept owner, belonging to exactly one engagement. */
+private class PreparedWifiAwareTransport(
     private val platform: WifiAwarePreparedPlatformPublisher,
+    connectionMethod: DeviceRetrievalMethod.WifiAware,
     private val maximumMessageBytes: Int,
-    sessionJob: Job?,
-) {
-    val supportedBands: WifiAwareSupportedBands get() = platform.supportedBands
+) : PreparedTransport {
+    private val method = ReaderSelectedTransportOffer.Method(connectionMethod)
+    override val connectionMethod: DeviceRetrievalMethod get() = method.value
+    override val kind: ProximityTransportKind = ProximityTransportKind.WIFI_AWARE
     private val closed = atomic(false)
     private val awaited = atomic(false)
     private val connection = atomic<ProximityConnection?>(null)
-    private val referenceMutex = Mutex()
-    private var references = 0
-    private var sessionHandle: kotlinx.coroutines.DisposableHandle? = null
 
-    init {
-        sessionHandle = sessionJob?.invokeOnCompletion {
-            forceClose(ProximityCloseReason.CANCELLED)
-        }
-    }
-
-    suspend fun acquire(method: DeviceRetrievalMethod.WifiAware): PreparedTransport = referenceMutex.withLock {
-        check(!closed.value) { "Wi-Fi Aware publication is closed" }
-        references++
-        PreparedWifiAwareTransport(this, method)
-    }
-
-    suspend fun awaitConnection(): ProximityConnection {
+    override suspend fun awaitConnection(): ProximityConnection {
         check(awaited.compareAndSet(expect = false, update = true)) {
             "A prepared Wi-Fi Aware endpoint accepts one connection"
         }
-        ensureOpen()
-        return try {
-            val raw = withTimeout(CONNECTION_TIMEOUT) { platform.awaitConnection() }
+        check(!closed.value) { "Wi-Fi Aware endpoint is closed" }
+        var acquired: WifiAwareRawConnection? = null
+        try {
+            val raw = withTimeout(CONNECTION_TIMEOUT) {
+                platform.awaitConnection().also { acquired = it }
+            }
+            val exact = WifiAwareHttpConnection(raw, maximumMessageBytes)
+            connection.value = exact
             if (closed.value) {
-                raw.close(ProximityCloseReason.CANCELLED)
-                throw CancellationException("Wi-Fi Aware endpoint closed while accepting a connection")
+                connection.compareAndSet(expect = exact, update = null)
+                exact.close(ProximityCloseReason.CANCELLED)
+                throw CancellationException("Wi-Fi Aware endpoint closed during connection delivery")
             }
-            WifiAwareHttpConnection(raw, maximumMessageBytes).also { exact ->
-                connection.value = exact
-                if (closed.value && connection.compareAndSet(expect = exact, update = null)) {
-                    exact.close(ProximityCloseReason.CANCELLED)
-                }
+            return exact
+        } catch (failure: Throwable) {
+            val reason = if (failure is TimeoutCancellationException) ProximityCloseReason.TIMEOUT
+                else ProximityCloseReason.CANCELLED
+            withContext(NonCancellable) {
+                acquired?.close(reason)
+                close(reason)
             }
-        } catch (_: TimeoutCancellationException) {
-            forceClose(ProximityCloseReason.TIMEOUT)
-            throw ProximityException(
-                ProximityError.Transport(
-                    "wifi_aware_connection_timeout",
-                    "Wi-Fi Aware reader connection timed out",
-                )
+            if (failure is TimeoutCancellationException) throw ProximityException(
+                ProximityError.Transport("wifi_aware_connection_timeout", "Wi-Fi Aware reader connection timed out")
             )
+            throw failure
         }
-    }
-
-    suspend fun release(reason: ProximityCloseReason) {
-        val close = referenceMutex.withLock {
-            if (references == 0) false else {
-                references--
-                references == 0
-            }
-        }
-        if (close) {
-            connection.getAndSet(null)?.close(reason)
-            forceClose(reason)
-        }
-    }
-
-    fun forceClose(reason: ProximityCloseReason) {
-        if (closed.compareAndSet(expect = false, update = true)) {
-            sessionHandle?.dispose()
-            platform.close(reason)
-        }
-    }
-
-    private fun ensureOpen() = check(!closed.value) { "Wi-Fi Aware endpoint is closed" }
-
-    private companion object {
-        val CONNECTION_TIMEOUT = 60.seconds
-    }
-}
-
-private class PreparedWifiAwareTransport(
-    private val shared: SharedWifiAwarePublication,
-    override val connectionMethod: DeviceRetrievalMethod.WifiAware,
-) : PreparedTransport {
-    override val kind: ProximityTransportKind = ProximityTransportKind.WIFI_AWARE
-    private val closed = atomic(false)
-
-    override suspend fun awaitConnection(): ProximityConnection {
-        check(!closed.value) { "Wi-Fi Aware transport handle is closed" }
-        return shared.awaitConnection()
     }
 
     override suspend fun close(reason: ProximityCloseReason) {
-        if (closed.compareAndSet(expect = false, update = true)) shared.release(reason)
+        if (closed.compareAndSet(expect = false, update = true)) {
+            // Close native resources before waiting for any framed connection cleanup.
+            platform.close(reason)
+            connection.getAndSet(null)?.close(reason)
+        }
+    }
+
+    private companion object {
+        val CONNECTION_TIMEOUT = 60.seconds
     }
 }

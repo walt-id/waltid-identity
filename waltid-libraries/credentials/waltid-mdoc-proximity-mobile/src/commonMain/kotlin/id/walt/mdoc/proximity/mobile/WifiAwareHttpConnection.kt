@@ -8,6 +8,7 @@ import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ProximityTransportKind
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.yield
@@ -19,27 +20,33 @@ internal class WifiAwareHttpConnection(
 ) : ProximityConnection {
     override val kind: ProximityTransportKind = ProximityTransportKind.WIFI_AWARE
 
-    private val exchangeMutex = Mutex()
+    private val receiveMutex = Mutex()
+    private val sendMutex = Mutex()
+    // HTTP remains request/response even when the NFCv2 coordinator reads ahead or queues a duplicate response.
+    private val nextRequest = Channel<Unit>(1).apply { trySend(Unit) }
+    private val pendingResponse = Channel<Unit>(1)
     private val closed = atomic(false)
     private var buffered = ByteArray(0)
-    private var responseExpected = false
 
     init {
         require(maximumMessageBytes > 0)
     }
 
-    override suspend fun receive(): ImmutableBytes? = exchangeMutex.withLock {
+    override suspend fun receive(): ImmutableBytes? = receiveMutex.withLock {
         ensureOpen()
-        check(!responseExpected) { "A Wi-Fi Aware response is still pending" }
         try {
-            val headerEnd = readHeaderEnd() ?: return@withLock null
+            if (nextRequest.receiveCatching().getOrNull() == null) return@withLock null
+            val headerEnd = readHeaderEnd() ?: run {
+                closeRaw(ProximityCloseReason.PEER_DISCONNECTED)
+                return@withLock null
+            }
             val header = buffered.copyOfRange(0, headerEnd)
             buffered = buffered.copyOfRange(headerEnd + HEADER_DELIMITER.size, buffered.size)
             val contentLength = parseRequestHeader(header)
             readBody(contentLength)
             val body = buffered.copyOfRange(0, contentLength)
             buffered = buffered.copyOfRange(contentLength, buffered.size)
-            responseExpected = true
+            check(pendingResponse.trySend(Unit).isSuccess) { "Wi-Fi Aware response route closed" }
             ImmutableBytes.of(body)
         } catch (cancelled: CancellationException) {
             closeRaw(ProximityCloseReason.CANCELLED)
@@ -53,9 +60,8 @@ internal class WifiAwareHttpConnection(
         }
     }
 
-    override suspend fun send(message: ImmutableBytes): Unit = exchangeMutex.withLock {
+    override suspend fun send(message: ImmutableBytes): Unit = sendMutex.withLock {
         ensureOpen()
-        check(responseExpected) { "A Wi-Fi Aware response requires a preceding request" }
         require(message.size <= maximumMessageBytes) {
             "Wi-Fi Aware response exceeds the configured message limit"
         }
@@ -67,8 +73,9 @@ internal class WifiAwareHttpConnection(
             append("\r\nContent-Type: application/cbor\r\n\r\n")
         }.encodeToByteArray()
         try {
+            check(pendingResponse.receiveCatching().getOrNull() != null) { "Wi-Fi Aware request route closed" }
             raw.write(header + body)
-            responseExpected = false
+            check(nextRequest.trySend(Unit).isSuccess) { "Wi-Fi Aware request route closed" }
         } catch (cancelled: CancellationException) {
             closeRaw(ProximityCloseReason.CANCELLED)
             throw cancelled
@@ -165,9 +172,11 @@ internal class WifiAwareHttpConnection(
 
     private fun closeRaw(reason: ProximityCloseReason) {
         if (closed.compareAndSet(expect = false, update = true)) {
+            nextRequest.close()
+            pendingResponse.close()
+            raw.close(reason)
             buffered.fill(0)
             buffered = ByteArray(0)
-            raw.close(reason)
         }
     }
 

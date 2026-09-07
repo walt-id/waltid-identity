@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -60,11 +61,15 @@ class WifiAwareTransportProviderTest {
     }
 
     @Test
-    fun `QR and negotiated NFC share one publication with engagement-specific secrets`() = runTest {
+    fun `QR and negotiated NFC own separate publications and transaction secrets`() = runTest {
         val platform = FakeWifiAwarePlatform()
         val provider = provider(platform)
         val qr = provider.prepare(qrContext, this)
-        val nfc = provider.prepareReaderSelected(
+        val nfcPlatform = FakeWifiAwarePlatform()
+        val nfcKeyBytes = ImmutableBytes.of(ByteArray(32) { (it + 1).toByte() })
+        val nfc = DefaultWifiAwareProximityTransportProvider(
+            WifiAwareProximityTransportConfiguration(nfcKeyBytes), nfcPlatform,
+        ).prepareReaderSelected(
             ReaderSelectedTransportOffer.Method(
                 DeviceRetrievalMethod.WifiAware(
                     passphraseInfo = null,
@@ -80,13 +85,16 @@ class WifiAwareTransportProviderTest {
         assertEquals(WifiAwareProtocol.derivePassphrase(eDeviceKeyBytes), platform.passphrase)
         assertNull((qr.connectionMethod as DeviceRetrievalMethod.WifiAware).passphraseInfo)
         val selected = nfc.connectionMethod as DeviceRetrievalMethod.WifiAware
-        assertEquals(WifiAwareProtocol.derivePassphrase(eDeviceKeyBytes), selected.passphraseInfo)
+        assertEquals(WifiAwareProtocol.derivePassphrase(nfcKeyBytes), selected.passphraseInfo)
+        assertFalse(platform.serviceName == nfcPlatform.serviceName)
         assertContentEquals(byteArrayOf(0x04), selected.supportedBands)
 
+        assertFailsWith<IllegalStateException> { provider.prepare(qrContext, this) }
         qr.close(ProximityCloseReason.CANCELLED)
-        assertTrue(platform.publisher.closeReasons.isEmpty())
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), platform.publisher.closeReasons)
+        assertTrue(nfcPlatform.publisher.closeReasons.isEmpty())
         nfc.close(ProximityCloseReason.COMPLETED)
-        assertEquals(listOf(ProximityCloseReason.COMPLETED), platform.publisher.closeReasons)
+        assertEquals(listOf(ProximityCloseReason.COMPLETED), nfcPlatform.publisher.closeReasons)
     }
 
     private fun provider(platform: FakeWifiAwarePlatform) = DefaultWifiAwareProximityTransportProvider(
@@ -103,13 +111,12 @@ private class FakeWifiAwarePlatform(
     var serviceName: String? = null
     var passphrase: String? = null
 
-    override suspend fun capability(securityPolicy: WifiAwareSecurityPolicy): WifiAwareProximityAvailability =
+    override suspend fun capability(): WifiAwareProximityAvailability =
         availability
 
     override suspend fun preparePublisher(
         serviceName: String,
         passphrase: String,
-        securityPolicy: WifiAwareSecurityPolicy,
         sessionScope: CoroutineScope,
     ): WifiAwarePreparedPlatformPublisher {
         prepareCount++
