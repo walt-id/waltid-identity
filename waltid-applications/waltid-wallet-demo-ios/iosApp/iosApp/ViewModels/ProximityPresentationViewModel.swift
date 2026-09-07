@@ -93,8 +93,8 @@ final class ProximityPresentationViewModel: ObservableObject {
             .init(
                 session: .nfc(.init(
                     handover: .negotiatedHandover,
-                    retrieval: .init(nfc: .init()),
-                    qrFallback: .init(nfc: .init())
+                    retrieval: .init(nfc: .init(), wifiAware: true),
+                    qrFallback: .init(nfc: .init(), wifiAware: true)
                 ))
             )
         },

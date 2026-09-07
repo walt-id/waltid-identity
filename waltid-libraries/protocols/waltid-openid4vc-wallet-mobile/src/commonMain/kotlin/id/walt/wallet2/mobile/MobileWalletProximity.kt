@@ -43,7 +43,6 @@ import id.walt.mdoc.proximity.mobile.NfcV2MaximumCommandDataLength
 import id.walt.mdoc.proximity.mobile.WifiAwareProximityAvailability
 import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportConfiguration
 import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
-import id.walt.mdoc.proximity.mobile.WifiAwareSecurityPolicy
 import id.walt.wallet2.data.Wallet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -75,6 +74,7 @@ internal class ProximityCoordinator(
     private val bleTransportFactory: BleProximityTransportFactory?,
     private val nfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
     private val sessionDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val wifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
 ) {
     private val activeMutex = Mutex()
     private var active: ProximitySessionImpl? = null
@@ -104,10 +104,9 @@ internal class ProximityCoordinator(
                     message = "NFC host-card presentation is unavailable on this wallet platform",
                 )
         } else null
-        val wifiAwareConfiguration = configuration.retrieval.wifiAwareConfiguration
-        val wifiAwareSelected = wifiAwareConfiguration != null
+        val wifiAwareSelected = owned.session.wifiAwareSelected
         val wifiAwareAvailability = if (wifiAwareSelected) {
-            wifiAwareTransportFactory?.capability(wifiAwareConfiguration.securityPolicy.toTransportPolicy())
+            wifiAwareTransportFactory?.capability()
                 ?: WifiAwareProximityAvailability.Unavailable(
                     implemented = false,
                     code = "wifi_aware_platform_unsupported",
@@ -158,6 +157,7 @@ internal class ProximityCoordinator(
                 configuration = owned,
                 bleTransportFactory = bleTransportFactory,
                 nfcHostPlatformAdapter = nfcHostPlatformAdapter,
+                wifiAwareTransportFactory = wifiAwareTransportFactory,
                 capabilityCheck = { capabilities(owned) },
                 initialCapabilities = initialCapabilities,
                 sessionDispatcher = sessionDispatcher,
@@ -239,6 +239,7 @@ private class ProximitySessionImpl(
     private suspend fun runSession() {
         var runtime: CryptoRuntime? = null
         var eDeviceKey: Key? = null
+        var qrDeviceKey: Key? = null
         var expiryJob: Job? = null
         var revocationJob: Job? = null
         try {
@@ -277,6 +278,16 @@ private class ProximitySessionImpl(
                     usages = setOf(KeyUsage.KEY_AGREEMENT),
                 )
             )
+            // Distinct keys yield distinct mandatory-derived NAN service names for concurrent routes.
+            if (configuration.session.nfcWifiAware && configuration.session.qrRetrieval?.wifiAware == true &&
+                prerequisites.nfcMayStart && prerequisites.qrMayStart && prerequisites.wifiAwareRetrieval.mayStart
+            ) {
+                qrDeviceKey = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+                    id = KeyId("mdoc-qr-session-${Uuid.random()}"),
+                    spec = KeySpec.Ec(EcCurve.P256),
+                    usages = setOf(KeyUsage.KEY_AGREEMENT),
+                ))
+            }
             val engagementFactory = MdocDeviceEngagementFactory()
             val eDeviceKeyBytes = engagementFactory.encodeEDeviceKeyBytes(eDeviceKey)
             val profile = configuration.profile.toEngineProfile()
@@ -301,6 +312,8 @@ private class ProximitySessionImpl(
             val engagementSources = buildEngagementSources(
                 prerequisites = prerequisites,
                 eDeviceKeyBytes = eDeviceKeyBytes,
+                qrDeviceKey = qrDeviceKey,
+                qrDeviceKeyBytes = qrDeviceKey?.let { engagementFactory.encodeEDeviceKeyBytes(it) } ?: eDeviceKeyBytes,
                 engagementFactory = engagementFactory,
             )
             val engine = MdocHolderProtocolEngine(
@@ -356,6 +369,7 @@ private class ProximitySessionImpl(
                 expiryJob?.cancelAndJoin()
                 revocationJob?.cancelAndJoin()
                 owner.cancel()
+                qrDeviceKey?.capabilities?.deleter?.let { deleter -> runCatching { deleter.delete() } }
                 eDeviceKey?.capabilities?.deleter?.let { deleter -> runCatching { deleter.delete() } }
                 runtime?.let { runCatching { it.close() } }
                 prerequisiteRetry.close()
@@ -368,19 +382,25 @@ private class ProximitySessionImpl(
     private fun buildEngagementSources(
         prerequisites: ProximityCapabilities,
         eDeviceKeyBytes: ImmutableBytes,
+        qrDeviceKey: Key?,
+        qrDeviceKeyBytes: ImmutableBytes,
         engagementFactory: MdocDeviceEngagementFactory,
     ): List<MdocEngagementSource> {
         val selected = configuration.session
-        fun newBleProviders(ble: ProximityBleConfiguration?, sharedUuid: Boolean = false): List<ProximityTransportProvider> =
-            if (ble == null || !prerequisites.bluetoothLowEnergy.mayStart) emptyList() else listOf(
-                requireNotNull(bleTransportFactory).create(
-                    BleProximityTransportConfiguration(
-                        roles = ble.roles.createTransactionRoles(sharedUuid),
-                        bearerPolicy = ble.bearerPolicy.toTransportPolicy(),
-                        eDeviceKeyBytes = eDeviceKeyBytes,
-                    )
-                )
+        fun newProviders(
+            ble: MobileWalletProximityBleConfiguration?, wifiAware: Boolean, keyBytes: ImmutableBytes, sharedBleUuid: Boolean = false,
+        ): List<ProximityTransportProvider> = buildList {
+            if (ble != null && prerequisites.bluetoothLowEnergy.mayStart) add(
+                requireNotNull(bleTransportFactory).create(BleProximityTransportConfiguration(
+                    roles = ble.roles.createTransactionRoles(sharedBleUuid),
+                    bearerPolicy = ble.bearerPolicy.toTransportPolicy(),
+                    eDeviceKeyBytes = keyBytes,
+                ))
             )
+            if (wifiAware && prerequisites.wifiAwareRetrieval.mayStart) add(
+                requireNotNull(wifiAwareTransportFactory).create(WifiAwareProximityTransportConfiguration(keyBytes))
+            )
+        }
         val qrPlan = selected.qrRetrieval
         val nfcDirect = selected.nfcRetrieval?.nfc?.takeIf { prerequisites.nfcRetrieval.mayStart }?.toTransportMethod()
         val qrDirect = qrPlan?.nfc?.takeIf { prerequisites.nfcRetrieval.mayStart }?.toTransportMethod()
@@ -391,13 +411,12 @@ private class ProximitySessionImpl(
                 qrRetrieval = qrDirect.takeUnless { scope is NfcMdocEngagementScope.NfcOnly },
             ),
             platform = requireNotNull(nfcHostPlatformAdapter),
-            alternateTransportProviders = if (scope is NfcMdocEngagementScope.QrOnly) emptyList() else newBleProviders(
-                selected.nfcBle,
-                sharedUuid = selected is ProximitySessionConfiguration.ConventionalNfc &&
-                    selected.handover == ProximityNfcHandover.Static,
-            ),
-            qrTransportProviders = if (scope is NfcMdocEngagementScope.NfcOnly) emptyList() else newBleProviders(qrPlan?.bluetoothLowEnergy),
+            alternateTransportProviders = if (scope is NfcMdocEngagementScope.QrOnly) emptyList() else newProviders(selected.nfcBle, selected.nfcWifiAware, eDeviceKeyBytes,
+                sharedBleUuid = selected is MobileWalletProximitySessionConfiguration.ConventionalNfc &&
+                    selected.handover == MobileWalletProximityNfcHandover.Static),
+            qrTransportProviders = if (scope is NfcMdocEngagementScope.NfcOnly) emptyList() else newProviders(qrPlan?.bluetoothLowEnergy, qrPlan?.wifiAware == true, qrDeviceKeyBytes),
             engagementFactory = engagementFactory,
+            qrDeviceKey = qrDeviceKey.takeIf { scope is NfcMdocEngagementScope.QrAndNfc },
         )
         val source = when {
             prerequisites.nfcMayStart -> {
@@ -413,7 +432,7 @@ private class ProximitySessionImpl(
                 nfcSource(if (prerequisites.qrMayStart) NfcMdocEngagementScope.QrAndNfc(profile) else NfcMdocEngagementScope.NfcOnly(profile))
             }
             prerequisites.qrMayStart && qrDirect != null -> nfcSource(NfcMdocEngagementScope.QrOnly)
-            prerequisites.qrMayStart -> QrMdocEngagementSource(newBleProviders(qrPlan?.bluetoothLowEnergy), engagementFactory = engagementFactory)
+            prerequisites.qrMayStart -> QrMdocEngagementSource(newProviders(qrPlan?.bluetoothLowEnergy, qrPlan?.wifiAware == true, qrDeviceKeyBytes), engagementFactory = engagementFactory)
             else -> error("Proximity prerequisites passed without a viable selected route")
         }
         return listOf(source)
@@ -495,9 +514,7 @@ private fun ProximityBleRoles.toTransportSelection(): BleMdocRoleSelection = whe
     ProximityBleRoles.Dual -> BleMdocRoleSelection.DUAL
 }
 
-private fun MobileWalletProximityWifiAwareSecurityPolicy.toTransportPolicy(): WifiAwareSecurityPolicy = when (this) {
-    MobileWalletProximityWifiAwareSecurityPolicy.NcsSk128 -> WifiAwareSecurityPolicy.NcsSk128
-}
+
 
 private fun MobileWalletProximityBleRoles.createTransactionRoles(sharedUuid: Boolean): BleMdocRoles = when (this) {
     MobileWalletProximityBleRoles.CentralClient -> BleMdocRoles.CentralClient(transactionUuid())
@@ -571,11 +588,9 @@ private fun wifiAwareCapability(
         message = availability.message,
         remediationActions = availability.code.toRemediationActions(),
     )
-    null -> unavailableCapability(
-        selected = false,
-        implemented = implemented,
-        code = "wifi_aware_not_selected",
-        message = "Wi-Fi Aware retrieval is not selected for this session",
+    null -> MobileWalletProximityTransportCapability(
+        implemented = implemented, profilePermitted = true, selected = selected,
+        runtime = MobileWalletProximityRuntimeObservation.NotChecked,
     )
 }
 

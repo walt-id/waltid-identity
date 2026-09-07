@@ -4,14 +4,11 @@ import id.walt.mdoc.proximity.ProximityCloseReason
 import kotlinx.coroutines.CoroutineScope
 
 internal interface WifiAwarePlatformAdapter {
-    suspend fun capability(
-        securityPolicy: WifiAwareSecurityPolicy,
-    ): WifiAwareProximityAvailability
+    suspend fun capability(): WifiAwareProximityAvailability
 
     suspend fun preparePublisher(
         serviceName: String,
         passphrase: String,
-        securityPolicy: WifiAwareSecurityPolicy,
         sessionScope: CoroutineScope,
     ): WifiAwarePreparedPlatformPublisher
 }

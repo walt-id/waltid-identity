@@ -71,26 +71,26 @@ public struct ProximityNFCRetrievalConfiguration: Sendable, Hashable {
     }
 }
 
-/// One or both conventional retrieval methods used by QR, Static Handover, or Negotiated Handover.
-public struct ProximityRetrievalOptions: Sendable, Hashable {
+/// A nonempty retrieval plan used by QR, Static Handover, or Negotiated Handover.
+public struct ProximityPresentationConventionalRetrievalConfiguration: Sendable, Hashable {
     /// Optional BLE role and bearer policy.
     public let bluetoothLowEnergy: ProximityBLEConfiguration?
     /// Optional conventional NFC command/response contract.
     public let nfc: ProximityPresentationNFCRetrievalConfiguration?
-    /// Optional Wi-Fi Aware holder-publisher contract.
-    public let wifiAware: ProximityPresentationWifiAwareConfiguration?
+    /// Whether to offer Wi-Fi Aware with mandatory NCS-SK-128 security.
+    public let wifiAware: Bool
 
     /// Creates a nonempty conventional retrieval configuration.
     /// - Parameters:
     ///   - bluetoothLowEnergy: Optional BLE role and bearer configuration.
     ///   - nfc: Optional conventional NFC command/response configuration.
-    ///   - wifiAware: Optional Wi-Fi Aware configuration.
+    ///   - wifiAware: Whether to offer Wi-Fi Aware retrieval.
     public init(
         bluetoothLowEnergy: ProximityPresentationBLEConfiguration? = .init(),
         nfc: ProximityPresentationNFCRetrievalConfiguration? = nil,
-        wifiAware: ProximityPresentationWifiAwareConfiguration? = nil
+        wifiAware: Bool = false
     ) {
-        precondition(bluetoothLowEnergy != nil || nfc != nil || wifiAware != nil)
+        precondition(bluetoothLowEnergy != nil || nfc != nil || wifiAware)
         self.bluetoothLowEnergy = bluetoothLowEnergy
         self.nfc = nfc
         self.wifiAware = wifiAware
@@ -138,7 +138,9 @@ public struct ProximityNFCV2SessionConfiguration: Sendable, Hashable {
     /// Maximum command-data length accepted by the provisional holder application.
     public let maximumCommandDataLength: Int
     /// Optional NFCv2 alternate BLE bearer.
-    public let bluetoothLowEnergy: ProximityBLEConfiguration?
+    public let bluetoothLowEnergy: ProximityPresentationBLEConfiguration?
+    /// Whether to offer an alternate Wi-Fi Aware bearer with mandatory NCS-SK-128 security.
+    public let wifiAware: Bool
     /// Optional nonempty retrieval plan offered through QR.
     public let qrFallback: ProximityRetrievalOptions?
 
@@ -147,16 +149,19 @@ public struct ProximityNFCV2SessionConfiguration: Sendable, Hashable {
     ///   - maximumCommandDataLength: Validated NFCv2 command-data limit.
     ///   - bluetoothLowEnergy: Optional alternate BLE bearer.
     ///   - qrFallback: Bearers offered through QR, when selected.
+    ///   - wifiAware: Whether to offer an alternate Wi-Fi Aware bearer.
     public init(
         maximumCommandDataLength: Int = 65_536,
-        bluetoothLowEnergy: ProximityBLEConfiguration? = nil,
-        qrFallback: ProximityRetrievalOptions? = nil
+        bluetoothLowEnergy: ProximityPresentationBLEConfiguration? = nil,
+        qrFallback: ProximityPresentationConventionalRetrievalConfiguration? = nil,
+        wifiAware: Bool = false
     ) {
         precondition((1...65_536).contains(maximumCommandDataLength))
         requireSharedBLEPolicy(bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
         self.maximumCommandDataLength = maximumCommandDataLength
         self.bluetoothLowEnergy = bluetoothLowEnergy
         self.qrFallback = qrFallback
+        self.wifiAware = wifiAware
     }
 }
 
@@ -1102,6 +1107,7 @@ public struct ProximityCapabilities: Sendable, Equatable {
         guard let plan else { return false }
         return (plan.bluetoothLowEnergy != nil && bluetoothLowEnergy.mayStart)
             || (plan.nfc != nil && nfcRetrieval.mayStart)
+            || (plan.wifiAware && wifiAwareRetrieval.mayStart)
     }
     /// Stable, de-duplicated remediation actions for unavailable selected dimensions.
     public var remediationActions: [ProximityRemediationAction] {

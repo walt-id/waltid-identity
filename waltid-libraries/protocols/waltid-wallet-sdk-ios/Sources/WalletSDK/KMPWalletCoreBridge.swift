@@ -2048,7 +2048,8 @@ private extension ProximityRetrievalOptions {
     func toKMPConfiguration() -> WalletCore.ProximityRetrievalOptions {
         WalletCore.ProximityRetrievalOptions(
             bluetoothLowEnergy: bluetoothLowEnergy?.toKMPConfiguration(),
-            nfc: nfc?.toKMPConfiguration()
+            nfc: nfc?.toKMPConfiguration(),
+            wifiAware: wifiAware
         )
     }
 }
@@ -2068,7 +2069,8 @@ private extension ProximitySessionConfiguration {
             return WalletCore.ProximitySessionConfigurationProvisionalNfcV2(
                 maximumCommandDataLength: Int32(configuration.maximumCommandDataLength),
                 bluetoothLowEnergy: configuration.bluetoothLowEnergy?.toKMPConfiguration(),
-                qrFallback: configuration.qrFallback?.toKMPConfiguration()
+                qrFallback: configuration.qrFallback?.toKMPConfiguration(),
+                wifiAware: configuration.wifiAware
             )
         }
     }
@@ -2090,7 +2092,8 @@ private extension WalletCore.ProximityRetrievalOptions {
             nfc: nfc.map { ProximityNFCRetrievalConfiguration(
                 maximumCommandDataLength: Int($0.maximumCommandDataLength),
                 maximumResponseDataLength: Int($0.maximumResponseDataLength)
-            ) }
+            ) },
+            wifiAware: wifiAware
         )
     }
 }
@@ -2108,7 +2111,8 @@ func swiftSession(_ session: any WalletCore.ProximitySessionConfiguration) -> Pr
         return .provisionalNFCV2(.init(
             maximumCommandDataLength: Int(value.maximumCommandDataLength),
             bluetoothLowEnergy: value.bluetoothLowEnergy?.toSwiftConfiguration(),
-            qrFallback: value.qrFallback?.toSwiftConfiguration()
+            qrFallback: value.qrFallback?.toSwiftConfiguration(),
+            wifiAware: value.wifiAware
         ))
     }
 }
