@@ -68,6 +68,7 @@ public class MobileWalletProximityCrlRevocationEvaluator internal constructor(
             .distinctBy { it.encodedDer }
     }
 
+    @Throws(IllegalArgumentException::class)
     public constructor(
         issuerCertificatesDerBase64Url: List<String>,
         scope: MobileWalletProximityCrlScope,
@@ -173,9 +174,12 @@ public class MobileWalletProximityCrlRevocationEvaluator internal constructor(
         const val MAX_CRL_BASE64_LENGTH = (MAX_CRL_BYTES * 4 + 2) / 3
         val crlBase64: Base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
 
-        fun parseCrlCertificate(encoded: String): X509Certificate {
+        fun parseCrlCertificate(encoded: String): X509Certificate = try {
             require(encoded.length in 1..87_382)
-            return X509CertificateUtil.parseCertificateDerEncoded(ByteString(crlBase64.decode(encoded)))
+            X509CertificateUtil.parseCertificateDerEncoded(ByteString(crlBase64.decode(encoded)))
+        } catch (error: Throwable) {
+            // Some platform ASN.1 parsers throw outside Exception; keep Swift construction recoverable.
+            throw IllegalArgumentException("Invalid CRL issuer certificate", error)
         }
 
         fun isCrlHttpUrl(value: String): Boolean = runCatching {
