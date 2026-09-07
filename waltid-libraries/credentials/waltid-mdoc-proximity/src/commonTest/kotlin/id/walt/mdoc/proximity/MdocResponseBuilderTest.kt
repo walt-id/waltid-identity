@@ -35,7 +35,7 @@ import id.walt.mdoc.objects.handover.NFCHandover
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
-import kotlinx.serialization.cbor.CborString
+import kotlinx.serialization.cbor.*
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -332,6 +332,39 @@ class MdocResponseBuilderTest {
         )
         assertEquals(-1L, response.documents!!.single().errors!!["org.example"]!!["portrait"])
         assertEquals(0L, response.documentErrors!!.single()["org.example.other"])
+    }
+
+    @Test
+    fun `error response wire maps preserve namespace identifiers and nonpositive integer codes`() = runTest {
+        val holderKey = key("error-wire-holder", setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+        val source = issue(holderKey)
+        val presentation = MdocDocumentPresentation(
+            source, holderKey, setOf(ElementReference("org.example", "given_name")),
+            elementErrors = mapOf("org.example" to mapOf("portrait" to 0L, "family_name" to -1L)),
+            authentication = MdocAuthenticationMethod.Signature(),
+        )
+        val response = MdocResponseBuilder().buildResponse(
+            listOf(presentation), SessionTranscript.forQr(byteArrayOf(1), byteArrayOf(2)),
+            documentErrors = listOf(MdocDocumentError("org.example.other", 0L), MdocDocumentError("org.example.third", -1L)),
+        )
+        val cbor = id.walt.cose.coseCompliantCbor
+        val wire = assertIs<CborMap>(cbor.decodeFromByteArray<CborElement>(cbor.encodeToByteArray(response)))
+        val documents = assertIs<CborArray>(wire[CborString("documents")])
+        val document = assertIs<CborMap>(documents.single())
+        // HF_Gen_35-38: Errors and ErrorItems are nonempty maps with text keys and integer values.
+        assertEquals(CborMap(mapOf(CborString("org.example") to CborMap(mapOf(
+            CborString("portrait") to CborInteger(0), CborString("family_name") to CborInteger(-1),
+        )))), document[CborString("errors")])
+        // HF_Gen_39-42: each documentErrors entry contains exactly one docType and its error code.
+        assertEquals(CborArray(listOf(
+            CborMap(mapOf(CborString("org.example.other") to CborInteger(0))),
+            CborMap(mapOf(CborString("org.example.third") to CborInteger(-1))),
+        )), wire[CborString("documentErrors")])
+        assertFailsWith<IllegalArgumentException> { presentation.copy(elementErrors = mapOf("org.example" to emptyMap())) }
+        assertFailsWith<IllegalArgumentException> { presentation.copy(elementErrors = mapOf("org.example" to mapOf("portrait" to 1L))) }
+        assertFailsWith<IllegalArgumentException> { presentation.copy(elementErrors = mapOf("" to mapOf("portrait" to 0L))) }
+        assertFailsWith<IllegalArgumentException> { MdocDocumentError("org.example.other", 1L) }
+        assertFailsWith<IllegalArgumentException> { MdocDocumentError("", 0L) }
     }
 
     @Test

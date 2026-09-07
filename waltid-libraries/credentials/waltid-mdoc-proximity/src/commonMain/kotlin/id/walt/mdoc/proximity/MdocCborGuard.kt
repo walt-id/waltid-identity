@@ -7,28 +7,28 @@ package id.walt.mdoc.proximity
  * interpret protocol fields. Typed serializers remain responsible for field-level validation.
  */
 internal object MdocCborGuard {
-    fun validate(bytes: ByteArray, maximumDepth: Int, maximumItems: Int) {
+    fun validate(bytes: ByteArray, maximumDepth: Int, maximumItems: Int, includeEmbeddedCbor: Boolean = false) {
         require(maximumDepth > 0 && maximumItems > 0)
-        Parser(bytes, maximumDepth, maximumItems).validate()
+        Parser(bytes, maximumDepth, ItemBudget(maximumItems), includeEmbeddedCbor).validate()
     }
 
     private class Parser(
         private val bytes: ByteArray,
         private val maximumDepth: Int,
-        private val maximumItems: Int,
+        private val budget: ItemBudget,
+        private val includeEmbeddedCbor: Boolean,
     ) {
         private var offset = 0
-        private var items = 0
 
-        fun validate() {
+        fun validate(depth: Int = 0) {
             if (bytes.isEmpty()) invalid("CBOR input is empty")
-            item(0)
+            item(depth)
             if (offset != bytes.size) invalid("CBOR input contains trailing data")
         }
 
         private fun item(depth: Int): KeyIdentity {
             if (depth > maximumDepth) invalid("CBOR nesting exceeds the configured limit")
-            if (++items > maximumItems) invalid("CBOR item count exceeds the configured limit")
+            if (++budget.items > budget.maximumItems) invalid("CBOR item count exceeds the configured limit")
             val start = offset
             val initial = readByte()
             val major = initial ushr 5
@@ -46,8 +46,11 @@ internal object MdocCborGuard {
                     KeyIdentity.Raw(bytes.copyOfRange(start, offset).asContentKey())
                 }
                 6 -> {
-                    argument(additional)
-                    item(depth + 1)
+                    val tag = argument(additional)
+                    val value = item(depth + 1)
+                    if (includeEmbeddedCbor && tag == 24uL && value is KeyIdentity.Bytes && value.major == 2) {
+                        Parser(value.value.copy(), maximumDepth, budget, true).validate(depth + 2)
+                    }
                     KeyIdentity.Raw(bytes.copyOfRange(start, offset).asContentKey())
                 }
                 7 -> {
@@ -197,7 +200,10 @@ internal object MdocCborGuard {
         data class Raw(val value: ContentKey) : KeyIdentity
     }
 
+    private class ItemBudget(val maximumItems: Int, var items: Int = 0)
+
     private class ContentKey(private val bytes: ByteArray) {
+        fun copy(): ByteArray = bytes.copyOf()
         override fun equals(other: Any?): Boolean = other is ContentKey && bytes.contentEquals(other.bytes)
         override fun hashCode(): Int = bytes.contentHashCode()
     }
