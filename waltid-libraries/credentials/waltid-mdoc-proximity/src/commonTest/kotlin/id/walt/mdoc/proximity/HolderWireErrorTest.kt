@@ -14,6 +14,9 @@ import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.session.SessionData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.cbor.*
 import kotlinx.serialization.decodeFromByteArray
@@ -23,7 +26,7 @@ class HolderWireErrorTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
-    fun invalidReaderKeysAndCiphertextsReturnSessionEncryptionError() = runTest {
+    fun invalidReaderKeysAndCiphertextsReturnSessionEncryptionError() = realDispatcherTest {
         for (case in listOf("01", "02", "03", "04", "05", "06", "07", "08", "09")) {
             val fixture = session()
             val key = fixture.readerKey.toMutableMap()
@@ -53,7 +56,7 @@ class HolderWireErrorTest {
     }
 
     @Test
-    fun unwrappedReaderKeyStillReturnsSessionCborError() = runTest {
+    fun unwrappedReaderKeyStillReturnsSessionCborError() = realDispatcherTest {
         val fixture = session()
         val result = fixture.exchange(encode(CborMap(mapOf(
             CborString("eReaderKey") to fixture.readerKey,
@@ -65,7 +68,7 @@ class HolderWireErrorTest {
     }
 
     @Test
-    fun malformedDeviceRequestsReturnEncryptedDeviceResponseErrors() = runTest {
+    fun malformedDeviceRequestsReturnEncryptedDeviceResponseErrors() = realDispatcherTest {
         val valid = validRequest()
         val fields = (coseCompliantCbor.decodeFromByteArray<CborElement>(valid) as CborMap).toMap()
         val duplicateItems = byteArrayOf(0xa3.toByte()) + encode(CborString("docType")) + encode(CborString(DOC_TYPE)) +
@@ -98,7 +101,7 @@ class HolderWireErrorTest {
     }
 
     @Test
-    fun denyingAllElementsReturnsAnEncryptedEmptyResponseWithoutResolvingKeys() = runTest {
+    fun denyingAllElementsReturnsAnEncryptedEmptyResponseWithoutResolvingKeys() = realDispatcherTest {
         val fixture = session()
         val result = fixture.exchange(establishment(encode(fixture.readerKey), fixture.readerCipher.encrypt(validRequest())))
         assertIs<MdocHolderSessionResult.Declined>(result.result)
@@ -112,7 +115,7 @@ class HolderWireErrorTest {
     }
 
     @Test
-    fun noDataPreparationReturnsAnEncryptedEmptyResponseWithoutConsent() = runTest {
+    fun noDataPreparationReturnsAnEncryptedEmptyResponseWithoutConsent() = realDispatcherTest {
         val fixture = session()
         val result = fixture.exchange(establishment(encode(fixture.readerKey), fixture.readerCipher.encrypt(validRequest())), noData = true)
         assertIs<MdocHolderSessionResult.Completed>(result.result)
@@ -123,7 +126,7 @@ class HolderWireErrorTest {
     }
 
     @Test
-    fun rejectedPreparationReturnsNoDataAndRetainsTheLocalFailure() = runTest {
+    fun rejectedPreparationReturnsNoDataAndRetainsTheLocalFailure() = realDispatcherTest {
         val fixture = session()
         val error = ProximityError.Policy("trusted_reader_required", "Reader trust is required")
         val result = fixture.exchange(establishment(encode(fixture.readerKey), fixture.readerCipher.encrypt(validRequest())), rejected = error)
@@ -140,6 +143,11 @@ class HolderWireErrorTest {
         assertFailsWith<MdocCborValidationException> { MdocCborGuard.validate(nested, 3, 100, includeEmbeddedCbor = true) }
         assertFailsWith<MdocCborValidationException> { MdocCborGuard.validate(nested, 30, 10, includeEmbeddedCbor = true) }
         MdocCborGuard.validate(nested, 30, 100, includeEmbeddedCbor = true)
+    }
+
+    // WebCrypto promises use real time; advancing virtual time would expire a live session.
+    private fun realDispatcherTest(block: suspend CoroutineScope.() -> Unit) = runTest {
+        withContext(Dispatchers.Default, block)
     }
 
     private suspend fun session(): Session {
