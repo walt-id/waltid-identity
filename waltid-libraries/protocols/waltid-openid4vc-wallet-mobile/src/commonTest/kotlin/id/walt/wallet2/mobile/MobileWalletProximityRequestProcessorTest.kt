@@ -1345,7 +1345,7 @@ class ProximityRequestProcessorTest {
         val processor = processor(fixture, configuration)
         val loopback = FakeProximityLoopback.create()
         var consentCalls = 0
-        val engine = MdocHolderProtocolEngine(deviceKey, listOf(FakeTransportProvider(method, loopback.holder)), processor,
+        val engine = MdocHolderProtocolEngine(deviceKey, listOf(QrMdocEngagementSource(listOf(FakeTransportProvider(method, loopback.holder)))), processor,
             MdocConsentHandler { prompt ->
                 consentCalls++
                 val review = processor.review(prompt)
