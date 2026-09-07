@@ -2278,17 +2278,6 @@ private extension WalletCore.ProximityReaderAuthentication {
     }
 }
 
-private extension WalletCore.ProximityReaderAuthenticationValidity {
-    func toSwiftValidity() -> ProximityReaderAuthenticationValidity {
-        switch self {
-        case .absent: return .absent
-        case .malformed: return .malformed
-        case .invalid: return .invalid
-        case .valid: return .valid
-        }
-    }
-}
-
 private extension WalletCore.ProximityReaderAuthenticationSummary {
     func toSwiftSummary() -> ProximityReaderAuthenticationSummary {
         switch self {
