@@ -13,11 +13,11 @@ import id.walt.wallet2.mobile.MobileWalletProximityElementReference
 import id.walt.wallet2.mobile.MobileWalletProximityError
 import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
 import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
-import id.walt.wallet2.mobile.MobileWalletProximityEngagementConfiguration
-import id.walt.wallet2.mobile.MobileWalletProximityNfcEngagementMode
+import id.walt.wallet2.mobile.MobileWalletProximitySessionConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityNfcHandover
 import id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
-import id.walt.wallet2.mobile.MobileWalletProximityRetrievalConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximityConventionalRetrievalConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityReview
 import id.walt.wallet2.mobile.MobileWalletProximityRecovery
 import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettings
@@ -100,6 +100,7 @@ class WalletDemoProximityController(
         { MobileWalletProximityReaderTrustSettings() },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
+    private val systemPresentationActive: () -> Boolean = { false },
 ) {
     private val mutableState = MutableStateFlow(WalletDemoProximityUiState())
     val state: StateFlow<WalletDemoProximityUiState> = mutableState.asStateFlow()
@@ -300,6 +301,7 @@ class WalletDemoProximityController(
     }
 
     fun handleLifecycleInterruption() {
+        if (systemPresentationActive()) return
         val current = mutableState.value
         if (current.hostActionInProgress == null &&
             current.sessionState !is ProximityState.CheckingPrerequisites
@@ -377,20 +379,21 @@ private val ProximityCapabilities.automaticPermissionActions:
 
 internal fun WalletDemoProximityTransportProfile.configuration(): MobileWalletProximityConfiguration =
     when (this) {
-        WalletDemoProximityTransportProfile.Default -> MobileWalletProximityConfiguration(
-            engagement = MobileWalletProximityEngagementConfiguration.QrAndNfc(
-                MobileWalletProximityNfcEngagementMode.Negotiated,
-            ),
-            retrieval = MobileWalletProximityRetrievalConfiguration.Conventional(
+        WalletDemoProximityTransportProfile.Default -> {
+            val retrieval = MobileWalletProximityConventionalRetrievalConfiguration(
                 nfc = MobileWalletProximityNfcRetrievalConfiguration(),
-            ),
-        )
+            )
+            MobileWalletProximityConfiguration(
+                session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
+                    handover = MobileWalletProximityNfcHandover.Negotiated,
+                    retrieval = retrieval,
+                    qrFallback = retrieval,
+                ),
+            )
+        }
         WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid ->
             MobileWalletProximityConfiguration(
-                engagement = MobileWalletProximityEngagementConfiguration.NfcOnly(
-                    MobileWalletProximityNfcEngagementMode.ProvisionalV2(),
-                ),
-                retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(
+                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(
                     bluetoothLowEnergy = MobileWalletProximityBleConfiguration(
                         roles = MobileWalletProximityBleRoles.CentralClient,
                         bearerPolicy = MobileWalletProximityBleBearerPolicy.GattOnly,
@@ -399,10 +402,7 @@ internal fun WalletDemoProximityTransportProfile.configuration(): MobileWalletPr
             )
         WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct ->
             MobileWalletProximityConfiguration(
-                engagement = MobileWalletProximityEngagementConfiguration.NfcOnly(
-                    MobileWalletProximityNfcEngagementMode.ProvisionalV2(),
-                ),
-                retrieval = MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2(),
+                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(),
             )
     }
 

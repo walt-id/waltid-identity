@@ -19,10 +19,12 @@ struct ContentView: UIViewControllerRepresentable {
     let signingProtectionMode: String
 
     func makeUIViewController(context: Context) -> UIViewController {
-        sharedUI.WalletDemoIosKt.walletDemoViewController(
+        let nfcHost = ComposeNfcHostPlatformAdapter()
+        return sharedUI.WalletDemoIosKt.walletDemoViewController(
             appGroupIdentifier: appGroupIdentifier,
             keychainAccessGroup: keychainAccessGroup,
-            nfcHostPlatformAdapter: ComposeNfcHostPlatformAdapter(),
+            nfcHostPlatformAdapter: nfcHost,
+            systemPresentationActive: { KotlinBoolean(bool: nfcHost.isPresenting) },
             onDigitalCredentialRegistryChanged: onDigitalCredentialRegistryChanged,
             walletId: walletId,
             attestationBaseUrl: attestationBaseUrl,

@@ -86,6 +86,15 @@ lifetime is not treated as CardSession availability. The SDK holds a successful
 assertion without renewing it automatically and continues the explicitly started
 CardSession if assertion acquisition fails or the assertion later expires.
 
+For background handling, read ``ProximityPresentationSession/systemPresentationActive``
+at the transition. It becomes true when the adapter enters `startEmulation()` and
+clears when emulation ends, fails, is invalidated, or loses to another engagement.
+NFC configuration, an armed card session, and the optional presentment assertion
+alone do not grant an exemption. The native and Compose hosts preserve the session
+only during that actual system-presentment interval; ordinary backgrounding during
+QR display, review, or post-handover BLE still interrupts it. This follows Apple's
+[CardSession lifecycle](https://developer.apple.com/documentation/corenfc/cardsession).
+
 Device signature is the default holder-authentication policy. Configure
 ``ProximityDeviceAuthenticationPolicy/macOnly``,
 ``ProximityDeviceAuthenticationPolicy/preferSignature``, or

@@ -11,6 +11,8 @@ final class ComposeNfcHostPlatformAdapter:
     @unchecked Sendable {
     private let bridge = IOSNfcHostBridge()
 
+    var isPresenting: Bool { bridge.isPresenting }
+
     func capability() async throws -> any sharedUI.Waltid_mdoc_proximity_mobileNfcHostAvailability {
         switch await bridge.capability() {
         case .available:

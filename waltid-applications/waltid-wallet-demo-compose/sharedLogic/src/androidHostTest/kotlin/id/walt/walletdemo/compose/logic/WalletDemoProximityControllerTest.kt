@@ -14,15 +14,15 @@ import id.walt.wallet2.mobile.MobileWalletProximityDeviceAuthenticationMethod
 import id.walt.wallet2.mobile.MobileWalletProximityDocumentReview
 import id.walt.wallet2.mobile.MobileWalletProximityElementReference
 import id.walt.wallet2.mobile.MobileWalletProximityError
+import id.walt.wallet2.mobile.MobileWalletProximityEngagement
 import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
-import id.walt.wallet2.mobile.MobileWalletProximityEngagementConfiguration
+import id.walt.wallet2.mobile.MobileWalletProximitySessionConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
-import id.walt.wallet2.mobile.MobileWalletProximityNfcEngagementMode
+import id.walt.wallet2.mobile.MobileWalletProximityNfcHandover
 import id.walt.wallet2.mobile.MobileWalletProximityProfile
 import id.walt.wallet2.mobile.MobileWalletProximityReaderPolicy
 import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettings
 import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
-import id.walt.wallet2.mobile.MobileWalletProximityRetrievalConfiguration
 import id.walt.wallet2.mobile.MobileWalletProximityRequestedElement
 import id.walt.wallet2.mobile.MobileWalletProximityReview
 import id.walt.wallet2.mobile.MobileWalletProximitySession
@@ -122,13 +122,12 @@ class WalletDemoProximityControllerTest {
 
         assertEquals(1, backend.startCalls)
         val configuration = requireNotNull(backend.lastConfiguration)
-        val engagement = assertIs<MobileWalletProximityEngagementConfiguration.QrAndNfc>(
-            configuration.engagement,
+        val engagement = assertIs<MobileWalletProximitySessionConfiguration.ConventionalNfc>(
+            configuration.session,
         )
-        assertIs<MobileWalletProximityNfcEngagementMode.Negotiated>(engagement.mode)
-        val retrieval = assertIs<MobileWalletProximityRetrievalConfiguration.Conventional>(
-            configuration.retrieval,
-        )
+        assertEquals(MobileWalletProximityNfcHandover.Negotiated, engagement.handover)
+        assertEquals(engagement.retrieval, engagement.qrFallback)
+        val retrieval = engagement.retrieval
         assertNotNull(retrieval.bluetoothLowEnergy)
         assertNotNull(retrieval.nfc)
         assertEquals(session.state.value, controller.state.value.sessionState)
@@ -141,32 +140,26 @@ class WalletDemoProximityControllerTest {
     fun `provisional NFCv2 hybrid profile selects only NFC engagement with alternate GATT BLE`() {
         val configuration = WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid.configuration()
 
-        val engagement = assertIs<MobileWalletProximityEngagementConfiguration.NfcOnly>(
-            configuration.engagement,
+        val engagement = assertIs<MobileWalletProximitySessionConfiguration.ProvisionalNfcV2>(
+            configuration.session,
         )
-        assertIs<MobileWalletProximityNfcEngagementMode.ProvisionalV2>(engagement.mode)
-        val retrieval = assertIs<MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2>(
-            configuration.retrieval,
-        )
+        val retrieval = engagement
         val bluetooth = assertNotNull(retrieval.bluetoothLowEnergy)
         assertEquals(MobileWalletProximityBleRoles.CentralClient, bluetooth.roles)
         assertEquals(MobileWalletProximityBleBearerPolicy.GattOnly, bluetooth.bearerPolicy)
-        assertNull(retrieval.qrNfc)
+        assertNull(retrieval.qrFallback)
     }
 
     @Test
     fun `provisional NFCv2 direct profile has no fallback bearer`() {
         val configuration = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct.configuration()
 
-        val engagement = assertIs<MobileWalletProximityEngagementConfiguration.NfcOnly>(
-            configuration.engagement,
+        val engagement = assertIs<MobileWalletProximitySessionConfiguration.ProvisionalNfcV2>(
+            configuration.session,
         )
-        assertIs<MobileWalletProximityNfcEngagementMode.ProvisionalV2>(engagement.mode)
-        val retrieval = assertIs<MobileWalletProximityRetrievalConfiguration.ProvisionalNfcV2>(
-            configuration.retrieval,
-        )
+        val retrieval = engagement
         assertNull(retrieval.bluetoothLowEnergy)
-        assertNull(retrieval.qrNfc)
+        assertNull(retrieval.qrFallback)
     }
 
     @Test
@@ -182,8 +175,8 @@ class WalletDemoProximityControllerTest {
         selected = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct
         advanceUntilIdle()
 
-        assertIs<MobileWalletProximityEngagementConfiguration.QrAndNfc>(
-            requireNotNull(backend.lastConfiguration).engagement,
+        assertIs<MobileWalletProximitySessionConfiguration.ConventionalNfc>(
+            requireNotNull(backend.lastConfiguration).session,
         )
         controller.dismiss()
         advanceUntilIdle()
@@ -291,6 +284,37 @@ class WalletDemoProximityControllerTest {
         controller.handleLifecycleInterruption()
         advanceUntilIdle()
         assertEquals(listOf<ProximityAction>(ProximityAction.Cancel), session.actions)
+    }
+
+    @Test
+    fun `only actual system presentment exempts NFC sessions from background interruption`() = runTest {
+        for (state in listOf(
+            MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026),
+            MobileWalletProximityState.EngagementReady(listOf(MobileWalletProximityEngagement.Qr("mdoc:test"))),
+            MobileWalletProximityState.AwaitingRequest(1),
+            MobileWalletProximityState.ReviewRequired(review()),
+        )) {
+            var presenting = false
+            val session = FakeSession(state)
+            val controller = WalletDemoProximityController(
+                wallet = FakeBackend(session),
+                scope = this,
+                dispatcher = StandardTestDispatcher(testScheduler),
+                systemPresentationActive = { presenting },
+            )
+            controller.start()
+            advanceUntilIdle()
+            presenting = true
+            controller.handleLifecycleInterruption()
+            advanceUntilIdle()
+            assertTrue(session.actions.isEmpty())
+            presenting = false
+            controller.handleLifecycleInterruption()
+            advanceUntilIdle()
+            assertEquals(listOf<MobileWalletProximityAction>(MobileWalletProximityAction.Cancel), session.actions)
+            controller.dismiss()
+            advanceUntilIdle()
+        }
     }
 
     @Test
@@ -414,7 +438,7 @@ class WalletDemoProximityControllerTest {
         profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct
         policy = MobileWalletProximityReaderPolicy.RequireTrusted
         val first = backend.configurations.single()
-        assertIs<MobileWalletProximityEngagementConfiguration.QrAndNfc>(first.engagement)
+        assertIs<MobileWalletProximitySessionConfiguration.ConventionalNfc>(first.session)
         assertEquals(
             MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
             first.readerPolicy,
@@ -425,7 +449,7 @@ class WalletDemoProximityControllerTest {
         controller.start()
         advanceUntilIdle()
         val second = backend.configurations.last()
-        assertIs<MobileWalletProximityEngagementConfiguration.NfcOnly>(second.engagement)
+        assertIs<MobileWalletProximitySessionConfiguration.ProvisionalNfcV2>(second.session)
         assertEquals(
             MobileWalletProximityReaderPolicy.RequireTrusted,
             second.readerPolicy,
