@@ -46,7 +46,7 @@ internal class AndroidBlePeripheralRole private constructor(
     private val sessionScope: CoroutineScope,
 ) : BlePreparedPlatformRole {
     override val role: BlePlatformRole = BlePlatformRole.PERIPHERAL_SERVER
-    override val l2capPsm: UInt? get() = l2capServer?.psm?.toUInt()
+    override val l2capPsm: UInt? get() = l2capServer?.socket?.psm?.toUInt()
     private val closed = AtomicBoolean(false)
     private val startedAwait = AtomicBoolean(false)
     private val activeDevice = AtomicReference<BluetoothDevice?>(null)
@@ -61,7 +61,7 @@ internal class AndroidBlePeripheralRole private constructor(
     private var gattServer: BluetoothGattServer? = null
     private var advertiser: BluetoothLeAdvertiser? = null
     private var advertisingCallback: AdvertiseCallback? = null
-    private var l2capServer: BluetoothServerSocket? = null
+    private var l2capServer: BlockingSocket<BluetoothServerSocket>? = null
     private var completion: DisposableHandle? = null
 
     private val stateCharacteristic = characteristic(
@@ -226,8 +226,8 @@ internal class AndroidBlePeripheralRole private constructor(
 
     private suspend fun start() {
         if (preferL2cap) {
-            l2capServer = runCatching { adapter.listenUsingInsecureL2capChannel() }.getOrNull()
-            if (l2capServer?.psm?.toUInt()?.let(BlePsmCodec::isDynamicLe) == false) {
+            l2capServer = runCatching { BlockingSocket(adapter.listenUsingInsecureL2capChannel()) }.getOrNull()
+            if (l2capServer?.socket?.psm?.toUInt()?.let(BlePsmCodec::isDynamicLe) == false) {
                 closeL2capListener()
             }
             l2capServer?.let { server ->
@@ -308,20 +308,24 @@ internal class AndroidBlePeripheralRole private constructor(
 
     private fun handleIncomingGatt(value: ByteArray): Boolean {
         if (activeConnection.get()?.bearer != BleRawBearer.GATT) return false
-        return incomingGatt.trySend(value.copyOf()).isSuccess
+        return incomingGatt.offerBlePacket(value) { close(ProximityCloseReason.CANCELLED) }
     }
 
-    private suspend fun acceptL2cap(server: BluetoothServerSocket) {
+    private suspend fun acceptL2cap(listener: BlockingSocket<BluetoothServerSocket>) {
         try {
             while (!closed.get() && !connection.isCompleted) {
-                val socket = withContext(Dispatchers.IO) { server.accept() }
+                val socket = listener.run(disposeResult = { it.close() }) { it.accept() }
+                if (closed.get()) {
+                    socket.close()
+                    return
+                }
                 val controlPeer = activeDevice.get()
                 if (controlPeer != null && controlPeer.address != socket.remoteDevice.address) {
                     runCatching { socket.close() }
                     continue
                 }
                 closeL2capListener()
-                val raw = AndroidL2capConnection(socket, sessionScope)
+                val raw = AndroidL2capConnection(BlockingSocket(socket), sessionScope)
                 if (activeConnection.compareAndSet(null, raw) && connection.complete(raw)) {
                     stopGattInfrastructure()
                 } else {

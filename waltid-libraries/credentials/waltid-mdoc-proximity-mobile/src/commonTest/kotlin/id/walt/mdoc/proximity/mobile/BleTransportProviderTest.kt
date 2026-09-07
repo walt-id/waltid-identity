@@ -185,6 +185,24 @@ class BleTransportProviderTest {
     }
 
     @Test
+    fun `callback overflow reaches framed receiver as capacity failure`() = runTest {
+        val platform = FakePlatform()
+        val prepared = provider(BleMdocRoles.CentralClient(centralUuid), platform).prepare(context, this)
+        val raw = FakeRawConnection(BleRawBearer.GATT, 5, capacity = 1)
+        platform.central.connection.complete(raw)
+        val connection = prepared.awaitConnection()
+        assertTrue(raw.incomingPackets.offerBlePacket(byteArrayOf(1, 1, 2, 3, 4)) {
+            raw.close(ProximityCloseReason.CANCELLED)
+        })
+        assertFalse(raw.incomingPackets.offerBlePacket(byteArrayOf(0, 5)) {
+            raw.close(ProximityCloseReason.CANCELLED)
+        })
+        val failure = assertFailsWith<ProximityException> { connection.receive() }
+        assertEquals("ble_receive_overflow", failure.error.code)
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), raw.closeReasons)
+    }
+
+    @Test
     fun `L2CAP connection rejects concurrent receive and truncated close`() = runTest {
         val platform = FakePlatform()
         val provider = provider(BleMdocRoles.CentralClient(centralUuid), platform)
@@ -342,8 +360,9 @@ private class FakePreparedRole(
 private class FakeRawConnection(
     override val bearer: BleRawBearer,
     override val maximumGattPacketBytes: Int?,
+    capacity: Int = Channel.UNLIMITED,
 ) : BleRawConnection {
-    val incomingPackets = Channel<ByteArray>(Channel.UNLIMITED)
+    val incomingPackets = Channel<ByteArray>(capacity)
     override val incoming = incomingPackets
     val writes = mutableListOf<ByteArray>()
     var finishCount = 0
