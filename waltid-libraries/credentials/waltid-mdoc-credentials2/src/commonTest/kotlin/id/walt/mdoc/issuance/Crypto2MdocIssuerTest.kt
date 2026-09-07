@@ -100,7 +100,7 @@ class Crypto2MdocIssuerTest {
                 expiryDate = LocalDate(2036, 1, 1),
                 documentNumber = "DOC-1",
                 drivingPrivileges = listOf(DrivingPrivilege("B", issueDate)),
-                portraitCaptureDate = Instant.parse("2024-02-29T12:34:56.123Z"),
+                portraitCaptureDate = LocalDate(2024, 2, 29),
             ),
         )
         assertTrue(typesafeIssued.issuerAuth.verify(issuerKey, Cose.Algorithm.ES256))
@@ -112,7 +112,7 @@ class Crypto2MdocIssuerTest {
         val portraitTimestamp = assertNotNull(decoded.namespaces)["org.iso.18013.5.1"]!!.entries
             .single { it.value.elementIdentifier == "portrait_capture_date" }.value
         assertContentEquals(
-            byteArrayOf(0xc0.toByte(), 0x74) + "2024-02-29T12:34:56Z".encodeToByteArray(),
+            byteArrayOf(0xc0.toByte(), 0x74) + "2024-02-29T00:00:00Z".encodeToByteArray(),
             coseCompliantCbor.encodeToByteArray(CborElement.serializer(), portraitTimestamp.elementValue),
         )
         assertTrue(decoded.issuerAuth.verify(issuerKey, Cose.Algorithm.ES256))

@@ -20,25 +20,35 @@
 
 ## Getting Started
 
-### Portrait capture timestamp migration
+### Portrait capture timestamps and compatibility
 
-`Mdl.portraitCaptureDate` and `PhotoId.portraitCaptureDate` use `kotlin.time.Instant?`.
-Supply the actual capture instant, for example `Instant.parse("2024-02-29T12:34:56Z")`.
-The JSON property remains `portrait_capture_date`; CBOR uses tag 0 and a UTC timestamp
-at whole-second precision. Fractional seconds are truncated during encoding.
+`Mdl.portraitCaptureDate` and `PhotoId.portraitCaptureDate` retain their `LocalDate?`
+API, including constructors, `copy`, getters, and date-only JSON. Existing clients and
+saved typed JSON do not need a migration. At issuance and during direct model CBOR
+serialization, a date such as `2018-08-09` becomes the tag-0 timestamp
+`2018-08-09T00:00:00Z`. Midnight UTC is an explicit compatibility assumption for
+legacy date-only inputs, not a recovered capture time or a server-local time zone.
+Null model properties remain omitted.
 
-This is a source and binary API change from `LocalDate?`: consumers must update
-constructor/copy calls and property usage, then recompile against the new library.
-Publish this change only in a release that permits that API break. Issuer profiles
-must use `stringToTDate` and provide a timestamp, replacing `stringToFullDate`.
-The bundled times are synthetic examples, not a migration rule for stored values.
+For a known capture time, supply the full timestamp through namespace-based issuance
+or server credential data. The legacy `LocalDate` models cannot retain a time of day
+and reject non-midnight timestamp input instead of silently discarding it. Namespace
+readers accept both legacy dates and full timestamps; timestamp issuance normalizes
+offsets to UTC and truncates fractional seconds to whole-second precision.
 
-A date alone does not identify a capture instant. Obtain the actual time from the
-issuer's source data or omit this optional field when it is unknown; do not assume
-midnight or the server's local time zone. Date-only model input is rejected.
-Do not re-encode an already signed credential to repair this field: its issuer
-must issue a replacement if correction is needed. Presentation continues to use
-the authoritative issuer-signed bytes.
+Shared server issuance and the legacy namespace builder normalize only the standard
+mDL and Photo ID `portrait_capture_date` fields, including inputs with an existing
+`stringToFullDate` mapping. Stored profiles and pending issuance sessions remain
+readable and do not require a bulk database or profile rewrite. New profiles should
+use `stringToTDate` and timestamps, as the bundled examples do. Deploy the shared
+issuance library update with each server; the compatibility behavior requires that
+code to be present. Other full-date fields, such as `birth_date`, are unchanged.
+
+Already signed credentials are not rewritten. Their authoritative issuer-signed
+bytes remain the basis for verification and presentation; an issuer must reissue a
+credential if its existing portrait field needs correction. Custom value-mapping
+callbacks passed directly to `MdocIssuer.issueUniversal` remain responsible for
+encoding their supplied timestamp as tag 0.
 
 ## What is the mdoc library
 This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://www.iso.org/standard/69084.html), Personal identification -- ISO-compliant driving licence -- Part 5: Mobile driving licence (mDL) application.

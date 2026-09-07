@@ -16,8 +16,8 @@ import kotlin.test.*
 import kotlin.time.Instant
 
 class PortraitCaptureTimestampTest {
-    private val capture = Instant.parse("2024-02-29T12:34:56Z")
-    private val expectedValue = byteArrayOf(0xc0.toByte(), 0x74) + "2024-02-29T12:34:56Z".encodeToByteArray()
+    private val capture = LocalDate(2024, 2, 29)
+    private val expectedValue = byteArrayOf(0xc0.toByte(), 0x74) + "2024-02-29T00:00:00Z".encodeToByteArray()
 
     @Test
     fun modelsProduceTagZeroTimestampIssuerSignedItems() {
@@ -25,6 +25,8 @@ class PortraitCaptureTimestampTest {
             val item = model.toNamespaceIssuerSignedItems().values.flatten()
                 .single { it.elementIdentifier == "portrait_capture_date" }
             assertContentEquals(expectedValue, coseCompliantCbor.encodeToByteArray(CborElement.serializer(), item.elementValue))
+            val jsonValue = model.toNamespacesJson().values.firstNotNullOf { it["portrait_capture_date"] }
+            assertEquals(JsonPrimitive("2024-02-29T00:00:00Z"), jsonValue)
         }
     }
 
@@ -42,6 +44,17 @@ class PortraitCaptureTimestampTest {
     }
 
     @Test
+    fun legacyModelCborDateOnlyValuesRemainReadable() {
+        val legacyValue = (byteArrayOf(0x6a) + "2024-02-29".encodeToByteArray()).toHexString()
+        val oldMdl = coseCompliantCbor.encodeToByteArray(mdl(capture)).toHexString()
+            .replace(expectedValue.toHexString(), legacyValue).hexToByteArray()
+        val oldPhoto = coseCompliantCbor.encodeToByteArray(photoId(capture)).toHexString()
+            .replace(expectedValue.toHexString(), legacyValue).hexToByteArray()
+        assertEquals(capture, coseCompliantCbor.decodeFromByteArray<Mdl>(oldMdl).portraitCaptureDate)
+        assertEquals(capture, coseCompliantCbor.decodeFromByteArray<PhotoId>(oldPhoto).portraitCaptureDate)
+    }
+
+    @Test
     fun unknownCaptureTimeIsOmitted() {
         for (model in listOf(mdl(null), photoId(null))) {
             assertTrue(model.toNamespaceIssuerSignedItems().values.flatten().none { it.elementIdentifier == "portrait_capture_date" })
@@ -51,28 +64,21 @@ class PortraitCaptureTimestampTest {
     }
 
     @Test
-    fun captureInstantNormalizesOffsetAndFractionToUtcWholeSeconds() {
-        val captureWithOffset = Instant.parse("2024-02-29T13:34:56.987+01:00")
-        for (model in listOf(mdl(captureWithOffset), photoId(captureWithOffset))) {
-            val value = model.toNamespaceIssuerSignedItems().values.flatten()
-                .single { it.elementIdentifier == "portrait_capture_date" }.elementValue
-            assertContentEquals(expectedValue, coseCompliantCbor.encodeToByteArray(CborElement.serializer(), value))
+    fun legacyJsonAndCopyKeepDateOnlyContract() {
+        val mdl = mdl(capture)
+        val photo = photoId(capture)
+        for (json in listOf(Json.encodeToString(mdl), Json.encodeToString(photo))) {
+            assertTrue(json.contains("\"portrait_capture_date\":\"2024-02-29\""))
         }
+        assertEquals(capture, mdl.copy(portraitCaptureDate = capture).portraitCaptureDate)
+        assertEquals(capture, photo.copy(portraitCaptureDate = capture).portraitCaptureDate)
     }
 
     @Test
-    fun issuanceRejectsCaptureInstantsOutsideFourDigitYearRange() {
-        for (capture in listOf(Instant.parse("+10000-01-01T00:00:00Z"), Instant.parse("-0001-01-01T00:00:00Z"))) {
-            assertFailsWith<IllegalArgumentException> { mdl(capture).toNamespaceIssuerSignedItems() }
-            assertFailsWith<IllegalArgumentException> { photoId(capture).toNamespaceIssuerSignedItems() }
-        }
-    }
-
-    @Test
-    fun modelInputRejectsDateOnlyAndInvalidCalendarTime() {
+    fun legacyModelRejectsLossyNonMidnightTimestampAndInvalidDate() {
         val mdlJson = Json.encodeToJsonElement(Mdl.serializer(), mdl(capture)).jsonObject
         val photoJson = Json.encodeToJsonElement(PhotoId.serializer(), photoId(capture)).jsonObject
-        for (invalid in listOf("2024-02-29", "2023-02-29T12:34:56Z", "2024-02-29T12:60:56Z", "not-a-timestamp")) {
+        for (invalid in listOf("2024-02-29T12:34:56Z", "2023-02-29", "not-a-date")) {
             assertFails("mDL: $invalid") {
                 Json.decodeFromJsonElement(Mdl.serializer(), JsonObject(mdlJson + ("portrait_capture_date" to JsonPrimitive(invalid))))
             }
@@ -88,17 +94,18 @@ class PortraitCaptureTimestampTest {
         PhotoId.registerSerializationTypes()
         for (namespace in listOf("org.iso.18013.5.1", "org.iso.23220.1", "org.iso.23220.photoid.1")) {
             val serializer = assertNotNull(MdocsCborSerializer.lookupSerializer(namespace, "portrait_capture_date"), namespace)
-            assertEquals(capture, Json.decodeFromString(serializer, "\"2024-02-29T12:34:56Z\""))
+            assertEquals(capture, Json.decodeFromString(serializer, "\"2024-02-29\""))
+            assertEquals(Instant.parse("2024-02-29T12:34:56Z"), Json.decodeFromString(serializer, "\"2024-02-29T12:34:56Z\""))
         }
     }
 
-    private fun mdl(capture: Instant?) = Mdl(
+    private fun mdl(capture: LocalDate?) = Mdl(
         familyName = "Example", givenName = "Holder", issueDate = LocalDate(2024, 3, 1),
         expiryDate = LocalDate(2030, 3, 1), documentNumber = "TEST-1", drivingPrivileges = emptyList(),
         portraitCaptureDate = capture,
     )
 
-    private fun photoId(capture: Instant?) = PhotoId(
+    private fun photoId(capture: LocalDate?) = PhotoId(
         familyNameUnicode = "Example", givenNameUnicode = "Holder", familyNameLatin1 = "Example", givenNameLatin1 = "Holder",
         birthDate = LocalDate(2000, 1, 1),
         portrait = byteArrayOf(1), issueDate = LocalDate(2024, 3, 1), expiryDate = LocalDate(2030, 3, 1),

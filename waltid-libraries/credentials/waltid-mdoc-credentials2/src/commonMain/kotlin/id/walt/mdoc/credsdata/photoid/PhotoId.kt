@@ -2,17 +2,18 @@ package id.walt.mdoc.credsdata
 
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnum
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnumSerializer
-import id.walt.mdoc.encoding.MdocTDateInstantSerializer
+import id.walt.mdoc.encoding.PortraitCaptureDateSerializer
+import id.walt.mdoc.encoding.PortraitCaptureTimestampSerializer
 import id.walt.mdoc.encoding.ByteArrayBase64UrlSerializer
 import id.walt.mdoc.objects.MdocsCborSerializer
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.cbor.ValueTags
 import kotlinx.serialization.cbor.ByteString
 
 
@@ -84,10 +85,9 @@ data class PhotoId(
     val ageOver68: Boolean? = null,
 
     @SerialName("age_birth_year") val ageBirthYear: UInt? = null,
-    /** Capture instant; omitted when the capture time is unknown. Encoded at whole-second UTC precision. */
-    @ValueTags(0u)
-    @Serializable(with = MdocTDateInstantSerializer::class)
-    @SerialName("portrait_capture_date") val portraitCaptureDate: Instant? = null,
+    /** Legacy date input; issuance interprets it as midnight UTC. JSON keeps its date-only form. */
+    @Serializable(with = PortraitCaptureDateSerializer::class)
+    @SerialName("portrait_capture_date") val portraitCaptureDate: LocalDate? = null,
     @SerialName("birthplace") val birthPlace: String? = null,
     @SerialName("name_at_birth") val nameAtBirth: String? = null,
     @SerialName("resident_address_unicode") val residentAddressUnicode: String? = null,
@@ -230,7 +230,7 @@ data class PhotoId(
                 "age_over_98",
                 "age_over_99",*/
                 "age_birth_year" to ageBirthYear,
-                "portrait_capture_date" to portraitCaptureDate,
+                "portrait_capture_date" to portraitCaptureDate?.atStartOfDayIn(TimeZone.UTC),
                 "birthplace" to birthPlace,
                 "name_at_birth" to nameAtBirth,
                 "resident_address" to residentAddressUnicode,
@@ -294,7 +294,7 @@ data class PhotoId(
                     "expiry_date" to localDate,
                     "portrait" to byteArray,
                     "sex" to IsoSexEnumSerializer,
-                    "portrait_capture_date" to MdocTDateInstantSerializer,
+                    "portrait_capture_date" to PortraitCaptureTimestampSerializer,
                     "age_in_year" to uint,
                     "age_birth_year" to uint,
                     "age_over_12" to boolean,
@@ -320,7 +320,7 @@ data class PhotoId(
                     "expiry_date" to localDate,
                     "portrait" to byteArray,
                     "sex" to IsoSexEnumSerializer,
-                    "portrait_capture_date" to MdocTDateInstantSerializer,
+                    "portrait_capture_date" to PortraitCaptureTimestampSerializer,
                     "age_in_year" to uint,
                     "age_birth_year" to uint,
                     "age_over_12" to boolean,

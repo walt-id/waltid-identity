@@ -26,6 +26,7 @@ import id.walt.mdoc.dataelement.ListElement
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.dataelement.toDataElement
+import id.walt.mdoc.dataelement.json.mapPortraitCaptureDate
 import id.walt.mdoc.dataelement.json.toDataElement
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
@@ -528,7 +529,8 @@ open class CIProvider(
                     addItemToSign(
                         nameSpace = namespace.key,
                         elementIdentifier = property.key,
-                        elementValue = property.value.toDataElement(),
+                        elementValue = mapPortraitCaptureDate(namespace.key, property.key, property.value)
+                            ?: property.value.toDataElement(),
                     )
                 }
             }
