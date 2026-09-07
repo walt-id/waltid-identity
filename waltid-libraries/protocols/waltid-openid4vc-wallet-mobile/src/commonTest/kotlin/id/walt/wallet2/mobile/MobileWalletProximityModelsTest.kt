@@ -93,6 +93,15 @@ class ProximityModelsTest {
         assertTrue(capabilities.mayStart)
         assertTrue(capabilities.nfcEngagement.selected)
         assertFalse(capabilities.nfcEngagement.mayStart)
+        listOf<() -> MobileWalletProximityCapabilities>(
+            { capabilities.copy(qrEngagement = available.copy(selected = false)) },
+            { capabilities.copy(nfcEngagement = unavailableAlternative.copy(selected = false)) },
+            { capabilities.copy(bluetoothLowEnergy = available.copy(selected = false)) },
+            { capabilities.copy(nfcRetrieval = unavailableAlternative.copy(selected = false)) },
+            { capabilities.copy(nfcV2Retrieval = available) },
+            { capabilities.copy(wifiAwareRetrieval = available) },
+        ).forEach { inconsistent -> assertFailsWith<IllegalArgumentException> { inconsistent() } }
+
     }
 
     @Test
@@ -130,7 +139,13 @@ class ProximityModelsTest {
         assertFailsWith<IllegalArgumentException> {
             MobileWalletProximityConfiguration(
                 profile = MobileWalletProximityProfile.Iso1801352021,
-                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(bluetoothLowEnergy = MobileWalletProximityBleConfiguration(), qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(bluetoothLowEnergy = MobileWalletProximityBleConfiguration(), nfc = null)),
+                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(
+                    bluetoothLowEnergy = MobileWalletProximityBleConfiguration(),
+                    qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(
+                        bluetoothLowEnergy = MobileWalletProximityBleConfiguration(),
+                        nfc = null
+                    )
+                ),
             )
         }
     }
@@ -149,14 +164,18 @@ class ProximityModelsTest {
             MobileWalletProximityConfiguration(session = MobileWalletProximitySessionConfiguration.Qr(retrieval))
             MobileWalletProximityNfcHandover.entries.forEach { handover ->
                 (listOf(null) + plans).forEach { qr ->
-                    MobileWalletProximityConfiguration(session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
-                        handover, retrieval, qr,
-                    ))
+                    MobileWalletProximityConfiguration(
+                        session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
+                            handover,
+                            retrieval,
+                            qr,
+                        )
+                    )
                 }
             }
-            MobileWalletProximityConfiguration(session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(
-                qrFallback = retrieval,
-            ))
+            MobileWalletProximityConfiguration(
+                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(qrFallback = retrieval,)
+            )
         }
         assertFailsWith<IllegalArgumentException> {
             MobileWalletProximitySessionConfiguration.ConventionalNfc(
