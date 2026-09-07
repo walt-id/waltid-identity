@@ -16,6 +16,11 @@ import id.walt.mdoc.objects.engagement.DeviceEngagementSecurity
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethodCodec
 import id.walt.mdoc.proximity.ImmutableBytes
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -25,20 +30,10 @@ import kotlinx.serialization.cbor.CborInteger
 import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
+
+
 
 class NfcV2ApduProcessorTest {
-    private val publicKey = CoseKey(
-        kty = Cose.KeyTypes.EC2,
-        crv = Cose.EllipticCurves.P_256,
-        x = ByteArray(32) { it.toByte() },
-        y = ByteArray(32) { (it + 1).toByte() },
-    )
-
     @Test
     fun `selection callback cannot rewrite the reader offered endpoint through a projection`() = runTest {
         val offered = DeviceRetrievalMethod.Ble(
@@ -59,6 +54,48 @@ class NfcV2ApduProcessorTest {
         ))
         assertEquals(NfcStatusWord.WRONG_DATA, result.statusWord)
         assertEquals(NfcV2State.DEACTIVATED, processor.state)
+    }
+
+
+    private val publicKey = CoseKey(
+        kty = Cose.KeyTypes.EC2,
+        crv = Cose.EllipticCurves.P_256,
+        x = ByteArray(32) { it.toByte() },
+        y = ByteArray(32) { (it + 1).toByte() },
+    )
+
+    @Test
+    fun `Wi-Fi selection permits holder passphrase and band intersection only`() = runTest {
+        val reader = DeviceRetrievalMethod.WifiAware(supportedBands = byteArrayOf(0x14))
+        val selections = listOf(
+            DeviceRetrievalMethod.WifiAware("holder-secret-123456", supportedBands = byteArrayOf(0x04)) to true,
+            DeviceRetrievalMethod.WifiAware("holder-secret-123456", supportedBands = byteArrayOf(0x14)) to true,
+            DeviceRetrievalMethod.WifiAware(supportedBands = byteArrayOf(0x04)) to false,
+            DeviceRetrievalMethod.WifiAware("short", supportedBands = byteArrayOf(0x04)) to false,
+            DeviceRetrievalMethod.WifiAware("holder-secret-123456", supportedBands = byteArrayOf(0x00)) to false,
+            DeviceRetrievalMethod.WifiAware("holder-secret-123456", supportedBands = byteArrayOf(0x24)) to false,
+            DeviceRetrievalMethod.WifiAware("holder-secret-123456", operatingClass = 81u, supportedBands = byteArrayOf(0x04)) to false,
+            DeviceRetrievalMethod.WifiAware("holder-secret-123456", supportedBands = byteArrayOf(0x04),
+                extensions = mapOf(9u to CborInteger(1))) to false,
+        )
+        for ((selected, accepted) in selections) {
+            val completed = mutableListOf<NfcV2Handover>()
+            val processor = NfcV2ApduProcessor(NfcV2MaximumCommandDataLength(4096), 128 * 1024,
+                select = { selection(selected) }, onHandover = completed::add)
+            processor.process(selectNfcV2())
+            val result = response(processor.process(envelope(
+                NfcDo53.encode(request(DeviceRetrievalMethod.NfcV2, reader)), 65_536)))
+            assertEquals(if (accepted) NfcStatusWord.SUCCESS else NfcStatusWord.WRONG_DATA, result.statusWord)
+            assertEquals(if (accepted) 1 else 0, completed.size)
+            if (accepted) assertEquals(selected, completed.single().selectedMethod)
+        }
+        // A reader cannot supply the holder's security parameter, even when exact objects match.
+        val injected = selections.first().first
+        val processor = NfcV2ApduProcessor(NfcV2MaximumCommandDataLength(4096), 128 * 1024,
+            select = { selection(injected) })
+        processor.process(selectNfcV2())
+        assertEquals(NfcStatusWord.WRONG_DATA, response(processor.process(envelope(
+            NfcDo53.encode(request(DeviceRetrievalMethod.NfcV2, injected)), 65_536))).statusWord)
     }
 
     @Test

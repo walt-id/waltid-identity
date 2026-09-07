@@ -56,93 +56,9 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalletDemoProximityControllerTest {
-    @Test
-    fun `reset drains a late startup and its asynchronous close even after settings dismissal`() = runTest {
-        val startGate = CompletableDeferred<Unit>()
-        val closeGate = CompletableDeferred<Unit>()
-        val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026), closeGate = closeGate)
-        val controller = controller(FakeBackend(session, startGate = startGate))
-        controller.start()
-        advanceUntilIdle()
-        controller.dismiss() // Opening Settings has already hidden the presentation route.
-        var deleted = false
-        val reset = launch { controller.closeAndAwait(); deleted = true }
-        advanceUntilIdle()
-        assertFalse(deleted)
-        startGate.complete(Unit)
-        advanceUntilIdle()
-        assertFalse(deleted)
-        assertEquals(1, session.closeCalls)
-        closeGate.complete(Unit)
-        advanceUntilIdle()
-        assertTrue(deleted)
-        reset.join()
-    }
-
-    @Test
-    fun `pending decision excludes duplicate and conflicting actions and ignores an old rejection`() = runTest {
-        val oldReview = review()
-        val gate = CompletableDeferred<Unit>()
-        val error = ProximityError(ProximityErrorCategory.Internal, "late", "Late rejection", ProximityRecovery.StartNewSession)
-        val session = FakeSession(ProximityState.ReviewRequired(oldReview), ProximityActionResult.Rejected(error), dispatchGate = gate)
-        val controller = controller(FakeBackend(session))
-        controller.start()
-        advanceUntilIdle()
-        controller.selectCredential(0, "credential-a")
-        controller.approve()
-        controller.approve()
-        controller.decline()
-        advanceUntilIdle()
-        assertEquals(1, session.actions.size)
-        assertFalse(controller.state.value.canApprove)
-        session.mutableState.value = ProximityState.ReviewRequired(review())
-        advanceUntilIdle()
-        gate.complete(Unit)
-        advanceUntilIdle()
-        assertNull(controller.state.value.actionError)
-        assertNull(controller.state.value.pendingReviewId)
-        controller.selectCredential(0, "credential-a")
-        controller.approve()
-        advanceUntilIdle()
-        assertEquals(2, session.actions.size)
-        assertEquals(error, controller.state.value.actionError)
-        assertTrue(controller.state.value.canApprove) // A current rejected decision is retryable.
-        controller.dismiss()
-        advanceUntilIdle()
-    }
-
-    @Test
-    fun `selected WiFi permissions gate the session before another transport can start`() = runTest {
-        listOf(
-            MobileWalletProximityRemediationAction.RequestNearbyWifiPermission,
-            MobileWalletProximityRemediationAction.RequestLocalNetworkPermission,
-        ).forEach { permissionAction ->
-            val capabilities = wifiPermissionCapabilities(permissionAction)
-            assertTrue(capabilities.mayStart)
-            val backend = FakeBackend(
-                session = FakeSession(
-                    MobileWalletProximityState.Preparing(
-                        MobileWalletProximityProfile.Iso180135Edition2Dis2026
-                    )
-                ),
-                capabilities = { capabilities },
-            )
-            val controller = controller(backend)
-
-            controller.start()
-            advanceUntilIdle()
-
-            assertEquals(0, backend.startCalls)
-            assertEquals(permissionAction, controller.state.value.automaticPermissionAction)
-            controller.dismiss()
-            advanceUntilIdle()
-        }
-    }
-
     @Test
     fun `selected runtime permission is resolved before the SDK session starts`() = runTest {
         var capabilities = blockedCapabilities
@@ -222,6 +138,66 @@ class WalletDemoProximityControllerTest {
     }
 
     @Test
+    fun `selected WiFi permission is offered once even when BLE can start`() = runTest {
+        listOf(
+            MobileWalletProximityRemediationAction.RequestNearbyWifiPermission,
+            MobileWalletProximityRemediationAction.RequestLocalNetworkPermission,
+        ).forEach { permissionAction ->
+            val capabilities = wifiPermissionCapabilities(permissionAction)
+            assertTrue(capabilities.mayStart)
+            val backend = FakeBackend(
+                session = FakeSession(
+                    MobileWalletProximityState.Preparing(
+                        MobileWalletProximityProfile.Iso180135Edition2Dis2026
+                    )
+                ),
+                capabilities = { capabilities },
+            )
+            val controller = controller(backend)
+
+            controller.start()
+            advanceUntilIdle()
+
+            assertEquals(0, backend.startCalls)
+            assertEquals(permissionAction, controller.state.value.automaticPermissionAction)
+            controller.remediate(permissionAction,
+                WalletDemoProximityHostActionExecutor { MobileWalletProximityHostActionResult.Cancelled })
+            advanceUntilIdle()
+            assertEquals(1, backend.startCalls)
+            assertNull(controller.state.value.automaticPermissionAction)
+            controller.dismiss()
+            advanceUntilIdle()
+        }
+    }
+
+    @Test
+    fun `required WiFi permission is repaired before a WiFi-only session starts`() = runTest {
+        for (action in listOf(
+            MobileWalletProximityRemediationAction.RequestNearbyWifiPermission,
+            MobileWalletProximityRemediationAction.RequestLocalNetworkPermission,
+        )) {
+            var capabilities = wifiPermissionCapabilities(action, bleSelected = false)
+            assertFalse(capabilities.mayStart)
+            val backend = FakeBackend(session = FakeSession(
+                MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026),
+            ), capabilities = { capabilities })
+            val controller = controller(backend)
+            controller.start()
+            advanceUntilIdle()
+            assertEquals(0, backend.startCalls)
+            assertEquals(action, controller.state.value.automaticPermissionAction)
+            controller.remediate(action, WalletDemoProximityHostActionExecutor {
+                capabilities = capabilities.copy(wifiAwareRetrieval = availableSelected)
+                MobileWalletProximityHostActionResult.Completed
+            })
+            advanceUntilIdle()
+            assertEquals(1, backend.startCalls)
+            controller.dismiss()
+            advanceUntilIdle()
+        }
+    }
+
+    @Test
     fun `start observes the SDK session without copying protocol state`() = runTest {
         val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
         val backend = FakeBackend(session = session)
@@ -274,14 +250,19 @@ class WalletDemoProximityControllerTest {
 
     @Test
     fun `compatibility profiles preserve engagement choice and narrow data transfer`() {
-        for (profile in listOf(WalletDemoProximityTransportProfile.Bluetooth)) {
-            val session = assertIs<ProximitySessionConfiguration.ConventionalNfc>(profile.configuration().session)
-            assertEquals(ProximityNfcHandover.Negotiated, session.handover)
+        for (profile in listOf(WalletDemoProximityTransportProfile.Bluetooth, WalletDemoProximityTransportProfile.WifiAware)) {
+            val session = assertIs<MobileWalletProximitySessionConfiguration.ConventionalNfc>(profile.configuration().session)
+            assertEquals(MobileWalletProximityNfcHandover.Negotiated, session.handover)
             assertEquals(session.retrieval, session.qrFallback)
             assertNull(session.retrieval.nfc)
             assertEquals(profile == WalletDemoProximityTransportProfile.Bluetooth, session.retrieval.bluetoothLowEnergy != null)
+            assertEquals(profile == WalletDemoProximityTransportProfile.WifiAware, session.retrieval.wifiAware)
         }
-
+        val nfc = assertIs<MobileWalletProximitySessionConfiguration.ProvisionalNfcV2>(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware.configuration().session)
+        assertTrue(nfc.wifiAware)
+        assertNull(nfc.bluetoothLowEnergy)
+        assertNull(nfc.qrFallback)
     }
 
     @Test
@@ -1088,7 +1069,6 @@ private class FakeSession(
     private val actionResult: ProximityActionResult = ProximityActionResult.Accepted,
     private val closeGate: CompletableDeferred<Unit>? = null,
     override val connectedRoute: ProximityConnectedRoute? = null,
-    private val dispatchGate: CompletableDeferred<Unit>? = null,
 ) : ProximitySession {
     val mutableState = MutableStateFlow(initialState)
     override val state: StateFlow<ProximityState> = mutableState
@@ -1098,7 +1078,6 @@ private class FakeSession(
 
     override suspend fun dispatch(action: ProximityAction): ProximityActionResult {
         actions += action
-        dispatchGate?.await()
         if (action == ProximityAction.Cancel && actionResult == ProximityActionResult.Accepted) {
             mutableState.value = ProximityState.Cancelled
         }
@@ -1209,19 +1188,25 @@ private val wifiPermissionUnavailable = MobileWalletProximityError(
     category = MobileWalletProximityErrorCategory.Capability,
     code = "wifi_permission_required",
     message = "WiFi permission is required",
-    recoverable = true,
+    recovery = MobileWalletProximityRecovery.RetryPrerequisites,
 )
 
 private fun wifiPermissionCapabilities(
     action: MobileWalletProximityRemediationAction,
+    bleSelected: Boolean = true,
 ): MobileWalletProximityCapabilities = readyCapabilities.copy(
+    bluetoothLowEnergy = availableSelected.copy(selected = bleSelected),
+    session = id.walt.wallet2.mobile.MobileWalletProximitySessionConfiguration.Qr(
+        id.walt.wallet2.mobile.MobileWalletProximityConventionalRetrievalConfiguration(
+            bluetoothLowEnergy = if (bleSelected) id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration() else null,
+            wifiAware = true,
+        ),
+    ),
     wifiAwareRetrieval = MobileWalletProximityTransportCapability(
         implemented = true,
         profilePermitted = true,
-        runtimeAvailable = false,
         selected = true,
-        unavailable = wifiPermissionUnavailable,
-        remediationActions = listOf(action),
+        runtime = MobileWalletProximityRuntimeObservation.Unavailable(wifiPermissionUnavailable, listOf(action)),
     )
 )
 

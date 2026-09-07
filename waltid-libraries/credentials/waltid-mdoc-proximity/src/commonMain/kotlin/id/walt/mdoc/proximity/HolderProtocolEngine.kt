@@ -554,7 +554,7 @@ class MdocHolderProtocolEngine(
             limits.requireEngagementOrHandover(exactTranscript)
             MdocCborGuard.validate(transcriptBytes, limits.maximumCborDepth, limits.maximumCborItems)
             cipher = try {
-                MdocSessionCipher.establishForHolder(eDeviceKey, establishment.eReaderKey.value, transcriptBytes)
+                MdocSessionCipher.establishForHolder(engaged.eDeviceKey, establishment.eReaderKey.value, transcriptBytes)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Throwable) {

@@ -24,7 +24,12 @@ consent, and trust remain in `waltid-mdoc-proximity`.
 resources. It performs no prompt or radio attach during capability checks. Android 13+ hosts request
 `NEARBY_WIFI_DEVICES`; target-37 hosts also request `ACCESS_LOCAL_NETWORK`. The provider publishes
 the transaction-derived service, establishes a secure responder data path, and serves bounded
-sequential `POST /mdoc` exchanges. `IosWifiAwareProximityTransportFactory` reports a precise
+sequential `POST /mdoc` exchanges. Each provider owns one publisher and one accept operation.
+Concurrent QR/NFC routes use separate transaction keys and service names; callers must not share
+a provider between them. Attach/publish callback results and network registrations enter their
+owner before coroutine delivery. Cancellation closes blocking socket operations before workers
+are joined. NFCv2 HTTP reads and queued duplicate responses wait for their request/response turn.
+`IosWifiAwareProximityTransportFactory` reports a precise
 unimplemented result because Apple's paired, statically declared DNS-SD service model cannot express
 the ISO transaction service name.
 

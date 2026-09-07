@@ -23,8 +23,10 @@ public enum WalletDemoProximityApprovalMode: String, CaseIterable, Identifiable,
 public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifiable, Sendable {
     case defaultProfile = "default"
     case bluetooth = "bluetooth"
+    case wifiAware = "wifi_aware"
     case provisionalNfcV2Hybrid = "provisional_nfc_v2_hybrid"
     case provisionalNfcV2Direct = "provisional_nfc_v2_direct"
+    case provisionalNfcV2WifiAware = "provisional_nfc_v2_wifi_aware"
 
     public var id: String { rawValue }
 
@@ -32,9 +34,11 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
     // These closed demo presets contain only fixed, tested SDK values.
     public var configuration: ProximityConfiguration {
         switch self {
-        case .defaultProfile, .bluetooth:
-            let retrieval = ProximityRetrievalOptions(
-                nfc: self == .defaultProfile ? .init() : nil
+        case .defaultProfile, .bluetooth, .wifiAware:
+            let retrieval = ProximityPresentationConventionalRetrievalConfiguration(
+                bluetoothLowEnergy: self == .wifiAware ? nil : .init(),
+                nfc: self == .defaultProfile ? .init() : nil,
+                wifiAware: self != .bluetooth
             )
             return try! ProximityConfiguration(
                 session: .nfc(.init(
@@ -53,6 +57,10 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
                         )
                     )
                 )
+            )
+        case .provisionalNfcV2WifiAware:
+            return ProximityPresentationConfiguration(
+                session: .provisionalNFCV2(.init(wifiAware: true))
             )
         case .provisionalNfcV2Direct:
             return try! ProximityConfiguration(
