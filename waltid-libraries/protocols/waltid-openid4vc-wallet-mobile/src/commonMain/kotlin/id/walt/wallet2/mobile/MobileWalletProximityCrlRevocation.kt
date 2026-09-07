@@ -81,26 +81,31 @@ public class MobileWalletProximityCrlRevocationEvaluator internal constructor(
         require(evidence.certificateChainDerBase64Url.size in 1..MAX_CHAIN_LENGTH)
         val supplied = evidence.certificateChainDerBase64Url.toList().map(::parseCrlCertificate)
         val path = resolvePath(supplied.first(), (supplied + issuers).distinctBy { it.encodedDer })
-        val at = now()
         val fetched = mutableMapOf<String, ByteString?>()
-        var complete = path.complete
+        val verified = mutableListOf<Pair<X509Certificate, List<CrlCertificateStatus.Good>>>()
         for ((index, pair) in path.pairs.withIndex()) {
             val (certificate, issuer) = pair
-            var good = false
+            val good = mutableListOf<CrlCertificateStatus.Good>()
             for (url in certificate.crlUrls()) {
                 val crl = if (url in fetched) fetched[url] else fetchCrl(url).also { fetched[url] = it }
                 if (crl == null) continue
-                when (verifier.verify(crl, certificate, issuer, at)) {
-                    is CrlCertificateStatus.Good -> good = true
+                when (val status = verifier.verify(crl, certificate, issuer, now())) {
+                    is CrlCertificateStatus.Good -> good += status
                     is CrlCertificateStatus.Revoked -> return MobileWalletProximityCertificateRevocationResult.Revoked(
                         if (index == 0) "Reader certificate is revoked" else "Reader certificate authority is revoked",
                     )
                     is CrlCertificateStatus.Indeterminate -> Unit
                 }
             }
-            if (!good) complete = false
+            verified += issuer to good
         }
-        if (complete && path.pairs.isNotEmpty()) MobileWalletProximityCertificateRevocationResult.Good
+        // A previously checked CRL or its issuer may expire while another fetch is suspended.
+        val completedAt = now()
+        val current = verified.all { (issuer, crls) ->
+            completedAt >= issuer.data.validity.notBefore && completedAt <= issuer.data.validity.notAfter &&
+                crls.any { it.thisUpdate <= completedAt && completedAt < it.nextUpdate }
+        }
+        if (path.complete && verified.isNotEmpty() && current) MobileWalletProximityCertificateRevocationResult.Good
         else indeterminate()
     } catch (cancelled: CancellationException) {
         throw cancelled

@@ -2,12 +2,16 @@ package id.walt.wallet2.mobile
 
 import id.walt.certificate.x509.revocation.CrlTestFixtures
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class MobileWalletProximityCrlRevocationTest {
@@ -31,6 +35,43 @@ class MobileWalletProximityCrlRevocationTest {
         assertEquals(MobileWalletProximityCertificateRevocationResult.Revoked("Reader certificate authority is revoked"), revoked)
         val leafOnly = evaluator("CA_ONLY_REVOKED", MobileWalletProximityCrlScope.ReaderCertificate).evaluate(evidence())
         assertEquals(MobileWalletProximityCertificateRevocationResult.Good, leafOnly)
+    }
+
+    @Test
+    fun readerStatusMustStillBeCurrentAfterEveryRequiredFetchCompletes() = runTest {
+        val fixture = ReaderCertificateProfileFixture.create(CryptoRuntime(defaultSoftwareKeyProviders()))
+        val start = Instant.fromEpochSeconds(Clock.System.now().epochSeconds) + 1.seconds
+        val expiry = start + 60.seconds
+        val readerCrl = fixture.crl(thisUpdate = start - 1.seconds, nextUpdate = expiry).encodeToBase64Url()
+        val authorityCrl = fixture.crl(thisUpdate = start - 1.seconds, nextUpdate = start + 3600.seconds).encodeToBase64Url()
+        val evidence = MobileWalletProximityReaderEvidence(
+            scope = MobileWalletProximityReaderAuthenticationScope.WholeRequest,
+            certificateChainDerBase64Url = listOf(fixture.leaf.encodedDer.toByteArray().encodeToBase64Url()),
+        )
+        for ((delayedUrl, completesAt) in listOf(
+            "https://reader.example/crl" to expiry,
+            "https://reader.example/ca-crl" to expiry,
+            "https://reader.example/ca-crl" to expiry - 1.seconds,
+        )) {
+            var currentTime = start
+            val calls = mutableListOf<String>()
+            val evaluator = MobileWalletProximityCrlRevocationEvaluator(
+                listOf(fixture.root.encodedDer.toByteArray().encodeToBase64Url()),
+                MobileWalletProximityCrlScope.ReaderCertificateAndIssuingAuthorities,
+                MobileWalletProximityCrlFetcher { url, _ ->
+                    calls += url
+                    if (url == delayedUrl) currentTime = completesAt
+                    MobileWalletProximityCrlFetchResult.Available(
+                        if (url.endsWith("/ca-crl")) authorityCrl else readerCrl,
+                    )
+                },
+                { currentTime },
+            )
+            val result = evaluator.evaluate(evidence)
+            if (completesAt == expiry) assertIs<MobileWalletProximityCertificateRevocationResult.Indeterminate>(result, delayedUrl)
+            else assertEquals(MobileWalletProximityCertificateRevocationResult.Good, result)
+            assertEquals(listOf("https://reader.example/crl", "https://reader.example/ca-crl"), calls)
+        }
     }
 
     @Test
