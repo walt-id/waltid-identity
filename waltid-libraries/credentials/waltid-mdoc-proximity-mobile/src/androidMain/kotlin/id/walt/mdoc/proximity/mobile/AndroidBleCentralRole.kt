@@ -22,18 +22,16 @@ import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.min
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 @SuppressLint("MissingPermission")
@@ -47,6 +45,7 @@ internal class AndroidBleCentralRole(
 ) : BlePreparedPlatformRole {
     override val role: BlePlatformRole = BlePlatformRole.CENTRAL_CLIENT
     override val l2capPsm: UInt? = null
+    private val pendingSocket = AtomicReference<BlockingSocket<android.bluetooth.BluetoothSocket>?>(null)
     private val started = AtomicBoolean(false)
     private val closed = AtomicBoolean(false)
     @Volatile private var scanCallback: ScanCallback? = null
@@ -61,11 +60,20 @@ internal class AndroidBleCentralRole(
         return try {
             val device = scanForReader()
             val session = AndroidCentralGattSession(context, device).also { gattSession = it }
+            if (closed.get()) {
+                session.close()
+                throw CancellationException("BLE role is closed")
+            }
             session.connect()
             val established = establishBearer(session)
             connection = established
+            if (closed.get()) {
+                established.close(ProximityCloseReason.CANCELLED)
+                throw CancellationException("BLE role is closed")
+            }
             established
         } catch (cancelled: CancellationException) {
+            close(ProximityCloseReason.CANCELLED)
             throw cancelled
         } catch (failure: Throwable) {
             close(ProximityCloseReason.CANCELLED)
@@ -105,53 +113,50 @@ internal class AndroidBleCentralRole(
             ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(),
             callback,
         )
+        if (!continuation.isActive || closed.get()) runCatching { scanner.stopScan(callback) }
     }
 
     private suspend fun establishBearer(session: AndroidCentralGattSession): BleRawConnection {
         val service = session.discover(UUID.fromString(serviceUuid.platformString()))
-        val state = service.required(BleGattUuid.READER_STATE)
-        val clientToServer = service.required(BleGattUuid.READER_CLIENT_TO_SERVER)
-        val serverToClient = service.required(BleGattUuid.READER_SERVER_TO_CLIENT)
-        val ident = service.required(BleGattUuid.READER_IDENT)
-        val readerIdent = session.read(ident)
-        if (!BleIdent.matches(expectedIdent, readerIdent)) throw ProximityException(
-            ProximityError.Security("ble_ident_mismatch", "The reader BLEIdent does not match EDeviceKeyBytes")
+        val characteristics = BleReaderCharacteristics(
+            state = service.required(BleGattUuid.READER_STATE),
+            clientToServer = service.required(BleGattUuid.READER_CLIENT_TO_SERVER),
+            serverToClient = service.required(BleGattUuid.READER_SERVER_TO_CLIENT),
+            ident = service.required(BleGattUuid.READER_IDENT),
+            psm = service.getCharacteristic(UUID.fromString(BleGattUuid.READER_L2CAP_PSM)),
         )
-
-        if (preferL2cap) {
-            val psmCharacteristic = service.getCharacteristic(UUID.fromString(BleGattUuid.READER_L2CAP_PSM))
-            val psm = psmCharacteristic?.let { characteristic ->
-                BlePsmCodec.decode(session.read(characteristic)).toInt()
-            }
-            if (psm != null) {
-                openL2cap(session.device, psm)?.let { socket ->
+        return establishBleCentralBearer(
+            characteristics, expectedIdent, preferL2cap,
+            read = session::read,
+            subscribe = session::subscribe,
+            write = session::write,
+            openL2cap = { psm ->
+                openL2cap(session.device, psm.toInt())?.let { socket ->
                     session.close()
                     gattSession = null
-                    return AndroidL2capConnection(socket, sessionScope)
+                    AndroidL2capConnection(socket, sessionScope)
                 }
-            }
-        }
-
-        session.subscribe(state)
-        session.subscribe(serverToClient)
-        session.write(state, byteArrayOf(BLE_STATE_START))
-        return AndroidCentralGattConnection(session, state, clientToServer)
+            },
+            gatt = { AndroidCentralGattConnection(session, characteristics.state, characteristics.clientToServer) },
+        )
     }
 
-    private suspend fun openL2cap(device: BluetoothDevice, psm: Int): android.bluetooth.BluetoothSocket? {
-        val socket = runCatching { device.createInsecureL2capChannel(psm) }.getOrNull() ?: return null
-        return try {
-            val connected = withTimeoutOrNull(5.seconds) {
-                withContext(Dispatchers.IO) { socket.connect() }
-                true
-            } == true
-            if (connected) socket else null.also { runCatching { socket.close() } }
+    private suspend fun openL2cap(device: BluetoothDevice, psm: Int): BlockingSocket<android.bluetooth.BluetoothSocket>? {
+        val socket = runCatching { BlockingSocket(device.createInsecureL2capChannel(psm)) }.getOrNull() ?: return null
+        pendingSocket.set(socket)
+        try {
+            if (closed.get()) throw CancellationException("BLE role is closed")
+            val connected = withTimeoutOrNull(5.seconds) { socket.run { it.connect() }; true } == true
+            if (!connected) socket.close()
+            return socket.takeIf { connected }
         } catch (cancelled: CancellationException) {
-            runCatching { socket.close() }
+            socket.close()
             throw cancelled
         } catch (_: Exception) {
-            runCatching { socket.close() }
-            null
+            socket.close()
+            return null
+        } finally {
+            pendingSocket.compareAndSet(socket, null)
         }
     }
 
@@ -160,6 +165,7 @@ internal class AndroidBleCentralRole(
         completion?.dispose()
         scanCallback?.let { callback -> runCatching { adapter.bluetoothLeScanner?.stopScan(callback) } }
         scanCallback = null
+        pendingSocket.getAndSet(null)?.close()
         connection?.close(reason)
         gattSession?.close()
     }
@@ -182,6 +188,7 @@ private class AndroidCentralGattSession(
     @Volatile var mtu: Int = 23
         private set
     private lateinit var gatt: BluetoothGatt
+    private val ownedGatt = AtomicReference<BluetoothGatt?>(null)
 
     private val callback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -246,7 +253,7 @@ private class AndroidCentralGattSession(
 
     private fun handleNotification(uuid: UUID, value: ByteArray) {
         when (uuid) {
-            UUID.fromString(BleGattUuid.READER_SERVER_TO_CLIENT) -> incoming.trySend(value)
+            UUID.fromString(BleGattUuid.READER_SERVER_TO_CLIENT) -> incoming.offerBlePacket(value, ::close)
             UUID.fromString(BleGattUuid.READER_STATE) -> when {
                 value.contentEquals(byteArrayOf(BLE_STATE_END)) -> incoming.close()
                 else -> incoming.close(
@@ -259,8 +266,14 @@ private class AndroidCentralGattSession(
     }
 
     suspend fun connect() {
+        if (closed.get()) throw CancellationException("GATT session is closed")
         gatt = device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
             ?: throw androidTransportFailure("ble_connect_failed", "Android could not create a GATT connection")
+        ownedGatt.set(gatt)
+        if (closed.get()) {
+            closeGatt()
+            throw CancellationException("GATT session is closed")
+        }
         val connected = awaitOperation<AndroidGattOperation.Connected>()
         requireGattSuccess(connected.status, "connection")
         if (gatt.requestMtu(515)) {
@@ -316,10 +329,16 @@ private class AndroidCentralGattSession(
 
     fun close() {
         if (!closed.compareAndSet(false, true)) return
-        runCatching { gatt.disconnect() }
-        runCatching { gatt.close() }
+        closeGatt()
         operations.close()
         incoming.close()
+    }
+
+    private fun closeGatt() {
+        ownedGatt.getAndSet(null)?.let { resource ->
+            runCatching { resource.disconnect() }
+            runCatching { resource.close() }
+        }
     }
 
     private suspend inline fun <reified T : AndroidGattOperation> awaitOperation(
