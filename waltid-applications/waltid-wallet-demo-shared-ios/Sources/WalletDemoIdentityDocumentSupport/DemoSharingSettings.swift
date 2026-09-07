@@ -14,13 +14,15 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
         switch self {
         case .defaultProfile:
             return ProximityPresentationConfiguration(
-                engagement: .qrAndNFC(.negotiatedHandover),
-                retrieval: .conventional(.init(nfc: .init()))
+                session: .nfc(.init(
+                    handover: .negotiatedHandover,
+                    retrieval: .init(nfc: .init()),
+                    qrFallback: .init(nfc: .init())
+                ))
             )
         case .provisionalNfcV2Hybrid:
             return ProximityPresentationConfiguration(
-                engagement: .nfcOnly(.provisionalV2()),
-                retrieval: .provisionalNFCV2(
+                session: .provisionalNFCV2(
                     .init(
                         bluetoothLowEnergy: .init(
                             roles: .centralClient,
@@ -31,8 +33,7 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
             )
         case .provisionalNfcV2Direct:
             return ProximityPresentationConfiguration(
-                engagement: .nfcOnly(.provisionalV2()),
-                retrieval: .provisionalNFCV2()
+                session: .provisionalNFCV2()
             )
         }
     }
