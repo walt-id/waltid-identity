@@ -157,13 +157,13 @@ class ProximityModelsTest {
 
         assertFailsWith<IllegalArgumentException> {
             MobileWalletProximityReaderAuthentication(
-                scope = MobileWalletProximityReaderAuthenticationScope.WholeRequest,
-                documentRequestIndex = null,
-                validity = MobileWalletProximityReaderAuthenticationValidity.Valid,
-                trust = MobileWalletProximityReaderTrustState.Trusted,
+            scope = MobileWalletProximityReaderAuthenticationScope.WholeRequest,
+            outcome = MobileWalletProximityReaderAuthenticationOutcome.Valid(MobileWalletProximityReaderTrustDecision(
+                state = MobileWalletProximityReaderTrustState.Trusted,
                 certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
                 revocation = MobileWalletProximityReaderRevocationState.Indeterminate,
-            )
+            )),
+        )
         }
     }
 
