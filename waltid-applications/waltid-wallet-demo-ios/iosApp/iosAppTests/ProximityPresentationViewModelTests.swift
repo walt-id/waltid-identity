@@ -4,8 +4,42 @@ import WalletDemoSharingUI
 import ZXingCpp
 @testable import iosApp
 @testable import WalletSDK
+@preconcurrency import WalletCore
 
 final class ProximityPresentationViewModelTests: XCTestCase {
+    func testSessionConfigurationMatrixRoundTripsThroughKotlinBridge() {
+        let ble = ProximityPresentationBLEConfiguration(roles: .centralClient, bearerPolicy: .gattOnly)
+        let plans: [ProximityPresentationConventionalRetrievalConfiguration] = [
+            .init(bluetoothLowEnergy: ble),
+            .init(bluetoothLowEnergy: nil, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256)),
+            .init(bluetoothLowEnergy: ble, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256)),
+        ]
+        var sessions = plans.map(ProximityPresentationSessionConfiguration.qr)
+        for handover in [ProximityPresentationNFCHandover.staticHandover, .negotiatedHandover] {
+            for retrieval in plans {
+                for qr in [nil] + plans.map(Optional.some) {
+                    sessions.append(.nfc(.init(handover: handover, retrieval: retrieval, qrFallback: qr)))
+                }
+            }
+        }
+        for limit in [1, 65_536] {
+            for qr in [nil] + plans.map(Optional.some) {
+                sessions.append(.provisionalNFCV2(.init(
+                    maximumCommandDataLength: limit, bluetoothLowEnergy: ble, qrFallback: qr
+                )))
+            }
+        }
+        for profile in ProximityPresentationProfile.allCases {
+            for session in sessions where profile != .iso1801352021 || !session.usesProvisionalNFCV2 {
+                let configuration = ProximityPresentationConfiguration(
+                    profile: profile, session: session,
+                    readerPolicy: profile == .eudiARF3FCAF202608 ? .requireTrusted : .allowAnonymousOrUntrusted
+                )
+                XCTAssertEqual(swiftSession(configuration.toKMPConfiguration().session), session)
+            }
+        }
+    }
+
     @MainActor
     func testStartObservesSessionAndLifecycleCancelsActiveExchange() async throws {
         let session = FakeProximitySession()

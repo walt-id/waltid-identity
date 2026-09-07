@@ -276,9 +276,10 @@ private val hostActions = WalletDemoProximityHostActionExecutor {
     ProximityHostActionResult.Completed
 }
 
-private val permissionBlockedCapabilities = ProximityCapabilities(
-    profile = ProximityProfile.Iso180135Edition2Dis2026,
-    qrEngagement = ProximityTransportCapability(
+private val permissionBlockedCapabilities = MobileWalletProximityCapabilities(
+    session = id.walt.wallet2.mobile.MobileWalletProximitySessionConfiguration.Qr(),
+    profile = MobileWalletProximityProfile.Iso180135Edition2Dis2026,
+    qrEngagement = MobileWalletProximityTransportCapability(
         implemented = true,
         profilePermitted = true,
         selected = true,

@@ -24,11 +24,15 @@ data class MdocEngagementPreparationContext(
 )
 
 /** Display-safe facts available before a reader has selected an engagement path. */
-data class MdocEngagementReadiness(
+class MdocEngagementReadiness(
     val qrPayload: String?,
-    val availableTransports: Set<ProximityTransportKind>,
-    val unavailableTransports: Map<ProximityTransportKind, ProximityError>,
+    availableTransports: Set<ProximityTransportKind>,
+    unavailableTransports: Map<ProximityTransportKind, ProximityError>,
 ) {
+    private val available = availableTransports.toSet()
+    private val unavailable = unavailableTransports.toMap()
+    val availableTransports: Set<ProximityTransportKind> get() = available.toSet()
+    val unavailableTransports: Map<ProximityTransportKind, ProximityError> get() = unavailable.toMap()
     init {
         require(qrPayload == null || qrPayload.isNotBlank()) { "A QR payload must not be blank" }
         require(availableTransports.intersect(unavailableTransports.keys).isEmpty()) {
@@ -77,14 +81,18 @@ interface MdocEngagementSource {
     ): PreparedMdocEngagement
 }
 
-@ConsistentCopyVisibility
-data class PreparedMdocEngagements internal constructor(
-    val sources: List<PreparedMdocEngagement>,
+class PreparedMdocEngagements internal constructor(
+    sources: List<PreparedMdocEngagement>,
     val readiness: MdocEngagementReadiness,
 ) {
+    private val ownedSources = sources.toList()
+    private val sourceModes = ownedSources.map { it to it.modes.toSet() }
+    val sources: List<PreparedMdocEngagement> get() = ownedSources.toList()
+    internal fun owns(source: PreparedMdocEngagement, mode: MdocEngagementMode): Boolean =
+        sourceModes.any { (candidate, modes) -> candidate === source && mode in modes }
     init {
         require(sources.isNotEmpty()) { "At least one engagement source must be prepared" }
-        require(sources.flatMap { it.modes }.distinct().size == sources.sumOf { it.modes.size }) {
+        require(sourceModes.flatMap { it.second }.distinct().size == sourceModes.sumOf { it.second.size }) {
             "An engagement mode may be prepared by only one source"
         }
     }
@@ -102,14 +110,15 @@ class MdocEngagementCoordinator {
         context: MdocEngagementPreparationContext,
         sessionScope: CoroutineScope,
     ): PreparedMdocEngagements = coroutineScope {
-        require(sources.isNotEmpty()) { "At least one engagement source is required" }
-        require(sources.all { it.modes.isNotEmpty() }) { "An engagement source must own at least one mode" }
-        require(sources.flatMap { it.modes }.distinct().size == sources.sumOf { it.modes.size }) {
+        val ownedSources = sources.map { it to it.modes.toSet() }
+        require(ownedSources.isNotEmpty()) { "At least one engagement source is required" }
+        require(ownedSources.all { it.second.isNotEmpty() }) { "An engagement source must own at least one mode" }
+        require(ownedSources.flatMap { it.second }.distinct().size == ownedSources.sumOf { it.second.size }) {
             "An engagement mode may be registered by only one source"
         }
         val prepared = mutableListOf<PreparedMdocEngagement>()
         try {
-            sources.forEach { source ->
+            ownedSources.forEach { (source, modes) ->
                 val candidate = try {
                     source.prepare(context, sessionScope)
                 } catch (cancelled: CancellationException) {
@@ -119,16 +128,11 @@ class MdocEngagementCoordinator {
                     // Another configured engagement path may still be usable.
                     return@forEach
                 }
-                if (candidate.modes != source.modes) {
-                    withContext(NonCancellable) {
-                        runCatching { candidate.close(ProximityCloseReason.CANCELLED) }
-                    }
-                    throw IllegalArgumentException("A prepared engagement must retain its source modes")
-                }
+                prepared += candidate
+                require(candidate.modes == modes) { "A prepared engagement must retain its source modes" }
                 require((MdocEngagementMode.Qr in candidate.modes) == (candidate.readiness.qrPayload != null)) {
                     "Only a prepared QR engagement may expose a QR payload"
                 }
-                prepared += candidate
             }
             if (prepared.isEmpty()) throw ProximityException(
                 ProximityError.Capability("no_engagement", "No requested engagement method could be prepared")
@@ -157,6 +161,7 @@ class MdocEngagementCoordinator {
         val results = Channel<Pair<PreparedMdocEngagement, Result<MdocEngagedConnection>>>(prepared.sources.size)
         val jobs = prepared.sources.map { source ->
             launch {
+                var connection: ProximityConnection? = null
                 try {
                     val result = try {
                         Result.success(source.awaitConnection())
@@ -166,10 +171,12 @@ class MdocEngagementCoordinator {
                     } catch (failure: Exception) {
                         Result.failure(failure)
                     }
+                    connection = result.getOrNull()?.connection
                     results.send(source to result)
-                } catch (cancelled: CancellationException) {
-                    withContext(NonCancellable) { source.close(ProximityCloseReason.LOST_RACE) }
-                    throw cancelled
+                    connection = null
+                } catch (failure: Throwable) {
+                    withContext(NonCancellable) { connection?.close(ProximityCloseReason.LOST_RACE) }
+                    throw failure
                 }
             }
         }
@@ -183,23 +190,23 @@ class MdocEngagementCoordinator {
                 if (engaged == null) {
                     failures++
                 } else {
-                    require(engaged.engagementMode in source.modes) {
+                    require(prepared.owns(source, engaged.engagementMode)) {
                         "An engaged connection must use a mode owned by its source"
                     }
                     winner = WinningMdocEngagement(source, engaged)
                 }
             }
-            jobs.forEach { if (it.isActive) it.cancelAndJoin() }
             val selected = winner ?: run {
                 failureCloseReason = ProximityCloseReason.PEER_DISCONNECTED
                 throw ProximityException(ProximityError.Transport("engagement_failed", "All engagement paths failed"))
             }
             closeAll(prepared.sources.filterNot { it === selected.source }, ProximityCloseReason.LOST_RACE)
+            jobs.forEach { if (it.isActive) it.cancelAndJoin() }
             selected
         } catch (failure: Throwable) {
             withContext(NonCancellable) {
-                jobs.forEach { if (it.isActive) it.cancelAndJoin() }
                 closeAll(prepared.sources, failureCloseReason)
+                jobs.forEach { if (it.isActive) it.cancelAndJoin() }
             }
             throw failure
         } finally {
@@ -217,10 +224,11 @@ class MdocEngagementCoordinator {
 
 /** Existing QR engagement expressed through the same source boundary used by NFC. */
 class QrMdocEngagementSource(
-    private val transportProviders: List<ProximityTransportProvider>,
+    transportProviders: List<ProximityTransportProvider>,
     private val transportCoordinator: TransportCoordinator = TransportCoordinator(),
     private val engagementFactory: MdocDeviceEngagementFactory = MdocDeviceEngagementFactory(),
 ) : MdocEngagementSource {
+    private val transportProviders = transportProviders.toList()
     override val modes: Set<MdocEngagementMode> = setOf(MdocEngagementMode.Qr)
 
     override suspend fun prepare(

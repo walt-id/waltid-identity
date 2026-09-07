@@ -412,12 +412,11 @@ private protocol KMPBackedProximityReaderTrustEvaluator {
     var kmpReaderTrustEvaluator: any WalletCore.ProximityReaderTrustEvaluator { get }
 }
 
-private extension ProximityConfiguration {
-    func toKMPConfiguration() -> WalletCore.ProximityConfiguration {
-        WalletCore.ProximityConfiguration(
+extension ProximityPresentationConfiguration {
+    func toKMPConfiguration() -> MobileWalletProximityConfiguration {
+        MobileWalletProximityConfiguration(
             profile: profile.toKMPProfile(),
-            engagement: engagement.toKMPConfiguration(),
-            retrieval: retrieval.toKMPConfiguration(),
+            session: session.toKMPConfiguration(),
             readerPolicy: readerPolicy.toKMPPolicy(),
             deviceAuthenticationPolicy: deviceAuthenticationPolicy.toKMPPolicy(),
             readerTrustEvaluator: readerTrustEvaluator.map { evaluator in
@@ -1932,53 +1931,77 @@ private extension ProximityPresentationNFCRetrievalConfiguration {
     }
 }
 
-private extension ProximityPresentationNFCEngagementMode {
-    func toKMPMode() -> any MobileWalletProximityNfcEngagementMode {
-        switch self {
-        case .staticHandover:
-            return MobileWalletProximityNfcEngagementModeStatic()
-        case .negotiatedHandover:
-            return MobileWalletProximityNfcEngagementModeNegotiated()
-        case let .provisionalV2(configuration):
-            return MobileWalletProximityNfcEngagementModeProvisionalV2(
-                maximumCommandDataLength: Int32(configuration.maximumCommandDataLength)
-            )
-        }
+private extension ProximityPresentationConventionalRetrievalConfiguration {
+    func toKMPConfiguration() -> MobileWalletProximityConventionalRetrievalConfiguration {
+        MobileWalletProximityConventionalRetrievalConfiguration(
+            bluetoothLowEnergy: bluetoothLowEnergy?.toKMPConfiguration(),
+            nfc: nfc?.toKMPConfiguration()
+        )
     }
 }
 
-private extension ProximityPresentationEngagementConfiguration {
-    func toKMPConfiguration() -> any MobileWalletProximityEngagementConfiguration {
+private extension ProximityPresentationSessionConfiguration {
+    func toKMPConfiguration() -> any MobileWalletProximitySessionConfiguration {
         switch self {
-        case .qrOnly:
-            return MobileWalletProximityEngagementConfigurationQrOnly()
-        case let .nfcOnly(mode):
-            return MobileWalletProximityEngagementConfigurationNfcOnly(mode: mode.toKMPMode())
-        case let .qrAndNFC(mode):
-            return MobileWalletProximityEngagementConfigurationQrAndNfc(mode: mode.toKMPMode())
-        }
-    }
-}
-
-private extension ProximityPresentationRetrievalConfiguration {
-    func toKMPConfiguration() -> any MobileWalletProximityRetrievalConfiguration {
-        switch self {
-        case let .conventional(configuration):
-            return MobileWalletProximityRetrievalConfigurationConventional(
-                bluetoothLowEnergy: configuration.bluetoothLowEnergy?.toKMPConfiguration(),
-                nfc: configuration.nfc?.toKMPConfiguration()
+        case let .qr(retrieval):
+            return MobileWalletProximitySessionConfigurationQr(retrieval: retrieval.toKMPConfiguration())
+        case let .nfc(configuration):
+            return MobileWalletProximitySessionConfigurationConventionalNfc(
+                handover: configuration.handover == .staticHandover ? .static : .negotiated,
+                retrieval: configuration.retrieval.toKMPConfiguration(),
+                qrFallback: configuration.qrFallback?.toKMPConfiguration()
             )
         case let .provisionalNFCV2(configuration):
-            return MobileWalletProximityRetrievalConfigurationProvisionalNfcV2(
+            return MobileWalletProximitySessionConfigurationProvisionalNfcV2(
+                maximumCommandDataLength: Int32(configuration.maximumCommandDataLength),
                 bluetoothLowEnergy: configuration.bluetoothLowEnergy?.toKMPConfiguration(),
-                qrNfc: configuration.qrNFC?.toKMPConfiguration()
+                qrFallback: configuration.qrFallback?.toKMPConfiguration()
             )
         }
     }
 }
 
-private extension ProximityReaderPolicy {
-    func toKMPPolicy() -> WalletCore.ProximityReaderPolicy {
+private extension MobileWalletProximityBleConfiguration {
+    func toSwiftConfiguration() -> ProximityPresentationBLEConfiguration {
+        ProximityPresentationBLEConfiguration(
+            roles: roles == .centralClient ? .centralClient : roles == .peripheralServer ? .peripheralServer : .dual,
+            bearerPolicy: bearerPolicy == .gattOnly ? .gattOnly : .preferL2CAP
+        )
+    }
+}
+
+private extension MobileWalletProximityConventionalRetrievalConfiguration {
+    func toSwiftConfiguration() -> ProximityPresentationConventionalRetrievalConfiguration {
+        ProximityPresentationConventionalRetrievalConfiguration(
+            bluetoothLowEnergy: bluetoothLowEnergy?.toSwiftConfiguration(),
+            nfc: nfc.map { ProximityPresentationNFCRetrievalConfiguration(
+                maximumCommandDataLength: Int($0.maximumCommandDataLength),
+                maximumResponseDataLength: Int($0.maximumResponseDataLength)
+            ) }
+        )
+    }
+}
+
+func swiftSession(_ session: any MobileWalletProximitySessionConfiguration) -> ProximityPresentationSessionConfiguration {
+    switch onEnum(of: session) {
+    case let .qr(value): return .qr(value.retrieval.toSwiftConfiguration())
+    case let .conventionalNfc(value):
+        return .nfc(.init(
+            handover: value.handover == .static ? .staticHandover : .negotiatedHandover,
+            retrieval: value.retrieval.toSwiftConfiguration(),
+            qrFallback: value.qrFallback?.toSwiftConfiguration()
+        ))
+    case let .provisionalNfcV2(value):
+        return .provisionalNFCV2(.init(
+            maximumCommandDataLength: Int(value.maximumCommandDataLength),
+            bluetoothLowEnergy: value.bluetoothLowEnergy?.toSwiftConfiguration(),
+            qrFallback: value.qrFallback?.toSwiftConfiguration()
+        ))
+    }
+}
+
+private extension ProximityPresentationReaderPolicy {
+    func toKMPPolicy() -> MobileWalletProximityReaderPolicy {
         switch self {
         case .allowAnonymousOrUntrusted: return .allowAnonymousOrUntrusted
         case .requireTrusted: return .requireTrusted
@@ -2064,6 +2087,7 @@ private extension WalletCore.ProximityCapabilities {
     func toSwiftCapabilities() -> ProximityCapabilities {
         ProximityCapabilities(
             profile: profile.toSwiftProfile(),
+            session: swiftSession(session),
             qrEngagement: qrEngagement.toSwiftCapability(),
             nfcEngagement: nfcEngagement.toSwiftCapability(),
             bluetoothLowEnergy: bluetoothLowEnergy.toSwiftCapability(),
