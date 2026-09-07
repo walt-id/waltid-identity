@@ -21,10 +21,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 internal class AndroidL2capConnection(
-    private val socket: BluetoothSocket,
+    private val ownedSocket: BlockingSocket<BluetoothSocket>,
     parentScope: CoroutineScope,
 ) : BleRawConnection {
     override val bearer: BleRawBearer = BleRawBearer.L2CAP
@@ -37,18 +36,21 @@ internal class AndroidL2capConnection(
         val buffer = ByteArray(16 * 1024)
         try {
             while (true) {
-                val count = socket.inputStream.read(buffer)
+                val count = ownedSocket.run { it.inputStream.read(buffer) }
                 if (count < 0) break
                 if (count > 0) packets.send(buffer.copyOf(count))
             }
             packets.close()
         } catch (failure: IOException) {
             if (closed.get()) packets.close() else packets.close(failure)
+        } finally {
+            ownedSocket.close()
+            packets.close()
         }
     }
 
     override suspend fun write(bytes: ByteArray) = writeMutex.withLock {
-        withContext(Dispatchers.IO) {
+        ownedSocket.run { socket ->
             socket.outputStream.write(bytes)
             socket.outputStream.flush()
         }
@@ -58,7 +60,7 @@ internal class AndroidL2capConnection(
 
     override fun close(reason: ProximityCloseReason) {
         if (!closed.compareAndSet(false, true)) return
-        runCatching { socket.close() }
+        ownedSocket.close()
         readerJob.cancel()
         packets.close()
     }
