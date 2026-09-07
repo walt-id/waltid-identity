@@ -236,6 +236,37 @@ provider roots, signer policy, revocation, and constraint boundaries. Demo apps
 can pass a named test anchor through the same configuration constructor, but
 test anchors must not become production defaults.
 
+For CRL checking, configure the shared verifier with public certificates from the
+reader's issuer path and application-owned transport:
+
+```kotlin
+val applicationRevocationEvaluator = MobileWalletProximityCrlRevocationEvaluator(
+    issuerCertificatesDerBase64Url = listOf(readerCaDerBase64Url),
+    scope = MobileWalletProximityCrlScope.ReaderCertificateAndIssuingAuthorities,
+    fetcher = MobileWalletProximityCrlFetcher { url, maximumBytes ->
+        // Apply application destination, redirect, timeout, and byte-limit policy.
+        // Return Available with unpadded Base64URL DER, or Unavailable.
+        applicationCrlClient.fetch(url, maximumBytes)
+    },
+)
+```
+
+The evaluator follows signature-linked issuers and fetches applicable HTTP(S)
+distribution points from the checked certificates. Authority scope includes the
+terminal self-signed Reader CA, which must also advertise a distribution point.
+A current, authenticated complete CRL must cover every checked certificate;
+verified revocation of either the reader or an authority prevents disclosure.
+The issuer list supplies path material and does not add trust anchors.
+
+The supported CRL profile is direct X.509 v2 with authority key identifier, CRL
+number, `thisUpdate` and `nextUpdate`, and ECDSA or RSA PKCS#1 signatures using
+SHA-256/384/512. CRLs are limited to 2 MiB and 10,000 entries. Delta, indirect,
+partitioned, stale or unverifiable CRLs remain indeterminate. Missing evidence
+never becomes `Good`. The SDK performs no implicit fetch and keeps no cache
+between evaluations. The default revocation policy remains `NotChecked`; demo
+trust settings do not configure a CRL client. OCSP needs a separate request and
+signed-response verifier and is not implemented by this evaluator.
+
 Wallet applications that let holders manage this policy can persist a canonical
 `MobileWalletProximityReaderTrustSettings` snapshot. Use
 `MobileWalletProximityReaderTrustSettingsCodec.prepareImport` to validate and

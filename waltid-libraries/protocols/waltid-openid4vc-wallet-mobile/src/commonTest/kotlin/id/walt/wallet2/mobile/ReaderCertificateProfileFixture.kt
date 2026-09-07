@@ -15,6 +15,10 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.x509.MdocReaderAuthenticationEkuOid
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 
 /** Runtime-generated reader CA and re-signed certificate mutations; no retained private-key material. */
 internal class ReaderCertificateProfileFixture private constructor(
@@ -23,6 +27,32 @@ internal class ReaderCertificateProfileFixture private constructor(
     val readerKey: Key,
     private val rootKey: Key,
 ) {
+    /** Signs a complete direct CRL for wallet integration; parser interoperability uses independent vectors. */
+    suspend fun crl(
+        revoked: List<X509Certificate> = emptyList(),
+        thisUpdate: Instant = Clock.System.now() - 1.seconds,
+        nextUpdate: Instant = thisUpdate + 1.hours,
+    ): ByteArray {
+        fun time(value: Instant): Der = Der(0x17,
+            Instant.fromEpochSeconds(value.epochSeconds).toString().filter(Char::isDigit).drop(2).plus("Z").encodeToByteArray())
+        fun extension(oid: Int, value: Der): Der = Der.container(0x30, listOf(
+            Der(6, byteArrayOf(0x55, 0x1d, oid.toByte())), Der(4, value.encode()),
+        ))
+        val algorithm = Der.read(root.encodedDer.toByteArray()).children()[1]
+        val items = mutableListOf(Der(2, byteArrayOf(1)), algorithm, Der.read(root.data.subjectDnRaw.toByteArray()),
+            time(thisUpdate), time(nextUpdate))
+        if (revoked.isNotEmpty()) items += Der.container(0x30, revoked.map { certificate ->
+            Der.container(0x30, listOf(Der(2, certificate.data.serialNumberRaw.toByteArray()), time(thisUpdate)))
+        })
+        items += Der.container(0xa0, listOf(Der.container(0x30, listOf(
+            extension(35, Der.container(0x30, listOf(Der(0x80, root.data.extensionSubjectKeyIdentifier!!.keyIdentifier.toByteArray())))),
+            extension(20, Der(2, byteArrayOf(1))),
+        ))))
+        val tbs = Der.container(0x30, items)
+        val signature = rootKey.capabilities.signer!!.sign(tbs.encode(), certificateAlgorithm)
+        return Der.container(0x30, listOf(tbs, algorithm, Der(3, byteArrayOf(0) + signature))).encode()
+    }
+
     suspend fun modified(case: String): ByteArray {
         val certificate = Der.read(leaf.encodedDer.toByteArray()).children().toMutableList()
         val tbs = certificate[0].children().toMutableList()
@@ -96,6 +126,7 @@ internal class ReaderCertificateProfileFixture private constructor(
             val readerKey = key("profile-reader-leaf")
             val root = X509CertificateUtil.createSelfSignedCertificate(rootKey, certificateAlgorithm) {
                 subjectDn = "CN=Profile reader root"
+                extensionCrlDistributionPoints { addUriDistributionPoint("https://reader.example/ca-crl") }
                 extensionKeyUsage { critical = true; addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign, KeyUsageExtension.KeyUsage.cRLSign) }
             }
             val leaf = X509CertificateUtil.createCertificate(rootKey, root, certificateAlgorithm) {

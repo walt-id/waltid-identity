@@ -18,6 +18,7 @@ import org.bouncycastle.asn1.x509.AlgorithmIdentifier
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import org.bouncycastle.cert.X509CertificateHolder
 import org.bouncycastle.cert.X509v3CertificateBuilder
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.ContentVerifierProvider
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder
 import org.bouncycastle.pkcs.PKCS10CertificationRequest
@@ -29,6 +30,9 @@ import id.walt.crypto.keys.Key as Crypto1Key
 class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
     override val name: String = "BouncyCastle"
+
+    // Certificate validation must work before any process-global provider registration.
+    private val verificationProvider = BouncyCastleProvider()
 
     override suspend fun convertKeyToPublicKeyInfo(key: Key): PublicKeyInfo =
         BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(key)
@@ -127,7 +131,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
         // Build the verifier provider using the issuer's public key
         val verifierProvider: ContentVerifierProvider? = JcaContentVerifierProviderBuilder()
-            .setProvider("BC")
+            .setProvider(verificationProvider)
             .build(publicKey)
 
         return bouncyCertificate.isSignatureValid(verifierProvider)
@@ -145,7 +149,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
         // Build the provider-backed verifier using the public key embedded inside the CSR
         val verifierProvider: ContentVerifierProvider? = JcaContentVerifierProviderBuilder()
-            .setProvider("BC")
+            .setProvider(verificationProvider)
             .build(bouncyCsr.getSubjectPublicKeyInfo())
 
         // Cryptographically validate the signature

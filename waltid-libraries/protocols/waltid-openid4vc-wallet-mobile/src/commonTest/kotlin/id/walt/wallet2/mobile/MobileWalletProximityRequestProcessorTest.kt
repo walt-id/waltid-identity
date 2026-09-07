@@ -62,6 +62,8 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -89,6 +91,14 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -1164,6 +1174,79 @@ class ProximityRequestProcessorTest {
         }
     }
 
+    @Test
+    fun `verified CRLs including revoked authorities govern disclosure over the encrypted session`() = runTest {
+        withFixture { fixture ->
+            val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
+            val goodCrl = certificates.crl()
+            val revokedCrl = certificates.crl(listOf(certificates.root))
+            val staleCrl = certificates.crl(thisUpdate = Clock.System.now() - 2.hours, nextUpdate = Clock.System.now() - 1.hours)
+            val damagedCrl = goodCrl.copyOf().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+            for (scenario in CrlScenario.entries) {
+                val requests = mutableListOf<String>()
+                val client = HttpClient(MockEngine { request ->
+                    val url = request.url.toString()
+                    requests += url
+                    val authority = url == "https://reader.example/ca-crl"
+                    if (scenario == CrlScenario.Unavailable || (scenario == CrlScenario.LeafUnavailableAuthorityRevoked && !authority)) {
+                        respond(byteArrayOf(), HttpStatusCode.ServiceUnavailable)
+                    } else {
+                        val body = when (scenario) {
+                            CrlScenario.AuthorityRevoked, CrlScenario.LeafUnavailableAuthorityRevoked -> if (authority) revokedCrl else goodCrl
+                            CrlScenario.Stale -> staleCrl
+                            CrlScenario.InvalidSignature -> damagedCrl
+                            else -> goodCrl
+                        }
+                        respond(body, HttpStatusCode.OK)
+                    }
+                })
+                try {
+                    val crls = MobileWalletProximityCrlRevocationEvaluator(
+                        listOf(certificates.root.encodedDer.toByteArray().encodeToBase64Url()),
+                        MobileWalletProximityCrlScope.ReaderCertificateAndIssuingAuthorities,
+                        MobileWalletProximityCrlFetcher { url, maximumBytes ->
+                            val response = client.get(url)
+                            if (response.status != HttpStatusCode.OK) MobileWalletProximityCrlFetchResult.Unavailable
+                            else {
+                                val bytes = response.body<ByteArray>()
+                                assertTrue(bytes.size <= maximumBytes)
+                                MobileWalletProximityCrlFetchResult.Available(bytes.encodeToBase64Url())
+                            }
+                        },
+                    )
+                    val configuration = MobileWalletProximityConfiguration(
+                        readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+                        readerTrustEvaluator = MobileWalletProximityConfiguredReaderTrustEvaluator(MobileWalletProximityReaderTrustConfiguration(
+                            trustAnchors = listOf(MobileWalletProximityReaderTrustAnchor(certificates.root.encodedDer.toByteArray().encodeToBase64Url())),
+                            revocationPolicy = MobileWalletProximityReaderRevocationPolicy.Check(crls),
+                        )),
+                    )
+                    val result = wireExchange(fixture, requestWithNames("given_name"), configuration,
+                        authenticate = { request, transcript -> authenticateDocument(request, transcript, certificates.readerKey,
+                            listOf(certificates.leaf.encodedDer.toByteArray())) })
+                    assertEquals(setOf("https://reader.example/crl", "https://reader.example/ca-crl"), requests.toSet(), scenario.name)
+                    assertEquals(0u, result.response.status, scenario.name)
+                    if (scenario == CrlScenario.Good) {
+                        assertIs<MdocHolderSessionResult.Completed>(result.result)
+                        assertEquals(1, result.consentCalls)
+                        assertEquals(1, result.response.documents!!.size)
+                    } else {
+                        val failed = assertIs<MdocHolderSessionResult.Failed>(result.result, scenario.name)
+                        if (scenario == CrlScenario.AuthorityRevoked || scenario == CrlScenario.LeafUnavailableAuthorityRevoked) {
+                            assertEquals("reader_revoked", failed.error.code, "mDL_SM_mdocRAuth_UF_29")
+                        }
+                        assertEquals(0, result.consentCalls, scenario.name)
+                        assertEquals(null, result.response.documents, scenario.name)
+                    }
+                } finally {
+                    client.close()
+                }
+            }
+        }
+    }
+
+    private enum class CrlScenario { Good, AuthorityRevoked, Unavailable, Stale, InvalidSignature, LeafUnavailableAuthorityRevoked }
+
     private suspend fun authenticateDocument(
         request: DeviceRequest,
         transcript: SessionTranscript,
@@ -1188,7 +1271,8 @@ class ProximityRequestProcessorTest {
         configuration: ProximityConfiguration = ProximityConfiguration(),
         denyFamilyName: Boolean = false,
         authenticate: suspend (DeviceRequest, SessionTranscript) -> DeviceRequest = { value, _ -> value },
-    ): WireOutcome {
+    ): WireOutcome = withContext(Dispatchers.Default) {
+        // Ktor and platform crypto use real dispatchers; virtual time must not expire their session.
         suspend fun key(id: String) = fixture.runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
             KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.KEY_AGREEMENT),
         ))
@@ -1225,9 +1309,9 @@ class ProximityRequestProcessorTest {
             val result = engine.run()
             val messages = mutableListOf<SessionData>()
             while (true) messages += coseCompliantCbor.decodeFromByteArray<SessionData>((loopback.reader.receive() ?: break).copy())
-            assertEquals(20u, messages.last().status)
+            assertEquals(20u, messages.lastOrNull()?.status, "Session result: $result")
             val encrypted = messages.mapNotNull { it.data }.single()
-            return WireOutcome(result, coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(encrypted)), consentCalls)
+            WireOutcome(result, coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(encrypted)), consentCalls)
         } finally {
             cipher.close()
             processor.cancel()
