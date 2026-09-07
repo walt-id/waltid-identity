@@ -371,18 +371,14 @@ public data class MobileWalletProximityCapabilities(
     public val wifiAwareRetrieval: MobileWalletProximityTransportCapability,
 ) {
     init {
-        require(qrEngagement.selected || nfcEngagement.selected) {
-            "At least one engagement capability must be selected"
-        }
         require(
-            bluetoothLowEnergy.selected || nfcRetrieval.selected ||
-                nfcV2Retrieval.selected || wifiAwareRetrieval.selected
-        ) {
-            "At least one retrieval capability must be selected"
-        }
-        require(!nfcV2Retrieval.selected || nfcEngagement.selected) {
-            "NFCv2 same-channel retrieval requires the NFCv2 engagement path"
-        }
+            qrEngagement.selected == (session.qrRetrieval != null) &&
+                nfcEngagement.selected == (session !is MobileWalletProximitySessionConfiguration.Qr) &&
+                bluetoothLowEnergy.selected == (session.bleConfiguration != null) &&
+                nfcRetrieval.selected == (session.nfcRetrieval?.nfc != null || session.qrRetrieval?.nfc != null) &&
+                nfcV2Retrieval.selected == (session is MobileWalletProximitySessionConfiguration.ProvisionalNfcV2) &&
+                !wifiAwareRetrieval.selected
+        ) { "Capability selection must match the owning session retrieval plans" }
         require(!nfcV2Retrieval.mayStart || nfcEngagement.mayStart) {
             "NFCv2 same-channel retrieval cannot start without NFC engagement"
         }
