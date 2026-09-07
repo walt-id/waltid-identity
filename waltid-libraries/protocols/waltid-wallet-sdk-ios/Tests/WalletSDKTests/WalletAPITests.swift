@@ -2,6 +2,24 @@ import XCTest
 @testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
+    func testProximityStreamCompletesAtEveryTerminalStateWithoutForwardingLaterStates() async {
+        let terminals: [ProximityPresentationState] = [
+            .completed(exchanges: 1, declined: false), .cancelled,
+            .failed(.init(category: .transport, code: "closed", message: "Closed", recovery: .startNewSession)),
+        ]
+        for terminal in terminals {
+            let bridge = TerminalProximityStreamBridge()
+            let session = ProximityPresentationSession(bridge: bridge)
+            bridge.continuation.yield(.terminating(exchange: 1))
+            bridge.continuation.yield(terminal)
+            bridge.continuation.yield(.preparing(profile: .iso180135Edition2DIS2026))
+            bridge.continuation.finish()
+            var values: [ProximityPresentationState] = []
+            for await state in session.states { values.append(state) }
+            XCTAssertEqual(values, [.terminating(exchange: 1), terminal])
+        }
+    }
+
     func testParsesKotlinInstantTimestampsWithOptionalFractionalSeconds() throws {
         let wholeSeconds = try XCTUnwrap(parseWalletISO8601Date("2026-07-21T17:20:00Z"))
         let fractionalSeconds = try XCTUnwrap(parseWalletISO8601Date("2026-07-21T17:20:00.123456Z"))
@@ -1394,3 +1412,16 @@ private let testVerifierMetadata = VerifierMetadata(
     policyURI: "https://verifier.example/privacy",
     termsOfServiceURI: "https://verifier.example/terms"
 )
+
+private struct TerminalProximityStreamBridge: ProximityPresentationSessionBridge {
+    let systemPresentationActive = false
+    let states: AsyncStream<ProximityPresentationState>
+    let continuation: AsyncStream<ProximityPresentationState>.Continuation
+    init() {
+        let pair = AsyncStream<ProximityPresentationState>.makeStream()
+        states = pair.stream
+        continuation = pair.continuation
+    }
+    func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult { .accepted }
+    func close() async { continuation.finish() }
+}
