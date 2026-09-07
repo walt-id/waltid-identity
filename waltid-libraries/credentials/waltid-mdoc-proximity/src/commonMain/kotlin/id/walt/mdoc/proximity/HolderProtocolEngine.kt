@@ -76,6 +76,7 @@ class MdocDeviceEngagementFactory {
         context: EngagementContext,
         capabilities: MdocSessionCapabilities,
     ): MdocEngagement {
+        val methods = methods.map { it.snapshot() }
         require(methods.isNotEmpty()) { "At least one retrieval method is required" }
         require(capabilities.profile == context.profile) { "Capability profile must match the engagement profile" }
         require(eDeviceKey.spec.toMdocSessionCurve() == capabilities.selectedCurve) {
