@@ -1,6 +1,7 @@
 package id.walt.mdoc.proximity.mobile
 
 import java.io.Closeable
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +18,7 @@ internal class BlockingSocket<T : Closeable>(val socket: T) : Closeable {
             continuation.invokeOnCancellation { close() }
             launch(Dispatchers.IO) {
                 try {
-                    check(!closed.get()) { "Socket is closed" }
+                    if (closed.get()) throw IOException("Socket is closed")
                     val result = operation(socket)
                     continuation.resume(result) { _, value, _ ->
                         close()

@@ -46,7 +46,6 @@ import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.cbor.CborString
-import kotlinx.serialization.cbor.CborByteString
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
