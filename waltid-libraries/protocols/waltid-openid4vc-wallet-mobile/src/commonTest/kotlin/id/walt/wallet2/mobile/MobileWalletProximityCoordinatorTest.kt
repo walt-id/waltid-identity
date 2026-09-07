@@ -13,6 +13,8 @@ import id.walt.mdoc.proximity.mobile.BleProximityAvailability
 import id.walt.mdoc.proximity.mobile.BleProximityTransportConfiguration
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.wallet2.data.Wallet
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -126,6 +128,33 @@ class MobileWalletProximityCoordinatorTest {
         )
         session.awaitConnection()
         assertEquals(1, factory.configurations.size)
+        session.close()
+    }
+
+    @Test
+    fun `configuration is owned before the first suspended capability probe`() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        val recorded = RecordingTransportFactory(BleProximityAvailability.Available)
+        val factory = object : BleProximityTransportFactory by recorded {
+            override suspend fun capability(roles: BleMdocRoleSelection): BleProximityAvailability {
+                entered.complete(Unit)
+                resume.await()
+                return BleProximityAvailability.Available
+            }
+        }
+        val engagements = linkedSetOf(MobileWalletProximityEngagementMethod.Qr)
+        val retrieval = linkedSetOf(MobileWalletProximityRetrievalMethod.BluetoothLowEnergy)
+        val configuration = MobileWalletProximityConfiguration(engagementMethods = engagements, retrievalMethods = retrieval)
+        val coordinator = MobileWalletProximityCoordinator(Wallet("owned-configuration"), factory)
+        val pending = async { coordinator.start(configuration) }
+        entered.await()
+        engagements.clear()
+        retrieval.clear()
+        resume.complete(Unit)
+        val session = pending.await()
+        session.awaitConnection()
+        assertEquals(1, recorded.configurations.size)
         session.close()
     }
 
