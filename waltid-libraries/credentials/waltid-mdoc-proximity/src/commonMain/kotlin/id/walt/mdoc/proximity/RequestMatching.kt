@@ -13,13 +13,16 @@ class MdocCredentialCandidate(
     availableElements: Collection<ElementReference>,
     booleanElements: Map<ElementReference, Boolean> = emptyMap(),
 ) {
-    val issuerAuthorityKeyIdentifiers: Set<ImmutableBytes> = issuerAuthorityKeyIdentifiers.toSet()
-    val availableElements: Set<ElementReference> = availableElements.toSet()
-    val booleanElements: Map<ElementReference, Boolean> = booleanElements.toMap()
+    private val ownedIssuerAuthorityKeyIdentifiers: Set<ImmutableBytes> = issuerAuthorityKeyIdentifiers.toSet()
+    val issuerAuthorityKeyIdentifiers: Set<ImmutableBytes> get() = ownedIssuerAuthorityKeyIdentifiers.toSet()
+    private val ownedAvailableElements: Set<ElementReference> = availableElements.toSet()
+    val availableElements: Set<ElementReference> get() = ownedAvailableElements.toSet()
+    private val ownedBooleanElements: Map<ElementReference, Boolean> = booleanElements.toMap()
+    val booleanElements: Map<ElementReference, Boolean> get() = ownedBooleanElements.toMap()
 
     init {
         require(id.isNotBlank() && docType.isNotBlank())
-        require(availableElements.isNotEmpty()) { "An mdoc candidate must expose at least one data element" }
+        require(this.availableElements.isNotEmpty()) { "An mdoc candidate must expose at least one data element" }
         require(this.booleanElements.keys.all { it in this.availableElements }) {
             "Boolean candidate values must belong to available data elements"
         }
@@ -221,8 +224,9 @@ class MdocRequestMatcher(
     private fun ElementReference.mdlAgeThreshold(): Int? =
         takeIf { namespace == MDL_NAMESPACE }
             ?.elementIdentifier
+            ?.takeIf { it.startsWith(AGE_OVER_PREFIX) }
             ?.removePrefix(AGE_OVER_PREFIX)
-            ?.takeIf { it.length == 2 && it.all(Char::isDigit) }
+            ?.takeIf { it.length == 2 && it.all { digit -> digit in '0'..'9' } }
             ?.toInt()
 
     private fun validateRequestReferences(request: DeviceRequest) {

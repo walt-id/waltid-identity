@@ -15,27 +15,24 @@ import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import kotlinx.io.bytestring.ByteString
 import kotlinx.coroutines.CancellationException
 
-enum class ReaderAuthenticationScope { DOCUMENT, WHOLE_REQUEST }
-
-data class ReaderAuthenticationEvidence(
-    val scope: ReaderAuthenticationScope,
-    val documentRequestIndex: Int? = null,
-    /** Zero-based statement index within the authentication scope. */
-    val authenticationIndex: Int = 0,
-    val certificateChainDer: List<ImmutableBytes> = emptyList(),
-) {
-    init {
-        require((scope == ReaderAuthenticationScope.DOCUMENT) == (documentRequestIndex != null))
-        require(documentRequestIndex == null || documentRequestIndex >= 0)
-        require(authenticationIndex >= 0)
+/** Scope is part of the statement identity; whole-request statements have no document index. */
+sealed interface ReaderAuthenticationScope {
+    data class Document(val index: Int) : ReaderAuthenticationScope {
+        init { require(index >= 0) { "Document request index must not be negative" } }
     }
+    data object WholeRequest : ReaderAuthenticationScope
 }
 
-sealed interface ReaderAuthenticationValidity {
-    data object Absent : ReaderAuthenticationValidity
-    data class Malformed(val reason: String) : ReaderAuthenticationValidity
-    data class Invalid(val reason: String) : ReaderAuthenticationValidity
-    data class Valid(val evidence: ReaderAuthenticationEvidence) : ReaderAuthenticationValidity
+class ReaderAuthenticationEvidence(
+    val scope: ReaderAuthenticationScope,
+    /** Zero-based statement index within the authentication scope. */
+    val authenticationIndex: Int = 0,
+    certificateChainDer: List<ImmutableBytes> = emptyList(),
+) {
+    private val certificateChain = certificateChainDer.toList()
+    val certificateChainDer: List<ImmutableBytes> get() = certificateChain.toList()
+
+    init { require(authenticationIndex >= 0) }
 }
 
 enum class ReaderTrustState { NOT_EVALUATED, VALID_BUT_UNTRUSTED, REVOKED, TRUSTED }
@@ -50,28 +47,32 @@ fun interface ReaderTrustEvaluator {
     suspend fun evaluate(evidence: ReaderAuthenticationEvidence): ReaderTrustDecision
 }
 
-data class ReaderAuthenticationResult(
-    val validity: ReaderAuthenticationValidity,
-    val trust: ReaderTrustDecision = ReaderTrustDecision(ReaderTrustState.NOT_EVALUATED),
-) {
-    init {
-        require(validity is ReaderAuthenticationValidity.Valid || trust.state == ReaderTrustState.NOT_EVALUATED) {
-            "Trust cannot be evaluated before reader authentication is cryptographically valid"
-        }
-    }
+/** Only cryptographically valid statements can carry evidence and an application trust decision. */
+sealed interface ReaderAuthenticationResult {
+    data object Absent : ReaderAuthenticationResult
+    data class Malformed(val reason: String) : ReaderAuthenticationResult
+    data class Invalid(val reason: String) : ReaderAuthenticationResult
+    data class Valid(
+        val evidence: ReaderAuthenticationEvidence,
+        val trust: ReaderTrustDecision,
+    ) : ReaderAuthenticationResult
 }
 
-data class DeviceRequestReaderAuthentication(
-    val documents: List<ReaderAuthenticationResult>,
-    val wholeRequest: List<ReaderAuthenticationResult>,
-)
+class DeviceRequestReaderAuthentication(
+    documents: List<ReaderAuthenticationResult>,
+    wholeRequest: List<ReaderAuthenticationResult>,
+) {
+    private val documentResults = documents.toList()
+    private val wholeRequestResults = wholeRequest.toList()
+    val documents: List<ReaderAuthenticationResult> get() = documentResults.toList()
+    val wholeRequest: List<ReaderAuthenticationResult> get() = wholeRequestResults.toList()
+}
 
 enum class ReaderAuthenticationDisplayValidity { ABSENT, MALFORMED, INVALID, VALID }
 
 /** Display-safe projection; it intentionally contains no signatures, certificates, or raw evidence. */
 data class ReaderAuthenticationDisplayEntry(
     val scope: ReaderAuthenticationScope,
-    val documentRequestIndex: Int?,
     val authenticationIndex: Int,
     val validity: ReaderAuthenticationDisplayValidity,
     val trust: ReaderTrustState,
@@ -79,61 +80,65 @@ data class ReaderAuthenticationDisplayEntry(
     val reason: String? = null,
 ) {
     init {
-        require((scope == ReaderAuthenticationScope.DOCUMENT) == (documentRequestIndex != null))
-        require(documentRequestIndex == null || documentRequestIndex >= 0)
         require(authenticationIndex >= 0)
+        require(validity == ReaderAuthenticationDisplayValidity.VALID || trust == ReaderTrustState.NOT_EVALUATED)
         require(displayName == null || displayName.isNotBlank())
         require(reason == null || reason.isNotBlank())
     }
 }
 
-data class DeviceRequestReaderAuthenticationDisplay(
-    val documents: List<ReaderAuthenticationDisplayEntry>,
-    val wholeRequest: List<ReaderAuthenticationDisplayEntry>,
-)
+class DeviceRequestReaderAuthenticationDisplay(
+    documents: List<ReaderAuthenticationDisplayEntry>,
+    wholeRequest: List<ReaderAuthenticationDisplayEntry>,
+) {
+    private val documentEntries = documents.toList()
+    private val wholeRequestEntries = wholeRequest.toList()
+    val documents: List<ReaderAuthenticationDisplayEntry> get() = documentEntries.toList()
+    val wholeRequest: List<ReaderAuthenticationDisplayEntry> get() = wholeRequestEntries.toList()
+}
 
 fun DeviceRequestReaderAuthentication.toDisplaySafe(): DeviceRequestReaderAuthenticationDisplay =
     DeviceRequestReaderAuthenticationDisplay(
         documents = documents.mapIndexed { index, result ->
-            result.toDisplayEntry(ReaderAuthenticationScope.DOCUMENT, index, 0)
+            result.toDisplayEntry(ReaderAuthenticationScope.Document(index), 0)
         },
         wholeRequest = wholeRequest.mapIndexed { index, result ->
-            result.toDisplayEntry(ReaderAuthenticationScope.WHOLE_REQUEST, null, index)
+            result.toDisplayEntry(ReaderAuthenticationScope.WholeRequest, index)
         },
     )
 
 private fun ReaderAuthenticationResult.toDisplayEntry(
     scope: ReaderAuthenticationScope,
-    documentRequestIndex: Int?,
     authenticationIndex: Int,
 ): ReaderAuthenticationDisplayEntry = ReaderAuthenticationDisplayEntry(
     scope = scope,
-    documentRequestIndex = documentRequestIndex,
     authenticationIndex = authenticationIndex,
-    validity = when (validity) {
-        ReaderAuthenticationValidity.Absent -> ReaderAuthenticationDisplayValidity.ABSENT
-        is ReaderAuthenticationValidity.Malformed -> ReaderAuthenticationDisplayValidity.MALFORMED
-        is ReaderAuthenticationValidity.Invalid -> ReaderAuthenticationDisplayValidity.INVALID
-        is ReaderAuthenticationValidity.Valid -> ReaderAuthenticationDisplayValidity.VALID
+    validity = when (this) {
+        ReaderAuthenticationResult.Absent -> ReaderAuthenticationDisplayValidity.ABSENT
+        is ReaderAuthenticationResult.Malformed -> ReaderAuthenticationDisplayValidity.MALFORMED
+        is ReaderAuthenticationResult.Invalid -> ReaderAuthenticationDisplayValidity.INVALID
+        is ReaderAuthenticationResult.Valid -> ReaderAuthenticationDisplayValidity.VALID
     },
-    trust = trust.state,
-    displayName = trust.displayName,
-    reason = when (val value = validity) {
-        is ReaderAuthenticationValidity.Malformed -> value.reason
-        is ReaderAuthenticationValidity.Invalid -> value.reason
-        ReaderAuthenticationValidity.Absent, is ReaderAuthenticationValidity.Valid -> trust.reason
+    trust = (this as? ReaderAuthenticationResult.Valid)?.trust?.state ?: ReaderTrustState.NOT_EVALUATED,
+    displayName = (this as? ReaderAuthenticationResult.Valid)?.trust?.displayName,
+    reason = when (this) {
+        is ReaderAuthenticationResult.Malformed -> reason
+        is ReaderAuthenticationResult.Invalid -> reason
+        is ReaderAuthenticationResult.Valid -> trust.reason
+        ReaderAuthenticationResult.Absent -> null
     },
 )
 
 class ReaderAuthenticationVerifier(
     private val trustEvaluator: ReaderTrustEvaluator,
-    private val allowedAlgorithms: Set<Int>,
+    allowedAlgorithms: Set<Int>,
     private val limits: MdocProximityLimits = MdocProximityLimits(),
 ) {
+    private val allowedAlgorithms = allowedAlgorithms.toSet()
     private val cryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     init {
-        require(allowedAlgorithms.isNotEmpty()) { "At least one reader-authentication algorithm is required" }
+        require(this.allowedAlgorithms.isNotEmpty()) { "At least one reader-authentication algorithm is required" }
     }
 
     suspend fun verify(
@@ -146,11 +151,10 @@ class ReaderAuthenticationVerifier(
                     signature,
                     ReaderAuthenticationPayloads.forDocument(transcript, docRequest.itemsRequest),
                     ReaderAuthenticationEvidence(
-                        scope = ReaderAuthenticationScope.DOCUMENT,
-                        documentRequestIndex = index,
+                        scope = ReaderAuthenticationScope.Document(index),
                     ),
                 )
-            } ?: ReaderAuthenticationResult(ReaderAuthenticationValidity.Absent)
+            } ?: ReaderAuthenticationResult.Absent
         }
         val whole = request.readerAuthAll.orEmpty().mapIndexed { index, signature ->
             verifyOne(
@@ -161,7 +165,7 @@ class ReaderAuthenticationVerifier(
                     request.deviceRequestInfo,
                 ),
                 ReaderAuthenticationEvidence(
-                    scope = ReaderAuthenticationScope.WHOLE_REQUEST,
+                    scope = ReaderAuthenticationScope.WholeRequest,
                     authenticationIndex = index,
                 ),
             )
@@ -179,14 +183,14 @@ class ReaderAuthenticationVerifier(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (cause: Exception) {
-            return ReaderAuthenticationResult(ReaderAuthenticationValidity.Malformed(cause.message ?: "Malformed reader authentication"))
+            return ReaderAuthenticationResult.Malformed(cause.message ?: "Malformed reader authentication")
         }
         val chainBytes = chain.sumOf { it.size.toLong() }
         if (
             chain.size > limits.maximumReaderCertificateChainLength ||
             chainBytes > limits.maximumReaderCertificateBytes.toLong()
         ) {
-            return ReaderAuthenticationResult(ReaderAuthenticationValidity.Malformed("Reader certificate chain exceeds configured limits"))
+            return ReaderAuthenticationResult.Malformed("Reader certificate chain exceeds configured limits")
         }
         val valid = try {
             val certificates = chain.map { X509CertificateUtil.parseCertificateDerEncoded(ByteString(it)) }
@@ -202,8 +206,8 @@ class ReaderAuthenticationVerifier(
         } catch (_: Exception) {
             false
         }
-        if (!valid) return ReaderAuthenticationResult(ReaderAuthenticationValidity.Invalid("Reader authentication signature is invalid"))
-        val verifiedEvidence = evidence.copy(certificateChainDer = chain.map { ImmutableBytes.of(it) })
+        if (!valid) return ReaderAuthenticationResult.Invalid("Reader authentication signature is invalid")
+        val verifiedEvidence = ReaderAuthenticationEvidence(evidence.scope, evidence.authenticationIndex, chain.map { ImmutableBytes.of(it) })
         val trust = try {
             trustEvaluator.evaluate(verifiedEvidence)
         } catch (cancelled: CancellationException) {
@@ -211,7 +215,7 @@ class ReaderAuthenticationVerifier(
         } catch (_: Exception) {
             ReaderTrustDecision(ReaderTrustState.VALID_BUT_UNTRUSTED, "Reader trust evaluation is unavailable")
         }
-        return ReaderAuthenticationResult(ReaderAuthenticationValidity.Valid(verifiedEvidence), trust)
+        return ReaderAuthenticationResult.Valid(verifiedEvidence, trust)
     }
 
     private fun certificateChain(signature: CoseSign1): List<ByteArray> {
