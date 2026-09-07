@@ -53,6 +53,7 @@ import id.walt.wallet2.mobile.MobileWalletProximityError
 import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthentication
 import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthenticationScope
 import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthenticationValidity
+import id.walt.wallet2.mobile.MobileWalletProximityRecovery
 import id.walt.wallet2.mobile.MobileWalletProximityReaderCertificatePathState
 import id.walt.wallet2.mobile.MobileWalletProximityReaderRevocationState
 import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustState
@@ -270,7 +271,7 @@ internal fun WalletDemoProximityScreen(
                     is MobileWalletProximityState.Failed -> FailedContent(
                         error = sessionState.error,
                         onDismiss = onDismiss,
-                        onRetry = if (sessionState.error.recoverable) onRestart else null,
+                        onRetry = if (sessionState.error.recovery == MobileWalletProximityRecovery.StartNewSession) onRestart else null,
                     )
                 }
             }
@@ -611,12 +612,12 @@ private fun ReaderAuthenticationContent(
         listOf(
             MetadataDetailItem(
                 stringResource(Res.string.proximity_applies_to),
-                when (authentication.scope) {
+                when (val scope = authentication.scope) {
                     MobileWalletProximityReaderAuthenticationScope.WholeRequest ->
                         stringResource(Res.string.proximity_whole_request)
-                    MobileWalletProximityReaderAuthenticationScope.Document -> {
+                    is MobileWalletProximityReaderAuthenticationScope.Document -> {
                         val document = documents.singleOrNull {
-                            it.requestIndex == authentication.documentRequestIndex
+                            it.requestIndex == scope.index
                         }
                         document?.let {
                             val displayName = it.credentialOptions.firstNotNullOfOrNull { option ->
@@ -625,7 +626,7 @@ private fun ReaderAuthenticationContent(
                             stringResource(Res.string.proximity_document_scope, displayName)
                         } ?: stringResource(
                             Res.string.proximity_document_request,
-                            authentication.documentRequestIndex?.plus(1) ?: 0,
+                            scope.index + 1,
                         )
                     }
                 },

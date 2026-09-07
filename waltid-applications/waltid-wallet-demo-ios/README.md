@@ -92,3 +92,7 @@ fixture Gradle tasks documented in the mobile guide.
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)
 - [waltid-openid4vc-wallet-persistence-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md)
 - [waltid-crypto](../../waltid-libraries/crypto/waltid-crypto/README.md)
+
+Review actions carry the identity of the displayed review. Each new review resets
+holder choices and continuation. Permission prompts are needed only when no
+selected route can start; terminal recovery creates a new single-use session.
