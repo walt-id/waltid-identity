@@ -1,5 +1,10 @@
 package id.walt.walletdemo.compose.ui
 
+import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustDecision
+import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthenticationOutcome
+import id.walt.wallet2.mobile.MobileWalletProximityReviewId
+import id.walt.wallet2.mobile.MobileWalletProximityRecovery
+import id.walt.wallet2.mobile.MobileWalletProximityRuntimeObservation
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -204,14 +209,9 @@ class WalletDemoProximityTestScenarios {
         val review = proximityReview().copy(
             readerAuthentication = listOf(
                 MobileWalletProximityReaderAuthentication(
-                    scope = MobileWalletProximityReaderAuthenticationScope.Document,
-                    documentRequestIndex = 0,
-                    validity = MobileWalletProximityReaderAuthenticationValidity.Absent,
-                    trust = MobileWalletProximityReaderTrustState.NotEvaluated,
-                    certificatePath = MobileWalletProximityReaderCertificatePathState.NotEvaluated,
-                    revocation = MobileWalletProximityReaderRevocationState.NotChecked,
-                    rical = MobileWalletProximityRicalState.NotEvaluated,
-                )
+            scope = MobileWalletProximityReaderAuthenticationScope.Document(0),
+            outcome = MobileWalletProximityReaderAuthenticationOutcome.Absent,
+        )
             )
         )
         setContent {
@@ -254,33 +254,31 @@ private val permissionBlockedCapabilities = MobileWalletProximityCapabilities(
     qrEngagement = MobileWalletProximityTransportCapability(
         implemented = true,
         profilePermitted = true,
-        runtimeAvailable = true,
         selected = true,
+        runtime = MobileWalletProximityRuntimeObservation.Available,
     ),
     nfcEngagement = availableUnselectedCapability(),
     bluetoothLowEnergy = MobileWalletProximityTransportCapability(
         implemented = true,
         profilePermitted = true,
-        runtimeAvailable = false,
         selected = true,
-        unavailable = MobileWalletProximityError(
+        runtime = MobileWalletProximityRuntimeObservation.Unavailable(MobileWalletProximityError(
             category = MobileWalletProximityErrorCategory.Capability,
             code = "bluetooth_permission_required",
             message = "Bluetooth permission is required",
-            recoverable = true,
-        ),
-        remediationActions = listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission),
+            recovery = MobileWalletProximityRecovery.RetryPrerequisites,
+        ), listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission)),
     ),
     nfcRetrieval = availableUnselectedCapability(),
     wifiAwareRetrieval = availableUnselectedCapability(),
 )
 
 private fun availableUnselectedCapability() = MobileWalletProximityTransportCapability(
-    implemented = true,
-    profilePermitted = true,
-    runtimeAvailable = true,
-    selected = false,
-)
+        implemented = true,
+        profilePermitted = true,
+        selected = false,
+        runtime = MobileWalletProximityRuntimeObservation.Available,
+    )
 
 private const val namespace = "org.iso.18013.5.1"
 private const val proofNamespace = "org.waltid.example.proof"
@@ -331,6 +329,7 @@ private fun proximityCredentialDetails(): Map<String, CredentialDetails> = listO
 ).associateBy { details -> details.summary.id }
 
 private fun proximityReview(): MobileWalletProximityReview = MobileWalletProximityReview(
+    reviewId = MobileWalletProximityReviewId(kotlin.uuid.Uuid.random().toString()),
     exchange = 1,
     documents = listOf(
         MobileWalletProximityDocumentReview(
@@ -377,24 +376,24 @@ private fun proximityReview(): MobileWalletProximityReview = MobileWalletProximi
     readerAuthentication = listOf(
         MobileWalletProximityReaderAuthentication(
             scope = MobileWalletProximityReaderAuthenticationScope.WholeRequest,
-            documentRequestIndex = null,
-            validity = MobileWalletProximityReaderAuthenticationValidity.Valid,
-            trust = MobileWalletProximityReaderTrustState.ValidButUntrusted,
-            certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
-            revocation = MobileWalletProximityReaderRevocationState.Good,
-            rical = MobileWalletProximityRicalState.Matched,
-            displayName = "Example reader",
-            reason = "No reader trust policy is configured",
+            outcome = MobileWalletProximityReaderAuthenticationOutcome.Valid(MobileWalletProximityReaderTrustDecision(
+                state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
+                certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
+                revocation = MobileWalletProximityReaderRevocationState.Good,
+                rical = MobileWalletProximityRicalState.Matched,
+                displayName = "Example reader",
+                reason = "No reader trust policy is configured",
+            )),
         ),
         MobileWalletProximityReaderAuthentication(
-            scope = MobileWalletProximityReaderAuthenticationScope.Document,
-            documentRequestIndex = 0,
-            validity = MobileWalletProximityReaderAuthenticationValidity.Valid,
-            trust = MobileWalletProximityReaderTrustState.Trusted,
-            certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
-            revocation = MobileWalletProximityReaderRevocationState.Good,
-            rical = MobileWalletProximityRicalState.Matched,
-            displayName = "Document reader",
+            scope = MobileWalletProximityReaderAuthenticationScope.Document(0),
+            outcome = MobileWalletProximityReaderAuthenticationOutcome.Valid(MobileWalletProximityReaderTrustDecision(
+                state = MobileWalletProximityReaderTrustState.Trusted,
+                certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
+                revocation = MobileWalletProximityReaderRevocationState.Good,
+                rical = MobileWalletProximityRicalState.Matched,
+                displayName = "Document reader",
+            )),
         ),
     ),
     useCases = emptyList(),
