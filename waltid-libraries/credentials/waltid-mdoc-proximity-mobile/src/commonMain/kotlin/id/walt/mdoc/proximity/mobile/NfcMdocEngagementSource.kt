@@ -83,18 +83,28 @@ public sealed interface NfcMdocEngagementScope {
  * Complete common NFC protocol configuration; platform session details remain in the adapter.
  *
  * @property scope Engagement paths prepared for the session.
- * @property conventionalRetrieval Conventional NFC data-transfer method advertised when present;
- * NFCv2 same-channel retrieval is independent.
+ * @property conventionalRetrieval Conventional NFC retrieval offered through conventional NFC handover.
+ * @property qrRetrieval Conventional NFC retrieval offered through QR. NFCv2 same-channel retrieval is independent.
  */
 public data class NfcMdocEngagementConfiguration(
     public val scope: NfcMdocEngagementScope,
-    public val conventionalRetrieval: DeviceRetrievalMethod.Nfc? =
-        DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
+    public val conventionalRetrieval: DeviceRetrievalMethod.Nfc? = null,
+    public val qrRetrieval: DeviceRetrievalMethod.Nfc? = null,
 ) {
     init {
-        require(scope !is NfcMdocEngagementScope.QrOnly || conventionalRetrieval != null) {
+        require(scope !is NfcMdocEngagementScope.QrOnly || (qrRetrieval != null && conventionalRetrieval == null)) {
             "QR-only NFC hosting requires conventional NFC retrieval"
         }
+        require(scope !is NfcMdocEngagementScope.NfcOnly || qrRetrieval == null)
+        require(conventionalRetrieval == null || qrRetrieval == null || conventionalRetrieval == qrRetrieval) {
+            "QR and NFC handover share one conventional NFC retrieval application and its length limits"
+        }
+        val profile = when (scope) {
+            NfcMdocEngagementScope.QrOnly -> null
+            is NfcMdocEngagementScope.NfcOnly -> scope.profile
+            is NfcMdocEngagementScope.QrAndNfc -> scope.profile
+        }
+        require(profile !is NfcMdocEngagementProfile.ProvisionalV2 || conventionalRetrieval == null)
     }
 }
 
@@ -107,13 +117,16 @@ public data class NfcMdocEngagementConfiguration(
 public class NfcMdocEngagementSource(
     private val configuration: NfcMdocEngagementConfiguration,
     private val platform: NfcHostPlatformAdapter,
-    private val alternateTransportProviders: List<ProximityTransportProvider>,
-    private val qrTransportProviders: List<ProximityTransportProvider> = emptyList(),
+    alternateTransportProviders: List<ProximityTransportProvider>,
+    qrTransportProviders: List<ProximityTransportProvider> = emptyList(),
     private val transportCoordinator: TransportCoordinator = TransportCoordinator(),
     private val engagementFactory: MdocDeviceEngagementFactory = MdocDeviceEngagementFactory(),
 ) : MdocEngagementSource {
+    private val alternateTransportProviders = alternateTransportProviders.toList()
+    private val qrTransportProviders = qrTransportProviders.toList()
+
     /** Engagement modes made available by the configured scope. */
-    override val modes: Set<MdocEngagementMode> = when (configuration.scope) {
+    override val modes: Set<MdocEngagementMode> get() = when (configuration.scope) {
         NfcMdocEngagementScope.QrOnly -> setOf(MdocEngagementMode.Qr)
         is NfcMdocEngagementScope.NfcOnly -> setOf(MdocEngagementMode.Nfc)
         is NfcMdocEngagementScope.QrAndNfc -> setOf(MdocEngagementMode.Qr, MdocEngagementMode.Nfc)
@@ -214,7 +227,7 @@ public class NfcMdocEngagementSource(
 
             val qrPath = if (includesQr) qrTransportProviders.let { providers ->
                 val qrContext = context.engagementContext.copy(engagementMode = MdocEngagementMode.Qr)
-                val qrDirect = configuration.conventionalRetrieval?.let {
+                val qrDirect = configuration.qrRetrieval?.let {
                     PreparedNfcApduTransport(PreparedTransportId("qr-nfc-retrieval"), it)
                 }
                 val qrTransports = prepareProviders(
@@ -340,7 +353,7 @@ public class NfcMdocEngagementSource(
                 )
                 is NfcMdocEngagementProfile.ProvisionalV2 -> null
             }
-            val retrievalProcessor = configuration.conventionalRetrieval
+            val retrievalProcessor = (configuration.conventionalRetrieval ?: configuration.qrRetrieval)
                 ?.takeIf { nfcDirect != null || qrPath?.directRetrieval != null }
                 ?.let { NfcRetrievalApduProcessor(it, maximumNfcSessionMessageBytes) }
             val nfcV2Processor = (nfcProfile as? NfcMdocEngagementProfile.ProvisionalV2)?.let { profile ->
@@ -719,7 +732,7 @@ private class NfcApplicationSelection(
 }
 
 private class PreparedNfcMdocEngagement(
-    override val modes: Set<MdocEngagementMode>,
+    modes: Set<MdocEngagementMode>,
     nfcCandidates: PreparedTransports?,
     private val qrPath: PreparedQrNfcPath?,
     readerSelectedKinds: Set<ProximityTransportKind>,
@@ -733,6 +746,8 @@ private class PreparedNfcMdocEngagement(
     private val sessionScope: CoroutineScope,
     private val maximumHybridMessages: Long,
 ) : PreparedMdocEngagement {
+    private val ownedModes = modes.toSet()
+    override val modes: Set<MdocEngagementMode> get() = ownedModes.toSet()
     private val availableTransportKinds = (
             nfcCandidates?.transports.orEmpty() + qrPath?.candidates?.transports.orEmpty()
         ).map { it.kind }.toSet() + readerSelectedKinds + ProximityTransportKind.NFC
@@ -788,7 +803,6 @@ private class PreparedNfcMdocEngagement(
             val selected = winner ?: throw ProximityException(
                 ProximityError.Transport("engagement_failed", "QR and NFC engagement both failed")
             )
-            jobs.forEach { if (it.isActive) it.cancelAndJoin() }
             if (selected.engagementMode == MdocEngagementMode.Qr) {
                 nfcResources.closeAll(ProximityCloseReason.LOST_RACE)
                 if (selected.connection.kind != ProximityTransportKind.NFC) {
@@ -797,9 +811,15 @@ private class PreparedNfcMdocEngagement(
             } else {
                 qrResources.closeAll(ProximityCloseReason.LOST_RACE)
             }
+            jobs.forEach { if (it.isActive) it.cancelAndJoin() }
             selected
         } catch (failure: Throwable) {
-            withContext(NonCancellable) { jobs.forEach { if (it.isActive) it.cancelAndJoin() } }
+            withContext(NonCancellable) {
+                nfcResources.closeAll(ProximityCloseReason.CANCELLED)
+                qrResources.closeAll(ProximityCloseReason.CANCELLED)
+                releaseNfcHost(ProximityCloseReason.CANCELLED)
+                jobs.forEach { if (it.isActive) it.cancelAndJoin() }
+            }
             throw failure
         } finally {
             results.close()

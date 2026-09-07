@@ -45,14 +45,20 @@ observation, and selection separate for QR, NFC, BLE, and Wi-Fi Aware. An
 unprobed method reports `notChecked`. Hosts derive startability from the viable
 selected routes; an unavailable optional route does not block a usable route.
 
-Select NFC through the typed engagement and retrieval contracts. Conventional
-NFC retrieval lengths and provisional NFCv2 engagement lengths are intentionally
-different types:
+A session variant owns its engagement and compatible retrieval. Optional QR
+fallback has its own nonempty plan; it may use different bearer choices. Shared
+BLE roles/policy and conventional NFC length limits must match because the
+session uses one capability probe and one conventional NFC application. The
+provisional NFCv2 variant carries its own command limit and always includes
+same-channel retrieval:
 
 ```swift
 let nfcConfiguration = ProximityPresentationConfiguration(
-    engagement: .qrAndNFC(.negotiatedHandover),
-    retrieval: .conventional(.init(nfc: .init()))
+    session: .nfc(.init(
+        handover: .negotiatedHandover,
+        retrieval: .init(nfc: .init()),
+        qrFallback: .init()
+    ))
 )
 ```
 
