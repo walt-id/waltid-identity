@@ -198,6 +198,24 @@ policy, revocation, and constraint boundaries. Demo apps can inject a named
 test anchor through the same configuration initializer without making it a
 production default.
 
+Use `ProximityCRLRevocationEvaluator` when the application supplies a complete-CRL transport:
+
+```swift
+let crlStatus = try ProximityCRLRevocationEvaluator(
+    issuerCertificatesDER: [readerCA],
+    scope: .readerCertificateAndIssuingAuthorities,
+    fetcher: applicationCRLFetcher
+)
+// Supply crlStatus to ProximityReaderTrustConfiguration(revocationPolicy: .check(crlStatus)).
+```
+
+`ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
+`ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,
+redirects, destination restrictions and caching. The shared verifier authenticates direct complete
+v2 CRLs and checks their scope and freshness; unsupported forms or unavailable status stay
+indeterminate. Issuer lookup certificates do not establish trust. Demo trust imports do not install
+a CRL client, and this CRL path does not implement OCSP.
+
 For holder-managed configuration, use `ProximityReaderTrustSettingsCodec` to
 validate and preview public Reader CA or versioned walt.id trust-bundle files
 before persisting the returned `ProximityReaderTrustSettings`. The importer

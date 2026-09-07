@@ -83,7 +83,7 @@ class MobileWalletProximityCrlRevocationTest {
 
     @Test
     fun invalidOrExcessiveIssuerInputIsRejectedAtConstruction() {
-        for (issuers in listOf(emptyList(), List(11) { encoded("EC256_CA") }, listOf("***"), listOf("A".repeat(90_000)))) {
+        for (issuers in listOf(emptyList(), List(11) { encoded("EC256_CA") }, listOf("***"), listOf("MAA"), listOf("A".repeat(90_000)))) {
             assertFailsWith<IllegalArgumentException> {
                 newEvaluator(MobileWalletProximityCrlFetcher { _, _ -> error("Must not fetch") }, issuers = issuers)
             }
