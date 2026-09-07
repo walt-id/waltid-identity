@@ -399,7 +399,7 @@ class HolderProtocolEngineTest {
                 notSelected,
             )
         }
-        assertEquals(ProximityTransportKind.FAKE, FakeTransportProvider(method, FakeProximityLoopback.create().holder).kind)
+        assertEquals(ProximityTransportKind.BLE, FakeTransportProvider(method, FakeProximityLoopback.create().holder).kind)
     }
 
     @Test
@@ -850,7 +850,7 @@ class HolderProtocolEngineTest {
     ) : ProximityTransportProvider {
         private val connected = CompletableDeferred<Unit>()
 
-        override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+        override val kind: ProximityTransportKind = ProximityTransportKind.BLE
 
         fun connect() {
             connected.complete(Unit)
@@ -863,7 +863,7 @@ class HolderProtocolEngineTest {
             context: EngagementContext,
             sessionScope: CoroutineScope,
         ): PreparedTransport = object : PreparedTransport {
-            override val kind: ProximityTransportKind = ProximityTransportKind.FAKE
+            override val kind: ProximityTransportKind = ProximityTransportKind.BLE
             override val connectionMethod: DeviceRetrievalMethod = method
             override val sessionTranscriptFactory: SessionTranscriptFactory = QrSessionTranscriptFactory
 

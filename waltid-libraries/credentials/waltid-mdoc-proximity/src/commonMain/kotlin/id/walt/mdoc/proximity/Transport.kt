@@ -3,7 +3,7 @@ package id.walt.mdoc.proximity
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import kotlinx.coroutines.CoroutineScope
 
-enum class ProximityTransportKind { BLE, NFC, WIFI_AWARE, FAKE }
+enum class ProximityTransportKind { BLE, NFC, WIFI_AWARE }
 
 sealed interface MdocEngagementMode {
     data object Qr : MdocEngagementMode
