@@ -35,6 +35,7 @@ kotlin {
             implementation(identityLibs.signum.indispensable) //TODO: get rid of it here
             implementation(identityLibs.signum.indispensable.josef) //TODO: get rid of it here
         }
+        commonTest { kotlin.srcDir("src/commonTestFixtures/kotlin") }
         commonTest.dependencies {
             implementation(identityLibs.kotlin.test)
             implementation(identityLibs.kotlinx.coroutines.test)
