@@ -153,10 +153,10 @@ session.state.collect { state ->
 ```
 
 The default configuration selects QR engagement and BLE retrieval. NFC and
-Wi-Fi Aware are represented in the capability contract but currently report
-precise unavailable results until their platform adapters are installed. A
-selected unavailable method prevents session preparation; it is never silently
-dropped.
+Wi-Fi Aware are represented in the capability contract as unimplemented in this
+build. Runtime observations distinguish `NotChecked`, `Available`, and
+`Unavailable`; session selection is independent. A session can start when a
+selected engagement and a compatible selected retrieval route are viable.
 
 Device signature is the default holder-authentication policy. Applications may
 require MAC or choose an explicit pre-review preference with
@@ -167,8 +167,22 @@ pinned EUDI profile currently requires device signature.
 Host applications perform permission or settings effects named by
 `capabilities.remediationActions`, report the privacy-safe outcome with
 `MobileWalletProximityAction.ReportRemediation`, and let the SDK re-check the
-platform. Review approval uses only the credential and element choices in the
-current immutable review. The SDK revalidates credential, holder key, reader
+platform. Approve and decline require the `reviewId` from the displayed review.
+A successful decision consumes that identity once; stale, duplicate, and
+cross-session actions are rejected. Invalid submissions leave the review open
+for correction. Acceptance records a decision; signing or transmission can still
+fail.
+
+The session owns configuration and nested review/profile/selection values.
+Changing caller collections or exported projections cannot alter accepted claims
+or continuation. The accepted choice has its own retained binding, while the
+preview digest still represents the request and fresh wallet/profile state.
+Only the ordered session owner publishes state, so delayed observations cannot
+replace a newer review or a terminal state. Error `recovery` distinguishes
+prerequisite retry in an active session from starting a new session after failure.
+
+Review approval uses only the credential and element choices in the displayed
+review. The SDK revalidates credential, holder key, reader
 trust, status, disclosure, and application-profile state before sending.
 Multiple reader-authentication statements retain their independent
 `authenticationIndex`, and holder-key authorization is reported per document

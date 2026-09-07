@@ -35,22 +35,25 @@ class MobileWalletProximityModelsTest {
             category = MobileWalletProximityErrorCategory.Capability,
             code = "ble_powered_off",
             message = "Bluetooth is powered off",
-            recoverable = true,
+            recovery = MobileWalletProximityRecovery.RetryPrerequisites,
         )
         val capability = MobileWalletProximityTransportCapability(
             implemented = true,
             profilePermitted = true,
-            runtimeAvailable = false,
+            runtime = MobileWalletProximityRuntimeObservation.Unavailable(
+                unavailable, listOf(MobileWalletProximityRemediationAction.EnableBluetooth),
+            ),
             selected = true,
-            unavailable = unavailable,
-            remediationActions = listOf(MobileWalletProximityRemediationAction.EnableBluetooth),
         )
 
         assertFalse(capability.mayStart)
         assertEquals(unavailable, capability.unavailable)
-        assertFailsWith<IllegalArgumentException> {
-            capability.copy(runtimeAvailable = true)
-        }
+        assertTrue(capability.copy(runtime = MobileWalletProximityRuntimeObservation.Available).mayStart)
+        val unchecked = capability.copy(runtime = MobileWalletProximityRuntimeObservation.NotChecked)
+        assertFalse(unchecked.runtimeAvailable)
+        assertEquals(null, unchecked.unavailable)
+        assertTrue(unchecked.remediationActions.isEmpty())
+        assertTrue(capability.copy(selected = false).runtime is MobileWalletProximityRuntimeObservation.Unavailable)
         val selectedButUnimplemented = capability.copy(implemented = false)
         assertTrue(selectedButUnimplemented.selected)
         assertFalse(selectedButUnimplemented.mayStart)
@@ -61,20 +64,14 @@ class MobileWalletProximityModelsTest {
         val available = MobileWalletProximityTransportCapability(
             implemented = true,
             profilePermitted = true,
-            runtimeAvailable = true,
+            runtime = MobileWalletProximityRuntimeObservation.Available,
             selected = true,
         )
         val unavailableAlternative = MobileWalletProximityTransportCapability(
             implemented = false,
             profilePermitted = true,
-            runtimeAvailable = false,
+            runtime = MobileWalletProximityRuntimeObservation.NotChecked,
             selected = true,
-            unavailable = MobileWalletProximityError(
-                MobileWalletProximityErrorCategory.Capability,
-                "not_implemented",
-                "The selected alternative is not implemented",
-                recoverable = false,
-            ),
         )
         val capabilities = MobileWalletProximityCapabilities(
             profile = MobileWalletProximityProfile.Iso180135Edition2Dis2026,
@@ -91,21 +88,16 @@ class MobileWalletProximityModelsTest {
     }
 
     @Test
-    fun `reader authentication scope and document index cannot contradict each other`() {
-        assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityReaderEvidence(
-                scope = MobileWalletProximityReaderAuthenticationScope.Document,
-                certificateChainDerBase64Url = listOf("AA"),
-            )
-        }
-        assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityReaderAuthentication(
-                scope = MobileWalletProximityReaderAuthenticationScope.WholeRequest,
-                documentRequestIndex = 0,
-                validity = MobileWalletProximityReaderAuthenticationValidity.Absent,
-                trust = MobileWalletProximityReaderTrustState.NotEvaluated,
-            )
-        }
+    fun `reader authentication scopes validate indices and invalid outcomes carry no trust`() {
+        assertFailsWith<IllegalArgumentException> { MobileWalletProximityReaderAuthenticationScope.Document(-1) }
+        val document = MobileWalletProximityReaderAuthenticationScope.Document(0)
+        assertEquals(0, document.documentRequestIndex)
+        assertEquals(null, MobileWalletProximityReaderAuthenticationScope.WholeRequest.documentRequestIndex)
+        val absent = MobileWalletProximityReaderAuthentication(
+            scope = document, outcome = MobileWalletProximityReaderAuthenticationOutcome.Absent,
+        )
+        assertEquals(MobileWalletProximityReaderTrustState.NotEvaluated, absent.trust)
+        assertEquals(MobileWalletProximityReaderAuthenticationValidity.Absent, absent.validity)
     }
 
     @Test
@@ -180,6 +172,7 @@ class MobileWalletProximityModelsTest {
     @Test
     fun `legal actions are derived only from current state`() {
         val review = MobileWalletProximityReview(
+            reviewId = MobileWalletProximityReviewId(kotlin.uuid.Uuid.random().toString()),
             exchange = 1,
             documents = listOf(
                 MobileWalletProximityDocumentReview(

@@ -38,6 +38,7 @@ import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ReaderAuthenticationDisplayEntry
 import id.walt.mdoc.proximity.ReaderAuthenticationDisplayValidity
 import id.walt.mdoc.proximity.ReaderAuthenticationEvidence
+import id.walt.mdoc.proximity.ReaderAuthenticationResult
 import id.walt.mdoc.proximity.ReaderAuthenticationScope
 import id.walt.mdoc.proximity.ReaderAuthenticationVerifier
 import id.walt.mdoc.proximity.ReaderTrustDecision
@@ -56,6 +57,7 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.resolveHolderKey
 import id.walt.x509.authorityKeyIdentifier
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -65,10 +67,12 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
+import kotlin.uuid.Uuid
+import kotlinx.serialization.json.JsonObject
 
 internal class MobileWalletProximityRequestProcessor(
     private val wallet: Wallet,
-    private val configuration: MobileWalletProximityConfiguration,
+    configuration: MobileWalletProximityConfiguration,
     readerAuthenticationAlgorithms: Set<Int>,
 ) : MdocHolderRequestProcessor {
     private data class InventoryDocument(
@@ -98,12 +102,14 @@ internal class MobileWalletProximityRequestProcessor(
 
     private data class Approved(
         val exchange: Int,
+        val reviewId: MobileWalletProximityReviewId,
         val submission: MobileWalletProximitySubmission,
+        val applicationProfiles: List<ApplicationProfileSnapshot>,
+        val choiceDigest: ImmutableBytes,
     )
 
     private data class ReaderTrustKey(
         val scope: MobileWalletProximityReaderAuthenticationScope,
-        val documentRequestIndex: Int?,
         val authenticationIndex: Int,
     )
 
@@ -112,6 +118,8 @@ internal class MobileWalletProximityRequestProcessor(
         val method: MobileWalletProximityDeviceAuthenticationMethod,
     )
 
+    private val configuration = configuration.snapshot()
+    private var closed = false
     private val readerVerifier = ReaderAuthenticationVerifier(
         trustEvaluator = ReaderTrustEvaluator(::evaluateReaderTrust),
         allowedAlgorithms = readerAuthenticationAlgorithms,
@@ -126,6 +134,7 @@ internal class MobileWalletProximityRequestProcessor(
     override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview {
         val snapshot = buildSnapshot(context)
         stateMutex.withLock {
+            check(!closed) { "The proximity processor is closed" }
             check(currentSnapshot == null) { "A previous proximity review has not been consumed" }
             currentSnapshot = snapshot
         }
@@ -136,36 +145,51 @@ internal class MobileWalletProximityRequestProcessor(
         val snapshot = requireNotNull(currentSnapshot) { "The proximity review snapshot is unavailable" }
         require(snapshot.exchange == prompt.exchange)
         require(snapshot.bindingDigest == prompt.preview.submissionBindingDigest)
-        snapshot.review
+        snapshot.review.snapshot()
+    }
+
+    suspend fun cancel() = stateMutex.withLock {
+        closed = true
+        approved = null
+        currentSnapshot = null
     }
 
     /** Returns a stable error when invalid; otherwise retains the exact immutable submission. */
     suspend fun accept(
         prompt: MdocConsentPrompt,
+        reviewId: MobileWalletProximityReviewId,
         submission: MobileWalletProximitySubmission,
-    ): MobileWalletProximityError? = stateMutex.withLock {
-        val snapshot = currentSnapshot
-            ?: return@withLock staleError("The proximity review is no longer current")
-        if (snapshot.exchange != prompt.exchange || snapshot.bindingDigest != prompt.preview.submissionBindingDigest) {
-            return@withLock staleError("The proximity action does not belong to the current review")
+    ): MobileWalletProximityError? {
+        val owned = try { submission.snapshot() } catch (_: IllegalArgumentException) {
+            return staleError("The proximity submission is invalid")
         }
-        validateSubmission(snapshot.review, submission)?.let { return@withLock it }
-        if (approved != null) return@withLock staleError("The proximity review was already submitted")
-        approved = Approved(prompt.exchange, submission)
-        null
+        return stateMutex.withLock {
+            val snapshot = currentSnapshot
+                ?: return@withLock staleError("The proximity review is no longer current")
+            if (closed || snapshot.review.reviewId != reviewId || snapshot.exchange != prompt.exchange ||
+                snapshot.bindingDigest != prompt.preview.submissionBindingDigest) {
+                return@withLock staleError("The proximity action does not belong to the current review")
+            }
+            validateSubmission(snapshot.review, owned)?.let { return@withLock it }
+            if (approved != null) return@withLock staleError("The proximity review was already submitted")
+            approved = Approved(
+                prompt.exchange, reviewId, owned, snapshot.applicationProfiles,
+                choiceDigest(reviewId, owned, snapshot.applicationProfiles),
+            )
+            null
+        }
     }
 
     suspend fun holderAuthorization(
-        prompt: MdocConsentPrompt,
-        submission: MobileWalletProximitySubmission,
+        reviewId: MobileWalletProximityReviewId,
     ): MobileWalletProximityHolderAuthorization = stateMutex.withLock {
         val snapshot = requireNotNull(currentSnapshot) { "The proximity review snapshot is unavailable" }
-        require(snapshot.exchange == prompt.exchange)
-        require(snapshot.bindingDigest == prompt.preview.submissionBindingDigest)
-        require(approved?.submission == submission) { "The submission has not been accepted" }
+        val retained = requireNotNull(approved) { "The submission has not been accepted" }
+        require(!closed && retained.reviewId == reviewId && snapshot.review.reviewId == reviewId)
         MobileWalletProximityHolderAuthorization(
-            exchange = prompt.exchange,
-            requests = submission.documents.sortedBy { it.requestIndex }.map { selected ->
+            reviewId = reviewId,
+            exchange = retained.exchange,
+            requests = retained.submission.documents.map { selected ->
                 val method = snapshot.review.documents
                     .single { it.requestIndex == selected.requestIndex }
                     .credentialOptions.single { it.credentialId == selected.credentialId }
@@ -185,7 +209,8 @@ internal class MobileWalletProximityRequestProcessor(
     ): MdocResponseResolution {
         val retained = stateMutex.withLock {
             val value = requireNotNull(approved) { "No holder-approved proximity submission is available" }
-            require(value.exchange == context.exchange)
+            require(!closed && value.exchange == context.exchange)
+            require(value.choiceDigest == choiceDigest(value.reviewId, value.submission, value.applicationProfiles))
             approved = null
             currentSnapshot = null
             value
@@ -202,7 +227,9 @@ internal class MobileWalletProximityRequestProcessor(
         validateSubmission(fresh.review, retained.submission)?.let { error ->
             throw ProximityException(ProximityError.Security(error.code, error.message))
         }
-        val response = buildResponse(context, fresh, retained.submission)
+        stateMutex.withLock { check(!closed) { "The proximity processor is closed" } }
+        val response = buildResponse(context, fresh, retained.submission, retained.applicationProfiles)
+        stateMutex.withLock { check(!closed) { "The proximity processor is closed" } }
         return MdocResponseResolution.Send(
             exactResponse = ImmutableBytes.of(
                 coseCompliantCbor.encodeToByteArray(DeviceResponse.serializer(), response)
@@ -220,7 +247,7 @@ internal class MobileWalletProximityRequestProcessor(
         val request = context.request.value
         val requestedDocTypes = request.docRequests.map { it.itemsRequest.value.docType }.toSet()
         val credentials = try {
-            wallet.streamAllCredentials().toList()
+            wallet.streamAllCredentials().map { it.snapshotForProximity() }.toList()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: HolderKeyBindingException) {
@@ -328,6 +355,7 @@ internal class MobileWalletProximityRequestProcessor(
             )
         }
         val review = MobileWalletProximityReview(
+            reviewId = MobileWalletProximityReviewId(Uuid.random().toString()),
             exchange = context.exchange,
             documents = documentReviews,
             readerAuthentication = readerDisplay,
@@ -415,10 +443,9 @@ internal class MobileWalletProximityRequestProcessor(
             document = document,
             holderKey = authentication.holderKey,
             deviceAuthentication = authentication.method,
-            issuerAuthorityKeyIdentifiers = listOfNotNull(
-                issuerAuthentication.certificateChain.firstOrNull()?.authorityKeyIdentifier
-                    ?.let(ImmutableBytes::of)
-            ),
+            issuerAuthorityKeyIdentifiers = issuerAuthentication.certificateChain.mapNotNull {
+                it.authorityKeyIdentifier?.let(ImmutableBytes::of)
+            }.distinct(),
         )
     }
 
@@ -501,7 +528,7 @@ internal class MobileWalletProximityRequestProcessor(
         )
         val recognized = configuration.applicationProfiles.profiles.mapNotNull { profile ->
             val result = try {
-                profile.evaluate(input)
+                profile.evaluate(input.snapshot())
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Throwable) {
@@ -525,7 +552,7 @@ internal class MobileWalletProximityRequestProcessor(
                             "The application profile returned an inconsistent identifier",
                         )
                     )
-                    result.authorization
+                    result.authorization.snapshot()
                 }
             }
         }
@@ -592,7 +619,6 @@ internal class MobileWalletProximityRequestProcessor(
     private suspend fun evaluateReaderTrust(evidence: ReaderAuthenticationEvidence): ReaderTrustDecision {
         val publicEvidence = MobileWalletProximityReaderEvidence(
             scope = evidence.scope.toPublic(),
-            documentRequestIndex = evidence.documentRequestIndex,
             authenticationIndex = evidence.authenticationIndex,
             certificateChainDerBase64Url = evidence.certificateChainDer.map { it.copy().toBase64Url() },
         )
@@ -600,7 +626,6 @@ internal class MobileWalletProximityRequestProcessor(
         evaluatedReaderTrust[
             ReaderTrustKey(
                 publicEvidence.scope,
-                publicEvidence.documentRequestIndex,
                 publicEvidence.authenticationIndex,
             )
         ] = decision
@@ -630,16 +655,16 @@ internal class MobileWalletProximityRequestProcessor(
                 )
             )
         }
-        if (all.any { it.trust.state == ReaderTrustState.REVOKED }) {
+        if (all.any { (it as? ReaderAuthenticationResult.Valid)?.trust?.state == ReaderTrustState.REVOKED }) {
             throw ProximityException(
                 ProximityError.Policy("reader_revoked", "The authenticated reader is revoked")
             )
         }
         if (configuration.readerPolicy == MobileWalletProximityReaderPolicy.RequireTrusted) {
-            val trustedWholeRequest = authentication.wholeRequest.any { it.trust.state == ReaderTrustState.TRUSTED }
+            val trustedWholeRequest = authentication.wholeRequest.any { (it as? ReaderAuthenticationResult.Valid)?.trust?.state == ReaderTrustState.TRUSTED }
             val selectedDocuments = selectedRequestIndices.map(authentication.documents::get)
             val everyDocumentTrusted = selectedDocuments.isNotEmpty() &&
-                selectedDocuments.all { it.trust.state == ReaderTrustState.TRUSTED }
+                selectedDocuments.all { (it as? ReaderAuthenticationResult.Valid)?.trust?.state == ReaderTrustState.TRUSTED }
             if (!trustedWholeRequest && !everyDocumentTrusted) {
                 throw ProximityException(
                     ProximityError.Policy(
@@ -655,9 +680,10 @@ internal class MobileWalletProximityRequestProcessor(
         context: MdocHolderRequestContext,
         snapshot: Snapshot,
         submission: MobileWalletProximitySubmission,
+        applicationProfiles: List<ApplicationProfileSnapshot>,
     ): DeviceResponse {
         val presentations = mutableListOf<Pair<Int, MdocDocumentPresentation>>()
-        submission.documents.sortedBy { it.requestIndex }.forEach { submitted ->
+        submission.documents.forEach { submitted ->
             val choice = snapshot.selection.eligibleDocuments.single {
                 it.requestIndex == submitted.requestIndex && it.credentialId == submitted.credentialId
             }
@@ -672,7 +698,7 @@ internal class MobileWalletProximityRequestProcessor(
             } else {
                 disclosed
             }
-            val deviceNamespaces = snapshot.applicationProfiles
+            val deviceNamespaces = applicationProfiles
                 .flatMap(ApplicationProfileSnapshot::decodedDeviceElements)
                 .filter { (element, _) -> element.credentialId == submitted.credentialId }
                 .groupBy { (element, _) -> element.namespace }
@@ -765,34 +791,68 @@ internal class MobileWalletProximityRequestProcessor(
         return (display.documents + display.wholeRequest).map { it.toPublic() }
     }
 
-    private fun ReaderAuthenticationDisplayEntry.toPublic(): MobileWalletProximityReaderAuthentication =
-        evaluatedReaderTrust[
-            ReaderTrustKey(scope.toPublic(), documentRequestIndex, authenticationIndex)
-        ].let { decision ->
-            MobileWalletProximityReaderAuthentication(
-                scope = scope.toPublic(),
-                documentRequestIndex = documentRequestIndex,
-                authenticationIndex = authenticationIndex,
-                validity = when (validity) {
-                    ReaderAuthenticationDisplayValidity.ABSENT -> MobileWalletProximityReaderAuthenticationValidity.Absent
-                    ReaderAuthenticationDisplayValidity.MALFORMED -> MobileWalletProximityReaderAuthenticationValidity.Malformed
-                    ReaderAuthenticationDisplayValidity.INVALID -> MobileWalletProximityReaderAuthenticationValidity.Invalid
-                    ReaderAuthenticationDisplayValidity.VALID -> MobileWalletProximityReaderAuthenticationValidity.Valid
-                },
-                trust = when (trust) {
-                    ReaderTrustState.NOT_EVALUATED -> MobileWalletProximityReaderTrustState.NotEvaluated
-                    ReaderTrustState.VALID_BUT_UNTRUSTED -> MobileWalletProximityReaderTrustState.ValidButUntrusted
-                    ReaderTrustState.REVOKED -> MobileWalletProximityReaderTrustState.Revoked
-                    ReaderTrustState.TRUSTED -> MobileWalletProximityReaderTrustState.Trusted
-                },
-                certificatePath = decision?.certificatePath
-                    ?: MobileWalletProximityReaderCertificatePathState.NotEvaluated,
-                revocation = decision?.revocation ?: MobileWalletProximityReaderRevocationState.NotChecked,
-                rical = decision?.rical ?: MobileWalletProximityRicalState.NotEvaluated,
-                displayName = displayName,
-                reason = reason,
-            )
+    private fun ReaderAuthenticationDisplayEntry.toPublic(): MobileWalletProximityReaderAuthentication {
+        val decision = evaluatedReaderTrust[ReaderTrustKey(scope.toPublic(), authenticationIndex)]
+        return MobileWalletProximityReaderAuthentication(
+            scope = scope.toPublic(),
+            authenticationIndex = authenticationIndex,
+            outcome = when (validity) {
+                ReaderAuthenticationDisplayValidity.ABSENT -> MobileWalletProximityReaderAuthenticationOutcome.Absent
+                ReaderAuthenticationDisplayValidity.MALFORMED ->
+                    MobileWalletProximityReaderAuthenticationOutcome.Malformed(reason ?: "Malformed reader authentication")
+                ReaderAuthenticationDisplayValidity.INVALID ->
+                    MobileWalletProximityReaderAuthenticationOutcome.Invalid(reason ?: "Invalid reader authentication")
+                ReaderAuthenticationDisplayValidity.VALID -> MobileWalletProximityReaderAuthenticationOutcome.Valid(
+                    requireNotNull(decision) { "Verified reader trust evaluation is missing" },
+                )
+            },
+        )
+    }
+
+    private fun choiceDigest(
+        reviewId: MobileWalletProximityReviewId,
+        submission: MobileWalletProximitySubmission,
+        profiles: List<ApplicationProfileSnapshot>,
+    ): ImmutableBytes {
+        val values = buildList {
+            add("walt.id/mobile-wallet-proximity-choice/v1".encodeToByteArray())
+            add(reviewId.value.encodeToByteArray())
+            add(byteArrayOf(if (submission.continueAfterResponse) 1 else 0))
+            add(intBytes(submission.documents.size))
+            submission.documents.forEach { document ->
+                add(intBytes(document.requestIndex))
+                add(document.credentialId.encodeToByteArray())
+                add(intBytes(document.disclosedElements.size))
+                document.disclosedElements.sortedWith(compareBy({ it.namespace }, { it.elementIdentifier })).forEach {
+                    add(it.namespace.encodeToByteArray())
+                    add(it.elementIdentifier.encodeToByteArray())
+                }
+            }
+            add(intBytes(profiles.size))
+            profiles.forEach { profile ->
+                val authorization = profile.public
+                add(authorization.profileId.encodeToByteArray())
+                add(authorization.displayTitle.encodeToByteArray())
+                add(authorization.resultBindingDigestBase64Url.fromBase64Url())
+                add(intBytes(authorization.details.size))
+                authorization.details.forEach {
+                    add(it.id.encodeToByteArray())
+                    add(it.label.encodeToByteArray())
+                    add(it.value.encodeToByteArray())
+                }
+                add(intBytes(authorization.compatibleCredentialIds.size))
+                authorization.compatibleCredentialIds.sorted().forEach { add(it.encodeToByteArray()) }
+                add(intBytes(authorization.deviceSignedElements.size))
+                authorization.deviceSignedElements.forEach {
+                    add(it.credentialId.encodeToByteArray())
+                    add(it.namespace.encodeToByteArray())
+                    add(it.elementIdentifier.encodeToByteArray())
+                    add(it.valueCborBase64Url.fromBase64Url())
+                }
+            }
         }
+        return ImmutableBytes.of(SHA256().digest(values.fold(intBytes(values.size)) { bytes, value -> bytes + lengthPrefixed(value) }))
+    }
 
     private fun snapshotDigest(
         context: MdocHolderRequestContext,
@@ -828,8 +888,8 @@ internal class MobileWalletProximityRequestProcessor(
                     }
             }
             review.readerAuthentication.forEach { entry ->
-                add(entry.scope.name.encodeToByteArray())
-                add((entry.documentRequestIndex?.toString() ?: "-").encodeToByteArray())
+                add((if (entry.scope is MobileWalletProximityReaderAuthenticationScope.Document) "Document" else "WholeRequest").encodeToByteArray())
+                add((entry.scope.documentRequestIndex?.toString() ?: "-").encodeToByteArray())
                 add(entry.authenticationIndex.toString().encodeToByteArray())
                 add(entry.validity.name.encodeToByteArray())
                 add(entry.trust.name.encodeToByteArray())
@@ -842,20 +902,14 @@ internal class MobileWalletProximityRequestProcessor(
             profiles.forEach { profile ->
                 add(profile.public.profileId.encodeToByteArray())
                 add(profile.public.displayTitle.encodeToByteArray())
-                profile.public.details.sortedBy { it.id }.forEach { detail ->
+                profile.public.details.forEach { detail ->
                     add(detail.id.encodeToByteArray())
                     add(detail.label.encodeToByteArray())
                     add(detail.value.encodeToByteArray())
                 }
                 add(profile.public.resultBindingDigestBase64Url.fromBase64Url())
                 profile.public.compatibleCredentialIds.sorted().forEach { add(it.encodeToByteArray()) }
-                profile.public.deviceSignedElements.sortedWith(
-                    compareBy(
-                        MobileWalletProximityDeviceSignedElement::credentialId,
-                        MobileWalletProximityDeviceSignedElement::namespace,
-                        MobileWalletProximityDeviceSignedElement::elementIdentifier,
-                    )
-                ).forEach { element ->
+                profile.public.deviceSignedElements.forEach { element ->
                     add(element.credentialId.encodeToByteArray())
                     add(element.namespace.encodeToByteArray())
                     add(element.elementIdentifier.encodeToByteArray())
@@ -871,8 +925,8 @@ internal class MobileWalletProximityRequestProcessor(
 private val MDL_PORTRAIT = ElementReference("org.iso.18013.5.1", "portrait")
 
 private fun ReaderAuthenticationScope.toPublic(): MobileWalletProximityReaderAuthenticationScope = when (this) {
-    ReaderAuthenticationScope.DOCUMENT -> MobileWalletProximityReaderAuthenticationScope.Document
-    ReaderAuthenticationScope.WHOLE_REQUEST -> MobileWalletProximityReaderAuthenticationScope.WholeRequest
+    is ReaderAuthenticationScope.Document -> MobileWalletProximityReaderAuthenticationScope.Document(index)
+    ReaderAuthenticationScope.WholeRequest -> MobileWalletProximityReaderAuthenticationScope.WholeRequest
 }
 
 private fun MobileWalletProximityReaderTrustState.toEngine(): ReaderTrustState = when (this) {
@@ -893,7 +947,7 @@ private fun staleError(message: String): MobileWalletProximityError = MobileWall
     category = MobileWalletProximityErrorCategory.StaleSubmission,
     code = "stale_submission",
     message = message,
-    recoverable = true,
+    recovery = MobileWalletProximityRecovery.None,
 )
 
 private fun intBytes(value: Int): ByteArray = byteArrayOf(
@@ -904,3 +958,21 @@ private fun intBytes(value: Int): ByteArray = byteArrayOf(
 )
 
 private fun lengthPrefixed(value: ByteArray): ByteArray = intBytes(value.size) + value
+
+/** Reparse the authoritative signed string into a private mdoc graph; never re-encode signed DTOs. */
+private fun StoredCredential.snapshotForProximity(): StoredCredential {
+    val mdoc = credential as? MdocsCredential ?: return this
+    return StoredCredential(
+        id = id,
+        credential = MdocsCredential(
+            credentialData = JsonObject(emptyMap()),
+            signed = mdoc.signed,
+            docType = mdoc.docType,
+            issuer = mdoc.issuer,
+            subject = mdoc.subject,
+        ),
+        label = label,
+        addedAt = addedAt,
+        holderKeyBinding = holderKeyBinding,
+    )
+}
