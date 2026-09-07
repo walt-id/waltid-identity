@@ -1,10 +1,7 @@
 package id.walt.wallet2.mobile
 
 /** Private proximity ownership boundaries; host DTOs never become retained policy by alias. */
-internal fun ProximityConfiguration.snapshot(): ProximityConfiguration = copy(
-    engagementMethods = engagementMethods.toSet(),
-    retrievalMethods = retrievalMethods.toSet(),
-)
+internal fun MobileWalletProximityConfiguration.snapshot(): MobileWalletProximityConfiguration = copy()
 
 internal fun ProximitySubmission.snapshot(): ProximitySubmission = copy(
     documents = documents.map { it.copy(disclosedElements = it.disclosedElements.toSet()) },
