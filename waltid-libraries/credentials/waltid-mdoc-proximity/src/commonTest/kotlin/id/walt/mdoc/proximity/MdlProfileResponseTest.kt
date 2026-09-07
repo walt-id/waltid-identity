@@ -36,6 +36,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -139,9 +140,12 @@ class MdlProfileResponseTest {
             listOf(MdocDocumentPresentation(source, holderKey, selected, authentication = MdocAuthenticationMethod.Signature())),
             SessionTranscript.forQr(byteArrayOf(1, 2), byteArrayOf(3, 4)),
         )
+        assertEquals(0u, response.status)
         // Inspect the raw response, including each tagged IssuerSignedItemBytes, without Mdl decoding.
         val wire = assertIs<CborMap>(coseCompliantCbor.decodeFromByteArray<CborElement>(coseCompliantCbor.encodeToByteArray(response)))
+        assertNull(wire[CborString("documentErrors")])
         val document = assertIs<CborMap>(assertIs<CborArray>(wire[CborString("documents")]).single())
+        assertNull(document[CborString("errors")])
         assertEquals(CborString("org.iso.18013.5.1.mDL"), document[CborString("docType")])
         val returnedIssuer = assertIs<CborMap>(document[CborString("issuerSigned")])
         val namespaces = assertIs<CborMap>(returnedIssuer[CborString("nameSpaces")])
