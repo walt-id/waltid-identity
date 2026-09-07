@@ -10,11 +10,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 
-@ConsistentCopyVisibility
-data class PreparedTransports internal constructor(
-    val transports: List<PreparedTransport>,
-    val unavailable: Map<ProximityTransportKind, ProximityError>,
+class PreparedTransports internal constructor(
+    transports: List<PreparedTransport>,
+    unavailable: Map<ProximityTransportKind, ProximityError>,
 ) {
+    private val ownedTransports = transports.toList()
+    private val ownedUnavailable = unavailable.toMap()
+    val transports: List<PreparedTransport> get() = ownedTransports.toList()
+    val unavailable: Map<ProximityTransportKind, ProximityError> get() = ownedUnavailable.toMap()
     init {
         require(transports.isNotEmpty()) { "At least one proximity transport must be prepared" }
         require(transports.map { it.kind }.distinct().size == transports.size) {
@@ -36,14 +39,15 @@ class TransportCoordinator {
         context: EngagementContext,
         sessionScope: CoroutineScope,
     ): PreparedTransports = coroutineScope {
-        require(providers.isNotEmpty()) { "At least one transport provider is required" }
-        require(providers.map { it.kind }.distinct().size == providers.size) {
+        val ownedProviders = providers.toList()
+        require(ownedProviders.isNotEmpty()) { "At least one transport provider is required" }
+        require(ownedProviders.map { it.kind }.distinct().size == ownedProviders.size) {
             "A transport provider kind may be registered only once"
         }
         val prepared = mutableListOf<PreparedTransport>()
         val unavailable = mutableMapOf<ProximityTransportKind, ProximityError>()
         try {
-            providers.forEach { provider ->
+            ownedProviders.forEach { provider ->
                 val capability = try {
                     provider.capability(context)
                 } catch (cancelled: CancellationException) {
@@ -121,7 +125,6 @@ class TransportCoordinator {
                 result.onSuccess { connection -> winner = WinningConnection(transport, connection) }
                     .onFailure { failures++ }
             }
-            jobs.forEach { if (it.isActive) it.cancelAndJoin() }
             val selected = winner ?: run {
                 failureCloseReason = ProximityCloseReason.PEER_DISCONNECTED
                 throw ProximityException(ProximityError.Transport("connection_failed", "All prepared transports failed"))
@@ -130,11 +133,12 @@ class TransportCoordinator {
                 prepared.transports.filterNot { it === selected.prepared },
                 ProximityCloseReason.LOST_RACE,
             )
+            jobs.forEach { if (it.isActive) it.cancelAndJoin() }
             selected
         } catch (failure: Throwable) {
             withContext(NonCancellable) {
-                jobs.forEach { if (it.isActive) it.cancelAndJoin() }
                 closeAll(prepared.transports, failureCloseReason)
+                jobs.forEach { if (it.isActive) it.cancelAndJoin() }
             }
             throw failure
         } finally {

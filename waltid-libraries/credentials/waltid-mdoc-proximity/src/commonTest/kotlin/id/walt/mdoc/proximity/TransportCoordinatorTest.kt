@@ -20,6 +20,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class TransportCoordinatorTest {
     private val method = DeviceRetrievalMethod.Nfc(256u, 256u)
@@ -134,6 +135,65 @@ class TransportCoordinatorTest {
         assertEquals(listOf(selected), prepared.transports)
         assertEquals(0, unselectedPrepareCalls)
         assertNotNull(prepared.unavailable[ProximityTransportKind.NFC])
+    }
+
+    @Test
+    fun `closing a losing or cancelled transport unblocks its worker before joining`() = runTest {
+        for (cancel in listOf(false, true)) {
+            val release = CompletableDeferred<Unit>()
+            val closeReasons = mutableListOf<ProximityCloseReason>()
+            val blocked = object : PreparedTransport {
+                override val kind = ProximityTransportKind.NFC
+                override val connectionMethod = method
+                override val sessionTranscriptFactory = QrSessionTranscriptFactory
+                override suspend fun awaitConnection(): ProximityConnection = withContext(NonCancellable) {
+                    release.await()
+                    throw IllegalStateException("Native accept was closed")
+                }
+                override suspend fun close(reason: ProximityCloseReason) {
+                    closeReasons += reason
+                    release.complete(Unit)
+                }
+            }
+            val connection = TrackingConnection()
+            val winner = TrackingPrepared(ProximityTransportKind.BLE, connection = connection)
+            val selection = async {
+                TransportCoordinator().awaitWinner(PreparedTransports(
+                    if (cancel) listOf(blocked) else listOf(blocked, winner), emptyMap(),
+                ))
+            }
+            try {
+                runCurrent()
+                if (cancel) {
+                    selection.cancel()
+                    runCurrent()
+                }
+                assertTrue(selection.isCompleted, "Resource closure must unblock a worker before joining it")
+                if (!cancel) assertSame(connection, selection.await().connection)
+                assertEquals(
+                    listOf(if (cancel) ProximityCloseReason.CANCELLED else ProximityCloseReason.LOST_RACE),
+                    closeReasons,
+                )
+            } finally {
+                release.complete(Unit)
+                selection.cancelAndJoin()
+            }
+        }
+    }
+
+    @Test
+    fun `prepared transports own input and exported collections`() = runTest {
+        val winner = TrackingPrepared(ProximityTransportKind.BLE, connection = TrackingConnection())
+        val loser = TrackingPrepared(ProximityTransportKind.NFC, waitForever = true)
+        val inputs = mutableListOf<PreparedTransport>(winner, loser)
+        val unavailable = linkedMapOf(ProximityTransportKind.WIFI_AWARE to ProximityError.Capability("offline", "Offline"))
+        val prepared = PreparedTransports(inputs, unavailable)
+        inputs.clear()
+        unavailable.clear()
+        (prepared.transports as MutableList).clear()
+        assertSame(winner, TransportCoordinator().awaitWinner(prepared).prepared)
+        assertEquals(listOf(ProximityCloseReason.LOST_RACE), loser.closeReasons)
+        assertEquals(setOf(ProximityTransportKind.WIFI_AWARE), prepared.unavailable.keys)
     }
 
     private fun provider(
