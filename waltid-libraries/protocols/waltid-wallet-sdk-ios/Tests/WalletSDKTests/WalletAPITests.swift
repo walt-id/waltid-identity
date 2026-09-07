@@ -304,11 +304,12 @@ final class WalletAPITests: XCTestCase {
         )
 
         XCTAssertEqual(evidence.authenticationIndex, 1)
-        XCTAssertNil(evidence.documentRequestIndex)
+        XCTAssertNil(evidence.scope.documentRequestIndex)
     }
 
     func testProximityHolderAuthorizationKeepsPerDocumentMethods() {
         let authorization = ProximityHolderAuthorization(
+            reviewID: ProximityReviewID(value: UUID().uuidString),
             exchange: 2,
             requests: [
                 ProximityHolderAuthorizationRequest(
@@ -354,23 +355,14 @@ final class WalletAPITests: XCTestCase {
         let available = ProximityPresentationTransportCapability(
             implemented: true,
             profilePermitted: true,
-            runtimeAvailable: true,
-            selected: true,
-            unavailable: nil,
-            remediationActions: []
+            runtime: .available,
+            selected: true
         )
         let unavailable = ProximityPresentationTransportCapability(
             implemented: false,
             profilePermitted: true,
-            runtimeAvailable: false,
-            selected: true,
-            unavailable: ProximityPresentationError(
-                category: .capability,
-                code: "not_implemented",
-                message: "The selected alternative is not implemented",
-                recoverable: false
-            ),
-            remediationActions: []
+            runtime: .notChecked,
+            selected: true
         )
         let capabilities = ProximityPresentationCapabilities(
             profile: .iso180135Edition2DIS2026,
@@ -384,6 +376,44 @@ final class WalletAPITests: XCTestCase {
         XCTAssertTrue(capabilities.mayStart)
         XCTAssertTrue(capabilities.nfcEngagement.selected)
         XCTAssertFalse(capabilities.nfcEngagement.mayStart)
+    }
+
+    func testProximityScopeOutcomeAndRuntimeFactsAreIndependent() {
+        let evidence = ProximityReaderEvidence(
+            scope: .document(index: 2), authenticationIndex: 0, certificateChainDER: [Data([0x30, 0x00])]
+        )
+        XCTAssertEqual(evidence.scope.documentRequestIndex, 2)
+        let absent = ProximityReaderAuthentication(scope: .wholeRequest, authenticationIndex: 0, outcome: .absent)
+        XCTAssertEqual(absent.validity, .absent)
+        XCTAssertEqual(absent.trust, .notEvaluated)
+        let capability = ProximityPresentationTransportCapability(
+            implemented: true, profilePermitted: true, runtime: .notChecked, selected: false
+        )
+        XCTAssertNil(capability.unavailable)
+        XCTAssertFalse(capability.runtimeAvailable)
+        XCTAssertEqual(capability.remediationActions, [])
+        let error = ProximityPresentationError(
+            category: .transport, code: "link_lost", message: "Link lost", recovery: .startNewSession
+        )
+        XCTAssertEqual(error.recovery, .startNewSession)
+    }
+
+    func testProximityActionsCarryTheReviewIdentityThroughTheFacade() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+        let session = try await wallet.startProximityPresentation()
+        let reviewID = ProximityReviewID(value: UUID().uuidString)
+        let submission = ProximityPresentationSubmission(documents: [
+            ProximityDocumentSubmission(requestIndex: 0, credentialID: "credential-1", disclosedElements: [
+                ProximityElementReference(namespace: "org.example", elementIdentifier: "name")
+            ])
+        ])
+        _ = try await session.dispatch(.approve(reviewID: reviewID, submission: submission))
+        _ = try await session.dispatch(.decline(reviewID: reviewID))
+        XCTAssertEqual(bridge.proximitySession.dispatches, [
+            .approve(reviewID: reviewID, submission: submission), .decline(reviewID: reviewID)
+        ])
+        await session.close()
     }
 
     func testBootstrapForwardsDefaultKeyTypeAndDidMethod() async throws {
@@ -956,34 +986,23 @@ private func makeTestProximityCapabilities() -> ProximityPresentationCapabilitie
     let unavailable = ProximityPresentationTransportCapability(
         implemented: false,
         profilePermitted: true,
-        runtimeAvailable: false,
-        selected: false,
-        unavailable: ProximityPresentationError(
-            category: .capability,
-            code: "not_implemented",
-            message: "This method is not implemented",
-            recoverable: false
-        ),
-        remediationActions: []
+        runtime: .notChecked,
+        selected: false
     )
     return ProximityPresentationCapabilities(
         profile: .iso180135Edition2DIS2026,
         qrEngagement: ProximityPresentationTransportCapability(
             implemented: true,
             profilePermitted: true,
-            runtimeAvailable: true,
-            selected: true,
-            unavailable: nil,
-            remediationActions: []
+            runtime: .available,
+            selected: true
         ),
         nfcEngagement: unavailable,
         bluetoothLowEnergy: ProximityPresentationTransportCapability(
             implemented: true,
             profilePermitted: true,
-            runtimeAvailable: true,
-            selected: true,
-            unavailable: nil,
-            remediationActions: []
+            runtime: .available,
+            selected: true
         ),
         nfcRetrieval: unavailable,
         wifiAwareRetrieval: unavailable

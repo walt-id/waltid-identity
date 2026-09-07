@@ -150,6 +150,15 @@ review; `.authorizingHolderKey` reports the exact method and credential for
 each document request. The pinned EUDI profile currently requires
 `.signatureOnly`.
 
+Approval uses `.approve(reviewID: review.reviewID, submission: submission)`;
+decline uses `.decline(reviewID: review.reviewID)`. Accepted decisions consume the
+review once; delayed or duplicate UI actions cannot act on a later review.
+`ProximityPresentationError.recovery` distinguishes prerequisite retry from a
+fresh session after terminal failure. Runtime capability observations distinguish
+`.notChecked`, `.available`, and `.unavailable` independently of selection.
+Reader scopes use `.document(index:)` or `.wholeRequest`; only the valid
+authentication outcome carries an evaluated trust decision.
+
 `ProximityPresentationSession` is an actor over the KMP source of truth. Its
 state stream, typed actions, immutable review, trust facts, disclosure choices,
 application-profile result, and terminal states contain no generated Kotlin,
