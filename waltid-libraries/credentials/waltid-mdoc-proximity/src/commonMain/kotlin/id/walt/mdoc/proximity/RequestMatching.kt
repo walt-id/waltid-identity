@@ -90,7 +90,8 @@ class MdocRequestMatcher(
             candidates.filter { candidate ->
                 candidate.docType == items.docType && issuerAccepted(items, candidate)
             }.mapNotNull { candidate ->
-                selectElements(items, candidate)?.let { elements ->
+                val requiresCompleteDocument = request.deviceRequestInfo != null || items.requestInfo != null
+                selectElements(items, candidate, requiresCompleteDocument)?.let { elements ->
                     val zkp = zkpRegistry.select(items.requestInfo?.zkRequest, candidate)
                     if (items.requestInfo?.zkRequest?.zkRequired == true && zkp == null) null
                     else SelectedDocument(index, candidate.id, elements, zkp)
@@ -169,6 +170,7 @@ class MdocRequestMatcher(
     private fun selectElements(
         items: ItemsRequest,
         candidate: MdocCredentialCandidate,
+        requiresCompleteDocument: Boolean,
     ): Set<SelectedElement>? {
         val alternatives = items.requestInfo?.alternativeDataElements.orEmpty().associateBy { it.requestedElement }
         val selected = linkedMapOf<ElementReference, SelectedElement>()
@@ -190,15 +192,19 @@ class MdocRequestMatcher(
                         ?.firstOrNull { set -> set.all { it in candidate.availableElements } }
                     when {
                         replacement != null -> replacement.forEach { include(it, item.value, reference) }
-                        reference.mdlAgeThreshold() != null -> candidate.closestAgeAttestation(reference)
-                            ?.let { include(it, item.value, reference) }
+                        reference.mdlAgeThreshold() != null -> {
+                            val proof = candidate.closestAgeAttestation(reference)
+                            if (proof != null) include(proof, item.value, reference)
+                            else if (requiresCompleteDocument) return null
+                        }
 
-                        else -> return null
+                        requiresCompleteDocument -> return null
+                        else -> Unit // Basic requests may return the known subset of requested elements.
                     }
                 }
             }
         }
-        return selected.values.toSet()
+        return selected.values.toSet().takeIf { it.isNotEmpty() }
     }
 
     private fun MdocCredentialCandidate.closestAgeAttestation(

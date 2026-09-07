@@ -203,7 +203,9 @@ class ReaderAuthenticationVerifier(
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
+            // Native ASN.1 structural failures inherit Throwable directly. Untrusted certificate
+            // decoding must still become invalid authentication; cancellation is rethrown above.
             false
         }
         if (!valid) return ReaderAuthenticationResult.Invalid("Reader authentication signature is invalid")

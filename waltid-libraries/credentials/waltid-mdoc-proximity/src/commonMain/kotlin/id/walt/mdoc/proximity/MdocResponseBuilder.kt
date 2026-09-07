@@ -69,13 +69,16 @@ data class MdocDocumentPresentation(
     init {
         require(elementErrors.keys.all { it.isNotBlank() })
         require(elementErrors.values.all { errors ->
-            errors.isNotEmpty() && errors.keys.all { it.isNotBlank() }
+            errors.isNotEmpty() && errors.keys.all { it.isNotBlank() } && errors.values.all { it <= 0 }
         })
     }
 }
 
 data class MdocDocumentError(val docType: String, val code: Long) {
-    init { require(docType.isNotBlank()) }
+    init {
+        require(docType.isNotBlank())
+        require(code <= 0) { "Document error codes must be zero or application-specific negative values" }
+    }
 }
 
 /** Builds selectively disclosed documents while keeping key access in the caller-provided handle. */

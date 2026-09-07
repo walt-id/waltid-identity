@@ -191,13 +191,15 @@ class RequestMatchingTest {
                 availableElements = values.keys,
                 booleanElements = values,
             )
-            val result = assertIs<MdocRequestMatchResult.Matched>(
-                MdocRequestMatcher().match(
-                    DeviceRequest(DeviceRequest.VERSION, listOf(docRequest(candidate.docType, requested))),
-                    listOf(candidate),
-                ),
-                "DM_AGE_POLICY:${scenario.id}",
+            val match = MdocRequestMatcher().match(
+                DeviceRequest(DeviceRequest.VERSION, listOf(docRequest(candidate.docType, requested))),
+                listOf(candidate),
             )
+            if (scenario.expected == null) {
+                assertIs<MdocRequestMatchResult.Unsatisfied>(match, "DM_AGE_POLICY:${scenario.id}")
+                return@forEach
+            }
+            val result = assertIs<MdocRequestMatchResult.Matched>(match, "DM_AGE_POLICY:${scenario.id}")
             val selected = result.selection.documents.single().elements.singleOrNull()
 
             assertEquals(scenario.expected, selected?.reference?.elementIdentifier, "DM_AGE_POLICY:${scenario.id}")
@@ -232,13 +234,37 @@ class RequestMatchingTest {
         )
         listOf("21", "age_over_٢١", "age_over_021").forEach { identifier ->
             val malformed = ElementReference(namespace, identifier)
-            val result = assertIs<MdocRequestMatchResult.Matched>(
+            assertIs<MdocRequestMatchResult.Unsatisfied>(
                 MdocRequestMatcher().match(
                     DeviceRequest(DeviceRequest.VERSION, listOf(docRequest("mdl", ElementReference(namespace, "age_over_18")))),
                     listOf(MdocCredentialCandidate("mdl", "mdl", emptyList(), listOf(malformed), mapOf(malformed to true))),
-                )
+                ),
+                identifier,
             )
-            assertEquals(emptySet(), result.selection.documents.single().elements, identifier)
+        }
+    }
+
+    @Test
+    fun `basic requests disclose the known subset while constrained requests require all elements`() = runTest {
+        val namespace = "org.iso.18013.5.1"
+        val known = ElementReference(namespace, "given_name")
+        val candidate = MdocCredentialCandidate("mdl", "mdl", emptyList(), listOf(known))
+        for (missing in listOf("unknown_element", "age_over_18")) {
+            val items = ItemsRequest("mdl", mapOf(namespace to ItemsRequestList(listOf(
+                ItemRequest("given_name", false), ItemRequest(missing, true),
+            ))))
+            val basic = DeviceRequest(DeviceRequest.VERSION, listOf(DocRequest(ByteStringWrapper(items))))
+            val partial = assertIs<MdocRequestMatchResult.Matched>(MdocRequestMatcher().match(basic, listOf(candidate)))
+            assertEquals(setOf(SelectedElement(known, false)), partial.selection.documents.single().elements)
+            val constrained = basic.copy(
+                version = DeviceRequest.VERSION_WITH_SIGNING,
+                deviceRequestInfo = ByteStringWrapper(DeviceRequestInfo(listOf(UseCase(true, documentSets = listOf(listOf(0u)))))),
+            )
+            assertIs<MdocRequestMatchResult.Unsatisfied>(MdocRequestMatcher().match(constrained, listOf(candidate)), missing)
+            val documentConstraint = basic.copy(docRequests = listOf(DocRequest(ByteStringWrapper(
+                items.copy(requestInfo = DocRequestInfo(uniqueDocSetRequired = true)),
+            ))))
+            assertIs<MdocRequestMatchResult.Unsatisfied>(MdocRequestMatcher().match(documentConstraint, listOf(candidate)), missing)
         }
     }
 

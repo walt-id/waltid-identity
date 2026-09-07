@@ -452,7 +452,7 @@ class HolderProtocolEngineTest {
     }
 
     @Test
-    fun `a denied consent decision cannot produce response data`() = realDispatcherTest {
+    fun `a denied consent decision cannot disclose credential data`() = realDispatcherTest {
         val denied = runSingleRequestSession(
             consent = { MdocConsentDecision.Deny(it.bindingToken) },
         )
