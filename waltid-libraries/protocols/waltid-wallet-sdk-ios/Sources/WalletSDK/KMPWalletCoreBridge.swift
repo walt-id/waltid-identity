@@ -451,7 +451,6 @@ private final class KMPProximityReaderTrustEvaluatorAdapter:
         let decision = try await evaluator.evaluate(
             ProximityReaderEvidence(
                 scope: evidence.scope.toSwiftScope(),
-                documentRequestIndex: evidence.documentRequestIndex.map { Int($0.int32Value) },
                 authenticationIndex: Int(evidence.authenticationIndex),
                 certificateChainDER: certificateChain
             )
@@ -591,7 +590,7 @@ private final class KMPProximityPresentationSessionBridge:
                                     category: .internalFailure,
                                     code: "invalid_sdk_state",
                                     message: "The wallet returned an invalid proximity session state",
-                                    recoverable: false
+                                    recovery: .none
                                 )
                             )
                         )
@@ -1211,7 +1210,7 @@ private extension MobileWalletAnnexCPreview {
             verifiedOrigin: verifiedOrigin,
             parsedRequest: AnnexCParsedRequest(
                 documents: swiftArray(parsedRequest.documents, of: MobileWalletAnnexCDocumentRequest.self).map {
-                    AnnexCDocumentRequest(documentType: $0.docType, namespaces: $0.namespaces as? [String: [String]] ?? [:])
+                    AnnexCDocumentRequest(documentType: $0.docType, namespaces: $0.namespaces)
                 }
             ),
             credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self).map { $0.toSwiftCredentialOption() },
@@ -1664,8 +1663,8 @@ private extension ProximityDeviceAuthenticationPolicy {
 
 private extension MobileWalletProximityReaderAuthenticationScope {
     func toSwiftScope() -> ProximityReaderAuthenticationScope {
-        switch self {
-        case .document: return .document
+        switch onEnum(of: self) {
+        case let .document(value): return .document(index: Int(value.index))
         case .wholeRequest: return .wholeRequest
         }
     }
@@ -1730,17 +1729,33 @@ private extension MobileWalletProximityCapabilities {
 
 private extension MobileWalletProximityTransportCapability {
     func toSwiftCapability() -> ProximityPresentationTransportCapability {
-        ProximityPresentationTransportCapability(
+        let observation: ProximityRuntimeObservation
+        switch onEnum(of: runtime) {
+        case .notChecked: observation = .notChecked
+        case .available: observation = .available
+        case let .unavailable(value):
+            observation = .unavailable(
+                value.error.toSwiftError(),
+                remediationActions: swiftArray(value.remediationActions, of: MobileWalletProximityRemediationAction.self)
+                    .map { $0.toSwiftAction() }
+            )
+        }
+        return ProximityPresentationTransportCapability(
             implemented: implemented,
             profilePermitted: profilePermitted,
-            runtimeAvailable: runtimeAvailable,
-            selected: selected,
-            unavailable: unavailable?.toSwiftError(),
-            remediationActions: swiftArray(
-                remediationActions,
-                of: MobileWalletProximityRemediationAction.self
-            ).map { $0.toSwiftAction() }
+            runtime: observation,
+            selected: selected
         )
+    }
+}
+
+private extension MobileWalletProximityRecovery {
+    func toSwiftRecovery() -> ProximityPresentationRecovery {
+        switch self {
+        case .none: .none
+        case .retryPrerequisites: .retryPrerequisites
+        case .startNewSession: .startNewSession
+        }
     }
 }
 
@@ -1762,7 +1777,7 @@ private extension MobileWalletProximityError {
             category: category.toSwiftCategory(),
             code: code,
             message: message,
-            recoverable: recoverable
+            recovery: recovery.toSwiftRecovery()
         )
     }
 }
@@ -1791,8 +1806,8 @@ private extension ProximityPresentationAction {
         switch self {
         case .cancel:
             return MobileWalletProximityActionCancel()
-        case .decline:
-            return MobileWalletProximityActionDecline()
+        case let .decline(reviewID):
+            return MobileWalletProximityActionDecline(reviewId: MobileWalletProximityReviewId(value: reviewID.value))
         case .retryPrerequisites:
             return MobileWalletProximityActionRetryPrerequisites()
         case let .reportRemediation(action, result):
@@ -1800,8 +1815,9 @@ private extension ProximityPresentationAction {
                 action: action.toKMPAction(),
                 result: result.toKMPResult()
             )
-        case let .approve(submission):
+        case let .approve(reviewID, submission):
             return MobileWalletProximityActionApprove(
+                reviewId: MobileWalletProximityReviewId(value: reviewID.value),
                 submission: MobileWalletProximitySubmission(
                     documents: submission.documents.map {
                         MobileWalletProximityDocumentSubmission(
@@ -1908,6 +1924,7 @@ private extension MobileWalletProximityEngagement {
 private extension MobileWalletProximityHolderAuthorization {
     func toSwiftAuthorization() -> ProximityHolderAuthorization {
         ProximityHolderAuthorization(
+            reviewID: ProximityReviewID(value: reviewId.value),
             exchange: Int(exchange),
             requests: swiftArray(
                 requests,
@@ -1926,6 +1943,7 @@ private extension MobileWalletProximityHolderAuthorization {
 private extension MobileWalletProximityReview {
     func toSwiftReview() throws -> ProximityPresentationReview {
         ProximityPresentationReview(
+            reviewID: ProximityReviewID(value: reviewId.value),
             exchange: Int(exchange),
             documents: try swiftArray(documents, of: MobileWalletProximityDocumentReview.self).map {
                 try $0.toSwiftReview()
@@ -2012,17 +2030,26 @@ private extension MobileWalletProximityRequestedElement {
 
 private extension MobileWalletProximityReaderAuthentication {
     func toSwiftAuthentication() -> ProximityReaderAuthentication {
-        ProximityReaderAuthentication(
+        let result: ProximityReaderAuthenticationOutcome
+        switch onEnum(of: outcome) {
+        case .absent: result = .absent
+        case let .malformed(value): result = .malformed(reason: value.reason)
+        case let .invalid(value): result = .invalid(reason: value.reason)
+        case let .valid(value):
+            let trust = value.trust
+            result = .valid(ProximityReaderTrustDecision(
+                state: trust.state.toSwiftTrust(),
+                certificatePath: trust.certificatePath.toSwiftPath(),
+                revocation: trust.revocation.toSwiftRevocation(),
+                rical: trust.rical.toSwiftRICAL(),
+                displayName: trust.displayName,
+                reason: trust.reason
+            ))
+        }
+        return ProximityReaderAuthentication(
             scope: scope.toSwiftScope(),
-            documentRequestIndex: documentRequestIndex.map { Int($0.int32Value) },
             authenticationIndex: Int(authenticationIndex),
-            validity: validity.toSwiftValidity(),
-            trust: trust.toSwiftTrust(),
-            certificatePath: certificatePath.toSwiftPath(),
-            revocation: revocation.toSwiftRevocation(),
-            rical: rical.toSwiftRICAL(),
-            displayName: displayName,
-            reason: reason
+            outcome: result
         )
     }
 }

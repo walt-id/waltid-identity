@@ -69,9 +69,27 @@ public enum ProximityDeviceAuthenticationPolicy: Sendable, Equatable {
 /// Portion of the device request covered by reader authentication.
 public enum ProximityReaderAuthenticationScope: Sendable, Equatable {
     /// Authentication covers one document request.
-    case document
+    case document(ProximityDocumentRequestIndex)
     /// Authentication covers the whole device request.
     case wholeRequest
+
+    /// Creates a document scope after validating its zero-based index.
+    /// - Parameter index: Nonnegative document-request index.
+    public static func document(index: Int) -> Self { .document(ProximityDocumentRequestIndex(index)) }
+
+    /// Document index carried by this scope, if it is document-scoped.
+    public var documentRequestIndex: Int? {
+        if case let .document(index) = self { index.value } else { nil }
+    }
+}
+
+/// Validated zero-based index used by document-scoped reader authentication.
+public struct ProximityDocumentRequestIndex: Sendable, Equatable {
+    /// Nonnegative document-request index.
+    public let value: Int
+    /// Creates a validated index.
+    /// - Parameter value: Nonnegative document-request index.
+    public init(_ value: Int) { precondition(value >= 0); self.value = value }
 }
 
 /// Structural and cryptographic validity of reader authentication.
@@ -138,8 +156,6 @@ public enum ProximityRICALState: Sendable, Equatable {
 public struct ProximityReaderEvidence: Sendable, Equatable {
     /// Portion of the request authenticated by this evidence.
     public let scope: ProximityReaderAuthenticationScope
-    /// Zero-based document-request index when ``scope`` is ``ProximityReaderAuthenticationScope/document``.
-    public let documentRequestIndex: Int?
     /// Zero-based statement index within the authentication scope.
     public let authenticationIndex: Int
     /// DER certificates in leaf-first order.
@@ -148,12 +164,10 @@ public struct ProximityReaderEvidence: Sendable, Equatable {
     /// Creates verified reader evidence for application trust evaluation.
     /// - Parameters:
     ///   - scope: Portion of the request covered by the authentication.
-    ///   - documentRequestIndex: Document index for document-scoped authentication.
     ///   - authenticationIndex: Statement index within the authentication scope.
     ///   - certificateChainDER: Nonempty DER certificate chain in leaf-first order.
     public init(
         scope: ProximityReaderAuthenticationScope,
-        documentRequestIndex: Int? = nil,
         authenticationIndex: Int = 0,
         certificateChainDER: [Data]
     ) {
@@ -161,14 +175,8 @@ public struct ProximityReaderEvidence: Sendable, Equatable {
             !certificateChainDER.isEmpty && certificateChainDER.allSatisfy { !$0.isEmpty },
             "Verified reader evidence requires nonempty certificates"
         )
-        precondition(
-            (scope == .document) == (documentRequestIndex != nil),
-            "Only document-scoped reader evidence carries a document index"
-        )
-        precondition(documentRequestIndex == nil || documentRequestIndex! >= 0)
         precondition(authenticationIndex >= 0)
         self.scope = scope
-        self.documentRequestIndex = documentRequestIndex
         self.authenticationIndex = authenticationIndex
         self.certificateChainDER = certificateChainDER
     }
@@ -526,8 +534,18 @@ public struct ProximityPresentationError: Error, Sendable, Equatable {
     public let code: String
     /// Display-safe error message.
     public let message: String
-    /// Whether the host may offer an in-session recovery action.
-    public let recoverable: Bool
+    /// Recovery supported by the phase that reported this failure.
+    public let recovery: ProximityPresentationRecovery
+}
+
+/// Recovery distinguishes an active prerequisite loop from a terminal session.
+public enum ProximityPresentationRecovery: Sendable, Equatable {
+    /// No retry is suggested.
+    case none
+    /// Recheck prerequisites in this still-active session after remediation.
+    case retryPrerequisites
+    /// Create a fresh session to retry after terminal failure.
+    case startNewSession
 }
 
 /// Host action that may restore a selected proximity capability.
@@ -550,16 +568,32 @@ public struct ProximityPresentationTransportCapability: Sendable, Equatable {
     public let implemented: Bool
     /// Whether the selected interoperability profile permits it.
     public let profilePermitted: Bool
-    /// Whether the current device and runtime can use it now.
-    public let runtimeAvailable: Bool
+    /// Independent result of probing the runtime.
+    public let runtime: ProximityRuntimeObservation
     /// Whether session configuration selected it.
     public let selected: Bool
-    /// Display-safe reason the selected dimension cannot start.
-    public let unavailable: ProximityPresentationError?
-    /// Ordered host actions that may restore availability.
-    public let remediationActions: [ProximityPresentationRemediationAction]
+    /// Whether a runtime probe established availability.
+    public var runtimeAvailable: Bool { if case .available = runtime { true } else { false } }
+    /// Observed runtime failure, if checked and unavailable.
+    public var unavailable: ProximityPresentationError? {
+        if case let .unavailable(error, _) = runtime { error } else { nil }
+    }
+    /// Ordered actions supplied by the runtime observation.
+    public var remediationActions: [ProximityPresentationRemediationAction] {
+        if case let .unavailable(_, actions) = runtime { actions } else { [] }
+    }
     /// Whether this selected dimension may start now.
     public var mayStart: Bool { implemented && profilePermitted && runtimeAvailable && selected }
+}
+
+/// Runtime evidence kept independent from session selection.
+public enum ProximityRuntimeObservation: Sendable, Equatable {
+    /// No runtime probe has run.
+    case notChecked
+    /// The runtime probe succeeded.
+    case available
+    /// The runtime probe failed with these possible host actions.
+    case unavailable(ProximityPresentationError, remediationActions: [ProximityPresentationRemediationAction])
 }
 
 /// Truthful capability report for every modeled engagement and retrieval dimension.
@@ -595,24 +629,52 @@ public struct ProximityPresentationCapabilities: Sendable, Equatable {
 public struct ProximityReaderAuthentication: Sendable, Equatable {
     /// Portion of the request covered by the result.
     public let scope: ProximityReaderAuthenticationScope
-    /// Document index for document-scoped authentication.
-    public let documentRequestIndex: Int?
-    /// Zero-based statement index within the authentication scope.
+    /// Zero-based statement index within the scope.
     public let authenticationIndex: Int
-    /// Structural and cryptographic validity.
-    public let validity: ProximityReaderAuthenticationValidity
-    /// Application trust state.
-    public let trust: ProximityReaderTrustState
-    /// Certificate-path state.
-    public let certificatePath: ProximityReaderCertificatePathState
-    /// Revocation state.
-    public let revocation: ProximityReaderRevocationState
-    /// RICAL evidence state.
-    public let rical: ProximityRICALState
-    /// Display-safe reader name supplied by the application.
-    public let displayName: String?
-    /// Display-safe explanation supplied by the application.
-    public let reason: String?
+    /// Only verified authentication carries evaluated trust facts.
+    public let outcome: ProximityReaderAuthenticationOutcome
+    /// Structural and cryptographic validity derived from the outcome.
+    public var validity: ProximityReaderAuthenticationValidity {
+        switch outcome {
+        case .absent: .absent
+        case .malformed: .malformed
+        case .invalid: .invalid
+        case .valid: .valid
+        }
+    }
+    private var decision: ProximityReaderTrustDecision? {
+        if case let .valid(value) = outcome { value } else { nil }
+    }
+    /// Application trust state when evaluated.
+    public var trust: ProximityReaderTrustState { decision?.state ?? .notEvaluated }
+    /// Independently evaluated certificate-path fact.
+    public var certificatePath: ProximityReaderCertificatePathState { decision?.certificatePath ?? .notEvaluated }
+    /// Independently evaluated revocation fact.
+    public var revocation: ProximityReaderRevocationState { decision?.revocation ?? .notChecked }
+    /// Independently evaluated RICAL fact.
+    public var rical: ProximityRICALState { decision?.rical ?? .notEvaluated }
+    /// Reader name established by trust policy.
+    public var displayName: String? { decision?.displayName }
+    /// Display-safe authentication or trust explanation.
+    public var reason: String? {
+        switch outcome {
+        case .absent: nil
+        case let .malformed(reason), let .invalid(reason): reason
+        case let .valid(trust): trust.reason
+        }
+    }
+}
+
+/// Authentication outcome with trust facts confined to verified authentication.
+public enum ProximityReaderAuthenticationOutcome: Sendable, Equatable {
+    /// No authentication statement was provided.
+    case absent
+    /// Authentication could not be parsed.
+    case malformed(reason: String)
+    /// Cryptographic verification failed.
+    case invalid(reason: String)
+    /// Verified authentication and independently evaluated trust facts.
+    case valid(ProximityReaderTrustDecision)
 }
 
 /// Names one issuer-signed element without exposing a credential model.
@@ -707,8 +769,15 @@ public struct ProximityUseCase: Sendable, Equatable, Identifiable {
     public let purposeHints: [ProximityPurposeHint]
 }
 
+/// Opaque identifier issued for exactly one review across session instances.
+public struct ProximityReviewID: Sendable, Equatable, Hashable {
+    internal let value: String
+}
+
 /// Frozen, display-safe review model for one exchange.
 public struct ProximityPresentationReview: Sendable, Equatable {
+    /// Identity required when approving or declining this review.
+    public let reviewID: ProximityReviewID
     /// One-based exchange number.
     public let exchange: Int
     /// Requested documents and credential choices.
@@ -766,9 +835,9 @@ public struct ProximityPresentationSubmission: Sendable, Equatable {
 /// Host intent accepted by a session only when legal for its current state.
 public enum ProximityPresentationAction: Sendable, Equatable {
     /// Approve a submission derived from the current frozen review.
-    case approve(ProximityPresentationSubmission)
+    case approve(reviewID: ProximityReviewID, submission: ProximityPresentationSubmission)
     /// Decline the current disclosure request without sharing documents.
-    case decline
+    case decline(reviewID: ProximityReviewID)
     /// Cancel the session and release its resources.
     case cancel
     /// Re-run prerequisite checks after external conditions may have changed.
@@ -809,6 +878,8 @@ public struct ProximityHolderAuthorizationRequest: Sendable, Equatable, Identifi
 
 /// Exact holder-key authorization context for a frozen approved submission.
 public struct ProximityHolderAuthorization: Sendable, Equatable {
+    /// Consumed review whose accepted choices require protected-key authorization.
+    public let reviewID: ProximityReviewID
     /// One-based exchange number being authorized.
     public let exchange: Int
     /// Per-document protected-key operations required by the frozen response.
@@ -910,7 +981,7 @@ public actor ProximityPresentationSession {
                     category: .policy,
                     code: "session_closed",
                     message: "The proximity presentation session is closed",
-                    recoverable: false
+                    recovery: .none
                 )
             )
         }
