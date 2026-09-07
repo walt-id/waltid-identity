@@ -64,6 +64,14 @@ class SocketCancellationTest {
         assertEquals(1, accepted.closes.get())
     }
 
+    @Test fun operationAfterExplicitCloseReportsSocketFailureWithoutStartingNativeWork() = runBlocking {
+        val native = BlockingResource()
+        val socket = BlockingSocket(native)
+        socket.close()
+        assertFailsWith<IOException> { socket.run { fail("Closed socket must not start native work") } }
+        assertEquals(1, native.closes.get())
+    }
+
     @Test fun failedOperationClosesOwnerAndFreshOwnerCanSucceed() = runBlocking {
         val native = BlockingResource()
         val socket = BlockingSocket(native)
