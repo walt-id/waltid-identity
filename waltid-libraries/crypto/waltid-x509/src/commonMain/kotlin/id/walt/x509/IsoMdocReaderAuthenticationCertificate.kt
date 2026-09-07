@@ -1,5 +1,10 @@
 package id.walt.x509
 
+import at.asitplus.signum.indispensable.asn1.Asn1Element
+import at.asitplus.signum.indispensable.asn1.Asn1ExplicitlyTagged
+import at.asitplus.signum.indispensable.asn1.encoding.parse
+import at.asitplus.signum.indispensable.asn1.readOid
+
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.dn.DistinguishedName
@@ -37,6 +42,7 @@ fun validateMdocReaderAuthenticationCertificateProfile(
     val subjectPublicKey = data.subjectPublicKeyInfo
 
     requireProfile(data.version == 3, "Reader certificate must be X.509 version 3")
+    validateReaderCertificateStructure(certificate)
     validateIsoCertificateSerialNumber(data.serialNumberRaw, "Reader certificate")
     requireProfile(
         now >= data.validity.notBefore && now < data.validity.notAfter,
@@ -131,6 +137,27 @@ fun validateMdocReaderAuthenticationCertificateProfile(
         .map { it.oid }
         .filterNot { it == KEY_USAGE_OID || it == EXTENDED_KEY_USAGE_OID }
     requireProfile(unsupportedCritical.isEmpty(), "Reader certificate contains an unsupported critical extension")
+}
+
+/** Check exact certificate fields before platform projections can normalize them. */
+private fun validateReaderCertificateStructure(certificate: CertificateDer) {
+    runCatching {
+        val outer = Asn1Element.parse(certificate.bytes.toByteArray()).asSequence().children
+        requireProfile(outer.size == 3, "Reader certificate must contain three certificate fields")
+        val tbs = outer[0].asSequence().children
+        requireProfile(
+            tbs[2].derEncoded.contentEquals(outer[1].derEncoded),
+            "Reader certificate signature algorithm identifiers must match",
+        )
+        val extensionBlocks = tbs.filterIsInstance<Asn1ExplicitlyTagged>().filter { it.tag.tagValue == 3uL }
+        requireProfile(extensionBlocks.size == 1, "Reader certificate requires one extensions field")
+        val extensions = extensionBlocks.single().children.single().asSequence().children
+        val oids = extensions.map { it.asSequence().children.first().asPrimitive().readOid().toString() }
+        requireProfile(oids.distinct().size == oids.size, "Reader certificate extensions must not repeat an OID")
+    }.getOrElse { cause ->
+        if (cause is X509ValidationException) throw cause
+        throw X509ValidationException("Invalid reader certificate structure", cause)
+    }
 }
 
 /**
