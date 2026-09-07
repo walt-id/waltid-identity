@@ -3,14 +3,38 @@ package id.walt.mdoc.proximity.mobile
 import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class WifiAwareHttpConnectionTest {
+    @Test
+    fun `hybrid read ahead and queued response preserve sequential HTTP ownership`() = runTest {
+        val raw = FakeWifiAwareRawConnection(mutableListOf(request(byteArrayOf(1)), request(byteArrayOf(2))))
+        val connection = WifiAwareHttpConnection(raw, 16)
+        val firstResponse = async { connection.send(ImmutableBytes.of(byteArrayOf(9))) }
+        runCurrent()
+        assertFalse(firstResponse.isCompleted)
+        assertContentEquals(byteArrayOf(1), connection.receive()!!.copy())
+        firstResponse.await()
+        assertContentEquals(byteArrayOf(2), connection.receive()!!.copy())
+        val readAhead = async { connection.receive() }
+        runCurrent()
+        assertFalse(readAhead.isCompleted)
+        connection.send(ImmutableBytes.of(byteArrayOf(8)))
+        assertNull(readAhead.await())
+        assertEquals(2, raw.writes.size)
+        assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), raw.closeReasons)
+    }
+
     @Test
     fun `one TCP stream carries strict sequential mdoc HTTP exchanges`() = runTest {
         val request = request(byteArrayOf(1, 2, 3))

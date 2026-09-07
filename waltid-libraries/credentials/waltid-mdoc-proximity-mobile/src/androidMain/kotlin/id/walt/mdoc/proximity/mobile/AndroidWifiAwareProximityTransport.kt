@@ -32,13 +32,12 @@ import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import java.io.Closeable
 import java.net.Inet6Address
 import java.net.ServerSocket
 import java.net.Socket
@@ -49,10 +48,8 @@ public class AndroidWifiAwareProximityTransportFactory(
 ) : WifiAwareProximityTransportFactory {
     private val applicationContext: Context = context.applicationContext
 
-    override suspend fun capability(
-        securityPolicy: WifiAwareSecurityPolicy,
-    ): WifiAwareProximityAvailability =
-        AndroidWifiAwarePlatformAdapter(applicationContext).capability(securityPolicy)
+    override suspend fun capability(): WifiAwareProximityAvailability =
+        AndroidWifiAwarePlatformAdapter(applicationContext).capability()
 
     override fun create(
         configuration: WifiAwareProximityTransportConfiguration,
@@ -69,9 +66,7 @@ internal class AndroidWifiAwarePlatformAdapter(
     private val wifiManager: WifiManager? = context.getSystemService(WifiManager::class.java)
 
     @SuppressLint("MissingPermission")
-    override suspend fun capability(
-        securityPolicy: WifiAwareSecurityPolicy,
-    ): WifiAwareProximityAvailability {
+    override suspend fun capability(): WifiAwareProximityAvailability {
         if (Build.VERSION.SDK_INT < MINIMUM_EXPLICIT_CIPHER_API) {
             return unavailable(
                 "wifi_aware_api_unsupported",
@@ -96,8 +91,7 @@ internal class AndroidWifiAwarePlatformAdapter(
             )
         }
         manager.characteristics?.let { characteristics ->
-            if (securityPolicy == WifiAwareSecurityPolicy.NcsSk128 &&
-                characteristics.supportedCipherSuites and Characteristics.WIFI_AWARE_CIPHER_SUITE_NCS_SK_128 == 0
+            if (characteristics.supportedCipherSuites and Characteristics.WIFI_AWARE_CIPHER_SUITE_NCS_SK_128 == 0
             ) {
                 return unavailable(
                     "wifi_aware_ncs_sk_128_unsupported",
@@ -130,10 +124,9 @@ internal class AndroidWifiAwarePlatformAdapter(
     override suspend fun preparePublisher(
         serviceName: String,
         passphrase: String,
-        securityPolicy: WifiAwareSecurityPolicy,
         sessionScope: CoroutineScope,
     ): WifiAwarePreparedPlatformPublisher {
-        val availability = capability(securityPolicy)
+        val availability = capability()
         if (availability !is WifiAwareProximityAvailability.Available) {
             val unavailable = availability as WifiAwareProximityAvailability.Unavailable
             throw ProximityException(ProximityError.Capability(unavailable.code, unavailable.message))
@@ -202,14 +195,13 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
     private val lock = Any()
     private val closed = atomic(false)
     private val connectionAwaited = atomic(false)
-    private val peers = Channel<Result<PeerHandle>>(capacity = Channel.BUFFERED)
-    private var receiver: BroadcastReceiver? = null
-    private var awareSession: WifiAwareSession? = null
-    private var publishSession: PublishDiscoverySession? = null
-    private var serverSocket: ServerSocket? = null
-    private var acceptedSocket: Socket? = null
+    private val peer = CompletableDeferred<PeerHandle>()
+    private val receiver = WifiAwareNativeResource<Closeable>()
+    private val awareSession = WifiAwareNativeResource<WifiAwareSession>()
+    private val publishSession = WifiAwareNativeResource<PublishDiscoverySession>()
+    private var serverSocket: BlockingSocket<ServerSocket>? = null
     private var rawConnection: AndroidWifiAwareRawConnection? = null
-    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private val networkRegistration = WifiAwareNativeResource<Closeable>()
     private var sessionHandle: kotlinx.coroutines.DisposableHandle? = null
 
     @SuppressLint("MissingPermission")
@@ -218,10 +210,9 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
             "A prepared Wi-Fi Aware publisher accepts one reader"
         }
         ensureOpen()
-        val peer = peers.receive().getOrElse { throw it }
-        val discovery = synchronized(lock) { publishSession }
-            ?: throw platformFailure("wifi_aware_publish_lost", "Wi-Fi Aware publishing ended before connection")
-        val server = ServerSocket(0)
+        val peer = peer.await()
+        val discovery = publishSession.await()
+        val server = BlockingSocket(ServerSocket(0))
         synchronized(lock) {
             if (closed.value) {
                 server.close()
@@ -232,7 +223,7 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
         val security = sharedKeySecurity(passphrase)
         val specifier = WifiAwareNetworkSpecifier.Builder(discovery, peer)
             .setDataPathSecurityConfig(security)
-            .setPort(server.localPort)
+            .setPort(server.socket.localPort)
             .setTransportProtocol(TCP_PROTOCOL_NUMBER)
             .build()
         val request = NetworkRequest.Builder()
@@ -259,38 +250,48 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
                 close(ProximityCloseReason.PEER_DISCONNECTED)
             }
         }
-        synchronized(lock) {
-            if (closed.value) throw platformFailure("wifi_aware_closed", "Wi-Fi Aware publisher is closed")
-            networkCallback = callback
-        }
-        val accepted = async(Dispatchers.IO) { server.accept() }
+        var accepted: kotlinx.coroutines.Deferred<BlockingSocket<Socket>>? = null
         try {
+            ensureOpen()
             connectivityManager.requestNetwork(request, callback)
+            // If close raced registration, install disposes this exact registration immediately.
+            networkRegistration.install(Closeable { connectivityManager.unregisterNetworkCallback(callback) })
+            ensureOpen()
+            accepted = async {
+                server.run(disposeResult = { it.close() }) { listener ->
+                    val raw = AndroidWifiAwareRawConnection(BlockingSocket(listener.accept()))
+                    synchronized(lock) {
+                        if (closed.value) {
+                            raw.close(ProximityCloseReason.CANCELLED)
+                            throw platformFailure("wifi_aware_closed", "Wi-Fi Aware publisher closed during accept")
+                        }
+                        rawConnection = raw
+                    }
+                    raw.ownedSocket
+                }
+            }
             discovery.sendMessage(peer, CONNECTION_READY_MESSAGE_ID, ByteArray(0))
             available.await()
-            val socket = accepted.await()
+            val ownedSocket = accepted.await()
+            val socket = ownedSocket.socket
             require(socket.inetAddress is Inet6Address && socket.inetAddress.isLinkLocalAddress) {
                 "Wi-Fi Aware TCP peer must use a link-local IPv6 address"
             }
             socket.tcpNoDelay = true
             server.close()
-            val raw = AndroidWifiAwareRawConnection(socket)
             synchronized(lock) {
                 if (closed.value) {
-                    raw.close(ProximityCloseReason.CANCELLED)
+                    ownedSocket.close()
                     throw platformFailure("wifi_aware_closed", "Wi-Fi Aware publisher closed while accepting the reader")
                 }
                 serverSocket = null
-                acceptedSocket = socket
-                rawConnection = raw
+                checkNotNull(rawConnection)
             }
-            raw
         } catch (failure: Throwable) {
-            accepted.cancel()
-            runCatching { server.close() }
-            if (failure !is kotlinx.coroutines.CancellationException) {
-                close(ProximityCloseReason.PLATFORM_UNAVAILABLE)
-            }
+            // Close accept/read resources before coroutineScope joins a blocked IO worker.
+            close(if (failure is kotlinx.coroutines.CancellationException) ProximityCloseReason.CANCELLED
+                else ProximityCloseReason.PLATFORM_UNAVAILABLE)
+            accepted?.cancel()
             throw failure
         }
     }
@@ -298,40 +299,19 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
     override fun close(reason: ProximityCloseReason) {
         if (!closed.compareAndSet(expect = false, update = true)) return
         sessionHandle?.dispose()
-        peers.close()
+        peer.cancel()
         val exact = synchronized(lock) {
-            Resources(
-                receiver = receiver.also { receiver = null },
-                awareSession = awareSession.also { awareSession = null },
-                publishSession = publishSession.also { publishSession = null },
-                serverSocket = serverSocket.also { serverSocket = null },
-                acceptedSocket = acceptedSocket.also { acceptedSocket = null },
-                rawConnection = rawConnection.also { rawConnection = null },
-                networkCallback = networkCallback.also { networkCallback = null },
-            )
+            Pair(serverSocket.also { serverSocket = null }, rawConnection.also { rawConnection = null })
         }
-        exact.rawConnection?.close(reason)
-        runCatching { exact.acceptedSocket?.close() }
-        runCatching { exact.serverSocket?.close() }
-        exact.networkCallback?.let { callback ->
-            runCatching { connectivityManager.unregisterNetworkCallback(callback) }
-        }
-        runCatching { exact.publishSession?.close() }
-        runCatching { exact.awareSession?.close() }
-        exact.receiver?.let { registered -> runCatching { context.unregisterReceiver(registered) } }
+        exact.first?.close()
+        exact.second?.close(reason)
+        networkRegistration.close()
+        publishSession.close()
+        awareSession.close()
+        receiver.close()
     }
 
     private fun ensureOpen() = check(!closed.value) { "Wi-Fi Aware publisher is closed" }
-
-    private data class Resources(
-        val receiver: BroadcastReceiver?,
-        val awareSession: WifiAwareSession?,
-        val publishSession: PublishDiscoverySession?,
-        val serverSocket: ServerSocket?,
-        val acceptedSocket: Socket?,
-        val rawConnection: AndroidWifiAwareRawConnection?,
-        val networkCallback: ConnectivityManager.NetworkCallback?,
-    )
 
     companion object {
         private const val TCP_PROTOCOL_NUMBER = 6
@@ -359,49 +339,37 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
             val stateReceiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context, intent: Intent) {
                     if (!awareManager.isAvailable) {
-                        endpoint.peers.trySend(
-                            Result.failure(
-                                platformFailure(
-                                    "wifi_aware_radio_lost",
-                                    "Wi-Fi Aware became unavailable during the session",
-                                )
-                            )
-                        )
+                        endpoint.peer.completeExceptionally(platformFailure(
+                            "wifi_aware_radio_lost", "Wi-Fi Aware became unavailable during the session",
+                        ))
                         endpoint.close(ProximityCloseReason.PLATFORM_UNAVAILABLE)
                     }
                 }
             }
-            endpoint.receiver = stateReceiver
-            val filter = IntentFilter(WifiAwareManager.ACTION_WIFI_AWARE_STATE_CHANGED)
+            try {
+                val filter = IntentFilter(WifiAwareManager.ACTION_WIFI_AWARE_STATE_CHANGED)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 context.registerReceiver(stateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
             } else {
                 context.registerReceiver(stateReceiver, filter)
             }
-            try {
+                endpoint.receiver.install(Closeable { context.unregisterReceiver(stateReceiver) })
+                endpoint.ensureOpen()
                 if (!awareManager.isAvailable) {
                     throw platformFailure("wifi_aware_radio_unavailable", "Wi-Fi Aware is unavailable")
                 }
-                val attached = CompletableDeferred<WifiAwareSession>()
                 awareManager.attach(object : AttachCallback() {
                     override fun onAttached(session: WifiAwareSession) {
-                        if (!attached.complete(session)) session.close()
+                        endpoint.awareSession.install(session)
                     }
 
                     override fun onAttachFailed() {
-                        attached.completeExceptionally(
+                        endpoint.awareSession.fail(
                             platformFailure("wifi_aware_attach_failed", "Android Wi-Fi Aware attach failed")
                         )
                     }
                 }, Handler(Looper.getMainLooper()))
-                val awareSession = attached.await()
-                synchronized(endpoint.lock) {
-                    if (endpoint.closed.value) {
-                        awareSession.close()
-                        throw platformFailure("wifi_aware_closed", "Wi-Fi Aware publisher closed during attach")
-                    }
-                    endpoint.awareSession = awareSession
-                }
+                val awareSession = endpoint.awareSession.await()
                 val characteristics = awareManager.characteristics
                     ?: throw platformFailure(
                         "wifi_aware_characteristics_unavailable",
@@ -417,42 +385,35 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
                     }
                 }
                 val security = sharedKeySecurity(passphrase)
-                val published = CompletableDeferred<PublishDiscoverySession>()
                 val config = PublishConfig.Builder()
                     .setServiceName(serviceName)
                     .setDataPathSecurityConfig(security)
                     .build()
                 awareSession.publish(config, object : DiscoverySessionCallback() {
                     override fun onPublishStarted(session: PublishDiscoverySession) {
-                        if (!published.complete(session)) session.close()
+                        endpoint.publishSession.install(session)
                     }
 
                     override fun onSessionConfigFailed() {
-                        published.completeExceptionally(
+                        endpoint.publishSession.fail(
                             platformFailure("wifi_aware_publish_failed", "Android Wi-Fi Aware publish failed")
                         )
                     }
 
                     override fun onSessionTerminated() {
-                        endpoint.peers.trySend(
-                            Result.failure(
-                                platformFailure("wifi_aware_publish_lost", "Android Wi-Fi Aware publish session ended")
-                            )
-                        )
+                        endpoint.peer.completeExceptionally(platformFailure(
+                            "wifi_aware_publish_lost", "Android Wi-Fi Aware publish session ended",
+                        ))
+                        endpoint.close(ProximityCloseReason.PLATFORM_UNAVAILABLE)
                     }
 
                     override fun onMessageReceived(peerHandle: PeerHandle, message: ByteArray) {
-                        endpoint.peers.trySend(Result.success(peerHandle))
+                        // This endpoint accepts one reader; later discovery notifications carry no payload to queue.
+                        endpoint.peer.complete(peerHandle)
                     }
                 }, Handler(Looper.getMainLooper()))
-                val publishSession = published.await()
-                synchronized(endpoint.lock) {
-                    if (endpoint.closed.value) {
-                        publishSession.close()
-                        throw platformFailure("wifi_aware_closed", "Wi-Fi Aware publisher closed during publish")
-                    }
-                    endpoint.publishSession = publishSession
-                }
+                endpoint.publishSession.await()
+                endpoint.ensureOpen()
                 return endpoint
             } catch (failure: Throwable) {
                 withContext(NonCancellable) { endpoint.close(ProximityCloseReason.PLATFORM_UNAVAILABLE) }
@@ -477,12 +438,12 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
     }
 }
 
-private class AndroidWifiAwareRawConnection(
-    private val socket: Socket,
+internal class AndroidWifiAwareRawConnection(
+    val ownedSocket: BlockingSocket<Socket>,
 ) : WifiAwareRawConnection {
     private val closed = atomic(false)
 
-    override suspend fun read(maximumBytes: Int): ByteArray? = withContext(Dispatchers.IO) {
+    override suspend fun read(maximumBytes: Int): ByteArray? = ownedSocket.run { socket ->
         require(maximumBytes > 0)
         val target = ByteArray(maximumBytes)
         val count = socket.getInputStream().read(target)
@@ -493,7 +454,7 @@ private class AndroidWifiAwareRawConnection(
         }
     }
 
-    override suspend fun write(bytes: ByteArray): Unit = withContext(Dispatchers.IO) {
+    override suspend fun write(bytes: ByteArray): Unit = ownedSocket.run { socket ->
         socket.getOutputStream().apply {
             write(bytes)
             flush()
@@ -501,7 +462,7 @@ private class AndroidWifiAwareRawConnection(
     }
 
     override fun close(reason: ProximityCloseReason) {
-        if (closed.compareAndSet(expect = false, update = true)) runCatching { socket.close() }
+        if (closed.compareAndSet(expect = false, update = true)) ownedSocket.close()
     }
 }
 

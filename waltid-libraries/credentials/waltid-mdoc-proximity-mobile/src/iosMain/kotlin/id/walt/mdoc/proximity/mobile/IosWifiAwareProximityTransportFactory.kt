@@ -4,9 +4,7 @@ import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 
 /** Truthful iOS capability boundary for the currently incompatible public Wi-Fi Aware API. */
 public class IosWifiAwareProximityTransportFactory : WifiAwareProximityTransportFactory {
-    override suspend fun capability(
-        securityPolicy: WifiAwareSecurityPolicy,
-    ): WifiAwareProximityAvailability = WifiAwareProximityAvailability.Unavailable(
+    override suspend fun capability(): WifiAwareProximityAvailability = WifiAwareProximityAvailability.Unavailable(
         implemented = false,
         code = "wifi_aware_ios_api_unsupported",
         message = "iOS Wi-Fi Aware requires prior pairing and a statically declared short service name, which cannot express ISO mdoc transaction-derived discovery",

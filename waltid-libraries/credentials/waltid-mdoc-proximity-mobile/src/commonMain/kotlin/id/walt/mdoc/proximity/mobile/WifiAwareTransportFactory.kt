@@ -3,12 +3,6 @@ package id.walt.mdoc.proximity.mobile
 import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 
-/** ISO mdoc Wi-Fi Aware security policies implemented by this transport. */
-public enum class WifiAwareSecurityPolicy {
-    /** Mandatory NAN Cipher Suite NCS-SK-128. */
-    NcsSk128,
-}
-
 /** Side-effect-free Wi-Fi Aware runtime result. No radio resource has been prepared. */
 public sealed interface WifiAwareProximityAvailability {
     /**
@@ -37,8 +31,6 @@ public sealed interface WifiAwareProximityAvailability {
 public data class WifiAwareProximityTransportConfiguration(
     /** Exact tagged EDeviceKeyBytes used for the transaction-derived service and passphrase. */
     public val eDeviceKeyBytes: ImmutableBytes,
-    /** NAN data-path policy. */
-    public val securityPolicy: WifiAwareSecurityPolicy = WifiAwareSecurityPolicy.NcsSk128,
 ) {
     init {
         require(eDeviceKeyBytes.size > 0) { "EDeviceKeyBytes must not be empty" }
@@ -48,9 +40,7 @@ public data class WifiAwareProximityTransportConfiguration(
 /** Platform Wi-Fi Aware preflight and provider factory. */
 public interface WifiAwareProximityTransportFactory {
     /** Reports availability without attaching, publishing, allocating a socket, or prompting. */
-    public suspend fun capability(
-        securityPolicy: WifiAwareSecurityPolicy,
-    ): WifiAwareProximityAvailability
+    public suspend fun capability(): WifiAwareProximityAvailability
 
     /** Creates a provider without preparing radio resources. */
     public fun create(

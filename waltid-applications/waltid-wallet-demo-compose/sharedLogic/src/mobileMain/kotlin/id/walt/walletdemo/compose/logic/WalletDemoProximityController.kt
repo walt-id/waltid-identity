@@ -27,7 +27,6 @@ import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettings
 import id.walt.wallet2.mobile.MobileWalletProximitySession
 import id.walt.wallet2.mobile.MobileWalletProximityState
 import id.walt.wallet2.mobile.MobileWalletProximitySubmission
-import id.walt.wallet2.mobile.MobileWalletProximityWifiAwareConfiguration
 import id.walt.wallet2.mobile.ProximityApproval
 import id.walt.wallet2.mobile.ProximityPreparationResult
 import id.walt.wallet2.mobile.ProximityPreparedSharing
@@ -595,11 +594,16 @@ private val ProximityCapabilities.automaticPermissionActions:
 internal fun WalletDemoProximityTransportProfile.configuration(): ProximityConfiguration =
     when (this) {
         WalletDemoProximityTransportProfile.Default,
-        WalletDemoProximityTransportProfile.Bluetooth -> {
-            val retrieval = ProximityRetrievalOptions(
-                nfc = ProximityNfcRetrievalConfiguration().takeIf {
+        WalletDemoProximityTransportProfile.Bluetooth,
+        WalletDemoProximityTransportProfile.WifiAware -> {
+            val retrieval = MobileWalletProximityConventionalRetrievalConfiguration(
+                bluetoothLowEnergy = MobileWalletProximityBleConfiguration().takeUnless {
+                    this == WalletDemoProximityTransportProfile.WifiAware
+                },
+                nfc = MobileWalletProximityNfcRetrievalConfiguration().takeIf {
                     this == WalletDemoProximityTransportProfile.Default
                 },
+                wifiAware = this != WalletDemoProximityTransportProfile.Bluetooth,
             )
             ProximityConfiguration(
                 session = ProximitySessionConfiguration.ConventionalNfc(
@@ -617,6 +621,10 @@ internal fun WalletDemoProximityTransportProfile.configuration(): ProximityConfi
                         bearerPolicy = ProximityBleBearerPolicy.GattOnly,
                     ),
                 ),
+            )
+        WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware ->
+            MobileWalletProximityConfiguration(
+                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(wifiAware = true),
             )
         WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct ->
             ProximityConfiguration(
