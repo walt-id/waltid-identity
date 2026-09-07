@@ -26,6 +26,7 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.SessionTranscript
@@ -35,6 +36,11 @@ import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.mdoc.proximity.*
+import id.walt.mdoc.crypto.MdocCryptoHelper
+import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
+import id.walt.mdoc.objects.session.SessionEstablishment
+import id.walt.mdoc.objects.session.SessionData
 import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocConsentPrompt
 import id.walt.mdoc.proximity.MdocHolderRequestContext
@@ -961,6 +967,91 @@ class MobileWalletProximityRequestProcessorTest {
             install(malformed)
             val invalid = kotlin.test.assertFailsWith<ProximityException> { processor(fixture).preview(matching) }
             assertEquals("credential_unavailable", invalid.error.code)
+        }
+    }
+
+    @Test
+    fun `unknown document and namespace requests return no data without consent`() = runTest {
+        withFixture { fixture ->
+            for ((id, request) in listOf(
+                "mDL_MS_DR_UF_07" to DeviceRequest("unknown.document", mapOf("org.iso.18013.5.1" to listOf("given_name"))),
+                "mDL_MS_DR_UF_10" to DeviceRequest("org.iso.18013.5.1.mDL", mapOf("unknown.namespace" to listOf("given_name"))),
+            )) {
+                val result = wireExchange(fixture, request)
+                assertIs<MdocHolderSessionResult.Completed>(result.result, id)
+                assertEquals(0, result.consentCalls, id)
+                assertEquals(0u, result.response.status, id)
+                assertEquals(null, result.response.documents, id)
+            }
+        }
+    }
+
+    @Test
+    fun `mixed known and unknown fields return only approved known elements over the encrypted session`() = runTest {
+        withFixture { fixture ->
+            for (denyFamilyName in listOf(false, true)) {
+                val result = wireExchange(fixture, requestWithNames("given_name", "family_name", "unknown_element"), denyFamilyName = denyFamilyName)
+                val id = if (denyFamilyName) "mDL_MS_DR_UF_13" else "mDL_MS_DR_UF_12"
+                assertIs<MdocHolderSessionResult.Completed>(result.result, id)
+                assertEquals(1, result.consentCalls, id)
+                assertEquals(0u, result.response.status, id)
+                val names = result.response.documents!!.single().issuerSigned.namespaces!!.getValue("org.iso.18013.5.1").entries
+                    .map { it.value.elementIdentifier }.toSet()
+                assertEquals(if (denyFamilyName) setOf("given_name") else setOf("given_name", "family_name"), names, id)
+            }
+        }
+    }
+
+    private data class WireOutcome(val result: MdocHolderSessionResult, val response: DeviceResponse, val consentCalls: Int)
+
+    private suspend fun wireExchange(
+        fixture: Fixture,
+        request: DeviceRequest,
+        configuration: MobileWalletProximityConfiguration = MobileWalletProximityConfiguration(),
+        denyFamilyName: Boolean = false,
+    ): WireOutcome {
+        suspend fun key(id: String) = fixture.runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.KEY_AGREEMENT),
+        ))
+        val deviceKey = key("wire-holder-ephemeral")
+        val readerKey = key("wire-reader-ephemeral")
+        val method = DeviceRetrievalMethod.Nfc(1024u, 1024u)
+        val context = EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1_048_576, MdocEngagementMode.Qr)
+        val capabilities = MdocSessionCapabilities.forSession(context.profile, deviceKey, emptySet())
+        val engagement = MdocDeviceEngagementFactory().create(deviceKey, listOf(method), context, capabilities)
+        val readerPublic = (readerKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey()
+        val readerBytes = coseCompliantCbor.encodeToByteArray(readerPublic)
+        val transcript = SessionTranscript.forQr(engagement.engagement.encodedCopy(), readerBytes)
+        val cipher = MdocSessionCipher.establishForReader(readerKey, engagement.engagement.value.security.eDeviceKey.value,
+            MdocCryptoHelper.buildSessionTranscriptBytes(transcript))
+        val processor = processor(fixture, configuration)
+        val loopback = FakeProximityLoopback.create()
+        var consentCalls = 0
+        val engine = MdocHolderProtocolEngine(deviceKey, listOf(FakeTransportProvider(method, loopback.holder)), processor,
+            MdocConsentHandler { prompt ->
+                consentCalls++
+                val review = processor.review(prompt)
+                val option = review.documents.single().credentialOptions.first()
+                val all = submissionFor(review, option)
+                val submission = if (!denyFamilyName) all else all.copy(documents = all.documents.map { document ->
+                    document.copy(disclosedElements = document.disclosedElements.filterNot { it.elementIdentifier == "family_name" }.toSet())
+                })
+                assertEquals(null, processor.accept(prompt, review.reviewId, submission))
+                MdocConsentDecision.Approve(prompt.bindingToken)
+            }, context, capabilities)
+        try {
+            loopback.reader.send(ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(SessionEstablishment(
+                ByteStringWrapper(readerPublic, readerBytes), cipher.encrypt(coseCompliantCbor.encodeToByteArray(request)),
+            ))))
+            val result = engine.run()
+            val messages = mutableListOf<SessionData>()
+            while (true) messages += coseCompliantCbor.decodeFromByteArray<SessionData>((loopback.reader.receive() ?: break).copy())
+            assertEquals(20u, messages.last().status)
+            val encrypted = messages.mapNotNull { it.data }.single()
+            return WireOutcome(result, coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(encrypted)), consentCalls)
+        } finally {
+            cipher.close()
+            processor.cancel()
         }
     }
 
