@@ -66,6 +66,7 @@ kotlin {
         }
         commonTest {
             kotlin.srcDir("../../credentials/waltid-mdoc-proximity/src/commonTestFixtures/kotlin")
+            kotlin.srcDir("../../crypto/waltid-x509/src/commonTestFixtures/kotlin")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
