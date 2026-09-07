@@ -117,6 +117,21 @@ class ReaderAuthenticationTest {
     }
 
     @Test
+    fun `reader authentication accepts the RFC 9864 fully specified P256 algorithm`() = runTest {
+        val unsigned = DeviceRequest("org.example.mdoc", mapOf("org.example" to listOf("given_name")))
+        val signed = signedRequest(
+            unsigned = unsigned,
+            document = true,
+            whole = false,
+            algorithm = Cose.Algorithm.ESP256,
+        )
+
+        assertIs<ReaderAuthenticationResult.Valid>(
+            verifier(ReaderTrustState.TRUSTED).verify(signed, transcript).documents.single()
+        )
+    }
+
+    @Test
     fun `COSE profile failures never reach reader trust evaluation`() = runTest {
         val unsigned = DeviceRequest("org.example.mdoc", mapOf("org.example" to listOf("given_name")))
         val key = runtime.generateMdocTestKey("reader-cose-profile", setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
@@ -159,28 +174,13 @@ class ReaderAuthenticationTest {
         for ((case, signature) in cases) {
             val request = unsigned.copy(docRequests = listOf(unsigned.docRequests.single().copy(readerAuth = signature)))
             val result = verifier.verify(request, transcript).documents.single()
-            assertFalse(result.validity is ReaderAuthenticationValidity.Valid, "mDL_SM_mdocRAuth_UF_$case")
+            assertFalse(result is ReaderAuthenticationResult.Valid, "mDL_SM_mdocRAuth_UF_$case")
             assertEquals(0, trustCalls, "mDL_SM_mdocRAuth_UF_$case")
         }
-        assertIs<ReaderAuthenticationValidity.Valid>(verifier.verify(
+        assertIs<ReaderAuthenticationResult.Valid>(verifier.verify(
             unsigned.copy(docRequests = listOf(unsigned.docRequests.single().copy(readerAuth = valid))), transcript,
-        ).documents.single().validity)
+        ).documents.single())
         assertEquals(1, trustCalls)
-    }
-
-    @Test
-    fun `reader authentication accepts the RFC 9864 fully specified P256 algorithm`() = runTest {
-        val unsigned = DeviceRequest("org.example.mdoc", mapOf("org.example" to listOf("given_name")))
-        val signed = signedRequest(
-            unsigned = unsigned,
-            document = true,
-            whole = false,
-            algorithm = Cose.Algorithm.ESP256,
-        )
-
-        assertIs<ReaderAuthenticationResult.Valid>(
-            verifier(ReaderTrustState.TRUSTED).verify(signed, transcript).documents.single()
-        )
     }
 
     private suspend fun signedRequest(
