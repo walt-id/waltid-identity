@@ -26,6 +26,7 @@ import id.walt.mdoc.proximity.MdocHolderRequestContext
 import id.walt.mdoc.proximity.MdocHolderRequestProcessor
 import id.walt.mdoc.proximity.MdocRequestMatchResult
 import id.walt.mdoc.proximity.MdocRequestMatcher
+import id.walt.mdoc.proximity.MdocRequestPreparation
 import id.walt.mdoc.proximity.MdocRequestPreview
 import id.walt.mdoc.proximity.MdocRequestSelection
 import id.walt.mdoc.proximity.MdocResponseBuilder
@@ -130,6 +131,17 @@ internal class MobileWalletProximityRequestProcessor(
     private val evaluatedReaderTrust = mutableMapOf<ReaderTrustKey, MobileWalletProximityReaderTrustDecision>()
     private var currentSnapshot: Snapshot? = null
     private var approved: Approved? = null
+
+    override suspend fun prepare(context: MdocHolderRequestContext): MdocRequestPreparation = try {
+        MdocRequestPreparation.Review(preview(context))
+    } catch (failure: ProximityException) {
+        when (failure.error.code) {
+            "request_unsatisfied" -> MdocRequestPreparation.NoData
+            "invalid_reader_authentication", "reader_revoked", "trusted_reader_required" ->
+                MdocRequestPreparation.Rejected(failure.error)
+            else -> throw failure
+        }
+    }
 
     override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview {
         val snapshot = buildSnapshot(context)
