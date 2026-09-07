@@ -298,6 +298,33 @@ public protocol ProximityReaderRevocationEvaluator: Sendable {
     func evaluate(_ evidence: ProximityReaderEvidence) async throws -> ProximityCertificateRevocationResult
 }
 
+/// Certificates whose complete CRL status the application requires.
+public enum ProximityCRLScope: Sendable, Equatable {
+    /// Check the reader certificate against its direct issuer's CRL.
+    case readerCertificate
+    /// Also check issuing authorities, including the terminal self-signed authority.
+    case readerCertificateAndIssuingAuthorities
+}
+
+/// A complete CRL obtained through the application's transport or cache policy.
+public enum ProximityCRLFetchResult: Sendable, Equatable {
+    /// Complete DER bytes; the SDK verifies signature, scope and freshness.
+    /// - Parameter der: Complete DER-encoded certificate revocation list.
+    case available(der: Data)
+    /// No complete CRL is available within the application's transport policy.
+    case unavailable
+}
+
+/// Application-owned HTTP transport for explicitly configured CRL evaluation.
+public protocol ProximityCRLFetcher: Sendable {
+    /// Retrieves a complete DER CRL under application timeout, redirect and destination policy.
+    /// - Parameters:
+    ///   - url: HTTP or HTTPS distribution-point URL from a reader-path certificate.
+    ///   - maximumBytes: Maximum permitted response size before Base64 encoding.
+    /// - Returns: Complete DER bytes or an unavailable result.
+    func fetch(from url: URL, maximumBytes: Int) async throws -> ProximityCRLFetchResult
+}
+
 /// Explicit revocation behavior selected for reader trust.
 public enum ProximityReaderRevocationPolicy: Sendable {
     /// Do not perform revocation lookup; the resulting fact remains ``ProximityReaderRevocationState/notChecked``.

@@ -459,6 +459,87 @@ public final class ProximityConfiguredReaderTrustEvaluator:
     }
 }
 
+/// Swift-native access to shared direct complete-CRL verification.
+///
+/// The application supplies issuer lookup certificates, selects the checked path scope, and owns
+/// transport/cache policy. Lookup certificates do not establish trust. Unsupported CRL forms and
+/// unavailable status remain indeterminate; verified revocation prevents disclosure.
+public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEvaluator, @unchecked Sendable {
+    private let evaluator: MobileWalletProximityCrlRevocationEvaluator
+
+    /// Creates an explicit CRL evaluator for a reader revocation policy.
+    /// - Parameters:
+    ///   - issuerCertificatesDER: Public issuer lookup certificates, up to ten certificates.
+    ///   - scope: Whether to check only the reader or also its issuing authorities.
+    ///   - fetcher: Application transport with explicit timeout, redirect and destination policy.
+    /// - Throws: ``WalletError/invalidInput(_:)`` when issuer input is invalid or exceeds bounds.
+    public init(
+        issuerCertificatesDER: [Data],
+        scope: ProximityCRLScope,
+        fetcher: any ProximityCRLFetcher
+    ) throws {
+        guard (1...10).contains(issuerCertificatesDER.count),
+              issuerCertificatesDER.allSatisfy({ !$0.isEmpty && $0.count <= 65_536 }) else {
+            throw WalletError.invalidInput("CRL issuer certificates exceed the supported bounds.")
+        }
+        do {
+            evaluator = try MobileWalletProximityCrlRevocationEvaluator(
+                issuerCertificatesDerBase64Url: issuerCertificatesDER.map { $0.base64URLEncodedString() },
+                scope: scope == .readerCertificate ? .readerCertificate : .readerCertificateAndIssuingAuthorities,
+                fetcher: KMPProximityCRLFetcherAdapter(fetcher)
+            )
+        } catch {
+            throw WalletError.invalidInput("CRL issuer certificates are invalid or exceed the supported bounds.")
+        }
+    }
+
+    /// Verifies the configured certificate scope using current complete CRLs.
+    /// - Parameter evidence: Authenticated reader evidence for one request scope.
+    /// - Returns: Good, revoked or indeterminate status, independently of certificate-path trust.
+    public func evaluate(_ evidence: ProximityReaderEvidence) async throws -> ProximityCertificateRevocationResult {
+        try Task.checkCancellation()
+        let result: any MobileWalletProximityCertificateRevocationResult
+        do {
+            result = try await evaluator.evaluate(evidence: evidence.toKMPEvidence())
+        } catch {
+            try Task.checkCancellation()
+            throw WalletError.internalFailure("CRL evaluation could not complete.")
+        }
+        try Task.checkCancellation()
+        switch onEnum(of: result) {
+        case .good:
+            return .good
+        case let .revoked(value):
+            return .revoked(reason: value.reason)
+        case let .indeterminate(value):
+            return .indeterminate(reason: value.reason)
+        }
+    }
+}
+
+private final class KMPProximityCRLFetcherAdapter: MobileWalletProximityCrlFetcher, @unchecked Sendable {
+    private let fetcher: any ProximityCRLFetcher
+
+    init(_ fetcher: any ProximityCRLFetcher) {
+        self.fetcher = fetcher
+    }
+
+    func __fetch(url: String, maximumBytes: Int32) async throws -> any MobileWalletProximityCrlFetchResult {
+        guard let destination = URL(string: url) else {
+            return MobileWalletProximityCrlFetchResultUnavailable.shared
+        }
+        switch try await fetcher.fetch(from: destination, maximumBytes: Int(maximumBytes)) {
+        case let .available(data):
+            guard !data.isEmpty, data.count <= Int(maximumBytes) else {
+                return MobileWalletProximityCrlFetchResultUnavailable.shared
+            }
+            return MobileWalletProximityCrlFetchResultAvailable(crlDerBase64Url: data.base64URLEncodedString())
+        case .unavailable:
+            return MobileWalletProximityCrlFetchResultUnavailable.shared
+        }
+    }
+}
+
 private final class KMPProximityReaderRevocationEvaluatorAdapter:
     MobileWalletProximityReaderRevocationEvaluator,
     @unchecked Sendable {
