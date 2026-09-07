@@ -15,10 +15,11 @@ func parseWalletISO8601Date(_ value: String) -> Date? {
 
 final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     private let bridge: WalletSdkBridge
+    private let nfcHost = IOSNfcHostPlatformAdapter()
 
     init(configuration: WalletConfiguration) async throws {
         let result = try await WalletSdkBridgeFactory(
-            nfcHostPlatformAdapter: IOSNfcHostPlatformAdapter()
+            nfcHostPlatformAdapter: nfcHost
         ).create(
             configuration: configuration.toKMPConfiguration()
         )
@@ -307,7 +308,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             as: WalletCore.ProximitySession.self,
             operation: "start proximity presentation"
         )
-        return KMPProximityPresentationSessionBridge(session: session)
+        return KMPProximityPresentationSessionBridge(session: session, nfcHost: nfcHost)
     }
 
     func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
@@ -859,10 +860,18 @@ private final class KMPProximityApplicationProfileAdapter:
 private final class KMPProximityPresentationSessionBridge:
     ProximitySessionBridge,
     @unchecked Sendable {
-    private let session: any WalletCore.ProximitySession
+    private let session: any MobileWalletProximitySession
+    private let nfcHost: IOSNfcHostPlatformAdapter
 
-    init(session: any WalletCore.ProximitySession) {
+    init(session: any MobileWalletProximitySession, nfcHost: IOSNfcHostPlatformAdapter) {
         self.session = session
+        self.nfcHost = nfcHost
+    }
+
+    var systemPresentationActive: Bool {
+        guard let projected = try? session.state.value.toSwiftState(),
+              projected.legalActions.contains(.cancel) else { return false }
+        return nfcHost.isPresenting
     }
 
     var states: AsyncStream<ProximityState> {

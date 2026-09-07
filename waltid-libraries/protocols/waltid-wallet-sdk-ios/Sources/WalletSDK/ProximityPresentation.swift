@@ -1423,9 +1423,10 @@ public enum ProximityState: Sendable, Equatable {
 }
 
 @available(macOS 10.15, *)
-protocol ProximitySessionBridge: Sendable {
-    var states: AsyncStream<ProximityState> { get }
-    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult
+protocol ProximityPresentationSessionBridge: Sendable {
+    var systemPresentationActive: Bool { get }
+    var states: AsyncStream<ProximityPresentationState> { get }
+    func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult
     func close() async
 }
 
@@ -1433,8 +1434,11 @@ protocol ProximitySessionBridge: Sendable {
 @available(macOS 10.15, *)
 public actor ProximitySession {
     /// Exhaustive state stream whose terminal state is emitted before completion.
-    public nonisolated let states: AsyncStream<ProximityState>
-    private let bridge: any ProximitySessionBridge
+    public nonisolated let states: AsyncStream<ProximityPresentationState>
+    /// Whether this live session currently owns Core NFC's modal emulation UI.
+    /// Hosts may preserve the session during the resulting background transition.
+    public nonisolated var systemPresentationActive: Bool { bridge.systemPresentationActive }
+    private let bridge: any ProximityPresentationSessionBridge
     private var closed = false
 
     init(bridge: any ProximitySessionBridge) {

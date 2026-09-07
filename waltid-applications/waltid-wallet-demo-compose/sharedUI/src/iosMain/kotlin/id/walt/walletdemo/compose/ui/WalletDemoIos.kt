@@ -51,6 +51,7 @@ fun composeNfcHostUnavailablePreparation(code: String, message: String): NfcHost
  * and then fail to sign for it.
  * @param nfcHostPlatformAdapter Swift-owned Core NFC adapter retained by the wallet for the
  * proximity-session lifetime.
+ * @param systemPresentationActive Observes the same adapter's actual Core NFC modal lifetime.
  * @param onDigitalCredentialRegistryChanged Called from Kotlin whenever the wallet's credential set
  * changed and its desired Apple registration state was re-published. The host reconciles Apple's
  * `IdentityDocumentProviderRegistrationStore` here; the wallet cannot, since only the app process may
@@ -69,6 +70,7 @@ fun walletDemoViewController(
     appGroupIdentifier: String,
     keychainAccessGroup: String,
     nfcHostPlatformAdapter: NfcHostPlatformAdapter,
+    systemPresentationActive: () -> Boolean,
     onDigitalCredentialRegistryChanged: () -> Unit,
     walletId: String = "default",
     attestationBaseUrl: String = "",
@@ -120,6 +122,7 @@ fun walletDemoViewController(
         wallet = wallet,
         profileProvider = sharingSettings::proximityTransportProfile,
         readerTrustSettingsProvider = readerTrustSettingsController::sessionSnapshot,
+        systemPresentationActive = systemPresentationActive,
     )
     iosController = controller
     iosProximityController?.dismiss()

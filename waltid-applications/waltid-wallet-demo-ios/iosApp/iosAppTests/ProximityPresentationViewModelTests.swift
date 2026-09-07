@@ -57,6 +57,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             capabilityResults: [
                 makeProximityCapabilities(
                     bluetoothAvailable: false,
+                    nfcAvailable: false,
                     bluetoothRemediation: [.requestBluetoothPermission]
                 ),
                 makeProximityCapabilities(),
@@ -75,10 +76,11 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testStartDoesNotAdvertiseBLEWhileItsPermissionIsDenied() async throws {
+    func testStartRequiresRemediationWhenEveryRetrievalRouteIsUnavailable() async throws {
         let session = FakeProximitySession()
         let capabilities = makeProximityCapabilities(
             bluetoothAvailable: false,
+            nfcAvailable: false,
             bluetoothRemediation: [.openApplicationSettings]
         )
         let client = FakeProximityWalletClient(
@@ -98,8 +100,30 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testViableNfcAndQrFallbackRoutesSkipOptionalBearerRemediation() async throws {
+        for capabilities in [
+            makeProximityCapabilities(
+                bluetoothAvailable: false,
+                bluetoothRemediation: [.requestBluetoothPermission]
+            ),
+            makeProximityCapabilities(nfcAvailable: false),
+        ] {
+            let session = FakeProximitySession()
+            let client = FakeProximityWalletClient(session: session, capabilityResults: [capabilities])
+            let hostActions = FakeProximityHostActionExecutor()
+            let viewModel = ProximityPresentationViewModel(client: client, hostActions: hostActions)
+            viewModel.start()
+            try await waitUntil { client.startCount == 1 }
+            XCTAssertTrue(hostActions.actions.isEmpty)
+            viewModel.dismiss()
+            try await waitUntilAsync { await session.closeCount == 1 }
+        }
+    }
+
+    @MainActor
     func testNfcSystemPresentationBackgroundDoesNotCancelActiveExchange() async throws {
         let session = FakeProximitySession()
+        session.presentment.setActive(true)
         let client = FakeProximityWalletClient(session: session)
         let viewModel = ProximityPresentationViewModel(
             client: client,
@@ -113,12 +137,11 @@ final class ProximityPresentationViewModelTests: XCTestCase {
 
         XCTAssertEqual(client.startCount, 1)
         let configuration = try XCTUnwrap(client.lastConfiguration)
-        guard case .qrAndNFC(.negotiatedHandover) = configuration.engagement else {
+        guard case let .nfc(nfc) = configuration.session, nfc.handover == .negotiatedHandover, nfc.qrFallback != nil else {
             return XCTFail("The demo must prepare QR and NFC Negotiated Handover")
         }
-        guard case let .conventional(retrieval) = configuration.retrieval,
-              retrieval.bluetoothLowEnergy != nil,
-              retrieval.nfc != nil else {
+        guard nfc.retrieval.bluetoothLowEnergy != nil,
+              nfc.retrieval.nfc != nil else {
             return XCTFail("The demo must prepare BLE and conventional NFC retrieval")
         }
         XCTAssertTrue(viewModel.active)
@@ -129,6 +152,35 @@ final class ProximityPresentationViewModelTests: XCTestCase {
 
         viewModel.dismiss()
         try await waitUntilAsync { await session.closeCount == 1 }
+    }
+
+    @MainActor
+    func testConfiguredNfcCancelsOnBackgroundOutsideSystemPresentment() async throws {
+        for state in [
+            ProximityPresentationState.preparing(profile: .iso180135Edition2DIS2026),
+            .engagementReady([.nfc]),
+            .awaitingRequest(exchange: 1),
+            .reviewRequired(combinedProximityReview()),
+        ] {
+            let session = FakeProximitySession()
+            let client = FakeProximityWalletClient(session: session)
+            let viewModel = ProximityPresentationViewModel(
+                client: client,
+                hostActions: FakeProximityHostActionExecutor()
+            )
+            viewModel.start()
+            await session.emit(state)
+            try await waitUntil { viewModel.sessionState == state }
+            session.presentment.setActive(true)
+            viewModel.handleLifecycleInterruption()
+            let actions = await session.actions
+            XCTAssertEqual(actions, [])
+            session.presentment.setActive(false)
+            viewModel.handleLifecycleInterruption()
+            try await waitUntilAsync { await session.actions == [.cancel] }
+            viewModel.dismiss()
+            try await waitUntilAsync { await session.closeCount == 1 }
+        }
     }
 
     @MainActor
@@ -321,7 +373,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         viewModel.start()
         try await waitUntil { client.startCount == 1 }
         let first = try XCTUnwrap(client.lastConfiguration)
-        guard case .nfcOnly(.provisionalV2) = first.engagement else {
+        guard case .provisionalNFCV2 = first.session else {
             return XCTFail("The selected transport profile must be preserved")
         }
         XCTAssertEqual(first.readerPolicy, .requireTrusted)
@@ -335,7 +387,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         viewModel.start()
         try await waitUntil { client.startCount == 2 }
         let second = try XCTUnwrap(client.lastConfiguration)
-        guard case .qrAndNFC(.negotiatedHandover) = second.engagement else {
+        guard case let .nfc(nfc) = second.session, nfc.handover == .negotiatedHandover, nfc.qrFallback != nil else {
             return XCTFail("The next session must use the newly selected transport profile")
         }
         XCTAssertEqual(second.readerPolicy, .allowAnonymousOrUntrusted)
@@ -343,31 +395,28 @@ final class ProximityPresentationViewModelTests: XCTestCase {
 
     func testNativeProfilesResolveToTheSameTransportConfigurationsAsCompose() throws {
         let defaultConfiguration = WalletDemoProximityTransportProfile.defaultProfile.configuration
-        guard case .qrAndNFC(.negotiatedHandover) = defaultConfiguration.engagement,
-              case let .conventional(defaultRetrieval) = defaultConfiguration.retrieval else {
+        guard case let .nfc(nfc) = defaultConfiguration.session, nfc.handover == .negotiatedHandover, nfc.qrFallback != nil else {
             return XCTFail("The default profile must use negotiated QR/NFC engagement")
         }
-        XCTAssertNotNil(defaultRetrieval.bluetoothLowEnergy)
-        XCTAssertNotNil(defaultRetrieval.nfc)
+        XCTAssertNotNil(nfc.retrieval.bluetoothLowEnergy)
+        XCTAssertNotNil(nfc.retrieval.nfc)
 
         let hybridConfiguration = WalletDemoProximityTransportProfile
             .provisionalNfcV2Hybrid.configuration
-        guard case .nfcOnly(.provisionalV2) = hybridConfiguration.engagement,
-              case let .provisionalNFCV2(hybridRetrieval) = hybridConfiguration.retrieval else {
+        guard case let .provisionalNFCV2(hybridRetrieval) = hybridConfiguration.session else {
             return XCTFail("The hybrid profile must use NFCv2 engagement and retrieval")
         }
         XCTAssertEqual(hybridRetrieval.bluetoothLowEnergy?.roles, .centralClient)
         XCTAssertEqual(hybridRetrieval.bluetoothLowEnergy?.bearerPolicy, .gattOnly)
-        XCTAssertNil(hybridRetrieval.qrNFC)
+        XCTAssertNil(hybridRetrieval.qrFallback)
 
         let directConfiguration = WalletDemoProximityTransportProfile
             .provisionalNfcV2Direct.configuration
-        guard case .nfcOnly(.provisionalV2) = directConfiguration.engagement,
-              case let .provisionalNFCV2(directRetrieval) = directConfiguration.retrieval else {
+        guard case let .provisionalNFCV2(directRetrieval) = directConfiguration.session else {
             return XCTFail("The direct profile must use NFCv2 engagement and retrieval")
         }
         XCTAssertNil(directRetrieval.bluetoothLowEnergy)
-        XCTAssertNil(directRetrieval.qrNFC)
+        XCTAssertNil(directRetrieval.qrFallback)
     }
 
     func testNativeProfilePersistenceUsesStableComposeValuesAndFallsBackSafely() {
@@ -416,7 +465,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         selectedProfile = .provisionalNfcV2Direct
 
         let startedConfiguration = try XCTUnwrap(client.lastConfiguration)
-        guard case .qrAndNFC(.negotiatedHandover) = startedConfiguration.engagement else {
+        guard case let .nfc(nfc) = startedConfiguration.session, nfc.handover == .negotiatedHandover, nfc.qrFallback != nil else {
             return XCTFail("The active session must retain the profile selected at start")
         }
 
@@ -546,9 +595,11 @@ private extension Collection {
 }
 
 private actor FakeProximitySession: DemoProximityPresentationSession {
-    nonisolated let states: AsyncStream<WalletSDK.ProximityState>
-    private let continuation: AsyncStream<WalletSDK.ProximityState>.Continuation
-    private(set) var actions: [WalletSDK.ProximityAction] = []
+    nonisolated let presentment = FakePresentmentState()
+    nonisolated var systemPresentationActive: Bool { presentment.active }
+    nonisolated let states: AsyncStream<ProximityPresentationState>
+    private let continuation: AsyncStream<ProximityPresentationState>.Continuation
+    private(set) var actions: [ProximityPresentationAction] = []
     private(set) var closeCount = 0
 
     init() {
@@ -586,6 +637,7 @@ private final class FakeProximityHostActionExecutor: ProximityHostActionExecutor
 
 private func makeProximityCapabilities(
     bluetoothAvailable: Bool = true,
+    nfcAvailable: Bool = true,
     bluetoothRemediation: [ProximityPresentationRemediationAction] = []
 ) -> ProximityPresentationCapabilities {
     func capability(
@@ -596,20 +648,22 @@ private func makeProximityCapabilities(
         ProximityPresentationTransportCapability(
             implemented: true,
             profilePermitted: true,
-            runtimeAvailable: available,
-            selected: selected,
-            unavailable: available ? nil : ProximityPresentationError(
-                category: .capability,
-                code: "test_unavailable",
-                message: "The selected test capability is unavailable",
-                recoverable: !remediation.isEmpty
+            runtime: !selected ? .notChecked : available ? .available : .unavailable(
+                ProximityPresentationError(
+                    category: .capability,
+                    code: "test_unavailable",
+                    message: "The selected test capability is unavailable",
+                    recovery: remediation.isEmpty ? .none : .retryPrerequisites
+                ),
+                remediationActions: remediation
             ),
-            remediationActions: remediation
+            selected: selected
         )
     }
 
     return ProximityPresentationCapabilities(
         profile: .iso180135Edition2DIS2026,
+        session: WalletDemoProximityTransportProfile.defaultProfile.configuration.session,
         qrEngagement: capability(available: true, selected: true),
         nfcEngagement: capability(available: true, selected: true),
         bluetoothLowEnergy: capability(
@@ -617,7 +671,7 @@ private func makeProximityCapabilities(
             selected: true,
             remediation: bluetoothRemediation
         ),
-        nfcRetrieval: capability(available: true, selected: true),
+        nfcRetrieval: capability(available: nfcAvailable, selected: true),
         nfcV2Retrieval: capability(available: false, selected: false),
         wifiAwareRetrieval: capability(available: false, selected: false)
     )
@@ -643,5 +697,20 @@ private func waitUntilAsync(
     while !(await condition()) {
         if Date() >= deadline { XCTFail("Timed out waiting for condition"); return }
         try await Task.sleep(nanoseconds: 10_000_000)
+    }
+}
+
+private final class FakePresentmentState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    var active: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+    func setActive(_ value: Bool) {
+        lock.lock()
+        self.value = value
+        lock.unlock()
     }
 }

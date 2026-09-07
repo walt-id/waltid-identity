@@ -5,8 +5,9 @@ import UIKit
 import WalletSDK
 
 protocol DemoProximityPresentationSession: Sendable {
-    var states: AsyncStream<ProximityState> { get }
-    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult
+    var systemPresentationActive: Bool { get }
+    var states: AsyncStream<ProximityPresentationState> { get }
+    func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult
     func close() async
 }
 
@@ -53,15 +54,17 @@ final class ProximityPresentationViewModel: ObservableObject {
     private var observationTask: Task<Void, Never>?
     private var hostActionTask: Task<Void, Never>?
     private var pendingConfiguration: ProximityPresentationConfiguration?
-    private var systemNfcPresentationActive = false
     private var sessionGeneration: UInt64 = 0
 
     init(
         client: any ProximityWalletClient,
         configurationProvider: @escaping @MainActor () -> ProximityPresentationConfiguration = {
             .init(
-                engagement: .qrAndNFC(.negotiatedHandover),
-                retrieval: .conventional(.init(nfc: .init()))
+                session: .nfc(.init(
+                    handover: .negotiatedHandover,
+                    retrieval: .init(nfc: .init()),
+                    qrFallback: .init(nfc: .init())
+                ))
             )
         },
         hostActions: (any ProximityHostActionExecutor)? = nil
@@ -104,7 +107,6 @@ final class ProximityPresentationViewModel: ObservableObject {
         sessionGeneration &+= 1
         let generation = sessionGeneration
         let configuration = configurationProvider()
-        systemNfcPresentationActive = configuration.engagement.usesSystemNfcPresentation
         pendingConfiguration = configuration
         checkPrerequisitesAndStart(configuration, generation: generation)
     }
@@ -123,11 +125,9 @@ final class ProximityPresentationViewModel: ObservableObject {
                 )
                 guard active, sessionGeneration == generation else { return }
                 sessionState = .checkingPrerequisites(capabilities)
-                if capabilities.bluetoothLowEnergy.selected,
-                   !capabilities.bluetoothLowEnergy.runtimeAvailable {
+                if !capabilities.mayStart {
                     if !automaticPermissionAttempted,
-                       capabilities.bluetoothLowEnergy.remediationActions
-                           .contains(.requestBluetoothPermission) {
+                       capabilities.remediationActions.contains(.requestBluetoothPermission) {
                         await remediateBeforeSession(
                             .requestBluetoothPermission,
                             configuration: configuration,
@@ -314,7 +314,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         // CardSession presents system UI in a separate full-screen process. That transition can
         // background the host application while HCE is active, so the protocol session must stay
         // alive until CardSession, the reader, the user, or the protocol timeout closes it.
-        guard !systemNfcPresentationActive else { return }
+        guard session?.systemPresentationActive != true else { return }
         guard case .checkingPrerequisites = sessionState else {
             cancel()
             return
@@ -330,7 +330,6 @@ final class ProximityPresentationViewModel: ObservableObject {
         let closing = session
         session = nil
         pendingConfiguration = nil
-        systemNfcPresentationActive = false
         active = false
         sessionState = nil
         selections = []
@@ -390,17 +389,6 @@ final class ProximityPresentationViewModel: ObservableObject {
     private static let demoSessionFailureMessage = String(
         localized: "The in-person presentation could not be started"
     )
-}
-
-private extension ProximityPresentationEngagementConfiguration {
-    var usesSystemNfcPresentation: Bool {
-        switch self {
-        case .qrOnly:
-            return false
-        case .nfcOnly, .qrAndNFC:
-            return true
-        }
-    }
 }
 
 @MainActor
