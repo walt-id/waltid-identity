@@ -15,6 +15,7 @@ class PreparedTransports internal constructor(
     unavailable: Map<ProximityTransportKind, ProximityError>,
 ) {
     private val ownedTransports = transports.toList()
+    private val ownedMethods = ownedTransports.map { it.connectionMethod.snapshot() }
     private val ownedUnavailable = unavailable.toMap()
     val transports: List<PreparedTransport> get() = ownedTransports.toList()
     val unavailable: Map<ProximityTransportKind, ProximityError> get() = ownedUnavailable.toMap()
@@ -25,7 +26,7 @@ class PreparedTransports internal constructor(
         }
     }
 
-    val connectionMethods get() = transports.map { it.connectionMethod }
+    val connectionMethods get() = ownedMethods.map { it.snapshot() }
 }
 
 data class WinningConnection(
