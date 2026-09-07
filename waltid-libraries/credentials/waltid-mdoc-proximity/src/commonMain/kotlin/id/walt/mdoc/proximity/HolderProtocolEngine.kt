@@ -461,7 +461,8 @@ class MdocHolderProtocolEngine(
                 MdocSessionCipher.establishForHolder(eDeviceKey, establishment.eReaderKey.value, transcriptBytes)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (failure: Exception) {
+            } catch (failure: Throwable) {
+                // WebCrypto can reject malformed peer keys with a native JavaScript error.
                 trySendStatus(connection, SessionStatusCode.SESSION_ENCRYPTION_ERROR)
                 throw ProximityException(ProximityError.Security("invalid_reader_key", "Reader session key is invalid"), failure)
             }
