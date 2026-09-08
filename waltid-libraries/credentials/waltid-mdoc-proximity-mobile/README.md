@@ -30,6 +30,10 @@ closes the bearer and reports `ble_receive_overflow`; callbacks after closure ar
 blocking socket operations register cancellation-driven closure before entering native I/O, including
 pending L2CAP connect/accept and active reads/writes.
 
+Successful L2CAP completion keeps the connection open for a one-second drain interval before native
+cleanup, allowing queued response bytes to leave the radio stack. This is a bounded completion grace,
+not a reader acknowledgement. Cancellation and error cleanup remain immediate.
+
 Android applications need the merged manifest permissions plus runtime grants for the selected
 role. Apple applications need `NSBluetoothAlwaysUsageDescription`; the provider uses CoreBluetooth
 on its main queue and does not request authorization itself.

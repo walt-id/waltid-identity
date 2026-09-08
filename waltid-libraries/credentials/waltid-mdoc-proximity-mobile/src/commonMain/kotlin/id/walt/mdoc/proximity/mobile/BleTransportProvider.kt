@@ -24,6 +24,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -379,6 +380,11 @@ private class BleMessageConnection(
                     if (reason == ProximityCloseReason.COMPLETED) {
                         try {
                             withTimeout(BLE_INACTIVITY_TIMEOUT) { raw.finish() }
+                            if (raw.bearer == BleRawBearer.L2CAP) {
+                                // Native stream writes can return with response bytes still queued for
+                                // the radio. Immediate socket/stream closure can discard those bytes.
+                                delay(BLE_L2CAP_COMPLETION_DRAIN_DELAY)
+                            }
                         } catch (_: TimeoutCancellationException) {
                             finalReason = ProximityCloseReason.TIMEOUT
                             throw ProximityException(
@@ -425,6 +431,7 @@ private class BleMessageConnection(
 
     private companion object {
         val BLE_INACTIVITY_TIMEOUT = 30.seconds
+        val BLE_L2CAP_COMPLETION_DRAIN_DELAY = 1.seconds
     }
 }
 
