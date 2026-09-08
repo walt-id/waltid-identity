@@ -640,14 +640,20 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     func testCompatibilityProfilesPreserveEngagementAndNarrowTransfer() {
-        for profile in [WalletDemoProximityTransportProfile.bluetooth] {
+        for profile in [WalletDemoProximityTransportProfile.bluetooth, .wifiAware] {
             guard case .nfc(let session) = profile.configuration.session else { return XCTFail("Expected NFC with QR fallback") }
             XCTAssertEqual(session.handover, .negotiatedHandover)
             XCTAssertEqual(session.retrieval, session.qrFallback)
             XCTAssertNil(session.retrieval.nfc)
             XCTAssertEqual(session.retrieval.bluetoothLowEnergy != nil, profile == .bluetooth)
+            XCTAssertEqual(session.retrieval.wifiAware, profile == .wifiAware)
         }
-
+        guard case .provisionalNFCV2(let nfc) = WalletDemoProximityTransportProfile.provisionalNfcV2WifiAware.configuration.session else {
+            return XCTFail("Expected NFCv2")
+        }
+        XCTAssertTrue(nfc.wifiAware)
+        XCTAssertNil(nfc.bluetoothLowEnergy)
+        XCTAssertNil(nfc.qrFallback)
     }
 
     func testNativeProfilePersistenceUsesStableComposeValuesAndFallsBackSafely() {

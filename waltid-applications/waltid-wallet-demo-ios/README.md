@@ -49,7 +49,7 @@ QR and choices remain hidden until the new profile is ready. Connected exchanges
 keep their configuration. New presentations use the latest preference.
 
 Automatic uses the available reader-compatible routes. Compatibility profiles narrow transfer to
-Bluetooth, or select provisional NFCv2 direct/handover modes. These choices stay in Settings.
+Bluetooth or Wi-Fi Aware, or select provisional NFCv2 direct/handover modes. These choices stay in Settings.
 Device support and permissions are checked at startup; NFCv2 retains its mandatory NFC channel.
 
 **Approval** in Nearby sharing settings stores **Ask each time** (default) or
