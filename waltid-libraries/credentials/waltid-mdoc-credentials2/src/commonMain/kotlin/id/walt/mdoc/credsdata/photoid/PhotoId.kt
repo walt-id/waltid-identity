@@ -118,7 +118,7 @@ data class PhotoId(
 
     override fun toNamespaces(): Map<String, Map<String, Any>> =
         namespacesOf(
-            "org.iso.23220.1" to mapOf(
+            MdocNamespaces.PERSON to mapOf(
                 "family_name" to familyNameUnicode,
                 //"family_name_viz",
                 "given_name" to givenNameUnicode,
@@ -245,7 +245,7 @@ data class PhotoId(
                 "family_name_latin1" to familyNameLatin1,
                 "given_name_latin1" to givenNameLatin1
             ),
-            "org.iso.23220.photoid.1" to mapOf(
+            MdocNamespaces.PHOTO_ID to mapOf(
                 "person_id" to personId,
                 "birth_country" to birthCountry,
                 "birth_state" to birthState,
@@ -310,7 +310,7 @@ data class PhotoId(
                     "age_over_68" to boolean,
 
                     ),
-                "org.iso.23220.photoid.1"
+                MdocNamespaces.PHOTO_ID
             )
 
             MdocsCborSerializer.register(
@@ -336,7 +336,7 @@ data class PhotoId(
                     "age_over_68" to boolean,
 
                     ),
-                "org.iso.23220.1"
+                MdocNamespaces.PERSON
             )
         }
 

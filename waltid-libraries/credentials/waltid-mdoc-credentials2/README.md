@@ -43,6 +43,7 @@ For direct namespace issuance, define this callback and pass
 ```kotlin
 @file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 
+import id.walt.mdoc.encoding.PortraitCaptureDateMapping
 import id.walt.mdoc.encoding.mapPortraitCaptureDate
 import id.walt.mdoc.issuance.MdocIssuer
 import kotlinx.serialization.cbor.CborElement
@@ -50,22 +51,35 @@ import kotlinx.serialization.json.JsonElement
 
 val portraitValueMapping: (String, String, String, JsonElement) -> CborElement? =
     { docType, namespace, elementIdentifier, value ->
-        mapPortraitCaptureDate(namespace, elementIdentifier, value)
-            ?: MdocIssuer.defaultSchemalessMappingFunction(docType, namespace, elementIdentifier, value)
+        when (val portrait = mapPortraitCaptureDate(namespace, elementIdentifier, value)) {
+            PortraitCaptureDateMapping.Omit -> null
+            is PortraitCaptureDateMapping.Mapped -> portrait.value
+            PortraitCaptureDateMapping.NotApplicable ->
+                MdocIssuer.defaultSchemalessMappingFunction(docType, namespace, elementIdentifier, value)
+        }
     }
 ```
 
-This preserves the default mapping for other fields. If your credential needs a custom
+Explicit null returns `Omit` and must not reach the fallback mapper. Absent and null
+portrait fields are omitted; malformed non-null inputs are rejected. This preserves
+the default mapping for other fields. If your credential needs a custom
 or schema-aware mapper, use that as the fallback instead of `defaultSchemalessMappingFunction`.
 
-Shared issuer2 issuance normalizes only the standard
-mDL and Photo ID `portrait_capture_date` fields, including inputs with an existing
-`stringToFullDate` mapping. Stored profiles and pending issuance sessions remain
+Shared issuer2 issuance matches `portrait_capture_date` by namespace and element,
+independently of document type: `org.iso.18013.5.1` and `org.iso.23220.1`, plus the
+existing `org.iso.23220.photoid.1` legacy alias. Reusing these namespaces keeps their
+field encoding; unrelated custom namespaces retain their configured mapping.
+Normalization and null omission take precedence over configured conversions and custom
+mapping callbacks, including an existing `stringToFullDate` or conflicting conversion. Stored profiles and pending issuance sessions remain
 readable and do not require a bulk database or profile rewrite. New profiles should
 use `stringToTDate` and timestamps, as the bundled examples do. Deploy the shared
 issuance library update with each issuer2 server; the compatibility behavior requires that
 code to be present. Other full-date fields, such as `birth_date`, are unchanged.
 This correction does not change the legacy mdoc library or legacy issuer services.
+
+The shared `tdate` formatter requires a four-digit year (`0000`–`9999`) after UTC
+normalization, following RFC 3339. This also applies to MSO validity timestamps and
+schema `DATETIME` values; full-date/tag-1004 encoding is unchanged.
 
 Already signed credentials are not rewritten. Their authoritative issuer-signed
 bytes remain the basis for verification and presentation; an issuer must reissue a

@@ -149,7 +149,7 @@ data class Mdl(
 
     override fun toNamespaces(): Map<String, Map<String, Any>> =
         namespacesOf(
-            "org.iso.18013.5.1" to mapOf(
+            MdocNamespaces.MDL to mapOf(
                 "family_name" to familyName,
                 "given_name" to givenName,
                 "birth_date" to birthDate, // full-date
@@ -235,7 +235,7 @@ data class Mdl(
                     "biometric_template_signature_sign" to ByteArraySerializer(),
                     "biometric_template_iris" to ByteArraySerializer()
                 ),
-                "org.iso.18013.5.1" // The namespace for mDL
+                MdocNamespaces.MDL // The namespace for mDL
             )
 
             // Fallback for issues in mdocs1:
@@ -245,7 +245,7 @@ data class Mdl(
                     "portrait" to ListSerializer(Byte.serializer()),
                     // Dates in DrivingPrivilege are CBOR-tagged 1004 ("full-date"), but it's just a text string
                     "driving_privileges" to ListSerializer(DrivingPrivilege.FallbackDrivingPrivilege.serializer()),
-                ), "org.iso.18013.5.1"
+                ), MdocNamespaces.MDL
             )
         }
     }
@@ -253,7 +253,7 @@ data class Mdl(
 
 @Serializable
 data class MobileDrivingLicenceJwsNamespace(
-    @SerialName("org.iso.18013.5.1")
+    @SerialName(MdocNamespaces.MDL)
     val mdl: Mdl,
 )
 

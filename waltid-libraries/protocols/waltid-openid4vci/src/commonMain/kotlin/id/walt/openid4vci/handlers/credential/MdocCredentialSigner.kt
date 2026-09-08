@@ -14,6 +14,7 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.mdoc.dataelement.DataElement as LegacyMdocDataElement
 import id.walt.mdoc.encoding.mapPortraitCaptureDate
+import id.walt.mdoc.encoding.PortraitCaptureDateMapping
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.Status
@@ -143,14 +144,17 @@ object MdocCredentialSigner {
 
         val effectiveValueMappingFunction =
             { docTypeValue: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement ->
-                mapPortraitCaptureDate(namespace, elementIdentifier, elementValueJson)
-                    ?: mDocNameSpacesDataMappingConfig
-                    ?.get(namespace)
-                    ?.entriesConfigMap
-                    ?.get(elementIdentifier)
-                    ?.executeMapping(elementValueJson)
-                    ?.toKotlinxCborElement()
-                    ?: valueMappingFunction(docTypeValue, namespace, elementIdentifier, elementValueJson)
+                when (val portrait = mapPortraitCaptureDate(namespace, elementIdentifier, elementValueJson)) {
+                    PortraitCaptureDateMapping.Omit -> null
+                    is PortraitCaptureDateMapping.Mapped -> portrait.value
+                    PortraitCaptureDateMapping.NotApplicable -> mDocNameSpacesDataMappingConfig
+                        ?.get(namespace)
+                        ?.entriesConfigMap
+                        ?.get(elementIdentifier)
+                        ?.executeMapping(elementValueJson)
+                        ?.toKotlinxCborElement()
+                        ?: valueMappingFunction(docTypeValue, namespace, elementIdentifier, elementValueJson)
+                }
             }
 
         val issuanceData = MdocIssuer.MdocUniversalIssuanceData(namespaces)

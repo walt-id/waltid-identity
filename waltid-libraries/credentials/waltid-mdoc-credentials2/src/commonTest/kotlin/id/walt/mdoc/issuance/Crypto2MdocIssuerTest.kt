@@ -18,6 +18,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.credsdata.DrivingPrivilege
 import id.walt.mdoc.credsdata.Mdl
 import id.walt.mdoc.encoding.mapPortraitCaptureDate
+import id.walt.mdoc.encoding.PortraitCaptureDateMapping
 import id.walt.mdoc.crypto.MdocCrypto.getSharedSecret
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
@@ -30,6 +31,7 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonNull
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -120,8 +122,9 @@ class Crypto2MdocIssuerTest {
 
         // Direct namespace issuance requires the explicit callback documented in the README.
         for ((input, expected) in listOf(
-            "2024-02-29" to "2024-02-29T00:00:00Z",
-            "2024-02-29T13:34:56.987+01:00" to "2024-02-29T12:34:56Z",
+            JsonPrimitive("2024-02-29") to "2024-02-29T00:00:00Z",
+            JsonPrimitive("2024-02-29T13:34:56.987+01:00") to "2024-02-29T12:34:56Z",
+            JsonNull to null,
         )) {
             val namespaceIssued = MdocIssuer.issueUniversal(
                 issuerKey = issuerKey,
@@ -131,23 +134,31 @@ class Crypto2MdocIssuerTest {
                 docType = "org.iso.18013.5.1.mDL",
                 data = MdocIssuer.MdocUniversalIssuanceData(mapOf(
                     "org.iso.18013.5.1" to JsonObject(mapOf(
-                        "portrait_capture_date" to JsonPrimitive(input),
+                        "portrait_capture_date" to input,
                         "birth_date" to JsonPrimitive("2000-01-01"),
                     )),
                 )),
                 valueMappingFunction = { docType, namespace, elementIdentifier, value ->
-                    mapPortraitCaptureDate(namespace, elementIdentifier, value)
-                        ?: MdocIssuer.defaultSchemalessMappingFunction(docType, namespace, elementIdentifier, value)
+                    when (val portrait = mapPortraitCaptureDate(namespace, elementIdentifier, value)) {
+                        PortraitCaptureDateMapping.NotApplicable ->
+                            MdocIssuer.defaultSchemalessMappingFunction(docType, namespace, elementIdentifier, value)
+                        PortraitCaptureDateMapping.Omit -> null
+                        is PortraitCaptureDateMapping.Mapped -> portrait.value
+                    }
                 },
             )
             val roundTripped = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(coseCompliantCbor.encodeToByteArray(namespaceIssued))
             assertTrue(roundTripped.issuerAuth.verify(issuerKey, Cose.Algorithm.ES256))
             val items = roundTripped.namespaces!!.getValue("org.iso.18013.5.1").entries
                 .associate { it.value.elementIdentifier to it.value.elementValue }
-            assertContentEquals(
-                byteArrayOf(0xc0.toByte(), 0x74) + expected.encodeToByteArray(),
-                coseCompliantCbor.encodeToByteArray(CborElement.serializer(), items.getValue("portrait_capture_date")),
-            )
+            if (expected == null) {
+                assertTrue("portrait_capture_date" !in items)
+            } else {
+                assertContentEquals(
+                    byteArrayOf(0xc0.toByte(), 0x74) + expected.encodeToByteArray(),
+                    coseCompliantCbor.encodeToByteArray(CborElement.serializer(), items.getValue("portrait_capture_date")),
+                )
+            }
             assertContentEquals(
                 byteArrayOf(0xd9.toByte(), 0x03, 0xec.toByte(), 0x6a) + "2000-01-01".encodeToByteArray(),
                 coseCompliantCbor.encodeToByteArray(CborElement.serializer(), items.getValue("birth_date")),

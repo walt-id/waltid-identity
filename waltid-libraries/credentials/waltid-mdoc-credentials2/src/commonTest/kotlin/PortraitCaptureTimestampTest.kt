@@ -3,6 +3,7 @@
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.credsdata.Mdl
 import id.walt.mdoc.credsdata.PhotoId
+import id.walt.mdoc.encoding.PortraitCaptureTimestampSerializer
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.cbor.CborElement
@@ -94,6 +95,9 @@ class PortraitCaptureTimestampTest {
         PhotoId.registerSerializationTypes()
         for (namespace in listOf("org.iso.18013.5.1", "org.iso.23220.1", "org.iso.23220.photoid.1")) {
             val serializer = assertNotNull(MdocsCborSerializer.lookupSerializer(namespace, "portrait_capture_date"), namespace)
+            assertEquals("\"2024-02-29T00:00:00Z\"", Json.encodeToString(PortraitCaptureTimestampSerializer, capture))
+            assertEquals("\"2024-02-29T12:34:56Z\"", Json.encodeToString(PortraitCaptureTimestampSerializer, Instant.parse("2024-02-29T13:34:56.987+01:00")))
+            assertFailsWith<IllegalArgumentException> { Json.encodeToString(PortraitCaptureTimestampSerializer, "2024-02-29") }
             assertEquals(capture, Json.decodeFromString(serializer, "\"2024-02-29\""))
             assertEquals(Instant.parse("2024-02-29T12:34:56Z"), Json.decodeFromString(serializer, "\"2024-02-29T12:34:56Z\""))
         }
