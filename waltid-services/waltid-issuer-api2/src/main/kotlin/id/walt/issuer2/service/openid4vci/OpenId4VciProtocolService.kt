@@ -1420,7 +1420,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
     private fun IssuanceSession.isActiveAuthorizationCodeSession(): Boolean =
         authenticationMethod == AuthenticationMethod.AUTHORIZED &&
-            status == IssuanceSessionStatus.ACTIVE &&
+            status in setOf(IssuanceSessionStatus.ACTIVE, IssuanceSessionStatus.SUCCESSFUL) &&
             !isClosed &&
             expiresAt > Clock.System.now()
 
