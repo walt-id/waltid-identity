@@ -30,11 +30,33 @@ serialization, a date such as `2018-08-09` becomes the tag-0 timestamp
 legacy date-only inputs, not a recovered capture time or a server-local time zone.
 Null model properties remain omitted.
 
-For a known capture time, supply the full timestamp through namespace-based issuance
-or server credential data. The legacy `LocalDate` models cannot retain a time of day
-and reject non-midnight timestamp input instead of silently discarding it. Namespace
-readers accept both legacy dates and full timestamps; timestamp issuance normalizes
-offsets to UTC and truncates fractional seconds to whole-second precision.
+For a known capture time, supply the full timestamp through issuer2 credential data
+or use the explicit mapping callback below with `MdocIssuer.issueUniversal`. Its default
+schemaless mapper emits timestamp strings without CBOR tag 0. The legacy `LocalDate`
+models cannot retain a time of day and reject non-midnight timestamp input instead of
+silently discarding it. Namespace readers accept both legacy dates and full timestamps.
+The portrait mapping normalizes offsets to UTC and truncates fractional seconds.
+
+For direct namespace issuance, define this callback and pass
+`valueMappingFunction = portraitValueMapping` to `MdocIssuer.issueUniversal`:
+
+```kotlin
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
+import id.walt.mdoc.encoding.mapPortraitCaptureDate
+import id.walt.mdoc.issuance.MdocIssuer
+import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.json.JsonElement
+
+val portraitValueMapping: (String, String, String, JsonElement) -> CborElement? =
+    { docType, namespace, elementIdentifier, value ->
+        mapPortraitCaptureDate(namespace, elementIdentifier, value)
+            ?: MdocIssuer.defaultSchemalessMappingFunction(docType, namespace, elementIdentifier, value)
+    }
+```
+
+This preserves the default mapping for other fields. If your credential needs a custom
+or schema-aware mapper, use that as the fallback instead of `defaultSchemalessMappingFunction`.
 
 Shared issuer2 issuance normalizes only the standard
 mDL and Photo ID `portrait_capture_date` fields, including inputs with an existing
@@ -47,9 +69,7 @@ This correction does not change the legacy mdoc library or legacy issuer service
 
 Already signed credentials are not rewritten. Their authoritative issuer-signed
 bytes remain the basis for verification and presentation; an issuer must reissue a
-credential if its existing portrait field needs correction. Custom value-mapping
-callbacks passed directly to `MdocIssuer.issueUniversal` remain responsible for
-encoding their supplied timestamp as tag 0.
+credential if its existing portrait field needs correction.
 
 ## What is the mdoc library
 This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://www.iso.org/standard/69084.html), Personal identification -- ISO-compliant driving licence -- Part 5: Mobile driving licence (mDL) application.

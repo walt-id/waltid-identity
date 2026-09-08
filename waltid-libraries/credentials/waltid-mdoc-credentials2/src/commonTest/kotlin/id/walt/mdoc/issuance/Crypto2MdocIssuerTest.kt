@@ -17,6 +17,7 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.credsdata.DrivingPrivilege
 import id.walt.mdoc.credsdata.Mdl
+import id.walt.mdoc.encoding.mapPortraitCaptureDate
 import id.walt.mdoc.crypto.MdocCrypto.getSharedSecret
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
@@ -116,6 +117,42 @@ class Crypto2MdocIssuerTest {
             coseCompliantCbor.encodeToByteArray(CborElement.serializer(), portraitTimestamp.elementValue),
         )
         assertTrue(decoded.issuerAuth.verify(issuerKey, Cose.Algorithm.ES256))
+
+        // Direct namespace issuance requires the explicit callback documented in the README.
+        for ((input, expected) in listOf(
+            "2024-02-29" to "2024-02-29T00:00:00Z",
+            "2024-02-29T13:34:56.987+01:00" to "2024-02-29T12:34:56Z",
+        )) {
+            val namespaceIssued = MdocIssuer.issueUniversal(
+                issuerKey = issuerKey,
+                signatureAlgorithm = Cose.Algorithm.ES256,
+                issuerCertificate = listOf(CoseCertificate(certificate.encodedDer.toByteArray())),
+                holderKey = holderCoseKey,
+                docType = "org.iso.18013.5.1.mDL",
+                data = MdocIssuer.MdocUniversalIssuanceData(mapOf(
+                    "org.iso.18013.5.1" to JsonObject(mapOf(
+                        "portrait_capture_date" to JsonPrimitive(input),
+                        "birth_date" to JsonPrimitive("2000-01-01"),
+                    )),
+                )),
+                valueMappingFunction = { docType, namespace, elementIdentifier, value ->
+                    mapPortraitCaptureDate(namespace, elementIdentifier, value)
+                        ?: MdocIssuer.defaultSchemalessMappingFunction(docType, namespace, elementIdentifier, value)
+                },
+            )
+            val roundTripped = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(coseCompliantCbor.encodeToByteArray(namespaceIssued))
+            assertTrue(roundTripped.issuerAuth.verify(issuerKey, Cose.Algorithm.ES256))
+            val items = roundTripped.namespaces!!.getValue("org.iso.18013.5.1").entries
+                .associate { it.value.elementIdentifier to it.value.elementValue }
+            assertContentEquals(
+                byteArrayOf(0xc0.toByte(), 0x74) + expected.encodeToByteArray(),
+                coseCompliantCbor.encodeToByteArray(CborElement.serializer(), items.getValue("portrait_capture_date")),
+            )
+            assertContentEquals(
+                byteArrayOf(0xd9.toByte(), 0x03, 0xec.toByte(), 0x6a) + "2000-01-01".encodeToByteArray(),
+                coseCompliantCbor.encodeToByteArray(CborElement.serializer(), items.getValue("birth_date")),
+            )
+        }
     }
 
     @Test
