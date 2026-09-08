@@ -132,6 +132,10 @@ val conformanceTruststorePath = providers.environmentVariable("CONFORMANCE_TRUST
 val conformanceTruststorePassword = providers.environmentVariable("CONFORMANCE_TRUSTSTORE_PASSWORD")
     .orElse("changeit")
 
+val skipLiveConformance = (
+    (findProperty("skipLiveConformance") as String?) ?: System.getenv("SKIP_LIVE_CONFORMANCE")
+).equals("true", ignoreCase = true)
+
 // The committed truststore matches the docker-compose flow, where
 // run-issuer-conformance-local.sh generates its own nginx certificate and imports it.
 // A devenv-based suite instead terminates TLS with an mkcert certificate, whose root CA lives at
@@ -204,6 +208,18 @@ tasks.withType<Test>().configureEach {
     ((findProperty("conformance.wallet.variants") as String?)
         ?: System.getProperty("conformance.wallet.variants"))
         ?.let { systemProperty("conformance.wallet.variants", it) }
+    if (skipLiveConformance) {
+        filter {
+            isFailOnNoMatchingTests = false
+            excludeTestsMatching("id.walt.openid4vp.conformance.ConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.IssuerConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.VerifierConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.VciWalletConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.VpWalletConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.WalletPresentConformanceTests*")
+            excludeTestsMatching("id.walt.openid4vp.conformance.IsolatedWalletConformanceTest*")
+        }
+    }
 }
 
 fun selectedPlaywrightBrowser(): String = when (

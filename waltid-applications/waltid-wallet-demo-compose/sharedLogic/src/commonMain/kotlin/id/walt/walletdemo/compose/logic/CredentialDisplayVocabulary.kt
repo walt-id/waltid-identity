@@ -282,6 +282,9 @@ internal object CredentialDisplayVocabulary {
     fun hasRole(path: ClaimPath, role: ClaimRole): Boolean =
         role in roles(path = path)
 
+    fun hasLeafDescriptor(path: ClaimPath): Boolean =
+        descriptorFor(path.leaf) != null
+
     fun isGenericCredentialType(value: String): Boolean =
         CredentialTypeIdentifier.token(value)?.equals(GenericVerifiableCredentialType, ignoreCase = true) == true
 

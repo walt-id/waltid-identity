@@ -9,6 +9,18 @@ inputs:
     description: 'Full path to the Xcode Developer directory to select'
     required: false
     default: ''
+  generate-dokka:
+    description: 'Generate Dokka HTML for the mobile SDK modules'
+    required: false
+    default: 'true'
+  check-snippets:
+    description: 'Run mobile wallet documentation snippet checks'
+    required: false
+    default: 'true'
+  skip-wallet-core-assemble:
+    description: 'Skip WalletCore XCFramework assemble when a restored artifact is already present'
+    required: false
+    default: 'false'
 runs:
   using: "composite"
   steps:
@@ -39,11 +51,13 @@ runs:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
     - name: Check mobile wallet documentation snippets
+      if: ${{ inputs.check-snippets == 'true' }}
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: python3 waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/check-mobile-wallet-doc-snippets.py
 
     - name: Generate mobile SDK API docs
+      if: ${{ inputs.generate-dokka == 'true' }}
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
@@ -57,6 +71,7 @@ runs:
           --warning-mode=summary
 
     - name: Assemble Swift wallet SDK core XCFramework
+      if: ${{ inputs.skip-wallet-core-assemble != 'true' }}
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
