@@ -48,6 +48,11 @@ on:
         description: "JSON array of platform-relevant path patterns"
         required: true
         type: string
+      pr-require-label:
+        description: "If true, pull requests run only when an opt-in label is present"
+        required: false
+        type: boolean
+        default: false
     outputs:
       should-run:
         description: "Whether platform jobs should run"
@@ -80,6 +85,7 @@ jobs:
           PR_HEAD_REPO: ${{ inputs.pr-head-repo }}
           PR_LABELS: ${{ inputs.pr-labels }}
           PR_NUMBER: ${{ inputs.pr-number }}
+          PR_REQUIRE_LABEL: ${{ inputs.pr-require-label }}
           REF: ${{ inputs.ref }}
         shell: bash
         run: |
@@ -153,6 +159,11 @@ jobs:
 
               if [[ "$PR_DRAFT" == "true" ]]; then
                 set_decision false "draft PR without $label_requirement label"
+                exit 0
+              fi
+
+              if [[ "$PR_REQUIRE_LABEL" == "true" ]]; then
+                set_decision false "PR requires $label_requirement label"
                 exit 0
               fi
 

@@ -161,7 +161,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             addedAt: nil,
             credentialDataJSON: """
             {
-              "portrait": "data:image/png;base64,\(Self.onePixelPNGBase64)",
+              "portrait": "data:image/png;base64,\(Self.syntheticPNGBase64)",
               "nationalities": ["AT", "CH"],
               "place_of_birth": {
                 "region": "Vienna",
@@ -203,7 +203,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             {
               "eu.europa.ec.eudi.pid.1": {
                 "portrait": {
-                  "elementValue": \(onePixelPNGByteArrayJSON())
+                  "elementValue": \(syntheticPNGByteArrayJSON())
                 }
               }
             }
@@ -218,8 +218,8 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             return XCTFail("Expected portrait to decode as image")
         }
         XCTAssertEqual(mimeType, "image/png")
-        XCTAssertEqual(byteCount, onePixelPNGData.count)
-        XCTAssertEqual(data, onePixelPNGData)
+        XCTAssertEqual(byteCount, syntheticPNGData.count)
+        XCTAssertEqual(data, syntheticPNGData)
     }
 
     func testRendersSdJwtProtocolDataAsReadableMetadataAndKeepsClaimsGrouped() throws {
@@ -358,7 +358,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   "credentialSubject": {
                     "given_name": "Ada",
                     "family_name": "Lovelace",
-                    "portrait": "data:image/png;base64,\(Self.onePixelPNGBase64)"
+                    "portrait": "data:image/png;base64,\(Self.syntheticPNGBase64)"
                   }
                 }
                 """,
@@ -639,14 +639,14 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             subject: nil,
             format: "mso_mdoc",
             addedAt: nil,
-            credentialDataJSON: #"{"portrait":{"elementValue":\#(onePixelPNGByteArrayJSON())}}"#
+            credentialDataJSON: #"{"portrait":{"elementValue":\#(syntheticPNGByteArrayJSON())}}"#
         )
 
-        XCTAssertEqual(details.cardSummary.portraitData, onePixelPNGData)
+        XCTAssertEqual(details.cardSummary.portraitData, syntheticPNGData)
         XCTAssertEqual(details.cardSummary.portraitMimeType, "image/png")
     }
 
-    func testValidatesDataURIImageBytesBeforeUsingMimeHint() throws {
+    func testUsesDetectedImageTypeInsteadOfDeclaredDataURLType() throws {
         let encodedJSON = try XCTUnwrap(#"{"purpose":"age proof"}"#.data(using: .utf8)?.base64EncodedString())
         let encodedText = try XCTUnwrap("Hello, wallet".data(using: .utf8)?.base64EncodedString())
         let details = CredentialDisplayNormalizer.details(
@@ -660,7 +660,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             {
               "json_note": "data:image/png;base64,\(encodedJSON)",
               "plain_note": "data:image/webp;base64,\(encodedText)",
-              "portrait": "data:image/png;base64,\(Self.onePixelPNGBase64)"
+              "portrait": "data:image/png;base64,\(Self.validPNGBase64)"
             }
             """
         )
@@ -670,6 +670,155 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(claims.first { $0.path.id == "plain_note" }?.value, .decodedText("Hello, wallet"))
         guard case .image(_, _, let mimeType, _) = claims.first(where: { $0.path.id == "portrait" })?.value else {
             return XCTFail("Expected valid PNG data URI to render as an image")
+        }
+        XCTAssertEqual(mimeType, "image/png")
+    }
+
+    func testRendersArbitraryDataImageClaimsForSDJWTAndW3CCredentialsUsingDetectedMimeType() {
+        for format in ["vc+sd-jwt", "dc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"] {
+            let details = CredentialDisplayNormalizer.details(
+                id: "cred-1",
+                title: format,
+                issuer: nil,
+                subject: nil,
+                format: format,
+                addedAt: nil,
+                credentialDataJSON: #"""
+                {
+                  "verification_artifact": "data:image/jpeg;base64,\#(Self.validJPEGBase64)",
+                  "resident_address": {
+                    "visual_proof": "data:image/jpeg;base64,\#(Self.validPNGBase64)"
+                  }
+                }
+                """#
+            )
+
+            let claim = details.groups
+                .flatMap(\.items)
+                .first(where: { $0.path.id == "verification_artifact" })
+            XCTAssertEqual(claim?.label, "Verification artifact")
+            guard case .image(_, let data, let mimeType, _) = claim?.value else {
+                XCTFail("Expected a valid data image claim to render for \(format)")
+                continue
+            }
+            XCTAssertEqual(mimeType, "image/jpeg")
+            XCTAssertEqual(data, Self.validJPEGData)
+
+            guard case .image(_, _, let nestedMimeType, _) = details.groups
+                .flatMap(\.items)
+                .first(where: { $0.path.id == "resident_address.visual_proof" })?.value else {
+                XCTFail("Expected a nested data image claim to render for \(format)")
+                continue
+            }
+            XCTAssertEqual(nestedMimeType, "image/png")
+        }
+    }
+
+    func testExplicitNonImageSchemaAndUnsupportedPayloadsDoNotRenderAsImages() throws {
+        let svg = try XCTUnwrap(
+            #"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/></svg>"#
+                .data(using: .utf8)?.base64EncodedString()
+        )
+        let dataImage = "data:image/png;base64,\(Self.syntheticPNGBase64)"
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "vc+sd-jwt",
+            issuer: nil,
+            subject: nil,
+            format: "vc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "given_name": "\(dataImage)",
+              "invalid_image": "data:image/png;base64,not-base64!",
+              "unsupported_image": "data:image/svg+xml;base64,\(svg)",
+              "non_image_data_url": "data:text/plain;base64,\(Self.syntheticPNGBase64)",
+              "plain_base64": "\(Self.syntheticPNGBase64)"
+            }
+            """
+        )
+
+        let claims = details.groups.flatMap(\.items)
+        for path in ["given_name", "invalid_image", "unsupported_image", "non_image_data_url", "plain_base64"] {
+            guard let value = claims.first(where: { $0.path.id == path })?.value else {
+                XCTFail("Missing claim at \(path)")
+                continue
+            }
+            if case .image = value {
+                XCTFail("Unexpected image rendering at \(path)")
+            }
+        }
+        let invalidImage = claims.first { $0.path.id == "invalid_image" }
+        XCTAssertEqual(invalidImage?.value, .text(CredentialDisplayText.imageUnavailable))
+        XCTAssertTrue(invalidImage?.rawValue?.contains("not-base64!") == true)
+    }
+
+    func testTruncatedImageSignaturesDisplayUnavailableValue() {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "vc+sd-jwt",
+            issuer: nil,
+            subject: nil,
+            format: "vc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "truncated_png": "data:image/png;base64,\(Self.syntheticPNGBase64)",
+              "truncated_jpeg": "data:image/jpeg;base64,\(Self.syntheticJPEGBase64)"
+            }
+            """
+        )
+
+        for claim in details.groups.flatMap(\.items) {
+            XCTAssertEqual(claim.value, .text(CredentialDisplayText.imageUnavailable))
+        }
+    }
+
+    func testOversizedDataImageDisplaysUnavailableValueWithoutDecoding() {
+        var oversizedPNG = Self.validPNGData
+        oversizedPNG.append(Data(count: Self.oversizedImageByteCount - oversizedPNG.count))
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "vc+sd-jwt",
+            issuer: nil,
+            subject: nil,
+            format: "vc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: #"{"visual_proof":"data:image/png;base64,\#(oversizedPNG.base64EncodedString())"}"#
+        )
+
+        guard let claim = details.groups.flatMap(\.items).first else {
+            return XCTFail("Missing oversized image claim")
+        }
+        XCTAssertEqual(claim.value, .text(CredentialDisplayText.imageUnavailable))
+        XCTAssertTrue(claim.rawValue?.contains("data:image/png;base64,") == true)
+    }
+
+    func testRendersArbitraryDataImageRequestedDisclosure() {
+        let option = PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: "credential-1",
+            format: "dc+sd-jwt",
+            issuer: "https://issuer.example",
+            subject: nil,
+            label: "PID",
+            credentialDataJSON: "{}",
+            disclosures: [
+                PresentationDisclosure(
+                    path: #"["$","verification_artifact"]"#,
+                    name: "verification_artifact",
+                    valueJSON: #""data:image/png;base64,\#(Self.validPNGBase64)""#,
+                    displayValue: nil,
+                    selectivelyDisclosable: true,
+                    required: false,
+                    selectable: true
+                )
+            ]
+        )
+
+        let value = CredentialDisplayNormalizer.details(for: option).groups.first?.items.first?.value
+        guard case .image(_, _, let mimeType, _) = value else {
+            return XCTFail("Expected the requested data image disclosure to render")
         }
         XCTAssertEqual(mimeType, "image/png")
     }
@@ -701,7 +850,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 PresentationDisclosure(
                     path: #"["eu.europa.ec.eudi.pid.1","portrait"]"#,
                     name: "portrait",
-                    valueJSON: onePixelPNGByteArrayJSON(),
+                    valueJSON: syntheticPNGByteArrayJSON(),
                     displayValue: nil,
                     selectivelyDisclosable: true,
                     required: false,
@@ -721,7 +870,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             return XCTFail("Expected requested portrait disclosure to render as an image")
         }
         XCTAssertEqual(mimeType, "image/png")
-        XCTAssertEqual(byteCount, onePixelPNGData.count)
+        XCTAssertEqual(byteCount, syntheticPNGData.count)
 
         let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
         XCTAssertEqual(personal.items.map(\.label), ["Given name", "Family name"])
@@ -804,7 +953,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             {
               "org.iso.18013.5.1": {
                 "signature_usual_mark": {
-                  "elementValue": \(onePixelPNGByteArrayJSON())
+                  "elementValue": \(syntheticPNGByteArrayJSON())
                 }
               }
             }
@@ -823,7 +972,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     }
 
     func testRecognizesStandardMdocBiometricImageBytes() throws {
-        let imageBytes = onePixelPNGByteArrayJSON()
+        let imageBytes = syntheticPNGByteArrayJSON()
         let details = CredentialDisplayNormalizer.details(
             id: "credential-1",
             title: "Mobile driving licence",
@@ -1071,16 +1220,39 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.cardSummary.title, "Personal ID")
     }
 
-    private func onePixelPNGByteArrayJSON() -> String {
-        "[" + onePixelPNGData.map { String($0) }.joined(separator: ",") + "]"
+    private func syntheticPNGByteArrayJSON() -> String {
+        "[" + syntheticPNGData.map { String($0) }.joined(separator: ",") + "]"
     }
 
-    private var onePixelPNGData: Data {
-        Data(base64Encoded: Self.onePixelPNGBase64)!
+    private var syntheticPNGData: Data {
+        Self.syntheticPNGBytes
     }
 
-    private static let onePixelPNGBase64 =
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+    private static let syntheticPNGBytes = Data([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+    ])
+    private static let syntheticJPEGData = Data([
+        0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46,
+    ])
+    private static let syntheticPNGBase64 = syntheticPNGBytes.base64EncodedString()
+    private static let syntheticJPEGBase64 = syntheticJPEGData.base64EncodedString()
+    private static let validPNGData = fixtureData(named: "synthetic-signature", extension: "png")
+    private static let validJPEGData = fixtureData(named: "synthetic-verification-document", extension: "jpg")
+    private static let validPNGBase64 = validPNGData.base64EncodedString()
+    private static let validJPEGBase64 = validJPEGData.base64EncodedString()
+    private static let oversizedImageByteCount = 2_000_001
+
+    private static func fixtureData(named name: String, extension fileExtension: String) -> Data {
+        guard let url = Bundle(for: CredentialDisplayNormalizerTests.self)
+            .url(forResource: name, withExtension: fileExtension) else {
+            preconditionFailure("Missing synthetic image fixture: \(name).\(fileExtension)")
+        }
+        do {
+            return try Data(contentsOf: url)
+        } catch {
+            preconditionFailure("Cannot load synthetic image fixture: \(error)")
+        }
+    }
 
     private static let isoDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
