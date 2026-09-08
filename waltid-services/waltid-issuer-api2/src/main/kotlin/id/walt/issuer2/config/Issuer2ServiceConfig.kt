@@ -17,6 +17,7 @@ data class Issuer2ServiceConfig(
     val clientAuthenticationConfig: ClientAuthenticationConfig? = null,
     /** Preferred encoded crypto2 StoredKey. Invalid or mismatched values fail startup. */
     val ciTokenStoredKey: String? = null,
+    val walletNotificationEndpointEnabled: Boolean = true,
 ) : WaltConfig() {
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(
@@ -26,12 +27,13 @@ data class Issuer2ServiceConfig(
         enforcePushedAuthorizationRequests: Boolean,
         clientAuthenticationConfig: ClientAuthenticationConfig?,
     ) : this(
-        baseUrl,
-        ciTokenKey,
-        credentialEncryptionKey,
-        enforcePushedAuthorizationRequests,
-        clientAuthenticationConfig,
-        null,
+        baseUrl = baseUrl,
+        ciTokenKey = ciTokenKey,
+        credentialEncryptionKey = credentialEncryptionKey,
+        enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
+        clientAuthenticationConfig = clientAuthenticationConfig,
+        ciTokenStoredKey = null,
+        walletNotificationEndpointEnabled = true,
     )
 
     init {

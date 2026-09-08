@@ -44,6 +44,8 @@ class MetadataService(
     private val enforcePushedAuthorizationRequests = serviceConfig.enforcePushedAuthorizationRequests
     private val supportsClientAttestation = serviceConfig.clientAttestationConfig() != null
 
+    private val notificationEndpointPath = "/notification".takeIf { serviceConfig.walletNotificationEndpointEnabled }
+
     private val issuerDisplay: List<IssuerDisplay>? =
         metadataConfig.issuerDisplay
             ?.map { json.decodeFromJsonElement(IssuerDisplay.serializer(), it) }
@@ -62,6 +64,7 @@ class MetadataService(
                 credentialConfigurationsSupported = credentialConfigurations,
                 credentialRequestEncryption = credentialRequestEncryption,
                 display = issuerDisplay,
+                notificationEndpointPath = notificationEndpointPath
             )
         }
 
@@ -127,6 +130,8 @@ class MetadataService(
     }
 
     fun issuerBaseUrl(): String = baseUrl
+
+    fun walletNotificationEndpointEnabled(): Boolean = notificationEndpointPath != null
 
     /**
      * Publishes the public halves of every key this issuer signs with, per RFC 8414 `jwks_uri`.

@@ -1,9 +1,11 @@
 package id.walt.issuer2.controller.openapi
 
 import id.walt.openid4vci.errors.CredentialError
+import id.walt.openid4vci.errors.NotificationError
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.ContentType
@@ -235,6 +237,36 @@ object OpenId4VciRoutesDocs {
             HttpStatusCode.InternalServerError to {
                 description = "Nonce generation failed"
                 body<OAuthError>()
+            }
+        }
+    }
+
+    fun notification(): RouteConfig.() -> Unit = {
+        summary = "Notification endpoint"
+        description = "The notification endpoint is used by the Wallet to notify certain events for issued Credentials."
+        request {
+            headerParameter<String>("Authorization") {
+                required = true
+                description = "Bearer or DPoP access-token authorization"
+            }
+            headerParameter<String>("DPoP") {
+                required = false
+                description = "Required when presenting a DPoP-bound access token"
+            }
+            body<DefaultNotificationRequest> {
+                mediaTypes(ContentType.Application.Json)
+            }
+        }
+        response {
+            HttpStatusCode.NoContent to {
+                description = "Notification response"
+            }
+            HttpStatusCode.BadRequest to {
+                description = "Invalid notification request"
+                body<NotificationError>()
+            }
+            HttpStatusCode.Unauthorized to {
+                description = "Client authentication failed"
             }
         }
     }
