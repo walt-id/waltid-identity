@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -255,82 +256,71 @@ private fun ProximityPresentationSettings(
     selected: WalletDemoProximityTransportProfile,
     onSelect: (WalletDemoProximityTransportProfile) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(WalletUiTestTags.SettingsProximityPresentation),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    var choosing by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextButton(
+            onClick = { choosing = true },
+            modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.SettingsProximityPresentation),
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Nearby sharing", modifier = Modifier.weight(1f))
+                Text(selected.title(), modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+            }
+        }
         Text(
-            "Proximity Presentation",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            "Choose the transport profile for the next in-person presentation session.",
+            "Applies to your next presentation.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        ProximityTransportProfileChoice(
-            profile = WalletDemoProximityTransportProfile.Default,
-            selected = selected,
-            title = "Default (QR + conventional NFC)",
-            description = "Production default with negotiated QR/NFC engagement and conventional retrieval.",
-            testTag = WalletUiTestTags.SettingsProximityDefault,
-            onSelect = onSelect,
-        )
-        ProximityTransportProfileChoice(
-            profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid,
-            selected = selected,
-            title = "NFCv2 hybrid (provisional)",
-            description = "Starts over NFCv2 and transfers the session over Bluetooth LE.",
-            testTag = WalletUiTestTags.SettingsProximityNfcV2Hybrid,
-            onSelect = onSelect,
-        )
-        ProximityTransportProfileChoice(
-            profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct,
-            selected = selected,
-            title = "NFCv2 direct (provisional)",
-            description = "Keeps engagement and encrypted session messages on NFCv2.",
-            testTag = WalletUiTestTags.SettingsProximityNfcV2Direct,
-            onSelect = onSelect,
-        )
-        Text(
-            "Availability is checked before engagement. The active session keeps its starting profile.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+    }
+    if (choosing) {
+        AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text("Nearby sharing") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text("Use Automatic unless your reader requires a specific connection.")
+                    WalletDemoProximityTransportProfile.entries.forEach { profile ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                onSelect(profile)
+                                choosing = false
+                            }.padding(vertical = 8.dp).testTag(profile.testTag()),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = profile == selected, onClick = null)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(profile.title(), style = MaterialTheme.typography.bodyLarge)
+                                Text(profile.description(), style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosing = false }) { Text("Done") } },
         )
     }
 }
 
-@Composable
-private fun ProximityTransportProfileChoice(
-    profile: WalletDemoProximityTransportProfile,
-    selected: WalletDemoProximityTransportProfile,
-    title: String,
-    description: String,
-    testTag: String,
-    onSelect: (WalletDemoProximityTransportProfile) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(
-            selected = profile == selected,
-            onClick = { onSelect(profile) },
-            modifier = Modifier.testTag(testTag),
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+private fun WalletDemoProximityTransportProfile.title(): String = when (this) {
+    WalletDemoProximityTransportProfile.Default -> "Automatic"
+    WalletDemoProximityTransportProfile.Bluetooth -> "Bluetooth transfer"
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> "NFCv2 + Bluetooth"
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> "NFCv2 direct"
+}
+
+private fun WalletDemoProximityTransportProfile.description(): String = when (this) {
+    WalletDemoProximityTransportProfile.Default -> "Use available connections supported by the reader."
+    WalletDemoProximityTransportProfile.Bluetooth -> "Start with NFC or QR; transfer over Bluetooth."
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> "Provisional profile. Start with NFCv2; transfer over Bluetooth."
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> "Provisional profile. Keep the connection on NFCv2."
+}
+
+private fun WalletDemoProximityTransportProfile.testTag(): String = when (this) {
+    WalletDemoProximityTransportProfile.Default -> WalletUiTestTags.SettingsProximityDefault
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> WalletUiTestTags.SettingsProximityNfcV2Hybrid
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> WalletUiTestTags.SettingsProximityNfcV2Direct
+    else -> "wallet.settingsProximity$name"
 }
 
 @Composable
