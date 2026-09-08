@@ -50,12 +50,18 @@ class SocketCancellationTest {
         val listener = BlockingResource()
         val accepted = BlockingResource()
         val completed = CountDownLatch(1)
+        val allowCompletion = CountDownLatch(1)
         val owner = BlockingSocket(listener)
         val work = launch {
-            owner.run(disposeResult = { it.close() }) { accepted.also { completed.countDown() } }
+            owner.run(disposeResult = { it.close() }) {
+                assertTrue(allowCompletion.await(5, TimeUnit.SECONDS))
+                accepted.also { completed.countDown() }
+            }
             fail("Cancelled result must not be delivered")
         }
+        // Do not let runCurrent dispatch a successful result before cancellation is requested.
         runCurrent()
+        allowCompletion.countDown()
         assertTrue(completed.await(5, TimeUnit.SECONDS))
         work.cancel()
         work.join()
