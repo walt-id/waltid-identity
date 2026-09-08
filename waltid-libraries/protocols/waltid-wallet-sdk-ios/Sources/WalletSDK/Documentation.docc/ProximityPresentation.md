@@ -62,6 +62,14 @@ let nfcConfiguration = ProximityConfiguration(
 )
 ```
 
+When the user selects a prepared NFC engagement, call
+``ProximityPresentationSession/presentNfc()`` to open the iOS system sheet. The
+request waits for NFC resources without replacing the engagement or session
+keys. Repeated requests during emulation have no effect. Calls outside NFC
+engagement readiness are ignored, and failures arrive through the state stream.
+This explicit action also works when the optional presentment assertion has
+expired or cannot be acquired during its cooldown.
+
 On iOS, the SDK installs its `CardSession` adapter automatically, but the host
 app must also be approved and provisioned by Apple for HCE. The package includes
 `HCE.entitlements.example` as a ready-to-copy template for the three ISO

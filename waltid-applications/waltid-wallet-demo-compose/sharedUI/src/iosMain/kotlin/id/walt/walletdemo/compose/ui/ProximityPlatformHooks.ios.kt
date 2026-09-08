@@ -58,39 +58,37 @@ internal actual fun ProximityPlatformSessionEffect(
     onInterrupted: () -> Unit,
 ) {
     val currentOnInterrupted = rememberUpdatedState(onInterrupted)
-    DisposableEffect(active, qrVisible) {
-        if (!active && !qrVisible) return@DisposableEffect onDispose {}
+    DisposableEffect(active) {
+        if (!active) return@DisposableEffect onDispose {}
         val application = UIApplication.sharedApplication
-        val screen = UIScreen.mainScreen
-        var previousIdle: Boolean? = null
-        var previousBrightness: Double? = null
-        fun applyPolicy() {
-            if (active) {
-                if (previousIdle == null) previousIdle = application.idleTimerDisabled
-                application.idleTimerDisabled = true
-            }
-            if (qrVisible) {
-                if (previousBrightness == null) previousBrightness = screen.brightness
-                screen.brightness = 1.0
-            }
+        val previousIdleTimerDisabled = application.idleTimerDisabled
+        application.idleTimerDisabled = true
+        val token = NSNotificationCenter.defaultCenter.addObserverForName(
+            name = UIApplicationDidEnterBackgroundNotification,
+            `object` = null,
+            queue = NSOperationQueue.mainQueue,
+        ) {
+            application.idleTimerDisabled = previousIdleTimerDisabled
+            currentOnInterrupted.value()
         }
-        fun restore() {
-            previousIdle?.let { application.idleTimerDisabled = it }
-            previousBrightness?.let { screen.brightness = it }
-            previousIdle = null
-            previousBrightness = null
-        }
-        applyPolicy()
-        val background = NSNotificationCenter.defaultCenter.addObserverForName(
-            UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue,
-        ) { restore(); currentOnInterrupted.value() }
-        val activation = NSNotificationCenter.defaultCenter.addObserverForName(
-            UIApplicationDidBecomeActiveNotification, null, NSOperationQueue.mainQueue,
-        ) { applyPolicy() }
         onDispose {
-            NSNotificationCenter.defaultCenter.removeObserver(background)
-            NSNotificationCenter.defaultCenter.removeObserver(activation)
-            restore()
+            NSNotificationCenter.defaultCenter.removeObserver(token)
+            application.idleTimerDisabled = previousIdleTimerDisabled
+        }
+    }
+    DisposableEffect(qrVisible) {
+        if (!qrVisible) return@DisposableEffect onDispose {}
+        val screen = UIScreen.mainScreen
+        val previousBrightness = screen.brightness
+        screen.brightness = 1.0
+        val token = NSNotificationCenter.defaultCenter.addObserverForName(
+            name = UIApplicationDidEnterBackgroundNotification,
+            `object` = null,
+            queue = NSOperationQueue.mainQueue,
+        ) { screen.brightness = previousBrightness }
+        onDispose {
+            NSNotificationCenter.defaultCenter.removeObserver(token)
+            screen.brightness = previousBrightness
         }
     }
 }
@@ -141,17 +139,17 @@ private class BluetoothAuthorizationRequester(
     }
 }
 
-private suspend fun openApplicationSettings(): ProximityHostActionResult {
-    val returned = CompletableDeferred<ProximityHostActionResult>()
+private suspend fun openApplicationSettings(): MobileWalletProximityHostActionResult {
+    val returned = CompletableDeferred<MobileWalletProximityHostActionResult>()
     val token = NSNotificationCenter.defaultCenter.addObserverForName(
         UIApplicationDidBecomeActiveNotification, `object` = null, queue = NSOperationQueue.mainQueue,
-    ) { returned.complete(ProximityHostActionResult.Completed) }
+    ) { returned.complete(MobileWalletProximityHostActionResult.Completed) }
     return try {
         val opened = CompletableDeferred<Boolean>()
         UIApplication.sharedApplication.openURL(
             NSURL(string = UIApplicationOpenSettingsURLString), options = emptyMap<Any?, Any?>(),
         ) { opened.complete(it) }
-        if (opened.await()) returned.await() else ProximityHostActionResult.Failed
+        if (opened.await()) returned.await() else MobileWalletProximityHostActionResult.Failed
     } finally {
         NSNotificationCenter.defaultCenter.removeObserver(token)
     }
