@@ -57,11 +57,8 @@ transfer to Bluetooth, or select provisional NFCv2 direct/handover modes. These 
 are kept out of the sharing journey and cannot change an active exchange. Device support and permissions
 are checked at startup; NFCv2 retains its mandatory NFC channel.
 
-The current journey selects Bluetooth Low Energy, conventional NFC, and Wi-Fi Aware as alternative
-retrieval methods; their independent capabilities are available in connection settings. Eligible Android API 33+
-devices may advertise the NCS-SK-128 Wi-Fi Aware holder path after runtime permissions and radio
-resources pass; iOS shows the precise unsupported result while retaining BLE/NFC fallback. The
-journey displays Device Engagement as an accessible QR code and supports per-document credential and element selection,
+The current journey displays Device Engagement as an accessible QR code and retrieves over the
+available Bluetooth Low Energy or NFC method. It supports per-document credential and element selection,
 shows reader-stated purpose and retention intent, and presents authentication scope, signature
 validity, certificate-path, revocation, optional RICAL, and product-trust evidence as separate facts.
 It requests fresh consent for repeated exchanges and restores temporary display changes on every exit
