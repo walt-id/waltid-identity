@@ -21,7 +21,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -275,6 +278,54 @@ class BleTransportProviderTest {
 
         assertEquals("ble_inactivity_timeout", failure.error.code)
         assertEquals(listOf(ProximityCloseReason.TIMEOUT), raw.closeReasons)
+    }
+
+    @Test
+    fun `completed L2CAP connection lets the queued response reach the peer before closing`() = runTest {
+        val platform = FakePlatform()
+        val prepared = provider(BleMdocRoles.CentralClient(centralUuid), platform).prepare(context.copy(maximumMessageBytes = 8_192), this)
+        val delegate = FakeRawConnection(BleRawBearer.L2CAP, null)
+        val delivered = mutableListOf<ByteArray>()
+        val raw = object : BleRawConnection by delegate {
+            override suspend fun write(bytes: ByteArray) {
+                // A native stream write accepts bytes before the radio has delivered them.
+                val queued = bytes.copyOf()
+                launch {
+                    delay(250)
+                    if (delegate.closeReasons.isEmpty()) delivered += queued
+                }
+            }
+        }
+        platform.central.connection.complete(raw)
+        val connection = prepared.awaitConnection()
+        val response = ImmutableBytes.of(ByteArray(4_574) { it.toByte() })
+
+        connection.send(response)
+        connection.close(ProximityCloseReason.COMPLETED)
+        connection.close(ProximityCloseReason.COMPLETED)
+        advanceUntilIdle()
+
+        assertEquals(1, delivered.size, "Closing the native socket must not discard the queued response")
+        assertContentEquals(response.copy(), BleL2capMessageDecoder(8_192).feed(delivered.single()).single().copy())
+        assertEquals(listOf(ProximityCloseReason.COMPLETED), delegate.closeReasons)
+    }
+
+    @Test
+    fun `L2CAP cancellation and failure close immediately`() = runTest {
+        for (reason in listOf(ProximityCloseReason.CANCELLED, ProximityCloseReason.PROTOCOL_ERROR)) {
+            val platform = FakePlatform()
+            val prepared = provider(BleMdocRoles.CentralClient(centralUuid), platform).prepare(context, this)
+            val raw = FakeRawConnection(BleRawBearer.L2CAP, null)
+            platform.central.connection.complete(raw)
+            val connection = prepared.awaitConnection()
+            connection.send(ImmutableBytes.of(byteArrayOf(1)))
+
+            connection.close(reason)
+
+            assertEquals(0, raw.finishCount)
+            assertEquals(0L, testScheduler.currentTime)
+            assertEquals(listOf(reason), raw.closeReasons)
+        }
     }
 
     @Test
