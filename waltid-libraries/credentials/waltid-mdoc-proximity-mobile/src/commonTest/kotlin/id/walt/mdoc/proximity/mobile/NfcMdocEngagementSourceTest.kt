@@ -275,7 +275,7 @@ class NfcMdocEngagementSourceTest {
                 platform.router.deactivate(ProximityCloseReason.PEER_DISCONNECTED)
 
                 val failure = assertFailsWith<ProximityException> { selection.await() }
-                assertEquals("connection_failed", failure.error.code)
+                assertEquals("nfc_retrieval_closed", assertIs<ProximityError.Transport>(failure.error).code)
             }
             prepared.close(ProximityCloseReason.CANCELLED)
         }
