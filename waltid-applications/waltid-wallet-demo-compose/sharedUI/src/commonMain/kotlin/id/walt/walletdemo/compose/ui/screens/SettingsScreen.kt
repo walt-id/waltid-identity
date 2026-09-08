@@ -318,15 +318,19 @@ private fun ProximityPresentationSettings(
 private fun WalletDemoProximityTransportProfile.title(): String = when (this) {
     WalletDemoProximityTransportProfile.Default -> "Automatic"
     WalletDemoProximityTransportProfile.Bluetooth -> "Bluetooth transfer"
+    WalletDemoProximityTransportProfile.WifiAware -> "Wi-Fi Aware transfer"
     WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> "NFCv2 + Bluetooth"
     WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> "NFCv2 direct"
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware -> "NFCv2 + Wi-Fi Aware"
 }
 
 private fun WalletDemoProximityTransportProfile.description(): String = when (this) {
     WalletDemoProximityTransportProfile.Default -> "Use available connections supported by the reader."
     WalletDemoProximityTransportProfile.Bluetooth -> "Start with NFC or QR; transfer over Bluetooth."
+    WalletDemoProximityTransportProfile.WifiAware -> "Start with NFC or QR; requires Wi-Fi Aware on both devices."
     WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> "Provisional profile. Start with NFCv2; transfer over Bluetooth."
     WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> "Provisional profile. Keep the connection on NFCv2."
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware -> "Provisional profile. Start with NFCv2; allow Wi-Fi Aware transfer."
 }
 
 private fun WalletDemoProximityTransportProfile.testTag(): String = when (this) {

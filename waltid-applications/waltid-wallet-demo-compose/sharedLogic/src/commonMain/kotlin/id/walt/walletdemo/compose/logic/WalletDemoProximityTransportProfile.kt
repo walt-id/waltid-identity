@@ -6,8 +6,10 @@ enum class WalletDemoProximityTransportProfile(
 ) {
     Default("default"),
     Bluetooth("bluetooth"),
+    WifiAware("wifi_aware"),
     ProvisionalNfcV2Hybrid("provisional_nfc_v2_hybrid"),
     ProvisionalNfcV2Direct("provisional_nfc_v2_direct"),
+    ProvisionalNfcV2WifiAware("provisional_nfc_v2_wifi_aware"),
     ;
 
     internal companion object {
