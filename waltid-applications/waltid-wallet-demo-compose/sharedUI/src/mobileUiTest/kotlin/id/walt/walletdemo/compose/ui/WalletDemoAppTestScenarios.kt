@@ -1117,6 +1117,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation)
             .performScrollTo()
             .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsProximityNfcV2Direct)
             .performScrollTo()
             .performClick()

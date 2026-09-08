@@ -25,6 +25,7 @@ struct ContentView: UIViewControllerRepresentable {
             keychainAccessGroup: keychainAccessGroup,
             nfcHostPlatformAdapter: nfcHost,
             systemPresentationActive: { KotlinBoolean(bool: nfcHost.isPresenting) },
+            requestNfcPresentment: { Task { await nfcHost.present() } },
             onDigitalCredentialRegistryChanged: onDigitalCredentialRegistryChanged,
             walletId: walletId,
             attestationBaseUrl: attestationBaseUrl,

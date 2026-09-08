@@ -32,14 +32,36 @@ The Android and iOS apps expose a dedicated **Present in person** journey for ho
 proximity presentation. The Wallet SDK remains the source of session, request, reader-authentication,
 trust, disclosure, and terminal-state meaning; the shared Compose UI renders those facts and performs
 only platform-owned permission, settings, lifecycle, screen-awake, and brightness actions.
-Before creating a session, the demo queries the SDK capabilities and automatically requests any
+Before creating a session, the demo queries the SDK capabilities and offers an explicit action for any
 runtime permission required by the selected proximity configuration. A permission that Android no
 longer allows the app to request is shown as an explicit **Open app settings** action; returning from
 Settings rechecks the selected configuration before session creation. Radio, power, and settings
 remediation otherwise remains an explicit user action.
 
-The current journey displays Device Engagement as an accessible QR code and retrieves over the
-available Bluetooth Low Energy method. It supports per-document credential and element selection,
+The sharing screen offers **Hold near the reader** and **Show QR code** only for engagements actually prepared
+by the SDK. A single ready QR method opens directly. On iOS, choosing NFC explicitly opens the system
+presentation sheet, including when NFC is the only available method.
+It does not depend on the optional short-lived presentment assertion. Choosing an already prepared
+engagement preserves the session and payload. Once connecting starts, method controls disappear;
+reader consent remains the focus, and the actual route is available under **Connection details**.
+Completion shows the result and **Done**, without radio controls.
+
+Permission setup explains the required action before opening an OS prompt. Users can skip optional
+setup only when the SDK reports another complete route that can start. Returning from Settings rechecks
+availability; declined permissions are not requested again automatically. QR visibility alone controls
+temporary screen brightness, and the QR is hidden once connecting begins.
+
+**Settings → Credential Sharing → Nearby sharing** stores the connection profile for the next
+presentation. Automatic uses the available reader-compatible routes. Compatibility profiles narrow
+transfer to Bluetooth, or select provisional NFCv2 direct/handover modes. These choices
+are kept out of the sharing journey and cannot change an active exchange. Device support and permissions
+are checked at startup; NFCv2 retains its mandatory NFC channel.
+
+The current journey selects Bluetooth Low Energy, conventional NFC, and Wi-Fi Aware as alternative
+retrieval methods; their independent capabilities are available in connection settings. Eligible Android API 33+
+devices may advertise the NCS-SK-128 Wi-Fi Aware holder path after runtime permissions and radio
+resources pass; iOS shows the precise unsupported result while retaining BLE/NFC fallback. The
+journey displays Device Engagement as an accessible QR code and supports per-document credential and element selection,
 shows reader-stated purpose and retention intent, and presents authentication scope, signature
 validity, certificate-path, revocation, optional RICAL, and product-trust evidence as separate facts.
 It requests fresh consent for repeated exchanges and restores temporary display changes on every exit

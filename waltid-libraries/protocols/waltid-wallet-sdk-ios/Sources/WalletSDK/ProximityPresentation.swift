@@ -957,7 +957,28 @@ public struct ProximityError: Error, Sendable, Equatable {
     /// Display-safe error message.
     public let message: String
     /// Recovery supported by the phase that reported this failure.
-    public let recovery: ProximityRecovery
+    public let recovery: ProximityPresentationRecovery
+    /// Host actions supplied by the SDK for this error.
+    public let remediationActions: [ProximityPresentationRemediationAction]
+
+    /// Creates a display-safe failure with optional host recovery actions.
+    /// - Parameters:
+    ///   - category: Stable failure category.
+    ///   - code: Stable machine-readable error code.
+    ///   - message: Display-safe explanation without raw exception content.
+    ///   - recovery: Whether recovery requires a fresh session.
+    ///   - remediationActions: Host actions that may restore availability.
+    public init(
+        category: ProximityPresentationErrorCategory, code: String, message: String,
+        recovery: ProximityPresentationRecovery,
+        remediationActions: [ProximityPresentationRemediationAction] = []
+    ) {
+        self.category = category
+        self.code = code
+        self.message = message
+        self.recovery = recovery
+        self.remediationActions = remediationActions
+    }
 }
 
 /// Recovery distinguishes an active prerequisite loop from a terminal session.
@@ -1422,12 +1443,54 @@ public enum ProximityState: Sendable, Equatable {
     }
 }
 
+/// Engagement that actually won the reader connection.
+public enum ProximityPresentationEngagementMethod: Sendable, Equatable {
+    /// The reader scanned a QR engagement.
+    case qr
+    /// The reader used NFC engagement.
+    case nfc
+}
+
+/// Bearer carrying the connected session.
+public enum ProximityPresentationTransport: Sendable, Equatable {
+    /// Bluetooth Low Energy carries the session.
+    case bluetoothLowEnergy
+    /// The NFC channel carries the session.
+    case nfc
+    /// Wi-Fi Aware carries the session.
+    case wifiAware
+}
+
+/// Actual route retained through review and termination.
+public struct ProximityPresentationConnectedRoute: Sendable, Equatable {
+    /// Engagement that won the reader connection.
+    public let engagement: ProximityPresentationEngagementMethod
+    /// Bearer carrying the connected session.
+    public let transport: ProximityPresentationTransport
+
+    /// Creates a snapshot of the actual connected route.
+    /// - Parameters:
+    ///   - engagement: Engagement that won the connection.
+    ///   - transport: Actual connected bearer.
+    public init(engagement: ProximityPresentationEngagementMethod, transport: ProximityPresentationTransport) {
+        self.engagement = engagement
+        self.transport = transport
+    }
+}
+
 @available(macOS 10.15, *)
 protocol ProximityPresentationSessionBridge: Sendable {
+    var connectedRoute: ProximityPresentationConnectedRoute? { get }
     var systemPresentationActive: Bool { get }
     var states: AsyncStream<ProximityPresentationState> { get }
+    func presentNfc() async
     func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult
     func close() async
+}
+
+@available(macOS 10.15, *)
+extension ProximityPresentationSessionBridge {
+    var connectedRoute: ProximityPresentationConnectedRoute? { nil }
 }
 
 /// Actor-safe, single-use native facade over one KMP proximity session.
@@ -1438,6 +1501,8 @@ public actor ProximitySession {
     /// Whether this live session currently owns Core NFC's modal emulation UI.
     /// Hosts may preserve the session during the resulting background transition.
     public nonisolated var systemPresentationActive: Bool { bridge.systemPresentationActive }
+    /// Winning route once connected, independent of configured and advertised methods.
+    public nonisolated var connectedRoute: ProximityPresentationConnectedRoute? { bridge.connectedRoute }
     private let bridge: any ProximityPresentationSessionBridge
     private var closed = false
 
@@ -1458,6 +1523,13 @@ public actor ProximitySession {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    /// Opens the iOS NFC sheet after an explicit user choice of a prepared NFC engagement.
+    /// Calls outside NFC engagement readiness are ignored; failures arrive through ``states``.
+    public func presentNfc() async {
+        guard !closed else { return }
+        await bridge.presentNfc()
     }
 
     /// Dispatches one host intent against the current session state.

@@ -16,6 +16,9 @@ struct ProximityPresentationView: View {
                 )
             }
             content
+            if let route = viewModel.connectedRoute {
+                ProximityConnectionDetails(route: route)
+            }
         }
         .accessibilityIdentifier(WalletAccessibilityID.proximityScreen)
     }
@@ -36,14 +39,15 @@ struct ProximityPresentationView: View {
                     capabilities: capabilities,
                     actionInProgress: viewModel.hostActionInProgress,
                     onRetry: viewModel.retryPrerequisites,
+                    onContinueWithAvailableConnection: viewModel.continueWithAvailableConnection,
                     onRemediate: viewModel.remediate
                 )
             case .preparing:
                 ProximityProgressContent(message: String(localized: "Preparing a secure presentation…"))
-            case .engagementReady(let engagements):
-                ProximityEngagementContent(engagements: engagements, connecting: false)
-            case .connecting(let engagements):
-                ProximityEngagementContent(engagements: engagements, connecting: true)
+            case .engagementReady:
+                ProximityEngagementContent(viewModel: viewModel)
+            case .connecting:
+                ProximityProgressContent(message: String(localized: "Connecting to reader…"))
             case .awaitingRequest:
                 ProximityProgressContent(
                     message: String(localized: "Connected. Waiting for the reader's request…")
@@ -95,7 +99,10 @@ struct ProximityPresentationView: View {
                     message: error.message,
                     recoverable: error.recovery == .startNewSession,
                     onRetry: viewModel.restart,
-                    onDismiss: viewModel.dismiss
+                    onDismiss: viewModel.dismiss,
+                    errorCode: error.code,
+                    remediationActions: error.remediationActions,
+                    onRemediate: viewModel.remediate
                 )
             }
         } else {
@@ -108,16 +115,15 @@ private struct ProximityPrerequisiteContent: View {
     let capabilities: ProximityCapabilities
     let actionInProgress: ProximityRemediationAction?
     let onRetry: () -> Void
-    let onRemediate: (ProximityRemediationAction) -> Void
+    let onContinueWithAvailableConnection: () -> Void
+    let onRemediate: (ProximityPresentationRemediationAction) -> Void
 
     var body: some View {
         ReviewMetadataSection(
-            title: capabilities.mayStart
-                ? String(localized: "Device ready")
-                : String(localized: "Action needed")
+            title: primaryAction?.label ?? String(localized: "Action needed")
         ) {
             Text(message)
-            ForEach(Array(capabilities.remediationActions.enumerated()), id: \.offset) { _, action in
+            if let action = primaryAction {
                 Button {
                     onRemediate(action)
                 } label: {
@@ -132,20 +138,31 @@ private struct ProximityPrerequisiteContent: View {
                 .buttonStyle(.bordered)
                 .disabled(actionInProgress != nil)
             }
-            Button("Check again", action: onRetry)
-                .buttonStyle(.borderedProminent)
-                .disabled(actionInProgress != nil)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier(WalletAccessibilityID.proximityRetryButton)
+            if capabilities.mayStart {
+                Button("Continue with available connection", action: onContinueWithAvailableConnection)
+                    .frame(minHeight: 44).disabled(actionInProgress != nil)
+            }
+            if primaryAction == nil {
+                Button("Check again", action: onRetry)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(actionInProgress != nil)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier(WalletAccessibilityID.proximityRetryButton)
+            }
         }
     }
 
+    private var primaryAction: ProximityPresentationRemediationAction? {
+        capabilities.remediationActions.first { $0 != .useSupportedDevice }
+    }
+
     private var message: String {
-        if capabilities.mayStart {
-            return String(localized: "This device is ready for nearby presentation.")
-        }
-        return capabilities.selectedUnavailableMessage
-            ?? String(localized: "Nearby presentation is not available yet.")
+        let selected = [capabilities.nfcEngagement, capabilities.qrEngagement, capabilities.bluetoothLowEnergy,
+            capabilities.nfcRetrieval, capabilities.nfcV2Retrieval, capabilities.wifiAwareRetrieval]
+        if let primaryAction, let error = selected.first(where: {
+            $0.selected && $0.remediationActions.contains(primaryAction)
+        })?.unavailable { return error.message }
+        return capabilities.selectedUnavailableMessage ?? String(localized: "Nearby presentation is not available yet.")
     }
 }
 
@@ -163,62 +180,59 @@ private extension ProximityPresentationCapabilities {
 }
 
 private struct ProximityEngagementContent: View {
-    let engagements: [ProximityEngagement]
-    let connecting: Bool
+    @ObservedObject var viewModel: ProximityPresentationViewModel
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text(title)
-                .font(.title2.bold())
-                .multilineTextAlignment(.center)
-                .accessibilityAddTraits(.isHeader)
-            Text(
-                connecting
-                    ? String(localized: "Keep this screen open while the secure connection is established.")
-                    : guidance
-            )
-            .multilineTextAlignment(.center)
-            if let payload = qrPayload {
-                ProximityQRCode(payload: payload)
-                    .frame(width: 280, height: 280)
-                    .accessibilityIdentifier(WalletAccessibilityID.proximityQRCode)
+        VStack(alignment: .leading, spacing: 20) {
+            if let method = viewModel.displayedEngagement {
+                Text(method == .qr ? String(localized: "Show QR code") : String(localized: "Hold near the reader"))
+                    .font(.title2.bold()).accessibilityAddTraits(.isHeader)
+                Text(method == .qr
+                    ? String(localized: "Let the reader scan this code. Keep both devices nearby. You’ll review the request before sharing.")
+                    : String(localized: "Keep your phone near the reader while it connects. You’ll review the request before sharing."))
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if let payload = viewModel.qrPayload {
+                    ProximityQRCode(payload: payload)
+                        .aspectRatio(1, contentMode: .fit)
+                        .frame(maxWidth: 320)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier(WalletAccessibilityID.proximityQRCode)
+                }
+                if viewModel.engagementChoices.count > 1 {
+                    Button(method == .qr ? String(localized: "Hold near the reader instead") : String(localized: "Show QR code instead")) {
+                        viewModel.showEngagement(method == .qr ? .nfc : .qr)
+                    }
+                    .frame(minHeight: 44)
+                }
+            } else {
+                Text("Share in person").font(.title2.bold()).accessibilityAddTraits(.isHeader)
+                Text("Choose how to connect to the reader.").foregroundStyle(.secondary)
+                ForEach(Array(viewModel.engagementChoices.enumerated()), id: \.offset) { _, method in
+                    Button { viewModel.showEngagement(method) } label: {
+                        HStack(spacing: 16) {
+                            Image(systemName: method == .qr ? "qrcode" : "wave.3.right")
+                                .font(.title2).foregroundStyle(Color.accentColor)
+                                .frame(width: 28).accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(method == .qr ? String(localized: "Show QR code") : String(localized: "Hold near the reader"))
+                                    .font(.headline).foregroundStyle(.primary)
+                                Text(method == .qr ? String(localized: "Let the reader scan your screen.")
+                                    : String(localized: "Bring your phone close to connect."))
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 16).frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier(method == .qr ? "proximity-show-Qr" : "proximity-show-Nfc")
+                    Divider()
+                }
             }
-            if connecting {
-                ProgressView()
-            }
         }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var qrPayload: String? {
-        engagements.compactMap { engagement in
-            guard case .qr(let payload) = engagement else { return nil }
-            return payload
-        }.first
-    }
-
-    private var hasNFC: Bool {
-        engagements.contains { engagement in
-            if case .nfc = engagement { return true }
-            return false
-        }
-    }
-
-    private var title: String {
-        if connecting { return String(localized: "Reader detected") }
-        if qrPayload != nil && hasNFC { return String(localized: "Scan or hold near the reader") }
-        if qrPayload != nil { return String(localized: "Scan with the reader") }
-        return String(localized: "Hold near the reader")
-    }
-
-    private var guidance: String {
-        if qrPayload != nil && hasNFC {
-            return String(localized: "Scan this QR code or hold this iPhone near a compatible reader.")
-        }
-        if qrPayload != nil {
-            return String(localized: "Open a compatible reader and scan this QR code. Keep both devices nearby.")
-        }
-        return String(localized: "Hold this iPhone near a compatible reader and keep this screen open.")
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -586,8 +600,9 @@ private struct ProximityTerminalContent: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        ReviewMetadataSection(title: title) {
-            Text(message)
+        VStack(alignment: .leading, spacing: 16) {
+            Text(title).font(.title2.bold()).accessibilityAddTraits(.isHeader)
+            Text(message).foregroundStyle(.secondary)
             Button("Done", action: onDismiss)
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity)
@@ -601,12 +616,18 @@ private struct ProximityFailureContent: View {
     let recoverable: Bool
     let onRetry: () -> Void
     let onDismiss: () -> Void
+    var errorCode: String? = nil
+    var remediationActions: [ProximityPresentationRemediationAction] = []
+    var onRemediate: (ProximityPresentationRemediationAction) -> Void = { _ in }
 
     var body: some View {
         ReviewMetadataSection(title: String(localized: "Presentation failed")) {
             Text(message)
                 .accessibilityIdentifier(WalletAccessibilityID.proximityError)
-            if recoverable {
+            if let action = remediationActions.first(where: { $0 != .retry && $0 != .useSupportedDevice }) {
+                Button(action.label) { onRemediate(action) }.buttonStyle(.bordered)
+            }
+            if recoverable && remediationActions.allSatisfy({ $0 == .retry || $0 == .useSupportedDevice }) {
                 Button("Try again", action: onRetry)
                     .buttonStyle(.borderedProminent)
                     .frame(maxWidth: .infinity)
@@ -753,6 +774,31 @@ private extension ProximityDeviceAuthenticationMethod {
         switch self {
         case .signature: String(localized: "Device signature")
         case .mac: String(localized: "Device MAC")
+        }
+    }
+}
+
+
+private struct ProximityConnectionDetails: View {
+    let route: ProximityPresentationConnectedRoute
+
+    var body: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Started with: \(route.engagement == .qr ? String(localized: "Show QR code") : String(localized: "Hold near the reader"))")
+                Text("Data connection: \(transport)")
+            }
+            .font(.subheadline).frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text("Connection details").font(.subheadline).frame(minHeight: 44)
+        }
+    }
+
+    private var transport: String {
+        switch route.transport {
+        case .bluetoothLowEnergy: String(localized: "Bluetooth")
+        case .nfc: String(localized: "NFC")
+        case .wifiAware: String(localized: "Wi-Fi Aware")
         }
     }
 }

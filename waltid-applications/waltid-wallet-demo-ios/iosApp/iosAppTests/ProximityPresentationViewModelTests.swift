@@ -50,7 +50,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testStartPreflightsAndRequestsBluetoothBeforeCreatingSession() async throws {
+    func testStartExplainsBluetoothAndWaitsForExplicitActionBeforeCreatingSession() async throws {
         let session = FakeProximitySession()
         let client = FakeProximityWalletClient(
             session: session,
@@ -67,6 +67,10 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let viewModel = ProximityPresentationViewModel(client: client, hostActions: hostActions)
 
         viewModel.start()
+        try await waitUntil { client.capabilityCallCount == 1 }
+        XCTAssertTrue(hostActions.actions.isEmpty)
+        XCTAssertEqual(client.startCount, 0)
+        viewModel.remediate(.requestBluetoothPermission)
         try await waitUntil {
             client.capabilityCallCount == 2 && client.startCount == 1
         }
@@ -100,7 +104,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testViableNfcAndQrFallbackRoutesSkipOptionalBearerRemediation() async throws {
+    func testSelectedBluetoothPermissionIsOfferedOnceEvenWhenNfcCanStart() async throws {
         for capabilities in [
             makeProximityCapabilities(
                 bluetoothAvailable: false,
@@ -113,8 +117,14 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             let hostActions = FakeProximityHostActionExecutor()
             let viewModel = ProximityPresentationViewModel(client: client, hostActions: hostActions)
             viewModel.start()
+            try await waitUntil { client.capabilityCallCount == 1 }
+            if capabilities.remediationActions.contains(.requestBluetoothPermission) {
+                XCTAssertTrue(hostActions.actions.isEmpty)
+                viewModel.remediate(.requestBluetoothPermission)
+            }
             try await waitUntil { client.startCount == 1 }
-            XCTAssertTrue(hostActions.actions.isEmpty)
+            XCTAssertEqual(hostActions.actions, capabilities.remediationActions.contains(.requestBluetoothPermission)
+                ? [.requestBluetoothPermission] : [])
             viewModel.dismiss()
             try await waitUntilAsync { await session.closeCount == 1 }
         }
@@ -419,6 +429,17 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         XCTAssertNil(directRetrieval.qrFallback)
     }
 
+    func testCompatibilityProfilesPreserveEngagementAndNarrowTransfer() {
+        for profile in [WalletDemoProximityTransportProfile.bluetooth] {
+            guard case .nfc(let session) = profile.configuration.session else { return XCTFail("Expected NFC with QR fallback") }
+            XCTAssertEqual(session.handover, .negotiatedHandover)
+            XCTAssertEqual(session.retrieval, session.qrFallback)
+            XCTAssertNil(session.retrieval.nfc)
+            XCTAssertEqual(session.retrieval.bluetoothLowEnergy != nil, profile == .bluetooth)
+        }
+
+    }
+
     func testNativeProfilePersistenceUsesStableComposeValuesAndFallsBackSafely() {
         let suiteName = "id.walt.walletdemo.tests.\(UUID().uuidString)"
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
@@ -473,6 +494,141 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         client.resumeStart()
         try await waitUntilAsync { await session.closeCount == 1 }
     }
+    @MainActor
+    func testPreparedEngagementSelectionKeepsSessionAndControlsQrVisibility() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.engagementReady([.qr(payload: "mdoc:stable"), .nfc]))
+        try await waitUntil { viewModel.engagementChoices.count == 2 }
+        XCTAssertNil(viewModel.displayedEngagement)
+        XCTAssertNil(viewModel.qrPayload)
+        for count in 1...3 {
+            viewModel.showEngagement(.qr)
+            XCTAssertEqual(viewModel.qrPayload, "mdoc:stable")
+            viewModel.showEngagement(.nfc)
+            XCTAssertNil(viewModel.qrPayload)
+            try await waitUntilAsync { await session.presentNfcCalls == count }
+        }
+        XCTAssertEqual(client.startCount, 1)
+        let closeCount = await session.closeCount
+        XCTAssertEqual(closeCount, 0)
+        await session.emit(.engagementReady([.qr(payload: "mdoc:stable")]))
+        try await waitUntil { viewModel.engagementChoices == [.qr] }
+        viewModel.showEngagement(.nfc)
+        XCTAssertEqual(viewModel.displayedEngagement, .qr)
+        XCTAssertEqual(viewModel.qrPayload, "mdoc:stable")
+        viewModel.dismiss()
+        XCTAssertNil(viewModel.qrPayload)
+        XCTAssertNil(viewModel.preferredEngagement)
+    }
+
+    @MainActor
+    func testConnectingAndConsentRejectAllConnectionChanges() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        for state in [ProximityPresentationState.connecting([.qr(payload: "mdoc:stable")]), .reviewRequired(combinedProximityReview())] {
+            await session.emit(state)
+            try await waitUntil { viewModel.sessionState == state }
+            viewModel.showEngagement(.qr)
+            XCTAssertEqual(viewModel.sessionState, state)
+            XCTAssertTrue(viewModel.engagementChoices.isEmpty)
+            XCTAssertNil(viewModel.qrPayload)
+            XCTAssertEqual(client.startCount, 1)
+            let closeCount = await session.closeCount
+            XCTAssertEqual(closeCount, 0)
+        }
+        XCTAssertTrue(viewModel.canApprove)
+        viewModel.dismiss()
+    }
+
+    @MainActor
+    func testOptionalPermissionCanBeSkippedOnlyWithViableAlternative() async throws {
+        for nfcAvailable in [false, true] {
+            let session = FakeProximitySession()
+            let capabilities = makeProximityCapabilities(bluetoothAvailable: false, nfcAvailable: nfcAvailable,
+                bluetoothRemediation: [.requestBluetoothPermission])
+            let client = FakeProximityWalletClient(session: session, capabilityResults: [capabilities])
+            let host = FakeProximityHostActionExecutor()
+            let viewModel = ProximityPresentationViewModel(client: client, hostActions: host)
+            viewModel.start()
+            try await waitUntil { viewModel.capabilities != nil }
+            viewModel.continueWithAvailableConnection()
+            if nfcAvailable { try await waitUntil { client.startCount == 1 } }
+            else { XCTAssertEqual(client.startCount, 0) }
+            XCTAssertTrue(host.actions.isEmpty)
+            viewModel.dismiss()
+        }
+    }
+
+    @MainActor
+    func testRetryWaitsForCleanupBeforeStartingFreshSession() async throws {
+        let session = FakeProximitySession(suspendClose: true)
+        let client = FakeProximityWalletClient(session: session)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        let initialConfiguration = client.lastConfiguration
+        await session.emit(.failed(.init(category: .transport, code: "nfc_failed",
+            message: "Connection failed", recovery: .startNewSession)))
+        try await waitUntil { viewModel.isTerminal }
+        viewModel.restart()
+        try await waitUntilAsync { await session.closeCount == 1 }
+        XCTAssertEqual(client.startCount, 1)
+        XCTAssertNil(viewModel.review)
+        await session.resumeClose()
+        try await waitUntil { client.startCount == 2 }
+        XCTAssertEqual(client.lastConfiguration?.session, initialConfiguration?.session)
+        viewModel.dismiss()
+    }
+
+    @MainActor
+    func testTerminalNfcDenialRetainsGuidanceAndUsesFreshSessionAfterSettings() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let host = FakeProximityHostActionExecutor(suspendAction: true)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: host)
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.failed(.init(category: .capability, code: "nfc_access_not_accepted",
+            message: "NFC access was not accepted", recovery: .startNewSession,
+            remediationActions: [.openApplicationSettings])))
+        try await waitUntil { viewModel.isTerminal }
+        viewModel.remediate(.openApplicationSettings)
+        try await waitUntil { host.actions == [.openApplicationSettings] }
+        let closeCount = await session.closeCount
+        XCTAssertEqual(closeCount, 1)
+        XCTAssertEqual(client.startCount, 1)
+        host.resumeAction()
+        try await waitUntil { client.startCount == 2 }
+        let actions = await session.actions
+        XCTAssertTrue(actions.isEmpty)
+        viewModel.dismiss()
+    }
+
+    @MainActor
+    func testActualConnectedRouteSurvivesSkippedConnectingStateAndCompletion() async throws {
+        let route = ProximityPresentationConnectedRoute(engagement: .nfc, transport: .bluetoothLowEnergy)
+        let session = FakeProximitySession(connectedRoute: route)
+        let client = FakeProximityWalletClient(session: session)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.awaitingRequest(exchange: 1))
+        try await waitUntil { viewModel.connectedRoute == route }
+        await session.emit(.completed(exchanges: 1, declined: false))
+        try await waitUntil { viewModel.isTerminal }
+        XCTAssertEqual(viewModel.connectedRoute, route)
+        viewModel.dismiss()
+        XCTAssertNil(viewModel.connectedRoute)
+    }
+
+
     @MainActor
     func testNoDataIsTerminalAndKeepsFinalExchangeUntilDismissal() async throws {
         let session = FakeProximitySession()
@@ -541,11 +697,13 @@ private func combinedProximityReview(exchange: Int = 1) -> WalletSDK.ProximityRe
         useCases: [],
         applicationAuthorizations: []
     )
+
 }
 
 @MainActor
 private final class FakeProximityWalletClient: ProximityWalletClient {
     private let session: any DemoProximityPresentationSession
+    private let nextSession: (any DemoProximityPresentationSession)?
     private let suspendStart: Bool
     private let capabilityResults: [ProximityPresentationCapabilities]
     private var startContinuation: CheckedContinuation<Void, Never>?
@@ -556,10 +714,12 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
 
     init(
         session: any DemoProximityPresentationSession,
+        nextSession: (any DemoProximityPresentationSession)? = nil,
         suspendStart: Bool = false,
         capabilityResults: [ProximityPresentationCapabilities] = [makeProximityCapabilities()]
     ) {
         self.session = session
+        self.nextSession = nextSession
         self.suspendStart = suspendStart
         self.capabilityResults = capabilityResults
     }
@@ -580,7 +740,7 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
         if suspendStart {
             await withCheckedContinuation { startContinuation = $0 }
         }
-        return session
+        return startCount > 1 ? nextSession ?? session : session
     }
 
     func resumeStart() {
@@ -596,14 +756,22 @@ private extension Collection {
 
 private actor FakeProximitySession: DemoProximityPresentationSession {
     nonisolated let presentment = FakePresentmentState()
+    nonisolated let connectedRoute: ProximityPresentationConnectedRoute?
+    private var suspendClose: Bool
+    private var closeContinuation: CheckedContinuation<Void, Never>?
     nonisolated var systemPresentationActive: Bool { presentment.active }
     nonisolated let states: AsyncStream<ProximityPresentationState>
     private let continuation: AsyncStream<ProximityPresentationState>.Continuation
     private(set) var actions: [ProximityPresentationAction] = []
     private(set) var closeCount = 0
+    private(set) var presentNfcCalls = 0
 
-    init() {
-        var continuation: AsyncStream<WalletSDK.ProximityState>.Continuation!
+    func presentNfc() async { presentNfcCalls += 1 }
+
+    init(suspendClose: Bool = false, connectedRoute: ProximityPresentationConnectedRoute? = nil) {
+        self.suspendClose = suspendClose
+        self.connectedRoute = connectedRoute
+        var continuation: AsyncStream<ProximityPresentationState>.Continuation!
         states = AsyncStream { continuation = $0 }
         self.continuation = continuation
     }
@@ -617,20 +785,40 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
         return .accepted
     }
 
-    func close() {
+    func close() async {
         closeCount += 1
+        if suspendClose { await withCheckedContinuation { closeContinuation = $0 } }
         continuation.finish()
+    }
+
+    func resumeClose() {
+        suspendClose = false
+        let continuation = closeContinuation
+        closeContinuation = nil
+        continuation?.resume()
     }
 }
 
 @MainActor
 private final class FakeProximityHostActionExecutor: ProximityHostActionExecutor {
     private(set) var actions: [ProximityPresentationRemediationAction] = []
+    private var suspendAction: Bool
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    init(suspendAction: Bool = false) { self.suspendAction = suspendAction }
+
+    func resumeAction() {
+        suspendAction = false
+        let pending = continuation
+        continuation = nil
+        pending?.resume()
+    }
 
     func perform(
         _ action: ProximityPresentationRemediationAction
     ) async -> ProximityPresentationHostActionResult {
         actions.append(action)
+        if suspendAction { await withCheckedContinuation { continuation = $0 } }
         return .completed
     }
 }

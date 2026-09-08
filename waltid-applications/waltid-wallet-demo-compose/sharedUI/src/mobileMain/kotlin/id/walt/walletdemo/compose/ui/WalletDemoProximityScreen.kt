@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -48,6 +50,7 @@ import id.walt.wallet2.mobile.ProximityDeviceAuthenticationMethod
 import id.walt.wallet2.mobile.ProximityDocumentReview
 import id.walt.wallet2.mobile.ProximityElementReference
 import id.walt.wallet2.mobile.ProximityEngagement
+import id.walt.wallet2.mobile.ProximityEngagementMethod
 import id.walt.wallet2.mobile.ProximityError
 import id.walt.wallet2.mobile.ProximityReaderAuthentication
 import id.walt.wallet2.mobile.ProximityReaderAuthenticationSummary
@@ -108,7 +111,7 @@ fun MobileWalletDemoApp(
         credentials.associate { credential -> credential.id to credential.toCredentialDetails() }
     }
     val qrVisible = walletState.selectedTab == WalletDemoTab.Present &&
-        proximity.sessionState.engagements().any { it is ProximityEngagement.Qr }
+        proximity.qrVisible
 
     ProximityPlatformSessionEffect(
         active = proximity.active && !proximity.isTerminal,
@@ -121,11 +124,6 @@ fun MobileWalletDemoApp(
     }
     LaunchedEffect(walletState.selectedTab, proximity.active) {
         if (proximity.active && walletState.selectedTab != WalletDemoTab.Present) proximityController.cancel()
-    }
-    LaunchedEffect(proximity.sessionState, proximity.automaticPermissionAction) {
-        proximity.automaticPermissionAction
-            ?.takeIf(hostActions::mayPerformAutomatically)
-            ?.let { proximityController.remediate(it, hostActions.executor) }
     }
     WalletDemoAppHost(
         controller = controller,
@@ -148,6 +146,8 @@ fun MobileWalletDemoApp(
                     onCancel = proximityController::cancel,
                     onDismiss = proximityController::dismiss,
                     onRestart = proximityController::restart,
+                    onShowEngagement = proximityController::showEngagement,
+                    onContinueWithAvailableConnection = proximityController::continueWithAvailableConnection,
                 )
             }
         } else null,
@@ -176,6 +176,8 @@ internal fun WalletDemoProximityScreen(
     onCancel: () -> Unit,
     onDismiss: () -> Unit,
     onRestart: () -> Unit,
+    onShowEngagement: (MobileWalletProximityEngagementMethod) -> Unit = {},
+    onContinueWithAvailableConnection: () -> Unit = {},
 ) {
     val sessionState = state.sessionState
     val terminal = state.isTerminal
@@ -189,7 +191,7 @@ internal fun WalletDemoProximityScreen(
         if (terminal) onDismiss() else onCancel()
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .testTag(WalletUiTestTags.ProximityScreen)
@@ -220,7 +222,7 @@ internal fun WalletDemoProximityScreen(
                     }
                 } else null,
             ) {
-                state.actionError?.let { ProximityErrorCard(it) }
+                state.actionError?.takeUnless { it == (sessionState as? MobileWalletProximityState.Failed)?.error }?.let { ProximityErrorCard(it) }
                 when (sessionState) {
                     null -> ProgressContent(stringResource(Res.string.proximity_checking_device))
                     is ProximityState.CheckingPrerequisites -> PrerequisiteContent(
@@ -228,19 +230,17 @@ internal fun WalletDemoProximityScreen(
                         hostActionInProgress = state.hostActionInProgress,
                         hostActionForDisplay = hostActionForDisplay,
                         onRetry = onRetry,
+                        onContinueWithAvailableConnection = onContinueWithAvailableConnection,
                         onRemediate = { onRemediate(it, hostActions) },
                     )
                     is ProximityState.Preparing ->
                         ProgressContent(stringResource(Res.string.proximity_preparing))
-                    is ProximityState.EngagementReady -> EngagementContent(
-                        engagements = sessionState.engagements,
-                        connecting = false,
+                    is MobileWalletProximityState.EngagementReady -> EngagementContent(
+                        state = state,
+                        onShowEngagement = onShowEngagement,
                     )
-                    is ProximityState.Connecting -> EngagementContent(
-                        engagements = sessionState.engagements,
-                        connecting = true,
-                    )
-                    is ProximityState.AwaitingRequest ->
+                    is MobileWalletProximityState.Connecting -> ProgressContent(stringResource(Res.string.proximity_reader_detected))
+                    is MobileWalletProximityState.AwaitingRequest ->
                         ProgressContent(stringResource(Res.string.proximity_awaiting_request))
                     is ProximityState.ReviewRequired -> Unit
                     is ProximityState.AuthorizingHolderKey ->
@@ -276,10 +276,14 @@ internal fun WalletDemoProximityScreen(
                     )
                     is ProximityState.Failed -> FailedContent(
                         error = sessionState.error,
+                        onRemediate = { onRemediate(it, hostActions) },
+                        hostActionForDisplay = hostActionForDisplay,
+                        actionInProgress = state.hostActionInProgress != null,
                         onDismiss = onDismiss,
                         onRetry = if (sessionState.error.recovery == ProximityRecovery.StartNewSession) onRestart else null,
                     )
                 }
+                state.connectedRoute?.let { ProximityConnectionDetails(it) }
             }
         }
     }
@@ -322,6 +326,7 @@ private fun WalletDemoProximityReview(
             onToggleElement = onToggleElement,
             onContinueAfterResponseChange = onContinueAfterResponseChange,
         )
+        state.connectedRoute?.let { ProximityConnectionDetails(it) }
     }
 }
 
@@ -331,40 +336,35 @@ private fun PrerequisiteContent(
     hostActionInProgress: ProximityRemediationAction?,
     hostActionForDisplay: (ProximityRemediationAction) -> ProximityRemediationAction,
     onRetry: () -> Unit,
-    onRemediate: (ProximityRemediationAction) -> Unit,
+    onContinueWithAvailableConnection: () -> Unit,
+    onRemediate: (MobileWalletProximityRemediationAction) -> Unit,
 ) {
-    ReviewMetadataSection(
-        title = stringResource(
-            if (capabilities.mayStart) Res.string.proximity_device_ready else Res.string.proximity_action_needed
-        )
-    ) {
-        Text(
-            if (capabilities.mayStart) {
-                stringResource(Res.string.proximity_ready_message)
-            } else {
-                capabilities.selectedUnavailableMessage
-                    ?: stringResource(Res.string.proximity_generic_unavailable)
-            }
-        )
-        capabilities.remediationActions.forEach { action ->
-            val displayedAction = hostActionForDisplay(action)
-            OutlinedButton(
-                onClick = { onRemediate(action) },
-                enabled = hostActionInProgress == null,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (hostActionInProgress == action) {
+    val action = capabilities.remediationActions.firstOrNull { it != MobileWalletProximityRemediationAction.UseSupportedDevice }
+    val message = listOf(capabilities.nfcEngagement, capabilities.qrEngagement, capabilities.bluetoothLowEnergy,
+        capabilities.nfcRetrieval, capabilities.nfcV2Retrieval, capabilities.wifiAwareRetrieval)
+        .firstOrNull { it.selected && action in it.remediationActions }?.unavailable?.message
+        ?: capabilities.selectedUnavailableMessage ?: stringResource(Res.string.proximity_generic_unavailable)
+    ReviewMetadataSection(title = action?.let(hostActionForDisplay)?.label() ?: stringResource(Res.string.proximity_action_needed)) {
+        Text(message)
+        if (action != null) {
+            Button(onClick = { onRemediate(action) }, enabled = hostActionInProgress == null, modifier = Modifier.fillMaxWidth()) {
+                if (hostActionInProgress != null) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.size(8.dp))
                 }
-                Text(displayedAction.label())
+                Text(hostActionForDisplay(action).label())
+            }
+        } else {
+            Button(onClick = onRetry, enabled = hostActionInProgress == null,
+                modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityRetry)) {
+                Text(stringResource(Res.string.proximity_check_again))
             }
         }
-        Button(
-            onClick = onRetry,
-            enabled = hostActionInProgress == null,
-            modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityRetry),
-        ) { Text(stringResource(Res.string.proximity_check_again)) }
+        if (capabilities.mayStart) {
+            TextButton(onClick = onContinueWithAvailableConnection, enabled = hostActionInProgress == null) {
+                Text(stringResource(Res.string.proximity_continue_available))
+            }
+        }
     }
 }
 
@@ -380,71 +380,50 @@ private val MobileWalletProximityCapabilities.selectedUnavailableMessage: String
 
 @Composable
 private fun EngagementContent(
-    engagements: List<ProximityEngagement>,
-    connecting: Boolean,
+    state: WalletDemoProximityUiState,
+    onShowEngagement: (MobileWalletProximityEngagementMethod) -> Unit,
 ) {
-    val qr = engagements.filterIsInstance<MobileWalletProximityEngagement.Qr>().singleOrNull()
-    val hasNfc = engagements.any { it is MobileWalletProximityEngagement.Nfc }
+    val method = state.displayedEngagement
+    val choices = state.engagementChoices
+    if (method == null) {
+        Text(stringResource(Res.string.proximity_share_in_person), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(Res.string.proximity_choose_connection))
+        choices.forEach { choice -> ProximityEngagementChoice(choice) { onShowEngagement(choice) } }
+        return
+    }
+    val qr = (state.sessionState as? MobileWalletProximityState.EngagementReady)?.engagements
+        ?.filterIsInstance<MobileWalletProximityEngagement.Qr>()?.singleOrNull()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(
-            if (connecting) {
-                stringResource(Res.string.proximity_reader_detected)
-            } else if (qr != null && hasNfc) {
-                stringResource(Res.string.proximity_reader_scan_or_hold_title)
-            } else if (qr != null) {
-                stringResource(Res.string.proximity_reader_scan_title)
-            } else {
-                stringResource(Res.string.proximity_reader_hold_title)
-            },
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            if (connecting) {
-                stringResource(Res.string.proximity_connecting_guidance)
-            } else if (qr != null && hasNfc) {
-                stringResource(Res.string.proximity_reader_scan_or_hold_guidance)
-            } else if (qr != null) {
-                stringResource(Res.string.proximity_reader_scan_guidance)
-            } else {
-                stringResource(Res.string.proximity_reader_hold_guidance)
-            },
-            textAlign = TextAlign.Center,
-        )
-        qr?.let { engagement ->
-            val qrCode = remember(engagement.payload) {
-                runCatching {
-                    encodeProximityQrCode(engagement.payload)
-                }.getOrNull()
-            }
+        Text(stringResource(if (method == MobileWalletProximityEngagementMethod.Qr)
+            Res.string.proximity_show_qr else Res.string.proximity_reader_hold_title),
+            style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+        Text(stringResource(if (method == MobileWalletProximityEngagementMethod.Qr)
+            Res.string.proximity_qr_instructions else Res.string.proximity_tap_instructions), textAlign = TextAlign.Center)
+        if (method == MobileWalletProximityEngagementMethod.Qr && qr != null) {
+            val qrCode = remember(qr.payload) { runCatching { encodeProximityQrCode(qr.payload) }.getOrNull() }
             if (qrCode != null) {
-                Surface(
-                    color = Color.White,
-                    shape = RoundedCornerShape(16.dp),
-                ) {
+                Surface(color = Color.White, shape = RoundedCornerShape(16.dp)) {
                     QrCodeCanvas(
                         qrCode = qrCode,
-                        modifier = Modifier
-                            .size(280.dp)
-                            .semantics {
-                                contentDescription = "Device engagement QR code"
-                            }
+                        modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+                            .semantics { contentDescription = "Device engagement QR code" }
                             .testTag(WalletUiTestTags.ProximityQr),
                     )
                 }
             } else {
-                Text(
-                    text = "The device engagement QR code could not be rendered.",
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
-                )
+                Text(stringResource(Res.string.proximity_qr_render_failed), color = MaterialTheme.colorScheme.error)
             }
         }
-        if (connecting) CircularProgressIndicator()
+        choices.filter { it != method }.forEach { other ->
+            TextButton(onClick = { onShowEngagement(other) }) {
+                Text(stringResource(if (other == MobileWalletProximityEngagementMethod.Qr)
+                    Res.string.proximity_show_qr_instead else Res.string.proximity_tap_instead))
+            }
+        }
     }
 }
 
@@ -853,7 +832,8 @@ private fun ProgressContent(message: String) {
 
 @Composable
 private fun TerminalContent(title: String, message: String, onDismiss: () -> Unit) {
-    ReviewMetadataSection(title) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(title, style = MaterialTheme.typography.headlineSmall)
         Text(message)
         Button(
             onClick = onDismiss,
@@ -864,13 +844,21 @@ private fun TerminalContent(title: String, message: String, onDismiss: () -> Uni
 
 @Composable
 private fun FailedContent(
-    error: ProximityError,
+    error: MobileWalletProximityError,
+    onRemediate: (MobileWalletProximityRemediationAction) -> Unit,
+    hostActionForDisplay: (MobileWalletProximityRemediationAction) -> MobileWalletProximityRemediationAction,
+    actionInProgress: Boolean,
     onDismiss: () -> Unit,
     onRetry: (() -> Unit)?,
 ) {
     ReviewMetadataSection(stringResource(Res.string.proximity_failed_title)) {
         Text(error.message, modifier = Modifier.testTag(WalletUiTestTags.ProximityError))
-        if (onRetry != null) {
+        error.remediationActions.firstOrNull { it != MobileWalletProximityRemediationAction.Retry && it != MobileWalletProximityRemediationAction.UseSupportedDevice }?.let { action ->
+            OutlinedButton(onClick = { onRemediate(action) }, enabled = !actionInProgress, modifier = Modifier.fillMaxWidth()) {
+                Text(hostActionForDisplay(action).label())
+            }
+        }
+        if (onRetry != null && error.remediationActions.none { it != MobileWalletProximityRemediationAction.Retry && it != MobileWalletProximityRemediationAction.UseSupportedDevice }) {
             Button(
                 onClick = onRetry,
                 modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityRetry),
@@ -908,7 +896,7 @@ private fun ProximityState?.engagements(): List<ProximityEngagement> = when (thi
 }
 
 @Composable
-private fun ProximityRemediationAction.label(): String = stringResource(
+internal fun MobileWalletProximityRemediationAction.label(): String = stringResource(
     when (this) {
         ProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
         ProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings

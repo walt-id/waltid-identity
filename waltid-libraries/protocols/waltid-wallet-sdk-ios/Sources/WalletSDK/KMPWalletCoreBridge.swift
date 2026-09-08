@@ -868,13 +868,36 @@ private final class KMPProximityPresentationSessionBridge:
         self.nfcHost = nfcHost
     }
 
+    var connectedRoute: ProximityPresentationConnectedRoute? {
+        guard let route = session.connectedRoute else { return nil }
+        let engagement: ProximityPresentationEngagementMethod
+        switch route.engagement {
+        case .qr: engagement = .qr
+        case .nfc: engagement = .nfc
+        }
+        let transport: ProximityPresentationTransport
+        switch route.transport {
+        case .bluetoothLowEnergy: transport = .bluetoothLowEnergy
+        case .nfc: transport = .nfc
+        case .wifiAware: transport = .wifiAware
+        }
+        return .init(engagement: engagement, transport: transport)
+    }
+
     var systemPresentationActive: Bool {
         guard let projected = try? session.state.value.toSwiftState(),
               projected.legalActions.contains(.cancel) else { return false }
         return nfcHost.isPresenting
     }
 
-    var states: AsyncStream<ProximityState> {
+    func presentNfc() async {
+        guard let projected = try? session.state.value.toSwiftState(),
+              case .engagementReady(let engagements) = projected,
+              engagements.contains(where: { if case .nfc = $0 { return true }; return false }) else { return }
+        await nfcHost.present()
+    }
+
+    var states: AsyncStream<ProximityPresentationState> {
         AsyncStream { continuation in
             let task = Task { [session] in
                 let flow = SkieSwiftFlow<any WalletCore.ProximityState>(
@@ -2158,7 +2181,9 @@ private extension WalletCore.ProximityError {
             category: category.toSwiftCategory(),
             code: code,
             message: message,
-            recovery: recovery.toSwiftRecovery()
+            recovery: recovery.toSwiftRecovery(),
+            remediationActions: swiftArray(remediationActions, of: MobileWalletProximityRemediationAction.self)
+                .map { $0.toSwiftAction() }
         )
     }
 }
