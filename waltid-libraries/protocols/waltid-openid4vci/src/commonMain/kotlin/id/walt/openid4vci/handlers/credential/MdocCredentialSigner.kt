@@ -55,6 +55,7 @@ object MdocCredentialSigner {
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
         authorizedTransactionDataTypes: List<String>? = null,
+        signedAt: Instant? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -65,6 +66,7 @@ object MdocCredentialSigner {
         credentialRequest = credentialRequest,
         credentialData = credentialData,
         issuerSigningKey = IssuerSigningKey.Legacy(issuerKey),
+        signedAt = signedAt,
         issuerCertificate = issuerCertificate,
         docType = docType,
         validFrom = validFrom,
@@ -90,6 +92,7 @@ object MdocCredentialSigner {
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
         authorizedTransactionDataTypes: List<String>? = null,
+        signedAt: Instant? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -100,6 +103,7 @@ object MdocCredentialSigner {
         credentialRequest = credentialRequest,
         credentialData = credentialData,
         issuerSigningKey = IssuerSigningKey.Crypto2(issuerKey, signatureAlgorithm),
+        signedAt = signedAt,
         issuerCertificate = issuerCertificate,
         docType = docType,
         validFrom = validFrom,
@@ -116,6 +120,7 @@ object MdocCredentialSigner {
         credentialRequest: CredentialRequest,
         credentialData: JsonObject,
         issuerSigningKey: IssuerSigningKey,
+        signedAt: Instant?,
         issuerCertificate: List<CoseCertificate>,
         docType: String,
         validFrom: Instant?,
@@ -155,6 +160,7 @@ object MdocCredentialSigner {
         val keyAuthorizations = authorizedTransactionDataTypes.toKeyAuthorizations()
         val issuedCredential = when (issuerSigningKey) {
             is IssuerSigningKey.Legacy -> MdocIssuer.issueUniversal(
+                signedAt = signedAt,
                 issuerKey = issuerSigningKey.key,
                 issuerCertificate = issuerCertificate,
                 holderKey = holderKey,
@@ -168,6 +174,7 @@ object MdocCredentialSigner {
             )
 
             is IssuerSigningKey.Crypto2 -> MdocIssuer.issueUniversal(
+                signedAt = signedAt,
                 issuerKey = issuerSigningKey.key,
                 signatureAlgorithm = issuerSigningKey.algorithm,
                 issuerCertificate = issuerCertificate,
