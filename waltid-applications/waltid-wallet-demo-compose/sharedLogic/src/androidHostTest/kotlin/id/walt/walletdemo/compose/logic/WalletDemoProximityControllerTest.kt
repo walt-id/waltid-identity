@@ -1,5 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.mobile.MobileWalletProximityConnectedRoute
+import id.walt.wallet2.mobile.MobileWalletProximityEngagementMethod
+import id.walt.wallet2.mobile.MobileWalletProximityTransport
 import id.walt.wallet2.mobile.MobileWalletProximityReviewId
 import id.walt.wallet2.mobile.MobileWalletProximityRecovery
 import id.walt.wallet2.mobile.MobileWalletProximityRuntimeObservation
@@ -94,7 +97,7 @@ class WalletDemoProximityControllerTest {
     }
 
     @Test
-    fun `optional BLE permission does not block a viable selected NFC route`() = runTest {
+    fun `selected BLE permission is offered even when NFC can start and decline allows fallback`() = runTest {
         assertTrue(fallbackCapabilities.mayStart)
         val session = FakeSession(
             ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026)
@@ -104,11 +107,33 @@ class WalletDemoProximityControllerTest {
         controller.start()
         advanceUntilIdle()
         assertEquals(1, backend.capabilityCalls)
+        assertEquals(0, backend.startCalls)
+        assertEquals(MobileWalletProximityRemediationAction.RequestBluetoothPermission, controller.state.value.automaticPermissionAction)
+        controller.remediate(MobileWalletProximityRemediationAction.RequestBluetoothPermission,
+            WalletDemoProximityHostActionExecutor { MobileWalletProximityHostActionResult.Cancelled })
+        advanceUntilIdle()
         assertEquals(1, backend.startCalls)
         assertEquals(session.state.value, controller.state.value.sessionState)
         assertNull(controller.state.value.automaticPermissionAction)
         controller.dismiss()
         advanceUntilIdle()
+    }
+
+    @Test
+    fun `optional permission setup can be skipped only with a complete viable route`() = runTest {
+        for (capabilities in listOf(fallbackCapabilities, blockedCapabilities)) {
+            val session = FakeSession(MobileWalletProximityState.EngagementReady(listOf(MobileWalletProximityEngagement.Nfc)))
+            val backend = FakeBackend(session, capabilities = { capabilities })
+            val controller = controller(backend)
+            controller.start()
+            advanceUntilIdle()
+            assertEquals(0, backend.startCalls)
+            controller.continueWithAvailableConnection()
+            advanceUntilIdle()
+            assertEquals(if (capabilities.mayStart) 1 else 0, backend.startCalls)
+            controller.dismiss()
+            advanceUntilIdle()
+        }
     }
 
     @Test
@@ -160,6 +185,18 @@ class WalletDemoProximityControllerTest {
         val retrieval = engagement
         assertNull(retrieval.bluetoothLowEnergy)
         assertNull(retrieval.qrFallback)
+    }
+
+    @Test
+    fun `compatibility profiles preserve engagement choice and narrow data transfer`() {
+        for (profile in listOf(WalletDemoProximityTransportProfile.Bluetooth)) {
+            val session = assertIs<MobileWalletProximitySessionConfiguration.ConventionalNfc>(profile.configuration().session)
+            assertEquals(MobileWalletProximityNfcHandover.Negotiated, session.handover)
+            assertEquals(session.retrieval, session.qrFallback)
+            assertNull(session.retrieval.nfc)
+            assertEquals(profile == WalletDemoProximityTransportProfile.Bluetooth, session.retrieval.bluetoothLowEnergy != null)
+        }
+
     }
 
     @Test
@@ -457,6 +494,185 @@ class WalletDemoProximityControllerTest {
     }
 
     @Test
+    fun `revealing prepared QR and NFC never restarts the session and QR brightness follows visibility`() = runTest {
+        val qr = MobileWalletProximityEngagement.Qr("mdoc:stable")
+        val session = FakeSession(MobileWalletProximityState.EngagementReady(listOf(qr, MobileWalletProximityEngagement.Nfc)))
+        val backend = FakeBackend(session)
+        val controller = controller(backend)
+        controller.start()
+        advanceUntilIdle()
+        assertNull(controller.state.value.displayedEngagement)
+        assertFalse(controller.state.value.qrVisible)
+        repeat(3) {
+            controller.showEngagement(MobileWalletProximityEngagementMethod.Qr)
+            assertTrue(controller.state.value.qrVisible)
+            assertEquals(listOf(qr, MobileWalletProximityEngagement.Nfc),
+                (controller.state.value.sessionState as MobileWalletProximityState.EngagementReady).engagements)
+            controller.showEngagement(MobileWalletProximityEngagementMethod.Nfc)
+            assertFalse(controller.state.value.qrVisible)
+        }
+        assertEquals(1, backend.startCalls)
+        assertEquals(0, session.closeCalls)
+        session.mutableState.value = MobileWalletProximityState.EngagementReady(listOf(qr))
+        advanceUntilIdle()
+        assertEquals(MobileWalletProximityEngagementMethod.Qr, controller.state.value.displayedEngagement)
+        controller.showEngagement(MobileWalletProximityEngagementMethod.Nfc)
+        assertEquals(listOf(MobileWalletProximityEngagementMethod.Qr), controller.state.value.engagementChoices)
+        assertTrue(controller.state.value.qrVisible)
+        controller.dismiss()
+        advanceUntilIdle()
+        assertFalse(controller.state.value.qrVisible)
+    }
+
+    @Test
+    fun `connection controls cannot replace a connecting or consent exchange`() = runTest {
+        val ready = listOf(MobileWalletProximityEngagement.Qr("mdoc:stable"), MobileWalletProximityEngagement.Nfc)
+        val session = FakeSession(MobileWalletProximityState.EngagementReady(ready))
+        val backend = FakeBackend(session)
+        val controller = controller(backend)
+        controller.start()
+        advanceUntilIdle()
+        controller.showEngagement(MobileWalletProximityEngagementMethod.Qr)
+        for (state in listOf(MobileWalletProximityState.Connecting(ready), MobileWalletProximityState.ReviewRequired(review()))) {
+            session.mutableState.value = state
+            advanceUntilIdle()
+            val before = controller.state.value
+            controller.showEngagement(MobileWalletProximityEngagementMethod.Nfc)
+            advanceUntilIdle()
+            assertEquals(before, controller.state.value)
+            assertFalse(controller.state.value.qrVisible)
+            assertTrue(controller.state.value.engagementChoices.isEmpty())
+            assertEquals(1, backend.startCalls)
+            assertEquals(0, session.closeCalls)
+        }
+        assertTrue(controller.state.value.canApprove)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `single prepared NFC does not advertise QR merely because QR capability exists`() {
+        val state = WalletDemoProximityUiState(sessionState = MobileWalletProximityState.EngagementReady(listOf(MobileWalletProximityEngagement.Nfc)))
+        assertEquals(listOf(MobileWalletProximityEngagementMethod.Nfc), state.engagementChoices)
+        assertEquals(MobileWalletProximityEngagementMethod.Nfc, state.displayedEngagement)
+        assertFalse(state.qrVisible)
+    }
+
+    @Test
+    fun `retry waits for old session cleanup before starting`() = runTest {
+        val closed = CompletableDeferred<Unit>()
+        val session = FakeSession(MobileWalletProximityState.Failed(
+            MobileWalletProximityError(MobileWalletProximityErrorCategory.Transport, "nfc_failed", "Connection failed", MobileWalletProximityRecovery.StartNewSession)), closeGate = closed)
+        val backend = FakeBackend(session)
+        val controller = controller(backend)
+        controller.start()
+        advanceUntilIdle()
+        controller.restart()
+        advanceUntilIdle()
+        assertEquals(1, session.closeCalls)
+        assertEquals(1, backend.startCalls)
+        assertTrue(controller.state.value.selections.isEmpty())
+        closed.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, backend.startCalls)
+        assertIs<MobileWalletProximitySessionConfiguration.ConventionalNfc>(backend.lastConfiguration?.session)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `terminal NFC denial keeps its settings action available and settings recovery starts a fresh session`() = runTest {
+        val denied = MobileWalletProximityError(MobileWalletProximityErrorCategory.Capability,
+            "nfc_access_not_accepted", "NFC access was not accepted", MobileWalletProximityRecovery.StartNewSession)
+        val session = FakeSession(MobileWalletProximityState.Failed(denied))
+        val backend = FakeBackend(session)
+        val controller = controller(backend)
+        controller.start()
+        advanceUntilIdle()
+        val returned = CompletableDeferred<Unit>()
+        controller.remediate(MobileWalletProximityRemediationAction.OpenApplicationSettings, WalletDemoProximityHostActionExecutor { action ->
+            assertEquals(MobileWalletProximityRemediationAction.OpenApplicationSettings, action)
+            assertEquals(1, session.closeCalls)
+            returned.await()
+            MobileWalletProximityHostActionResult.Completed
+        })
+        advanceUntilIdle()
+        assertEquals(1, backend.startCalls)
+        returned.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, backend.startCalls)
+        assertTrue(session.actions.isEmpty())
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `actual route is visible in review even when connecting state was never observed`() = runTest {
+        val route = MobileWalletProximityConnectedRoute(MobileWalletProximityEngagementMethod.Nfc,
+            MobileWalletProximityTransport.BluetoothLowEnergy)
+        val session = FakeSession(MobileWalletProximityState.ReviewRequired(review()), connectedRoute = route)
+        val controller = controller(FakeBackend(session))
+        controller.start()
+        advanceUntilIdle()
+        assertEquals(route, controller.state.value.connectedRoute)
+        session.mutableState.value = MobileWalletProximityState.Completed(1, false)
+        advanceUntilIdle()
+        assertEquals(route, controller.state.value.connectedRoute)
+        controller.dismiss()
+        advanceUntilIdle()
+        assertNull(controller.state.value.connectedRoute)
+    }
+
+    @Test
+    fun `dismissing and reopening also waits for radio cleanup`() = runTest {
+        val closeGate = CompletableDeferred<Unit>()
+        val session = FakeSession(MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026), closeGate = closeGate)
+        val backend = FakeBackend(session)
+        val controller = controller(backend)
+        controller.start()
+        advanceUntilIdle()
+        controller.dismiss()
+        controller.start()
+        advanceUntilIdle()
+        assertEquals(1, backend.startCalls)
+        closeGate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, backend.startCalls)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `explicit NFC host action is available for NFC-only sessions and ignores QR and connected states`() = runTest {
+        val nfc = MobileWalletProximityEngagement.Nfc
+        val session = FakeSession(MobileWalletProximityState.EngagementReady(listOf(nfc)))
+        val backend = FakeBackend(session)
+        var requests = 0
+        val controller = controller(backend, requestNfcPresentment = { requests += 1 })
+        controller.start()
+        advanceUntilIdle()
+        assertNull(controller.state.value.displayedEngagement)
+        assertEquals(0, requests)
+        controller.showEngagement(MobileWalletProximityEngagementMethod.Nfc)
+        assertEquals(1, requests)
+        assertEquals(MobileWalletProximityEngagementMethod.Nfc, controller.state.value.displayedEngagement)
+        for (next in listOf(
+            MobileWalletProximityState.EngagementReady(listOf(MobileWalletProximityEngagement.Qr("mdoc:stable"))),
+            MobileWalletProximityState.Connecting(listOf(nfc)),
+            MobileWalletProximityState.ReviewRequired(review()),
+        )) {
+            session.mutableState.value = next
+            advanceUntilIdle()
+            controller.showEngagement(MobileWalletProximityEngagementMethod.Nfc)
+            assertEquals(1, requests)
+        }
+        assertEquals(1, backend.startCalls)
+        assertEquals(0, session.closeCalls)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun `no-data ends the session and keeps its result available until dismissal`() = runTest {
         val session = FakeSession(ProximityState.AwaitingRequest(2))
         val controller = controller(FakeBackend(session))
@@ -474,6 +690,7 @@ class WalletDemoProximityControllerTest {
 
     private fun TestScope.controller(
         backend: ProximityPresentationBackend,
+        requestNfcPresentment: (() -> Unit)? = null,
         profileProvider: () -> WalletDemoProximityTransportProfile = {
             WalletDemoProximityTransportProfile.Default
         },
@@ -482,6 +699,7 @@ class WalletDemoProximityControllerTest {
         profileProvider = profileProvider,
         scope = this,
         dispatcher = StandardTestDispatcher(testScheduler),
+        requestNfcPresentment = requestNfcPresentment,
     )
 }
 
@@ -516,9 +734,11 @@ private class FakeBackend(
 }
 
 private class FakeSession(
-    initialState: ProximityState,
-    private val actionResult: ProximityActionResult = ProximityActionResult.Accepted,
-) : ProximitySession {
+    initialState: MobileWalletProximityState,
+    private val actionResult: MobileWalletProximityActionResult = MobileWalletProximityActionResult.Accepted,
+    private val closeGate: CompletableDeferred<Unit>? = null,
+    override val connectedRoute: MobileWalletProximityConnectedRoute? = null,
+) : MobileWalletProximitySession {
     val mutableState = MutableStateFlow(initialState)
     override val state: StateFlow<ProximityState> = mutableState
     val actions = mutableListOf<ProximityAction>()
@@ -535,6 +755,7 @@ private class FakeSession(
 
     override suspend fun close() {
         closeCalls += 1
+        closeGate?.await()
     }
 }
 

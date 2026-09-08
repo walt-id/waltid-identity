@@ -152,6 +152,12 @@ viable selected routes. Perform a suggested permission or settings effect in app
 UI and report its privacy-safe
 outcome with `.reportRemediation`. The SDK alone advances protocol state.
 
+When the user chooses a prepared NFC engagement, call `await session.presentNfc()` to open Core NFC's
+system sheet. The request preserves the current engagement and keys, waits for the NFC resource to be
+ready, and is idempotent while emulation is starting or active. The optional presentment assertion may
+expire or be unavailable during its cooldown; explicit presentation does not require it. Calls outside
+NFC engagement readiness are ignored. Failures and cancellation still arrive through `session.states`.
+
 NFC card presentation requires Apple's managed HCE capability and a matching
 provisioning profile. [`HCE.entitlements.example`](HCE.entitlements.example) is
 an unreferenced host-app template containing the Type 4/NDEF, conventional mdoc
@@ -176,7 +182,12 @@ fresh session after terminal failure. Runtime capability observations distinguis
 Reader scopes use `.document(index:)` or `.wholeRequest`; only the valid
 authentication outcome carries an evaluated trust decision.
 
-`ProximitySession` is an actor over the KMP source of truth. Its
+`session.connectedRoute` retains the actual engagement and bearer through review and completion,
+even if a consumer skips the brief connecting state. Terminal errors also expose `remediationActions`;
+after Settings, wait for the application to become active and close the failed session before starting
+a fresh one. Do not send prerequisite retry actions to a terminal session.
+
+`ProximityPresentationSession` is an actor over the KMP source of truth. Its
 state stream, typed actions, immutable review, trust facts, disclosure choices,
 application-profile result, and terminal states contain no generated Kotlin,
 Bluetooth, COSE, or platform objects. Call `close()` when the journey ends;

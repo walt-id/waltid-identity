@@ -56,6 +56,7 @@ final class MockWalletUITests: XCTestCase {
         )
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
         ui.assertExists(identifier: "wallet.settingsProximityPresentation")
+        ui.tapElement(identifier: "wallet.settingsProximityPresentation")
         ui.assertExists(identifier: "wallet.settingsProximityDefault")
         ui.assertExists(identifier: "wallet.settingsProximityNfcV2Hybrid")
         ui.assertExists(identifier: "wallet.settingsProximityNfcV2Direct")

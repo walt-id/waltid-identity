@@ -1,5 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.mobile.MobileWalletProximityConnectedRoute
+import id.walt.wallet2.mobile.MobileWalletProximityEngagement
+import id.walt.wallet2.mobile.MobileWalletProximityEngagementMethod
 import id.walt.wallet2.mobile.MobileWalletProximityAction
 import id.walt.wallet2.mobile.MobileWalletProximityActionResult
 import id.walt.wallet2.mobile.MobileWalletProximityActionType
@@ -58,11 +61,30 @@ data class WalletDemoProximityUiState(
     val sessionState: ProximityState? = null,
     val selections: List<WalletDemoProximityDocumentSelection> = emptyList(),
     val continueAfterResponse: Boolean = false,
-    val hostActionInProgress: ProximityRemediationAction? = null,
-    val actionError: ProximityError? = null,
+    val hostActionInProgress: MobileWalletProximityRemediationAction? = null,
+    val actionError: MobileWalletProximityError? = null,
+    val capabilities: MobileWalletProximityCapabilities? = null,
+    val connectedRoute: MobileWalletProximityConnectedRoute? = null,
+    val automaticPermissionAttempts: Set<MobileWalletProximityRemediationAction> = emptySet(),
+    val preferredEngagement: MobileWalletProximityEngagementMethod? = null,
+    val nfcRequiresUserAction: Boolean = false,
 ) {
-    val review: ProximityReview?
-        get() = (sessionState as? ProximityState.ReviewRequired)?.review
+    /** Only prepared SDK engagements are offered as ready user actions. */
+    val engagementChoices: List<MobileWalletProximityEngagementMethod>
+        get() = (sessionState as? MobileWalletProximityState.EngagementReady)?.engagements.orEmpty()
+            .map { if (it is MobileWalletProximityEngagement.Qr) MobileWalletProximityEngagementMethod.Qr else MobileWalletProximityEngagementMethod.Nfc }
+            .distinct().sortedBy { it == MobileWalletProximityEngagementMethod.Qr }
+
+    val displayedEngagement: MobileWalletProximityEngagementMethod?
+        get() = preferredEngagement?.takeIf { it in engagementChoices }
+            ?: engagementChoices.singleOrNull()?.takeUnless {
+                it == MobileWalletProximityEngagementMethod.Nfc && nfcRequiresUserAction
+            }
+
+    val qrVisible: Boolean get() = displayedEngagement == MobileWalletProximityEngagementMethod.Qr
+
+    val review: MobileWalletProximityReview?
+        get() = (sessionState as? MobileWalletProximityState.ReviewRequired)?.review
 
     val canApprove: Boolean
         get() = review?.let { current ->
@@ -75,7 +97,7 @@ data class WalletDemoProximityUiState(
         get() = (sessionState as? ProximityState.CheckingPrerequisites)
             ?.capabilities
             ?.automaticPermissionActions
-            ?.firstOrNull()
+            ?.firstOrNull { it !in automaticPermissionAttempts }
 
     val isTerminal: Boolean
         get() = sessionState.isTerminal()
@@ -101,12 +123,15 @@ class WalletDemoProximityController(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
     private val systemPresentationActive: () -> Boolean = { false },
+    private val requestNfcPresentment: (() -> Unit)? = null,
 ) {
-    private val mutableState = MutableStateFlow(WalletDemoProximityUiState())
+    private val mutableState = MutableStateFlow(initialUiState())
     val state: StateFlow<WalletDemoProximityUiState> = mutableState.asStateFlow()
 
-    private var session: ProximitySession? = null
-    private var pendingConfiguration: ProximityConfiguration? = null
+    private var session: MobileWalletProximitySession? = null
+    private var closingJob: Job? = null
+    private var effectiveConfiguration: MobileWalletProximityConfiguration? = null
+    private var pendingConfiguration: MobileWalletProximityConfiguration? = null
     private var sessionJob: Job? = null
     private var hostActionJob: Job? = null
     private var generation: Long = 0
@@ -119,7 +144,8 @@ class WalletDemoProximityController(
         generation += 1
         val startGeneration = generation
         pendingConfiguration = configuration
-        mutableState.value = WalletDemoProximityUiState(active = true)
+        effectiveConfiguration = configuration
+        mutableState.value = initialUiState().copy(active = true)
         checkPrerequisitesAndStart(configuration, startGeneration)
     }
 
@@ -130,11 +156,13 @@ class WalletDemoProximityController(
         sessionJob?.cancel()
         sessionJob = scope.launch(dispatcher) {
             try {
+                closingJob?.join()
+                if (!isCurrent(startGeneration)) return@launch
                 val capabilities = wallet.proximityPresentationCapabilities(configuration)
                 if (!isCurrent(startGeneration)) return@launch
-                publish(ProximityState.CheckingPrerequisites(capabilities))
-                // Request permission only when no selected route can start without it.
-                if (capabilities.automaticPermissionActions.isNotEmpty()) return@launch
+                mutableState.update { it.copy(capabilities = capabilities) }
+                publish(MobileWalletProximityState.CheckingPrerequisites(capabilities))
+                if (mutableState.value.automaticPermissionAction != null || !capabilities.mayStart) return@launch
 
                 val started = wallet.startProximityPresentation(configuration)
                 if (!isCurrent(startGeneration)) {
@@ -240,17 +268,35 @@ class WalletDemoProximityController(
         }
     }
 
+    /** Skips optional permission setup only when the SDK has proved a complete alternative route. */
+    fun continueWithAvailableConnection() {
+        val current = mutableState.value
+        val capabilities = (current.sessionState as? MobileWalletProximityState.CheckingPrerequisites)?.capabilities ?: return
+        if (!capabilities.mayStart || current.hostActionInProgress != null) return
+        mutableState.update { it.copy(automaticPermissionAttempts = it.automaticPermissionAttempts + capabilities.automaticPermissionActions) }
+        retryPrerequisites()
+    }
+
     fun remediate(
         action: ProximityRemediationAction,
         executor: WalletDemoProximityHostActionExecutor,
     ) {
-        val capabilities = (mutableState.value.sessionState as? ProximityState.CheckingPrerequisites)
+        val current = mutableState.value
+        val terminalError = (current.sessionState as? MobileWalletProximityState.Failed)?.error
+        if (terminalError != null && action in terminalError.remediationActions) {
+            replaceSession(effectiveConfiguration ?: return, action, executor)
+            return
+        }
+        val capabilities = (current.sessionState as? MobileWalletProximityState.CheckingPrerequisites)
             ?.capabilities ?: return
         if (action !in capabilities.remediationActions || mutableState.value.hostActionInProgress != null) return
         val currentSession = session
         val configuration = pendingConfiguration
         if (currentSession == null && configuration == null) return
-        mutableState.update { it.copy(hostActionInProgress = action, actionError = null) }
+        mutableState.update { it.copy(
+            hostActionInProgress = action, actionError = null,
+            automaticPermissionAttempts = it.automaticPermissionAttempts + action,
+        ) }
         val actionGeneration = generation
         val job = scope.launch(dispatcher, start = CoroutineStart.LAZY) {
             try {
@@ -319,15 +365,73 @@ class WalletDemoProximityController(
         val closing = session
         session = null
         pendingConfiguration = null
-        mutableState.value = WalletDemoProximityUiState()
-        if (closing != null) scope.launch(dispatcher) { closing.close() }
+        effectiveConfiguration = null
+        mutableState.value = initialUiState()
+        scheduleClose(closing)
     }
 
     /** Closes a terminal session before starting a fresh capability check and exchange. */
     fun restart() {
         if (!mutableState.value.isTerminal) return
-        dismiss()
-        start()
+        replaceSession(effectiveConfiguration ?: return)
+    }
+
+    /** Reveals the prepared engagement and requests platform NFC UI after an explicit user choice. */
+    fun showEngagement(method: MobileWalletProximityEngagementMethod) {
+        val current = mutableState.value
+        if (current.hostActionInProgress != null || method !in current.engagementChoices) return
+        mutableState.update { current ->
+            if (current.hostActionInProgress == null && method in current.engagementChoices) {
+                current.copy(preferredEngagement = method)
+            } else current
+        }
+        if (method == MobileWalletProximityEngagementMethod.Nfc) requestNfcPresentment?.invoke()
+    }
+
+    private fun replaceSession(
+        configuration: MobileWalletProximityConfiguration,
+        action: MobileWalletProximityRemediationAction? = null,
+        executor: WalletDemoProximityHostActionExecutor? = null,
+    ) {
+        generation += 1
+        val nextGeneration = generation
+        sessionJob?.cancel()
+        hostActionJob?.cancel()
+        val closing = session
+        session = null
+        effectiveConfiguration = configuration
+        pendingConfiguration = configuration
+        mutableState.value = initialUiState().copy(active = true, hostActionInProgress = action)
+        scheduleClose(closing)
+        sessionJob = scope.launch(dispatcher) {
+            closingJob?.join()
+            if (!isCurrent(nextGeneration)) return@launch
+            if (action != null && executor != null) {
+                try {
+                    executor.perform(action)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Rechecking reports the current safe platform error and guidance.
+                }
+                if (!isCurrent(nextGeneration)) return@launch
+                mutableState.update { it.copy(
+                    hostActionInProgress = null, automaticPermissionAttempts = setOf(action),
+                ) }
+            }
+            checkPrerequisitesAndStart(configuration, nextGeneration)
+        }
+    }
+
+    private fun scheduleClose(closing: MobileWalletProximitySession?) {
+        if (closing == null) return
+        val previous = closingJob
+        closingJob = scope.launch(dispatcher) {
+            kotlinx.coroutines.withContext(NonCancellable) {
+                previous?.join()
+                closing.close()
+            }
+        }
     }
 
     private fun dispatch(action: ProximityAction) {
@@ -353,12 +457,16 @@ class WalletDemoProximityController(
                 ?.takeIf { current.review?.reviewId != it.reviewId }
             current.copy(
                 sessionState = sessionState,
+                capabilities = (sessionState as? MobileWalletProximityState.CheckingPrerequisites)?.capabilities ?: current.capabilities,
+                connectedRoute = session?.connectedRoute ?: current.connectedRoute,
                 selections = reviewForNewExchange?.defaultSelections() ?: current.selections,
                 continueAfterResponse = if (reviewForNewExchange != null) false else current.continueAfterResponse,
                 actionError = null,
             )
         }
     }
+
+    private fun initialUiState() = WalletDemoProximityUiState(nfcRequiresUserAction = requestNfcPresentment != null)
 
     private fun replaceSelection(selection: WalletDemoProximityDocumentSelection) {
         mutableState.update { current ->
@@ -371,17 +479,20 @@ class WalletDemoProximityController(
     }
 }
 
-private val ProximityCapabilities.automaticPermissionActions:
-    List<ProximityRemediationAction>
-    get() = if (mayStart) emptyList() else remediationActions.filter {
-        it == ProximityRemediationAction.RequestBluetoothPermission
+private val MobileWalletProximityCapabilities.automaticPermissionActions:
+    List<MobileWalletProximityRemediationAction>
+    get() = remediationActions.filter {
+        it == MobileWalletProximityRemediationAction.RequestBluetoothPermission
     }
 
 internal fun WalletDemoProximityTransportProfile.configuration(): MobileWalletProximityConfiguration =
     when (this) {
-        WalletDemoProximityTransportProfile.Default -> {
+        WalletDemoProximityTransportProfile.Default,
+        WalletDemoProximityTransportProfile.Bluetooth -> {
             val retrieval = MobileWalletProximityConventionalRetrievalConfiguration(
-                nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+                nfc = MobileWalletProximityNfcRetrievalConfiguration().takeIf {
+                    this == WalletDemoProximityTransportProfile.Default
+                },
             )
             MobileWalletProximityConfiguration(
                 session = MobileWalletProximitySessionConfiguration.ConventionalNfc(

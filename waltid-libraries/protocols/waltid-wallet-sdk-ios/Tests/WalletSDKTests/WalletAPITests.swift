@@ -436,6 +436,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertTrue(capabilities.mayStart)
 
         let session = try await wallet.startProximityPresentation()
+        await session.presentNfc()
         var states = session.states.makeAsyncIterator()
         let firstState = await states.next()
         XCTAssertEqual(firstState, .checkingPrerequisites(capabilities))
@@ -443,11 +444,13 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(actionResult, .accepted)
         await session.close()
         await session.close()
+        await session.presentNfc()
 
         XCTAssertEqual(bridge.proximityCapabilityCalls, 1)
         XCTAssertEqual(bridge.proximitySessionStarts, 1)
         XCTAssertEqual(bridge.proximitySession.dispatches, [.cancel])
         XCTAssertEqual(bridge.proximitySession.closeCalls, 1)
+        XCTAssertEqual(bridge.proximitySession.presentNfcCalls, 1)
     }
 
     func testProximityCapabilitiesAllowUnavailableSelectedAlternatives() {
@@ -1506,6 +1509,9 @@ private final class FakeProximityPresentationSessionBridge: ProximityPresentatio
     var capabilities = makeTestProximityCapabilities()
     private(set) var dispatches: [ProximityAction] = []
     private(set) var closeCalls = 0
+    private(set) var presentNfcCalls = 0
+
+    func presentNfc() async { presentNfcCalls += 1 }
 
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult {
         dispatches.append(action)
@@ -1540,4 +1546,5 @@ private struct TerminalProximityStreamBridge: ProximitySessionBridge {
     }
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult { .accepted }
     func close() async { continuation.finish() }
+    func presentNfc() async {}
 }

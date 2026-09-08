@@ -4,6 +4,7 @@ import WalletSDK
 /// Stable demo choices for one immutable proximity-presentation session.
 public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifiable, Sendable {
     case defaultProfile = "default"
+    case bluetooth = "bluetooth"
     case provisionalNfcV2Hybrid = "provisional_nfc_v2_hybrid"
     case provisionalNfcV2Direct = "provisional_nfc_v2_direct"
 
@@ -12,12 +13,15 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
     /// Resolves this persisted demo choice to the same typed SDK configuration as the Compose app.
     public var configuration: ProximityPresentationConfiguration {
         switch self {
-        case .defaultProfile:
+        case .defaultProfile, .bluetooth:
+            let retrieval = ProximityPresentationConventionalRetrievalConfiguration(
+                nfc: self == .defaultProfile ? .init() : nil
+            )
             return ProximityPresentationConfiguration(
                 session: .nfc(.init(
                     handover: .negotiatedHandover,
-                    retrieval: .init(nfc: .init()),
-                    qrFallback: .init(nfc: .init())
+                    retrieval: retrieval,
+                    qrFallback: retrieval
                 ))
             )
         case .provisionalNfcV2Hybrid:

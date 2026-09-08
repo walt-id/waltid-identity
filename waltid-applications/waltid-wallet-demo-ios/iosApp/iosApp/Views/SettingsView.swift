@@ -48,7 +48,7 @@ struct SettingsView: View {
                 .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwkCopy)
             }
             signingProtectionSection
-            Section("Credential Sharing") {
+            Section {
                 Toggle(
                     "Show Walt Wallet preview for DC API Presentation",
                     isOn: $viewModel.showDcApiPresentationPreview
@@ -62,8 +62,10 @@ struct SettingsView: View {
                     ReaderTrustSettingsView(controller: viewModel.readerTrustSettings)
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsReaderAuthentication)
+            } header: {
+                Text("Credential Sharing")
+                    .accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
             }
-            .accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
             Section {
                 Button("Lock") {
                     viewModel.lock()
@@ -106,68 +108,43 @@ struct SettingsView: View {
         }
     }
 
-    @ViewBuilder
     private var proximityPresentationSettings: some View {
-        Group {
-            Text("Proximity Presentation")
-                .font(.headline)
-                .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
-            Text("Choose the transport profile for the next in-person presentation session.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            proximityTransportProfileChoice(
-                .defaultProfile,
-                title: "Default (QR + conventional NFC)",
-                description: "Production default with negotiated QR/NFC engagement and conventional retrieval.",
-                accessibilityIdentifier: WalletAccessibilityID.settingsProximityDefault
-            )
-            proximityTransportProfileChoice(
-                .provisionalNfcV2Hybrid,
-                title: "NFCv2 hybrid (provisional)",
-                description: "Starts over NFCv2 and transfers the session over Bluetooth LE.",
-                accessibilityIdentifier: WalletAccessibilityID.settingsProximityNfcV2Hybrid
-            )
-            proximityTransportProfileChoice(
-                .provisionalNfcV2Direct,
-                title: "NFCv2 direct (provisional)",
-                description: "Keeps engagement and encrypted session messages on NFCv2.",
-                accessibilityIdentifier: WalletAccessibilityID.settingsProximityNfcV2Direct
-            )
-            Text("Availability is checked before engagement. The active session keeps its starting profile.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func proximityTransportProfileChoice(
-        _ profile: WalletDemoProximityTransportProfile,
-        title: String,
-        description: String,
-        accessibilityIdentifier: String
-    ) -> some View {
-        Button {
-            viewModel.proximityTransportProfile = profile
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(
-                    systemName: viewModel.proximityTransportProfile == profile
-                        ? "largecircle.fill.circle"
-                        : "circle"
-                )
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .foregroundStyle(.primary)
-                    Text(description)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+        NavigationLink {
+            List {
+                Section {
+                    ForEach(WalletDemoProximityTransportProfile.allCases) { profile in
+                        Button {
+                            viewModel.proximityTransportProfile = profile
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(profile.title).foregroundStyle(.primary)
+                                    Text(profile.description).font(.footnote).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if viewModel.proximityTransportProfile == profile {
+                                    Image(systemName: "checkmark").accessibilityHidden(true)
+                                }
+                            }
+                        }
+                        .accessibilityIdentifier(profile.accessibilityIdentifier)
+                        .accessibilityValue(viewModel.proximityTransportProfile == profile ? "Selected" : "Not selected")
+                    }
+                } header: {
+                    Text("Use Automatic unless your reader requires a specific connection.")
+                } footer: {
+                    Text("Applies to your next presentation. Availability depends on your device and permissions.")
                 }
             }
+            .navigationTitle("Nearby sharing")
+        } label: {
+            HStack {
+                Text("Nearby sharing")
+                Spacer()
+                Text(viewModel.proximityTransportProfile.title).foregroundStyle(.secondary)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(accessibilityIdentifier)
-        .accessibilityValue(viewModel.proximityTransportProfile == profile ? "Selected" : "Not selected")
+        .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
     }
 
     @ViewBuilder
@@ -537,6 +514,35 @@ private struct ReaderTrustImportReviewView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.caption).foregroundStyle(.secondary)
             Text(value, style: .date).font(.footnote)
+        }
+    }
+}
+
+private extension WalletDemoProximityTransportProfile {
+    var title: String {
+        switch self {
+        case .defaultProfile: String(localized: "Automatic")
+        case .bluetooth: String(localized: "Bluetooth transfer")
+        case .provisionalNfcV2Hybrid: String(localized: "NFCv2 + Bluetooth")
+        case .provisionalNfcV2Direct: String(localized: "NFCv2 direct")
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .defaultProfile: String(localized: "Use available connections supported by the reader.")
+        case .bluetooth: String(localized: "Start with NFC or QR; transfer over Bluetooth.")
+        case .provisionalNfcV2Hybrid: String(localized: "Provisional profile. Start with NFCv2; transfer over Bluetooth.")
+        case .provisionalNfcV2Direct: String(localized: "Provisional profile. Keep the connection on NFCv2.")
+        }
+    }
+
+    var accessibilityIdentifier: String {
+        switch self {
+        case .defaultProfile: WalletAccessibilityID.settingsProximityDefault
+        case .provisionalNfcV2Hybrid: WalletAccessibilityID.settingsProximityNfcV2Hybrid
+        case .provisionalNfcV2Direct: WalletAccessibilityID.settingsProximityNfcV2Direct
+        default: "wallet.settingsProximity.\(rawValue)"
         }
     }
 }

@@ -30,6 +30,25 @@ The Present tab includes a dedicated **Present in person** journey for holder-si
 proximity presentation. The native SwiftUI view model consumes the Wallet SDK session directly and
 does not reconstruct protocol state, reader trust, request meaning, or disclosure rules.
 
+The sharing screen offers **Hold near the reader** and **Show QR code** only for engagements actually prepared
+by the SDK. A single ready QR method opens directly. On iOS, choosing NFC explicitly opens the system
+presentation sheet, including when NFC is the only available method.
+It does not depend on the optional short-lived presentment assertion. Choosing an already prepared
+engagement preserves the session and payload. Once connecting starts, method controls disappear;
+reader consent remains the focus, and the actual route is available under **Connection details**.
+Completion shows the result and **Done**, without radio controls.
+
+Permission setup explains the required action before opening an OS prompt. Users can skip optional
+setup only when the SDK reports another complete route that can start. Returning from Settings rechecks
+availability; declined permissions are not requested again automatically. QR visibility alone controls
+temporary screen brightness, and the QR is hidden once connecting begins.
+
+**Settings → Credential Sharing → Nearby sharing** stores the connection profile for the next
+presentation. Automatic uses the available reader-compatible routes. Compatibility profiles narrow
+transfer to Bluetooth, or select provisional NFCv2 direct/handover modes. These choices
+are kept out of the sharing journey and cannot change an active exchange. Device support and permissions
+are checked at startup; NFCv2 retains its mandatory NFC channel.
+
 The journey displays Device Engagement as an accessible QR code, retrieves over the available
 Bluetooth Low Energy method, and presents authentication scope, signature validity, certificate-path,
 revocation, optional RICAL, and product-trust evidence as separate facts. It exposes reader-stated

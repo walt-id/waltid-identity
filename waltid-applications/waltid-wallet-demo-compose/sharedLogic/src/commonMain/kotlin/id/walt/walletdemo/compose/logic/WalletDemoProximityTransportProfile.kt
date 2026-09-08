@@ -5,6 +5,7 @@ enum class WalletDemoProximityTransportProfile(
     internal val persistedValue: String,
 ) {
     Default("default"),
+    Bluetooth("bluetooth"),
     ProvisionalNfcV2Hybrid("provisional_nfc_v2_hybrid"),
     ProvisionalNfcV2Direct("provisional_nfc_v2_direct"),
     ;

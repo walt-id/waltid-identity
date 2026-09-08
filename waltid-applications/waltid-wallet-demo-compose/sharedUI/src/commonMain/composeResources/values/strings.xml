@@ -97,4 +97,22 @@
     <string name="proximity_validated_application_request">Validated application request</string>
     <string name="proximity_value_preview_unavailable">Value preview unavailable</string>
     <string name="proximity_whole_request">Whole request</string>
+    <string name="proximity_method_bluetooth">Bluetooth</string>
+    <string name="proximity_method_nfc">NFC</string>
+    <string name="proximity_method_wifi">Wi-Fi Aware</string>
+    <string name="proximity_share_in_person">Share in person</string>
+    <string name="proximity_choose_connection">Choose how to connect to the reader.</string>
+    <string name="proximity_tap_reader">Hold near the reader</string>
+    <string name="proximity_show_qr">Show QR code</string>
+    <string name="proximity_tap_description">Bring your phone close to connect.</string>
+    <string name="proximity_qr_description">Let the reader scan your screen.</string>
+    <string name="proximity_tap_instructions">Keep your phone near the reader while it connects. You’ll review the request before sharing.</string>
+    <string name="proximity_qr_instructions">Let the reader scan this code. Keep both devices nearby. You’ll review the request before sharing.</string>
+    <string name="proximity_show_qr_instead">Show QR code instead</string>
+    <string name="proximity_tap_instead">Hold near the reader instead</string>
+    <string name="proximity_qr_render_failed">The connection QR code could not be displayed. Please start again.</string>
+    <string name="proximity_connection_details">Connection details</string>
+    <string name="proximity_started_with">Started with: %1$s</string>
+    <string name="proximity_used_connection">Data connection: %1$s</string>
+    <string name="proximity_continue_available">Continue with available connection</string>
 </resources>

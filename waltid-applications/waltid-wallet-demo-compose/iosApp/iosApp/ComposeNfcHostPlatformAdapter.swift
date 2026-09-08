@@ -13,6 +13,10 @@ final class ComposeNfcHostPlatformAdapter:
 
     var isPresenting: Bool { bridge.isPresenting }
 
+    func present() async {
+        await bridge.present()
+    }
+
     func capability() async throws -> any sharedUI.Waltid_mdoc_proximity_mobileNfcHostAvailability {
         switch await bridge.capability() {
         case .available:
