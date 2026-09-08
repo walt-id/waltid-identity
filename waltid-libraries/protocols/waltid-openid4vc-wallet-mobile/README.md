@@ -191,6 +191,16 @@ require MAC or choose an explicit pre-review preference with
 option, bound into the immutable review, and never changed after consent. The
 pinned EUDI profile currently requires device signature.
 
+`session.connectedRoute` reports the winning engagement and actual connected bearer. It remains
+available after the brief connecting state, including during review and after completion. Configured
+or advertised methods alone do not establish which route a reader used.
+
+Terminal errors expose display-safe `code`, `message`, and `remediationActions`. For example, NFC
+access not accepted maps to application settings. Perform that host action, wait for the application
+to return, close the failed session, and create a new session. `ReportRemediation` belongs only to the
+active prerequisite loop. The radio-independent engine retains unexpected exception causes on its
+failure result for diagnostics; raw exception text must never be rendered as presentation content.
+
 Host applications perform permission or settings effects named by
 `capabilities.remediationActions`, report the privacy-safe outcome with
 `ProximityAction.ReportRemediation`, and let the SDK re-check the

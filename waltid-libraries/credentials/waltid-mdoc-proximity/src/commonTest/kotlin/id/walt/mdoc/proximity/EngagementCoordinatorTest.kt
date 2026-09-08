@@ -110,6 +110,30 @@ class EngagementCoordinatorTest {
     }
 
     @Test
+    fun `failed engagement paths retain typed errors and diagnostic causes`() = runTest {
+        val platformFailure = ProximityException(
+            ProximityError.Capability("nfc_access_not_accepted", "NFC access was not accepted"),
+            IllegalStateException("private platform diagnostics"),
+        )
+        val otherFailure = IllegalStateException("private transport diagnostics")
+        fun failing(mode: MdocEngagementMode, failure: Exception) = object : PreparedMdocEngagement {
+            override val modes = setOf(mode)
+            override val readiness = MdocEngagementReadiness(null, emptySet(), emptyMap())
+            override suspend fun awaitConnection(): MdocEngagedConnection = throw failure
+            override suspend fun close(reason: ProximityCloseReason) = Unit
+        }
+        val failure = assertFailsWith<ProximityException> {
+            MdocEngagementCoordinator().awaitWinner(prepared(
+                failing(MdocEngagementMode.Qr, otherFailure),
+                failing(MdocEngagementMode.Nfc, platformFailure),
+            ))
+        }
+        assertSame(platformFailure, failure)
+        assertEquals(listOf(otherFailure), failure.suppressedExceptions)
+        assertEquals("NFC access was not accepted", failure.error.message)
+    }
+
+    @Test
     fun `engagement completed after cancellation is still closed`() = runTest {
         val release = CompletableDeferred<Unit>()
         val connection = TrackingConnection(ProximityTransportKind.NFC)
@@ -227,6 +251,10 @@ class EngagementCoordinatorTest {
                 this,
             )
             assertEquals(listOf(available), prepared.sources)
+            val preparationFailure = assertFailsWith<ProximityException> {
+                MdocEngagementCoordinator().prepare(listOf(unavailable), context, this)
+            }
+            assertEquals("nfc_unavailable", preparationFailure.error.code)
 
             val preparedBeforeProtocolFailure = TrackingEngagement(MdocEngagementMode.Nfc, waitForever = true)
             val sourceBeforeProtocolFailure = object : MdocEngagementSource {

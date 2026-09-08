@@ -306,10 +306,15 @@ class ProximityCoordinatorTest {
 
         val first = coordinator.start(ProximityConfiguration())
         first.awaitConnection()
+        assertEquals(MobileWalletProximityConnectedRoute(
+            MobileWalletProximityEngagementMethod.Qr, MobileWalletProximityTransport.BluetoothLowEnergy,
+        ), first.connectedRoute)
         assertFailsWith<IllegalStateException> {
             coordinator.start(ProximityConfiguration())
         }
+        val retainedRoute = first.connectedRoute
         first.close()
+        assertEquals(retainedRoute, first.connectedRoute)
 
         val second = coordinator.start(ProximityConfiguration())
         second.awaitConnection()
