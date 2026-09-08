@@ -55,6 +55,24 @@ class TransportCoordinatorTest {
     }
 
     @Test
+    fun `platform permission failure survives preparation and connection aggregation`() = runTest {
+        val denied = ProximityException(ProximityError.Capability("ble_permission_denied", "Bluetooth access is denied"))
+        val preparation = assertFailsWith<ProximityException> {
+            TransportCoordinator().prepare(
+                listOf(provider(ProximityTransportKind.BLE) { throw denied }),
+                EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1024, MdocEngagementMode.Qr), this,
+            )
+        }
+        assertSame(denied, preparation)
+        val connection = assertFailsWith<ProximityException> {
+            TransportCoordinator().awaitWinner(PreparedTransports(listOf(
+                TrackingPrepared(ProximityTransportKind.BLE, failure = denied),
+            ), emptyMap()))
+        }
+        assertSame(denied, connection)
+    }
+
+    @Test
     fun `a transport-local cancellation is a failed candidate rather than a stalled race`() = runTest {
         val cancelled = TrackingPrepared(
             ProximityTransportKind.NFC,

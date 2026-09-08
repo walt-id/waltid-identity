@@ -224,7 +224,7 @@ class MdocHolderRequestContext(
     /** Exact SessionTranscriptBytes, including the tag-24 byte-string wrapper. */
     val transcript: ExactCbor<SessionTranscript>
         get() = ExactCbor.of(
-            coseCompliantCbor.decodeFromByteArray(coseCompliantCbor.decodeFromByteArray<ByteArray>(transcriptBytes)),
+            decodeProximitySessionTranscript(transcriptBytes),
             transcriptBytes,
         )
     /** Exact reader ephemeral COSE_Key from SessionEstablishment, available for device-MAC selection. */
@@ -289,6 +289,9 @@ sealed interface MdocConsentDecision {
 fun interface MdocConsentHandler {
     suspend fun decide(prompt: MdocConsentPrompt): MdocConsentDecision
 }
+
+/** Winning engagement and the bearer carrying the session, retained after connection. */
+data class MdocConnectedRoute(val engagement: MdocEngagementMode, val transport: ProximityTransportKind)
 
 sealed interface MdocHolderSessionState {
     data object Idle : MdocHolderSessionState
@@ -368,7 +371,8 @@ sealed interface MdocHolderSessionResult {
         init { require(exchange > 0) }
     }
     data class Completed(val exchanges: Int) : MdocHolderSessionResult
-    data class Failed(val error: ProximityError) : MdocHolderSessionResult
+    /** Original failure is retained for diagnostics; never render its message as user-facing text. */
+    data class Failed(val error: ProximityError, val cause: Throwable? = null) : MdocHolderSessionResult
 }
 
 /**
@@ -388,6 +392,8 @@ class MdocHolderProtocolEngine(
     private val engagementSources = engagementSources.toList()
     private val mutableState = MutableStateFlow<MdocHolderSessionState>(MdocHolderSessionState.Idle)
     val state: StateFlow<MdocHolderSessionState> = mutableState.asStateFlow()
+    private val mutableConnectedRoute = MutableStateFlow<MdocConnectedRoute?>(null)
+    val connectedRoute: MdocConnectedRoute? get() = mutableConnectedRoute.value
     private val startMutex = Mutex()
     private var started = false
     private lateinit var messageSequencer: MdocSessionMessageSequencer
@@ -425,12 +431,34 @@ class MdocHolderProtocolEngine(
             throw cancelled
         } catch (failure: ProximityException) {
             mutableState.value = MdocHolderSessionState.Failed(failure.error)
-            MdocHolderSessionResult.Failed(failure.error)
+            MdocHolderSessionResult.Failed(failure.error, failure)
         } catch (failure: Exception) {
-            val error = ProximityError.Protocol("session_failed", "The proximity session failed")
+            val error = unexpectedFailure(mutableState.value)
             mutableState.value = MdocHolderSessionState.Failed(error)
-            MdocHolderSessionResult.Failed(error)
+            MdocHolderSessionResult.Failed(error, failure)
         }
+    }
+
+    private fun unexpectedFailure(state: MdocHolderSessionState): ProximityError = when (state) {
+        is MdocHolderSessionState.Preparing -> ProximityError.Capability(
+            "session_preparation_failed", "The selected presentation methods could not be prepared",
+        )
+        is MdocHolderSessionState.EngagementReady,
+        is MdocHolderSessionState.Connecting -> ProximityError.Transport(
+            "session_connection_failed", "The reader connection could not be established",
+        )
+        is MdocHolderSessionState.AwaitingRequest,
+        is MdocHolderSessionState.AwaitingNextRequest -> ProximityError.Protocol(
+            "request_processing_failed", "The reader request could not be processed",
+        )
+        is MdocHolderSessionState.ReviewRequired,
+        is MdocHolderSessionState.SendingResponse -> ProximityError.Protocol(
+            "response_processing_failed", "The presentation response could not be prepared or sent",
+        )
+        is MdocHolderSessionState.Terminating -> ProximityError.Transport(
+            "session_termination_failed", "The presentation session could not be closed normally",
+        )
+        else -> ProximityError.Protocol("session_failed", "The proximity session failed")
     }
 
     private suspend fun withTotalSessionTimeout(): MdocHolderSessionResult = phase(
@@ -700,6 +728,7 @@ class MdocHolderProtocolEngine(
         awaitConnection: suspend () -> WinningMdocEngagement,
     ): Pair<WinningMdocEngagement, ImmutableBytes> {
         val winner = awaitConnection()
+        mutableConnectedRoute.value = MdocConnectedRoute(winner.engaged.engagementMode, winner.engaged.connection.kind)
         onConnected()
         val firstBytes = phase(
             establishmentTimeout(winner.engaged.engagementMode),

@@ -11,6 +11,16 @@ import kotlin.uuid.Uuid
 
 class ProximityModelsTest {
     @Test
+    fun `NFC platform failures retain actionable fresh-session recovery`() {
+        val denied = ProximityError.Capability("nfc_access_not_accepted", "NFC access was not accepted").toWalletError()
+        assertEquals(MobileWalletProximityRecovery.StartNewSession, denied.recovery)
+        assertEquals(listOf(MobileWalletProximityRemediationAction.OpenApplicationSettings), denied.remediationActions)
+        for (code in listOf("nfc_system_unavailable", "nfc_session_already_active")) {
+            assertEquals(listOf(MobileWalletProximityRemediationAction.Retry), code.toRemediationActions())
+        }
+    }
+
+    @Test
     fun `EUDI profile requires trusted-reader policy`() {
         assertFailsWith<IllegalArgumentException> {
             ProximityConfiguration(
