@@ -7,6 +7,7 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.utils.JsonObjectPathMapper
+import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -105,6 +106,8 @@ class CredentialOfferService(
                 overrides?.mDocNameSpacesDataMappingConfig ?: profile.mDocNameSpacesDataMappingConfig,
             authorizedTransactionDataTypes = overrides?.authorizedTransactionDataTypes
                 ?: profile.authorizedTransactionDataTypes,
+            msoData = (profile.msoData ?: MsoData()).merge(overrides?.msoData)
+                .takeUnless { it.isEmpty() },
             x5Chain = overrides?.x5Chain ?: profile.x5Chain,
             issuerDid = issuerDid,
             credentialOffer = credentialOffer,

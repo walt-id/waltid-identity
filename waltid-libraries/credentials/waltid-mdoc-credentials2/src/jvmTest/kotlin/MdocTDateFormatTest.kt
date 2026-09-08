@@ -7,6 +7,7 @@ import kotlinx.serialization.encodeToHexString
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.time.Instant
 
@@ -35,5 +36,18 @@ class MdocTDateFormatTest {
             "2026-05-15T15:16:00Z",
             "2026-05-15T15:16:00.000Z".toMdocTDateString(),
         )
+    }
+
+    @Test
+    fun precheckRejectsEqualNormalizedTimestamps() {
+        val instant = Instant.fromEpochSeconds(1715786160)
+        val validityInfo = ValidityInfo(
+            signed = instant,
+            validFrom = instant,
+            validUntil = instant,
+        )
+        assertFailsWith<IllegalArgumentException> {
+            validityInfo.precheck()
+        }
     }
 }

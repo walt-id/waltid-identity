@@ -52,6 +52,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult = sign(configuration, verifiedProofs) { verifiedProof ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
@@ -84,6 +85,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult = sign(configuration, verifiedProofs) { verifiedProof ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
