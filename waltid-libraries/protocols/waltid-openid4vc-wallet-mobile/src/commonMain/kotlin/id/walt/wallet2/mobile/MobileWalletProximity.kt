@@ -20,6 +20,7 @@ import id.walt.mdoc.proximity.MdocProtocolFeature
 import id.walt.mdoc.proximity.MdocProximityProfile
 import id.walt.mdoc.proximity.MdocSessionCapabilities
 import id.walt.mdoc.proximity.ProximityTransportProvider
+import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.QrMdocEngagementSource
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
@@ -50,6 +51,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -172,6 +174,21 @@ private class ProximitySessionImpl(
     private val initialCapabilities = initialCapabilities
     override val state: StateFlow<ProximityState> = owner.state
     private lateinit var sessionJob: Job
+    private val engineReference = MutableStateFlow<MdocHolderProtocolEngine?>(null)
+    override val connectedRoute: MobileWalletProximityConnectedRoute?
+        get() = engineReference.value?.connectedRoute?.let { route ->
+            MobileWalletProximityConnectedRoute(
+                engagement = when (route.engagement) {
+                    MdocEngagementMode.Qr -> MobileWalletProximityEngagementMethod.Qr
+                    MdocEngagementMode.Nfc -> MobileWalletProximityEngagementMethod.Nfc
+                },
+                transport = when (route.transport) {
+                    id.walt.mdoc.proximity.ProximityTransportKind.BLE -> MobileWalletProximityTransport.BluetoothLowEnergy
+                    id.walt.mdoc.proximity.ProximityTransportKind.NFC -> MobileWalletProximityTransport.Nfc
+                    id.walt.mdoc.proximity.ProximityTransportKind.WIFI_AWARE -> MobileWalletProximityTransport.WifiAware
+                },
+            )
+        }
 
     @OptIn(DelicateCoroutinesApi::class)
     fun start() {
@@ -254,6 +271,7 @@ private class ProximitySessionImpl(
                 ),
                 capabilities = capabilities,
             )
+            engineReference.value = engine
             val stateCollector = scope.launch {
                 engine.state.collect(::publishEngineState)
             }
@@ -274,13 +292,15 @@ private class ProximitySessionImpl(
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) { owner.cancel() }
             throw cancelled
+        } catch (failure: ProximityException) {
+            owner.publish(MobileWalletProximityState.Failed(failure.error.toWalletError()))
         } catch (_: Throwable) {
-            owner.publish(ProximityState.Failed(
-                ProximityError(
-                    category = ProximityErrorCategory.Internal,
-                    code = "session_failed",
-                    message = "The proximity presentation session failed",
-                    recovery = ProximityRecovery.StartNewSession,
+            owner.publish(MobileWalletProximityState.Failed(
+                MobileWalletProximityError(
+                    category = MobileWalletProximityErrorCategory.Internal,
+                    code = "session_preparation_failed",
+                    message = "The proximity presentation session could not be prepared",
+                    recovery = MobileWalletProximityRecovery.StartNewSession,
                 )
             ))
         } finally {
@@ -506,7 +526,7 @@ private fun unavailableCapability(
         ),
 )
 
-private fun String.toRemediationActions(): List<ProximityRemediationAction> = when (this) {
+internal fun String.toRemediationActions(): List<MobileWalletProximityRemediationAction> = when (this) {
     "ble_permission_missing",
     "ble_permission_not_determined" -> listOf(ProximityRemediationAction.RequestBluetoothPermission)
     "ble_permission_denied",
@@ -521,8 +541,11 @@ private fun String.toRemediationActions(): List<ProximityRemediationAction> = wh
     "nfc_hce_unsupported",
     "nfc_adapter_unavailable",
     "nfc_host_unavailable",
-    "nfc_card_session_unsupported",
-    "nfc_system_ineligible" -> listOf(MobileWalletProximityRemediationAction.UseSupportedDevice)
+    "nfc_card_session_unsupported" -> listOf(MobileWalletProximityRemediationAction.UseSupportedDevice)
+    "nfc_access_not_accepted",
+    "nfc_system_ineligible" -> listOf(MobileWalletProximityRemediationAction.OpenApplicationSettings)
+    "nfc_system_unavailable",
+    "nfc_session_already_active",
     "nfc_foreground_routing_required",
     "nfc_card_session_active",
     "nfc_session_expired" -> listOf(MobileWalletProximityRemediationAction.Retry)
@@ -559,8 +582,8 @@ internal fun EngineProximityError.toWalletError(): ProximityError = ProximityErr
     },
     code = code,
     message = message,
-    recovery = if (this is EngineProximityError.Transport || code in setOf("changed_submission", "stale_consent", "stale_submission")) {
-        ProximityRecovery.StartNewSession
+    recovery = if (this is ProximityError.Transport || this is ProximityError.Capability || code in setOf("request_processing_failed", "response_processing_failed", "changed_submission", "stale_consent", "stale_submission")) {
+        MobileWalletProximityRecovery.StartNewSession
     } else {
         ProximityRecovery.None
     },

@@ -519,6 +519,17 @@ class HolderProtocolEngineTest {
     }
 
     @Test
+    fun `unexpected preview failure retains diagnostics without exposing exception text`() = realDispatcherTest {
+        val cause = IllegalStateException("private request bytes")
+        val run = runSingleRequestSession(previewFailure = cause)
+        val result = assertIs<MdocHolderSessionResult.Failed>(run.result)
+        assertEquals(cause.message, assertIs<IllegalStateException>(result.cause).message)
+        assertEquals("request_processing_failed", result.error.code)
+        assertEquals("The reader request could not be processed", result.error.message)
+        assertEquals(0, run.resolveCalls)
+    }
+
+    @Test
     fun `stale consent and changed submission bindings fail closed before response`() = realDispatcherTest {
         val stale = runSingleRequestSession(
             consent = { MdocConsentDecision.Approve(ImmutableBytes.of(ByteArray(32))) },
@@ -628,8 +639,13 @@ class HolderProtocolEngineTest {
             eDeviceKey = deviceKey,
             engagementSources = listOf(source),
             requestProcessor = object : MdocHolderRequestProcessor {
-                override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview =
-                    preview(context.request.value)
+                override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview {
+                    assertEquals(transcript, context.transcript.value)
+                    assertContentEquals(
+                        MdocCryptoHelper.buildSessionTranscriptBytes(transcript), context.transcript.encodedCopy(),
+                    )
+                    return preview(context.request.value)
+                }
 
                 override suspend fun resolve(
                     context: MdocHolderRequestContext,
@@ -855,6 +871,7 @@ class HolderProtocolEngineTest {
 
     private suspend fun CoroutineScope.runSingleRequestSession(
         consent: suspend (MdocConsentPrompt) -> MdocConsentDecision = { MdocConsentDecision.Approve(it.bindingToken) },
+        previewFailure: Exception? = null,
         applicationAuthorization: MdocApplicationAuthorization? = null,
         resolvedApplicationAuthorization: MdocApplicationAuthorization? = null,
         resolutionBinding: ImmutableBytes? = null,
@@ -907,6 +924,7 @@ class HolderProtocolEngineTest {
             requestProcessor = object : MdocHolderRequestProcessor {
                 override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview {
                     onPreview()
+                    previewFailure?.let { throw it }
                     return preview(
                         context.request.value,
                         applicationAuthorizations = listOfNotNull(applicationAuthorization),

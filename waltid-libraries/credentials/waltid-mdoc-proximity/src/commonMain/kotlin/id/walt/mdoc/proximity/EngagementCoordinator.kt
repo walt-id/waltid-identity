@@ -118,6 +118,7 @@ class MdocEngagementCoordinator {
             "An engagement mode may be registered by only one source"
         }
         val prepared = mutableListOf<PreparedMdocEngagement>()
+        val preparationFailures = mutableListOf<ProximityException>()
         try {
             ownedSources.forEach { (source, modes) ->
                 val candidate = try {
@@ -126,6 +127,7 @@ class MdocEngagementCoordinator {
                     throw cancelled
                 } catch (failure: ProximityException) {
                     if (failure.error !is ProximityError.Capability) throw failure
+                    preparationFailures += failure
                     // Another configured engagement path may still be usable.
                     return@forEach
                 }
@@ -137,9 +139,9 @@ class MdocEngagementCoordinator {
                     "Only a prepared QR engagement may expose a QR payload"
                 }
             }
-            if (prepared.isEmpty()) throw ProximityException(
-                ProximityError.Capability("no_engagement", "No requested engagement method could be prepared")
-            )
+            if (prepared.isEmpty()) throw preparationFailures.first().also { first ->
+                preparationFailures.drop(1).forEach(first::addSuppressed)
+            }
             val qrPayloads = prepared.mapNotNull { it.readiness.qrPayload }
             require(qrPayloads.size <= 1) { "Only one prepared engagement may expose a QR payload" }
             val availableTransports = prepared.flatMap { it.readiness.availableTransports }.toSet()
@@ -185,13 +187,13 @@ class MdocEngagementCoordinator {
         }
         var failureCloseReason = ProximityCloseReason.CANCELLED
         try {
-            var failures = 0
+            val failures = mutableListOf<Throwable>()
             var winner: WinningMdocEngagement? = null
-            while (winner == null && failures < prepared.sources.size) {
+            while (winner == null && failures.size < prepared.sources.size) {
                 val (source, result) = results.receive()
                 val engaged = result.getOrNull()
                 if (engaged == null) {
-                    failures++
+                    failures += requireNotNull(result.exceptionOrNull())
                 } else {
                     require(prepared.owns(source, engaged.engagementMode)) {
                         "An engaged connection must use a mode owned by its source"
@@ -201,7 +203,13 @@ class MdocEngagementCoordinator {
             }
             val selected = winner ?: run {
                 failureCloseReason = ProximityCloseReason.PEER_DISCONNECTED
-                throw ProximityException(ProximityError.Transport("engagement_failed", "All engagement paths failed"))
+                val first = failures.filterIsInstance<ProximityException>().firstOrNull()
+                    ?: ProximityException(
+                        ProximityError.Transport("engagement_failed", "All engagement paths failed"),
+                        failures.firstOrNull(),
+                    )
+                failures.filter { it !== first && it !== first.cause }.forEach(first::addSuppressed)
+                throw first
             }
             closeAll(prepared.sources.filterNot { it === selected.source }, ProximityCloseReason.LOST_RACE)
             jobs.forEach { if (it.isActive) it.cancelAndJoin() }

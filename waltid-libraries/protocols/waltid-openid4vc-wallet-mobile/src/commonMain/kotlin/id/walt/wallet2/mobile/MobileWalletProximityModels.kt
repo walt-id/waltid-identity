@@ -259,6 +259,10 @@ public data class ProximityError(
     public val message: String,
     public val recovery: ProximityRecovery,
 ) {
+    /** Host actions for this safe error code; terminal failures require a fresh session afterward. */
+    public val remediationActions: List<MobileWalletProximityRemediationAction>
+        get() = code.toRemediationActions()
+
     init {
         require(code.isNotBlank()) { "A proximity error code must not be blank" }
         require(message.isNotBlank()) { "A proximity error message must not be blank" }
@@ -1422,8 +1426,27 @@ public enum class ProximityActionType {
     ReportRemediation,
 }
 
+/** Engagement that actually won the reader connection. */
+public enum class MobileWalletProximityEngagementMethod { Qr, Nfc }
+
+/** Bearer actually carrying the connected session. */
+public enum class MobileWalletProximityTransport { BluetoothLowEnergy, Nfc, WifiAware }
+
+/**
+ * Actual connected route, independent of the methods configured or advertised.
+ * @property engagement Engagement that won the reader connection.
+ * @property transport Bearer carrying the connected session.
+ */
+public data class MobileWalletProximityConnectedRoute(
+    public val engagement: MobileWalletProximityEngagementMethod,
+    public val transport: MobileWalletProximityTransport,
+)
+
 /** Single-use, wallet-owned proximity presentation session. */
-public interface ProximitySession {
+public interface MobileWalletProximitySession {
+    /** Winning route once connected; remains available through review and termination. */
+    public val connectedRoute: MobileWalletProximityConnectedRoute? get() = null
+
     /** Hot state stream whose variants define the only legal phase data and actions. */
     public val state: StateFlow<ProximityState>
 
