@@ -63,7 +63,7 @@ let nfcConfiguration = ProximityConfiguration(
 ```
 
 When the user selects a prepared NFC engagement, call
-``ProximityPresentationSession/presentNfc()`` to open the iOS system sheet. The
+``ProximitySession/presentNfc()`` to open the iOS system sheet. The
 request waits for NFC resources without replacing the engagement or session
 keys. Repeated requests during emulation have no effect. Calls outside NFC
 engagement readiness are ignored, and failures arrive through the state stream.
@@ -94,7 +94,7 @@ lifetime is not treated as CardSession availability. The SDK holds a successful
 assertion without renewing it automatically and continues the explicitly started
 CardSession if assertion acquisition fails or the assertion later expires.
 
-For background handling, read ``ProximityPresentationSession/systemPresentationActive``
+For background handling, read ``ProximitySession/systemPresentationActive``
 at the transition. It becomes true when the adapter enters `startEmulation()` and
 clears when emulation ends, fails, is invalidated, or loses to another engagement.
 NFC configuration, an armed card session, and the optional presentment assertion

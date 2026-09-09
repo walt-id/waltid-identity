@@ -139,17 +139,17 @@ private class BluetoothAuthorizationRequester(
     }
 }
 
-private suspend fun openApplicationSettings(): MobileWalletProximityHostActionResult {
-    val returned = CompletableDeferred<MobileWalletProximityHostActionResult>()
+private suspend fun openApplicationSettings(): ProximityHostActionResult {
+    val returned = CompletableDeferred<ProximityHostActionResult>()
     val token = NSNotificationCenter.defaultCenter.addObserverForName(
         UIApplicationDidBecomeActiveNotification, `object` = null, queue = NSOperationQueue.mainQueue,
-    ) { returned.complete(MobileWalletProximityHostActionResult.Completed) }
+    ) { returned.complete(ProximityHostActionResult.Completed) }
     return try {
         val opened = CompletableDeferred<Boolean>()
         UIApplication.sharedApplication.openURL(
             NSURL(string = UIApplicationOpenSettingsURLString), options = emptyMap<Any?, Any?>(),
         ) { opened.complete(it) }
-        if (opened.await()) returned.await() else MobileWalletProximityHostActionResult.Failed
+        if (opened.await()) returned.await() else ProximityHostActionResult.Failed
     } finally {
         NSNotificationCenter.defaultCenter.removeObserver(token)
     }

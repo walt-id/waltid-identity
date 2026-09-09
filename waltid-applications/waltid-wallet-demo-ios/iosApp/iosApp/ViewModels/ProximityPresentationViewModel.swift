@@ -6,24 +6,24 @@ import WalletSDK
 
 protocol DemoProximityPresentationSession: Sendable {
     var systemPresentationActive: Bool { get }
-    var connectedRoute: ProximityPresentationConnectedRoute? { get }
-    var states: AsyncStream<ProximityPresentationState> { get }
+    var connectedRoute: ProximityConnectedRoute? { get }
+    var states: AsyncStream<ProximityState> { get }
     func presentNfc() async
-    func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult
+    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult
     func close() async
 }
 
 extension DemoProximityPresentationSession {
-    var connectedRoute: ProximityPresentationConnectedRoute? { nil }
+    var connectedRoute: ProximityConnectedRoute? { nil }
 }
 
-extension ProximityPresentationSession: DemoProximityPresentationSession {}
+extension ProximitySession: DemoProximityPresentationSession {}
 
 @MainActor
 protocol ProximityWalletClient: AnyObject {
     func proximityPresentationCapabilities(
-        configuration: ProximityPresentationConfiguration
-    ) async throws -> ProximityPresentationCapabilities
+        configuration: ProximityConfiguration
+    ) async throws -> ProximityCapabilities
 
     func startProximityPresentation(
         configuration: ProximityConfiguration
@@ -52,9 +52,9 @@ final class ProximityPresentationViewModel: ObservableObject {
     @Published private(set) var hostActionInProgress: ProximityRemediationAction?
     @Published private(set) var actionErrorMessage: String?
     @Published private(set) var startupFailed = false
-    @Published private(set) var capabilities: ProximityPresentationCapabilities?
-    @Published private(set) var connectedRoute: ProximityPresentationConnectedRoute?
-    @Published private(set) var preferredEngagement: ProximityPresentationEngagementMethod?
+    @Published private(set) var capabilities: ProximityCapabilities?
+    @Published private(set) var connectedRoute: ProximityConnectedRoute?
+    @Published private(set) var preferredEngagement: ProximityEngagementMethod?
 
     private let client: any ProximityWalletClient
     private let configurationProvider: @MainActor () -> ProximityConfiguration
@@ -63,13 +63,13 @@ final class ProximityPresentationViewModel: ObservableObject {
     private var observationTask: Task<Void, Never>?
     private var hostActionTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
-    private var effectiveConfiguration: ProximityPresentationConfiguration?
-    private var pendingConfiguration: ProximityPresentationConfiguration?
+    private var effectiveConfiguration: ProximityConfiguration?
+    private var pendingConfiguration: ProximityConfiguration?
     private var sessionGeneration: UInt64 = 0
 
     init(
         client: any ProximityWalletClient,
-        configurationProvider: @escaping @MainActor () -> ProximityPresentationConfiguration = {
+        configurationProvider: @escaping @MainActor () -> ProximityConfiguration = {
             .init(
                 session: .nfc(.init(
                     handover: .negotiatedHandover,
@@ -108,19 +108,19 @@ final class ProximityPresentationViewModel: ObservableObject {
         }.first
     }
 
-    var engagementChoices: [ProximityPresentationEngagementMethod] {
+    var engagementChoices: [ProximityEngagementMethod] {
         guard case .engagementReady(let engagements) = sessionState else { return [] }
         let hasNFC = engagements.contains { if case .nfc = $0 { return true }; return false }
         let hasQR = engagements.contains { if case .qr = $0 { return true }; return false }
         return (hasNFC ? [.nfc] : []) + (hasQR ? [.qr] : [])
     }
 
-    var displayedEngagement: ProximityPresentationEngagementMethod? {
+    var displayedEngagement: ProximityEngagementMethod? {
         if let preferredEngagement, engagementChoices.contains(preferredEngagement) { return preferredEngagement }
         return engagementChoices == [.qr] ? .qr : nil
     }
 
-    func showEngagement(_ method: ProximityPresentationEngagementMethod) {
+    func showEngagement(_ method: ProximityEngagementMethod) {
         guard hostActionInProgress == nil, engagementChoices.contains(method) else { return }
         preferredEngagement = method
         if method == .nfc, let session {
@@ -151,7 +151,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     private func checkPrerequisitesAndStart(
-        _ configuration: ProximityPresentationConfiguration,
+        _ configuration: ProximityConfiguration,
         generation: UInt64,
         automaticPermissionAttempted: Bool = false
     ) {
@@ -198,8 +198,8 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     private func remediateBeforeSession(
-        _ action: ProximityPresentationRemediationAction,
-        configuration: ProximityPresentationConfiguration,
+        _ action: ProximityRemediationAction,
+        configuration: ProximityConfiguration,
         generation: UInt64
     ) async {
         hostActionInProgress = action
@@ -304,7 +304,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         checkPrerequisitesAndStart(pendingConfiguration, generation: sessionGeneration, automaticPermissionAttempted: true)
     }
 
-    func remediate(_ action: ProximityPresentationRemediationAction) {
+    func remediate(_ action: ProximityRemediationAction) {
         if case .failed(let error) = sessionState, error.remediationActions.contains(action),
            let effectiveConfiguration, hostActionInProgress == nil {
             replaceSession(effectiveConfiguration, action: action)
@@ -333,7 +333,7 @@ final class ProximityPresentationViewModel: ObservableObject {
                 return
             }
             guard let session else { return }
-            let result: ProximityPresentationActionResult
+            let result: ProximityActionResult
             do {
                 result = try await session.dispatch(.reportRemediation(action, outcome))
             } catch {
@@ -401,8 +401,8 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     private func replaceSession(
-        _ configuration: ProximityPresentationConfiguration,
-        action: ProximityPresentationRemediationAction? = nil
+        _ configuration: ProximityConfiguration,
+        action: ProximityRemediationAction? = nil
     ) {
         sessionGeneration &+= 1
         let generation = sessionGeneration
@@ -491,7 +491,7 @@ final class ProximityPresentationViewModel: ObservableObject {
 @MainActor
 private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActionExecutor,
     @preconcurrency CBCentralManagerDelegate {
-    private var settingsContinuation: CheckedContinuation<ProximityPresentationHostActionResult, Never>?
+    private var settingsContinuation: CheckedContinuation<ProximityHostActionResult, Never>?
     private var settingsObserver: NSObjectProtocol?
     private var bluetoothManager: CBCentralManager?
     private var bluetoothContinuation: CheckedContinuation<ProximityHostActionResult, Never>?
@@ -514,7 +514,7 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
         }
     }
 
-    private func openSettingsAndWaitForReturn() async -> ProximityPresentationHostActionResult {
+    private func openSettingsAndWaitForReturn() async -> ProximityHostActionResult {
         guard settingsContinuation == nil, let url = URL(string: UIApplication.openSettingsURLString) else { return .failed }
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
@@ -533,7 +533,7 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
         }
     }
 
-    private func finishSettings(_ result: ProximityPresentationHostActionResult) {
+    private func finishSettings(_ result: ProximityHostActionResult) {
         if let settingsObserver { NotificationCenter.default.removeObserver(settingsObserver) }
         settingsObserver = nil
         let continuation = settingsContinuation
@@ -581,8 +581,8 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
 @MainActor
 final class UnavailableProximityWalletClient: ProximityWalletClient {
     func proximityPresentationCapabilities(
-        configuration: ProximityPresentationConfiguration
-    ) async throws -> ProximityPresentationCapabilities {
+        configuration: ProximityConfiguration
+    ) async throws -> ProximityCapabilities {
         throw ProximityPresentationUnavailable()
     }
 

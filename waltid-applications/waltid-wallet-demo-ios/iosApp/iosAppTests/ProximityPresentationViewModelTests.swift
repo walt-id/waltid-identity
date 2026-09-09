@@ -167,7 +167,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     @MainActor
     func testConfiguredNfcCancelsOnBackgroundOutsideSystemPresentment() async throws {
         for state in [
-            ProximityPresentationState.preparing(profile: .iso180135Edition2DIS2026),
+            WalletSDK.ProximityState.preparing(profile: .iso180135Edition2DIS2026),
             .engagementReady([.nfc]),
             .awaitingRequest(exchange: 1),
             .reviewRequired(combinedProximityReview()),
@@ -199,7 +199,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let client = FakeProximityWalletClient(session: session)
         let viewModel = ProximityPresentationViewModel(
             client: client,
-            configurationProvider: { ProximityPresentationConfiguration() },
+            configurationProvider: { WalletSDK.ProximityConfiguration() },
             hostActions: FakeProximityHostActionExecutor()
         )
 
@@ -369,11 +369,11 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let session = FakeProximitySession()
         let client = FakeProximityWalletClient(session: session)
         var profile = WalletDemoProximityTransportProfile.provisionalNfcV2Direct
-        var policy = ProximityStoredReaderPolicy.requireTrusted
+        var policy = WalletSDK.ProximityStoredReaderPolicy.requireTrusted
         let viewModel = ProximityPresentationViewModel(
             client: client,
             configurationProvider: {
-                ProximityReaderTrustSettings(readerPolicy: policy).applying(
+                WalletSDK.ProximityReaderTrustSettings(readerPolicy: policy).applying(
                     to: profile.configuration
                 )
             },
@@ -532,7 +532,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
         viewModel.start()
         try await waitUntil { client.startCount == 1 }
-        for state in [ProximityPresentationState.connecting([.qr(payload: "mdoc:stable")]), .reviewRequired(combinedProximityReview())] {
+        for state in [WalletSDK.ProximityState.connecting([.qr(payload: "mdoc:stable")]), .reviewRequired(combinedProximityReview())] {
             await session.emit(state)
             try await waitUntil { viewModel.sessionState == state }
             viewModel.showEngagement(.qr)
@@ -612,8 +612,22 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testNoDataIsTerminalAndKeepsFinalExchangeUntilDismissal() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.noData(exchange: 2))
+        try await waitUntil { viewModel.isTerminal }
+        XCTAssertEqual(viewModel.sessionState, .noData(exchange: 2))
+        viewModel.dismiss()
+        XCTAssertNil(viewModel.sessionState)
+    }
+
+    @MainActor
     func testActualConnectedRouteSurvivesSkippedConnectingStateAndCompletion() async throws {
-        let route = ProximityPresentationConnectedRoute(engagement: .nfc, transport: .bluetoothLowEnergy)
+        let route = WalletSDK.ProximityConnectedRoute(engagement: .nfc, transport: .bluetoothLowEnergy)
         let session = FakeProximitySession(connectedRoute: route)
         let client = FakeProximityWalletClient(session: session)
         let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
@@ -628,20 +642,6 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.connectedRoute)
     }
 
-
-    @MainActor
-    func testNoDataIsTerminalAndKeepsFinalExchangeUntilDismissal() async throws {
-        let session = FakeProximitySession()
-        let client = FakeProximityWalletClient(session: session)
-        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
-        viewModel.start()
-        try await waitUntil { client.startCount == 1 }
-        await session.emit(.noData(exchange: 2))
-        try await waitUntil { viewModel.isTerminal }
-        XCTAssertEqual(viewModel.sessionState, .noData(exchange: 2))
-        viewModel.dismiss()
-        XCTAssertNil(viewModel.sessionState)
-    }
 
 }
 
@@ -705,18 +705,18 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
     private let session: any DemoProximityPresentationSession
     private let nextSession: (any DemoProximityPresentationSession)?
     private let suspendStart: Bool
-    private let capabilityResults: [ProximityPresentationCapabilities]
+    private let capabilityResults: [WalletSDK.ProximityCapabilities]
     private var startContinuation: CheckedContinuation<Void, Never>?
     private(set) var capabilityCallCount = 0
     private(set) var startCount = 0
-    private(set) var configurations: [ProximityPresentationConfiguration] = []
-    var lastConfiguration: ProximityPresentationConfiguration? { configurations.last }
+    private(set) var configurations: [WalletSDK.ProximityConfiguration] = []
+    var lastConfiguration: WalletSDK.ProximityConfiguration? { configurations.last }
 
     init(
         session: any DemoProximityPresentationSession,
         nextSession: (any DemoProximityPresentationSession)? = nil,
         suspendStart: Bool = false,
-        capabilityResults: [ProximityPresentationCapabilities] = [makeProximityCapabilities()]
+        capabilityResults: [WalletSDK.ProximityCapabilities] = [makeProximityCapabilities()]
     ) {
         self.session = session
         self.nextSession = nextSession
@@ -725,8 +725,8 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
     }
 
     func proximityPresentationCapabilities(
-        configuration: ProximityPresentationConfiguration
-    ) async throws -> ProximityPresentationCapabilities {
+        configuration: WalletSDK.ProximityConfiguration
+    ) async throws -> WalletSDK.ProximityCapabilities {
         let index = min(capabilityCallCount, capabilityResults.count - 1)
         capabilityCallCount += 1
         return capabilityResults[index]
@@ -756,22 +756,22 @@ private extension Collection {
 
 private actor FakeProximitySession: DemoProximityPresentationSession {
     nonisolated let presentment = FakePresentmentState()
-    nonisolated let connectedRoute: ProximityPresentationConnectedRoute?
+    nonisolated let connectedRoute: WalletSDK.ProximityConnectedRoute?
     private var suspendClose: Bool
     private var closeContinuation: CheckedContinuation<Void, Never>?
     nonisolated var systemPresentationActive: Bool { presentment.active }
-    nonisolated let states: AsyncStream<ProximityPresentationState>
-    private let continuation: AsyncStream<ProximityPresentationState>.Continuation
-    private(set) var actions: [ProximityPresentationAction] = []
+    nonisolated let states: AsyncStream<WalletSDK.ProximityState>
+    private let continuation: AsyncStream<WalletSDK.ProximityState>.Continuation
+    private(set) var actions: [WalletSDK.ProximityAction] = []
     private(set) var closeCount = 0
     private(set) var presentNfcCalls = 0
 
     func presentNfc() async { presentNfcCalls += 1 }
 
-    init(suspendClose: Bool = false, connectedRoute: ProximityPresentationConnectedRoute? = nil) {
+    init(suspendClose: Bool = false, connectedRoute: WalletSDK.ProximityConnectedRoute? = nil) {
         self.suspendClose = suspendClose
         self.connectedRoute = connectedRoute
-        var continuation: AsyncStream<ProximityPresentationState>.Continuation!
+        var continuation: AsyncStream<WalletSDK.ProximityState>.Continuation!
         states = AsyncStream { continuation = $0 }
         self.continuation = continuation
     }
@@ -801,7 +801,7 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
 
 @MainActor
 private final class FakeProximityHostActionExecutor: ProximityHostActionExecutor {
-    private(set) var actions: [ProximityPresentationRemediationAction] = []
+    private(set) var actions: [WalletSDK.ProximityRemediationAction] = []
     private var suspendAction: Bool
     private var continuation: CheckedContinuation<Void, Never>?
 
@@ -815,8 +815,8 @@ private final class FakeProximityHostActionExecutor: ProximityHostActionExecutor
     }
 
     func perform(
-        _ action: ProximityPresentationRemediationAction
-    ) async -> ProximityPresentationHostActionResult {
+        _ action: WalletSDK.ProximityRemediationAction
+    ) async -> WalletSDK.ProximityHostActionResult {
         actions.append(action)
         if suspendAction { await withCheckedContinuation { continuation = $0 } }
         return .completed
@@ -826,18 +826,18 @@ private final class FakeProximityHostActionExecutor: ProximityHostActionExecutor
 private func makeProximityCapabilities(
     bluetoothAvailable: Bool = true,
     nfcAvailable: Bool = true,
-    bluetoothRemediation: [ProximityPresentationRemediationAction] = []
-) -> ProximityPresentationCapabilities {
+    bluetoothRemediation: [WalletSDK.ProximityRemediationAction] = []
+) -> WalletSDK.ProximityCapabilities {
     func capability(
         available: Bool,
         selected: Bool,
-        remediation: [ProximityPresentationRemediationAction] = []
-    ) -> ProximityPresentationTransportCapability {
-        ProximityPresentationTransportCapability(
+        remediation: [WalletSDK.ProximityRemediationAction] = []
+    ) -> WalletSDK.ProximityTransportCapability {
+        WalletSDK.ProximityTransportCapability(
             implemented: true,
             profilePermitted: true,
             runtime: !selected ? .notChecked : available ? .available : .unavailable(
-                ProximityPresentationError(
+                WalletSDK.ProximityError(
                     category: .capability,
                     code: "test_unavailable",
                     message: "The selected test capability is unavailable",
@@ -849,7 +849,7 @@ private func makeProximityCapabilities(
         )
     }
 
-    return ProximityPresentationCapabilities(
+    return WalletSDK.ProximityCapabilities(
         profile: .iso180135Edition2DIS2026,
         session: WalletDemoProximityTransportProfile.defaultProfile.configuration.session,
         qrEngagement: capability(available: true, selected: true),

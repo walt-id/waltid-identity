@@ -95,7 +95,7 @@ class WalletDemoProximityTestScenarios {
         }
 
         onNode(hasText("Open app settings") and hasClickAction()).assertIsDisplayed().performClick()
-        assertEquals(MobileWalletProximityRemediationAction.RequestBluetoothPermission, remediated)
+        assertEquals(ProximityRemediationAction.RequestBluetoothPermission, remediated)
     }
 
     fun connectingHidesEngagementChoicesAndQrCode() = runComposeUiTest {
@@ -103,10 +103,10 @@ class WalletDemoProximityTestScenarios {
             WalletDemoProximityScreen(
                 state = WalletDemoProximityUiState(
                     active = true,
-                    sessionState = MobileWalletProximityState.Connecting(
+                    sessionState = ProximityState.Connecting(
                         listOf(
-                            MobileWalletProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(120)),
-                            MobileWalletProximityEngagement.Nfc,
+                            ProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(120)),
+                            ProximityEngagement.Nfc,
                         )
                     ),
                 ),
@@ -134,7 +134,7 @@ class WalletDemoProximityTestScenarios {
     fun nfcOnlyEngagementShowsHoldGuidanceWithoutInventingAQrCode(requiresUserAction: Boolean = false) = runComposeUiTest {
         val state = mutableStateOf(WalletDemoProximityUiState(
             active = true,
-            sessionState = MobileWalletProximityState.EngagementReady(listOf(MobileWalletProximityEngagement.Nfc)),
+            sessionState = ProximityState.EngagementReady(listOf(ProximityEngagement.Nfc)),
             nfcRequiresUserAction = requiresUserAction,
         ))
         setContent {
@@ -158,7 +158,7 @@ class WalletDemoProximityTestScenarios {
 
         if (requiresUserAction) {
             onNodeWithTag("proximity-show-Nfc").assertIsDisplayed().performClick()
-            assertEquals(MobileWalletProximityEngagementMethod.Nfc, state.value.preferredEngagement)
+            assertEquals(ProximityEngagementMethod.Nfc, state.value.preferredEngagement)
         }
         onNodeWithText("Hold near the reader").assertIsDisplayed()
         onNodeWithText("Keep your phone near the reader while it connects. You’ll review the request before sharing.").assertIsDisplayed()
@@ -167,9 +167,9 @@ class WalletDemoProximityTestScenarios {
 
     fun guidedChoicesRemainUsableWithLargeTextAndDoNotShowRadios() = runComposeUiTest {
         val state = mutableStateOf(WalletDemoProximityUiState(active = true,
-            sessionState = MobileWalletProximityState.EngagementReady(listOf(
-                MobileWalletProximityEngagement.Nfc,
-                MobileWalletProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(120)),
+            sessionState = ProximityState.EngagementReady(listOf(
+                ProximityEngagement.Nfc,
+                ProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(120)),
             ))))
         setContent {
             val density = LocalDensity.current
@@ -192,24 +192,7 @@ class WalletDemoProximityTestScenarios {
         onNodeWithText("Hold near the reader instead").performScrollTo().performClick()
         onNodeWithText("Hold near the reader").performScrollTo().assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
-        assertEquals(MobileWalletProximityEngagementMethod.Nfc, state.value.displayedEngagement)
-    }
-
-    fun completedPresentationShowsDoneAndNoConnectionControls() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                WalletDemoProximityScreen(WalletDemoProximityUiState(active = true,
-                    sessionState = MobileWalletProximityState.Completed(1, false)), emptyMap(), hostActions,
-                    onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
-                    onContinueAfterResponseChange = {}, onApprove = {}, onDecline = {}, onRetry = {},
-                    onRemediate = { _, _ -> }, onCancel = {}, onDismiss = {}, onRestart = {})
-            }
-        }
-        onNodeWithText("Presentation complete").assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.ProximityDone).assertIsDisplayed()
-        onAllNodesWithText("Connection settings").assertCountEquals(0)
-        onAllNodesWithTag("proximity-show-Qr").assertCountEquals(0)
-        onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
+        assertEquals(ProximityEngagementMethod.Nfc, state.value.displayedEngagement)
     }
 
     fun completedPresentationShowsDoneAndNoConnectionControls() = runComposeUiTest {

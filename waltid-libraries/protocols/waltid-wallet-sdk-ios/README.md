@@ -187,7 +187,7 @@ even if a consumer skips the brief connecting state. Terminal errors also expose
 after Settings, wait for the application to become active and close the failed session before starting
 a fresh one. Do not send prerequisite retry actions to a terminal session.
 
-`ProximityPresentationSession` is an actor over the KMP source of truth. Its
+`ProximitySession` is an actor over the KMP source of truth. Its
 state stream, typed actions, immutable review, trust facts, disclosure choices,
 application-profile result, and terminal states contain no generated Kotlin,
 Bluetooth, COSE, or platform objects. Call `close()` when the journey ends;
