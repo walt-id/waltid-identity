@@ -50,6 +50,7 @@ import id.walt.wallet2.mobile.ProximityElementReference
 import id.walt.wallet2.mobile.ProximityEngagement
 import id.walt.wallet2.mobile.ProximityError
 import id.walt.wallet2.mobile.ProximityReaderAuthentication
+import id.walt.wallet2.mobile.ProximityReaderAuthenticationSummary
 import id.walt.wallet2.mobile.ProximityReaderAuthenticationScope
 import id.walt.wallet2.mobile.ProximityReaderAuthenticationValidity
 import id.walt.wallet2.mobile.ProximityRecovery
@@ -260,6 +261,11 @@ internal fun WalletDemoProximityScreen(
                         } else {
                             stringResource(Res.string.proximity_presentation_complete_message)
                         },
+                        onDismiss = onDismiss,
+                    )
+                    is ProximityState.NoData -> TerminalContent(
+                        title = stringResource(Res.string.proximity_no_data_title),
+                        message = stringResource(Res.string.proximity_declined_message),
                         onDismiss = onDismiss,
                     )
                     ProximityState.Cancelled -> TerminalContent(
@@ -524,10 +530,6 @@ private fun ReaderMetadataCard(
     }
 
     var expanded by rememberSaveable { mutableStateOf(false) }
-    val mostSevereAuthentication = review.readerAuthentication.maxByOrNull { it.summarySeverity() }
-    val hasMissingAuthentication = review.readerAuthentication.any {
-        it.validity == ProximityReaderAuthenticationValidity.Absent
-    }
     val displayNames = suppliedAuthentications.mapNotNull { authentication ->
         authentication.displayName?.trim()?.takeIf(String::isNotEmpty)
     }.distinct()
@@ -536,18 +538,14 @@ private fun ReaderMetadataCard(
         1 -> displayNames.single()
         else -> stringResource(Res.string.proximity_multiple_reader_identities)
     }
-    val supportingText = mostSevereAuthentication?.let { authentication ->
-        when {
-            authentication.validity == ProximityReaderAuthenticationValidity.Malformed ||
-                authentication.validity == ProximityReaderAuthenticationValidity.Invalid ->
-                authentication.validity.displayName()
-            authentication.trust == ProximityReaderTrustState.Revoked ->
-                authentication.trust.displayName()
-            hasMissingAuthentication -> stringResource(Res.string.proximity_reader_authentication_partial)
-            authentication.validity != ProximityReaderAuthenticationValidity.Valid ->
-                authentication.validity.displayName()
-            else -> authentication.trust.displayName()
-        }
+    val supportingText = when (review.readerAuthenticationSummary) {
+        ProximityReaderAuthenticationSummary.Absent -> ProximityReaderAuthenticationValidity.Absent.displayName()
+        ProximityReaderAuthenticationSummary.Malformed -> ProximityReaderAuthenticationValidity.Malformed.displayName()
+        ProximityReaderAuthenticationSummary.Invalid -> ProximityReaderAuthenticationValidity.Invalid.displayName()
+        ProximityReaderAuthenticationSummary.Revoked -> ProximityReaderTrustState.Revoked.displayName()
+        ProximityReaderAuthenticationSummary.Partial -> stringResource(Res.string.proximity_reader_authentication_partial)
+        ProximityReaderAuthenticationSummary.ValidButUntrusted -> ProximityReaderTrustState.ValidButUntrusted.displayName()
+        ProximityReaderAuthenticationSummary.Trusted -> ProximityReaderTrustState.Trusted.displayName()
     }
 
     ExpandableMetadataCard(
@@ -559,13 +557,11 @@ private fun ReaderMetadataCard(
         summary = {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(displayName, fontWeight = FontWeight.SemiBold)
-                supportingText?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    supportingText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         },
         details = {
@@ -584,16 +580,6 @@ private fun ReaderMetadataCard(
             }
         },
     )
-}
-
-private fun ProximityReaderAuthentication.summarySeverity(): Int = when {
-    validity == ProximityReaderAuthenticationValidity.Malformed -> 7
-    validity == ProximityReaderAuthenticationValidity.Invalid -> 6
-    trust == ProximityReaderTrustState.Revoked -> 5
-    validity == ProximityReaderAuthenticationValidity.Absent -> 4
-    trust == ProximityReaderTrustState.ValidButUntrusted -> 3
-    trust == ProximityReaderTrustState.NotEvaluated -> 2
-    else -> 1
 }
 
 @Composable

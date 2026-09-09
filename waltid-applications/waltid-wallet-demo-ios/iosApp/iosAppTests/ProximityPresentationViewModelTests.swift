@@ -178,6 +178,20 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         XCTAssertEqual(resolutionCount, 2)
         XCTAssertEqual(client.configurations.last?.readerPolicy, .requireTrusted)
     }
+    @MainActor
+    func testNoDataIsTerminalAndKeepsFinalExchangeUntilDismissal() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.noData(exchange: 2))
+        try await waitUntil { viewModel.isTerminal }
+        XCTAssertEqual(viewModel.sessionState, .noData(exchange: 2))
+        viewModel.dismiss()
+        XCTAssertNil(viewModel.sessionState)
+    }
+
 }
 
 private func combinedProximityReview(exchange: Int = 1) -> ProximityReview {
@@ -228,6 +242,7 @@ private func combinedProximityReview(exchange: Int = 1) -> ProximityReview {
             ),
         ],
         readerAuthentication: [],
+        readerAuthenticationSummary: .absent,
         useCases: [],
         applicationAuthorizations: []
     )
