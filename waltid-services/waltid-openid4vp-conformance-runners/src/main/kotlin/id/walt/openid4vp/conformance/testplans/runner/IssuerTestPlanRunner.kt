@@ -30,8 +30,6 @@ class IssuerTestPlanRunner(
     private val conformanceHost = conformance.conformanceHost
     private val conformancePort = conformance.conformancePort
     private val moduleSelection = IssuerModuleSelection.fromEnvironment()
-    private val excludePreAuthorizedMultipleClients = System.getenv(EXCLUDE_PREAUTH_MULTIPLE_CLIENTS_ENV)
-        ?.equals("true", ignoreCase = true) == true
     private val browserAutomationConfig = IssuerBrowserAutomationConfig.fromEnvironment()
     private val browserAutomation = IssuerConformanceBrowserAutomation(
         config = browserAutomationConfig,
@@ -235,21 +233,12 @@ class IssuerTestPlanRunner(
 
     private fun knownSuiteBugExclusionReason(variant: IssuerVariant, testModule: String): String? {
         if (
-            excludePreAuthorizedMultipleClients &&
-            variant.grantType == PRE_AUTHORIZATION_CODE &&
-            testModule == MULTIPLE_CLIENTS_MODULE
-        ) {
-            return "upstream module reuses client 1's consumed pre-authorized code for client 2."
-        }
-
-        if (
             variant.grantType == PRE_AUTHORIZATION_CODE &&
             variant.clientAuthType == CLIENT_ATTESTATION &&
             testModule in PREAUTH_CLIENT_ATTESTATION_NEGATIVE_MODULES
         ) {
-            return "upstream module falls back to the positive token response check for " +
-                "pre_authorization_code, expecting HTTP 200 after issuer correctly rejects invalid " +
-                "client attestation with invalid_client."
+            return "upstream db1080a does not correctly exercise this client-attestation negative " +
+                "case for pre_authorization_code; authorization_code still covers it at PAR."
         }
 
         return null
@@ -281,26 +270,25 @@ class IssuerTestPlanRunner(
         listOfNotNull(javaClass.simpleName, message).joinToString(": ")
 
     private companion object {
-        const val EXCLUDE_PREAUTH_MULTIPLE_CLIENTS_ENV =
-            "OPENID4VCI_CONFORMANCE_EXCLUDE_PREAUTH_MULTIPLE_CLIENTS"
-        const val MULTIPLE_CLIENTS_MODULE = "oid4vci-1_0-issuer-happy-flow-multiple-clients"
         const val PRE_AUTHORIZATION_CODE = "pre_authorization_code"
         const val CLIENT_ATTESTATION = "client_attestation"
 
         /*
-         * These current upstream negative modules mutate client-attestation input, and issuer2
-         * correctly rejects the pre-authorized token request with invalid_client. In the
-         * pre_authorization_code variant, however, the suite continues with the base positive token
-         * response validator and expects HTTP 200, so these produce false failures for issuer2.
+         * At suite revision db1080a, these negative modules either continue after finishing the
+         * test, expect a positive token response after invalid_client, or only mutate the PAR
+         * request and therefore do not exercise the intended condition in a pre-authorized flow.
          * Keep the exclusion scoped to pre_authorization_code + client_attestation; authorization
          * code variants still exercise these checks at PAR and should remain runnable.
          */
         val PREAUTH_CLIENT_ATTESTATION_NEGATIVE_MODULES = setOf(
+            // Validates 401 invalid_client, then continues into requestProtectedResource() after
+            // fireTestFinished(): CreateEmptyResourceEndpointRequestHeaders fails in WAITING state.
             "oid4vci-1_0-issuer-fail-invalid-client-attestation-signature",
             "oid4vci-1_0-issuer-fail-invalid-client-attestation-pop-signature",
             "oid4vci-1_0-issuer-fail-client-attestation-exp-in-past",
             "oid4vci-1_0-issuer-fail-client-attestation-no-sub",
             "oid4vci-1_0-issuer-fail-client-attestation-pop-wrong-aud",
+            "oid4vci-1_0-issuer-fail-mismatched-client-attestation-pop-key",
         )
     }
 

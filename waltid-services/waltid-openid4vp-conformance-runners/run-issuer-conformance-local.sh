@@ -148,25 +148,6 @@ if [[ -n "${OPENID4VCI_CONFORMANCE_VARIANT_ID:-}" ]]; then
   export OPENID4VCI_CONFORMANCE_VARIANTS="$OPENID4VCI_CONFORMANCE_VARIANT_ID"
 fi
 
-###############################################################################
-# TEMPORARY UPSTREAM CONFORMANCE-SUITE EXCLUSION
-#
-# Exclude oid4vci-1_0-issuer-happy-flow-multiple-clients ONLY for the
-# pre_authorization_code variant. After client 1 consumes its one-time code, the
-# upstream module starts an authorization-endpoint flow for client 2 and then
-# submits client 1's already-consumed pre-authorized code again. issuer2 correctly
-# rejects that request with HTTP 400 invalid_grant. Allowing pre-authorized-code
-# reuse in issuer2 would be a protocol and security regression, not a valid way
-# to satisfy this test.
-#
-# Keep this exclusion until the upstream module either obtains a fresh credential
-# offer/pre-authorized code for client 2 or declares that variant inapplicable.
-# The authorization_code variant is valid and MUST remain enabled. The Kotlin
-# runner therefore applies this rule to the module-and-grant combination, not to
-# the module globally. This also works for matrices containing both grant types.
-###############################################################################
-export OPENID4VCI_CONFORMANCE_EXCLUDE_PREAUTH_MULTIPLE_CLIENTS="true"
-
 if [[ -z "${OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION+x}" ]] && module_selection_can_require_browser_automation; then
   BROWSER_AUTOMATION_DEFAULT="true"
   echo "Browser automation defaulted to true because the selected issuer module set can require front-channel authorization."
