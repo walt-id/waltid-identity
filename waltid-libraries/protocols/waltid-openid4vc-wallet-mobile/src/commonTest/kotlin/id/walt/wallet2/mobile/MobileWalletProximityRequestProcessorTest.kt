@@ -689,6 +689,21 @@ class ProximityRequestProcessorTest {
     }
 
     @Test
+    fun `no-data terminal state rejects late observations and holder actions`() = runTest {
+        withFixture { fixture ->
+            val owner = owner(fixture, processor(fixture))
+            owner.publish(ProximityState.AwaitingRequest(2))
+            owner.publish(ProximityState.NoData(1))
+            assertIs<ProximityState.AwaitingRequest>(owner.state.value)
+            owner.publish(ProximityState.NoData(2))
+            owner.publish(ProximityState.Completed(2, false))
+            owner.publish(ProximityState.AwaitingRequest(3))
+            assertEquals(ProximityState.NoData(2), owner.state.value)
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Cancel))
+        }
+    }
+
+    @Test
     fun `older engine observations never replace a dispatchable review or authorization`() = runTest {
         withFixture { fixture ->
             val processor = processor(fixture)
@@ -978,7 +993,7 @@ class ProximityRequestProcessorTest {
                 "mDL_MS_DR_UF_10" to DeviceRequest("org.iso.18013.5.1.mDL", mapOf("unknown.namespace" to listOf("given_name"))),
             )) {
                 val result = wireExchange(fixture, request)
-                assertIs<MdocHolderSessionResult.Completed>(result.result, id)
+                assertEquals(1, assertIs<MdocHolderSessionResult.NoData>(result.result, id).exchange)
                 assertEquals(0, result.consentCalls, id)
                 assertEquals(0u, result.response.status, id)
                 assertEquals(null, result.response.documents, id)

@@ -241,6 +241,7 @@ private class ProximitySessionImpl(
                 withContext(NonCancellable) { stateCollector.cancelAndJoin() }
             }
             when (result) {
+                is MdocHolderSessionResult.NoData -> owner.publish(ProximityState.NoData(result.exchange))
                 is MdocHolderSessionResult.Completed -> owner.publish(
                     ProximityState.Completed(result.exchanges, declined = false))
                 is MdocHolderSessionResult.Declined -> owner.publish(
@@ -301,6 +302,7 @@ private class ProximitySessionImpl(
                 ProximityState.Terminating(engineState.exchange)
             is MdocHolderSessionState.Declined ->
                 ProximityState.Completed(engineState.exchange, declined = true)
+            is MdocHolderSessionState.NoData -> ProximityState.NoData(engineState.exchange)
             is MdocHolderSessionState.Completed ->
                 ProximityState.Completed(engineState.exchanges, declined = false)
             is MdocHolderSessionState.Failed -> ProximityState.Failed(engineState.error.toWalletError())
