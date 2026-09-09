@@ -60,7 +60,12 @@ class HolderProtocolEngineTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
-    fun `fake reader completes repeated signature and MAC response exchanges`() = realDispatcherTest {
+    fun `fake reader completes repeated signature and MAC response exchanges`() = repeatedExchanges(noDataOnSecondRequest = false)
+
+    @Test
+    fun `empty second request preserves the first response and ends without further consent`() = repeatedExchanges(noDataOnSecondRequest = true)
+
+    private fun repeatedExchanges(noDataOnSecondRequest: Boolean) = realDispatcherTest {
         val deviceKey = agreementKey("engine-device")
         val readerKey = agreementKey("engine-reader")
         val signatureHolderKey = runtime.generateMdocTestKey(
@@ -106,10 +111,14 @@ class HolderProtocolEngineTest {
             )
         )
         var resolved = 0
+        var consentCalls = 0
         val engine = MdocHolderProtocolEngine(
             eDeviceKey = deviceKey,
             transportProviders = listOf(transport),
             requestProcessor = object : MdocHolderRequestProcessor {
+                override suspend fun prepare(context: MdocHolderRequestContext): MdocRequestPreparation =
+                    if (noDataOnSecondRequest && resolved == 1) MdocRequestPreparation.NoData
+                    else super.prepare(context)
                 override suspend fun preview(context: MdocHolderRequestContext) = preview(context.request.value)
                 override suspend fun resolve(
                     context: MdocHolderRequestContext,
@@ -153,7 +162,10 @@ class HolderProtocolEngineTest {
                     )
                 }
             },
-            consentHandler = MdocConsentHandler { MdocConsentDecision.Approve(it.bindingToken) },
+            consentHandler = MdocConsentHandler {
+                consentCalls++
+                MdocConsentDecision.Approve(it.bindingToken)
+            },
             engagementContext = engagementContext,
             capabilities = capabilities,
         )
@@ -178,31 +190,48 @@ class HolderProtocolEngineTest {
                     .first().completedExchanges,
             )
             loopback.reader.send(secondRequest)
-            val macResponse = assertResponse(loopback.reader, readerSession.cipher, engine)
-            assertEquals(
-                2,
-                engine.state.filterIsInstance<MdocHolderSessionState.Terminating>().first().exchange,
+            val macResponse = assertResponse(
+                loopback.reader, readerSession.cipher, engine,
+                expectedStatus = if (noDataOnSecondRequest) SessionStatusCode.SESSION_TERMINATION else null,
             )
-            val termination = withTimeoutOrNull(5.seconds) { loopback.reader.receive() }
-                ?: error("No session termination from holder")
-            assertEquals(
-                SessionStatusCode.SESSION_TERMINATION,
-                coseCompliantCbor.decodeFromByteArray<SessionData>(termination.copy()).statusCode,
-            )
+            if (!noDataOnSecondRequest) {
+                assertEquals(
+                    2,
+                    engine.state.filterIsInstance<MdocHolderSessionState.Terminating>().first().exchange,
+                )
+                val termination = withTimeoutOrNull(5.seconds) { loopback.reader.receive() }
+                    ?: error("No session termination from holder")
+                assertEquals(
+                    SessionStatusCode.SESSION_TERMINATION,
+                    coseCompliantCbor.decodeFromByteArray<SessionData>(termination.copy()).statusCode,
+                )
+            }
             val signatureDocuments = requireNotNull(signatureResponse.documents)
             assertEquals(2, signatureDocuments.size)
             signatureDocuments.forEach {
                 assertIs<DeviceAuth.Signature>(it.deviceSigned!!.deviceAuth)
             }
-            assertIs<DeviceAuth.Mac>(macResponse.documents!!.single().deviceSigned!!.deviceAuth)
+            if (noDataOnSecondRequest) {
+                assertEquals(null, macResponse.documents)
+                assertEquals(0u, macResponse.status)
+            } else {
+                assertIs<DeviceAuth.Mac>(macResponse.documents!!.single().deviceSigned!!.deviceAuth)
+            }
             readerSession.cipher.close()
         }
 
         val result = engine.run()
         reader.await()
 
-        assertEquals(2, assertIs<MdocHolderSessionResult.Completed>(result).exchanges)
-        assertEquals(2, resolved)
+        if (noDataOnSecondRequest) {
+            assertEquals(2, assertIs<MdocHolderSessionResult.NoData>(result).exchange)
+            assertEquals(2, assertIs<MdocHolderSessionState.NoData>(engine.state.value).exchange)
+        } else {
+            assertEquals(2, assertIs<MdocHolderSessionResult.Completed>(result).exchanges)
+            assertEquals(2, assertIs<MdocHolderSessionState.Completed>(engine.state.value).exchanges)
+        }
+        assertEquals(if (noDataOnSecondRequest) 1 else 2, resolved)
+        assertEquals(resolved, consentCalls)
         assertFailsWith<IllegalStateException> { engine.run() }
     }
 
@@ -343,7 +372,7 @@ class HolderProtocolEngineTest {
     @Test
     fun `negotiated handover accepts only the exact SessionEstablishment copy`() = realDispatcherTest {
         val accepted = runNegotiatedHandover(mutateEstablishment = false)
-        assertEquals(1, assertIs<MdocHolderSessionResult.Completed>(accepted).exchanges)
+        assertEquals(1, assertIs<MdocHolderSessionResult.NoData>(accepted).exchange)
 
         val rejected = assertIs<MdocHolderSessionResult.Failed>(
             runNegotiatedHandover(mutateEstablishment = true)
@@ -513,10 +542,12 @@ class HolderProtocolEngineTest {
         connection: ProximityConnection,
         cipher: MdocSessionCipher,
         engine: MdocHolderProtocolEngine,
+        expectedStatus: SessionStatusCode? = null,
     ): DeviceResponse {
         val bytes = withTimeoutOrNull(5.seconds) { connection.receive() }
             ?: error("No response from holder; state=${engine.state.value}")
         val responseMessage = coseCompliantCbor.decodeFromByteArray<SessionData>(bytes.copy())
+        assertEquals(expectedStatus, responseMessage.statusCode)
         val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(responseMessage.data!!))
         assertEquals(0u, response.status)
         return response
