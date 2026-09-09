@@ -46,7 +46,7 @@ jobs:
             echo "Branch '$REF' not found in $REPO, using default branch."
             echo "ref=" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ inputs.repository }}
           ref: ${{ steps.ref.outputs.ref }}
