@@ -147,7 +147,7 @@ internal class ProximitySessionOwner(
 }
 
 private val ProximityState.isTerminal: Boolean
-    get() = this is ProximityState.Completed || this is ProximityState.Failed ||
+    get() = this is ProximityState.Completed || this is ProximityState.NoData || this is ProximityState.Failed ||
         this is ProximityState.Cancelled
 
 /** Exchange and phase order rejects delayed observations even when they acquire the lock later. */
@@ -163,6 +163,7 @@ private fun ProximityState.position(): Long = when (this) {
     is ProximityState.AwaitingNextRequest -> completedExchanges.toLong() * 10 + 4
     is ProximityState.Terminating -> exchange.toLong() * 10 + 5
     is ProximityState.Completed -> exchanges.toLong() * 10 + 6
+    is ProximityState.NoData -> exchange.toLong() * 10 + 6
     is ProximityState.Cancelled, is ProximityState.Failed -> Long.MAX_VALUE
 }
 
