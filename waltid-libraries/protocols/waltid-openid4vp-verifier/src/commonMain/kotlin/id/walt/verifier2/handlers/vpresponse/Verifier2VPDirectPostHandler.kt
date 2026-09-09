@@ -2,6 +2,7 @@
 
 package id.walt.verifier2.handlers.vpresponse
 
+import kotlin.time.TimeSource
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.jwk.JWKKey
@@ -309,18 +310,29 @@ object Verifier2VPDirectPostHandler {
         }
 
         try {
+            // Phase timings: this call is 74% of the enterprise verification response handler (46.6ms of
+            // 63ms), so attributing it is what makes optimisation here a measured decision. Logged as one
+            // debug line rather than reported through a framework type, to keep the library standalone.
+            val started = TimeSource.Monotonic.markNow()
+            val responseData = call.parseHttpRequestToDirectPostResponse()
+            val afterParse = started.elapsedNow()
             val result = handleDirectPost(
                 verificationSession = verificationSession,
-                responseData = call.parseHttpRequestToDirectPostResponse(),
+                responseData = responseData,
                 updateSessionCallback = updateSessionCallback,
                 failSessionCallback = failSessionCallback,
                 policyContext = policyContext,
                 ephemeralDecryptionKey = ephemeralDecryptionKey,
                 crypto2EphemeralDecryptionKey = crypto2EphemeralDecryptionKey,
             )
+            val afterHandle = started.elapsedNow()
 
             beforeRespond(false)
             call.respond(result)
+            log.debug {
+                "Direct post phases: parse=$afterParse, handle=${afterHandle - afterParse}, " +
+                    "respond=${started.elapsedNow() - afterHandle}"
+            }
         } catch (e: PresentationRejectionException) {
             // OID4VP 1.0 §8.2 / §response_mode_post: the verifier signals rejection with a 4xx
             // response so the wallet knows the presentation was not accepted.
@@ -449,7 +461,9 @@ object Verifier2VPDirectPostHandler {
         }
 
         // Parse vp_token
+        val phaseStart = TimeSource.Monotonic.markNow()
         val vpTokenContents = parseVpToken(vpTokenString)
+        val afterVpToken = phaseStart.elapsedNow()
         log.debug { "Parsed vp_token for state $receivedState: $vpTokenContents" }
 
         session.updateSession(SessionEvent.attempted_presentation) {
@@ -457,6 +471,7 @@ object Verifier2VPDirectPostHandler {
             status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
             presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, receivedState)
         }
+        val afterSessionUpdate = phaseStart.elapsedNow()
 
         // Process
 
@@ -473,6 +488,15 @@ object Verifier2VPDirectPostHandler {
             verificationTime,
             trustedAuthoritiesChecker
         )
+        // Phase timings for the dominant part of the verifier: this function is ~43ms of a 63ms request,
+        // and the split between parsing, the session write and the verification engine is what tells an
+        // optimisation where to go. Isolated costs for comparison: mdoc verify 1.4ms, raw ES256 verify
+        // 0.7ms, so anything much larger here is surrounding work rather than credential or crypto work.
+        log.debug {
+            "handleDirectPost phases: vpTokenParse=$afterVpToken, " +
+                "sessionUpdate=${afterSessionUpdate - afterVpToken}, " +
+                "verification=${phaseStart.elapsedNow() - afterSessionUpdate}"
+        }
 
 
         val optionalSuccessRedirectUrl = session.redirects?.successRedirectUri
