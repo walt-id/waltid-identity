@@ -29,11 +29,14 @@ class WalletDemoController(
     private val signingProtectionStore: WalletDemoSigningProtectionStore =
         InMemoryWalletDemoSigningProtectionStore(),
     private val sharingSettings: DemoSharingSettingsStore = InMemoryDemoSharingSettingsStore(),
+    private val skipPin: Boolean = false,
+    private val issuanceRedirectUri: String = "openid://",
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private var receiveJob: Job? = null
     private var issuanceSession: WalletDemoIssuanceSession? = null
+    private var pendingAuthorizationCallback: String? = null
     private var presentationJob: Job? = null
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
@@ -44,13 +47,17 @@ class WalletDemoController(
 
     private fun initialState(): WalletDemoUiState = WalletDemoUiState(
         auth = readInitialAuthState(),
-        biometricUnlockAvailable = biometricAuthenticator.isAvailable(),
+        biometricUnlockAvailable = !skipPin && biometricAuthenticator.isAvailable(),
         signingProtectionMode = signingProtectionMode,
         selectedSigningProtection = signingProtectionMode.resolve(signingProtectionStore.load()),
         showDcApiPresentationPreview = sharingSettings.showDcApiPresentationPreview(),
+        pinLockEnabled = !skipPin,
     )
 
     init {
+        if (skipPin) {
+            bootstrapIfNeeded()
+        }
         scope.launch(dispatcher) {
             state
                 .map { ui ->
@@ -388,6 +395,7 @@ class WalletDemoController(
     }
 
     fun lock() {
+        if (skipPin) return
         receiveJob?.cancel()
         presentationJob?.cancel()
         val previous = getAndUpdateState {
@@ -478,10 +486,13 @@ class WalletDemoController(
                 val message = WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, error)
                 _state.update {
                     it.copy(
-                        auth = WalletAuthState.Setup(error = message),
+                        auth = if (skipPin) WalletAuthState.Unlocked else WalletAuthState.Setup(error = message),
                         operation = WalletOperationState.Failed(message, WalletDemoTab.Credentials),
                     ).withPublishedStatus()
                 }
+            }
+            if (skipPin && _state.value.auth is WalletAuthState.Unlocked) {
+                bootstrapIfNeeded()
             }
         }
     }
@@ -693,7 +704,7 @@ class WalletDemoController(
             try {
                 val session = wallet.startIssuance(
                     offerUrl = offerUrl,
-                    redirectUri = "openid://",
+                    redirectUri = issuanceRedirectUri,
                     did = (current.session as? WalletSessionState.Ready)?.did,
                 )
                 startedSession = session
@@ -941,11 +952,31 @@ class WalletDemoController(
     fun authorizationRequestOpened() { _state.update { it.copy(authorizationRequestUrl = null) } }
 
     private fun continueAuthorization(callbackUri: String) {
-        val session = issuanceSession ?: return
+        if (issuanceSession == null) {
+            issuanceSession = wallet.pendingAuthorizationIssuance()
+        }
+        val session = issuanceSession
+        if (session == null) return
         val current = _state.value
-        val ready = current.session as? WalletSessionState.Ready ?: return
-        val request = ReceiveRequest(current.requestDrafts.offerUrl.trim(), current.receiveNavigationResetKey)
-        if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.Receiving))) return
+        val ready = current.session as? WalletSessionState.Ready
+        if (ready == null) {
+            pendingAuthorizationCallback = callbackUri
+            return
+        }
+        pendingAuthorizationCallback = null
+        val offerUrl = current.requestDrafts.offerUrl.trim().ifBlank { callbackUri }
+        val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
+        if (!_state.compareAndSet(
+                current,
+                current.copy(
+                    selectedTab = WalletDemoTab.Receive,
+                    requestDrafts = current.requestDrafts.copy(offerUrl = offerUrl),
+                    operation = WalletOperationState.Receiving,
+                ),
+            )
+        ) {
+            return
+        }
         receiveJob = scope.launch(dispatcher) {
             try {
                 completeIssuanceOutcome(
@@ -964,6 +995,11 @@ class WalletDemoController(
                 }
             }
         }
+    }
+
+    private fun flushPendingAuthorizationCallback() {
+        val callback = pendingAuthorizationCallback ?: return
+        continueAuthorization(callback)
     }
 
     private fun isCurrent(request: ReceiveRequest): Boolean =
@@ -1475,6 +1511,7 @@ class WalletDemoController(
                     ).withPublishedStatus()
                 }
                 showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })
+                flushPendingAuthorizationCallback()
             }.onFailure { error ->
                 _state.update {
                     it.copy(
@@ -1613,10 +1650,14 @@ class WalletDemoController(
         copy(statusOccurrenceId = statusOccurrenceId + 1)
 
     private fun readInitialAuthState(): WalletAuthState =
-        runCatching {
-            if (pinStore.hasPin()) WalletAuthState.Login() else WalletAuthState.Setup()
-        }.getOrElse {
-            WalletAuthState.StorageUnavailable()
+        if (skipPin) {
+            WalletAuthState.Unlocked
+        } else {
+            runCatching {
+                if (pinStore.hasPin()) WalletAuthState.Login() else WalletAuthState.Setup()
+            }.getOrElse {
+                WalletAuthState.StorageUnavailable()
+            }
         }
 
     private companion object {

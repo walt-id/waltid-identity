@@ -168,6 +168,11 @@ data class AccountInfoResponse(
  * [OSSWallet2AuthConfig.tokenExpiry] to [registerWallet2AuthRoutes].
  *
  * Called from Main.kt when the auth optional feature is enabled.
+ *
+ * The ktor-authnz provider is also registered from [id.walt.wallet2.main] before
+ * [id.walt.commons.web.WebService] installs Authentication. This assignment stays so
+ * in-process tests that skip [main] still hook the provider when they call this
+ * function before the plugin is installed.
  */
 suspend fun Application.configureWallet2Auth(
     cryptoRuntime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),

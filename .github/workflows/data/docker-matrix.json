@@ -20,6 +20,11 @@
     "image": "portal2"
   },
   {
+    "context": "waltid-identity",
+    "folder": "waltid-identity/waltid-applications/waltid-wallet-demo-compose/webApp",
+    "image": "wallet-demo-compose-web"
+  },
+  {
     "context": "waltid-identity/waltid-applications/waltid-credentials",
     "folder": "waltid-identity/waltid-applications/waltid-credentials",
     "image": "vc-repository"

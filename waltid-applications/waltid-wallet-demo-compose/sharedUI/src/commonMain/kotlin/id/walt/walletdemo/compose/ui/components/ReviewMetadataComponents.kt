@@ -123,7 +123,7 @@ internal fun MetadataIdentityRow(
     modifier: Modifier = Modifier,
 ) {
     val name = display?.name?.takeIf { it.isNotBlank() } ?: fallbackName
-    val logoUri = display?.logoUri?.takeIf(::isHttpsUrl)
+    val logoUri = display?.logoUri?.takeIf(RasterImageSupport::isHttpsDisplayImageUrl)
 
     Row(
         modifier = modifier,

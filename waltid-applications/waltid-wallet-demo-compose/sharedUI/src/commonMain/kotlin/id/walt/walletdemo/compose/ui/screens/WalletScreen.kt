@@ -10,23 +10,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
 
 @Composable
-internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
+internal fun WalletScreen(
+    controller: WalletDemoController,
+    state: WalletDemoUiState,
+    onSignOut: (() -> Unit)? = null,
+) {
     val ready = state.session as? WalletSessionState.Ready
     val credentials = ready?.credentials.orEmpty()
-    val uriHandler = LocalUriHandler.current
+    val openAuthorizationRequest = rememberAuthorizationRequestOpener()
     var showingSettings by remember { mutableStateOf(false) }
     var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
 
     LaunchedEffect(state.authorizationRequestUrl) {
         state.authorizationRequestUrl?.let { authorizationUrl ->
-            uriHandler.openUri(authorizationUrl)
+            openAuthorizationRequest(authorizationUrl)
             controller.authorizationRequestOpened()
         }
     }
@@ -38,6 +42,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             onBack = { showingSettings = false },
             onLock = controller::lock,
             onResetWallet = controller::resetWallet,
+            onSignOut = onSignOut,
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,

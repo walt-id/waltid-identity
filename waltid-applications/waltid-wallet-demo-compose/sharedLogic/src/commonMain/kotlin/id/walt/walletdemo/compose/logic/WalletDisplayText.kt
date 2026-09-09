@@ -10,7 +10,10 @@ internal enum class WalletDeepLinkScheme(val scheme: String) {
         fun parse(rawUrl: String): WalletDeepLinkScheme? {
             val scheme = rawUrl.substringBefore(':', missingDelimiterValue = "").takeIf { it.isNotBlank() }
                 ?: return null
-            return entries.firstOrNull { it.scheme == scheme }
+            entries.firstOrNull { it.scheme == scheme }?.let { return it }
+            val isHttp = scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true)
+            val hasCode = rawUrl.substringAfter('?', "").split('&', '#').any { it.startsWith("code=") }
+            return if (isHttp && hasCode) AuthorizationCallback else null
         }
     }
 }
