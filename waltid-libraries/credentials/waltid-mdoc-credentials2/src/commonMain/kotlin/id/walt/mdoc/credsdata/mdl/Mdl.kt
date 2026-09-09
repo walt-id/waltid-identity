@@ -4,9 +4,13 @@ package id.walt.mdoc.credsdata
 
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnum
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnumSerializer
+import id.walt.mdoc.encoding.PortraitCaptureDateSerializer
+import id.walt.mdoc.encoding.PortraitCaptureTimestampSerializer
 import id.walt.mdoc.encoding.ByteArrayBase64UrlSerializer
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -51,7 +55,9 @@ data class Mdl(
     @SerialName("hair_colour") val hairColour: String? = null,
     @SerialName("birth_place") val birthPlace: String? = null,
     @SerialName("resident_address") val residentAddress: String? = null,
-    @SerialName("portrait_capture_date") val portraitCaptureDate: LocalDate? = null, // tdate
+    /** Legacy date input; issuance interprets it as midnight UTC. JSON keeps its date-only form. */
+    @Serializable(with = PortraitCaptureDateSerializer::class)
+    @SerialName("portrait_capture_date") val portraitCaptureDate: LocalDate? = null,
     @SerialName("age_in_years") val ageInYears: UInt? = null,
     @SerialName("age_birth_year") val ageBirthYear: UInt? = null,
 
@@ -143,7 +149,7 @@ data class Mdl(
 
     override fun toNamespaces(): Map<String, Map<String, Any>> =
         namespacesOf(
-            "org.iso.18013.5.1" to mapOf(
+            MdocNamespaces.MDL to mapOf(
                 "family_name" to familyName,
                 "given_name" to givenName,
                 "birth_date" to birthDate, // full-date
@@ -163,7 +169,7 @@ data class Mdl(
                 "hair_colour" to hairColour,
                 "birth_place" to birthPlace,
                 "resident_address" to residentAddress,
-                "portrait_capture_date" to portraitCaptureDate, // tdate
+                "portrait_capture_date" to portraitCaptureDate?.atStartOfDayIn(TimeZone.UTC), // tdate
                 "age_in_years" to ageInYears,
                 "age_birth_year" to ageBirthYear,
                 "age_over_12" to ageOver12,
@@ -209,7 +215,7 @@ data class Mdl(
                     "sex" to IsoSexEnumSerializer,
                     "height" to uint,
                     "weight" to uint,
-                    "portrait_capture_date" to localDate,
+                    "portrait_capture_date" to PortraitCaptureTimestampSerializer,
                     "age_in_year" to uint,
                     "age_birth_year" to uint,
                     "signature_usual_mark" to ByteArraySerializer(),
@@ -229,7 +235,7 @@ data class Mdl(
                     "biometric_template_signature_sign" to ByteArraySerializer(),
                     "biometric_template_iris" to ByteArraySerializer()
                 ),
-                "org.iso.18013.5.1" // The namespace for mDL
+                MdocNamespaces.MDL // The namespace for mDL
             )
 
             // Fallback for issues in mdocs1:
@@ -239,7 +245,7 @@ data class Mdl(
                     "portrait" to ListSerializer(Byte.serializer()),
                     // Dates in DrivingPrivilege are CBOR-tagged 1004 ("full-date"), but it's just a text string
                     "driving_privileges" to ListSerializer(DrivingPrivilege.FallbackDrivingPrivilege.serializer()),
-                ), "org.iso.18013.5.1"
+                ), MdocNamespaces.MDL
             )
         }
     }
@@ -247,7 +253,7 @@ data class Mdl(
 
 @Serializable
 data class MobileDrivingLicenceJwsNamespace(
-    @SerialName("org.iso.18013.5.1")
+    @SerialName(MdocNamespaces.MDL)
     val mdl: Mdl,
 )
 
