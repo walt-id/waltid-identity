@@ -36,17 +36,17 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
                     when (action) {
                         ProximityRemediationAction.RequestBluetoothPermission ->
                             requestBluetoothAuthorization()
-                        MobileWalletProximityRemediationAction.OpenApplicationSettings,
-                        MobileWalletProximityRemediationAction.EnableBluetooth -> openApplicationSettings()
-                        MobileWalletProximityRemediationAction.RequestNearbyWifiPermission,
-                        MobileWalletProximityRemediationAction.RequestLocalNetworkPermission,
-                        MobileWalletProximityRemediationAction.EnableWifi,
-                        MobileWalletProximityRemediationAction.EnableNfc ->
-                            MobileWalletProximityHostActionResult.Cancelled
-                        MobileWalletProximityRemediationAction.Retry ->
-                            MobileWalletProximityHostActionResult.Completed
-                        MobileWalletProximityRemediationAction.UseSupportedDevice ->
-                            MobileWalletProximityHostActionResult.Cancelled
+                        ProximityRemediationAction.OpenApplicationSettings,
+                        ProximityRemediationAction.EnableBluetooth -> openApplicationSettings()
+                        ProximityRemediationAction.RequestNearbyWifiPermission,
+                        ProximityRemediationAction.RequestLocalNetworkPermission,
+                        ProximityRemediationAction.EnableWifi,
+                        ProximityRemediationAction.EnableNfc ->
+                            ProximityHostActionResult.Cancelled
+                        ProximityRemediationAction.Retry ->
+                            ProximityHostActionResult.Completed
+                        ProximityRemediationAction.UseSupportedDevice ->
+                            ProximityHostActionResult.Cancelled
                     }
                 }
             },

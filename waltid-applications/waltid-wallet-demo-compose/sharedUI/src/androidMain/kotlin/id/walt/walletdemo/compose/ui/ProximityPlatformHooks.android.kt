@@ -112,11 +112,11 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
                 when (action) {
                     ProximityRemediationAction.RequestBluetoothPermission ->
                         requestPermissions(bluetoothPermissions())
-                    MobileWalletProximityRemediationAction.RequestNearbyWifiPermission ->
+                    ProximityRemediationAction.RequestNearbyWifiPermission ->
                         requestPermissions(arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES))
-                    MobileWalletProximityRemediationAction.RequestLocalNetworkPermission ->
+                    ProximityRemediationAction.RequestLocalNetworkPermission ->
                         requestPermissions(arrayOf(ACCESS_LOCAL_NETWORK_PERMISSION))
-                    MobileWalletProximityRemediationAction.OpenApplicationSettings ->
+                    ProximityRemediationAction.OpenApplicationSettings ->
                         launchSystemSurface(
                             applicationSettingsIntent(context),
                             current = { systemSurface },
@@ -130,14 +130,14 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
                             setCurrent = { systemSurface = it },
                             launch = systemSurfaceLauncher::launch,
                         )
-                    MobileWalletProximityRemediationAction.EnableWifi ->
+                    ProximityRemediationAction.EnableWifi ->
                         launchSystemSurface(
                             Intent(Settings.ACTION_WIFI_SETTINGS),
                             current = { systemSurface },
                             setCurrent = { systemSurface = it },
                             launch = systemSurfaceLauncher::launch,
                         )
-                    MobileWalletProximityRemediationAction.EnableNfc ->
+                    ProximityRemediationAction.EnableNfc ->
                         launchSystemSurface(
                             Intent(Settings.ACTION_NFC_SETTINGS),
                             current = { systemSurface },
@@ -153,7 +153,7 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
             actionForDisplay = { action ->
                 val permissions = runtimePermissionsFor(action)
                 if (permissions != null && permissionRoute(permissions) == AndroidRuntimePermissionRoute.OpenSettings) {
-                    MobileWalletProximityRemediationAction.OpenApplicationSettings
+                    ProximityRemediationAction.OpenApplicationSettings
                 } else {
                     action
                 }
@@ -279,11 +279,11 @@ private fun bluetoothPermissions(): Array<String> = if (Build.VERSION.SDK_INT >=
     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
 }
 
-internal fun runtimePermissionsFor(action: MobileWalletProximityRemediationAction): Array<String>? = when (action) {
-    MobileWalletProximityRemediationAction.RequestBluetoothPermission -> bluetoothPermissions()
-    MobileWalletProximityRemediationAction.RequestNearbyWifiPermission ->
+internal fun runtimePermissionsFor(action: ProximityRemediationAction): Array<String>? = when (action) {
+    ProximityRemediationAction.RequestBluetoothPermission -> bluetoothPermissions()
+    ProximityRemediationAction.RequestNearbyWifiPermission ->
         arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES)
-    MobileWalletProximityRemediationAction.RequestLocalNetworkPermission ->
+    ProximityRemediationAction.RequestLocalNetworkPermission ->
         arrayOf(ACCESS_LOCAL_NETWORK_PERMISSION)
     else -> null
 }

@@ -171,7 +171,7 @@ class ProximityModelsTest {
         )
         val plans = listOf(ble, nfc, ble.copy(nfc = nfc.nfc)).let { conventional ->
             conventional + conventional.map { it.copy(wifiAware = true) } +
-                MobileWalletProximityConventionalRetrievalConfiguration(bluetoothLowEnergy = null, wifiAware = true)
+                ProximityRetrievalOptions(bluetoothLowEnergy = null, wifiAware = true)
         }
         plans.forEach { retrieval ->
             ProximityConfiguration(session = ProximitySessionConfiguration.Qr(retrieval))
@@ -187,8 +187,8 @@ class ProximityModelsTest {
                 }
             }
             for (wifiAware in listOf(false, true)) for (bluetooth in listOf(null, ble.bluetoothLowEnergy)) {
-                MobileWalletProximityConfiguration(
-                    session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(
+                ProximityConfiguration(
+                    session = ProximitySessionConfiguration.ProvisionalNfcV2(
                         bluetoothLowEnergy = bluetooth, qrFallback = retrieval, wifiAware = wifiAware,
                     )
                 )

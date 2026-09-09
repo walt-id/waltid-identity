@@ -69,9 +69,9 @@ public data class ProximityNfcRetrievalConfiguration(
  * @property nfc Optional conventional NFC command/response contract.
  * @property wifiAware Whether to offer Wi-Fi Aware with mandatory NCS-SK-128 security.
  */
-public data class MobileWalletProximityConventionalRetrievalConfiguration(
-    public val bluetoothLowEnergy: MobileWalletProximityBleConfiguration? = MobileWalletProximityBleConfiguration(),
-    public val nfc: MobileWalletProximityNfcRetrievalConfiguration? = null,
+public data class ProximityRetrievalOptions(
+    public val bluetoothLowEnergy: ProximityBleConfiguration? = ProximityBleConfiguration(),
+    public val nfc: ProximityNfcRetrievalConfiguration? = null,
     public val wifiAware: Boolean = false,
 ) {
     init { require(bluetoothLowEnergy != null || nfc != null || wifiAware) { "A retrieval plan must contain a bearer" } }
@@ -124,10 +124,10 @@ public sealed interface ProximitySessionConfiguration {
      */
     public data class ProvisionalNfcV2(
         public val maximumCommandDataLength: Int = 65_536,
-        public val bluetoothLowEnergy: MobileWalletProximityBleConfiguration? = null,
-        public val qrFallback: MobileWalletProximityConventionalRetrievalConfiguration? = null,
+        public val bluetoothLowEnergy: ProximityBleConfiguration? = null,
+        public val qrFallback: ProximityRetrievalOptions? = null,
         public val wifiAware: Boolean = false,
-    ) : MobileWalletProximitySessionConfiguration {
+    ) : ProximitySessionConfiguration {
         init {
             require(maximumCommandDataLength in 1..65_536)
             requireSharedBlePolicy(bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
@@ -157,17 +157,17 @@ internal val ProximitySessionConfiguration.nfcBle: ProximityBleConfiguration?
         is ProximitySessionConfiguration.ProvisionalNfcV2 -> bluetoothLowEnergy
     }
 
-internal val MobileWalletProximitySessionConfiguration.nfcWifiAware: Boolean
+internal val ProximitySessionConfiguration.nfcWifiAware: Boolean
     get() = when (this) {
-        is MobileWalletProximitySessionConfiguration.Qr -> false
-        is MobileWalletProximitySessionConfiguration.ConventionalNfc -> retrieval.wifiAware
-        is MobileWalletProximitySessionConfiguration.ProvisionalNfcV2 -> wifiAware
+        is ProximitySessionConfiguration.Qr -> false
+        is ProximitySessionConfiguration.ConventionalNfc -> retrieval.wifiAware
+        is ProximitySessionConfiguration.ProvisionalNfcV2 -> wifiAware
     }
 
-internal val MobileWalletProximitySessionConfiguration.wifiAwareSelected: Boolean
+internal val ProximitySessionConfiguration.wifiAwareSelected: Boolean
     get() = nfcWifiAware || qrRetrieval?.wifiAware == true
 
-internal val MobileWalletProximitySessionConfiguration.bleConfiguration: MobileWalletProximityBleConfiguration?
+internal val ProximitySessionConfiguration.bleConfiguration: ProximityBleConfiguration?
     get() = nfcBle ?: qrRetrieval?.bluetoothLowEnergy
 
 /** Holder authentication frozen for a reviewed document response. */
@@ -399,7 +399,7 @@ public data class ProximityCapabilities(
                 nfcEngagement.selected == (session !is ProximitySessionConfiguration.Qr) &&
                 bluetoothLowEnergy.selected == (session.bleConfiguration != null) &&
                 nfcRetrieval.selected == (session.nfcRetrieval?.nfc != null || session.qrRetrieval?.nfc != null) &&
-                nfcV2Retrieval.selected == (session is MobileWalletProximitySessionConfiguration.ProvisionalNfcV2) &&
+                nfcV2Retrieval.selected == (session is ProximitySessionConfiguration.ProvisionalNfcV2) &&
                 wifiAwareRetrieval.selected == session.wifiAwareSelected
         ) { "Capability selection must match the owning session retrieval plans" }
         require(!nfcV2Retrieval.mayStart || nfcEngagement.mayStart) {

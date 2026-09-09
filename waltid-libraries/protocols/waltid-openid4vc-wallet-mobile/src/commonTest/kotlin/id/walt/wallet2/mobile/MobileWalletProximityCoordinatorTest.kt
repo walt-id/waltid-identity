@@ -275,14 +275,14 @@ class ProximityCoordinatorTest {
                 message = "Wi-Fi Aware is unavailable through public iOS APIs",
             )
         )
-        val coordinator = MobileWalletProximityCoordinator(
+        val coordinator = ProximityCoordinator(
             wallet = Wallet("wifi-aware-ios-fallback"),
             bleTransportFactory = ble,
             wifiAwareTransportFactory = wifiAware,
         )
         val session = coordinator.start(
-            MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.Qr(MobileWalletProximityConventionalRetrievalConfiguration(
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.Qr(ProximityRetrievalOptions(
                     wifiAware = true,
                 ))
             )
@@ -292,21 +292,21 @@ class ProximityCoordinatorTest {
         assertEquals(1, wifiAware.capabilityCalls)
         assertTrue(ble.configurations.isNotEmpty())
         assertTrue(wifiAware.configurations.isEmpty())
-        assertTrue(engagements.any { it is MobileWalletProximityEngagement.Qr })
+        assertTrue(engagements.any { it is ProximityEngagement.Qr })
         session.close()
     }
 
     @Test
     fun `Wi-Fi Aware can be the only QR retrieval and receives session-bound key bytes`() = runTest {
         val wifiAware = RecordingWifiAwareTransportFactory(WifiAwareProximityAvailability.Available)
-        val coordinator = MobileWalletProximityCoordinator(
+        val coordinator = ProximityCoordinator(
             wallet = Wallet("wifi-aware-only"),
             bleTransportFactory = null,
             wifiAwareTransportFactory = wifiAware,
         )
         val session = coordinator.start(
-            MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.Qr(MobileWalletProximityConventionalRetrievalConfiguration(
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.Qr(ProximityRetrievalOptions(
                     bluetoothLowEnergy = null,
                     wifiAware = true,
                 ))
@@ -316,21 +316,21 @@ class ProximityCoordinatorTest {
         val engagements = session.awaitEngagements()
         assertEquals(1, wifiAware.configurations.size)
         assertTrue(wifiAware.configurations.single().eDeviceKeyBytes.size > 0)
-        assertIs<MobileWalletProximityEngagement.Qr>(engagements.single())
+        assertIs<ProximityEngagement.Qr>(engagements.single())
         session.close()
     }
 
     @Test
     fun `concurrent QR and NFC Wi-Fi use distinct device keys and matching BLE Ident inputs`() = runTest {
-        for (handover in MobileWalletProximityNfcHandover.entries) {
+        for (handover in ProximityNfcHandover.entries) {
             val ble = RecordingTransportFactory(BleProximityAvailability.Available)
             val wifi = RecordingWifiAwareTransportFactory(WifiAwareProximityAvailability.Available)
             val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
-            val coordinator = MobileWalletProximityCoordinator(Wallet("isolated-wifi-$handover"), ble, nfc,
+            val coordinator = ProximityCoordinator(Wallet("isolated-wifi-$handover"), ble, nfc,
                 wifiAwareTransportFactory = wifi)
-            val plan = MobileWalletProximityConventionalRetrievalConfiguration(wifiAware = true)
-            val session = coordinator.start(MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.ConventionalNfc(handover, plan, plan)))
+            val plan = ProximityRetrievalOptions(wifiAware = true)
+            val session = coordinator.start(ProximityConfiguration(
+                session = ProximitySessionConfiguration.ConventionalNfc(handover, plan, plan)))
             val engagements = session.awaitEngagements()
             assertEquals(2, engagements.size)
             assertEquals(2, wifi.configurations.size)
@@ -339,7 +339,7 @@ class ProximityCoordinatorTest {
             assertEquals(wifi.configurations.map { it.eDeviceKeyBytes }, ble.configurations.map { it.eDeviceKeyBytes })
             val nfcRoles = assertIs<BleMdocRoles.Dual>(ble.configurations[0].roles)
             val qrRoles = assertIs<BleMdocRoles.Dual>(ble.configurations[1].roles)
-            assertEquals(handover == MobileWalletProximityNfcHandover.Static, nfcRoles.readerServiceUuid == nfcRoles.mdocServiceUuid)
+            assertEquals(handover == ProximityNfcHandover.Static, nfcRoles.readerServiceUuid == nfcRoles.mdocServiceUuid)
             assertNotEquals(qrRoles.readerServiceUuid, qrRoles.mdocServiceUuid)
             session.close()
         }
@@ -352,11 +352,11 @@ class ProximityCoordinatorTest {
                 else NfcHostAvailability.Unavailable("nfc_unavailable", "Unavailable"))
             val wifi = RecordingWifiAwareTransportFactory(if (wifiAvailable) WifiAwareProximityAvailability.Available
                 else WifiAwareProximityAvailability.Unavailable(true, "wifi_unavailable", "Unavailable"))
-            val coordinator = MobileWalletProximityCoordinator(Wallet("wifi-route-$nfcAvailable-$wifiAvailable"), null, nfc,
+            val coordinator = ProximityCoordinator(Wallet("wifi-route-$nfcAvailable-$wifiAvailable"), null, nfc,
                 wifiAwareTransportFactory = wifi)
-            val result = coordinator.capabilities(MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(
-                    qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(bluetoothLowEnergy = null, wifiAware = true),
+            val result = coordinator.capabilities(ProximityConfiguration(
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(
+                    qrFallback = ProximityRetrievalOptions(bluetoothLowEnergy = null, wifiAware = true),
                     wifiAware = true,
                 )))
             assertEquals(wifiAvailable, result.qrMayStart)
@@ -370,13 +370,13 @@ class ProximityCoordinatorTest {
     @Test
     fun `unselected Wi-Fi is not probed or reported unavailable`() = runTest {
         val wifi = RecordingWifiAwareTransportFactory(WifiAwareProximityAvailability.Available)
-        val coordinator = MobileWalletProximityCoordinator(Wallet("wifi-not-checked"), null,
+        val coordinator = ProximityCoordinator(Wallet("wifi-not-checked"), null,
             wifiAwareTransportFactory = wifi)
-        val capabilities = coordinator.capabilities(MobileWalletProximityConfiguration())
+        val capabilities = coordinator.capabilities(ProximityConfiguration())
         assertEquals(0, wifi.capabilityCalls)
         assertFalse(capabilities.wifiAwareRetrieval.selected)
         assertTrue(capabilities.wifiAwareRetrieval.implemented)
-        assertIs<MobileWalletProximityRuntimeObservation.NotChecked>(capabilities.wifiAwareRetrieval.runtime)
+        assertIs<ProximityRuntimeObservation.NotChecked>(capabilities.wifiAwareRetrieval.runtime)
     }
 
     @Test
@@ -609,8 +609,8 @@ class ProximityCoordinatorTest {
         withContext(Dispatchers.Default) {
             withTimeout(5.seconds) {
                 when (val current = state.first {
-                    it is MobileWalletProximityState.EngagementReady ||
-                        it is MobileWalletProximityState.Connecting || it is MobileWalletProximityState.Failed
+                    it is ProximityState.EngagementReady ||
+                        it is ProximityState.Connecting || it is ProximityState.Failed
                 }) {
                     is ProximityState.EngagementReady -> current.engagements
                     is ProximityState.Connecting -> current.engagements
