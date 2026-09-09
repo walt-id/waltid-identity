@@ -81,6 +81,7 @@ may already have shared approved data. Holder decline remains a distinct outcome
 | `MdocHolderRequestProcessor` | Match available credentials, build the preview and resolve an approved submission |
 | `MdocConsentHandler` | Return an explicit holder decision for the immutable review |
 | `MdocHolderProtocolEngine` | Own encrypted exchange, repeated requests, limits, timeouts and terminal cleanup |
+| [Mobile transports](../waltid-mdoc-proximity-mobile/README.md) | Move bounded complete messages over platform bearers |
 
 A request can have multiple matching credentials. The wallet selects a credential
 for each requested document and then chooses fields from that credential. The
@@ -110,3 +111,4 @@ From the unified-build root, run the focused engine suite with:
 ```
 
 - [mdoc data model and issuance](../waltid-mdoc-credentials2/README.md)
+- [Android and iOS transport adapters](../waltid-mdoc-proximity-mobile/README.md)

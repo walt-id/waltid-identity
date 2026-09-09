@@ -1,44 +1,102 @@
-# waltid-mdoc-proximity-mobile
+<div align="center">
+  <h1>Mobile mdoc proximity transports</h1>
+  <p>by <a href="https://walt.id">walt.id</a></p>
+  <p>Android and iOS adapters for the shared ISO mdoc holder protocol.</p>
+</div>
 
-Kotlin Multiplatform BLE transport for the radio-independent ISO mdoc proximity engine.
+## Overview
 
-The module owns ISO/IEC 18013-5 BLE roles, Ident verification, GATT and L2CAP framing,
-connection selection, and the Android Bluetooth / Apple CoreBluetooth adapters. It moves opaque
-session bytes only; device engagement, session encryption, request processing, consent, and trust
-remain in `waltid-mdoc-proximity`.
+`waltid-mdoc-proximity-mobile` connects the
+[shared proximity engine](../waltid-mdoc-proximity/README.md) to platform radios.
+It owns BLE role setup, Ident checks, GATT/L2CAP framing
+and transport lifecycle. The shared engine owns engagement coordination,
+session encryption, request processing, consent and trust decisions.
 
-Applications must declare and request the platform Bluetooth permissions described by the public
-Android and Apple provider KDoc. Bluetooth availability is reported through the proximity
-capability contract rather than prompting from inside this library.
+| Transport | Android | iOS |
+|---|---|---|
+| BLE central/client and peripheral/server | Native Bluetooth adapters; GATT and L2CAP | CoreBluetooth adapters; GATT and L2CAP |
 
-Use `AndroidBleProximityTransportFactory` or `IosBleProximityTransportFactory` to check the exact
-role selection before generating session keys or transaction UUIDs. The probe does not prepare
-radio resources. After prerequisites pass, create a validated `BleProximityTransportConfiguration`
-for one transaction and ask the same factory for its provider. The provider prepares only methods
-that can actually be advertised and exposes them through the shared `ProximityTransportProvider`
-contract.
+These are implementation boundaries. Physical-device and independent-reader
+qualification remain separate from compilation, unit tests and API availability.
 
-Prepared BLE listeners remain available until the shared proximity session selects a connection or
-closes them. The radio-independent engine owns the advertised engagement lifetime so a displayed QR
-code cannot outlive its BLE retrieval path; the BLE module still bounds radio setup and
-post-connection inactivity.
+## Getting started
 
-Both native central adapters use the same ordered Ident, bearer-selection, subscription and START
-handshake. Native discovery and resource ownership remain in their platform adapters. GATT callback
-payload queues are bounded on both roles and platforms: a live overflow discards queued fragments,
-closes the bearer and reports `ble_receive_overflow`; callbacks after closure are ignored. Android
-blocking socket operations register cancellation-driven closure before entering native I/O, including
-pending L2CAP connect/accept and active reads/writes.
+Within the coordinated source build:
 
-Successful L2CAP completion keeps the connection open for a one-second drain interval before native
-cleanup, allowing queued response bytes to leave the radio stack. This is a bounded completion grace,
-not a reader acknowledgement. Cancellation and error cleanup remain immediate.
+```kotlin
+commonMain.dependencies {
+    implementation(project(":waltid-libraries:credentials:waltid-mdoc-proximity-mobile"))
+}
+```
 
-Android applications need the merged manifest permissions plus runtime grants for the selected
-role. Apple applications need `NSBluetoothAlwaysUsageDescription`; the provider uses CoreBluetooth
-on its main queue and does not request authorization itself.
+### Check Android BLE availability
 
-See [ADR 0001](docs/adr/0001-ble-building-block-selection.md) for the standards baseline, exact
-upstream candidates, selected native composition, ownership boundary, and qualification status.
-Physical two-device and external-reader qualification remains required before production support is
-claimed.
+```kotlin
+import android.content.Context
+import id.walt.mdoc.proximity.mobile.*
+
+suspend fun checkBle(context: Context): BleProximityAvailability {
+    val factory = AndroidBleProximityTransportFactory(context)
+    return factory.capability(BleMdocRoleSelection.DUAL)
+}
+```
+
+`capability` checks exactly the selected roles without generating keys, creating
+transaction UUIDs or starting radio resources. Handle `Available` and
+`Unavailable` explicitly in the host; an unavailable result supplies a stable
+code and diagnostic message for the application's remediation UI.
+
+### Create a provider for one transaction
+
+After prerequisites pass, the integration supplies the role configuration and
+exact tagged `EDeviceKeyBytes` from that transaction's Device Engagement:
+
+```kotlin
+import id.walt.mdoc.proximity.ImmutableBytes
+import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
+import id.walt.mdoc.proximity.mobile.*
+
+fun createBleProvider(
+    factory: BleProximityTransportFactory,
+    roles: BleMdocRoles,
+    eDeviceKeyBytes: ImmutableBytes,
+): ReaderSelectedTransportProvider = factory.create(
+    BleProximityTransportConfiguration(
+        roles = roles,
+        bearerPolicy = BleBearerPolicy.PreferL2cap,
+        eDeviceKeyBytes = eDeviceKeyBytes,
+    ),
+)
+```
+
+Use `IosBleProximityTransportFactory` for the equivalent iOS integration. Factory
+creation does not start BLE: the engine prepares the provider for engagement and
+owns its lifetime. Prepared listeners remain available until a connection wins
+or the session closes, so an advertised QR cannot outlive its retrieval path.
+
+## Platform setup and lifecycle
+
+Android hosts need the merged manifest declarations and runtime permissions for
+the selected roles. Apple hosts need `NSBluetoothAlwaysUsageDescription`; the
+provider runs CoreBluetooth on its main queue and leaves authorization prompts
+to the app. See the platform provider KDoc for the permission matrix.
+
+Both central adapters follow the same Ident, bearer-selection, subscription and
+START order. Bounded GATT queues fail with `ble_receive_overflow` rather than
+retaining incomplete messages; callbacks after closure are ignored. Android
+blocking socket operations register cancellation-driven closure before native
+connect, accept, read or write operations begin.
+
+Successful L2CAP completion permits a one-second drain before native cleanup.
+This allows queued response bytes to leave the radio stack; it is not a reader
+acknowledgement. Cancellation and error cleanup remain immediate.
+
+## Tests and design references
+
+From the unified-build root:
+
+```bash
+./gradlew :waltid-libraries:credentials:waltid-mdoc-proximity-mobile:allTests -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
+- [BLE building blocks and qualification boundary](docs/adr/0001-ble-building-block-selection.md)
