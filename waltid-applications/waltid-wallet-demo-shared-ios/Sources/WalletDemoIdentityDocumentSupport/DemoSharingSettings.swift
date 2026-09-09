@@ -34,7 +34,7 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
     public var configuration: ProximityConfiguration {
         switch self {
         case .defaultProfile, .bluetooth, .wifiAware:
-            let retrieval = ProximityPresentationConventionalRetrievalConfiguration(
+            let retrieval = ProximityRetrievalOptions(
                 bluetoothLowEnergy: self == .wifiAware ? nil : .init(),
                 nfc: self == .defaultProfile ? .init() : nil,
                 wifiAware: self != .bluetooth
@@ -58,7 +58,7 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
                 )
             )
         case .provisionalNfcV2WifiAware:
-            return ProximityPresentationConfiguration(
+            return ProximityConfiguration(
                 session: .provisionalNFCV2(.init(wifiAware: true))
             )
         case .provisionalNfcV2Direct:

@@ -1,36 +1,36 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.MobileWalletProximityConnectedRoute
-import id.walt.wallet2.mobile.MobileWalletProximityEngagement
-import id.walt.wallet2.mobile.MobileWalletProximityEngagementMethod
-import id.walt.wallet2.mobile.MobileWalletProximityAction
-import id.walt.wallet2.mobile.MobileWalletProximityActionResult
-import id.walt.wallet2.mobile.MobileWalletProximityActionType
-import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
-import id.walt.wallet2.mobile.MobileWalletProximityBleBearerPolicy
-import id.walt.wallet2.mobile.MobileWalletProximityBleConfiguration
-import id.walt.wallet2.mobile.MobileWalletProximityBleRoles
-import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
-import id.walt.wallet2.mobile.MobileWalletProximityDocumentSubmission
-import id.walt.wallet2.mobile.MobileWalletProximityElementReference
-import id.walt.wallet2.mobile.MobileWalletProximityError
-import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
-import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
-import id.walt.wallet2.mobile.MobileWalletProximitySessionConfiguration
-import id.walt.wallet2.mobile.MobileWalletProximityNfcHandover
-import id.walt.wallet2.mobile.MobileWalletProximityNfcRetrievalConfiguration
-import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
-import id.walt.wallet2.mobile.MobileWalletProximityConventionalRetrievalConfiguration
-import id.walt.wallet2.mobile.MobileWalletProximityReview
-import id.walt.wallet2.mobile.MobileWalletProximityRecovery
-import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettings
-import id.walt.wallet2.mobile.MobileWalletProximitySession
-import id.walt.wallet2.mobile.MobileWalletProximityState
-import id.walt.wallet2.mobile.MobileWalletProximitySubmission
+import id.walt.wallet2.mobile.ProximityConnectedRoute
+import id.walt.wallet2.mobile.ProximityEngagement
+import id.walt.wallet2.mobile.ProximityEngagementMethod
+import id.walt.wallet2.mobile.ProximityAction
+import id.walt.wallet2.mobile.ProximityActionResult
+import id.walt.wallet2.mobile.ProximityActionType
 import id.walt.wallet2.mobile.ProximityApproval
 import id.walt.wallet2.mobile.ProximityPreparationResult
 import id.walt.wallet2.mobile.ProximityPreparedSharing
 import id.walt.wallet2.mobile.ProximitySharingPlan
+import id.walt.wallet2.mobile.ProximityCapabilities
+import id.walt.wallet2.mobile.ProximityBleBearerPolicy
+import id.walt.wallet2.mobile.ProximityBleConfiguration
+import id.walt.wallet2.mobile.ProximityBleRoles
+import id.walt.wallet2.mobile.ProximityConfiguration
+import id.walt.wallet2.mobile.ProximityDocumentSubmission
+import id.walt.wallet2.mobile.ProximityElementReference
+import id.walt.wallet2.mobile.ProximityError
+import id.walt.wallet2.mobile.ProximityErrorCategory
+import id.walt.wallet2.mobile.ProximityHostActionResult
+import id.walt.wallet2.mobile.ProximitySessionConfiguration
+import id.walt.wallet2.mobile.ProximityNfcHandover
+import id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration
+import id.walt.wallet2.mobile.ProximityRemediationAction
+import id.walt.wallet2.mobile.ProximityRetrievalOptions
+import id.walt.wallet2.mobile.ProximityReview
+import id.walt.wallet2.mobile.ProximityRecovery
+import id.walt.wallet2.mobile.ProximityReaderTrustSettings
+import id.walt.wallet2.mobile.ProximitySession
+import id.walt.wallet2.mobile.ProximityState
+import id.walt.wallet2.mobile.ProximitySubmission
 import id.walt.wallet2.mobile.legalActions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -586,9 +586,9 @@ class WalletDemoProximityController(
 private val ProximityCapabilities.automaticPermissionActions:
     List<ProximityRemediationAction>
     get() = remediationActions.filter {
-        it == MobileWalletProximityRemediationAction.RequestBluetoothPermission ||
-            it == MobileWalletProximityRemediationAction.RequestNearbyWifiPermission ||
-            it == MobileWalletProximityRemediationAction.RequestLocalNetworkPermission
+        it == ProximityRemediationAction.RequestBluetoothPermission ||
+            it == ProximityRemediationAction.RequestNearbyWifiPermission ||
+            it == ProximityRemediationAction.RequestLocalNetworkPermission
     }
 
 internal fun WalletDemoProximityTransportProfile.configuration(): ProximityConfiguration =
@@ -596,11 +596,11 @@ internal fun WalletDemoProximityTransportProfile.configuration(): ProximityConfi
         WalletDemoProximityTransportProfile.Default,
         WalletDemoProximityTransportProfile.Bluetooth,
         WalletDemoProximityTransportProfile.WifiAware -> {
-            val retrieval = MobileWalletProximityConventionalRetrievalConfiguration(
-                bluetoothLowEnergy = MobileWalletProximityBleConfiguration().takeUnless {
+            val retrieval = ProximityRetrievalOptions(
+                bluetoothLowEnergy = ProximityBleConfiguration().takeUnless {
                     this == WalletDemoProximityTransportProfile.WifiAware
                 },
-                nfc = MobileWalletProximityNfcRetrievalConfiguration().takeIf {
+                nfc = ProximityNfcRetrievalConfiguration().takeIf {
                     this == WalletDemoProximityTransportProfile.Default
                 },
                 wifiAware = this != WalletDemoProximityTransportProfile.Bluetooth,
@@ -623,8 +623,8 @@ internal fun WalletDemoProximityTransportProfile.configuration(): ProximityConfi
                 ),
             )
         WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware ->
-            MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(wifiAware = true),
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(wifiAware = true),
             )
         WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct ->
             ProximityConfiguration(
