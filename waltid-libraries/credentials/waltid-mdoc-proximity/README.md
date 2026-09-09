@@ -1,24 +1,98 @@
-# waltid-mdoc-proximity
+<div align="center">
+  <h1>Kotlin Multiplatform mdoc proximity library</h1>
+  <p>by <a href="https://walt.id">walt.id</a></p>
+  <p>Shared holder protocol for local presentation of ISO mdoc credentials.</p>
+</div>
 
-Pure Kotlin Multiplatform holder protocol for ISO mdoc proximity presentation.
+## Overview
 
-The module owns session establishment and encryption, immutable request/consent binding, repeated
-exchange state, limits, timeouts, normalized errors, reader evidence/trust seams, and transport
-contracts. It has no Android or Apple radio API, wallet store, application lifecycle, or UI dependency.
+`waltid-mdoc-proximity` implements the radio-independent holder session: device
+engagement, session encryption, request matching, reader authentication, consent
+binding and response construction. It uses the existing mdoc, COSE and crypto
+libraries and has no wallet database, UI, Android or Apple radio dependency.
 
-Wallet-owned application profiles may supply versioned, locally validated, display-safe authorization
-details plus an opaque profile-result digest. The engine carries and binds that data through consent
-and submission without interpreting application extensions or introducing application-specific types.
+The baseline is [ISO/IEC 18013-5:2021](https://www.iso.org/standard/69084.html).
+Edition-2 draft features use an explicit versioned profile. Implemented protocol
+paths and deterministic tests do not establish certification or interoperability
+with every reader.
 
-Transport implementations exchange complete bounded messages through the walt-owned SPI. Platform
-adapters must treat the message bytes as opaque and keep ISO parsing, cryptography, credential choice,
-trust, and disclosure decisions in common code.
+## Getting started
 
-Reader-authentication scope is either `Document(index)` or `WholeRequest`; only a valid authentication
-result carries verified evidence and an application trust decision. Consent previews, capability
-snapshots, and trust policy retain owned collections and return detached collection views. Request
-contexts reconstruct decoded projections from their original exact bytes, preserving signed and
-transcript encodings when a consumer modifies a projection.
+Within the coordinated source build, add the module to the consuming source set:
 
-The deterministic loopback fixtures live in `src/commonTestFixtures/kotlin` and are included only by
-consumer test source sets. Production transport kinds describe actual supported bearers.
+```kotlin
+commonMain.dependencies {
+    implementation(project(":waltid-libraries:credentials:waltid-mdoc-proximity"))
+}
+```
+
+Use this lower-level engine directly when implementing a wallet integration or a
+protocol harness with its own credential source and consent boundary:
+
+```kotlin
+import id.walt.crypto2.keys.Key
+import id.walt.mdoc.proximity.*
+
+suspend fun runHolderSession(
+    ephemeralDeviceKey: Key,
+    sources: List<MdocEngagementSource>,
+    requestProcessor: MdocHolderRequestProcessor,
+    consentHandler: MdocConsentHandler,
+    context: EngagementContext,
+    capabilities: MdocSessionCapabilities,
+): MdocHolderSessionResult {
+    val engine = MdocHolderProtocolEngine(
+        eDeviceKey = ephemeralDeviceKey,
+        engagementSources = sources,
+        requestProcessor = requestProcessor,
+        consentHandler = consentHandler,
+        engagementContext = context,
+        capabilities = capabilities,
+    )
+    return engine.run()
+}
+```
+
+The caller supplies a fresh supported ephemeral key, compatible engagement
+sources and matching context/capability profiles. Collect `engine.state` in the
+same lifecycle scope when rendering protocol progress. Run an engine once;
+cancel its coroutine when the host ends an active session. Do not reuse session
+keys or engagement material for a later presentation.
+
+## Integration boundaries
+
+| Component | Responsibility |
+|---|---|
+| `MdocEngagementSource` | Prepare QR or NFC engagement and compatible retrieval providers |
+| `MdocHolderRequestProcessor` | Match available credentials, build the preview and resolve an approved submission |
+| `MdocConsentHandler` | Return an explicit holder decision for the immutable review |
+| `MdocHolderProtocolEngine` | Own encrypted exchange, repeated requests, limits, timeouts and terminal cleanup |
+
+A request can have multiple matching credentials. The wallet selects a credential
+for each requested document and then chooses fields from that credential. The
+engine binds the submission to the reviewed request and rejects changed or stale
+choices. A valid reader signature is evidence of authentication; trust depends on
+the application's configured Reader CA and policy. Neither replaces holder consent.
+
+Reader authentication is scoped to `Document(index)` or `WholeRequest`. Only a
+valid result carries verified evidence and a trust decision. Public previews and
+capabilities retain owned collections and return detached views; exact signed
+bytes and session-transcript encodings remain authoritative.
+
+Wallet-owned application profiles can contribute validated, display-safe
+authorization details and an opaque result digest. The engine binds those values
+through review and submission without interpreting application-specific extensions.
+Platform adapters keep ISO parsing, cryptography, credential choice and disclosure
+decisions out of radio code.
+
+## Testing and related modules
+
+Deterministic loopback fixtures in `src/commonTestFixtures/kotlin` are included
+only by consumer test source sets. They do not add a production transport kind.
+From the unified-build root, run the focused engine suite with:
+
+```bash
+./gradlew :waltid-libraries:credentials:waltid-mdoc-proximity:jvmTest
+```
+
+- [mdoc data model and issuance](../waltid-mdoc-credentials2/README.md)
