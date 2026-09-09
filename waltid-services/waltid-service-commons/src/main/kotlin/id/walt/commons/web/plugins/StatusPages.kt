@@ -40,12 +40,16 @@ fun Application.configureStatusPages() {
     }
 }
 
-private fun statusCodeForException(cause: Throwable): HttpStatusCode = when (cause) {
+internal fun statusCodeForException(cause: Throwable): HttpStatusCode = when (cause) {
     is KeyAlreadyExistsException -> HttpStatusCode.Conflict
     is KeySerializationException -> HttpStatusCode.InternalServerError
     is NotFoundException -> HttpStatusCode.NotFound
     is IllegalArgumentException -> HttpStatusCode.BadRequest
     is BadRequestException -> HttpStatusCode.BadRequest
+    // Ktor raises this when a request body cannot be deserialized into the expected type. It extends
+    // IOException rather than BadRequestException, so without this branch a malformed body reaches the
+    // catch-all below and is reported as 500, blaming the server for the caller's payload.
+    is ContentTransformationException -> HttpStatusCode.BadRequest
     is IllegalStateException -> HttpStatusCode.InternalServerError
     is JedisException -> HttpStatusCode.InternalServerError
     is SerializableWebException -> HttpStatusCode.fromValue(cause.status)
