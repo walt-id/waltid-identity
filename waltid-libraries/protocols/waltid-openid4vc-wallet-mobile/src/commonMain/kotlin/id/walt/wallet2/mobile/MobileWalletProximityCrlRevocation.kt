@@ -24,7 +24,11 @@ public enum class MobileWalletProximityCrlScope {
 
 /** A complete DER CRL retrieved by the application's network/cache policy. */
 public sealed interface MobileWalletProximityCrlFetchResult {
-    /** Unpadded Base64URL-encoded DER. Signature, scope and freshness are checked by the SDK. */
+    /**
+     * A retrieved CRL whose signature, scope and freshness are checked by the SDK.
+     *
+     * @property crlDerBase64Url Unpadded Base64URL-encoded DER CRL.
+     */
     public data class Available(public val crlDerBase64Url: String) : MobileWalletProximityCrlFetchResult
 
     /** No complete CRL could be retrieved within the application's transport policy. */
