@@ -8,7 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettingsCodec
+import id.walt.wallet2.mobile.ProximityReaderTrustSettingsCodec
 import java.io.ByteArrayOutputStream
 
 @Composable
@@ -53,7 +53,7 @@ private fun ContentResolver.readReaderTrustFile(uri: Uri): ReaderTrustImportFile
             val count = input.read(buffer)
             if (count < 0) break
             output.write(buffer, 0, count)
-            require(output.size() <= MobileWalletProximityReaderTrustSettingsCodec.MaximumImportBytes) {
+            require(output.size() <= ProximityReaderTrustSettingsCodec.MaximumImportBytes) {
                 "The imported file exceeds 1 MiB"
             }
         }

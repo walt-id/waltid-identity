@@ -4,7 +4,7 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettingsCodec
+import id.walt.wallet2.mobile.ProximityReaderTrustSettingsCodec
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
 import platform.Foundation.NSData
@@ -67,7 +67,7 @@ private class ReaderTrustDocumentPickerDelegate : NSObject(), UIDocumentPickerDe
                 }
                 require(
                     data.length <=
-                        MobileWalletProximityReaderTrustSettingsCodec.MaximumImportBytes.toULong()
+                        ProximityReaderTrustSettingsCodec.MaximumImportBytes.toULong()
                 ) {
                     "The imported file exceeds 1 MiB"
                 }

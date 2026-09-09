@@ -18,7 +18,7 @@ import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
 import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.logic.createAndroidDemoReaderTrustSettingsStore
-import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
+import id.walt.wallet2.mobile.ProximityConfiguration
 import id.walt.walletdemo.compose.logic.createAndroidDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.ui.MobileWalletDemoApp
@@ -71,7 +71,7 @@ class MainActivity : FragmentActivity() {
             wallet = wallet,
             configurationProvider = {
                 readerTrustSettingsController.sessionSnapshot().applyTo(
-                    MobileWalletProximityConfiguration()
+                    ProximityConfiguration()
                 )
             },
         )

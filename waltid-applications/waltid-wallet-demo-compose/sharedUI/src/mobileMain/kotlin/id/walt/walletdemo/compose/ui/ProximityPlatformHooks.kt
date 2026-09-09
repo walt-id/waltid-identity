@@ -1,19 +1,19 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.Composable
-import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
+import id.walt.wallet2.mobile.ProximityRemediationAction
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 
 internal class WalletDemoProximityHostActions(
     val executor: WalletDemoProximityHostActionExecutor,
-    private val actionForDisplay: (MobileWalletProximityRemediationAction) ->
-        MobileWalletProximityRemediationAction = { it },
-    private val automaticallyPerform: (MobileWalletProximityRemediationAction) -> Boolean = { true },
+    private val actionForDisplay: (ProximityRemediationAction) ->
+        ProximityRemediationAction = { it },
+    private val automaticallyPerform: (ProximityRemediationAction) -> Boolean = { true },
 ) {
-    fun displayedAction(action: MobileWalletProximityRemediationAction): MobileWalletProximityRemediationAction =
+    fun displayedAction(action: ProximityRemediationAction): ProximityRemediationAction =
         actionForDisplay(action)
 
-    fun mayPerformAutomatically(action: MobileWalletProximityRemediationAction): Boolean =
+    fun mayPerformAutomatically(action: ProximityRemediationAction): Boolean =
         automaticallyPerform(action)
 }
 

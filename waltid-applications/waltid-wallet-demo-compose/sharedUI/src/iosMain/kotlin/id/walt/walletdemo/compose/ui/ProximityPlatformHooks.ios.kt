@@ -6,8 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
-import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
+import id.walt.wallet2.mobile.ProximityHostActionResult
+import id.walt.wallet2.mobile.ProximityRemediationAction
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -32,14 +32,14 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
             executor = WalletDemoProximityHostActionExecutor { action ->
                 withContext(Dispatchers.Main) {
                     when (action) {
-                        MobileWalletProximityRemediationAction.RequestBluetoothPermission ->
+                        ProximityRemediationAction.RequestBluetoothPermission ->
                             requestBluetoothAuthorization()
-                        MobileWalletProximityRemediationAction.OpenApplicationSettings,
-                        MobileWalletProximityRemediationAction.EnableBluetooth -> openApplicationSettings()
-                        MobileWalletProximityRemediationAction.Retry ->
-                            MobileWalletProximityHostActionResult.Completed
-                        MobileWalletProximityRemediationAction.UseSupportedDevice ->
-                            MobileWalletProximityHostActionResult.Cancelled
+                        ProximityRemediationAction.OpenApplicationSettings,
+                        ProximityRemediationAction.EnableBluetooth -> openApplicationSettings()
+                        ProximityRemediationAction.Retry ->
+                            ProximityHostActionResult.Completed
+                        ProximityRemediationAction.UseSupportedDevice ->
+                            ProximityHostActionResult.Cancelled
                     }
                 }
             },
@@ -88,15 +88,15 @@ internal actual fun ProximityPlatformSessionEffect(
     }
 }
 
-private suspend fun requestBluetoothAuthorization(): MobileWalletProximityHostActionResult {
+private suspend fun requestBluetoothAuthorization(): ProximityHostActionResult {
     if (CBCentralManager.authorization != CBManagerAuthorizationNotDetermined) {
         return if (CBCentralManager.authorization == CBManagerAuthorizationAllowedAlways) {
-            MobileWalletProximityHostActionResult.Completed
+            ProximityHostActionResult.Completed
         } else {
-            MobileWalletProximityHostActionResult.Cancelled
+            ProximityHostActionResult.Cancelled
         }
     }
-    val result = CompletableDeferred<MobileWalletProximityHostActionResult>()
+    val result = CompletableDeferred<ProximityHostActionResult>()
     val requester = BluetoothAuthorizationRequester(result)
     return try {
         requester.start()
@@ -107,16 +107,16 @@ private suspend fun requestBluetoothAuthorization(): MobileWalletProximityHostAc
 }
 
 private class BluetoothAuthorizationRequester(
-    private val result: CompletableDeferred<MobileWalletProximityHostActionResult>,
+    private val result: CompletableDeferred<ProximityHostActionResult>,
 ) {
     private val delegate = object : NSObject(), CBCentralManagerDelegateProtocol {
         override fun centralManagerDidUpdateState(central: CBCentralManager) {
             if (CBCentralManager.authorization != CBManagerAuthorizationNotDetermined) {
                 result.complete(
                     if (CBCentralManager.authorization == CBManagerAuthorizationAllowedAlways) {
-                        MobileWalletProximityHostActionResult.Completed
+                        ProximityHostActionResult.Completed
                     } else {
-                        MobileWalletProximityHostActionResult.Cancelled
+                        ProximityHostActionResult.Cancelled
                     }
                 )
             }
@@ -134,8 +134,8 @@ private class BluetoothAuthorizationRequester(
     }
 }
 
-private fun openApplicationSettings(): MobileWalletProximityHostActionResult {
+private fun openApplicationSettings(): ProximityHostActionResult {
     val url = NSURL(string = UIApplicationOpenSettingsURLString)
     UIApplication.sharedApplication.openURL(url, options = emptyMap<Any?, Any?>(), completionHandler = null)
-    return MobileWalletProximityHostActionResult.Completed
+    return ProximityHostActionResult.Completed
 }
