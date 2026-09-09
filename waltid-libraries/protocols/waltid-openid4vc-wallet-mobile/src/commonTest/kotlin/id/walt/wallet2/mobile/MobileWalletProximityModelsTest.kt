@@ -1,59 +1,59 @@
 package id.walt.wallet2.mobile
 
-import id.walt.mdoc.proximity.ProximityError
+import id.walt.mdoc.proximity.ProximityError as EngineProximityError
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class MobileWalletProximityModelsTest {
+class ProximityModelsTest {
     @Test
     fun `EUDI profile requires trusted-reader policy`() {
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityConfiguration(
-                profile = MobileWalletProximityProfile.EudiArf3Fcaf202608,
+            ProximityConfiguration(
+                profile = ProximityProfile.EudiArf3Fcaf202608,
             )
         }
 
-        MobileWalletProximityConfiguration(
-            profile = MobileWalletProximityProfile.EudiArf3Fcaf202608,
-            readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+        ProximityConfiguration(
+            profile = ProximityProfile.EudiArf3Fcaf202608,
+            readerPolicy = ProximityReaderPolicy.RequireTrusted,
         )
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityConfiguration(
-                profile = MobileWalletProximityProfile.EudiArf3Fcaf202608,
-                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
-                deviceAuthenticationPolicy = MobileWalletProximityDeviceAuthenticationPolicy.MacOnly,
+            ProximityConfiguration(
+                profile = ProximityProfile.EudiArf3Fcaf202608,
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
+                deviceAuthenticationPolicy = ProximityDeviceAuthenticationPolicy.MacOnly,
             )
         }
     }
 
     @Test
     fun `transport capability keeps support dimensions independent and truthful`() {
-        val unavailable = MobileWalletProximityError(
-            category = MobileWalletProximityErrorCategory.Capability,
+        val unavailable = ProximityError(
+            category = ProximityErrorCategory.Capability,
             code = "ble_powered_off",
             message = "Bluetooth is powered off",
-            recovery = MobileWalletProximityRecovery.RetryPrerequisites,
+            recovery = ProximityRecovery.RetryPrerequisites,
         )
-        val capability = MobileWalletProximityTransportCapability(
+        val capability = ProximityTransportCapability(
             implemented = true,
             profilePermitted = true,
-            runtime = MobileWalletProximityRuntimeObservation.Unavailable(
-                unavailable, listOf(MobileWalletProximityRemediationAction.EnableBluetooth),
+            runtime = ProximityRuntimeObservation.Unavailable(
+                unavailable, listOf(ProximityRemediationAction.EnableBluetooth),
             ),
             selected = true,
         )
 
         assertFalse(capability.mayStart)
         assertEquals(unavailable, capability.unavailable)
-        assertTrue(capability.copy(runtime = MobileWalletProximityRuntimeObservation.Available).mayStart)
-        val unchecked = capability.copy(runtime = MobileWalletProximityRuntimeObservation.NotChecked)
+        assertTrue(capability.copy(runtime = ProximityRuntimeObservation.Available).mayStart)
+        val unchecked = capability.copy(runtime = ProximityRuntimeObservation.NotChecked)
         assertFalse(unchecked.runtimeAvailable)
         assertEquals(null, unchecked.unavailable)
         assertTrue(unchecked.remediationActions.isEmpty())
-        assertTrue(capability.copy(selected = false).runtime is MobileWalletProximityRuntimeObservation.Unavailable)
+        assertTrue(capability.copy(selected = false).runtime is ProximityRuntimeObservation.Unavailable)
         val selectedButUnimplemented = capability.copy(implemented = false)
         assertTrue(selectedButUnimplemented.selected)
         assertFalse(selectedButUnimplemented.mayStart)
@@ -61,20 +61,20 @@ class MobileWalletProximityModelsTest {
 
     @Test
     fun `session may start with one usable selected engagement and retrieval method`() {
-        val available = MobileWalletProximityTransportCapability(
+        val available = ProximityTransportCapability(
             implemented = true,
             profilePermitted = true,
-            runtime = MobileWalletProximityRuntimeObservation.Available,
+            runtime = ProximityRuntimeObservation.Available,
             selected = true,
         )
-        val unavailableAlternative = MobileWalletProximityTransportCapability(
+        val unavailableAlternative = ProximityTransportCapability(
             implemented = false,
             profilePermitted = true,
-            runtime = MobileWalletProximityRuntimeObservation.NotChecked,
+            runtime = ProximityRuntimeObservation.NotChecked,
             selected = true,
         )
-        val capabilities = MobileWalletProximityCapabilities(
-            profile = MobileWalletProximityProfile.Iso180135Edition2Dis2026,
+        val capabilities = ProximityCapabilities(
+            profile = ProximityProfile.Iso180135Edition2Dis2026,
             qrEngagement = available,
             nfcEngagement = unavailableAlternative,
             bluetoothLowEnergy = available,
@@ -89,50 +89,50 @@ class MobileWalletProximityModelsTest {
 
     @Test
     fun `reader authentication scopes validate indices and invalid outcomes carry no trust`() {
-        assertFailsWith<IllegalArgumentException> { MobileWalletProximityReaderAuthenticationScope.Document(-1) }
-        val document = MobileWalletProximityReaderAuthenticationScope.Document(0)
+        assertFailsWith<IllegalArgumentException> { ProximityReaderAuthenticationScope.Document(-1) }
+        val document = ProximityReaderAuthenticationScope.Document(0)
         assertEquals(0, document.documentRequestIndex)
-        assertEquals(null, MobileWalletProximityReaderAuthenticationScope.WholeRequest.documentRequestIndex)
-        val absent = MobileWalletProximityReaderAuthentication(
-            scope = document, outcome = MobileWalletProximityReaderAuthenticationOutcome.Absent,
+        assertEquals(null, ProximityReaderAuthenticationScope.WholeRequest.documentRequestIndex)
+        val absent = ProximityReaderAuthentication(
+            scope = document, outcome = ProximityReaderAuthenticationOutcome.Absent,
         )
-        assertEquals(MobileWalletProximityReaderTrustState.NotEvaluated, absent.trust)
-        assertEquals(MobileWalletProximityReaderAuthenticationValidity.Absent, absent.validity)
+        assertEquals(ProximityReaderTrustState.NotEvaluated, absent.trust)
+        assertEquals(ProximityReaderAuthenticationValidity.Absent, absent.validity)
     }
 
     @Test
     fun `reader trust facts reject contradictory states`() {
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityReaderTrustDecision(
-                state = MobileWalletProximityReaderTrustState.Trusted,
+            ProximityReaderTrustDecision(
+                state = ProximityReaderTrustState.Trusted,
             )
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityReaderTrustDecision(
-                state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
-                revocation = MobileWalletProximityReaderRevocationState.Revoked,
+            ProximityReaderTrustDecision(
+                state = ProximityReaderTrustState.ValidButUntrusted,
+                revocation = ProximityReaderRevocationState.Revoked,
             )
         }
 
-        val ricalEvidenceWithoutAutomaticTrust = MobileWalletProximityReaderTrustDecision(
-            state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
-            certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
-            revocation = MobileWalletProximityReaderRevocationState.Good,
-            rical = MobileWalletProximityRicalState.Matched,
+        val ricalEvidenceWithoutAutomaticTrust = ProximityReaderTrustDecision(
+            state = ProximityReaderTrustState.ValidButUntrusted,
+            certificatePath = ProximityReaderCertificatePathState.Valid,
+            revocation = ProximityReaderRevocationState.Good,
+            rical = ProximityRicalState.Matched,
             reason = "The configured policy does not establish reader trust",
         )
         assertEquals(
-            MobileWalletProximityReaderTrustState.ValidButUntrusted,
+            ProximityReaderTrustState.ValidButUntrusted,
             ricalEvidenceWithoutAutomaticTrust.state,
         )
     }
 
     @Test
     fun `application profile binding requires exact unpadded SHA-256 bytes`() {
-        fun authorization(digest: String) = MobileWalletProximityApplicationAuthorization(
+        fun authorization(digest: String) = ProximityApplicationAuthorization(
             profileId = "test-profile",
             displayTitle = "Test profile",
-            details = listOf(MobileWalletProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 1.00")),
+            details = listOf(ProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 1.00")),
             compatibleCredentialIds = setOf("credential-1"),
             resultBindingDigestBase64Url = digest,
         )
@@ -147,46 +147,46 @@ class MobileWalletProximityModelsTest {
     @Test
     fun `lower-layer errors retain the precise wallet category`() {
         assertEquals(
-            MobileWalletProximityErrorCategory.Trust,
-            ProximityError.Policy("trusted_reader_required", "Trusted reader required").toWalletError().category,
+            ProximityErrorCategory.Trust,
+            EngineProximityError.Policy("trusted_reader_required", "Trusted reader required").toWalletError().category,
         )
         assertEquals(
-            MobileWalletProximityErrorCategory.StaleSubmission,
-            ProximityError.Security("changed_submission", "Submission changed").toWalletError().category,
+            ProximityErrorCategory.StaleSubmission,
+            EngineProximityError.Security("changed_submission", "Submission changed").toWalletError().category,
         )
         assertEquals(
-            MobileWalletProximityErrorCategory.ApplicationProfile,
-            ProximityError.Policy("application_profile_invalid", "Invalid profile").toWalletError().category,
+            ProximityErrorCategory.ApplicationProfile,
+            EngineProximityError.Policy("application_profile_invalid", "Invalid profile").toWalletError().category,
         )
         assertEquals(
-            MobileWalletProximityErrorCategory.HolderKey,
-            ProximityError.Policy("holder_key_unavailable", "Holder key unavailable").toWalletError().category,
+            ProximityErrorCategory.HolderKey,
+            EngineProximityError.Policy("holder_key_unavailable", "Holder key unavailable").toWalletError().category,
         )
         assertEquals(
-            MobileWalletProximityErrorCategory.Protocol,
-            ProximityError.Security("session_authentication_failed", "Session authentication failed")
+            ProximityErrorCategory.Protocol,
+            EngineProximityError.Security("session_authentication_failed", "Session authentication failed")
                 .toWalletError().category,
         )
     }
 
     @Test
     fun `legal actions are derived only from current state`() {
-        val review = MobileWalletProximityReview(
-            reviewId = MobileWalletProximityReviewId(kotlin.uuid.Uuid.random().toString()),
+        val review = ProximityReview(
+            reviewId = ProximityReviewId(kotlin.uuid.Uuid.random().toString()),
             exchange = 1,
             documents = listOf(
-                MobileWalletProximityDocumentReview(
+                ProximityDocumentReview(
                     requestIndex = 0,
                     docType = "org.example.mdoc",
                     credentialOptions = listOf(
-                        MobileWalletProximityCredentialOption(
+                        ProximityCredentialOption(
                             credentialId = "credential-1",
                             label = "Example",
                             issuer = null,
                             validUntil = kotlin.time.Instant.DISTANT_FUTURE,
-                            deviceAuthentication = MobileWalletProximityDeviceAuthenticationMethod.Signature,
+                            deviceAuthentication = ProximityDeviceAuthenticationMethod.Signature,
                             requestedElements = listOf(
-                                MobileWalletProximityRequestedElement(
+                                ProximityRequestedElement(
                                     namespace = "org.example",
                                     elementIdentifier = "given_name",
                                     intentToRetain = false,
@@ -203,16 +203,16 @@ class MobileWalletProximityModelsTest {
 
         assertEquals(
             setOf(
-                MobileWalletProximityActionType.Approve,
-                MobileWalletProximityActionType.Decline,
-                MobileWalletProximityActionType.Cancel,
+                ProximityActionType.Approve,
+                ProximityActionType.Decline,
+                ProximityActionType.Cancel,
             ),
-            MobileWalletProximityState.ReviewRequired(review).legalActions,
+            ProximityState.ReviewRequired(review).legalActions,
         )
         assertEquals(
-            setOf(MobileWalletProximityActionType.Cancel),
-            MobileWalletProximityState.AwaitingRequest(1).legalActions,
+            setOf(ProximityActionType.Cancel),
+            ProximityState.AwaitingRequest(1).legalActions,
         )
-        assertTrue(MobileWalletProximityState.Cancelled.legalActions.isEmpty())
+        assertTrue(ProximityState.Cancelled.legalActions.isEmpty())
     }
 }

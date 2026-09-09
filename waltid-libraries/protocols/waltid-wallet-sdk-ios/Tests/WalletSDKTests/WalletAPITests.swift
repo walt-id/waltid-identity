@@ -3,18 +3,18 @@ import XCTest
 
 final class WalletAPITests: XCTestCase {
     func testProximityStreamCompletesAtEveryTerminalStateWithoutForwardingLaterStates() async {
-        let terminals: [ProximityPresentationState] = [
+        let terminals: [ProximityState] = [
             .completed(exchanges: 1, declined: false), .cancelled,
             .failed(.init(category: .transport, code: "closed", message: "Closed", recovery: .startNewSession)),
         ]
         for terminal in terminals {
             let bridge = TerminalProximityStreamBridge()
-            let session = ProximityPresentationSession(bridge: bridge)
+            let session = ProximitySession(bridge: bridge)
             bridge.continuation.yield(.terminating(exchange: 1))
             bridge.continuation.yield(terminal)
             bridge.continuation.yield(.preparing(profile: .iso180135Edition2DIS2026))
             bridge.continuation.finish()
-            var values: [ProximityPresentationState] = []
+            var values: [ProximityState] = []
             for await state in session.states { values.append(state) }
             XCTAssertEqual(values, [.terminating(exchange: 1), terminal])
         }
@@ -302,7 +302,7 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testProximityConfigurationUsesStableNativeDefaults() {
-        let configuration = ProximityPresentationConfiguration()
+        let configuration = ProximityConfiguration()
 
         acceptsSendable(configuration)
         XCTAssertEqual(configuration.profile, .iso180135Edition2DIS2026)
@@ -370,19 +370,19 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testProximityCapabilitiesAllowUnavailableSelectedAlternatives() {
-        let available = ProximityPresentationTransportCapability(
+        let available = ProximityTransportCapability(
             implemented: true,
             profilePermitted: true,
             runtime: .available,
             selected: true
         )
-        let unavailable = ProximityPresentationTransportCapability(
+        let unavailable = ProximityTransportCapability(
             implemented: false,
             profilePermitted: true,
             runtime: .notChecked,
             selected: true
         )
-        let capabilities = ProximityPresentationCapabilities(
+        let capabilities = ProximityCapabilities(
             profile: .iso180135Edition2DIS2026,
             qrEngagement: available,
             nfcEngagement: unavailable,
@@ -404,13 +404,13 @@ final class WalletAPITests: XCTestCase {
         let absent = ProximityReaderAuthentication(scope: .wholeRequest, authenticationIndex: 0, outcome: .absent)
         XCTAssertEqual(absent.validity, .absent)
         XCTAssertEqual(absent.trust, .notEvaluated)
-        let capability = ProximityPresentationTransportCapability(
+        let capability = ProximityTransportCapability(
             implemented: true, profilePermitted: true, runtime: .notChecked, selected: false
         )
         XCTAssertNil(capability.unavailable)
         XCTAssertFalse(capability.runtimeAvailable)
         XCTAssertEqual(capability.remediationActions, [])
-        let error = ProximityPresentationError(
+        let error = ProximityError(
             category: .transport, code: "link_lost", message: "Link lost", recovery: .startNewSession
         )
         XCTAssertEqual(error.recovery, .startNewSession)
@@ -421,7 +421,7 @@ final class WalletAPITests: XCTestCase {
         let wallet = Wallet(bridge: bridge)
         let session = try await wallet.startProximityPresentation()
         let reviewID = ProximityReviewID(value: UUID().uuidString)
-        let submission = ProximityPresentationSubmission(documents: [
+        let submission = ProximitySubmission(documents: [
             ProximityDocumentSubmission(requestIndex: 0, credentialID: "credential-1", disclosedElements: [
                 ProximityElementReference(namespace: "org.example", elementIdentifier: "name")
             ])
@@ -1000,23 +1000,23 @@ private extension Array {
     }
 }
 
-private func makeTestProximityCapabilities() -> ProximityPresentationCapabilities {
-    let unavailable = ProximityPresentationTransportCapability(
+private func makeTestProximityCapabilities() -> ProximityCapabilities {
+    let unavailable = ProximityTransportCapability(
         implemented: false,
         profilePermitted: true,
         runtime: .notChecked,
         selected: false
     )
-    return ProximityPresentationCapabilities(
+    return ProximityCapabilities(
         profile: .iso180135Edition2DIS2026,
-        qrEngagement: ProximityPresentationTransportCapability(
+        qrEngagement: ProximityTransportCapability(
             implemented: true,
             profilePermitted: true,
             runtime: .available,
             selected: true
         ),
         nfcEngagement: unavailable,
-        bluetoothLowEnergy: ProximityPresentationTransportCapability(
+        bluetoothLowEnergy: ProximityTransportCapability(
             implemented: true,
             profilePermitted: true,
             runtime: .available,
@@ -1330,16 +1330,16 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     }
 
     func proximityPresentationCapabilities(
-        configuration: ProximityPresentationConfiguration
-    ) async throws -> ProximityPresentationCapabilities {
+        configuration: ProximityConfiguration
+    ) async throws -> ProximityCapabilities {
         if let error { throw error }
         proximityCapabilityCalls += 1
         return proximityCapabilitiesResult
     }
 
     func startProximityPresentation(
-        configuration: ProximityPresentationConfiguration
-    ) async throws -> any ProximityPresentationSessionBridge {
+        configuration: ProximityConfiguration
+    ) async throws -> any ProximitySessionBridge {
         if let error { throw error }
         proximitySessionStarts += 1
         return proximitySession
@@ -1382,16 +1382,16 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     }
 }
 
-private final class FakeProximityPresentationSessionBridge: ProximityPresentationSessionBridge, @unchecked Sendable {
-    lazy var states = AsyncStream<ProximityPresentationState> { [unowned self] continuation in
+private final class FakeProximityPresentationSessionBridge: ProximitySessionBridge, @unchecked Sendable {
+    lazy var states = AsyncStream<ProximityState> { [unowned self] continuation in
         continuation.yield(.checkingPrerequisites(capabilities))
         continuation.finish()
     }
     var capabilities = makeTestProximityCapabilities()
-    private(set) var dispatches: [ProximityPresentationAction] = []
+    private(set) var dispatches: [ProximityAction] = []
     private(set) var closeCalls = 0
 
-    func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult {
+    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult {
         dispatches.append(action)
         return .accepted
     }
@@ -1413,15 +1413,15 @@ private let testVerifierMetadata = VerifierMetadata(
     termsOfServiceURI: "https://verifier.example/terms"
 )
 
-private struct TerminalProximityStreamBridge: ProximityPresentationSessionBridge {
+private struct TerminalProximityStreamBridge: ProximitySessionBridge {
     let systemPresentationActive = false
-    let states: AsyncStream<ProximityPresentationState>
-    let continuation: AsyncStream<ProximityPresentationState>.Continuation
+    let states: AsyncStream<ProximityState>
+    let continuation: AsyncStream<ProximityState>.Continuation
     init() {
-        let pair = AsyncStream<ProximityPresentationState>.makeStream()
+        let pair = AsyncStream<ProximityState>.makeStream()
         states = pair.stream
         continuation = pair.continuation
     }
-    func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult { .accepted }
+    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult { .accepted }
     func close() async { continuation.finish() }
 }

@@ -38,11 +38,11 @@ protocol WalletCoreBridge: Sendable {
     ) async throws -> PresentationResult
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws
     func proximityPresentationCapabilities(
-        configuration: ProximityPresentationConfiguration
-    ) async throws -> ProximityPresentationCapabilities
+        configuration: ProximityConfiguration
+    ) async throws -> ProximityCapabilities
     func startProximityPresentation(
-        configuration: ProximityPresentationConfiguration
-    ) async throws -> any ProximityPresentationSessionBridge
+        configuration: ProximityConfiguration
+    ) async throws -> any ProximitySessionBridge
     func digitalCredentialCapabilities() -> DigitalCredentialCapabilities
     func previewAnnexCPresentation(
         parsedRequest: AnnexCParsedRequest,
@@ -162,14 +162,14 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func proximityPresentationCapabilities(
-        configuration: ProximityPresentationConfiguration
-    ) async throws -> ProximityPresentationCapabilities {
+        configuration: ProximityConfiguration
+    ) async throws -> ProximityCapabilities {
         throw unavailableError()
     }
 
     func startProximityPresentation(
-        configuration: ProximityPresentationConfiguration
-    ) async throws -> any ProximityPresentationSessionBridge {
+        configuration: ProximityConfiguration
+    ) async throws -> any ProximitySessionBridge {
         throw unavailableError()
     }
     func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
