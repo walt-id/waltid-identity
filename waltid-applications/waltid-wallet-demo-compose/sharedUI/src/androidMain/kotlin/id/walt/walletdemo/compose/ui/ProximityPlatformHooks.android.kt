@@ -26,8 +26,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
-import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
+import id.walt.wallet2.mobile.ProximityHostActionResult
+import id.walt.wallet2.mobile.ProximityRemediationAction
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -40,10 +40,10 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
         AndroidPermissionRequestHistory(context.applicationContext)
     }
     var permissionRequest by remember {
-        mutableStateOf<CompletableDeferred<MobileWalletProximityHostActionResult>?>(null)
+        mutableStateOf<CompletableDeferred<ProximityHostActionResult>?>(null)
     }
     var systemSurface by remember {
-        mutableStateOf<CompletableDeferred<MobileWalletProximityHostActionResult>?>(null)
+        mutableStateOf<CompletableDeferred<ProximityHostActionResult>?>(null)
     }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -51,9 +51,9 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
         permissionHistory.recordDecision(grants.keys)
         permissionRequest?.complete(
             if (grants.isNotEmpty() && grants.values.all { it }) {
-                MobileWalletProximityHostActionResult.Completed
+                ProximityHostActionResult.Completed
             } else {
-                MobileWalletProximityHostActionResult.Cancelled
+                ProximityHostActionResult.Cancelled
             }
         )
         permissionRequest = null
@@ -61,7 +61,7 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
     val systemSurfaceLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
-        systemSurface?.complete(MobileWalletProximityHostActionResult.Completed)
+        systemSurface?.complete(ProximityHostActionResult.Completed)
         systemSurface = null
     }
     fun permissionRoute(permissions: Array<String>): AndroidRuntimePermissionRoute =
@@ -75,9 +75,9 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
                 activity?.shouldShowRequestPermissionRationale(permission) == true
             },
         )
-    suspend fun requestPermissions(permissions: Array<String>): MobileWalletProximityHostActionResult {
+    suspend fun requestPermissions(permissions: Array<String>): ProximityHostActionResult {
         when (permissionRoute(permissions)) {
-            AndroidRuntimePermissionRoute.Granted -> return MobileWalletProximityHostActionResult.Completed
+            AndroidRuntimePermissionRoute.Granted -> return ProximityHostActionResult.Completed
             AndroidRuntimePermissionRoute.OpenSettings -> return launchSystemSurface(
                 applicationSettingsIntent(context),
                 current = { systemSurface },
@@ -86,8 +86,8 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
             )
             AndroidRuntimePermissionRoute.Request -> Unit
         }
-        if (permissionRequest != null) return MobileWalletProximityHostActionResult.Failed
-        return CompletableDeferred<MobileWalletProximityHostActionResult>().let { result ->
+        if (permissionRequest != null) return ProximityHostActionResult.Failed
+        return CompletableDeferred<ProximityHostActionResult>().let { result ->
             permissionRequest = result
             try {
                 permissionLauncher.launch(permissions)
@@ -95,7 +95,7 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Throwable) {
-                MobileWalletProximityHostActionResult.Failed
+                ProximityHostActionResult.Failed
             } finally {
                 if (permissionRequest === result) permissionRequest = null
             }
@@ -106,40 +106,40 @@ internal actual fun rememberProximityHostActions(): WalletDemoProximityHostActio
         WalletDemoProximityHostActions(
             executor = WalletDemoProximityHostActionExecutor { action ->
                 when (action) {
-                    MobileWalletProximityRemediationAction.RequestBluetoothPermission ->
+                    ProximityRemediationAction.RequestBluetoothPermission ->
                         requestPermissions(bluetoothPermissions())
-                    MobileWalletProximityRemediationAction.OpenApplicationSettings ->
+                    ProximityRemediationAction.OpenApplicationSettings ->
                         launchSystemSurface(
                             applicationSettingsIntent(context),
                             current = { systemSurface },
                             setCurrent = { systemSurface = it },
                             launch = systemSurfaceLauncher::launch,
                         )
-                    MobileWalletProximityRemediationAction.EnableBluetooth ->
+                    ProximityRemediationAction.EnableBluetooth ->
                         launchSystemSurface(
                             Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE),
                             current = { systemSurface },
                             setCurrent = { systemSurface = it },
                             launch = systemSurfaceLauncher::launch,
                         )
-                    MobileWalletProximityRemediationAction.Retry ->
-                        MobileWalletProximityHostActionResult.Completed
-                    MobileWalletProximityRemediationAction.UseSupportedDevice ->
-                        MobileWalletProximityHostActionResult.Cancelled
+                    ProximityRemediationAction.Retry ->
+                        ProximityHostActionResult.Completed
+                    ProximityRemediationAction.UseSupportedDevice ->
+                        ProximityHostActionResult.Cancelled
                 }
             },
             actionForDisplay = { action ->
                 if (
-                    action == MobileWalletProximityRemediationAction.RequestBluetoothPermission &&
+                    action == ProximityRemediationAction.RequestBluetoothPermission &&
                     permissionRoute(bluetoothPermissions()) == AndroidRuntimePermissionRoute.OpenSettings
                 ) {
-                    MobileWalletProximityRemediationAction.OpenApplicationSettings
+                    ProximityRemediationAction.OpenApplicationSettings
                 } else {
                     action
                 }
             },
             automaticallyPerform = { action ->
-                action != MobileWalletProximityRemediationAction.RequestBluetoothPermission ||
+                action != ProximityRemediationAction.RequestBluetoothPermission ||
                     permissionRoute(bluetoothPermissions()) != AndroidRuntimePermissionRoute.OpenSettings
             },
         )
@@ -252,25 +252,25 @@ private const val PERMISSION_REQUEST_HISTORY_PREFERENCES = "proximity_permission
 
 private suspend fun launchSystemSurface(
     intent: Intent,
-    current: () -> CompletableDeferred<MobileWalletProximityHostActionResult>?,
-    setCurrent: (CompletableDeferred<MobileWalletProximityHostActionResult>?) -> Unit,
+    current: () -> CompletableDeferred<ProximityHostActionResult>?,
+    setCurrent: (CompletableDeferred<ProximityHostActionResult>?) -> Unit,
     launch: (Intent) -> Unit,
-): MobileWalletProximityHostActionResult {
-    if (current() != null) return MobileWalletProximityHostActionResult.Failed
-    val result = CompletableDeferred<MobileWalletProximityHostActionResult>()
+): ProximityHostActionResult {
+    if (current() != null) return ProximityHostActionResult.Failed
+    val result = CompletableDeferred<ProximityHostActionResult>()
     setCurrent(result)
     try {
         launch(intent)
     } catch (_: Throwable) {
         if (current() === result) setCurrent(null)
-        return MobileWalletProximityHostActionResult.Failed
+        return ProximityHostActionResult.Failed
     }
     return try {
         result.await()
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Throwable) {
-        MobileWalletProximityHostActionResult.Failed
+        ProximityHostActionResult.Failed
     } finally {
         if (current() === result) setCurrent(null)
     }

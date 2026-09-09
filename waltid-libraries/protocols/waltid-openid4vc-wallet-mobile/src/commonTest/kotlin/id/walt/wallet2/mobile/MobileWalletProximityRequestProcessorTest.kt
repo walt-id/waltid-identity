@@ -1070,10 +1070,10 @@ class ProximityRequestProcessorTest {
     fun `reader certificate profile failures return encrypted empty responses before consent`() = runTest {
         withFixture { fixture ->
             val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
-            val configuration = MobileWalletProximityConfiguration(
-                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
-                readerTrustEvaluator = MobileWalletProximityConfiguredReaderTrustEvaluator(MobileWalletProximityReaderTrustConfiguration(
-                    trustAnchors = listOf(MobileWalletProximityReaderTrustAnchor(certificates.root.encodedDer.toByteArray().encodeToBase64Url())),
+            val configuration = ProximityConfiguration(
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
+                readerTrustEvaluator = ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
+                    trustAnchors = listOf(ProximityReaderTrustAnchor(certificates.root.encodedDer.toByteArray().encodeToBase64Url())),
                 )),
             )
             for (case in listOf("01", "02", "05", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16")) {
@@ -1102,10 +1102,10 @@ class ProximityRequestProcessorTest {
     fun `reader COSE profile failures return an encrypted response without disclosure`() = runTest {
         withFixture { fixture ->
             val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
-            val configuration = MobileWalletProximityConfiguration(
-                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
-                readerTrustEvaluator = MobileWalletProximityConfiguredReaderTrustEvaluator(MobileWalletProximityReaderTrustConfiguration(
-                    trustAnchors = listOf(MobileWalletProximityReaderTrustAnchor(certificates.root.encodedDer.toByteArray().encodeToBase64Url())),
+            val configuration = ProximityConfiguration(
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
+                readerTrustEvaluator = ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
+                    trustAnchors = listOf(ProximityReaderTrustAnchor(certificates.root.encodedDer.toByteArray().encodeToBase64Url())),
                 )),
             )
             for (case in listOf("21", "23", "24", "25", "26", "27", "28")) {
@@ -1153,14 +1153,14 @@ class ProximityRequestProcessorTest {
             val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
             val chain = listOf(certificates.leaf, certificates.root).map { it.encodedDer.toByteArray() }
             var revocationCalls = 0
-            val configuration = MobileWalletProximityConfiguration(
-                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
-                readerTrustEvaluator = MobileWalletProximityConfiguredReaderTrustEvaluator(MobileWalletProximityReaderTrustConfiguration(
-                    trustAnchors = listOf(MobileWalletProximityReaderTrustAnchor(chain.last().encodeToBase64Url())),
-                    revocationPolicy = MobileWalletProximityReaderRevocationPolicy.Check(MobileWalletProximityReaderRevocationEvaluator { evidence ->
+            val configuration = ProximityConfiguration(
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
+                readerTrustEvaluator = ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
+                    trustAnchors = listOf(ProximityReaderTrustAnchor(chain.last().encodeToBase64Url())),
+                    revocationPolicy = ProximityReaderRevocationPolicy.Check(ProximityReaderRevocationEvaluator { evidence ->
                         assertEquals(chain.map { it.encodeToBase64Url() }, evidence.certificateChainDerBase64Url)
                         revocationCalls++
-                        MobileWalletProximityCertificateRevocationResult.Revoked("The reader CA was revoked")
+                        ProximityCertificateRevocationResult.Revoked("The reader CA was revoked")
                     }),
                 )),
             )
@@ -1201,24 +1201,24 @@ class ProximityRequestProcessorTest {
                     }
                 })
                 try {
-                    val crls = MobileWalletProximityCrlRevocationEvaluator(
+                    val crls = ProximityCrlRevocationEvaluator(
                         listOf(certificates.root.encodedDer.toByteArray().encodeToBase64Url()),
-                        MobileWalletProximityCrlScope.ReaderCertificateAndIssuingAuthorities,
-                        MobileWalletProximityCrlFetcher { url, maximumBytes ->
+                        ProximityCrlScope.ReaderCertificateAndIssuingAuthorities,
+                        ProximityCrlFetcher { url, maximumBytes ->
                             val response = client.get(url)
-                            if (response.status != HttpStatusCode.OK) MobileWalletProximityCrlFetchResult.Unavailable
+                            if (response.status != HttpStatusCode.OK) ProximityCrlFetchResult.Unavailable
                             else {
                                 val bytes = response.body<ByteArray>()
                                 assertTrue(bytes.size <= maximumBytes)
-                                MobileWalletProximityCrlFetchResult.Available(bytes.encodeToBase64Url())
+                                ProximityCrlFetchResult.Available(bytes.encodeToBase64Url())
                             }
                         },
                     )
-                    val configuration = MobileWalletProximityConfiguration(
-                        readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
-                        readerTrustEvaluator = MobileWalletProximityConfiguredReaderTrustEvaluator(MobileWalletProximityReaderTrustConfiguration(
-                            trustAnchors = listOf(MobileWalletProximityReaderTrustAnchor(certificates.root.encodedDer.toByteArray().encodeToBase64Url())),
-                            revocationPolicy = MobileWalletProximityReaderRevocationPolicy.Check(crls),
+                    val configuration = ProximityConfiguration(
+                        readerPolicy = ProximityReaderPolicy.RequireTrusted,
+                        readerTrustEvaluator = ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
+                            trustAnchors = listOf(ProximityReaderTrustAnchor(certificates.root.encodedDer.toByteArray().encodeToBase64Url())),
+                            revocationPolicy = ProximityReaderRevocationPolicy.Check(crls),
                         )),
                     )
                     val result = wireExchange(fixture, requestWithNames("given_name"), configuration,

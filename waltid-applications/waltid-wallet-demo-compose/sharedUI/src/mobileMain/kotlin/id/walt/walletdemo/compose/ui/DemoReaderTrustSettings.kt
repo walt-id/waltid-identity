@@ -27,7 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import id.walt.wallet2.mobile.MobileWalletProximityReaderPolicy
+import id.walt.wallet2.mobile.ProximityReaderPolicy
 import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 
 @Composable
@@ -52,19 +52,19 @@ internal fun DemoReaderTrustSettings(
         ReaderPolicyChoice(
             title = "Allow anonymous or untrusted readers",
             selected = state.settings.readerPolicy ==
-                MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
+                ProximityReaderPolicy.AllowAnonymousOrUntrusted,
             tag = WalletUiTestTags.SettingsReaderPolicyAllowUntrusted,
             onSelect = {
-                controller.setReaderPolicy(MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted)
+                controller.setReaderPolicy(ProximityReaderPolicy.AllowAnonymousOrUntrusted)
             },
         )
         ReaderPolicyChoice(
             title = "Require a trusted reader",
-            selected = state.settings.readerPolicy == MobileWalletProximityReaderPolicy.RequireTrusted,
+            selected = state.settings.readerPolicy == ProximityReaderPolicy.RequireTrusted,
             tag = WalletUiTestTags.SettingsReaderPolicyRequireTrusted,
-            onSelect = { controller.setReaderPolicy(MobileWalletProximityReaderPolicy.RequireTrusted) },
+            onSelect = { controller.setReaderPolicy(ProximityReaderPolicy.RequireTrusted) },
         )
-        if (state.settings.readerPolicy == MobileWalletProximityReaderPolicy.RequireTrusted &&
+        if (state.settings.readerPolicy == ProximityReaderPolicy.RequireTrusted &&
             state.settings.trustAnchors.isEmpty() && state.settings.ricalProviders.isEmpty()
         ) {
             Text("No trust material is configured, so all readers will be rejected.")
@@ -107,7 +107,7 @@ internal fun DemoReaderTrustSettings(
             onClick = controller::reset,
             enabled = state.settings.trustAnchors.isNotEmpty() ||
                 state.settings.ricalProviders.isNotEmpty() ||
-                state.settings.readerPolicy != MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
+                state.settings.readerPolicy != ProximityReaderPolicy.AllowAnonymousOrUntrusted,
             modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.SettingsReaderTrustReset),
         ) {
             Text("Reset Reader Authentication settings")

@@ -46,20 +46,20 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
-class MobileWalletProximityReaderTrustTest {
+class ProximityReaderTrustTest {
     @Test
     fun `explicit anchor establishes trust without trusting a reader supplied root implicitly`() = runTest {
         withCertificates { certificates ->
             val trusted = evaluator(certificates.root).evaluate(certificates.evidence(includeRoot = false))
-            assertEquals(MobileWalletProximityReaderTrustState.Trusted, trusted.state)
-            assertEquals(MobileWalletProximityReaderCertificatePathState.Valid, trusted.certificatePath)
-            assertEquals(MobileWalletProximityReaderRevocationState.NotChecked, trusted.revocation)
+            assertEquals(ProximityReaderTrustState.Trusted, trusted.state)
+            assertEquals(ProximityReaderCertificatePathState.Valid, trusted.certificatePath)
+            assertEquals(ProximityReaderRevocationState.NotChecked, trusted.revocation)
             assertEquals("Example reader", trusted.displayName)
 
             val otherRoot = certificates.createRoot("Different reader root")
             val unknown = evaluator(otherRoot).evaluate(certificates.evidence(includeRoot = true))
-            assertEquals(MobileWalletProximityReaderTrustState.ValidButUntrusted, unknown.state)
-            assertEquals(MobileWalletProximityReaderCertificatePathState.UnknownAuthority, unknown.certificatePath)
+            assertEquals(ProximityReaderTrustState.ValidButUntrusted, unknown.state)
+            assertEquals(ProximityReaderCertificatePathState.UnknownAuthority, unknown.certificatePath)
             assertEquals(null, unknown.displayName)
         }
     }
@@ -68,21 +68,21 @@ class MobileWalletProximityReaderTrustTest {
     fun `trust policy and evidence remain owned while revocation is suspended`() = runTest {
         withCertificates { certificates ->
             val anchors = mutableListOf(
-                MobileWalletProximityReaderTrustAnchor(certificates.root.base64Url()),
-                MobileWalletProximityReaderTrustAnchor(certificates.createRoot("Other root").base64Url()),
+                ProximityReaderTrustAnchor(certificates.root.base64Url()),
+                ProximityReaderTrustAnchor(certificates.createRoot("Other root").base64Url()),
             )
             val entered = CompletableDeferred<Unit>()
             val resume = CompletableDeferred<Unit>()
             val expected = certificates.evidence(includeRoot = true).certificateChainDerBase64Url
-            val evaluator = MobileWalletProximityConfiguredReaderTrustEvaluator(
-                MobileWalletProximityReaderTrustConfiguration(
+            val evaluator = ProximityConfiguredReaderTrustEvaluator(
+                ProximityReaderTrustConfiguration(
                     trustAnchors = anchors,
-                    revocationPolicy = MobileWalletProximityReaderRevocationPolicy.Check(
-                        MobileWalletProximityReaderRevocationEvaluator { evidence ->
+                    revocationPolicy = ProximityReaderRevocationPolicy.Check(
+                        ProximityReaderRevocationEvaluator { evidence ->
                             entered.complete(Unit)
                             resume.await()
                             assertEquals(expected, evidence.certificateChainDerBase64Url)
-                            MobileWalletProximityCertificateRevocationResult.Good
+                            ProximityCertificateRevocationResult.Good
                         },
                     ),
                 ),
@@ -94,8 +94,8 @@ class MobileWalletProximityReaderTrustTest {
             input.clear()
             (evaluator.configuration.trustAnchors as MutableList).clear()
             resume.complete(Unit)
-            assertEquals(MobileWalletProximityReaderTrustState.Trusted, pending.await().state)
-            assertEquals(MobileWalletProximityReaderTrustState.Trusted, evaluator.evaluate(certificates.evidence(includeRoot = true)).state)
+            assertEquals(ProximityReaderTrustState.Trusted, pending.await().state)
+            assertEquals(ProximityReaderTrustState.Trusted, evaluator.evaluate(certificates.evidence(includeRoot = true)).state)
         }
     }
 
@@ -104,8 +104,8 @@ class MobileWalletProximityReaderTrustTest {
         withCertificates { certificates ->
             val decision = evaluator(certificates.reader).evaluate(certificates.evidence())
 
-            assertEquals(MobileWalletProximityReaderTrustState.ValidButUntrusted, decision.state)
-            assertEquals(MobileWalletProximityReaderCertificatePathState.UnknownAuthority, decision.certificatePath)
+            assertEquals(ProximityReaderTrustState.ValidButUntrusted, decision.state)
+            assertEquals(ProximityReaderCertificatePathState.UnknownAuthority, decision.certificatePath)
         }
     }
 
@@ -114,9 +114,9 @@ class MobileWalletProximityReaderTrustTest {
         withCertificates(readerExtendedKeyUsage = null) { certificates ->
             val decision = evaluator(certificates.root).evaluate(certificates.evidence())
 
-            assertEquals(MobileWalletProximityReaderTrustState.ValidButUntrusted, decision.state)
-            assertEquals(MobileWalletProximityReaderCertificatePathState.Invalid, decision.certificatePath)
-            assertEquals(MobileWalletProximityReaderRevocationState.NotChecked, decision.revocation)
+            assertEquals(ProximityReaderTrustState.ValidButUntrusted, decision.state)
+            assertEquals(ProximityReaderCertificatePathState.Invalid, decision.certificatePath)
+            assertEquals(ProximityReaderRevocationState.NotChecked, decision.revocation)
         }
     }
 
@@ -128,9 +128,9 @@ class MobileWalletProximityReaderTrustTest {
                 now = Clock.System.now() + 31.days,
             ).evaluate(certificates.evidence())
 
-            assertEquals(MobileWalletProximityReaderTrustState.ValidButUntrusted, decision.state)
-            assertEquals(MobileWalletProximityReaderCertificatePathState.Invalid, decision.certificatePath)
-            assertEquals(MobileWalletProximityReaderRevocationState.NotChecked, decision.revocation)
+            assertEquals(ProximityReaderTrustState.ValidButUntrusted, decision.state)
+            assertEquals(ProximityReaderCertificatePathState.Invalid, decision.certificatePath)
+            assertEquals(ProximityReaderRevocationState.NotChecked, decision.revocation)
         }
     }
 
@@ -139,19 +139,19 @@ class MobileWalletProximityReaderTrustTest {
         withCertificates { certificates ->
             val revoked = evaluator(
                 certificates.root,
-                MobileWalletProximityCertificateRevocationResult.Revoked("Revoked by test source"),
+                ProximityCertificateRevocationResult.Revoked("Revoked by test source"),
             ).evaluate(certificates.evidence())
-            assertEquals(MobileWalletProximityReaderTrustState.Revoked, revoked.state)
-            assertEquals(MobileWalletProximityReaderCertificatePathState.Valid, revoked.certificatePath)
-            assertEquals(MobileWalletProximityReaderRevocationState.Revoked, revoked.revocation)
+            assertEquals(ProximityReaderTrustState.Revoked, revoked.state)
+            assertEquals(ProximityReaderCertificatePathState.Valid, revoked.certificatePath)
+            assertEquals(ProximityReaderRevocationState.Revoked, revoked.revocation)
 
             val indeterminate = evaluator(
                 certificates.root,
-                MobileWalletProximityCertificateRevocationResult.Indeterminate("Status source is offline"),
+                ProximityCertificateRevocationResult.Indeterminate("Status source is offline"),
             ).evaluate(certificates.evidence())
-            assertEquals(MobileWalletProximityReaderTrustState.ValidButUntrusted, indeterminate.state)
-            assertEquals(MobileWalletProximityReaderCertificatePathState.Valid, indeterminate.certificatePath)
-            assertEquals(MobileWalletProximityReaderRevocationState.Indeterminate, indeterminate.revocation)
+            assertEquals(ProximityReaderTrustState.ValidButUntrusted, indeterminate.state)
+            assertEquals(ProximityReaderCertificatePathState.Valid, indeterminate.certificatePath)
+            assertEquals(ProximityReaderRevocationState.Indeterminate, indeterminate.revocation)
         }
     }
 
@@ -159,19 +159,19 @@ class MobileWalletProximityReaderTrustTest {
     fun `revocation source exceptions are indeterminate and repeated evaluations are independent`() = runTest {
         withCertificates { certificates ->
             var calls = 0
-            val evaluator = MobileWalletProximityConfiguredReaderTrustEvaluator(
-                MobileWalletProximityReaderTrustConfiguration(
+            val evaluator = ProximityConfiguredReaderTrustEvaluator(
+                ProximityReaderTrustConfiguration(
                     trustAnchors = listOf(
-                        MobileWalletProximityReaderTrustAnchor(
+                        ProximityReaderTrustAnchor(
                             certificates.root.base64Url(),
                             "Configured reader authority",
                         )
                     ),
-                    revocationPolicy = MobileWalletProximityReaderRevocationPolicy.Check(
-                        MobileWalletProximityReaderRevocationEvaluator {
+                    revocationPolicy = ProximityReaderRevocationPolicy.Check(
+                        ProximityReaderRevocationEvaluator {
                             calls += 1
                             if (calls == 1) error("status source offline")
-                            MobileWalletProximityCertificateRevocationResult.Good
+                            ProximityCertificateRevocationResult.Good
                         }
                     ),
                 )
@@ -180,10 +180,10 @@ class MobileWalletProximityReaderTrustTest {
             val first = evaluator.evaluate(certificates.evidence())
             val second = evaluator.evaluate(certificates.evidence())
 
-            assertEquals(MobileWalletProximityReaderRevocationState.Indeterminate, first.revocation)
-            assertEquals(MobileWalletProximityReaderTrustState.ValidButUntrusted, first.state)
-            assertEquals(MobileWalletProximityReaderRevocationState.Good, second.revocation)
-            assertEquals(MobileWalletProximityReaderTrustState.Trusted, second.state)
+            assertEquals(ProximityReaderRevocationState.Indeterminate, first.revocation)
+            assertEquals(ProximityReaderTrustState.ValidButUntrusted, first.state)
+            assertEquals(ProximityReaderRevocationState.Good, second.revocation)
+            assertEquals(ProximityReaderTrustState.Trusted, second.state)
             assertEquals("Configured reader authority", second.displayName)
             assertEquals(2, calls)
         }
@@ -192,62 +192,62 @@ class MobileWalletProximityReaderTrustTest {
     @Test
     fun `RICAL provider availability and conflicts remain distinct trust facts`() = runTest {
         withCertificates { certificates ->
-            suspend fun evaluate(result: MobileWalletProximityRicalProviderResult) =
-                MobileWalletProximityConfiguredReaderTrustEvaluator(
-                    MobileWalletProximityReaderTrustConfiguration(
+            suspend fun evaluate(result: ProximityRicalProviderResult) =
+                ProximityConfiguredReaderTrustEvaluator(
+                    ProximityReaderTrustConfiguration(
                         ricalProviders = listOf(
-                            MobileWalletProximityRicalConfiguration(
+                            ProximityRicalConfiguration(
                                 providerId = "provider",
                                 acceptedTypes = setOf("org.iso.18013.5.1.reader_authentication"),
                                 providerTrustAnchors = listOf(
-                                    MobileWalletProximityRicalProviderTrustAnchor(certificates.root.base64Url())
+                                    ProximityRicalProviderTrustAnchor(certificates.root.base64Url())
                                 ),
                                 acceptedSignerCertificatePolicyOids = setOf("1.2.3.4"),
-                                provider = MobileWalletProximityRicalProvider { result },
+                                provider = ProximityRicalProvider { result },
                             )
                         )
                     )
                 ).evaluate(certificates.evidence())
 
-            val unavailable = evaluate(MobileWalletProximityRicalProviderResult.Unavailable("offline"))
-            assertEquals(MobileWalletProximityReaderCertificatePathState.UnknownAuthority, unavailable.certificatePath)
-            assertEquals(MobileWalletProximityRicalState.Unavailable, unavailable.rical)
+            val unavailable = evaluate(ProximityRicalProviderResult.Unavailable("offline"))
+            assertEquals(ProximityReaderCertificatePathState.UnknownAuthority, unavailable.certificatePath)
+            assertEquals(ProximityRicalState.Unavailable, unavailable.rical)
 
-            val conflict = evaluate(MobileWalletProximityRicalProviderResult.Conflict("two active lists"))
-            assertEquals(MobileWalletProximityReaderCertificatePathState.UnknownAuthority, conflict.certificatePath)
-            assertEquals(MobileWalletProximityRicalState.Invalid, conflict.rical)
+            val conflict = evaluate(ProximityRicalProviderResult.Conflict("two active lists"))
+            assertEquals(ProximityReaderCertificatePathState.UnknownAuthority, conflict.certificatePath)
+            assertEquals(ProximityRicalState.Invalid, conflict.rical)
         }
     }
 
     @Test
     fun `configured RICAL validates signer path policy status and reader authority`() = runTest {
         var signerRevocationChecks = 0
-        val evidence = MobileWalletProximityReaderEvidence(
-            scope = MobileWalletProximityReaderAuthenticationScope.WholeRequest,
+        val evidence = ProximityReaderEvidence(
+            scope = ProximityReaderAuthenticationScope.WholeRequest,
             certificateChainDerBase64Url = listOf(RICAL_READER_LEAF),
         )
         val evaluator = ricalEvaluator {
             signerRevocationChecks += 1
             assertEquals("test-provider", it.providerId)
             assertEquals(1, it.certificateChainDerBase64Url.size)
-            MobileWalletProximityCertificateRevocationResult.Good
+            ProximityCertificateRevocationResult.Good
         }
 
         val decision = evaluator.evaluate(evidence)
 
-        assertEquals(MobileWalletProximityReaderTrustState.Trusted, decision.state)
-        assertEquals(MobileWalletProximityReaderCertificatePathState.Valid, decision.certificatePath)
-        assertEquals(MobileWalletProximityReaderRevocationState.NotChecked, decision.revocation)
-        assertEquals(MobileWalletProximityRicalState.Matched, decision.rical)
+        assertEquals(ProximityReaderTrustState.Trusted, decision.state)
+        assertEquals(ProximityReaderCertificatePathState.Valid, decision.certificatePath)
+        assertEquals(ProximityReaderRevocationState.NotChecked, decision.revocation)
+        assertEquals(ProximityRicalState.Matched, decision.rical)
         assertEquals("Fixture reader authority", decision.displayName)
         assertEquals(1, signerRevocationChecks)
 
         val revokedSigner = ricalEvaluator {
-            MobileWalletProximityCertificateRevocationResult.Revoked("Signer revoked")
+            ProximityCertificateRevocationResult.Revoked("Signer revoked")
         }.evaluate(evidence)
-        assertEquals(MobileWalletProximityReaderTrustState.ValidButUntrusted, revokedSigner.state)
-        assertEquals(MobileWalletProximityReaderCertificatePathState.UnknownAuthority, revokedSigner.certificatePath)
-        assertEquals(MobileWalletProximityRicalState.Invalid, revokedSigner.rical)
+        assertEquals(ProximityReaderTrustState.ValidButUntrusted, revokedSigner.state)
+        assertEquals(ProximityReaderCertificatePathState.UnknownAuthority, revokedSigner.certificatePath)
+        assertEquals(ProximityRicalState.Invalid, revokedSigner.rical)
     }
 
     @Test
@@ -289,20 +289,20 @@ class MobileWalletProximityReaderTrustTest {
     @Test
     fun `configuration rejects empty and malformed anchors`() {
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityReaderTrustConfiguration()
+            ProximityReaderTrustConfiguration()
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityReaderTrustAnchor("not base64 url!")
+            ProximityReaderTrustAnchor("not base64 url!")
         }
     }
 
     @Test
     fun `configuration rejects duplicate anchors`() = runTest {
         withCertificates { certificates ->
-            val anchor = MobileWalletProximityReaderTrustAnchor(certificates.root.base64Url())
+            val anchor = ProximityReaderTrustAnchor(certificates.root.base64Url())
 
             assertFailsWith<IllegalArgumentException> {
-                MobileWalletProximityReaderTrustConfiguration(
+                ProximityReaderTrustConfiguration(
                     trustAnchors = listOf(anchor, anchor)
                 )
             }
@@ -312,18 +312,18 @@ class MobileWalletProximityReaderTrustTest {
     @Test
     fun `settings codec round trips policy and public trust material`() = runTest {
         withCertificates { certificates ->
-            val settings = MobileWalletProximityReaderTrustSettings(
-                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+            val settings = ProximityReaderTrustSettings(
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
                 trustAnchors = listOf(
-                    MobileWalletProximityStoredReaderTrustAnchor(
+                    ProximityStoredReaderTrustAnchor(
                         certificates.root.base64Url(),
                         "Local Reader CA",
                     )
                 ),
             )
 
-            val encoded = MobileWalletProximityReaderTrustSettingsCodec.encode(settings)
-            val decoded = MobileWalletProximityReaderTrustSettingsCodec.decode(encoded)
+            val encoded = ProximityReaderTrustSettingsCodec.encode(settings)
+            val decoded = ProximityReaderTrustSettingsCodec.decode(encoded)
 
             assertEquals(settings, decoded)
             assertContains(encoded, "require_trusted")
@@ -335,11 +335,11 @@ class MobileWalletProximityReaderTrustTest {
     fun `DER and multi PEM imports validate CAs and prepare review without persisting`() = runTest {
         withCertificates { certificates ->
             val second = certificates.createRoot("Second reader root")
-            val existing = MobileWalletProximityReaderTrustSettings(
-                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+            val existing = ProximityReaderTrustSettings(
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
             )
 
-            val der = MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+            val der = ProximityReaderTrustSettingsCodec.prepareImport(
                 sourceName = "reader-ca.der",
                 bytes = certificates.root.encodedDer.toByteArray(),
                 existing = existing,
@@ -353,7 +353,7 @@ class MobileWalletProximityReaderTrustTest {
             )
             assertEquals(0, existing.trustAnchors.size)
 
-            val pem = MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+            val pem = ProximityReaderTrustSettingsCodec.prepareImport(
                 sourceName = "reader-cas.pem",
                 bytes = "${certificates.root.encodedPem}\n${second.encodedPem}".encodeToByteArray(),
                 existing = existing,
@@ -368,44 +368,44 @@ class MobileWalletProximityReaderTrustTest {
         withCertificates { certificates ->
             assertContains(
                 assertFailsWith<IllegalArgumentException> {
-                    MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                    ProximityReaderTrustSettingsCodec.prepareImport(
                         "reader.p12",
                         byteArrayOf(1),
-                        MobileWalletProximityReaderTrustSettings(),
+                        ProximityReaderTrustSettings(),
                     )
                 }.message.orEmpty(),
                 "PKCS#12",
             )
             assertContains(
                 assertFailsWith<IllegalArgumentException> {
-                    MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                    ProximityReaderTrustSettingsCodec.prepareImport(
                         "secret.pem",
                         "-----BEGIN PRIVATE KEY-----\nAA==\n-----END PRIVATE KEY-----".encodeToByteArray(),
-                        MobileWalletProximityReaderTrustSettings(),
+                        ProximityReaderTrustSettings(),
                     )
                 }.message.orEmpty(),
                 "Private keys",
             )
             assertFailsWith<IllegalArgumentException> {
-                MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                ProximityReaderTrustSettingsCodec.prepareImport(
                     "broken.der",
                     byteArrayOf(1, 2, 3),
-                    MobileWalletProximityReaderTrustSettings(),
+                    ProximityReaderTrustSettings(),
                 )
             }
             assertContains(
                 assertFailsWith<IllegalArgumentException> {
-                    MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                    ProximityReaderTrustSettingsCodec.prepareImport(
                         "reader.der",
                         certificates.reader.encodedDer.toByteArray(),
-                        MobileWalletProximityReaderTrustSettings(),
+                        ProximityReaderTrustSettings(),
                     )
                 }.message.orEmpty(),
                 "not a valid current CA",
             )
-            val existing = MobileWalletProximityReaderTrustSettings(
+            val existing = ProximityReaderTrustSettings(
                 trustAnchors = listOf(
-                    MobileWalletProximityStoredReaderTrustAnchor(
+                    ProximityStoredReaderTrustAnchor(
                         certificates.root.base64Url(),
                         "Existing",
                     )
@@ -413,7 +413,7 @@ class MobileWalletProximityReaderTrustTest {
             )
             assertContains(
                 assertFailsWith<IllegalArgumentException> {
-                    MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                    ProximityReaderTrustSettingsCodec.prepareImport(
                         "reader.der",
                         certificates.root.encodedDer.toByteArray(),
                         existing,
@@ -427,34 +427,34 @@ class MobileWalletProximityReaderTrustTest {
     @Test
     fun `strict bundle validates signed RICAL and rejects unknown or expired data`() = runTest {
         val bundle = ricalBundleJson()
-        val preview = MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+        val preview = ProximityReaderTrustSettingsCodec.prepareImport(
             sourceName = "qualification.walt-reader-trust.json",
             bytes = bundle.encodeToByteArray(),
-            existing = MobileWalletProximityReaderTrustSettings(
-                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+            existing = ProximityReaderTrustSettings(
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
             ),
             now = Instant.parse("2026-09-02T00:00:00Z"),
         )
 
-        assertEquals(MobileWalletProximityReaderTrustImportKind.TrustBundle, preview.kind)
+        assertEquals(ProximityReaderTrustImportKind.TrustBundle, preview.kind)
         assertEquals(1, preview.ricalProviders.size)
         assertTrue(preview.ricalProviders.single().establishesReaderTrust)
         assertContains(preview.policyEffect, "Only readers trusted")
 
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+            ProximityReaderTrustSettingsCodec.prepareImport(
                 "unknown.json",
                 bundle.replaceFirst("\"version\": 1,", "\"version\": 1, \"unknown\": true,")
                     .encodeToByteArray(),
-                MobileWalletProximityReaderTrustSettings(),
+                ProximityReaderTrustSettings(),
             )
         }
         assertContains(
             assertFailsWith<IllegalArgumentException> {
-                MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                ProximityReaderTrustSettingsCodec.prepareImport(
                     "expired.json",
                     bundle.encodeToByteArray(),
-                    MobileWalletProximityReaderTrustSettings(),
+                    ProximityReaderTrustSettings(),
                     now = Instant.parse("2028-01-01T00:00:00Z"),
                 )
             }.message.orEmpty(),
@@ -466,28 +466,28 @@ class MobileWalletProximityReaderTrustTest {
     fun `import rejects oversized truncated and unsupported version data`() = runTest {
         assertContains(
             assertFailsWith<IllegalArgumentException> {
-                MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                ProximityReaderTrustSettingsCodec.prepareImport(
                     "oversized.der",
-                    ByteArray(MobileWalletProximityReaderTrustSettingsCodec.MaximumImportBytes + 1),
-                    MobileWalletProximityReaderTrustSettings(),
+                    ByteArray(ProximityReaderTrustSettingsCodec.MaximumImportBytes + 1),
+                    ProximityReaderTrustSettings(),
                 )
             }.message.orEmpty(),
             "exceeds 1 MiB",
         )
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+            ProximityReaderTrustSettingsCodec.prepareImport(
                 "truncated.pem",
                 "-----BEGIN CERTIFICATE-----\nAA".encodeToByteArray(),
-                MobileWalletProximityReaderTrustSettings(),
+                ProximityReaderTrustSettings(),
             )
         }
         assertContains(
             assertFailsWith<IllegalArgumentException> {
-                MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                ProximityReaderTrustSettingsCodec.prepareImport(
                     "unsupported.json",
                     """{"version":2,"type":"org.waltid.wallet.reader-trust","readerAuthorities":[],"ricalProviders":[]}"""
                         .encodeToByteArray(),
-                    MobileWalletProximityReaderTrustSettings(),
+                    ProximityReaderTrustSettings(),
                 )
             }.message.orEmpty(),
             "version",
@@ -497,25 +497,25 @@ class MobileWalletProximityReaderTrustTest {
     @Test
     fun `each proximity session receives an immutable settings snapshot`() = runTest {
         withCertificates { certificates ->
-            val trusted = MobileWalletProximityReaderTrustSettings(
-                readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+            val trusted = ProximityReaderTrustSettings(
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
                 trustAnchors = listOf(
-                    MobileWalletProximityStoredReaderTrustAnchor(
+                    ProximityStoredReaderTrustAnchor(
                         certificates.root.base64Url(),
                         "Snapshot authority",
                     )
                 ),
-            ).applyTo(MobileWalletProximityConfiguration())
-            val reset = MobileWalletProximityReaderTrustSettings()
-                .applyTo(MobileWalletProximityConfiguration())
+            ).applyTo(ProximityConfiguration())
+            val reset = ProximityReaderTrustSettings()
+                .applyTo(ProximityConfiguration())
 
-            assertEquals(MobileWalletProximityReaderPolicy.RequireTrusted, trusted.readerPolicy)
+            assertEquals(ProximityReaderPolicy.RequireTrusted, trusted.readerPolicy)
             assertEquals(
-                MobileWalletProximityReaderTrustState.Trusted,
+                ProximityReaderTrustState.Trusted,
                 trusted.readerTrustEvaluator.evaluate(certificates.evidence()).state,
             )
             assertEquals(
-                MobileWalletProximityReaderTrustState.ValidButUntrusted,
+                ProximityReaderTrustState.ValidButUntrusted,
                 reset.readerTrustEvaluator.evaluate(certificates.evidence()).state,
             )
             assertNotSame(trusted.readerTrustEvaluator, reset.readerTrustEvaluator)
@@ -541,39 +541,39 @@ class MobileWalletProximityReaderTrustTest {
 
     private fun evaluator(
         root: X509Certificate,
-        revocation: MobileWalletProximityCertificateRevocationResult? = null,
+        revocation: ProximityCertificateRevocationResult? = null,
         now: Instant = Clock.System.now(),
-    ): MobileWalletProximityConfiguredReaderTrustEvaluator = MobileWalletProximityConfiguredReaderTrustEvaluator(
-        MobileWalletProximityReaderTrustConfiguration(
-            trustAnchors = listOf(MobileWalletProximityReaderTrustAnchor(root.base64Url())),
+    ): ProximityConfiguredReaderTrustEvaluator = ProximityConfiguredReaderTrustEvaluator(
+        ProximityReaderTrustConfiguration(
+            trustAnchors = listOf(ProximityReaderTrustAnchor(root.base64Url())),
             revocationPolicy = revocation?.let { result ->
-                MobileWalletProximityReaderRevocationPolicy.Check(
-                    MobileWalletProximityReaderRevocationEvaluator { result }
+                ProximityReaderRevocationPolicy.Check(
+                    ProximityReaderRevocationEvaluator { result }
                 )
-            } ?: MobileWalletProximityReaderRevocationPolicy.NotChecked,
+            } ?: ProximityReaderRevocationPolicy.NotChecked,
         ),
         now = { now },
     )
 
     private fun ricalEvaluator(
-        signerRevocationEvaluator: MobileWalletProximityRicalSignerRevocationEvaluator,
-    ): MobileWalletProximityConfiguredReaderTrustEvaluator =
-        MobileWalletProximityConfiguredReaderTrustEvaluator(
-            configuration = MobileWalletProximityReaderTrustConfiguration(
+        signerRevocationEvaluator: ProximityRicalSignerRevocationEvaluator,
+    ): ProximityConfiguredReaderTrustEvaluator =
+        ProximityConfiguredReaderTrustEvaluator(
+            configuration = ProximityReaderTrustConfiguration(
                 ricalProviders = listOf(
-                    MobileWalletProximityRicalConfiguration(
+                    ProximityRicalConfiguration(
                         providerId = "test-provider",
                         acceptedTypes = setOf("org.iso.18013.5.1.reader_authentication"),
                         providerTrustAnchors = listOf(
-                            MobileWalletProximityRicalProviderTrustAnchor(RICAL_PROVIDER_ROOT)
+                            ProximityRicalProviderTrustAnchor(RICAL_PROVIDER_ROOT)
                         ),
                         acceptedSignerCertificatePolicyOids = setOf("1.2.3.4"),
-                        signerRevocationPolicy = MobileWalletProximityRicalSignerRevocationPolicy.Check(
+                        signerRevocationPolicy = ProximityRicalSignerRevocationPolicy.Check(
                             signerRevocationEvaluator
                         ),
                         establishReaderTrust = true,
-                        provider = MobileWalletProximityRicalProvider {
-                            MobileWalletProximityRicalProviderResult.Available(SIGNED_RICAL)
+                        provider = ProximityRicalProvider {
+                            ProximityRicalProviderResult.Available(SIGNED_RICAL)
                         },
                     )
                 )
@@ -683,9 +683,9 @@ class MobileWalletProximityReaderTrustTest {
         val root: X509Certificate,
         val reader: X509Certificate,
     ) {
-        fun evidence(includeRoot: Boolean = false): MobileWalletProximityReaderEvidence =
-            MobileWalletProximityReaderEvidence(
-                scope = MobileWalletProximityReaderAuthenticationScope.WholeRequest,
+        fun evidence(includeRoot: Boolean = false): ProximityReaderEvidence =
+            ProximityReaderEvidence(
+                scope = ProximityReaderAuthenticationScope.WholeRequest,
                 certificateChainDerBase64Url = buildList {
                     add(reader.base64Url())
                     if (includeRoot) add(root.base64Url())
@@ -693,7 +693,7 @@ class MobileWalletProximityReaderTrustTest {
             )
 
         suspend fun createRoot(commonName: String): X509Certificate =
-            this@MobileWalletProximityReaderTrustTest.createRoot(
+            this@ProximityReaderTrustTest.createRoot(
                 runtime.testKey(commonName.replace(' ', '-')),
                 commonName,
             )

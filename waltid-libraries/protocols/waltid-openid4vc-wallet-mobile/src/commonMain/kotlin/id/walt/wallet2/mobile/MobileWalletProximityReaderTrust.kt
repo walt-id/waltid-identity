@@ -31,7 +31,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 /** Explicit application-provisioned Reader CA certificate and optional display label. */
-public data class MobileWalletProximityReaderTrustAnchor(
+public data class ProximityReaderTrustAnchor(
     /** DER certificate encoded as unpadded Base64URL. */
     public val certificateDerBase64Url: String,
     /** Display-safe authority label. This label is evidence and never establishes trust by itself. */
@@ -46,15 +46,15 @@ public data class MobileWalletProximityReaderTrustAnchor(
 }
 
 /** Result returned by an application-owned certificate-revocation source. */
-public sealed interface MobileWalletProximityCertificateRevocationResult {
+public sealed interface ProximityCertificateRevocationResult {
     /** The configured source established that the certificate is not revoked. */
-    public data object Good : MobileWalletProximityCertificateRevocationResult
+    public data object Good : ProximityCertificateRevocationResult
 
     /** The configured source established that the certificate is revoked. */
     public data class Revoked(
         /** Optional display-safe reason supplied by the configured revocation source. */
         public val reason: String? = null,
-    ) : MobileWalletProximityCertificateRevocationResult {
+    ) : ProximityCertificateRevocationResult {
         init {
             require(reason == null || reason.isNotBlank())
         }
@@ -64,7 +64,7 @@ public sealed interface MobileWalletProximityCertificateRevocationResult {
     public data class Indeterminate(
         /** Display-safe reason why current revocation status could not be established. */
         public val reason: String,
-    ) : MobileWalletProximityCertificateRevocationResult {
+    ) : ProximityCertificateRevocationResult {
         init {
             require(reason.isNotBlank())
         }
@@ -72,27 +72,27 @@ public sealed interface MobileWalletProximityCertificateRevocationResult {
 }
 
 /** Explicit application boundary for OCSP, CRL, or another reader-certificate status source. */
-public fun interface MobileWalletProximityReaderRevocationEvaluator {
+public fun interface ProximityReaderRevocationEvaluator {
     /** Evaluates the exact verified reader evidence without an implicit SDK network request. */
     public suspend fun evaluate(
-        evidence: MobileWalletProximityReaderEvidence,
-    ): MobileWalletProximityCertificateRevocationResult
+        evidence: ProximityReaderEvidence,
+    ): ProximityCertificateRevocationResult
 }
 
 /** Revocation behavior selected for reader trust. */
-public sealed interface MobileWalletProximityReaderRevocationPolicy {
+public sealed interface ProximityReaderRevocationPolicy {
     /** Do not perform revocation lookup; the resulting trust fact remains `NotChecked`. */
-    public data object NotChecked : MobileWalletProximityReaderRevocationPolicy
+    public data object NotChecked : ProximityReaderRevocationPolicy
 
     /** Require the supplied source to return a conclusive result before the reader can be trusted. */
     public data class Check(
         /** Application-owned reader-certificate revocation source. */
-        public val evaluator: MobileWalletProximityReaderRevocationEvaluator,
-    ) : MobileWalletProximityReaderRevocationPolicy
+        public val evaluator: ProximityReaderRevocationEvaluator,
+    ) : ProximityReaderRevocationPolicy
 }
 
 /** Exact RICAL signer evidence passed to an application-owned revocation source. */
-public data class MobileWalletProximityRicalSignerEvidence(
+public data class ProximityRicalSignerEvidence(
     /** Stable application-configured identifier for the RICAL provider. */
     public val providerId: String,
     /** DER certificates in leaf-first order, encoded as unpadded Base64URL. */
@@ -106,27 +106,27 @@ public data class MobileWalletProximityRicalSignerEvidence(
 }
 
 /** Explicit application boundary for RICAL-signer OCSP, CRL, or another status source. */
-public fun interface MobileWalletProximityRicalSignerRevocationEvaluator {
+public fun interface ProximityRicalSignerRevocationEvaluator {
     /** Evaluates the verified signer chain for the selected RICAL provider. */
     public suspend fun evaluate(
-        evidence: MobileWalletProximityRicalSignerEvidence,
-    ): MobileWalletProximityCertificateRevocationResult
+        evidence: ProximityRicalSignerEvidence,
+    ): ProximityCertificateRevocationResult
 }
 
 /** Revocation behavior selected for one RICAL provider's signer certificate. */
-public sealed interface MobileWalletProximityRicalSignerRevocationPolicy {
+public sealed interface ProximityRicalSignerRevocationPolicy {
     /** Do not perform a signer-revocation lookup. */
-    public data object NotChecked : MobileWalletProximityRicalSignerRevocationPolicy
+    public data object NotChecked : ProximityRicalSignerRevocationPolicy
 
     /** Require the supplied source to establish that the RICAL signer is not revoked. */
     public data class Check(
         /** Application-owned RICAL-signer revocation source. */
-        public val evaluator: MobileWalletProximityRicalSignerRevocationEvaluator,
-    ) : MobileWalletProximityRicalSignerRevocationPolicy
+        public val evaluator: ProximityRicalSignerRevocationEvaluator,
+    ) : ProximityRicalSignerRevocationPolicy
 }
 
 /** Explicit application-provisioned root for one RICAL provider. */
-public data class MobileWalletProximityRicalProviderTrustAnchor(
+public data class ProximityRicalProviderTrustAnchor(
     /** DER certificate encoded as unpadded Base64URL. */
     public val certificateDerBase64Url: String,
 ) {
@@ -138,12 +138,12 @@ public data class MobileWalletProximityRicalProviderTrustAnchor(
 }
 
 /** Exact active RICAL supplied by an application-owned provider boundary. */
-public sealed interface MobileWalletProximityRicalProviderResult {
+public sealed interface ProximityRicalProviderResult {
     /** Untagged COSE_Sign1 bytes encoded as unpadded Base64URL. */
     public data class Available(
         /** Untagged COSE_Sign1 bytes encoded as unpadded Base64URL. */
         public val signedRicalBase64Url: String,
-    ) : MobileWalletProximityRicalProviderResult {
+    ) : ProximityRicalProviderResult {
         init {
             require(signedRicalBase64Url.isTrustBase64Url())
         }
@@ -153,7 +153,7 @@ public sealed interface MobileWalletProximityRicalProviderResult {
     public data class Unavailable(
         /** Display-safe reason why the provider has no active list. */
         public val reason: String,
-    ) : MobileWalletProximityRicalProviderResult {
+    ) : ProximityRicalProviderResult {
         init {
             require(reason.isNotBlank())
         }
@@ -163,7 +163,7 @@ public sealed interface MobileWalletProximityRicalProviderResult {
     public data class Conflict(
         /** Display-safe description of the conflicting provider state. */
         public val reason: String,
-    ) : MobileWalletProximityRicalProviderResult {
+    ) : ProximityRicalProviderResult {
         init {
             require(reason.isNotBlank())
         }
@@ -171,13 +171,13 @@ public sealed interface MobileWalletProximityRicalProviderResult {
 }
 
 /** Supplies the latest application-selected RICAL without an implicit SDK network request. */
-public fun interface MobileWalletProximityRicalProvider {
+public fun interface ProximityRicalProvider {
     /** Returns the application's current provider result for this evaluation. */
-    public suspend fun current(): MobileWalletProximityRicalProviderResult
+    public suspend fun current(): ProximityRicalProviderResult
 }
 
 /** One RICAL trust constraint, with each value CBOR-encoded as unpadded Base64URL. */
-public data class MobileWalletProximityRicalTrustConstraint(
+public data class ProximityRicalTrustConstraint(
     /** Constraint name to its CBOR-encoded value, using unpadded Base64URL. */
     public val valuesCborBase64Url: Map<String, String>,
 ) {
@@ -189,33 +189,33 @@ public data class MobileWalletProximityRicalTrustConstraint(
 }
 
 /** Application-owned evaluator for ecosystem-specific RICAL trust-constraint semantics. */
-public fun interface MobileWalletProximityRicalConstraintEvaluator {
+public fun interface ProximityRicalConstraintEvaluator {
     /** Returns true only when at least one complete constraint is understood and satisfied. */
     public suspend fun accepts(
-        constraints: List<MobileWalletProximityRicalTrustConstraint>,
-        reader: MobileWalletProximityReaderEvidence,
+        constraints: List<ProximityRicalTrustConstraint>,
+        reader: ProximityReaderEvidence,
     ): Boolean
 }
 
 /** Immutable policy for one explicitly configured RICAL provider. */
-public data class MobileWalletProximityRicalConfiguration(
+public data class ProximityRicalConfiguration(
     /** Stable application-configured provider identifier. */
     public val providerId: String,
     /** RICAL type identifiers accepted from this provider. */
     public val acceptedTypes: Set<String>,
     /** Explicit X.509 trust anchors accepted for this provider's signer. */
-    public val providerTrustAnchors: List<MobileWalletProximityRicalProviderTrustAnchor>,
+    public val providerTrustAnchors: List<ProximityRicalProviderTrustAnchor>,
     /** Certificate-policy OIDs accepted on this provider's signer certificate. */
     public val acceptedSignerCertificatePolicyOids: Set<String>,
     /** Revocation behavior for this provider's verified signer certificate. */
-    public val signerRevocationPolicy: MobileWalletProximityRicalSignerRevocationPolicy =
-        MobileWalletProximityRicalSignerRevocationPolicy.NotChecked,
+    public val signerRevocationPolicy: ProximityRicalSignerRevocationPolicy =
+        ProximityRicalSignerRevocationPolicy.NotChecked,
     /** Whether an accepted matching authority may establish product reader trust. */
     public val establishReaderTrust: Boolean = false,
     /** Application-owned source of the current signed RICAL. */
-    public val provider: MobileWalletProximityRicalProvider,
+    public val provider: ProximityRicalProvider,
     /** Null rejects any non-empty, ecosystem-specific constraint as unsupported. */
-    public val constraintEvaluator: MobileWalletProximityRicalConstraintEvaluator? = null,
+    public val constraintEvaluator: ProximityRicalConstraintEvaluator? = null,
 ) {
     init {
         require(providerId.isNotBlank())
@@ -238,14 +238,14 @@ public data class MobileWalletProximityRicalConfiguration(
  * carried by a reader or a RICAL are path inputs only and never become implicit SDK trust anchors.
  * RICAL providers are evaluated in configured order; the first matching authority owns the result.
  */
-public data class MobileWalletProximityReaderTrustConfiguration(
+public data class ProximityReaderTrustConfiguration(
     /** Explicit application-provisioned Reader CA trust anchors. */
-    public val trustAnchors: List<MobileWalletProximityReaderTrustAnchor> = emptyList(),
+    public val trustAnchors: List<ProximityReaderTrustAnchor> = emptyList(),
     /** Ordered application-configured RICAL provider policies. */
-    public val ricalProviders: List<MobileWalletProximityRicalConfiguration> = emptyList(),
+    public val ricalProviders: List<ProximityRicalConfiguration> = emptyList(),
     /** Revocation behavior for a reader chain trusted by a direct Reader CA anchor. */
-    public val revocationPolicy: MobileWalletProximityReaderRevocationPolicy =
-        MobileWalletProximityReaderRevocationPolicy.NotChecked,
+    public val revocationPolicy: ProximityReaderRevocationPolicy =
+        ProximityReaderRevocationPolicy.NotChecked,
 ) {
     init {
         require(trustAnchors.isNotEmpty() || ricalProviders.isNotEmpty()) {
@@ -261,22 +261,22 @@ public data class MobileWalletProximityReaderTrustConfiguration(
 }
 
 /** Shared standards-profile, path, revocation, RICAL, and product-trust evaluator. */
-public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constructor(
-    configuration: MobileWalletProximityReaderTrustConfiguration,
+public class ProximityConfiguredReaderTrustEvaluator internal constructor(
+    configuration: ProximityReaderTrustConfiguration,
     private val now: () -> Instant,
-) : MobileWalletProximityReaderTrustEvaluator {
+) : ProximityReaderTrustEvaluator {
     private val ownedConfiguration = configuration.snapshot()
 
     /** Detached view of the application-provisioned trust policy retained by this instance. */
-    public val configuration: MobileWalletProximityReaderTrustConfiguration get() = ownedConfiguration.snapshot()
+    public val configuration: ProximityReaderTrustConfiguration get() = ownedConfiguration.snapshot()
 
     public constructor(
-        configuration: MobileWalletProximityReaderTrustConfiguration,
+        configuration: ProximityReaderTrustConfiguration,
     ) : this(configuration, { Clock.System.now() })
 
     override suspend fun evaluate(
-        evidence: MobileWalletProximityReaderEvidence,
-    ): MobileWalletProximityReaderTrustDecision {
+        evidence: ProximityReaderEvidence,
+    ): ProximityReaderTrustDecision {
         val ownedEvidence = evidence.snapshot()
         val evaluatedAt = now()
         val chain = runCatching { ownedEvidence.certificateChainDerBase64Url.map(String::trustCertificateDer) }
@@ -300,7 +300,7 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
             return decisionForValidatedPath(
                 evidence = ownedEvidence,
                 displayName = anchor.displayName ?: readerName,
-                rical = MobileWalletProximityRicalState.NotEvaluated,
+                rical = ProximityRicalState.NotEvaluated,
                 establishesTrust = true,
             )
         }
@@ -310,18 +310,18 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
             val result = evaluateRical(rical, ownedEvidence, evaluatedAt)
             result.matched?.let { matched ->
                 return when (matched) {
-                    is RicalMatch.Revoked -> MobileWalletProximityReaderTrustDecision(
-                        state = MobileWalletProximityReaderTrustState.Revoked,
-                        certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
-                        revocation = MobileWalletProximityReaderRevocationState.Revoked,
-                        rical = MobileWalletProximityRicalState.Matched,
+                    is RicalMatch.Revoked -> ProximityReaderTrustDecision(
+                        state = ProximityReaderTrustState.Revoked,
+                        certificatePath = ProximityReaderCertificatePathState.Valid,
+                        revocation = ProximityReaderRevocationState.Revoked,
+                        rical = ProximityRicalState.Matched,
                         displayName = matched.displayName ?: readerName,
                         reason = matched.reason ?: "Reader authentication certificate is revoked",
                     )
                     is RicalMatch.Valid -> decisionForValidatedPath(
                         evidence = ownedEvidence,
                         displayName = matched.displayName ?: readerName,
-                        rical = MobileWalletProximityRicalState.Matched,
+                        rical = ProximityRicalState.Matched,
                         establishesTrust = matched.establishesTrust,
                     )
                 }
@@ -329,28 +329,28 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
             fallback = fallback.prefer(result.fallback)
         }
 
-        return MobileWalletProximityReaderTrustDecision(
-            state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
-            certificatePath = MobileWalletProximityReaderCertificatePathState.UnknownAuthority,
-            rical = fallback?.state ?: MobileWalletProximityRicalState.NotEvaluated,
+        return ProximityReaderTrustDecision(
+            state = ProximityReaderTrustState.ValidButUntrusted,
+            certificatePath = ProximityReaderCertificatePathState.UnknownAuthority,
+            rical = fallback?.state ?: ProximityRicalState.NotEvaluated,
             reason = fallback?.reason ?: "Reader authentication is valid, but its authority is not configured",
         )
     }
 
     private suspend fun evaluateRical(
-        configuration: MobileWalletProximityRicalConfiguration,
-        evidence: MobileWalletProximityReaderEvidence,
+        configuration: ProximityRicalConfiguration,
+        evidence: ProximityReaderEvidence,
         evaluatedAt: Instant,
     ): RicalAttempt {
         val evaluator = RicalReaderTrustEvaluator(
             provider = RicalProvider {
                 when (val result = configuration.provider.current()) {
-                    is MobileWalletProximityRicalProviderResult.Available -> RicalProviderResult.Available(
+                    is ProximityRicalProviderResult.Available -> RicalProviderResult.Available(
                         SignedRical.decode(result.signedRicalBase64Url.decodeTrustBase64Url())
                     )
-                    is MobileWalletProximityRicalProviderResult.Unavailable ->
+                    is ProximityRicalProviderResult.Unavailable ->
                         RicalProviderResult.Unavailable(result.reason)
-                    is MobileWalletProximityRicalProviderResult.Conflict ->
+                    is ProximityRicalProviderResult.Conflict ->
                         RicalProviderResult.Conflict(result.reason)
                 }
             },
@@ -380,7 +380,7 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
         } catch (_: Throwable) {
             return RicalAttempt(
                 fallback = RicalFallback(
-                    MobileWalletProximityRicalState.Invalid,
+                    ProximityRicalState.Invalid,
                     "RICAL provider data is invalid",
                 )
             )
@@ -398,26 +398,26 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
             )
             RicalEvaluationState.UNAVAILABLE -> RicalAttempt(
                 fallback = RicalFallback(
-                    MobileWalletProximityRicalState.Unavailable,
+                    ProximityRicalState.Unavailable,
                     result.decision.reason ?: "RICAL provider is unavailable",
                 )
             )
             RicalEvaluationState.INVALID -> RicalAttempt(
                 fallback = RicalFallback(
-                    MobileWalletProximityRicalState.Invalid,
+                    ProximityRicalState.Invalid,
                     result.decision.reason ?: "RICAL provider data is invalid",
                 )
             )
             RicalEvaluationState.NO_MATCHING_AUTHORITY -> RicalAttempt(
                 fallback = RicalFallback(
-                    MobileWalletProximityRicalState.NoMatchingAuthority,
+                    ProximityRicalState.NoMatchingAuthority,
                     result.decision.reason ?: "RICAL has no matching reader authority",
                 )
             )
         }
     }
 
-    private fun MobileWalletProximityRicalConfiguration.signatureValidator(
+    private fun ProximityRicalConfiguration.signatureValidator(
         evaluatedAt: Instant,
     ): RicalSignatureValidator {
         val x509 = X509RicalSignatureValidator(acceptedSignerCertificatePolicyOids) { evaluatedAt }
@@ -426,16 +426,16 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
                 false
             } else {
                 when (val policy = signerRevocationPolicy) {
-                    MobileWalletProximityRicalSignerRevocationPolicy.NotChecked -> true
-                    is MobileWalletProximityRicalSignerRevocationPolicy.Check -> try {
+                    ProximityRicalSignerRevocationPolicy.NotChecked -> true
+                    is ProximityRicalSignerRevocationPolicy.Check -> try {
                         policy.evaluator.evaluate(
-                            MobileWalletProximityRicalSignerEvidence(
+                            ProximityRicalSignerEvidence(
                                 providerId = providerId,
                                 certificateChainDerBase64Url = signed.signerChainDer.map {
                                     it.copy().encodeTrustBase64Url()
                                 },
                             )
-                        ) == MobileWalletProximityCertificateRevocationResult.Good
+                        ) == ProximityCertificateRevocationResult.Good
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Throwable) {
@@ -447,33 +447,33 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
     }
 
     private suspend fun decisionForValidatedPath(
-        evidence: MobileWalletProximityReaderEvidence,
+        evidence: ProximityReaderEvidence,
         displayName: String,
-        rical: MobileWalletProximityRicalState,
+        rical: ProximityRicalState,
         establishesTrust: Boolean,
-    ): MobileWalletProximityReaderTrustDecision = when (val revocation = evaluateRevocation(evidence)) {
-        is EvaluatedRevocation.Good -> MobileWalletProximityReaderTrustDecision(
-            state = if (establishesTrust) MobileWalletProximityReaderTrustState.Trusted
-                else MobileWalletProximityReaderTrustState.ValidButUntrusted,
-            certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
+    ): ProximityReaderTrustDecision = when (val revocation = evaluateRevocation(evidence)) {
+        is EvaluatedRevocation.Good -> ProximityReaderTrustDecision(
+            state = if (establishesTrust) ProximityReaderTrustState.Trusted
+                else ProximityReaderTrustState.ValidButUntrusted,
+            certificatePath = ProximityReaderCertificatePathState.Valid,
             revocation = revocation.state,
             rical = rical,
             displayName = displayName,
             reason = if (establishesTrust) null
                 else "RICAL evidence is valid but the active policy does not establish reader trust",
         )
-        is EvaluatedRevocation.Revoked -> MobileWalletProximityReaderTrustDecision(
-            state = MobileWalletProximityReaderTrustState.Revoked,
-            certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
-            revocation = MobileWalletProximityReaderRevocationState.Revoked,
+        is EvaluatedRevocation.Revoked -> ProximityReaderTrustDecision(
+            state = ProximityReaderTrustState.Revoked,
+            certificatePath = ProximityReaderCertificatePathState.Valid,
+            revocation = ProximityReaderRevocationState.Revoked,
             rical = rical,
             displayName = displayName,
             reason = revocation.reason ?: "Reader authentication certificate is revoked",
         )
-        is EvaluatedRevocation.Indeterminate -> MobileWalletProximityReaderTrustDecision(
-            state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
-            certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
-            revocation = MobileWalletProximityReaderRevocationState.Indeterminate,
+        is EvaluatedRevocation.Indeterminate -> ProximityReaderTrustDecision(
+            state = ProximityReaderTrustState.ValidButUntrusted,
+            certificatePath = ProximityReaderCertificatePathState.Valid,
+            revocation = ProximityReaderRevocationState.Indeterminate,
             rical = rical,
             displayName = displayName,
             reason = revocation.reason,
@@ -481,17 +481,17 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
     }
 
     private suspend fun evaluateRevocation(
-        evidence: MobileWalletProximityReaderEvidence,
+        evidence: ProximityReaderEvidence,
     ): EvaluatedRevocation = when (val policy = ownedConfiguration.revocationPolicy) {
-        MobileWalletProximityReaderRevocationPolicy.NotChecked ->
-            EvaluatedRevocation.Good(MobileWalletProximityReaderRevocationState.NotChecked)
-        is MobileWalletProximityReaderRevocationPolicy.Check -> try {
+        ProximityReaderRevocationPolicy.NotChecked ->
+            EvaluatedRevocation.Good(ProximityReaderRevocationState.NotChecked)
+        is ProximityReaderRevocationPolicy.Check -> try {
             when (val result = policy.evaluator.evaluate(evidence.snapshot())) {
-                MobileWalletProximityCertificateRevocationResult.Good ->
-                    EvaluatedRevocation.Good(MobileWalletProximityReaderRevocationState.Good)
-                is MobileWalletProximityCertificateRevocationResult.Revoked ->
+                ProximityCertificateRevocationResult.Good ->
+                    EvaluatedRevocation.Good(ProximityReaderRevocationState.Good)
+                is ProximityCertificateRevocationResult.Revoked ->
                     EvaluatedRevocation.Revoked(result.reason)
-                is MobileWalletProximityCertificateRevocationResult.Indeterminate ->
+                is ProximityCertificateRevocationResult.Indeterminate ->
                     EvaluatedRevocation.Indeterminate(result.reason)
             }
         } catch (cancelled: CancellationException) {
@@ -502,7 +502,7 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
     }
 
     private sealed interface EvaluatedRevocation {
-        data class Good(val state: MobileWalletProximityReaderRevocationState) : EvaluatedRevocation
+        data class Good(val state: ProximityReaderRevocationState) : EvaluatedRevocation
         data class Revoked(val reason: String?) : EvaluatedRevocation
         data class Indeterminate(val reason: String) : EvaluatedRevocation
     }
@@ -520,35 +520,35 @@ public class MobileWalletProximityConfiguredReaderTrustEvaluator internal constr
             val reason: String?,
         ) : RicalMatch
     }
-    private data class RicalFallback(val state: MobileWalletProximityRicalState, val reason: String)
+    private data class RicalFallback(val state: ProximityRicalState, val reason: String)
     private data class RicalAttempt(val matched: RicalMatch? = null, val fallback: RicalFallback? = null)
 
     private fun RicalFallback?.prefer(candidate: RicalFallback?): RicalFallback? {
         candidate ?: return this
         this ?: return candidate
-        fun MobileWalletProximityRicalState.priority(): Int = when (this) {
-            MobileWalletProximityRicalState.Invalid -> 3
-            MobileWalletProximityRicalState.Unavailable -> 2
-            MobileWalletProximityRicalState.NoMatchingAuthority -> 1
-            MobileWalletProximityRicalState.NotEvaluated, MobileWalletProximityRicalState.Matched -> 0
+        fun ProximityRicalState.priority(): Int = when (this) {
+            ProximityRicalState.Invalid -> 3
+            ProximityRicalState.Unavailable -> 2
+            ProximityRicalState.NoMatchingAuthority -> 1
+            ProximityRicalState.NotEvaluated, ProximityRicalState.Matched -> 0
         }
         return if (candidate.state.priority() > state.priority()) candidate else this
     }
 
-    private fun invalidPathDecision(): MobileWalletProximityReaderTrustDecision =
-        MobileWalletProximityReaderTrustDecision(
-            state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
-            certificatePath = MobileWalletProximityReaderCertificatePathState.Invalid,
+    private fun invalidPathDecision(): ProximityReaderTrustDecision =
+        ProximityReaderTrustDecision(
+            state = ProximityReaderTrustState.ValidButUntrusted,
+            certificatePath = ProximityReaderCertificatePathState.Invalid,
             reason = "Reader authentication certificate path or profile is invalid",
         )
 }
 
-private fun MobileWalletProximityReaderEvidence.toRicalEvidence(): ReaderAuthenticationEvidence =
+private fun ProximityReaderEvidence.toRicalEvidence(): ReaderAuthenticationEvidence =
     ReaderAuthenticationEvidence(
         scope = when (val scope = scope) {
-            is MobileWalletProximityReaderAuthenticationScope.Document ->
+            is ProximityReaderAuthenticationScope.Document ->
                 id.walt.mdoc.proximity.ReaderAuthenticationScope.Document(scope.index)
-            MobileWalletProximityReaderAuthenticationScope.WholeRequest ->
+            ProximityReaderAuthenticationScope.WholeRequest ->
                 id.walt.mdoc.proximity.ReaderAuthenticationScope.WholeRequest
         },
         authenticationIndex = authenticationIndex,
@@ -557,8 +557,8 @@ private fun MobileWalletProximityReaderEvidence.toRicalEvidence(): ReaderAuthent
         },
     )
 
-private fun RicalTrustConstraint.toPublic(): MobileWalletProximityRicalTrustConstraint =
-    MobileWalletProximityRicalTrustConstraint(
+private fun RicalTrustConstraint.toPublic(): ProximityRicalTrustConstraint =
+    ProximityRicalTrustConstraint(
         valuesCborBase64Url = values.mapValues { (_, value) -> value.toTrustBase64Url() }
     )
 
@@ -581,7 +581,7 @@ private fun ByteArray.encodeTrustBase64Url(): String =
 private fun String.isTrustBase64Url(): Boolean =
     isNotBlank() && !contains('=') && runCatching { decodeTrustBase64Url().isNotEmpty() }.getOrDefault(false)
 
-private fun MobileWalletProximityReaderTrustConfiguration.snapshot() = copy(
+private fun ProximityReaderTrustConfiguration.snapshot() = copy(
     trustAnchors = trustAnchors.toList(),
     ricalProviders = ricalProviders.map { provider ->
         provider.copy(
@@ -592,6 +592,6 @@ private fun MobileWalletProximityReaderTrustConfiguration.snapshot() = copy(
     },
 )
 
-private fun MobileWalletProximityReaderEvidence.snapshot() = copy(
+private fun ProximityReaderEvidence.snapshot() = copy(
     certificateChainDerBase64Url = certificateChainDerBase64Url.toList(),
 )

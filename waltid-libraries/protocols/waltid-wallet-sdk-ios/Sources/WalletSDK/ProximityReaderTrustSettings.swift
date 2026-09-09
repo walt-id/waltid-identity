@@ -113,11 +113,11 @@ public struct ProximityReaderTrustSettings: Sendable, Equatable {
     /// Applies this immutable settings snapshot to one new proximity session.
     /// - Parameter configuration: Base presentation configuration to update.
     public func applying(
-        to configuration: ProximityPresentationConfiguration = .init()
-    ) -> ProximityPresentationConfiguration {
+        to configuration: ProximityConfiguration = .init()
+    ) -> ProximityConfiguration {
         let evaluator = configuredReaderTrustEvaluator(for: self)
 
-        return ProximityPresentationConfiguration(
+        return ProximityConfiguration(
             profile: configuration.profile,
             bleRoles: configuration.bleRoles,
             bearerPolicy: configuration.bearerPolicy,
@@ -206,7 +206,7 @@ public enum ProximityReaderTrustSettingsCodec {
     /// - Parameter settings: Validated reader-trust settings to encode.
     public static func encode(_ settings: ProximityReaderTrustSettings) throws -> String {
         #if canImport(WalletCore) && os(iOS)
-        return MobileWalletProximityReaderTrustSettingsCodec.shared.encode(
+        return WalletCore.ProximityReaderTrustSettingsCodec.shared.encode(
             settings: settings.toKMPSettings()
         )
         #else
@@ -218,7 +218,7 @@ public enum ProximityReaderTrustSettingsCodec {
     /// - Parameter encoded: Versioned reader-trust settings document.
     public static func decode(_ encoded: String) throws -> ProximityReaderTrustSettings {
         #if canImport(WalletCore) && os(iOS)
-        return try MobileWalletProximityReaderTrustSettingsCodec.shared
+        return try WalletCore.ProximityReaderTrustSettingsCodec.shared
             .decode(encoded: encoded)
             .toSwiftSettings()
         #else
@@ -242,7 +242,7 @@ public enum ProximityReaderTrustSettingsCodec {
         let seconds = now.timeIntervalSince1970
         let wholeSeconds = Int64(seconds.rounded(.down))
         let nanoseconds = Int32(((seconds - Double(wholeSeconds)) * 1_000_000_000).rounded())
-        let preview = try await MobileWalletProximityReaderTrustSettingsCodec.shared.prepareImport(
+        let preview = try await WalletCore.ProximityReaderTrustSettingsCodec.shared.prepareImport(
             sourceName: sourceName,
             bytes: data.toKotlinByteArray(),
             existing: existing.toKMPSettings(),
@@ -300,7 +300,7 @@ private struct StaticProximityRICALProvider: ProximityRICALProvider {
 }
 
 private extension ProximityStoredReaderPolicy {
-    var presentationPolicy: ProximityPresentationReaderPolicy {
+    var presentationPolicy: ProximityReaderPolicy {
         switch self {
         case .allowAnonymousOrUntrusted: return .allowAnonymousOrUntrusted
         case .requireTrusted: return .requireTrusted
@@ -361,7 +361,7 @@ private func configuredReaderTrustEvaluator(
 @preconcurrency import WalletCore
 
 private extension ProximityStoredReaderPolicy {
-    var kmpPolicy: MobileWalletProximityReaderPolicy {
+    var kmpPolicy: WalletCore.ProximityReaderPolicy {
         switch self {
         case .allowAnonymousOrUntrusted: return .allowAnonymousOrUntrusted
         case .requireTrusted: return .requireTrusted
@@ -369,7 +369,7 @@ private extension ProximityStoredReaderPolicy {
     }
 }
 
-private extension MobileWalletProximityReaderPolicy {
+private extension WalletCore.ProximityReaderPolicy {
     var storedPolicy: ProximityStoredReaderPolicy {
         switch self {
         case .allowAnonymousOrUntrusted: return .allowAnonymousOrUntrusted
@@ -379,17 +379,17 @@ private extension MobileWalletProximityReaderPolicy {
 }
 
 private extension ProximityReaderTrustSettings {
-    func toKMPSettings() -> MobileWalletProximityReaderTrustSettings {
-        MobileWalletProximityReaderTrustSettings(
+    func toKMPSettings() -> WalletCore.ProximityReaderTrustSettings {
+        WalletCore.ProximityReaderTrustSettings(
             readerPolicy: readerPolicy.kmpPolicy,
             trustAnchors: trustAnchors.map {
-                MobileWalletProximityStoredReaderTrustAnchor(
+                WalletCore.ProximityStoredReaderTrustAnchor(
                     certificateDerBase64Url: $0.certificateDERBase64URL,
                     displayName: $0.displayName
                 )
             },
             ricalProviders: ricalProviders.map {
-                MobileWalletProximityStoredRicalProvider(
+                WalletCore.ProximityStoredRicalProvider(
                     providerId: $0.providerID,
                     acceptedTypes: $0.acceptedTypes,
                     providerTrustAnchorsDerBase64Url: $0.providerTrustAnchorsDERBase64URL,
@@ -402,7 +402,7 @@ private extension ProximityReaderTrustSettings {
     }
 }
 
-private extension MobileWalletProximityReaderTrustSettings {
+private extension WalletCore.ProximityReaderTrustSettings {
     func toSwiftSettings() throws -> ProximityReaderTrustSettings {
         ProximityReaderTrustSettings(
             readerPolicy: readerPolicy.storedPolicy,
@@ -427,7 +427,7 @@ private extension MobileWalletProximityReaderTrustSettings {
     }
 }
 
-private extension MobileWalletProximityReaderTrustImportPreview {
+private extension WalletCore.ProximityReaderTrustImportPreview {
     func toSwiftPreview() throws -> ProximityReaderTrustImportPreview {
         ProximityReaderTrustImportPreview(
             kind: kind == .readerCa ? .readerCA : .trustBundle,

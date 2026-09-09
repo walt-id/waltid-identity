@@ -14,7 +14,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 /** Certificates whose CRL status the hosting application requires. */
-public enum class MobileWalletProximityCrlScope {
+public enum class ProximityCrlScope {
     /** Check the reader certificate against its direct issuer's CRL. */
     ReaderCertificate,
 
@@ -23,29 +23,29 @@ public enum class MobileWalletProximityCrlScope {
 }
 
 /** A complete DER CRL retrieved by the application's network/cache policy. */
-public sealed interface MobileWalletProximityCrlFetchResult {
+public sealed interface ProximityCrlFetchResult {
     /**
      * A retrieved CRL whose signature, scope and freshness are checked by the SDK.
      *
      * @property crlDerBase64Url Unpadded Base64URL-encoded DER CRL.
      */
-    public data class Available(public val crlDerBase64Url: String) : MobileWalletProximityCrlFetchResult
+    public data class Available(public val crlDerBase64Url: String) : ProximityCrlFetchResult
 
     /** No complete CRL could be retrieved within the application's transport policy. */
-    public data object Unavailable : MobileWalletProximityCrlFetchResult
+    public data object Unavailable : ProximityCrlFetchResult
 }
 
 /** Application-owned transport for explicit CRL distribution-point requests. */
-public fun interface MobileWalletProximityCrlFetcher {
+public fun interface ProximityCrlFetcher {
     /**
      * Fetch at most [maximumBytes] from [url]. Apply application timeout, redirect and destination
      * policy before returning. The SDK neither opens connections nor retains a cache between calls.
      */
-    public suspend fun fetch(url: String, maximumBytes: Int): MobileWalletProximityCrlFetchResult
+    public suspend fun fetch(url: String, maximumBytes: Int): ProximityCrlFetchResult
 }
 
 /**
- * Reader-certificate CRL evaluator for [MobileWalletProximityReaderRevocationPolicy.Check].
+ * Reader-certificate CRL evaluator for [ProximityReaderRevocationPolicy.Check].
  *
  * [issuerCertificatesDerBase64Url] supplies the public issuer certificates needed to follow the
  * authenticated reader chain. They are lookup material and do not establish trust. With authority
@@ -57,12 +57,12 @@ public fun interface MobileWalletProximityCrlFetcher {
  * remain indeterminate. A verified revocation takes precedence over an unavailable status elsewhere
  * in the selected chain. The application continues to own fetching and certificate-path trust.
  */
-public class MobileWalletProximityCrlRevocationEvaluator internal constructor(
+public class ProximityCrlRevocationEvaluator internal constructor(
     issuerCertificatesDerBase64Url: List<String>,
-    private val scope: MobileWalletProximityCrlScope,
-    private val fetcher: MobileWalletProximityCrlFetcher,
+    private val scope: ProximityCrlScope,
+    private val fetcher: ProximityCrlFetcher,
     private val now: () -> Instant,
-) : MobileWalletProximityReaderRevocationEvaluator {
+) : ProximityReaderRevocationEvaluator {
     private val issuers: List<X509Certificate>
     private val verifier = CertificateRevocationListVerifier()
 
@@ -75,13 +75,13 @@ public class MobileWalletProximityCrlRevocationEvaluator internal constructor(
     @Throws(IllegalArgumentException::class)
     public constructor(
         issuerCertificatesDerBase64Url: List<String>,
-        scope: MobileWalletProximityCrlScope,
-        fetcher: MobileWalletProximityCrlFetcher,
+        scope: ProximityCrlScope,
+        fetcher: ProximityCrlFetcher,
     ) : this(issuerCertificatesDerBase64Url, scope, fetcher, { Clock.System.now() })
 
     override suspend fun evaluate(
-        evidence: MobileWalletProximityReaderEvidence,
-    ): MobileWalletProximityCertificateRevocationResult = try {
+        evidence: ProximityReaderEvidence,
+    ): ProximityCertificateRevocationResult = try {
         require(evidence.certificateChainDerBase64Url.size in 1..MAX_CHAIN_LENGTH)
         val supplied = evidence.certificateChainDerBase64Url.toList().map(::parseCrlCertificate)
         val path = resolvePath(supplied.first(), (supplied + issuers).distinctBy { it.encodedDer })
@@ -95,7 +95,7 @@ public class MobileWalletProximityCrlRevocationEvaluator internal constructor(
                 if (crl == null) continue
                 when (val status = verifier.verify(crl, certificate, issuer, now())) {
                     is CrlCertificateStatus.Good -> good += status
-                    is CrlCertificateStatus.Revoked -> return MobileWalletProximityCertificateRevocationResult.Revoked(
+                    is CrlCertificateStatus.Revoked -> return ProximityCertificateRevocationResult.Revoked(
                         if (index == 0) "Reader certificate is revoked" else "Reader certificate authority is revoked",
                     )
                     is CrlCertificateStatus.Indeterminate -> Unit
@@ -109,7 +109,7 @@ public class MobileWalletProximityCrlRevocationEvaluator internal constructor(
             completedAt >= issuer.data.validity.notBefore && completedAt <= issuer.data.validity.notAfter &&
                 crls.any { it.thisUpdate <= completedAt && completedAt < it.nextUpdate }
         }
-        if (path.complete && verified.isNotEmpty() && current) MobileWalletProximityCertificateRevocationResult.Good
+        if (path.complete && verified.isNotEmpty() && current) ProximityCertificateRevocationResult.Good
         else indeterminate()
     } catch (cancelled: CancellationException) {
         throw cancelled
@@ -119,11 +119,11 @@ public class MobileWalletProximityCrlRevocationEvaluator internal constructor(
 
     private suspend fun fetchCrl(url: String): ByteString? = try {
         when (val result = fetcher.fetch(url, MAX_CRL_BYTES)) {
-            is MobileWalletProximityCrlFetchResult.Available -> {
+            is ProximityCrlFetchResult.Available -> {
                 require(result.crlDerBase64Url.length in 1..MAX_CRL_BASE64_LENGTH)
                 ByteString(crlBase64.decode(result.crlDerBase64Url)).also { require(it.size <= MAX_CRL_BYTES) }
             }
-            MobileWalletProximityCrlFetchResult.Unavailable -> null
+            ProximityCrlFetchResult.Unavailable -> null
         }
     } catch (cancelled: CancellationException) {
         throw cancelled
@@ -154,7 +154,7 @@ public class MobileWalletProximityCrlRevocationEvaluator internal constructor(
             if (candidates.size != 1) return CrlPath(pairs, false)
             val issuer = candidates.single()
             pairs += certificate to issuer
-            if (scope == MobileWalletProximityCrlScope.ReaderCertificate || certificate.encodedDer == issuer.encodedDer) {
+            if (scope == ProximityCrlScope.ReaderCertificate || certificate.encodedDer == issuer.encodedDer) {
                 return CrlPath(pairs, true)
             }
             certificate = issuer
@@ -172,8 +172,8 @@ public class MobileWalletProximityCrlRevocationEvaluator internal constructor(
         .distinct()
         .also { require(it.size <= 8) }
 
-    private fun indeterminate(): MobileWalletProximityCertificateRevocationResult.Indeterminate =
-        MobileWalletProximityCertificateRevocationResult.Indeterminate("Reader certificate CRL status could not be established")
+    private fun indeterminate(): ProximityCertificateRevocationResult.Indeterminate =
+        ProximityCertificateRevocationResult.Indeterminate("Reader certificate CRL status could not be established")
 
     private data class CrlPath(val pairs: List<Pair<X509Certificate, X509Certificate>>, val complete: Boolean)
 

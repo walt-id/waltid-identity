@@ -1,21 +1,21 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.MobileWalletProximityAction
-import id.walt.wallet2.mobile.MobileWalletProximityActionResult
-import id.walt.wallet2.mobile.MobileWalletProximityActionType
-import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
-import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
-import id.walt.wallet2.mobile.MobileWalletProximityDocumentSubmission
-import id.walt.wallet2.mobile.MobileWalletProximityElementReference
-import id.walt.wallet2.mobile.MobileWalletProximityError
-import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
-import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
-import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
-import id.walt.wallet2.mobile.MobileWalletProximityReview
-import id.walt.wallet2.mobile.MobileWalletProximityRecovery
-import id.walt.wallet2.mobile.MobileWalletProximitySession
-import id.walt.wallet2.mobile.MobileWalletProximityState
-import id.walt.wallet2.mobile.MobileWalletProximitySubmission
+import id.walt.wallet2.mobile.ProximityAction
+import id.walt.wallet2.mobile.ProximityActionResult
+import id.walt.wallet2.mobile.ProximityActionType
+import id.walt.wallet2.mobile.ProximityCapabilities
+import id.walt.wallet2.mobile.ProximityConfiguration
+import id.walt.wallet2.mobile.ProximityDocumentSubmission
+import id.walt.wallet2.mobile.ProximityElementReference
+import id.walt.wallet2.mobile.ProximityError
+import id.walt.wallet2.mobile.ProximityErrorCategory
+import id.walt.wallet2.mobile.ProximityHostActionResult
+import id.walt.wallet2.mobile.ProximityRemediationAction
+import id.walt.wallet2.mobile.ProximityReview
+import id.walt.wallet2.mobile.ProximityRecovery
+import id.walt.wallet2.mobile.ProximitySession
+import id.walt.wallet2.mobile.ProximityState
+import id.walt.wallet2.mobile.ProximitySubmission
 import id.walt.wallet2.mobile.legalActions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -40,20 +40,20 @@ import kotlinx.coroutines.launch
 data class WalletDemoProximityDocumentSelection(
     val requestIndex: Int,
     val credentialId: String,
-    val disclosedElements: Set<MobileWalletProximityElementReference>,
+    val disclosedElements: Set<ProximityElementReference>,
 )
 
 /** Shared Android/iOS Compose state around the SDK-owned protocol state. */
 data class WalletDemoProximityUiState(
     val active: Boolean = false,
-    val sessionState: MobileWalletProximityState? = null,
+    val sessionState: ProximityState? = null,
     val selections: List<WalletDemoProximityDocumentSelection> = emptyList(),
     val continueAfterResponse: Boolean = false,
-    val hostActionInProgress: MobileWalletProximityRemediationAction? = null,
-    val actionError: MobileWalletProximityError? = null,
+    val hostActionInProgress: ProximityRemediationAction? = null,
+    val actionError: ProximityError? = null,
 ) {
-    val review: MobileWalletProximityReview?
-        get() = (sessionState as? MobileWalletProximityState.ReviewRequired)?.review
+    val review: ProximityReview?
+        get() = (sessionState as? ProximityState.ReviewRequired)?.review
 
     val canApprove: Boolean
         get() = review?.let { current ->
@@ -62,8 +62,8 @@ data class WalletDemoProximityUiState(
         } == true
 
     /** Runtime permission the demo host must resolve before the SDK session may be created. */
-    val automaticPermissionAction: MobileWalletProximityRemediationAction?
-        get() = (sessionState as? MobileWalletProximityState.CheckingPrerequisites)
+    val automaticPermissionAction: ProximityRemediationAction?
+        get() = (sessionState as? ProximityState.CheckingPrerequisites)
             ?.capabilities
             ?.automaticPermissionActions
             ?.firstOrNull()
@@ -75,8 +75,8 @@ data class WalletDemoProximityUiState(
 /** Performs one OS-owned prerequisite action and returns only its privacy-safe outcome. */
 fun interface WalletDemoProximityHostActionExecutor {
     suspend fun perform(
-        action: MobileWalletProximityRemediationAction,
-    ): MobileWalletProximityHostActionResult
+        action: ProximityRemediationAction,
+    ): ProximityHostActionResult
 }
 
 /**
@@ -85,8 +85,8 @@ fun interface WalletDemoProximityHostActionExecutor {
  */
 class WalletDemoProximityController(
     private val wallet: ProximityPresentationBackend,
-    private val configurationProvider: () -> MobileWalletProximityConfiguration = {
-        MobileWalletProximityConfiguration()
+    private val configurationProvider: () -> ProximityConfiguration = {
+        ProximityConfiguration()
     },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
@@ -94,8 +94,8 @@ class WalletDemoProximityController(
     private val mutableState = MutableStateFlow(WalletDemoProximityUiState())
     val state: StateFlow<WalletDemoProximityUiState> = mutableState.asStateFlow()
 
-    private var session: MobileWalletProximitySession? = null
-    private var pendingConfiguration: MobileWalletProximityConfiguration? = null
+    private var session: ProximitySession? = null
+    private var pendingConfiguration: ProximityConfiguration? = null
     private var sessionJob: Job? = null
     private var hostActionJob: Job? = null
     private var generation: Long = 0
@@ -111,7 +111,7 @@ class WalletDemoProximityController(
     }
 
     private fun checkPrerequisitesAndStart(
-        configuration: MobileWalletProximityConfiguration,
+        configuration: ProximityConfiguration,
         startGeneration: Long,
     ) {
         sessionJob?.cancel()
@@ -119,7 +119,7 @@ class WalletDemoProximityController(
             try {
                 val capabilities = wallet.proximityPresentationCapabilities(configuration)
                 if (!isCurrent(startGeneration)) return@launch
-                publish(MobileWalletProximityState.CheckingPrerequisites(capabilities))
+                publish(ProximityState.CheckingPrerequisites(capabilities))
                 // Request permission only when no selected route can start without it.
                 if (capabilities.automaticPermissionActions.isNotEmpty()) return@launch
 
@@ -142,7 +142,7 @@ class WalletDemoProximityController(
                 if (generation != startGeneration || !mutableState.value.active) return@launch
                 mutableState.update {
                     it.copy(
-                        sessionState = MobileWalletProximityState.Failed(demoSessionFailure),
+                        sessionState = ProximityState.Failed(demoSessionFailure),
                         actionError = demoSessionFailure,
                     )
                 }
@@ -158,13 +158,13 @@ class WalletDemoProximityController(
             requestIndex = requestIndex,
             credentialId = credentialId,
             disclosedElements = credential.requestedElements.mapTo(linkedSetOf()) {
-                MobileWalletProximityElementReference(it.namespace, it.elementIdentifier)
+                ProximityElementReference(it.namespace, it.elementIdentifier)
             },
         )
         replaceSelection(selection)
     }
 
-    fun toggleElement(requestIndex: Int, element: MobileWalletProximityElementReference) {
+    fun toggleElement(requestIndex: Int, element: ProximityElementReference) {
         val current = mutableState.value
         val review = current.review ?: return
         val selection = current.selections.singleOrNull { it.requestIndex == requestIndex } ?: return
@@ -194,12 +194,12 @@ class WalletDemoProximityController(
         val review = current.review ?: return
         if (!current.canApprove) return
         dispatch(
-            MobileWalletProximityAction.Approve(
+            ProximityAction.Approve(
                 reviewId = review.reviewId,
-                submission = MobileWalletProximitySubmission(
+                submission = ProximitySubmission(
                     documents = review.documents.map { document ->
                         val selection = current.selections.single { it.requestIndex == document.requestIndex }
-                        MobileWalletProximityDocumentSubmission(
+                        ProximityDocumentSubmission(
                             requestIndex = selection.requestIndex,
                             credentialId = selection.credentialId,
                             disclosedElements = selection.disclosedElements,
@@ -213,7 +213,7 @@ class WalletDemoProximityController(
 
     fun decline() {
         val review = mutableState.value.review ?: return
-        dispatch(MobileWalletProximityAction.Decline(review.reviewId))
+        dispatch(ProximityAction.Decline(review.reviewId))
     }
 
     fun retryPrerequisites() {
@@ -223,15 +223,15 @@ class WalletDemoProximityController(
                 checkPrerequisitesAndStart(configuration, generation)
             }
         } else {
-            dispatch(MobileWalletProximityAction.RetryPrerequisites)
+            dispatch(ProximityAction.RetryPrerequisites)
         }
     }
 
     fun remediate(
-        action: MobileWalletProximityRemediationAction,
+        action: ProximityRemediationAction,
         executor: WalletDemoProximityHostActionExecutor,
     ) {
-        val capabilities = (mutableState.value.sessionState as? MobileWalletProximityState.CheckingPrerequisites)
+        val capabilities = (mutableState.value.sessionState as? ProximityState.CheckingPrerequisites)
             ?.capabilities ?: return
         if (action !in capabilities.remediationActions || mutableState.value.hostActionInProgress != null) return
         val currentSession = session
@@ -246,7 +246,7 @@ class WalletDemoProximityController(
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Throwable) {
-                    MobileWalletProximityHostActionResult.Failed
+                    ProximityHostActionResult.Failed
                 }
                 if (generation != actionGeneration || !mutableState.value.active) return@launch
                 if (currentSession == null) {
@@ -254,13 +254,13 @@ class WalletDemoProximityController(
                     checkPrerequisitesAndStart(requireNotNull(configuration), actionGeneration)
                 } else {
                     val dispatchResult = currentSession.dispatch(
-                        MobileWalletProximityAction.ReportRemediation(action, result)
+                        ProximityAction.ReportRemediation(action, result)
                     )
                     if (generation != actionGeneration || !mutableState.value.active) return@launch
                     mutableState.update {
                         it.copy(
                             hostActionInProgress = null,
-                            actionError = (dispatchResult as? MobileWalletProximityActionResult.Rejected)?.error,
+                            actionError = (dispatchResult as? ProximityActionResult.Rejected)?.error,
                         )
                     }
                 }
@@ -282,15 +282,15 @@ class WalletDemoProximityController(
             dismiss()
             return
         }
-        if (MobileWalletProximityActionType.Cancel in current.legalActions) {
-            dispatch(MobileWalletProximityAction.Cancel)
+        if (ProximityActionType.Cancel in current.legalActions) {
+            dispatch(ProximityAction.Cancel)
         }
     }
 
     fun handleLifecycleInterruption() {
         val current = mutableState.value
         if (current.hostActionInProgress == null &&
-            current.sessionState !is MobileWalletProximityState.CheckingPrerequisites
+            current.sessionState !is ProximityState.CheckingPrerequisites
         ) {
             cancel()
         }
@@ -316,7 +316,7 @@ class WalletDemoProximityController(
         start()
     }
 
-    private fun dispatch(action: MobileWalletProximityAction) {
+    private fun dispatch(action: ProximityAction) {
         val currentSession = session ?: return
         val actionGeneration = generation
         mutableState.update { it.copy(actionError = null) }
@@ -324,7 +324,7 @@ class WalletDemoProximityController(
             val result = currentSession.dispatch(action)
             if (generation != actionGeneration || !mutableState.value.active) return@launch
             mutableState.update {
-                it.copy(actionError = (result as? MobileWalletProximityActionResult.Rejected)?.error)
+                it.copy(actionError = (result as? ProximityActionResult.Rejected)?.error)
             }
         }
     }
@@ -332,9 +332,9 @@ class WalletDemoProximityController(
     private suspend fun isCurrent(expectedGeneration: Long): Boolean =
         currentCoroutineContext().isActive && generation == expectedGeneration && mutableState.value.active
 
-    private fun publish(sessionState: MobileWalletProximityState) {
+    private fun publish(sessionState: ProximityState) {
         mutableState.update { current ->
-            val reviewForNewExchange = (sessionState as? MobileWalletProximityState.ReviewRequired)
+            val reviewForNewExchange = (sessionState as? ProximityState.ReviewRequired)
                 ?.review
                 ?.takeIf { current.review?.reviewId != it.reviewId }
             current.copy(
@@ -357,34 +357,34 @@ class WalletDemoProximityController(
     }
 }
 
-private val MobileWalletProximityCapabilities.automaticPermissionActions:
-    List<MobileWalletProximityRemediationAction>
+private val ProximityCapabilities.automaticPermissionActions:
+    List<ProximityRemediationAction>
     get() = if (mayStart) emptyList() else remediationActions.filter {
-        it == MobileWalletProximityRemediationAction.RequestBluetoothPermission
+        it == ProximityRemediationAction.RequestBluetoothPermission
     }
 
-private fun MobileWalletProximityReview.defaultSelections(): List<WalletDemoProximityDocumentSelection> =
+private fun ProximityReview.defaultSelections(): List<WalletDemoProximityDocumentSelection> =
     documents.map { document ->
         val credential = document.credentialOptions.first()
         WalletDemoProximityDocumentSelection(
             requestIndex = document.requestIndex,
             credentialId = credential.credentialId,
             disclosedElements = credential.requestedElements.mapTo(linkedSetOf()) {
-                MobileWalletProximityElementReference(it.namespace, it.elementIdentifier)
+                ProximityElementReference(it.namespace, it.elementIdentifier)
             },
         )
     }
 
-private fun MobileWalletProximityState?.isTerminal(): Boolean = when (this) {
-    is MobileWalletProximityState.Completed,
-    MobileWalletProximityState.Cancelled,
-    is MobileWalletProximityState.Failed -> true
+private fun ProximityState?.isTerminal(): Boolean = when (this) {
+    is ProximityState.Completed,
+    ProximityState.Cancelled,
+    is ProximityState.Failed -> true
     else -> false
 }
 
-private val demoSessionFailure = MobileWalletProximityError(
-    category = MobileWalletProximityErrorCategory.Internal,
+private val demoSessionFailure = ProximityError(
+    category = ProximityErrorCategory.Internal,
     code = "demo_session_failed",
     message = "The in-person presentation could not be started",
-    recovery = MobileWalletProximityRecovery.StartNewSession,
+    recovery = ProximityRecovery.StartNewSession,
 )
