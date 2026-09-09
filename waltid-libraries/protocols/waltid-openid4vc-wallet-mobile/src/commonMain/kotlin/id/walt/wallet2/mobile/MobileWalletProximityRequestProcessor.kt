@@ -314,8 +314,8 @@ internal class ProximityRequestProcessor(
         val readerDisplay = readerAuthentication.toPublicEntries()
         val selectedReaderDisplay = readerDisplay.filter { authentication ->
             when (val scope = authentication.scope) {
-                MobileWalletProximityReaderAuthenticationScope.WholeRequest -> true
-                is MobileWalletProximityReaderAuthenticationScope.Document -> scope.index in selectedRequestIndices
+                ProximityReaderAuthenticationScope.WholeRequest -> true
+                is ProximityReaderAuthenticationScope.Document -> scope.index in selectedRequestIndices
             }
         }
         val eligibleCredentialIds = eligible.map(SelectedDocument::credentialId).toSet()

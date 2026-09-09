@@ -159,6 +159,16 @@ try {
 }
 ```
 
+The `show*` functions are application UI callbacks. Collect in a screen-owned
+coroutine and cancel it on leaving the screen; the `finally` block releases the
+session even during cancellation. Import `NonCancellable` and `withContext` from
+`kotlinx.coroutines`. Handle the capability snapshot before starting; remediations
+and protected-key authorization remain explicit host actions. A `StateFlow` does
+not complete automatically on a terminal state.
+
+Kotlin and Swift proximity types use the `Proximity` prefix.
+`ProximityRetrievalOptions` selects conventional retrieval bearers and defaults to BLE.
+
 The default configuration selects QR engagement and BLE retrieval. NFC supports
 conventional static/negotiated handover, conventional retrieval, and the explicit
 provisional NFCv2 session variant. Wi-Fi Aware remains unimplemented at this
@@ -168,13 +178,13 @@ route's own retrieval plan, so an unavailable optional bearer cannot block a
 usable route or lend an unrelated bearer to another route.
 
 ```kotlin
-val nfcConfiguration = MobileWalletProximityConfiguration(
-    session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
-        handover = MobileWalletProximityNfcHandover.Negotiated,
-        retrieval = MobileWalletProximityConventionalRetrievalConfiguration(
-            nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+val nfcConfiguration = ProximityConfiguration(
+    session = ProximitySessionConfiguration.ConventionalNfc(
+        handover = ProximityNfcHandover.Negotiated,
+        retrieval = ProximityRetrievalOptions(
+            nfc = ProximityNfcRetrievalConfiguration(),
         ),
-        qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(),
+        qrFallback = ProximityRetrievalOptions(),
     ),
 )
 ```

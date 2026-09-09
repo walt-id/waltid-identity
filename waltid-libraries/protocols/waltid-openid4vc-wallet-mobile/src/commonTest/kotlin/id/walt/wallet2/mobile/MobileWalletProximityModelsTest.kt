@@ -12,11 +12,11 @@ import kotlin.uuid.Uuid
 class ProximityModelsTest {
     @Test
     fun `NFC platform failures retain actionable fresh-session recovery`() {
-        val denied = ProximityError.Capability("nfc_access_not_accepted", "NFC access was not accepted").toWalletError()
-        assertEquals(MobileWalletProximityRecovery.StartNewSession, denied.recovery)
-        assertEquals(listOf(MobileWalletProximityRemediationAction.OpenApplicationSettings), denied.remediationActions)
+        val denied = EngineProximityError.Capability("nfc_access_not_accepted", "NFC access was not accepted").toWalletError()
+        assertEquals(ProximityRecovery.StartNewSession, denied.recovery)
+        assertEquals(listOf(ProximityRemediationAction.OpenApplicationSettings), denied.remediationActions)
         for (code in listOf("nfc_system_unavailable", "nfc_session_already_active")) {
-            assertEquals(listOf(MobileWalletProximityRemediationAction.Retry), code.toRemediationActions())
+            assertEquals(listOf(ProximityRemediationAction.Retry), code.toRemediationActions())
         }
     }
 
@@ -85,13 +85,13 @@ class ProximityModelsTest {
             runtime = ProximityRuntimeObservation.NotChecked,
             selected = true,
         )
-        val capabilities = MobileWalletProximityCapabilities(
-            session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
-                MobileWalletProximityNfcHandover.Static,
-                MobileWalletProximityConventionalRetrievalConfiguration(nfc = MobileWalletProximityNfcRetrievalConfiguration()),
-                qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(),
+        val capabilities = ProximityCapabilities(
+            session = ProximitySessionConfiguration.ConventionalNfc(
+                ProximityNfcHandover.Static,
+                ProximityRetrievalOptions(nfc = ProximityNfcRetrievalConfiguration()),
+                qrFallback = ProximityRetrievalOptions(),
             ),
-            profile = MobileWalletProximityProfile.Iso180135Edition2Dis2026,
+            profile = ProximityProfile.Iso180135Edition2Dis2026,
             qrEngagement = available,
             nfcEngagement = unavailableAlternative,
             bluetoothLowEnergy = available,
@@ -103,7 +103,7 @@ class ProximityModelsTest {
         assertTrue(capabilities.mayStart)
         assertTrue(capabilities.nfcEngagement.selected)
         assertFalse(capabilities.nfcEngagement.mayStart)
-        listOf<() -> MobileWalletProximityCapabilities>(
+        listOf<() -> ProximityCapabilities>(
             { capabilities.copy(qrEngagement = available.copy(selected = false)) },
             { capabilities.copy(nfcEngagement = unavailableAlternative.copy(selected = false)) },
             { capabilities.copy(bluetoothLowEnergy = available.copy(selected = false)) },
@@ -116,18 +116,18 @@ class ProximityModelsTest {
 
     @Test
     fun `NFCv2 retrieval cannot be selected without its NFC engagement path`() {
-        val available = MobileWalletProximityTransportCapability(
+        val available = ProximityTransportCapability(
             implemented = true,
             profilePermitted = true,
-            runtime = MobileWalletProximityRuntimeObservation.Available,
+            runtime = ProximityRuntimeObservation.Available,
             selected = true,
         )
         val unselected = available.copy(selected = false)
 
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityCapabilities(
-                session = id.walt.wallet2.mobile.MobileWalletProximitySessionConfiguration.Qr(),
-                profile = MobileWalletProximityProfile.Iso180135Edition2Dis2026,
+            ProximityCapabilities(
+                session = id.walt.wallet2.mobile.ProximitySessionConfiguration.Qr(),
+                profile = ProximityProfile.Iso180135Edition2Dis2026,
                 qrEngagement = available,
                 nfcEngagement = unselected,
                 bluetoothLowEnergy = unselected,
@@ -141,18 +141,18 @@ class ProximityModelsTest {
     @Test
     fun `first-edition profile rejects NFCv2 instead of claiming unsupported compatibility`() {
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityConfiguration(
-                profile = MobileWalletProximityProfile.Iso1801352021,
-                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(bluetoothLowEnergy = null),
+            ProximityConfiguration(
+                profile = ProximityProfile.Iso1801352021,
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(bluetoothLowEnergy = null),
             )
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityConfiguration(
-                profile = MobileWalletProximityProfile.Iso1801352021,
-                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(
-                    bluetoothLowEnergy = MobileWalletProximityBleConfiguration(),
-                    qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(
-                        bluetoothLowEnergy = MobileWalletProximityBleConfiguration(),
+            ProximityConfiguration(
+                profile = ProximityProfile.Iso1801352021,
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(
+                    bluetoothLowEnergy = ProximityBleConfiguration(),
+                    qrFallback = ProximityRetrievalOptions(
+                        bluetoothLowEnergy = ProximityBleConfiguration(),
                         nfc = null
                     )
                 ),
@@ -163,19 +163,19 @@ class ProximityModelsTest {
     @Test
     fun `session variants own nonempty retrieval and compatible optional QR plans`() {
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityConventionalRetrievalConfiguration(bluetoothLowEnergy = null)
+            ProximityRetrievalOptions(bluetoothLowEnergy = null)
         }
-        val ble = MobileWalletProximityConventionalRetrievalConfiguration()
-        val nfc = MobileWalletProximityConventionalRetrievalConfiguration(
-            bluetoothLowEnergy = null, nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+        val ble = ProximityRetrievalOptions()
+        val nfc = ProximityRetrievalOptions(
+            bluetoothLowEnergy = null, nfc = ProximityNfcRetrievalConfiguration(),
         )
         val plans = listOf(ble, nfc, ble.copy(nfc = nfc.nfc))
         plans.forEach { retrieval ->
-            MobileWalletProximityConfiguration(session = MobileWalletProximitySessionConfiguration.Qr(retrieval))
-            MobileWalletProximityNfcHandover.entries.forEach { handover ->
+            ProximityConfiguration(session = ProximitySessionConfiguration.Qr(retrieval))
+            ProximityNfcHandover.entries.forEach { handover ->
                 (listOf(null) + plans).forEach { qr ->
-                    MobileWalletProximityConfiguration(
-                        session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
+                    ProximityConfiguration(
+                        session = ProximitySessionConfiguration.ConventionalNfc(
                             handover,
                             retrieval,
                             qr,
@@ -183,25 +183,25 @@ class ProximityModelsTest {
                     )
                 }
             }
-            MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(qrFallback = retrieval,)
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(qrFallback = retrieval,)
             )
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximitySessionConfiguration.ConventionalNfc(
-                MobileWalletProximityNfcHandover.Static, nfc,
-                nfc.copy(nfc = MobileWalletProximityNfcRetrievalConfiguration(maximumCommandDataLength = 255)),
+            ProximitySessionConfiguration.ConventionalNfc(
+                ProximityNfcHandover.Static, nfc,
+                nfc.copy(nfc = ProximityNfcRetrievalConfiguration(maximumCommandDataLength = 255)),
             )
         }
-        val central = MobileWalletProximityBleConfiguration(roles = MobileWalletProximityBleRoles.CentralClient)
+        val central = ProximityBleConfiguration(roles = ProximityBleRoles.CentralClient)
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximitySessionConfiguration.ConventionalNfc(
-                MobileWalletProximityNfcHandover.Static, ble,
-                MobileWalletProximityConventionalRetrievalConfiguration(bluetoothLowEnergy = central),
+            ProximitySessionConfiguration.ConventionalNfc(
+                ProximityNfcHandover.Static, ble,
+                ProximityRetrievalOptions(bluetoothLowEnergy = central),
             )
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(
+            ProximitySessionConfiguration.ProvisionalNfcV2(
                 bluetoothLowEnergy = central, qrFallback = ble,
             )
         }
@@ -209,34 +209,34 @@ class ProximityModelsTest {
 
     @Test
     fun `NFC length domains reject values outside their distinct wire limits`() {
-        MobileWalletProximityNfcRetrievalConfiguration(
+        ProximityNfcRetrievalConfiguration(
             maximumCommandDataLength = 255,
             maximumResponseDataLength = 256,
         )
-        MobileWalletProximityNfcRetrievalConfiguration(
+        ProximityNfcRetrievalConfiguration(
             maximumCommandDataLength = 65_535,
             maximumResponseDataLength = 65_536,
         )
-        MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(1)
-        MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(65_536)
+        ProximitySessionConfiguration.ProvisionalNfcV2(1)
+        ProximitySessionConfiguration.ProvisionalNfcV2(65_536)
 
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityNfcRetrievalConfiguration(maximumCommandDataLength = 254)
+            ProximityNfcRetrievalConfiguration(maximumCommandDataLength = 254)
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityNfcRetrievalConfiguration(maximumCommandDataLength = 65_536)
+            ProximityNfcRetrievalConfiguration(maximumCommandDataLength = 65_536)
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityNfcRetrievalConfiguration(maximumResponseDataLength = 255)
+            ProximityNfcRetrievalConfiguration(maximumResponseDataLength = 255)
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximityNfcRetrievalConfiguration(maximumResponseDataLength = 65_537)
+            ProximityNfcRetrievalConfiguration(maximumResponseDataLength = 65_537)
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(0)
+            ProximitySessionConfiguration.ProvisionalNfcV2(0)
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(65_537)
+            ProximitySessionConfiguration.ProvisionalNfcV2(65_537)
         }
     }
 

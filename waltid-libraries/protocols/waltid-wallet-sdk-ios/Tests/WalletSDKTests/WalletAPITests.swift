@@ -314,40 +314,40 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testProximityConfigurationRepresentsCombinedNFCSessionPrecisely() {
-        let ble = ProximityPresentationBLEConfiguration(roles: .peripheralServer, bearerPolicy: .gattOnly)
-        let qr = ProximityPresentationConventionalRetrievalConfiguration(
+        let ble = ProximityBLEConfiguration(roles: .peripheralServer, bearerPolicy: .gattOnly)
+        let qr = ProximityRetrievalOptions(
             bluetoothLowEnergy: ble,
             nfc: .init(maximumCommandDataLength: 4_095, maximumResponseDataLength: 4_096)
         )
-        let session = ProximityPresentationSessionConfiguration.provisionalNFCV2(.init(
+        let session = ProximitySessionConfiguration.provisionalNFCV2(.init(
             maximumCommandDataLength: 4_096, bluetoothLowEnergy: ble, qrFallback: qr
         ))
-        let configuration = ProximityPresentationConfiguration(session: session)
+        let configuration = ProximityConfiguration(session: session)
         XCTAssertEqual(configuration.session, session)
         XCTAssertEqual(configuration.session.qrRetrieval, qr)
     }
 
     func testProximitySessionConfigurationMatrix() {
-        let ble = ProximityPresentationConventionalRetrievalConfiguration()
-        let nfc = ProximityPresentationConventionalRetrievalConfiguration(bluetoothLowEnergy: nil, nfc: .init())
+        let ble = ProximityRetrievalOptions()
+        let nfc = ProximityRetrievalOptions(bluetoothLowEnergy: nil, nfc: .init())
         let plans = [ble, nfc, .init(nfc: .init())]
         for retrieval in plans {
-            XCTAssertEqual(ProximityPresentationConfiguration(session: .qr(retrieval)).session, .qr(retrieval))
-            for handover in [ProximityPresentationNFCHandover.staticHandover, .negotiatedHandover] {
+            XCTAssertEqual(ProximityConfiguration(session: .qr(retrieval)).session, .qr(retrieval))
+            for handover in [ProximityNFCHandover.staticHandover, .negotiatedHandover] {
                 for qr in [nil] + plans.map(Optional.some) {
-                    let session = ProximityPresentationSessionConfiguration.nfc(.init(
+                    let session = ProximitySessionConfiguration.nfc(.init(
                         handover: handover, retrieval: retrieval, qrFallback: qr
                     ))
-                    XCTAssertEqual(ProximityPresentationConfiguration(session: session).session.qrRetrieval, qr)
+                    XCTAssertEqual(ProximityConfiguration(session: session).session.qrRetrieval, qr)
                 }
             }
-            let session = ProximityPresentationSessionConfiguration.provisionalNFCV2(.init(qrFallback: retrieval))
-            XCTAssertEqual(ProximityPresentationConfiguration(session: session).session.qrRetrieval, retrieval)
+            let session = ProximitySessionConfiguration.provisionalNFCV2(.init(qrFallback: retrieval))
+            XCTAssertEqual(ProximityConfiguration(session: session).session.qrRetrieval, retrieval)
         }
     }
 
     func testApplyingReaderTrustSettingsPreservesTransportConfiguration() {
-        let configuration = ProximityPresentationConfiguration(
+        let configuration = ProximityConfiguration(
             session: .provisionalNFCV2(.init(
                 bluetoothLowEnergy: .init(roles: .peripheralServer, bearerPolicy: .gattOnly)
             )),
@@ -355,7 +355,7 @@ final class WalletAPITests: XCTestCase {
         )
         let updated = ProximityReaderTrustSettings(readerPolicy: .requireTrusted).applying(to: configuration)
         XCTAssertEqual(updated.session, configuration.session)
-        XCTAssertEqual(updated.readerPolicy, ProximityPresentationReaderPolicy.requireTrusted)
+        XCTAssertEqual(updated.readerPolicy, ProximityReaderPolicy.requireTrusted)
         XCTAssertEqual(updated.maximumMessageBytes, configuration.maximumMessageBytes)
     }
 
@@ -518,20 +518,20 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testProximityCapabilitiesDoNotBorrowBearersFromAnotherRoute() {
-        let available = ProximityPresentationTransportCapability(
+        let available = ProximityTransportCapability(
             implemented: true, profilePermitted: true, runtime: .available, selected: true
         )
-        let unavailable = ProximityPresentationTransportCapability(
+        let unavailable = ProximityTransportCapability(
             implemented: true, profilePermitted: true, runtime: .notChecked, selected: true
         )
         for session in [
-            ProximityPresentationSessionConfiguration.nfc(.init(
+            ProximitySessionConfiguration.nfc(.init(
                 handover: .staticHandover, retrieval: .init(),
                 qrFallback: .init(bluetoothLowEnergy: nil, nfc: .init())
             )),
             .provisionalNFCV2(.init(qrFallback: .init(bluetoothLowEnergy: nil, nfc: .init())))
         ] {
-            let capabilities = ProximityPresentationCapabilities(
+            let capabilities = ProximityCapabilities(
                 profile: .iso180135Edition2DIS2026,
                 session: session,
                 qrEngagement: available,
@@ -1123,7 +1123,7 @@ private func makeTestProximityCapabilities() -> ProximityCapabilities {
     return ProximityCapabilities(
         profile: .iso180135Edition2DIS2026,
         session: .qr(),
-        qrEngagement: ProximityPresentationTransportCapability(
+        qrEngagement: ProximityTransportCapability(
             implemented: true,
             profilePermitted: true,
             runtime: .available,

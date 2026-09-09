@@ -630,7 +630,9 @@ public class NfcMdocEngagementSource(
         omitBleUuid: Boolean = false,
     ): NfcHandoverCarrier = NfcMdocCarrierCodec.encode(
         method = method,
-        carrierReference = ImmutableBytes.of(index.toString().encodeToByteArray()),
+        carrierReference = ImmutableBytes.of(
+            (if (method is DeviceRetrievalMethod.Nfc) "nfc" else index.toString()).encodeToByteArray(),
+        ),
         auxiliaryRecords = listOf(deviceEngagementRecord),
         actor = NfcMdocActor.HOLDER,
         omitBleUuid = omitBleUuid,
