@@ -34,7 +34,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runComposeUiTest
-import id.walt.wallet2.mobile.MobileWalletProximityReaderPolicy
+import id.walt.wallet2.mobile.ProximityReaderPolicy
 import id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.DemoBiometricResult
 import id.walt.walletdemo.compose.logic.DemoPinStore
@@ -1153,7 +1153,7 @@ class WalletDemoAppTestScenarios(
         requireTrusted.performClick()
         waitForIdle()
         assertEquals(
-            MobileWalletProximityReaderPolicy.RequireTrusted,
+            ProximityReaderPolicy.RequireTrusted,
             store.load().readerPolicy,
         )
         assertEquals(
@@ -1193,7 +1193,7 @@ class WalletDemoAppTestScenarios(
         assertEquals(null, controller.state.value.pendingImport)
         assertTrue(store.load().trustAnchors.isEmpty())
         assertEquals(
-            MobileWalletProximityReaderPolicy.RequireTrusted,
+            ProximityReaderPolicy.RequireTrusted,
             store.load().readerPolicy,
         )
 
@@ -1237,7 +1237,7 @@ class WalletDemoAppTestScenarios(
         assertEquals(null, controller.state.value.pendingImport)
         assertEquals(1, store.load().trustAnchors.size)
         assertEquals(
-            MobileWalletProximityReaderPolicy.RequireTrusted,
+            ProximityReaderPolicy.RequireTrusted,
             store.load().readerPolicy,
         )
     }

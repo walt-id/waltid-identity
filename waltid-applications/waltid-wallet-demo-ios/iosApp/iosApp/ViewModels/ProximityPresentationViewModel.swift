@@ -5,25 +5,25 @@ import UIKit
 import WalletSDK
 
 protocol DemoProximityPresentationSession: Sendable {
-    var states: AsyncStream<ProximityPresentationState> { get }
-    func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult
+    var states: AsyncStream<ProximityState> { get }
+    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult
     func close() async
 }
 
-extension ProximityPresentationSession: DemoProximityPresentationSession {}
+extension ProximitySession: DemoProximityPresentationSession {}
 
 @MainActor
 protocol ProximityWalletClient: AnyObject {
     func startProximityPresentation(
-        configuration: ProximityPresentationConfiguration
+        configuration: ProximityConfiguration
     ) async throws -> any DemoProximityPresentationSession
 }
 
 @MainActor
 protocol ProximityHostActionExecutor: AnyObject {
     func perform(
-        _ action: ProximityPresentationRemediationAction
-    ) async -> ProximityPresentationHostActionResult
+        _ action: ProximityRemediationAction
+    ) async -> ProximityHostActionResult
 }
 
 struct ProximityDocumentSelection: Equatable {
@@ -35,15 +35,15 @@ struct ProximityDocumentSelection: Equatable {
 @MainActor
 final class ProximityPresentationViewModel: ObservableObject {
     @Published private(set) var active = false
-    @Published private(set) var sessionState: ProximityPresentationState?
+    @Published private(set) var sessionState: ProximityState?
     @Published private(set) var selections: [ProximityDocumentSelection] = []
     @Published private(set) var continueAfterResponse = false
-    @Published private(set) var hostActionInProgress: ProximityPresentationRemediationAction?
+    @Published private(set) var hostActionInProgress: ProximityRemediationAction?
     @Published private(set) var actionErrorMessage: String?
     @Published private(set) var startupFailed = false
 
     private let client: any ProximityWalletClient
-    private let configurationProvider: @MainActor () -> ProximityPresentationConfiguration
+    private let configurationProvider: @MainActor () -> ProximityConfiguration
     private let hostActions: any ProximityHostActionExecutor
     private var session: (any DemoProximityPresentationSession)?
     private var observationTask: Task<Void, Never>?
@@ -52,7 +52,7 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     init(
         client: any ProximityWalletClient,
-        configurationProvider: @escaping @MainActor () -> ProximityPresentationConfiguration = {
+        configurationProvider: @escaping @MainActor () -> ProximityConfiguration = {
             .init()
         },
         hostActions: (any ProximityHostActionExecutor)? = nil
@@ -62,7 +62,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         self.hostActions = hostActions ?? IOSProximityHostActionExecutor()
     }
 
-    var review: ProximityPresentationReview? {
+    var review: ProximityReview? {
         guard case .reviewRequired(let review) = sessionState else { return nil }
         return review
     }
@@ -183,7 +183,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         dispatch(
             .approve(
                 reviewID: review.reviewID,
-                submission: ProximityPresentationSubmission(
+                submission: ProximitySubmission(
                     documents: documents,
                     continueAfterResponse: continueAfterResponse
                 )
@@ -200,7 +200,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         dispatch(.retryPrerequisites)
     }
 
-    func remediate(_ action: ProximityPresentationRemediationAction) {
+    func remediate(_ action: ProximityRemediationAction) {
         guard case .checkingPrerequisites(let capabilities) = sessionState,
               capabilities.remediationActions.contains(action),
               hostActionInProgress == nil,
@@ -214,7 +214,7 @@ final class ProximityPresentationViewModel: ObservableObject {
             guard let self else { return }
             let outcome = await hostActions.perform(action)
             guard !Task.isCancelled, active, sessionGeneration == generation else { return }
-            let result: ProximityPresentationActionResult
+            let result: ProximityActionResult
             do {
                 result = try await session.dispatch(.reportRemediation(action, outcome))
             } catch {
@@ -274,12 +274,12 @@ final class ProximityPresentationViewModel: ObservableObject {
         start()
     }
 
-    private func dispatch(_ action: ProximityPresentationAction) {
+    private func dispatch(_ action: ProximityAction) {
         guard let session else { return }
         actionErrorMessage = nil
         let generation = sessionGeneration
         Task { [weak self] in
-            let result: ProximityPresentationActionResult
+            let result: ProximityActionResult
             do {
                 result = try await session.dispatch(action)
             } catch {
@@ -296,7 +296,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         }
     }
 
-    private func publish(_ state: ProximityPresentationState) {
+    private func publish(_ state: ProximityState) {
         let previousReviewID = review?.reviewID
         sessionState = state
         if case .reviewRequired(let review) = state, previousReviewID != review.reviewID {
@@ -321,11 +321,11 @@ final class ProximityPresentationViewModel: ObservableObject {
 private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActionExecutor,
     @preconcurrency CBCentralManagerDelegate {
     private var bluetoothManager: CBCentralManager?
-    private var bluetoothContinuation: CheckedContinuation<ProximityPresentationHostActionResult, Never>?
+    private var bluetoothContinuation: CheckedContinuation<ProximityHostActionResult, Never>?
 
     func perform(
-        _ action: ProximityPresentationRemediationAction
-    ) async -> ProximityPresentationHostActionResult {
+        _ action: ProximityRemediationAction
+    ) async -> ProximityHostActionResult {
         switch action {
         case .requestBluetoothPermission:
             return await requestBluetoothPermission()
@@ -346,7 +346,7 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
         )
     }
 
-    private func requestBluetoothPermission() async -> ProximityPresentationHostActionResult {
+    private func requestBluetoothPermission() async -> ProximityHostActionResult {
         switch CBCentralManager.authorization {
         case .allowedAlways:
             return .completed
@@ -368,7 +368,7 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
         }
     }
 
-    private func finishBluetoothRequest(_ result: ProximityPresentationHostActionResult) {
+    private func finishBluetoothRequest(_ result: ProximityHostActionResult) {
         let continuation = bluetoothContinuation
         bluetoothContinuation = nil
         bluetoothManager = nil
@@ -379,7 +379,7 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
 @MainActor
 final class UnavailableProximityWalletClient: ProximityWalletClient {
     func startProximityPresentation(
-        configuration: ProximityPresentationConfiguration
+        configuration: ProximityConfiguration
     ) async throws -> any DemoProximityPresentationSession {
         throw ProximityPresentationUnavailable()
     }
@@ -387,8 +387,8 @@ final class UnavailableProximityWalletClient: ProximityWalletClient {
 
 private struct ProximityPresentationUnavailable: Error {}
 
-extension ProximityPresentationState {
-    var engagements: [ProximityPresentationEngagement] {
+extension ProximityState {
+    var engagements: [ProximityEngagement] {
         switch self {
         case .engagementReady(let engagements), .connecting(let engagements):
             return engagements
@@ -407,7 +407,7 @@ extension ProximityPresentationState {
     }
 }
 
-private extension ProximityPresentationReview {
+private extension ProximityReview {
     var defaultSelections: [ProximityDocumentSelection] {
         documents.compactMap { document in
             guard let credential = document.credentialOptions.first else { return nil }

@@ -10,7 +10,7 @@ import id.walt.walletdemo.compose.logic.createIosDemoWallet
 import id.walt.walletdemo.compose.logic.createIosDemoPinStore
 import id.walt.walletdemo.compose.logic.createIosDemoSharingSettingsStore
 import id.walt.walletdemo.compose.logic.createIosDemoReaderTrustSettingsStore
-import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
+import id.walt.wallet2.mobile.ProximityConfiguration
 import id.walt.walletdemo.compose.logic.createIosDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.createIosDemoSigningProtectionStore
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
@@ -94,7 +94,7 @@ fun walletDemoViewController(
         wallet = wallet,
         configurationProvider = {
             readerTrustSettingsController.sessionSnapshot().applyTo(
-                MobileWalletProximityConfiguration()
+                ProximityConfiguration()
             )
         },
     )

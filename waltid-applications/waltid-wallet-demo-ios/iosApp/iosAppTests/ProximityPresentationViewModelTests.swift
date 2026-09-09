@@ -150,13 +150,13 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     func testConfigurationProviderIsResolvedOncePerSession() async throws {
         let session = FakeProximitySession()
         let client = FakeProximityWalletClient(session: session)
-        var policy = ProximityPresentationReaderPolicy.allowAnonymousOrUntrusted
+        var policy = ProximityReaderPolicy.allowAnonymousOrUntrusted
         var resolutionCount = 0
         let viewModel = ProximityPresentationViewModel(
             client: client,
             configurationProvider: {
                 resolutionCount += 1
-                return ProximityPresentationConfiguration(readerPolicy: policy)
+                return ProximityConfiguration(readerPolicy: policy)
             },
             hostActions: FakeProximityHostActionExecutor()
         )
@@ -180,7 +180,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 }
 
-private func combinedProximityReview(exchange: Int = 1) -> ProximityPresentationReview {
+private func combinedProximityReview(exchange: Int = 1) -> ProximityReview {
     let familyName = ProximityRequestedElement(
         namespace: "org.iso.18013.5.1",
         elementIdentifier: "family_name",
@@ -207,7 +207,7 @@ private func combinedProximityReview(exchange: Int = 1) -> ProximityPresentation
             requestedElements: elements
         )
     }
-    return ProximityPresentationReview(
+    return ProximityReview(
         reviewID: ProximityReviewID(value: UUID().uuidString),
         exchange: exchange,
         documents: [
@@ -239,7 +239,7 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
     private let suspendStart: Bool
     private var startContinuation: CheckedContinuation<Void, Never>?
     private(set) var startCount = 0
-    private(set) var configurations: [ProximityPresentationConfiguration] = []
+    private(set) var configurations: [ProximityConfiguration] = []
 
     init(session: any DemoProximityPresentationSession, suspendStart: Bool = false) {
         self.session = session
@@ -247,7 +247,7 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
     }
 
     func startProximityPresentation(
-        configuration: ProximityPresentationConfiguration
+        configuration: ProximityConfiguration
     ) async throws -> any DemoProximityPresentationSession {
         startCount += 1
         configurations.append(configuration)
@@ -269,22 +269,22 @@ private extension Collection {
 }
 
 private actor FakeProximitySession: DemoProximityPresentationSession {
-    nonisolated let states: AsyncStream<ProximityPresentationState>
-    private let continuation: AsyncStream<ProximityPresentationState>.Continuation
-    private(set) var actions: [ProximityPresentationAction] = []
+    nonisolated let states: AsyncStream<ProximityState>
+    private let continuation: AsyncStream<ProximityState>.Continuation
+    private(set) var actions: [ProximityAction] = []
     private(set) var closeCount = 0
 
     init() {
-        var continuation: AsyncStream<ProximityPresentationState>.Continuation!
+        var continuation: AsyncStream<ProximityState>.Continuation!
         states = AsyncStream { continuation = $0 }
         self.continuation = continuation
     }
 
-    func emit(_ state: ProximityPresentationState) {
+    func emit(_ state: ProximityState) {
         continuation.yield(state)
     }
 
-    func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult {
+    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult {
         actions.append(action)
         return .accepted
     }
@@ -298,8 +298,8 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
 @MainActor
 private final class FakeProximityHostActionExecutor: ProximityHostActionExecutor {
     func perform(
-        _ action: ProximityPresentationRemediationAction
-    ) async -> ProximityPresentationHostActionResult {
+        _ action: ProximityRemediationAction
+    ) async -> ProximityHostActionResult {
         .completed
     }
 }

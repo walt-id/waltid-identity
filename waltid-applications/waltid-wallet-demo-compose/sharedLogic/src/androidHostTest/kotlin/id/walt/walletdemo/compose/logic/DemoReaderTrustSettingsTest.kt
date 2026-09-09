@@ -1,8 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.MobileWalletProximityReaderPolicy
-import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettings
-import id.walt.wallet2.mobile.MobileWalletProximityStoredReaderTrustAnchor
+import id.walt.wallet2.mobile.ProximityReaderPolicy
+import id.walt.wallet2.mobile.ProximityReaderTrustSettings
+import id.walt.wallet2.mobile.ProximityStoredReaderTrustAnchor
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -18,8 +18,8 @@ class DemoReaderTrustSettingsTest {
             read = { encoded },
             write = { encoded = it },
         )
-        val settings = MobileWalletProximityReaderTrustSettings(
-            readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+        val settings = ProximityReaderTrustSettings(
+            readerPolicy = ProximityReaderPolicy.RequireTrusted,
         )
 
         store.save(settings)
@@ -40,16 +40,16 @@ class DemoReaderTrustSettingsTest {
             dispatcher = StandardTestDispatcher(testScheduler),
         )
 
-        assertEquals(MobileWalletProximityReaderTrustSettings(), controller.state.value.settings)
+        assertEquals(ProximityReaderTrustSettings(), controller.state.value.settings)
         assertTrue(controller.state.value.error.orEmpty().contains("invalid", ignoreCase = true))
     }
 
     @Test
     fun `policy removal and reset are persisted atomically`() = runTest {
         val store = InMemoryDemoReaderTrustSettingsStore(
-            MobileWalletProximityReaderTrustSettings(
+            ProximityReaderTrustSettings(
                 trustAnchors = listOf(
-                    MobileWalletProximityStoredReaderTrustAnchor("public-certificate", "Reader CA")
+                    ProximityStoredReaderTrustAnchor("public-certificate", "Reader CA")
                 )
             )
         )
@@ -59,15 +59,15 @@ class DemoReaderTrustSettingsTest {
             dispatcher = StandardTestDispatcher(testScheduler),
         )
 
-        controller.setReaderPolicy(MobileWalletProximityReaderPolicy.RequireTrusted)
+        controller.setReaderPolicy(ProximityReaderPolicy.RequireTrusted)
         controller.removeReaderAuthority("public-certificate")
 
-        assertEquals(MobileWalletProximityReaderPolicy.RequireTrusted, store.load().readerPolicy)
+        assertEquals(ProximityReaderPolicy.RequireTrusted, store.load().readerPolicy)
         assertTrue(store.load().trustAnchors.isEmpty())
         assertNull(controller.state.value.pendingImport)
 
         controller.reset()
-        assertEquals(MobileWalletProximityReaderTrustSettings(), store.load())
+        assertEquals(ProximityReaderTrustSettings(), store.load())
         assertEquals(store.load(), controller.sessionSnapshot())
     }
 }

@@ -184,7 +184,7 @@ let readerTrust = ProximityConfiguredReaderTrustEvaluator(
         revocationPolicy: .check(applicationRevocationEvaluator)
     )
 )
-let configuration = ProximityPresentationConfiguration(
+let configuration = ProximityConfiguration(
     readerPolicy: .requireTrusted,
     readerTrustEvaluator: readerTrust
 )
