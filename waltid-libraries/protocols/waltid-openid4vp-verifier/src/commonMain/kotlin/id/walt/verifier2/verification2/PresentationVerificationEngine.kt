@@ -327,14 +327,23 @@ object PresentationVerificationEngine {
         //      an unprocessable credential should not be a 500)
         try {
 
-
+            // Phase timings for the verifier's real work. The enclosing call is ~13ms of a 40ms
+            // presentation while an isolated mdoc verification is 1.4ms, so most of it is elsewhere in
+            // these phases and this is what says where.
+            val phaseStart = TimeSource.Monotonic.markNow()
             val parsedPresentations = parseAllPresentations(vpTokenContents, session)
+            val afterParse = phaseStart.elapsedNow()
 
             session.updateSession(SessionEvent.parsed_presentation_available) {
                 presentedPresentations = parsedPresentations.map { it.key.second.id to it.value }.toMap()
             }
 
             val presentationValidationResult = verifyAllPresentations(parsedPresentations, session, verificationTime)
+            val afterPresentationPolicies = phaseStart.elapsedNow()
+            log.debug {
+                "Verification phases: parsePresentations=$afterParse, " +
+                    "presentationPolicies=${afterPresentationPolicies - afterParse}"
+            }
 
             session.updateSession(SessionEvent.presentation_validation_available) {
                 presentationValidationResults = presentationValidationResult
@@ -472,11 +481,13 @@ object PresentationVerificationEngine {
 
             // --- Credential verification ---
 
+            val credentialPolicyStart = TimeSource.Monotonic.markNow()
             val credentialPolicyResults = Verifier2SessionCredentialPolicyValidation.validateCredentialPolicies(
                 session.policies,
                 allSuccessfullyValidatedAndProcessedData,
                 policyContext
             )
+            log.debug { "Verification phases: credentialPolicies=${credentialPolicyStart.elapsedNow()}" }
 
             val verificationSessionPolicyResults = Verifier2PolicyResults(
                 vpPolicies = presentationValidationResult,
