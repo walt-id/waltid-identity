@@ -349,6 +349,22 @@ class WalletDemoProximityControllerTest {
         )
     }
 
+    @Test
+    fun `no-data ends the session and keeps its result available until dismissal`() = runTest {
+        val session = FakeSession(ProximityState.AwaitingRequest(2))
+        val controller = controller(FakeBackend(session))
+        controller.start()
+        advanceUntilIdle()
+        session.mutableState.value = ProximityState.NoData(2)
+        advanceUntilIdle()
+        assertEquals(ProximityState.NoData(2), controller.state.value.sessionState)
+        assertTrue(controller.state.value.isTerminal)
+        controller.dismiss()
+        advanceUntilIdle()
+        assertEquals(1, session.closeCalls)
+        assertNull(controller.state.value.sessionState)
+    }
+
     private fun kotlinx.coroutines.test.TestScope.controller(
         backend: ProximityPresentationBackend,
     ): WalletDemoProximityController = WalletDemoProximityController(

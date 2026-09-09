@@ -399,7 +399,7 @@ extension ProximityState {
 
     var isTerminal: Bool {
         switch self {
-        case .completed, .cancelled, .failed:
+        case .completed, .noData, .cancelled, .failed:
             return true
         default:
             return false

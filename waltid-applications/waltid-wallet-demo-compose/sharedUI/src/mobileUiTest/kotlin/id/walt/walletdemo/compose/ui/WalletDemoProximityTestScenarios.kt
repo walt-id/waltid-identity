@@ -1,5 +1,8 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
+
 import id.walt.wallet2.mobile.ProximityReaderTrustDecision
 import id.walt.wallet2.mobile.ProximityReaderAuthenticationOutcome
 import id.walt.wallet2.mobile.ProximityReviewId
@@ -117,6 +120,29 @@ class WalletDemoProximityTestScenarios {
         onNodeWithText("Reader detected").assertIsDisplayed()
     }
 
+    fun completedPresentationShowsDoneAndNoConnectionControls() = runComposeUiTest {
+        val sessionState = mutableStateOf<ProximityState>(ProximityState.Completed(1, false))
+        setContent {
+            MaterialTheme {
+                WalletDemoProximityScreen(WalletDemoProximityUiState(active = true,
+                    sessionState = sessionState.value), emptyMap(), hostActions,
+                    onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
+                    onContinueAfterResponseChange = {}, onApprove = {}, onDecline = {}, onRetry = {},
+                    onRemediate = { _, _ -> }, onCancel = {}, onDismiss = {}, onRestart = {})
+            }
+        }
+        onNodeWithText("Presentation complete").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.ProximityDone).assertIsDisplayed()
+        onAllNodesWithText("Connection settings").assertCountEquals(0)
+        onAllNodesWithTag("proximity-show-Qr").assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
+        runOnIdle { sessionState.value = ProximityState.NoData(2) }
+        onNodeWithText("No data shared").assertIsDisplayed()
+        onNodeWithText("No credential data was shared for this request.").assertIsDisplayed()
+        onAllNodesWithText("Presentation complete").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.ProximityDone).assertIsDisplayed()
+    }
+
     fun reviewSeparatesReaderTrustAndSendsOnlyExplicitHolderActions() = runComposeUiTest {
         var toggled: ProximityElementReference? = null
         var approved = false
@@ -163,6 +189,7 @@ class WalletDemoProximityTestScenarios {
         onNodeWithTag(WalletUiTestTags.ProximityReview).assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.ProximityReaderDetails).assertCountEquals(0)
         onNodeWithText("Multiple reader identities").assertIsDisplayed()
+        onAllNodesWithText("Authentication missing for part of the request").assertCountEquals(0)
         onNodeWithText("Valid but untrusted").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.ProximityReaderDetailsToggle).performClick()
         onNodeWithTag(WalletUiTestTags.ProximityReaderDetails).assertIsDisplayed()
@@ -373,6 +400,10 @@ private fun proximityReview(): ProximityReview = ProximityReview(
         ),
     ),
     readerAuthentication = listOf(
+        ProximityReaderAuthentication(
+            scope = ProximityReaderAuthenticationScope.Document(1),
+            outcome = ProximityReaderAuthenticationOutcome.Absent,
+        ),
         ProximityReaderAuthentication(
             scope = ProximityReaderAuthenticationScope.WholeRequest,
             outcome = ProximityReaderAuthenticationOutcome.Valid(ProximityReaderTrustDecision(

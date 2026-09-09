@@ -27,7 +27,8 @@
     <string name="proximity_continue_after_response_description">You will review and approve each new request separately.</string>
     <string name="proximity_data_to_share">Data to share</string>
     <string name="proximity_decline">Decline</string>
-    <string name="proximity_declined_message">No credential data was shared.</string>
+    <string name="proximity_no_data_title">No data shared</string>
+    <string name="proximity_declined_message">No credential data was shared for this request.</string>
     <string name="proximity_declined_title">Request declined</string>
     <string name="proximity_device_authentication">Device authentication</string>
     <string name="proximity_device_ready">Device ready</string>
