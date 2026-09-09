@@ -91,19 +91,19 @@ class ProximityCoordinatorTest {
                 message = "The signed application is missing the managed HCE entitlement",
             )
         )
-        val coordinator = MobileWalletProximityCoordinator(
+        val coordinator = ProximityCoordinator(
             Wallet("nfc-preflight"),
             RecordingTransportFactory(BleProximityAvailability.Available),
             nfc,
         )
-        val configuration = MobileWalletProximityConfiguration(
-            session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
-                handover = MobileWalletProximityNfcHandover.Negotiated,
-                retrieval = MobileWalletProximityConventionalRetrievalConfiguration(
-                    nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+        val configuration = ProximityConfiguration(
+            session = ProximitySessionConfiguration.ConventionalNfc(
+                handover = ProximityNfcHandover.Negotiated,
+                retrieval = ProximityRetrievalOptions(
+                    nfc = ProximityNfcRetrievalConfiguration(),
                 ),
-                qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(
-                    nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+                qrFallback = ProximityRetrievalOptions(
+                    nfc = ProximityNfcRetrievalConfiguration(),
                 )
             ),
         )
@@ -117,7 +117,7 @@ class ProximityCoordinatorTest {
         assertFalse(capabilities.nfcRetrieval.mayStart)
         assertEquals("nfc_entitlement_missing", capabilities.nfcEngagement.unavailable?.code)
         assertTrue(capabilities.nfcEngagement.remediationActions.isEmpty())
-        assertEquals(MobileWalletProximityRecovery.None, capabilities.nfcEngagement.unavailable?.recovery)
+        assertEquals(ProximityRecovery.None, capabilities.nfcEngagement.unavailable?.recovery)
     }
 
     @Test
@@ -125,23 +125,23 @@ class ProximityCoordinatorTest {
         val nfc = RecordingNfcHostAdapter(
             NfcHostAvailability.Unavailable("nfc_powered_off", "NFC is powered off")
         )
-        val coordinator = MobileWalletProximityCoordinator(Wallet("nfc-only-blocked"), null, nfc)
+        val coordinator = ProximityCoordinator(Wallet("nfc-only-blocked"), null, nfc)
         val session = coordinator.start(
-            MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
-                    handover = MobileWalletProximityNfcHandover.Static,
-                    retrieval = MobileWalletProximityConventionalRetrievalConfiguration(
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ConventionalNfc(
+                    handover = ProximityNfcHandover.Static,
+                    retrieval = ProximityRetrievalOptions(
                         bluetoothLowEnergy = null,
-                        nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+                        nfc = ProximityNfcRetrievalConfiguration(),
                     )
                 ),
             )
         )
 
-        val state = assertIs<MobileWalletProximityState.CheckingPrerequisites>(session.state.value)
+        val state = assertIs<ProximityState.CheckingPrerequisites>(session.state.value)
         assertFalse(state.capabilities.mayStart)
         assertEquals(
-            listOf(MobileWalletProximityRemediationAction.EnableNfc),
+            listOf(ProximityRemediationAction.EnableNfc),
             state.capabilities.remediationActions,
         )
         assertEquals(0, nfc.prepareCalls)
@@ -154,9 +154,9 @@ class ProximityCoordinatorTest {
             BleProximityAvailability.Unavailable("ble_powered_off", "Bluetooth is powered off")
         )
         val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
-        val coordinator = MobileWalletProximityCoordinator(Wallet("nfc-v2-capability"), ble, nfc)
-        val configuration = MobileWalletProximityConfiguration(
-            session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(bluetoothLowEnergy = null),
+        val coordinator = ProximityCoordinator(Wallet("nfc-v2-capability"), ble, nfc)
+        val configuration = ProximityConfiguration(
+            session = ProximitySessionConfiguration.ProvisionalNfcV2(bluetoothLowEnergy = null),
         )
 
         val capabilities = coordinator.capabilities(configuration)
@@ -174,13 +174,13 @@ class ProximityCoordinatorTest {
     @Test
     fun `QR engagement with NFC retrieval arms one NFC host without exposing NFC engagement`() = runTest {
         val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
-        val coordinator = MobileWalletProximityCoordinator(Wallet("qr-nfc"), null, nfc)
+        val coordinator = ProximityCoordinator(Wallet("qr-nfc"), null, nfc)
         val session = coordinator.start(
-            MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.Qr(
-                    MobileWalletProximityConventionalRetrievalConfiguration(
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.Qr(
+                    ProximityRetrievalOptions(
                     bluetoothLowEnergy = null,
-                    nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+                    nfc = ProximityNfcRetrievalConfiguration(),
                 )
                 ),
             )
@@ -189,7 +189,7 @@ class ProximityCoordinatorTest {
         val engagements = session.awaitEngagements()
         assertEquals(1, nfc.prepareCalls)
         assertEquals(1, engagements.size)
-        assertIs<MobileWalletProximityEngagement.Qr>(engagements.single())
+        assertIs<ProximityEngagement.Qr>(engagements.single())
         session.close()
     }
 
@@ -199,13 +199,13 @@ class ProximityCoordinatorTest {
         val nfc = RecordingNfcHostAdapter(
             NfcHostAvailability.Unavailable("nfc_system_ineligible", "NFC HCE is ineligible")
         )
-        val coordinator = MobileWalletProximityCoordinator(Wallet("combined-fallback"), ble, nfc)
+        val coordinator = ProximityCoordinator(Wallet("combined-fallback"), ble, nfc)
         val session = coordinator.start(
-            MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
-                    handover = MobileWalletProximityNfcHandover.Negotiated,
-                    retrieval = MobileWalletProximityConventionalRetrievalConfiguration(),
-                    qrFallback = MobileWalletProximityConventionalRetrievalConfiguration()
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ConventionalNfc(
+                    handover = ProximityNfcHandover.Negotiated,
+                    retrieval = ProximityRetrievalOptions(),
+                    qrFallback = ProximityRetrievalOptions()
                 ),
             )
         )
@@ -214,7 +214,7 @@ class ProximityCoordinatorTest {
         assertEquals(1, ble.configurations.size)
         assertEquals(0, nfc.prepareCalls)
         assertEquals(1, engagements.size)
-        assertIs<MobileWalletProximityEngagement.Qr>(engagements.single())
+        assertIs<ProximityEngagement.Qr>(engagements.single())
         session.close()
     }
 
@@ -222,13 +222,13 @@ class ProximityCoordinatorTest {
     fun `combined QR and NFC engagement gets distinct BLE transaction configurations`() = runTest {
         val ble = RecordingTransportFactory(BleProximityAvailability.Available)
         val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
-        val coordinator = MobileWalletProximityCoordinator(Wallet("combined-uuids"), ble, nfc)
+        val coordinator = ProximityCoordinator(Wallet("combined-uuids"), ble, nfc)
         val session = coordinator.start(
-            MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(
-                    bluetoothLowEnergy = MobileWalletProximityBleConfiguration(),
-                    qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(
-                        bluetoothLowEnergy = MobileWalletProximityBleConfiguration(),
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(
+                    bluetoothLowEnergy = ProximityBleConfiguration(),
+                    qrFallback = ProximityRetrievalOptions(
+                        bluetoothLowEnergy = ProximityBleConfiguration(),
                         nfc = null
                     )
                 ),
@@ -239,8 +239,8 @@ class ProximityCoordinatorTest {
         assertEquals(2, ble.configurations.size)
         assertEquals(1, nfc.prepareCalls)
         assertEquals(2, engagements.size)
-        assertTrue(engagements.any { it is MobileWalletProximityEngagement.Qr })
-        assertTrue(engagements.any { it is MobileWalletProximityEngagement.Nfc })
+        assertTrue(engagements.any { it is ProximityEngagement.Qr })
+        assertTrue(engagements.any { it is ProximityEngagement.Nfc })
         assertEquals(
             ble.configurations[0].eDeviceKeyBytes,
             ble.configurations[1].eDeviceKeyBytes,
@@ -253,12 +253,12 @@ class ProximityCoordinatorTest {
     fun `static NFC dual-role BLE uses the shared carrier UUID while QR stays distinct`() = runTest {
         val ble = RecordingTransportFactory(BleProximityAvailability.Available)
         val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
-        val coordinator = MobileWalletProximityCoordinator(Wallet("static-dual-role"), ble, nfc)
-        val session = coordinator.start(MobileWalletProximityConfiguration(
-            session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
-                handover = MobileWalletProximityNfcHandover.Static,
-                retrieval = MobileWalletProximityConventionalRetrievalConfiguration(),
-                qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(),
+        val coordinator = ProximityCoordinator(Wallet("static-dual-role"), ble, nfc)
+        val session = coordinator.start(ProximityConfiguration(
+            session = ProximitySessionConfiguration.ConventionalNfc(
+                handover = ProximityNfcHandover.Static,
+                retrieval = ProximityRetrievalOptions(),
+                qrFallback = ProximityRetrievalOptions(),
             ),
         ))
         try {
@@ -278,13 +278,13 @@ class ProximityCoordinatorTest {
             BleProximityAvailability.Unavailable("ble_powered_off", "Bluetooth is powered off")
         )
         val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
-        val coordinator = MobileWalletProximityCoordinator(Wallet("combined-nfc-v2-only"), ble, nfc)
+        val coordinator = ProximityCoordinator(Wallet("combined-nfc-v2-only"), ble, nfc)
         val session = coordinator.start(
-            MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.ProvisionalNfcV2(
-                    bluetoothLowEnergy = MobileWalletProximityBleConfiguration(),
-                    qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(
-                        bluetoothLowEnergy = MobileWalletProximityBleConfiguration(),
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(
+                    bluetoothLowEnergy = ProximityBleConfiguration(),
+                    qrFallback = ProximityRetrievalOptions(
+                        bluetoothLowEnergy = ProximityBleConfiguration(),
                         nfc = null
                     )
                 ),
@@ -295,7 +295,7 @@ class ProximityCoordinatorTest {
 
         assertEquals(1, nfc.prepareCalls)
         assertEquals(1, engagements.size)
-        assertIs<MobileWalletProximityEngagement.Nfc>(engagements.single())
+        assertIs<ProximityEngagement.Nfc>(engagements.single())
         session.close()
     }
 
@@ -306,8 +306,8 @@ class ProximityCoordinatorTest {
 
         val first = coordinator.start(ProximityConfiguration())
         first.awaitConnection()
-        assertEquals(MobileWalletProximityConnectedRoute(
-            MobileWalletProximityEngagementMethod.Qr, MobileWalletProximityTransport.BluetoothLowEnergy,
+        assertEquals(ProximityConnectedRoute(
+            ProximityEngagementMethod.Qr, ProximityTransport.BluetoothLowEnergy,
         ), first.connectedRoute)
         assertFailsWith<IllegalStateException> {
             coordinator.start(ProximityConfiguration())
@@ -387,15 +387,15 @@ class ProximityCoordinatorTest {
     fun `unavailable NFC cannot lend its BLE bearer to an NFC-only QR fallback`() = runTest {
         val ble = RecordingTransportFactory(BleProximityAvailability.Available)
         val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Unavailable("nfc_powered_off", "NFC is off"))
-        val coordinator = MobileWalletProximityCoordinator(Wallet("crossed-routes"), ble, nfc)
-        for (handover in MobileWalletProximityNfcHandover.entries) {
-            val configuration = MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
+        val coordinator = ProximityCoordinator(Wallet("crossed-routes"), ble, nfc)
+        for (handover in ProximityNfcHandover.entries) {
+            val configuration = ProximityConfiguration(
+                session = ProximitySessionConfiguration.ConventionalNfc(
                     handover = handover,
-                    retrieval = MobileWalletProximityConventionalRetrievalConfiguration(),
-                    qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(
+                    retrieval = ProximityRetrievalOptions(),
+                    qrFallback = ProximityRetrievalOptions(
                         bluetoothLowEnergy = null,
-                        nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+                        nfc = ProximityNfcRetrievalConfiguration(),
                     ),
                 ),
             )
@@ -405,7 +405,7 @@ class ProximityCoordinatorTest {
             assertFalse(capabilities.nfcMayStart)
             assertFalse(capabilities.mayStart)
             val session = coordinator.start(configuration)
-            assertIs<MobileWalletProximityState.CheckingPrerequisites>(session.state.value)
+            assertIs<ProximityState.CheckingPrerequisites>(session.state.value)
             session.close()
         }
         assertTrue(ble.configurations.isEmpty())
@@ -415,22 +415,22 @@ class ProximityCoordinatorTest {
     @Test
     fun `missing optional BLE factory does not block a usable direct NFC route`() = runTest {
         val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
-        val coordinator = MobileWalletProximityCoordinator(Wallet("nfc-without-ble"), null, nfc)
-        for (handover in MobileWalletProximityNfcHandover.entries) {
-            val configuration = MobileWalletProximityConfiguration(
-                session = MobileWalletProximitySessionConfiguration.ConventionalNfc(
+        val coordinator = ProximityCoordinator(Wallet("nfc-without-ble"), null, nfc)
+        for (handover in ProximityNfcHandover.entries) {
+            val configuration = ProximityConfiguration(
+                session = ProximitySessionConfiguration.ConventionalNfc(
                     handover = handover,
-                    retrieval = MobileWalletProximityConventionalRetrievalConfiguration(
-                        nfc = MobileWalletProximityNfcRetrievalConfiguration(),
+                    retrieval = ProximityRetrievalOptions(
+                        nfc = ProximityNfcRetrievalConfiguration(),
                     ),
-                    qrFallback = MobileWalletProximityConventionalRetrievalConfiguration(),
+                    qrFallback = ProximityRetrievalOptions(),
                 ),
             )
             val capabilities = coordinator.capabilities(configuration)
             assertFalse(capabilities.qrMayStart)
             assertTrue(capabilities.nfcMayStart)
             val session = coordinator.start(configuration)
-            assertIs<MobileWalletProximityEngagement.Nfc>(session.awaitEngagements().single())
+            assertIs<ProximityEngagement.Nfc>(session.awaitEngagements().single())
             session.close()
         }
         assertEquals(2, nfc.prepareCalls)
@@ -444,15 +444,15 @@ class ProximityCoordinatorTest {
         }
     }
 
-    private suspend fun MobileWalletProximitySession.awaitEngagements(): List<MobileWalletProximityEngagement> =
+    private suspend fun ProximitySession.awaitEngagements(): List<ProximityEngagement> =
         withContext(Dispatchers.Default) {
             withTimeout(5.seconds) {
                 when (val current = state.first {
-                    it is MobileWalletProximityState.EngagementReady ||
-                        it is MobileWalletProximityState.Connecting
+                    it is ProximityState.EngagementReady ||
+                        it is ProximityState.Connecting
                 }) {
-                    is MobileWalletProximityState.EngagementReady -> current.engagements
-                    is MobileWalletProximityState.Connecting -> current.engagements
+                    is ProximityState.EngagementReady -> current.engagements
+                    is ProximityState.Connecting -> current.engagements
                     else -> error("Unexpected proximity state $current")
                 }
             }

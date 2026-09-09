@@ -412,9 +412,9 @@ private protocol KMPBackedProximityReaderTrustEvaluator {
     var kmpReaderTrustEvaluator: any WalletCore.ProximityReaderTrustEvaluator { get }
 }
 
-extension ProximityPresentationConfiguration {
-    func toKMPConfiguration() -> MobileWalletProximityConfiguration {
-        MobileWalletProximityConfiguration(
+extension ProximityConfiguration {
+    func toKMPConfiguration() -> WalletCore.ProximityConfiguration {
+        WalletCore.ProximityConfiguration(
             profile: profile.toKMPProfile(),
             session: session.toKMPConfiguration(),
             readerPolicy: readerPolicy.toKMPPolicy(),
@@ -1913,46 +1913,46 @@ private extension ProximityBLEBearerPolicy {
     }
 }
 
-private extension ProximityPresentationBLEConfiguration {
-    func toKMPConfiguration() -> MobileWalletProximityBleConfiguration {
-        MobileWalletProximityBleConfiguration(
+private extension ProximityBLEConfiguration {
+    func toKMPConfiguration() -> WalletCore.ProximityBleConfiguration {
+        WalletCore.ProximityBleConfiguration(
             roles: roles.toKMPRoles(),
             bearerPolicy: bearerPolicy.toKMPPolicy()
         )
     }
 }
 
-private extension ProximityPresentationNFCRetrievalConfiguration {
-    func toKMPConfiguration() -> MobileWalletProximityNfcRetrievalConfiguration {
-        MobileWalletProximityNfcRetrievalConfiguration(
+private extension ProximityNFCRetrievalConfiguration {
+    func toKMPConfiguration() -> WalletCore.ProximityNfcRetrievalConfiguration {
+        WalletCore.ProximityNfcRetrievalConfiguration(
             maximumCommandDataLength: Int32(maximumCommandDataLength),
             maximumResponseDataLength: Int32(maximumResponseDataLength)
         )
     }
 }
 
-private extension ProximityPresentationConventionalRetrievalConfiguration {
-    func toKMPConfiguration() -> MobileWalletProximityConventionalRetrievalConfiguration {
-        MobileWalletProximityConventionalRetrievalConfiguration(
+private extension ProximityRetrievalOptions {
+    func toKMPConfiguration() -> WalletCore.ProximityRetrievalOptions {
+        WalletCore.ProximityRetrievalOptions(
             bluetoothLowEnergy: bluetoothLowEnergy?.toKMPConfiguration(),
             nfc: nfc?.toKMPConfiguration()
         )
     }
 }
 
-private extension ProximityPresentationSessionConfiguration {
-    func toKMPConfiguration() -> any MobileWalletProximitySessionConfiguration {
+private extension ProximitySessionConfiguration {
+    func toKMPConfiguration() -> any WalletCore.ProximitySessionConfiguration {
         switch self {
         case let .qr(retrieval):
-            return MobileWalletProximitySessionConfigurationQr(retrieval: retrieval.toKMPConfiguration())
+            return WalletCore.ProximitySessionConfigurationQr(retrieval: retrieval.toKMPConfiguration())
         case let .nfc(configuration):
-            return MobileWalletProximitySessionConfigurationConventionalNfc(
+            return WalletCore.ProximitySessionConfigurationConventionalNfc(
                 handover: configuration.handover == .staticHandover ? .static : .negotiated,
                 retrieval: configuration.retrieval.toKMPConfiguration(),
                 qrFallback: configuration.qrFallback?.toKMPConfiguration()
             )
         case let .provisionalNFCV2(configuration):
-            return MobileWalletProximitySessionConfigurationProvisionalNfcV2(
+            return WalletCore.ProximitySessionConfigurationProvisionalNfcV2(
                 maximumCommandDataLength: Int32(configuration.maximumCommandDataLength),
                 bluetoothLowEnergy: configuration.bluetoothLowEnergy?.toKMPConfiguration(),
                 qrFallback: configuration.qrFallback?.toKMPConfiguration()
@@ -1961,20 +1961,20 @@ private extension ProximityPresentationSessionConfiguration {
     }
 }
 
-private extension MobileWalletProximityBleConfiguration {
-    func toSwiftConfiguration() -> ProximityPresentationBLEConfiguration {
-        ProximityPresentationBLEConfiguration(
+private extension WalletCore.ProximityBleConfiguration {
+    func toSwiftConfiguration() -> ProximityBLEConfiguration {
+        ProximityBLEConfiguration(
             roles: roles == .centralClient ? .centralClient : roles == .peripheralServer ? .peripheralServer : .dual,
             bearerPolicy: bearerPolicy == .gattOnly ? .gattOnly : .preferL2CAP
         )
     }
 }
 
-private extension MobileWalletProximityConventionalRetrievalConfiguration {
-    func toSwiftConfiguration() -> ProximityPresentationConventionalRetrievalConfiguration {
-        ProximityPresentationConventionalRetrievalConfiguration(
+private extension WalletCore.ProximityRetrievalOptions {
+    func toSwiftConfiguration() -> ProximityRetrievalOptions {
+        ProximityRetrievalOptions(
             bluetoothLowEnergy: bluetoothLowEnergy?.toSwiftConfiguration(),
-            nfc: nfc.map { ProximityPresentationNFCRetrievalConfiguration(
+            nfc: nfc.map { ProximityNFCRetrievalConfiguration(
                 maximumCommandDataLength: Int($0.maximumCommandDataLength),
                 maximumResponseDataLength: Int($0.maximumResponseDataLength)
             ) }
@@ -1982,7 +1982,7 @@ private extension MobileWalletProximityConventionalRetrievalConfiguration {
     }
 }
 
-func swiftSession(_ session: any MobileWalletProximitySessionConfiguration) -> ProximityPresentationSessionConfiguration {
+func swiftSession(_ session: any WalletCore.ProximitySessionConfiguration) -> ProximitySessionConfiguration {
     switch onEnum(of: session) {
     case let .qr(value): return .qr(value.retrieval.toSwiftConfiguration())
     case let .conventionalNfc(value):
@@ -2000,8 +2000,8 @@ func swiftSession(_ session: any MobileWalletProximitySessionConfiguration) -> P
     }
 }
 
-private extension ProximityPresentationReaderPolicy {
-    func toKMPPolicy() -> MobileWalletProximityReaderPolicy {
+private extension ProximityReaderPolicy {
+    func toKMPPolicy() -> WalletCore.ProximityReaderPolicy {
         switch self {
         case .allowAnonymousOrUntrusted: return .allowAnonymousOrUntrusted
         case .requireTrusted: return .requireTrusted

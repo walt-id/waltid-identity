@@ -8,14 +8,14 @@ import ZXingCpp
 
 final class ProximityPresentationViewModelTests: XCTestCase {
     func testSessionConfigurationMatrixRoundTripsThroughKotlinBridge() {
-        let ble = ProximityPresentationBLEConfiguration(roles: .centralClient, bearerPolicy: .gattOnly)
-        let plans: [ProximityPresentationConventionalRetrievalConfiguration] = [
+        let ble = WalletSDK.ProximityBLEConfiguration(roles: .centralClient, bearerPolicy: .gattOnly)
+        let plans: [WalletSDK.ProximityRetrievalOptions] = [
             .init(bluetoothLowEnergy: ble),
             .init(bluetoothLowEnergy: nil, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256)),
             .init(bluetoothLowEnergy: ble, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256)),
         ]
-        var sessions = plans.map(ProximityPresentationSessionConfiguration.qr)
-        for handover in [ProximityPresentationNFCHandover.staticHandover, .negotiatedHandover] {
+        var sessions = plans.map(WalletSDK.ProximitySessionConfiguration.qr)
+        for handover in [WalletSDK.ProximityNFCHandover.staticHandover, .negotiatedHandover] {
             for retrieval in plans {
                 for qr in [nil] + plans.map(Optional.some) {
                     sessions.append(.nfc(.init(handover: handover, retrieval: retrieval, qrFallback: qr)))
@@ -29,9 +29,9 @@ final class ProximityPresentationViewModelTests: XCTestCase {
                 )))
             }
         }
-        for profile in ProximityPresentationProfile.allCases {
+        for profile in WalletSDK.ProximityProfile.allCases {
             for session in sessions where profile != .iso1801352021 || !session.usesProvisionalNFCV2 {
-                let configuration = ProximityPresentationConfiguration(
+                let configuration = WalletSDK.ProximityConfiguration(
                     profile: profile, session: session,
                     readerPolicy: profile == .eudiARF3FCAF202608 ? .requireTrusted : .allowAnonymousOrUntrusted
                 )
@@ -94,7 +94,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             hostActions: FakeProximityHostActionExecutor()
         )
         let review = combinedProximityReview()
-        let familyName = ProximityElementReference(
+        let familyName = WalletSDK.ProximityElementReference(
             namespace: "org.iso.18013.5.1",
             elementIdentifier: "family_name"
         )
@@ -184,13 +184,13 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     func testConfigurationProviderIsResolvedOncePerSession() async throws {
         let session = FakeProximitySession()
         let client = FakeProximityWalletClient(session: session)
-        var policy = ProximityReaderPolicy.allowAnonymousOrUntrusted
+        var policy = WalletSDK.ProximityReaderPolicy.allowAnonymousOrUntrusted
         var resolutionCount = 0
         let viewModel = ProximityPresentationViewModel(
             client: client,
             configurationProvider: {
                 resolutionCount += 1
-                return ProximityConfiguration(readerPolicy: policy)
+                return WalletSDK.ProximityConfiguration(readerPolicy: policy)
             },
             hostActions: FakeProximityHostActionExecutor()
         )
@@ -228,14 +228,14 @@ final class ProximityPresentationViewModelTests: XCTestCase {
 
 }
 
-private func combinedProximityReview(exchange: Int = 1) -> ProximityReview {
-    let familyName = ProximityRequestedElement(
+private func combinedProximityReview(exchange: Int = 1) -> WalletSDK.ProximityReview {
+    let familyName = WalletSDK.ProximityRequestedElement(
         namespace: "org.iso.18013.5.1",
         elementIdentifier: "family_name",
         intentToRetain: true,
         satisfiesRequestedElements: []
     )
-    let eligibility = ProximityRequestedElement(
+    let eligibility = WalletSDK.ProximityRequestedElement(
         namespace: "org.waltid.example.proof",
         elementIdentifier: "eligible",
         intentToRetain: false,
@@ -244,9 +244,9 @@ private func combinedProximityReview(exchange: Int = 1) -> ProximityReview {
     func credential(
         id: String,
         label: String,
-        elements: [ProximityRequestedElement]
-    ) -> ProximityCredentialOption {
-        ProximityCredentialOption(
+        elements: [WalletSDK.ProximityRequestedElement]
+    ) -> WalletSDK.ProximityCredentialOption {
+        WalletSDK.ProximityCredentialOption(
             credentialID: id,
             label: label,
             issuer: "Example issuer",
@@ -255,11 +255,11 @@ private func combinedProximityReview(exchange: Int = 1) -> ProximityReview {
             requestedElements: elements
         )
     }
-    return ProximityReview(
-        reviewID: ProximityReviewID(value: UUID().uuidString),
+    return WalletSDK.ProximityReview(
+        reviewID: WalletSDK.ProximityReviewID(value: UUID().uuidString),
         exchange: exchange,
         documents: [
-            ProximityDocumentReview(
+            WalletSDK.ProximityDocumentReview(
                 requestIndex: 0,
                 documentType: "org.waltid.example.payment",
                 credentialOptions: [
@@ -267,7 +267,7 @@ private func combinedProximityReview(exchange: Int = 1) -> ProximityReview {
                     credential(id: "payment-b", label: "Payment credential B", elements: [familyName]),
                 ]
             ),
-            ProximityDocumentReview(
+            WalletSDK.ProximityDocumentReview(
                 requestIndex: 1,
                 documentType: "org.waltid.example.proof",
                 credentialOptions: [
@@ -288,7 +288,7 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
     private let suspendStart: Bool
     private var startContinuation: CheckedContinuation<Void, Never>?
     private(set) var startCount = 0
-    private(set) var configurations: [ProximityConfiguration] = []
+    private(set) var configurations: [WalletSDK.ProximityConfiguration] = []
 
     init(session: any DemoProximityPresentationSession, suspendStart: Bool = false) {
         self.session = session
@@ -296,7 +296,7 @@ private final class FakeProximityWalletClient: ProximityWalletClient {
     }
 
     func startProximityPresentation(
-        configuration: ProximityConfiguration
+        configuration: WalletSDK.ProximityConfiguration
     ) async throws -> any DemoProximityPresentationSession {
         startCount += 1
         configurations.append(configuration)
@@ -318,22 +318,22 @@ private extension Collection {
 }
 
 private actor FakeProximitySession: DemoProximityPresentationSession {
-    nonisolated let states: AsyncStream<ProximityState>
-    private let continuation: AsyncStream<ProximityState>.Continuation
-    private(set) var actions: [ProximityAction] = []
+    nonisolated let states: AsyncStream<WalletSDK.ProximityState>
+    private let continuation: AsyncStream<WalletSDK.ProximityState>.Continuation
+    private(set) var actions: [WalletSDK.ProximityAction] = []
     private(set) var closeCount = 0
 
     init() {
-        var continuation: AsyncStream<ProximityState>.Continuation!
+        var continuation: AsyncStream<WalletSDK.ProximityState>.Continuation!
         states = AsyncStream { continuation = $0 }
         self.continuation = continuation
     }
 
-    func emit(_ state: ProximityState) {
+    func emit(_ state: WalletSDK.ProximityState) {
         continuation.yield(state)
     }
 
-    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult {
+    func dispatch(_ action: WalletSDK.ProximityAction) async throws -> WalletSDK.ProximityActionResult {
         actions.append(action)
         return .accepted
     }
@@ -347,8 +347,8 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
 @MainActor
 private final class FakeProximityHostActionExecutor: ProximityHostActionExecutor {
     func perform(
-        _ action: ProximityRemediationAction
-    ) async -> ProximityHostActionResult {
+        _ action: WalletSDK.ProximityRemediationAction
+    ) async -> WalletSDK.ProximityHostActionResult {
         .completed
     }
 }

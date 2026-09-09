@@ -53,7 +53,7 @@ provisional NFCv2 variant carries its own command limit and always includes
 same-channel retrieval:
 
 ```swift
-let nfcConfiguration = ProximityPresentationConfiguration(
+let nfcConfiguration = ProximityConfiguration(
     session: .nfc(.init(
         handover: .negotiatedHandover,
         retrieval: .init(nfc: .init()),
