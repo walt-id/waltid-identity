@@ -377,6 +377,7 @@ private fun ProximityReview.defaultSelections(): List<WalletDemoProximityDocumen
 
 private fun ProximityState?.isTerminal(): Boolean = when (this) {
     is ProximityState.Completed,
+    is ProximityState.NoData,
     ProximityState.Cancelled,
     is ProximityState.Failed -> true
     else -> false
