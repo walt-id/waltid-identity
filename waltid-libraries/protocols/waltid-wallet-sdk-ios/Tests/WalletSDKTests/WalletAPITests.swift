@@ -4,7 +4,7 @@ import XCTest
 final class WalletAPITests: XCTestCase {
     func testProximityStreamCompletesAtEveryTerminalStateWithoutForwardingLaterStates() async {
         let terminals: [ProximityState] = [
-            .completed(exchanges: 1, declined: false), .cancelled,
+            .completed(exchanges: 1, declined: false), .noData(exchange: 2), .cancelled,
             .failed(.init(category: .transport, code: "closed", message: "Closed", recovery: .startNewSession)),
         ]
         for terminal in terminals {

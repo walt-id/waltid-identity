@@ -143,6 +143,7 @@ try {
             is ProximityState.ReviewRequired -> showProximityReview(state.review)
             is ProximityState.AuthorizingHolderKey -> showHolderAuthorization(state.authorization)
             is ProximityState.Completed -> showCompletion(state.exchanges, state.declined)
+            is ProximityState.NoData -> showNoData(state.exchange)
             is ProximityState.Failed -> showProximityError(state.error)
             ProximityState.Cancelled -> showCancelled()
             is ProximityState.Preparing,
@@ -206,6 +207,14 @@ request so mixed signature/MAC responses cannot be collapsed into one prompt.
 Only one proximity session may be active per wallet. Always call `close()` when
 the journey leaves the screen; closing and cancellation are idempotent and every
 new session creates fresh engagement identifiers and ephemeral key material.
+
+A request with no returnable data ends in `ProximityState.NoData` without holder
+consent or key authorization. Its `exchange` identifies the final request;
+earlier exchanges may already have shared approved data. Use
+`ProximityReview.readerAuthenticationSummary` for the collapsed reader summary.
+The shared SDK accounts for whole-request coverage while preserving malformed,
+invalid, and revoked authentication warnings. Raw authentication entries remain
+available for detailed inspection.
 
 ## Persistence and encryption
 

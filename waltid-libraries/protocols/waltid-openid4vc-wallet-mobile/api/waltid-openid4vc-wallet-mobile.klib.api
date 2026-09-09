@@ -397,6 +397,22 @@ final enum class id.walt.wallet2.mobile/ProximityProfile : kotlin/Enum<id.walt.w
     final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityProfile> // id.walt.wallet2.mobile/ProximityProfile.values|values#static(){}[0]
 }
 
+final enum class id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary : kotlin/Enum<id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary> { // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary|null[0]
+    enum entry Absent // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.Absent|null[0]
+    enum entry Invalid // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.Invalid|null[0]
+    enum entry Malformed // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.Malformed|null[0]
+    enum entry Partial // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.Partial|null[0]
+    enum entry Revoked // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.Revoked|null[0]
+    enum entry Trusted // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.Trusted|null[0]
+    enum entry ValidButUntrusted // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.ValidButUntrusted|null[0]
+
+    final val entries // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary> // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary> // id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary.values|values#static(){}[0]
+}
+
 final enum class id.walt.wallet2.mobile/ProximityReaderAuthenticationValidity : kotlin/Enum<id.walt.wallet2.mobile/ProximityReaderAuthenticationValidity> { // id.walt.wallet2.mobile/ProximityReaderAuthenticationValidity|null[0]
     enum entry Absent // id.walt.wallet2.mobile/ProximityReaderAuthenticationValidity.Absent|null[0]
     enum entry Invalid // id.walt.wallet2.mobile/ProximityReaderAuthenticationValidity.Invalid|null[0]
@@ -1252,6 +1268,19 @@ sealed interface id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobi
         final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityState.Failed.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.Failed.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityState.Failed.toString|toString(){}[0]
+    }
+
+    final class NoData : id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobile/ProximityState.NoData|null[0]
+        constructor <init>(kotlin/Int) // id.walt.wallet2.mobile/ProximityState.NoData.<init>|<init>(kotlin.Int){}[0]
+
+        final val exchange // id.walt.wallet2.mobile/ProximityState.NoData.exchange|{}exchange[0]
+            final fun <get-exchange>(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.NoData.exchange.<get-exchange>|<get-exchange>(){}[0]
+
+        final fun component1(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.NoData.component1|component1(){}[0]
+        final fun copy(kotlin/Int = ...): id.walt.wallet2.mobile/ProximityState.NoData // id.walt.wallet2.mobile/ProximityState.NoData.copy|copy(kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityState.NoData.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.NoData.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityState.NoData.toString|toString(){}[0]
     }
 
     final class Preparing : id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobile/ProximityState.Preparing|null[0]
@@ -3063,6 +3092,8 @@ final class id.walt.wallet2.mobile/ProximityReview { // id.walt.wallet2.mobile/P
         final fun <get-exchange>(): kotlin/Int // id.walt.wallet2.mobile/ProximityReview.exchange.<get-exchange>|<get-exchange>(){}[0]
     final val readerAuthentication // id.walt.wallet2.mobile/ProximityReview.readerAuthentication|{}readerAuthentication[0]
         final fun <get-readerAuthentication>(): kotlin.collections/List<id.walt.wallet2.mobile/ProximityReaderAuthentication> // id.walt.wallet2.mobile/ProximityReview.readerAuthentication.<get-readerAuthentication>|<get-readerAuthentication>(){}[0]
+    final val readerAuthenticationSummary // id.walt.wallet2.mobile/ProximityReview.readerAuthenticationSummary|{}readerAuthenticationSummary[0]
+        final fun <get-readerAuthenticationSummary>(): id.walt.wallet2.mobile/ProximityReaderAuthenticationSummary // id.walt.wallet2.mobile/ProximityReview.readerAuthenticationSummary.<get-readerAuthenticationSummary>|<get-readerAuthenticationSummary>(){}[0]
     final val reviewId // id.walt.wallet2.mobile/ProximityReview.reviewId|{}reviewId[0]
         final fun <get-reviewId>(): id.walt.wallet2.mobile/ProximityReviewId // id.walt.wallet2.mobile/ProximityReview.reviewId.<get-reviewId>|<get-reviewId>(){}[0]
     final val useCases // id.walt.wallet2.mobile/ProximityReview.useCases|{}useCases[0]

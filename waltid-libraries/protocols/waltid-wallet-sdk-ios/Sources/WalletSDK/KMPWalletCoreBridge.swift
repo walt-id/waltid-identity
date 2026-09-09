@@ -1902,6 +1902,8 @@ private extension WalletCore.ProximityState {
             return .awaitingNextRequest(completedExchanges: Int(value.completedExchanges))
         case let .terminating(value):
             return .terminating(exchange: Int(value.exchange))
+        case let .noData(value):
+            return .noData(exchange: Int(value.exchange))
         case let .completed(value):
             return .completed(exchanges: Int(value.exchanges), declined: value.declined)
         case .cancelled:
@@ -1952,6 +1954,7 @@ private extension WalletCore.ProximityReview {
                 readerAuthentication,
                 of: WalletCore.ProximityReaderAuthentication.self
             ).map { $0.toSwiftAuthentication() },
+            readerAuthenticationSummary: readerAuthenticationSummary.toSwiftSummary(),
             useCases: swiftArray(useCases, of: WalletCore.ProximityUseCase.self).map {
                 $0.toSwiftUseCase()
             },
@@ -2061,6 +2064,20 @@ private extension WalletCore.ProximityReaderAuthenticationValidity {
         case .malformed: return .malformed
         case .invalid: return .invalid
         case .valid: return .valid
+        }
+    }
+}
+
+private extension WalletCore.ProximityReaderAuthenticationSummary {
+    func toSwiftSummary() -> ProximityReaderAuthenticationSummary {
+        switch self {
+        case .absent: return .absent
+        case .malformed: return .malformed
+        case .invalid: return .invalid
+        case .revoked: return .revoked
+        case .partial: return .partial
+        case .validButUntrusted: return .validButUntrusted
+        case .trusted: return .trusted
         }
     }
 }
