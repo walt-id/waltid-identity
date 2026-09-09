@@ -171,35 +171,7 @@ class ProximityModelsTest {
 
     @Test
     fun `legal actions are derived only from current state`() {
-        val review = ProximityReview(
-            reviewId = ProximityReviewId(kotlin.uuid.Uuid.random().toString()),
-            exchange = 1,
-            documents = listOf(
-                ProximityDocumentReview(
-                    requestIndex = 0,
-                    docType = "org.example.mdoc",
-                    credentialOptions = listOf(
-                        ProximityCredentialOption(
-                            credentialId = "credential-1",
-                            label = "Example",
-                            issuer = null,
-                            validUntil = kotlin.time.Instant.DISTANT_FUTURE,
-                            deviceAuthentication = ProximityDeviceAuthenticationMethod.Signature,
-                            requestedElements = listOf(
-                                ProximityRequestedElement(
-                                    namespace = "org.example",
-                                    elementIdentifier = "given_name",
-                                    intentToRetain = false,
-                                )
-                            ),
-                        )
-                    ),
-                )
-            ),
-            readerAuthentication = emptyList(),
-            useCases = emptyList(),
-            applicationAuthorizations = emptyList(),
-        )
+        val review = review()
 
         assertEquals(
             setOf(
@@ -215,4 +187,80 @@ class ProximityModelsTest {
         )
         assertTrue(ProximityState.Cancelled.legalActions.isEmpty())
     }
+
+    @Test
+    fun `authentication summary uses coverage and preserves failed statements`() {
+        val first = review().documents.single()
+        val review = review().copy(documents = listOf(first, first.copy(requestIndex = 1)))
+        fun statement(scope: ProximityReaderAuthenticationScope, outcome: ProximityReaderAuthenticationOutcome) =
+            ProximityReaderAuthentication(scope = scope, outcome = outcome)
+        fun valid(scope: ProximityReaderAuthenticationScope, trust: ProximityReaderTrustState) =
+            statement(scope, ProximityReaderAuthenticationOutcome.Valid(ProximityReaderTrustDecision(
+                state = trust,
+                certificatePath = if (trust == ProximityReaderTrustState.Trusted || trust == ProximityReaderTrustState.Revoked)
+                    ProximityReaderCertificatePathState.Valid else ProximityReaderCertificatePathState.NotEvaluated,
+                revocation = if (trust == ProximityReaderTrustState.Revoked) ProximityReaderRevocationState.Revoked
+                    else ProximityReaderRevocationState.NotChecked,
+            )))
+        val whole = ProximityReaderAuthenticationScope.WholeRequest
+        val document0 = ProximityReaderAuthenticationScope.Document(0)
+        val document1 = ProximityReaderAuthenticationScope.Document(1)
+        val absent0 = statement(document0, ProximityReaderAuthenticationOutcome.Absent)
+        val absent1 = statement(document1, ProximityReaderAuthenticationOutcome.Absent)
+        val trusted0 = valid(document0, ProximityReaderTrustState.Trusted)
+        val trusted1 = valid(document1, ProximityReaderTrustState.Trusted)
+        val trustedAll = valid(whole, ProximityReaderTrustState.Trusted)
+        val cases = listOf(
+            emptyList<ProximityReaderAuthentication>() to ProximityReaderAuthenticationSummary.Absent,
+            listOf(absent0, absent1) to ProximityReaderAuthenticationSummary.Absent,
+            listOf(trustedAll, absent0, absent1) to ProximityReaderAuthenticationSummary.Trusted,
+            listOf(trusted0, absent1) to ProximityReaderAuthenticationSummary.Partial,
+            listOf(trusted0, trusted1) to ProximityReaderAuthenticationSummary.Trusted,
+            listOf(valid(whole, ProximityReaderTrustState.ValidButUntrusted), absent0, absent1) to ProximityReaderAuthenticationSummary.ValidButUntrusted,
+            listOf(valid(whole, ProximityReaderTrustState.ValidButUntrusted), trusted0, trusted1) to ProximityReaderAuthenticationSummary.Trusted,
+            listOf(trustedAll, statement(document0, ProximityReaderAuthenticationOutcome.Malformed("bad encoding"))) to ProximityReaderAuthenticationSummary.Malformed,
+            listOf(trustedAll, statement(document0, ProximityReaderAuthenticationOutcome.Invalid("bad signature"))) to ProximityReaderAuthenticationSummary.Invalid,
+            listOf(trustedAll, valid(document0, ProximityReaderTrustState.Revoked)) to ProximityReaderAuthenticationSummary.Revoked,
+        )
+        for ((statements, expected) in cases) {
+            assertEquals(expected, review.copy(readerAuthentication = statements).readerAuthenticationSummary, statements.toString())
+        }
+    }
+
+    @Test
+    fun `no-data is terminal and retains the final request index`() {
+        assertTrue(ProximityState.NoData(2).legalActions.isEmpty())
+        assertEquals(2, ProximityState.NoData(2).exchange)
+        assertFailsWith<IllegalArgumentException> { ProximityState.NoData(0) }
+    }
+
+    private fun review() = ProximityReview(
+        reviewId = ProximityReviewId(kotlin.uuid.Uuid.random().toString()),
+        exchange = 1,
+        documents = listOf(
+            ProximityDocumentReview(
+                requestIndex = 0,
+                docType = "org.example.mdoc",
+                credentialOptions = listOf(
+                    ProximityCredentialOption(
+                        credentialId = "credential-1",
+                        label = "Example",
+                        issuer = null,
+                        validUntil = kotlin.time.Instant.DISTANT_FUTURE,
+                        deviceAuthentication = ProximityDeviceAuthenticationMethod.Signature,
+                        requestedElements = listOf(
+                            ProximityRequestedElement(
+                                namespace = "org.example",
+                                elementIdentifier = "given_name",
+                                intentToRetain = false,
+                            )
+                        ),
+                    )
+                ),
+            )
+        ),
+        readerAuthentication = emptyList(),
+        useCases = emptyList(),
+        applicationAuthorizations = emptyList(),
+    )
 }

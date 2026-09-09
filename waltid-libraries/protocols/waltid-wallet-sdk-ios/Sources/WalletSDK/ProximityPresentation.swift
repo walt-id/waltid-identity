@@ -774,6 +774,24 @@ public struct ProximityReviewID: Sendable, Equatable, Hashable {
     internal let value: String
 }
 
+/// Request-wide coverage and trust computed by the shared wallet SDK.
+public enum ProximityReaderAuthenticationSummary: Sendable, Equatable {
+    /// No reader authentication was supplied.
+    case absent
+    /// At least one authentication is malformed.
+    case malformed
+    /// At least one authentication is invalid.
+    case invalid
+    /// At least one authenticated reader is revoked.
+    case revoked
+    /// Valid authentication does not cover every requested document.
+    case partial
+    /// Coverage is complete, but at least one document lacks trusted authentication.
+    case validButUntrusted
+    /// Every document is covered by trusted authentication.
+    case trusted
+}
+
 /// Frozen, display-safe review model for one exchange.
 public struct ProximityReview: Sendable, Equatable {
     /// Identity required when approving or declining this review.
@@ -784,6 +802,8 @@ public struct ProximityReview: Sendable, Equatable {
     public let documents: [ProximityDocumentReview]
     /// Reader-authentication results.
     public let readerAuthentication: [ProximityReaderAuthentication]
+    /// Shared summary accounting for whole-request and document authentication coverage.
+    public let readerAuthenticationSummary: ProximityReaderAuthenticationSummary
     /// Parsed ISO use-case metadata.
     public let useCases: [ProximityUseCase]
     /// Recognized application-profile contributions.
@@ -932,6 +952,8 @@ public enum ProximityState: Sendable, Equatable {
     case terminating(exchange: Int)
     /// The session completed normally.
     case completed(exchanges: Int, declined: Bool)
+    /// The final request ended without credential data; earlier exchanges may have shared data.
+    case noData(exchange: Int)
     /// The host cancelled the session.
     case cancelled
     /// The session failed with a display-safe typed error.
@@ -945,7 +967,7 @@ public enum ProximityState: Sendable, Equatable {
         case .preparing, .engagementReady, .connecting,
              .awaitingRequest, .authorizingHolderKey, .sendingResponse, .awaitingNextRequest:
             [.cancel]
-        case .terminating, .completed, .cancelled, .failed:
+        case .terminating, .completed, .noData, .cancelled, .failed:
             []
         }
     }
@@ -973,7 +995,7 @@ public actor ProximitySession {
                 for await state in bridge.states {
                     continuation.yield(state)
                     switch state {
-                    case .completed, .cancelled, .failed:
+                    case .completed, .noData, .cancelled, .failed:
                         continuation.finish()
                         return
                     default: break

@@ -314,6 +314,24 @@ public enum class ProximityReaderAuthenticationValidity {
     Valid,
 }
 
+/** Scope-aware summary for the reviewed documents; raw statement evidence remains available. */
+public enum class ProximityReaderAuthenticationSummary {
+    /** No reader-authentication statement was supplied. */
+    Absent,
+    /** At least one supplied statement could not be parsed. */
+    Malformed,
+    /** At least one supplied statement failed cryptographic verification. */
+    Invalid,
+    /** At least one verified reader statement was revoked. */
+    Revoked,
+    /** Some reviewed documents lack valid authentication coverage. */
+    Partial,
+    /** Every document is authenticated, but trusted coverage is incomplete. */
+    ValidButUntrusted,
+    /** Every document is covered by trusted document or whole-request authentication. */
+    Trusted,
+}
+
 /** Trust outcome after valid reader authentication. */
 public enum class ProximityReaderTrustState {
     NotEvaluated,
@@ -900,6 +918,42 @@ public data class ProximityReview(
     public val useCases: List<ProximityUseCase>,
     public val applicationAuthorizations: List<ProximityApplicationAuthorization>,
 ) {
+    /**
+     * Coverage and trust summary computed in the shared SDK for all reviewed documents.
+     * Invalid, malformed and revoked statements remain visible even alongside trusted coverage.
+     */
+    public val readerAuthenticationSummary: ProximityReaderAuthenticationSummary
+        get() {
+            if (readerAuthentication.any { it.validity == ProximityReaderAuthenticationValidity.Malformed }) {
+                return ProximityReaderAuthenticationSummary.Malformed
+            }
+            if (readerAuthentication.any { it.validity == ProximityReaderAuthenticationValidity.Invalid }) {
+                return ProximityReaderAuthenticationSummary.Invalid
+            }
+            if (readerAuthentication.any { it.trust == ProximityReaderTrustState.Revoked }) {
+                return ProximityReaderAuthenticationSummary.Revoked
+            }
+            val valid = readerAuthentication.filter { it.validity == ProximityReaderAuthenticationValidity.Valid }
+            if (valid.isEmpty()) return ProximityReaderAuthenticationSummary.Absent
+            val coverage = documents.map { document ->
+                valid.filter { authentication ->
+                    authentication.scope == ProximityReaderAuthenticationScope.WholeRequest ||
+                        authentication.scope.documentRequestIndex == document.requestIndex
+                }.map { it.trust }.let { trust ->
+                    when {
+                        ProximityReaderTrustState.Trusted in trust -> ProximityReaderAuthenticationSummary.Trusted
+                        ProximityReaderTrustState.ValidButUntrusted in trust -> ProximityReaderAuthenticationSummary.ValidButUntrusted
+                        else -> ProximityReaderAuthenticationSummary.Partial
+                    }
+                }
+            }
+            return when {
+                ProximityReaderAuthenticationSummary.Partial in coverage -> ProximityReaderAuthenticationSummary.Partial
+                ProximityReaderAuthenticationSummary.ValidButUntrusted in coverage -> ProximityReaderAuthenticationSummary.ValidButUntrusted
+                else -> ProximityReaderAuthenticationSummary.Trusted
+            }
+        }
+
     init {
         require(exchange > 0 && documents.isNotEmpty())
         require(documents.distinctBy { it.requestIndex }.size == documents.size)
@@ -1140,7 +1194,18 @@ public sealed interface ProximityState {
         init { require(exchange > 0) }
     }
 
-    /** Session reached a normal terminal state. */
+    /**
+     * The session ended without sharing data for its final request.
+     * Earlier exchanges may already have sent holder-approved data.
+     */
+    public data class NoData(
+        /** One-based final request exchange number. */
+        public val exchange: Int,
+    ) : ProximityState {
+        init { require(exchange > 0) }
+    }
+
+    /** Session reached a normal terminal state after disclosure or holder decline. */
     public data class Completed(
         /** Number of requests handled before termination. */
         public val exchanges: Int,
@@ -1183,6 +1248,7 @@ public val ProximityState.legalActions: Set<ProximityActionType>
         is ProximityState.AwaitingNextRequest -> setOf(ProximityActionType.Cancel)
         is ProximityState.Terminating,
         is ProximityState.Completed,
+        is ProximityState.NoData,
         ProximityState.Cancelled,
         is ProximityState.Failed -> emptySet()
     }
