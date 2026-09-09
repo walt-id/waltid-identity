@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.handlers
 
+import kotlin.time.TimeSource
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.keys.KeyUsage
@@ -453,8 +454,13 @@ object WalletPresentationHandler {
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
                 log.trace { "Selecting credentials for DCQL query: ${query.credentials.map { it.id }}" }
+                // Timed and counted: the presentation flow is believed to run this selection more than
+                // once per presentation (see submitPresentation and buildVpToken), and each pass reads,
+                // parses and DCQL-matches the wallet's credentials again.
+                val selectionStart = TimeSource.Monotonic.markNow()
                 selectPresentableFromStores(wallet, query)
                     .also { matched ->
+                        log.debug { "DCQL selection pass took ${selectionStart.elapsedNow()}" }
                         log.trace { "DCQL matched queryIds: ${matched.keys}" }
                         onEvent(WalletSessionEvent.presentation_credentials_selected)
                     }
