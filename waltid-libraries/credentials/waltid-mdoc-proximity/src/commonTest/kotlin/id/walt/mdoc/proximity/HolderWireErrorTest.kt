@@ -118,10 +118,28 @@ class HolderWireErrorTest {
     fun noDataPreparationReturnsAnEncryptedEmptyResponseWithoutConsent() = realDispatcherTest {
         val fixture = session()
         val result = fixture.exchange(establishment(encode(fixture.readerKey), fixture.readerCipher.encrypt(validRequest())), noData = true)
-        assertIs<MdocHolderSessionResult.Completed>(result.result)
+        assertEquals(1, assertIs<MdocHolderSessionResult.NoData>(result.result).exchange)
         assertEquals(0, result.previewCalls)
         assertEquals(0, result.resolveCalls)
-        assertEquals(0u, fixture.response(result, "no-data preparation").status)
+        val response = fixture.response(result, "no-data preparation")
+        assertEquals(0u, response.status)
+        assertNull(response.documents)
+        fixture.readerCipher.close()
+    }
+
+    @Test
+    fun terminationWithoutResponseDoesNotReportCredentialSharing() = realDispatcherTest {
+        val fixture = session()
+        val result = fixture.exchange(
+            establishment(encode(fixture.readerKey), fixture.readerCipher.encrypt(validRequest())),
+            terminateWithoutResponse = true,
+        )
+        assertEquals(1, assertIs<MdocHolderSessionResult.NoData>(result.result).exchange)
+        assertEquals(1, result.previewCalls)
+        assertEquals(1, result.resolveCalls)
+        val message = result.messages.single()
+        assertEquals(20u, message.status)
+        assertNull(message.data)
         fixture.readerCipher.close()
     }
 
@@ -175,7 +193,12 @@ class HolderWireErrorTest {
         val readerKey: CborMap,
         val readerCipher: MdocSessionCipher,
     ) {
-        suspend fun exchange(bytes: ByteArray, noData: Boolean = false, rejected: ProximityError? = null): Exchange {
+        suspend fun exchange(
+            bytes: ByteArray,
+            noData: Boolean = false,
+            rejected: ProximityError? = null,
+            terminateWithoutResponse: Boolean = false,
+        ): Exchange {
             val loopback = FakeProximityLoopback.create()
             var previewCalls = 0
             var resolveCalls = 0
@@ -191,11 +214,13 @@ class HolderWireErrorTest {
                     }
                     override suspend fun resolve(context: MdocHolderRequestContext, preview: MdocRequestPreview): MdocResponseResolution {
                         resolveCalls++
+                        if (terminateWithoutResponse) return MdocResponseResolution.TerminateWithoutResponse(preview.submissionBindingDigest)
                         error("These requests must not authorize credential disclosure")
                     }
                 }, MdocConsentHandler {
                     check(!noData && rejected == null) { "A no-data response must not request consent" }
-                    MdocConsentDecision.Deny(it.bindingToken)
+                    if (terminateWithoutResponse) MdocConsentDecision.Approve(it.bindingToken)
+                    else MdocConsentDecision.Deny(it.bindingToken)
                 }, context, capabilities)
             loopback.reader.send(ImmutableBytes.of(bytes))
             val result = engine.run()

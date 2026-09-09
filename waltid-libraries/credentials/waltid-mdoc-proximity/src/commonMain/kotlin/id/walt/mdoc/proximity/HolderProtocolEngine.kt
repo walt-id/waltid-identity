@@ -286,6 +286,10 @@ sealed interface MdocHolderSessionState {
     data class Declined(val exchange: Int) : MdocHolderSessionState {
         init { require(exchange > 0) }
     }
+    /** The final request ended without disclosure; earlier exchanges may have sent approved data. */
+    data class NoData(val exchange: Int) : MdocHolderSessionState {
+        init { require(exchange > 0) }
+    }
     data class Completed(val exchanges: Int) : MdocHolderSessionState {
         init { require(exchanges > 0) }
     }
@@ -301,6 +305,7 @@ val MdocHolderSessionState.legalActions: Set<MdocHolderAction>
         MdocHolderSessionState.Idle,
         is MdocHolderSessionState.Declined,
         is MdocHolderSessionState.Completed,
+        is MdocHolderSessionState.NoData,
         is MdocHolderSessionState.Failed,
         is MdocHolderSessionState.Terminating,
         MdocHolderSessionState.Cancelled -> emptySet()
@@ -319,6 +324,10 @@ val MdocHolderSessionState.legalActions: Set<MdocHolderAction>
 
 sealed interface MdocHolderSessionResult {
     data class Declined(val exchange: Int) : MdocHolderSessionResult
+    /** No data was disclosed for the final request; this does not describe earlier exchanges. */
+    data class NoData(val exchange: Int) : MdocHolderSessionResult {
+        init { require(exchange > 0) }
+    }
     data class Completed(val exchanges: Int) : MdocHolderSessionResult
     data class Failed(val error: ProximityError) : MdocHolderSessionResult
 }
@@ -498,8 +507,8 @@ class MdocHolderProtocolEngine(
                     }
                     if (preparation is MdocRequestPreparation.Rejected) throw ProximityException(preparation.error)
                     closeReason = ProximityCloseReason.COMPLETED
-                    mutableState.value = MdocHolderSessionState.Completed(exchange)
-                    return MdocHolderSessionResult.Completed(exchange)
+                    mutableState.value = MdocHolderSessionState.NoData(exchange)
+                    return MdocHolderSessionResult.NoData(exchange)
                 }
                 val preview = preparation.preview
                 val token = consentBinding(incoming, exactTranscript, exchange, preview)
@@ -546,6 +555,10 @@ class MdocHolderProtocolEngine(
                         ProximityError.Transport("termination_timeout", "Session termination timed out"),
                     ) { send(connection, SessionData(status = SessionStatusCode.SESSION_TERMINATION.code), budget) }
                     closeReason = ProximityCloseReason.COMPLETED
+                    if (resolution is MdocResponseResolution.TerminateWithoutResponse) {
+                        mutableState.value = MdocHolderSessionState.NoData(exchange)
+                        return MdocHolderSessionResult.NoData(exchange)
+                    }
                     mutableState.value = MdocHolderSessionState.Completed(exchange)
                     return MdocHolderSessionResult.Completed(exchange)
                 }
