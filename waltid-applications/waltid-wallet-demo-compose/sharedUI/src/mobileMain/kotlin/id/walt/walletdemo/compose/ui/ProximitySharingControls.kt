@@ -17,9 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import id.walt.wallet2.mobile.MobileWalletProximityConnectedRoute
-import id.walt.wallet2.mobile.MobileWalletProximityEngagementMethod
-import id.walt.wallet2.mobile.MobileWalletProximityTransport
+import id.walt.wallet2.mobile.ProximityConnectedRoute
+import id.walt.wallet2.mobile.ProximityEngagementMethod
+import id.walt.wallet2.mobile.ProximityTransport
 import id.walt.walletdemo.compose.ui.components.MetadataDisclosure
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.painterResource
@@ -27,10 +27,10 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun ProximityEngagementChoice(
-    method: MobileWalletProximityEngagementMethod,
+    method: ProximityEngagementMethod,
     onClick: () -> Unit,
 ) {
-    val nfc = method == MobileWalletProximityEngagementMethod.Nfc
+    val nfc = method == ProximityEngagementMethod.Nfc
     TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().testTag("proximity-show-${method.name}")) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
@@ -51,16 +51,16 @@ internal fun ProximityEngagementChoice(
 }
 
 @Composable
-internal fun ProximityConnectionDetails(route: MobileWalletProximityConnectedRoute) {
+internal fun ProximityConnectionDetails(route: ProximityConnectedRoute) {
     MetadataDisclosure(title = stringResource(Res.string.proximity_connection_details), initiallyExpanded = false, modifier = Modifier.heightIn(min = 48.dp)) {
         Text(stringResource(Res.string.proximity_started_with, stringResource(
-            if (route.engagement == MobileWalletProximityEngagementMethod.Qr) Res.string.proximity_show_qr
+            if (route.engagement == ProximityEngagementMethod.Qr) Res.string.proximity_show_qr
             else Res.string.proximity_tap_reader,
         )))
         Text(stringResource(Res.string.proximity_used_connection, when (route.transport) {
-            MobileWalletProximityTransport.BluetoothLowEnergy -> stringResource(Res.string.proximity_method_bluetooth)
-            MobileWalletProximityTransport.Nfc -> stringResource(Res.string.proximity_method_nfc)
-            MobileWalletProximityTransport.WifiAware -> stringResource(Res.string.proximity_method_wifi)
+            ProximityTransport.BluetoothLowEnergy -> stringResource(Res.string.proximity_method_bluetooth)
+            ProximityTransport.Nfc -> stringResource(Res.string.proximity_method_nfc)
+            ProximityTransport.WifiAware -> stringResource(Res.string.proximity_method_wifi)
         }))
     }
 }

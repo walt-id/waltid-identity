@@ -860,22 +860,22 @@ private final class KMPProximityApplicationProfileAdapter:
 private final class KMPProximityPresentationSessionBridge:
     ProximitySessionBridge,
     @unchecked Sendable {
-    private let session: any MobileWalletProximitySession
+    private let session: any WalletCore.ProximitySession
     private let nfcHost: IOSNfcHostPlatformAdapter
 
-    init(session: any MobileWalletProximitySession, nfcHost: IOSNfcHostPlatformAdapter) {
+    init(session: any WalletCore.ProximitySession, nfcHost: IOSNfcHostPlatformAdapter) {
         self.session = session
         self.nfcHost = nfcHost
     }
 
-    var connectedRoute: ProximityPresentationConnectedRoute? {
+    var connectedRoute: ProximityConnectedRoute? {
         guard let route = session.connectedRoute else { return nil }
-        let engagement: ProximityPresentationEngagementMethod
+        let engagement: ProximityEngagementMethod
         switch route.engagement {
         case .qr: engagement = .qr
         case .nfc: engagement = .nfc
         }
-        let transport: ProximityPresentationTransport
+        let transport: ProximityTransport
         switch route.transport {
         case .bluetoothLowEnergy: transport = .bluetoothLowEnergy
         case .nfc: transport = .nfc
@@ -897,7 +897,7 @@ private final class KMPProximityPresentationSessionBridge:
         await nfcHost.present()
     }
 
-    var states: AsyncStream<ProximityPresentationState> {
+    var states: AsyncStream<ProximityState> {
         AsyncStream { continuation in
             let task = Task { [session] in
                 let flow = SkieSwiftFlow<any WalletCore.ProximityState>(
@@ -2182,7 +2182,7 @@ private extension WalletCore.ProximityError {
             code: code,
             message: message,
             recovery: recovery.toSwiftRecovery(),
-            remediationActions: swiftArray(remediationActions, of: MobileWalletProximityRemediationAction.self)
+            remediationActions: swiftArray(remediationActions, of: WalletCore.ProximityRemediationAction.self)
                 .map { $0.toSwiftAction() }
         )
     }

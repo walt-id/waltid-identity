@@ -116,7 +116,7 @@ private struct ProximityPrerequisiteContent: View {
     let actionInProgress: ProximityRemediationAction?
     let onRetry: () -> Void
     let onContinueWithAvailableConnection: () -> Void
-    let onRemediate: (ProximityPresentationRemediationAction) -> Void
+    let onRemediate: (ProximityRemediationAction) -> Void
 
     var body: some View {
         ReviewMetadataSection(
@@ -152,7 +152,7 @@ private struct ProximityPrerequisiteContent: View {
         }
     }
 
-    private var primaryAction: ProximityPresentationRemediationAction? {
+    private var primaryAction: ProximityRemediationAction? {
         capabilities.remediationActions.first { $0 != .useSupportedDevice }
     }
 
@@ -166,7 +166,7 @@ private struct ProximityPrerequisiteContent: View {
     }
 }
 
-private extension ProximityPresentationCapabilities {
+private extension ProximityCapabilities {
     var selectedUnavailableMessage: String? {
         [
             nfcEngagement,
@@ -617,8 +617,8 @@ private struct ProximityFailureContent: View {
     let onRetry: () -> Void
     let onDismiss: () -> Void
     var errorCode: String? = nil
-    var remediationActions: [ProximityPresentationRemediationAction] = []
-    var onRemediate: (ProximityPresentationRemediationAction) -> Void = { _ in }
+    var remediationActions: [ProximityRemediationAction] = []
+    var onRemediate: (ProximityRemediationAction) -> Void = { _ in }
 
     var body: some View {
         ReviewMetadataSection(title: String(localized: "Presentation failed")) {
@@ -780,7 +780,7 @@ private extension ProximityDeviceAuthenticationMethod {
 
 
 private struct ProximityConnectionDetails: View {
-    let route: ProximityPresentationConnectedRoute
+    let route: ProximityConnectedRoute
 
     var body: some View {
         DisclosureGroup {

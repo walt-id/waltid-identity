@@ -1500,9 +1500,9 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     }
 }
 
-private final class FakeProximityPresentationSessionBridge: ProximityPresentationSessionBridge, @unchecked Sendable {
+private final class FakeProximityPresentationSessionBridge: ProximitySessionBridge, @unchecked Sendable {
     let systemPresentationActive = false
-    lazy var states = AsyncStream<ProximityPresentationState> { [unowned self] continuation in
+    lazy var states = AsyncStream<ProximityState> { [unowned self] continuation in
         continuation.yield(.checkingPrerequisites(capabilities))
         continuation.finish()
     }
