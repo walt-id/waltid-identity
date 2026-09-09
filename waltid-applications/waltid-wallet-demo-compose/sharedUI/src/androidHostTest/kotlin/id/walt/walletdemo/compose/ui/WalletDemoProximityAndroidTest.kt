@@ -25,4 +25,8 @@ class WalletDemoProximityAndroidTest {
     @Test
     fun reviewDoesNotInventAnIdentityForAnUnsignedReader() =
         scenarios.reviewDoesNotInventAnIdentityForAnUnsignedReader()
+    @Test
+    fun completedPresentationShowsDoneAndNoConnectionControls() =
+        scenarios.completedPresentationShowsDoneAndNoConnectionControls()
+
 }

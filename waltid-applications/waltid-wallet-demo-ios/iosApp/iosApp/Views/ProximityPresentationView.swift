@@ -74,8 +74,14 @@ struct ProximityPresentationView: View {
                         ? String(localized: "Request declined")
                         : String(localized: "Presentation complete"),
                     message: declined
-                        ? String(localized: "No credential data was shared.")
+                        ? String(localized: "No credential data was shared for this request.")
                         : String(localized: "The approved credential data was sent to the reader."),
+                    onDismiss: viewModel.dismiss
+                )
+            case .noData:
+                ProximityTerminalContent(
+                    title: String(localized: "No data shared"),
+                    message: String(localized: "No credential data was shared for this request."),
                     onDismiss: viewModel.dismiss
                 )
             case .cancelled:
@@ -193,6 +199,7 @@ private struct ProximityReviewContent: View {
         VStack(alignment: .leading, spacing: 16) {
             ProximityReaderMetadataCard(
                 authentications: review.readerAuthentication,
+                summary: review.readerAuthenticationSummary,
                 documents: review.documents,
                 credentialDetailsByID: credentialDetailsByID
             )
@@ -254,6 +261,7 @@ private struct ProximityReviewContent: View {
 
 private struct ProximityReaderMetadataCard: View {
     let authentications: [ProximityReaderAuthentication]
+    let summary: ProximityReaderAuthenticationSummary
     let documents: [ProximityDocumentReview]
     let credentialDetailsByID: [String: CredentialDetails]
     @State private var isExpanded = false
@@ -281,22 +289,16 @@ private struct ProximityReaderMetadataCard: View {
         }
     }
 
-    private var mostSevereAuthentication: ProximityReaderAuthentication? {
-        authentications.max { $0.summarySeverity < $1.summarySeverity }
-    }
-
-    private var authenticationSummary: String? {
-        guard let authentication = mostSevereAuthentication else { return nil }
-        if authentication.validity == .malformed || authentication.validity == .invalid {
-            return authentication.validity.label
+    private var authenticationSummary: String {
+        switch summary {
+        case .absent: ProximityReaderAuthenticationValidity.absent.label
+        case .malformed: ProximityReaderAuthenticationValidity.malformed.label
+        case .invalid: ProximityReaderAuthenticationValidity.invalid.label
+        case .revoked: ProximityReaderTrustState.revoked.label
+        case .partial: String(localized: "Authentication missing for part of the request")
+        case .validButUntrusted: ProximityReaderTrustState.validButUntrusted.label
+        case .trusted: ProximityReaderTrustState.trusted.label
         }
-        if authentication.trust == .revoked {
-            return authentication.trust.label
-        }
-        if authentications.contains(where: { $0.validity == .absent }) {
-            return String(localized: "Authentication missing for part of the request")
-        }
-        return authentication.trust.label
     }
 
     var body: some View {
@@ -321,11 +323,9 @@ private struct ProximityReaderMetadataCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(readerDisplayName)
                         .font(.headline)
-                    if let authenticationSummary {
-                        Text(authenticationSummary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(authenticationSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             } details: {
                 VStack(alignment: .leading, spacing: 8) {
@@ -389,20 +389,6 @@ private struct ProximityReaderMetadataCard: View {
                 return String(localized: "Document: \(displayName)")
             }
             return String(localized: "Document request \(requestIndex + 1)")
-        }
-    }
-}
-
-private extension ProximityReaderAuthentication {
-    var summarySeverity: Int {
-        switch (validity, trust) {
-        case (.malformed, _): 7
-        case (.invalid, _): 6
-        case (.valid, .revoked): 5
-        case (.absent, _): 4
-        case (.valid, .validButUntrusted): 3
-        case (.valid, .notEvaluated): 2
-        case (.valid, .trusted): 1
         }
     }
 }
