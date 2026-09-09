@@ -209,21 +209,21 @@ trusted reader, provision Reader CA certificates out of band and pass the shared
 evaluator explicitly:
 
 ```kotlin
-val readerTrust = MobileWalletProximityConfiguredReaderTrustEvaluator(
-    MobileWalletProximityReaderTrustConfiguration(
+val readerTrust = ProximityConfiguredReaderTrustEvaluator(
+    ProximityReaderTrustConfiguration(
         trustAnchors = listOf(
-            MobileWalletProximityReaderTrustAnchor(
+            ProximityReaderTrustAnchor(
                 certificateDerBase64Url = readerCaDerBase64Url,
                 displayName = "Example reader authority",
             )
         ),
-        revocationPolicy = MobileWalletProximityReaderRevocationPolicy.Check(
+        revocationPolicy = ProximityReaderRevocationPolicy.Check(
             applicationRevocationEvaluator
         ),
     )
 )
-val configuration = MobileWalletProximityConfiguration(
-    readerPolicy = MobileWalletProximityReaderPolicy.RequireTrusted,
+val configuration = ProximityConfiguration(
+    readerPolicy = ProximityReaderPolicy.RequireTrusted,
     readerTrustEvaluator = readerTrust,
 )
 ```
@@ -240,10 +240,10 @@ For CRL checking, configure the shared verifier with public certificates from th
 reader's issuer path and application-owned transport:
 
 ```kotlin
-val applicationRevocationEvaluator = MobileWalletProximityCrlRevocationEvaluator(
+val applicationRevocationEvaluator = ProximityCrlRevocationEvaluator(
     issuerCertificatesDerBase64Url = listOf(readerCaDerBase64Url),
-    scope = MobileWalletProximityCrlScope.ReaderCertificateAndIssuingAuthorities,
-    fetcher = MobileWalletProximityCrlFetcher { url, maximumBytes ->
+    scope = ProximityCrlScope.ReaderCertificateAndIssuingAuthorities,
+    fetcher = ProximityCrlFetcher { url, maximumBytes ->
         // Apply application destination, redirect, timeout, and byte-limit policy.
         // Return Available with unpadded Base64URL DER, or Unavailable.
         applicationCrlClient.fetch(url, maximumBytes)
@@ -268,8 +268,8 @@ trust settings do not configure a CRL client. OCSP needs a separate request and
 signed-response verifier and is not implemented by this evaluator.
 
 Wallet applications that let holders manage this policy can persist a canonical
-`MobileWalletProximityReaderTrustSettings` snapshot. Use
-`MobileWalletProximityReaderTrustSettingsCodec.prepareImport` to validate and
+`ProximityReaderTrustSettings` snapshot. Use
+`ProximityReaderTrustSettingsCodec.prepareImport` to validate and
 preview public trust material before saving the returned settings. The importer
 accepts DER or certificate-only PEM Reader CAs and versioned walt.id JSON trust
 bundles containing named Reader CAs and static signed RICAL configuration. It
@@ -304,7 +304,7 @@ unpadded Base64URL and unknown fields are rejected:
 ```
 
 Read one immutable settings snapshot when a new session starts and apply it with
-`MobileWalletProximityReaderTrustSettings.applyTo`. Settings changed during a
+`ProximityReaderTrustSettings.applyTo`. Settings changed during a
 session therefore affect only the next session. The demo wallets expose this as
 **Settings → Credential Sharing → Reader Authentication** and store only the
 canonical public configuration in app-private storage.

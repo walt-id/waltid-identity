@@ -99,10 +99,10 @@ struct ProximityPresentationView: View {
 }
 
 private struct ProximityPrerequisiteContent: View {
-    let capabilities: ProximityPresentationCapabilities
-    let actionInProgress: ProximityPresentationRemediationAction?
+    let capabilities: ProximityCapabilities
+    let actionInProgress: ProximityRemediationAction?
     let onRetry: () -> Void
-    let onRemediate: (ProximityPresentationRemediationAction) -> Void
+    let onRemediate: (ProximityRemediationAction) -> Void
 
     var body: some View {
         ReviewMetadataSection(
@@ -145,7 +145,7 @@ private struct ProximityPrerequisiteContent: View {
 }
 
 private struct ProximityEngagementContent: View {
-    let engagements: [ProximityPresentationEngagement]
+    let engagements: [ProximityEngagement]
     let connecting: Bool
 
     var body: some View {
@@ -181,7 +181,7 @@ private struct ProximityEngagementContent: View {
 }
 
 private struct ProximityReviewContent: View {
-    let review: ProximityPresentationReview
+    let review: ProximityReview
     let selections: [ProximityDocumentSelection]
     let credentialDetailsByID: [String: CredentialDetails]
     let onSelectCredential: (Int, String) -> Void
@@ -658,7 +658,7 @@ final class ProximityScreenPolicy: ObservableObject {
     }
 }
 
-private extension ProximityPresentationRemediationAction {
+private extension ProximityRemediationAction {
     var label: String {
         switch self {
         case .requestBluetoothPermission: String(localized: "Allow Bluetooth")

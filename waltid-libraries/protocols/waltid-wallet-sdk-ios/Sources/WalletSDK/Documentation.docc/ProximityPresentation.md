@@ -79,7 +79,7 @@ trust facts, document requests, retention intent, eligible credentials,
 disclosure alternatives, use-case and purpose assertions, and any recognized
 application authorization. These are protocol facts, not UI-derived state.
 
-Build ``ProximityPresentationSubmission`` only from the current review and dispatch
+Build ``ProximitySubmission`` only from the current review and dispatch
 `.approve(reviewID: review.reviewID, submission: submission)` or
 `.decline(reviewID: review.reviewID)`. A valid decision consumes that identity once;
 invalid submissions leave the review available for correction. Acceptance records
@@ -116,7 +116,7 @@ let readerTrust = ProximityConfiguredReaderTrustEvaluator(
         revocationPolicy: .check(applicationRevocationEvaluator)
     )
 )
-let configuration = ProximityPresentationConfiguration(
+let configuration = ProximityConfiguration(
     readerPolicy: .requireTrusted,
     readerTrustEvaluator: readerTrust
 )

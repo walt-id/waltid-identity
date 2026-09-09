@@ -23,7 +23,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 /** Persisted Reader CA trust material selected by the holder. */
-public data class MobileWalletProximityStoredReaderTrustAnchor(
+public data class ProximityStoredReaderTrustAnchor(
     /** DER certificate encoded as unpadded Base64URL. */
     public val certificateDerBase64Url: String,
     /** Holder-visible name for the authority. */
@@ -36,7 +36,7 @@ public data class MobileWalletProximityStoredReaderTrustAnchor(
 }
 
 /** Persisted, already validated static qualification RICAL provider. */
-public data class MobileWalletProximityStoredRicalProvider(
+public data class ProximityStoredRicalProvider(
     /** Stable application-owned identifier for this provider. */
     public val providerId: String,
     /** RICAL list types this provider is allowed to supply. */
@@ -61,14 +61,14 @@ public data class MobileWalletProximityStoredRicalProvider(
 }
 
 /** Complete holder-owned Reader Authentication settings snapshot. */
-public data class MobileWalletProximityReaderTrustSettings(
+public data class ProximityReaderTrustSettings(
     /** Reader policy applied after the configured trust evidence is evaluated. */
-    public val readerPolicy: MobileWalletProximityReaderPolicy =
-        MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
+    public val readerPolicy: ProximityReaderPolicy =
+        ProximityReaderPolicy.AllowAnonymousOrUntrusted,
     /** Validated Reader CA trust anchors available to new sessions. */
-    public val trustAnchors: List<MobileWalletProximityStoredReaderTrustAnchor> = emptyList(),
+    public val trustAnchors: List<ProximityStoredReaderTrustAnchor> = emptyList(),
     /** Validated static RICAL providers available to new sessions. */
-    public val ricalProviders: List<MobileWalletProximityStoredRicalProvider> = emptyList(),
+    public val ricalProviders: List<ProximityStoredRicalProvider> = emptyList(),
 ) {
     init {
         require(trustAnchors.distinctBy { it.certificateDerBase64Url }.size == trustAnchors.size) {
@@ -81,28 +81,28 @@ public data class MobileWalletProximityReaderTrustSettings(
 
     /** Applies this immutable settings snapshot to one new proximity session. */
     public fun applyTo(
-        configuration: MobileWalletProximityConfiguration,
-    ): MobileWalletProximityConfiguration {
+        configuration: ProximityConfiguration,
+    ): ProximityConfiguration {
         val trustConfiguration = if (trustAnchors.isEmpty() && ricalProviders.isEmpty()) null else
-            MobileWalletProximityReaderTrustConfiguration(
+            ProximityReaderTrustConfiguration(
                 trustAnchors = trustAnchors.map {
-                    MobileWalletProximityReaderTrustAnchor(
+                    ProximityReaderTrustAnchor(
                         certificateDerBase64Url = it.certificateDerBase64Url,
                         displayName = it.displayName,
                     )
                 },
                 ricalProviders = ricalProviders.map { stored ->
-                    MobileWalletProximityRicalConfiguration(
+                    ProximityRicalConfiguration(
                         providerId = stored.providerId,
                         acceptedTypes = stored.acceptedTypes,
                         providerTrustAnchors = stored.providerTrustAnchorsDerBase64Url.map {
-                            MobileWalletProximityRicalProviderTrustAnchor(it)
+                            ProximityRicalProviderTrustAnchor(it)
                         },
                         acceptedSignerCertificatePolicyOids =
                             stored.acceptedSignerCertificatePolicyOids,
                         establishReaderTrust = stored.establishReaderTrust,
-                        provider = MobileWalletProximityRicalProvider {
-                            MobileWalletProximityRicalProviderResult.Available(
+                        provider = ProximityRicalProvider {
+                            ProximityRicalProviderResult.Available(
                                 stored.signedRicalBase64Url
                             )
                         },
@@ -112,14 +112,14 @@ public data class MobileWalletProximityReaderTrustSettings(
         return configuration.copy(
             readerPolicy = readerPolicy,
             readerTrustEvaluator = trustConfiguration?.let(
-                ::MobileWalletProximityConfiguredReaderTrustEvaluator
-            ) ?: UnconfiguredMobileWalletProximityReaderTrustEvaluator,
+                ::ProximityConfiguredReaderTrustEvaluator
+            ) ?: UnconfiguredProximityReaderTrustEvaluator,
         )
     }
 }
 
 /** Kind of public reader-trust material represented by an import preview. */
-public enum class MobileWalletProximityReaderTrustImportKind {
+public enum class ProximityReaderTrustImportKind {
     /** One or more public Reader CA certificates. */
     ReaderCa,
     /** A versioned walt.id reader-trust bundle. */
@@ -127,7 +127,7 @@ public enum class MobileWalletProximityReaderTrustImportKind {
 }
 
 /** Display-safe preview of an imported Reader CA. */
-public data class MobileWalletProximityReaderTrustAnchorPreview(
+public data class ProximityReaderTrustAnchorPreview(
     /** Holder-visible authority name proposed for persistence. */
     public val displayName: String,
     /** Display-safe certificate subject. */
@@ -145,7 +145,7 @@ public data class MobileWalletProximityReaderTrustAnchorPreview(
 )
 
 /** Display-safe preview of a validated static RICAL provider. */
-public data class MobileWalletProximityRicalPreview(
+public data class ProximityRicalPreview(
     /** Stable provider identifier from the imported bundle. */
     public val providerId: String,
     /** Holder-visible provider name. */
@@ -163,30 +163,30 @@ public data class MobileWalletProximityRicalPreview(
 )
 
 /** Import review which must be explicitly confirmed before its settings are persisted. */
-public data class MobileWalletProximityReaderTrustImportPreview(
+public data class ProximityReaderTrustImportPreview(
     /** Kind of imported public trust material. */
-    public val kind: MobileWalletProximityReaderTrustImportKind,
+    public val kind: ProximityReaderTrustImportKind,
     /** Original display-safe file name supplied by the platform picker. */
     public val sourceName: String,
     /** Reader CA previews added by this import. */
-    public val readerAuthorities: List<MobileWalletProximityReaderTrustAnchorPreview>,
+    public val readerAuthorities: List<ProximityReaderTrustAnchorPreview>,
     /** RICAL provider previews added by this import. */
-    public val ricalProviders: List<MobileWalletProximityRicalPreview>,
+    public val ricalProviders: List<ProximityRicalPreview>,
     /** Complete immutable settings that will replace the prior value after confirmation. */
-    public val resultingSettings: MobileWalletProximityReaderTrustSettings,
+    public val resultingSettings: ProximityReaderTrustSettings,
 ) {
     /** Display-safe description of the policy enforced by [resultingSettings]. */
     public val policyEffect: String
         get() = when (resultingSettings.readerPolicy) {
-            MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted ->
+            ProximityReaderPolicy.AllowAnonymousOrUntrusted ->
                 "Untrusted readers may still reach holder consent"
-            MobileWalletProximityReaderPolicy.RequireTrusted ->
+            ProximityReaderPolicy.RequireTrusted ->
                 "Only readers trusted by the configured material may reach holder consent"
         }
 }
 
 /** Strict codec and importer for holder-owned Reader Authentication settings. */
-public object MobileWalletProximityReaderTrustSettingsCodec {
+public object ProximityReaderTrustSettingsCodec {
     /** Maximum accepted encoded settings or import-file size in bytes. */
     public const val MaximumImportBytes: Int = 1_048_576
 
@@ -197,7 +197,7 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
     }
 
     /** Encodes validated settings into the versioned app-private persistence representation. */
-    public fun encode(settings: MobileWalletProximityReaderTrustSettings): String =
+    public fun encode(settings: ProximityReaderTrustSettings): String =
         json.encodeToString(settings.toPersisted())
 
     /**
@@ -206,7 +206,7 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
      * @throws IllegalArgumentException when the representation is malformed or unsupported.
      */
     @Throws(IllegalArgumentException::class)
-    public fun decode(encoded: String): MobileWalletProximityReaderTrustSettings = try {
+    public fun decode(encoded: String): ProximityReaderTrustSettings = try {
         json.decodeFromString<PersistedSettings>(encoded).toPublic().also(::validateStoredShape)
     } catch (error: IllegalArgumentException) {
         throw error
@@ -221,9 +221,9 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
     public suspend fun prepareImport(
         sourceName: String,
         bytes: ByteArray,
-        existing: MobileWalletProximityReaderTrustSettings,
+        existing: ProximityReaderTrustSettings,
         now: Instant = Clock.System.now(),
-    ): MobileWalletProximityReaderTrustImportPreview = try {
+    ): ProximityReaderTrustImportPreview = try {
         require(sourceName.isNotBlank()) { "The imported file must have a name" }
         require(bytes.isNotEmpty()) { "The imported file is empty" }
         require(bytes.size <= MaximumImportBytes) { "The imported file exceeds 1 MiB" }
@@ -252,9 +252,9 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
         sourceName: String,
         bytes: ByteArray,
         text: String,
-        existing: MobileWalletProximityReaderTrustSettings,
+        existing: ProximityReaderTrustSettings,
         now: Instant,
-    ): MobileWalletProximityReaderTrustImportPreview {
+    ): ProximityReaderTrustImportPreview {
         val certificates = if (text.contains("-----BEGIN")) parseStrictCertificatePem(text) else listOf(
             parseCertificate(bytes)
         )
@@ -271,13 +271,13 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
             certificate.preview(defaultDisplayName(sourceName, certificate, index, certificates.size))
         }
         val importedAnchors = certificates.zip(previews).map { (certificate, preview) ->
-            MobileWalletProximityStoredReaderTrustAnchor(
+            ProximityStoredReaderTrustAnchor(
                 certificateDerBase64Url = certificate.encodedDer.toByteArray().encodeBase64Url(),
                 displayName = preview.displayName,
             )
         }
-        return MobileWalletProximityReaderTrustImportPreview(
-            kind = MobileWalletProximityReaderTrustImportKind.ReaderCa,
+        return ProximityReaderTrustImportPreview(
+            kind = ProximityReaderTrustImportKind.ReaderCa,
             sourceName = sourceName,
             readerAuthorities = previews,
             ricalProviders = emptyList(),
@@ -288,9 +288,9 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
     private suspend fun prepareBundleImport(
         sourceName: String,
         text: String,
-        existing: MobileWalletProximityReaderTrustSettings,
+        existing: ProximityReaderTrustSettings,
         now: Instant,
-    ): MobileWalletProximityReaderTrustImportPreview {
+    ): ProximityReaderTrustImportPreview {
         val bundle = json.decodeFromString<TrustBundle>(text)
         require(bundle.version == BundleVersion) { "Unsupported reader trust bundle version" }
         require(bundle.type == BundleType) { "Unsupported reader trust bundle type" }
@@ -311,7 +311,7 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
             certificate.preview(anchor.name)
         }
         val storedAnchors = bundle.readerAuthorities.mapIndexed { index, anchor ->
-            MobileWalletProximityStoredReaderTrustAnchor(
+            ProximityStoredReaderTrustAnchor(
                 certificateDerBase64Url =
                     parseCertificate(anchor.certificateDerBase64Url.decodeBase64Url())
                         .encodedDer.toByteArray().encodeBase64Url(),
@@ -320,7 +320,7 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
         }
 
         val providerIds = existing.ricalProviders.mapTo(mutableSetOf()) { it.providerId }
-        val ricalPreviews = mutableListOf<MobileWalletProximityRicalPreview>()
+        val ricalPreviews = mutableListOf<ProximityRicalPreview>()
         val storedProviders = bundle.ricalProviders.map { provider ->
             require(providerIds.add(provider.providerId)) {
                 "Duplicate RICAL provider identifier: ${provider.providerId}"
@@ -363,7 +363,7 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
                 roots.map { ImmutableBytes.of(it.encodedDer.toByteArray()) },
             )
             require(signatureValid) { "RICAL signature, signer profile, or signer path is invalid" }
-            ricalPreviews += MobileWalletProximityRicalPreview(
+            ricalPreviews += ProximityRicalPreview(
                 providerId = provider.providerId,
                 providerName = signed.rical.provider,
                 type = signed.rical.type,
@@ -372,7 +372,7 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
                 validUntil = signed.rical.notAfter,
                 establishesReaderTrust = provider.establishReaderTrust,
             )
-            MobileWalletProximityStoredRicalProvider(
+            ProximityStoredRicalProvider(
                 providerId = provider.providerId,
                 acceptedTypes = provider.acceptedTypes,
                 providerTrustAnchorsDerBase64Url = roots.map {
@@ -383,8 +383,8 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
                 signedRicalBase64Url = signed.exactMessage.copy().encodeBase64Url(),
             )
         }
-        return MobileWalletProximityReaderTrustImportPreview(
-            kind = MobileWalletProximityReaderTrustImportKind.TrustBundle,
+        return ProximityReaderTrustImportPreview(
+            kind = ProximityReaderTrustImportKind.TrustBundle,
             sourceName = sourceName,
             readerAuthorities = readerPreviews,
             ricalProviders = ricalPreviews,
@@ -432,7 +432,7 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
     }
 
     private fun X509Certificate.preview(displayName: String) =
-        MobileWalletProximityReaderTrustAnchorPreview(
+        ProximityReaderTrustAnchorPreview(
             displayName = displayName,
             subject = data.subjectDn,
             issuer = data.issuerDn,
@@ -451,7 +451,7 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
     ): String = certificate.data.subjectDn.takeIf(String::isNotBlank)
         ?: if (count == 1) sourceName else "$sourceName (${index + 1})"
 
-    private fun validateStoredShape(settings: MobileWalletProximityReaderTrustSettings) {
+    private fun validateStoredShape(settings: ProximityReaderTrustSettings) {
         settings.trustAnchors.forEach {
             parseCertificate(it.certificateDerBase64Url.decodeBase64Url())
         }
@@ -511,11 +511,11 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
         val certificateDerBase64Url: String,
     )
 
-    private fun MobileWalletProximityReaderTrustSettings.toPersisted() = PersistedSettings(
+    private fun ProximityReaderTrustSettings.toPersisted() = PersistedSettings(
         readerPolicy = when (readerPolicy) {
-            MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted ->
+            ProximityReaderPolicy.AllowAnonymousOrUntrusted ->
                 PersistedReaderPolicy.AllowAnonymousOrUntrusted
-            MobileWalletProximityReaderPolicy.RequireTrusted -> PersistedReaderPolicy.RequireTrusted
+            ProximityReaderPolicy.RequireTrusted -> PersistedReaderPolicy.RequireTrusted
         },
         readerAuthorities = trustAnchors.map {
             PersistedReaderAuthority(it.displayName, it.certificateDerBase64Url)
@@ -532,19 +532,19 @@ public object MobileWalletProximityReaderTrustSettingsCodec {
         },
     )
 
-    private fun PersistedSettings.toPublic(): MobileWalletProximityReaderTrustSettings {
+    private fun PersistedSettings.toPublic(): ProximityReaderTrustSettings {
         require(version == SettingsVersion) { "Unsupported reader trust settings version" }
-        return MobileWalletProximityReaderTrustSettings(
+        return ProximityReaderTrustSettings(
             readerPolicy = when (readerPolicy) {
                 PersistedReaderPolicy.AllowAnonymousOrUntrusted ->
-                    MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted
-                PersistedReaderPolicy.RequireTrusted -> MobileWalletProximityReaderPolicy.RequireTrusted
+                    ProximityReaderPolicy.AllowAnonymousOrUntrusted
+                PersistedReaderPolicy.RequireTrusted -> ProximityReaderPolicy.RequireTrusted
             },
             trustAnchors = readerAuthorities.map {
-                MobileWalletProximityStoredReaderTrustAnchor(it.certificateDerBase64Url, it.name)
+                ProximityStoredReaderTrustAnchor(it.certificateDerBase64Url, it.name)
             },
             ricalProviders = ricalProviders.map {
-                MobileWalletProximityStoredRicalProvider(
+                ProximityStoredRicalProvider(
                     providerId = it.providerId,
                     acceptedTypes = it.acceptedTypes,
                     providerTrustAnchorsDerBase64Url = it.providerTrustAnchorsDerBase64Url,

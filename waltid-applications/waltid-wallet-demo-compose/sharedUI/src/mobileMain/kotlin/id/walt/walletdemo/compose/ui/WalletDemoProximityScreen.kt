@@ -41,25 +41,25 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import id.walt.wallet2.mobile.MobileWalletProximityActionType
-import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
-import id.walt.wallet2.mobile.MobileWalletProximityCredentialOption
-import id.walt.wallet2.mobile.MobileWalletProximityDeviceAuthenticationMethod
-import id.walt.wallet2.mobile.MobileWalletProximityDocumentReview
-import id.walt.wallet2.mobile.MobileWalletProximityElementReference
-import id.walt.wallet2.mobile.MobileWalletProximityEngagement
-import id.walt.wallet2.mobile.MobileWalletProximityError
-import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthentication
-import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthenticationScope
-import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthenticationValidity
-import id.walt.wallet2.mobile.MobileWalletProximityRecovery
-import id.walt.wallet2.mobile.MobileWalletProximityReaderCertificatePathState
-import id.walt.wallet2.mobile.MobileWalletProximityReaderRevocationState
-import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustState
-import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
-import id.walt.wallet2.mobile.MobileWalletProximityReview
-import id.walt.wallet2.mobile.MobileWalletProximityRicalState
-import id.walt.wallet2.mobile.MobileWalletProximityState
+import id.walt.wallet2.mobile.ProximityActionType
+import id.walt.wallet2.mobile.ProximityCapabilities
+import id.walt.wallet2.mobile.ProximityCredentialOption
+import id.walt.wallet2.mobile.ProximityDeviceAuthenticationMethod
+import id.walt.wallet2.mobile.ProximityDocumentReview
+import id.walt.wallet2.mobile.ProximityElementReference
+import id.walt.wallet2.mobile.ProximityEngagement
+import id.walt.wallet2.mobile.ProximityError
+import id.walt.wallet2.mobile.ProximityReaderAuthentication
+import id.walt.wallet2.mobile.ProximityReaderAuthenticationScope
+import id.walt.wallet2.mobile.ProximityReaderAuthenticationValidity
+import id.walt.wallet2.mobile.ProximityRecovery
+import id.walt.wallet2.mobile.ProximityReaderCertificatePathState
+import id.walt.wallet2.mobile.ProximityReaderRevocationState
+import id.walt.wallet2.mobile.ProximityReaderTrustState
+import id.walt.wallet2.mobile.ProximityRemediationAction
+import id.walt.wallet2.mobile.ProximityReview
+import id.walt.wallet2.mobile.ProximityRicalState
+import id.walt.wallet2.mobile.ProximityState
 import id.walt.wallet2.mobile.legalActions
 import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.CredentialDetails
@@ -107,7 +107,7 @@ fun MobileWalletDemoApp(
         credentials.associate { credential -> credential.id to credential.toCredentialDetails() }
     }
     val qrVisible = walletState.selectedTab == WalletDemoTab.Present &&
-        proximity.sessionState.engagements().any { it is MobileWalletProximityEngagement.Qr }
+        proximity.sessionState.engagements().any { it is ProximityEngagement.Qr }
 
     ProximityPlatformSessionEffect(
         active = proximity.active && !proximity.isTerminal,
@@ -162,15 +162,15 @@ internal fun WalletDemoProximityScreen(
     state: WalletDemoProximityUiState,
     credentialDetailsById: Map<String, CredentialDetails>,
     hostActions: WalletDemoProximityHostActionExecutor,
-    hostActionForDisplay: (MobileWalletProximityRemediationAction) ->
-        MobileWalletProximityRemediationAction = { it },
+    hostActionForDisplay: (ProximityRemediationAction) ->
+        ProximityRemediationAction = { it },
     onSelectCredential: (Int, String) -> Unit,
-    onToggleElement: (Int, MobileWalletProximityElementReference) -> Unit,
+    onToggleElement: (Int, ProximityElementReference) -> Unit,
     onContinueAfterResponseChange: (Boolean) -> Unit,
     onApprove: () -> Unit,
     onDecline: () -> Unit,
     onRetry: () -> Unit,
-    onRemediate: (MobileWalletProximityRemediationAction, WalletDemoProximityHostActionExecutor) -> Unit,
+    onRemediate: (ProximityRemediationAction, WalletDemoProximityHostActionExecutor) -> Unit,
     onCancel: () -> Unit,
     onDismiss: () -> Unit,
     onRestart: () -> Unit,
@@ -178,11 +178,11 @@ internal fun WalletDemoProximityScreen(
     val sessionState = state.sessionState
     val terminal = state.isTerminal
     val canCancel = !terminal && (
-        sessionState == null || MobileWalletProximityActionType.Cancel in sessionState.legalActions
+        sessionState == null || ProximityActionType.Cancel in sessionState.legalActions
     )
     val screenTitle = stringResource(Res.string.proximity_in_person_title)
     SystemBackHandler(
-        enabled = sessionState !is MobileWalletProximityState.ReviewRequired && (terminal || canCancel),
+        enabled = sessionState !is ProximityState.ReviewRequired && (terminal || canCancel),
     ) {
         if (terminal) onDismiss() else onCancel()
     }
@@ -193,7 +193,7 @@ internal fun WalletDemoProximityScreen(
             .testTag(WalletUiTestTags.ProximityScreen)
             .semantics { paneTitle = screenTitle },
     ) {
-        if (sessionState is MobileWalletProximityState.ReviewRequired) {
+        if (sessionState is ProximityState.ReviewRequired) {
             WalletDemoProximityReview(
                 state = state,
                 review = sessionState.review,
@@ -221,35 +221,35 @@ internal fun WalletDemoProximityScreen(
                 state.actionError?.let { ProximityErrorCard(it) }
                 when (sessionState) {
                     null -> ProgressContent(stringResource(Res.string.proximity_checking_device))
-                    is MobileWalletProximityState.CheckingPrerequisites -> PrerequisiteContent(
+                    is ProximityState.CheckingPrerequisites -> PrerequisiteContent(
                         capabilities = sessionState.capabilities,
                         hostActionInProgress = state.hostActionInProgress,
                         hostActionForDisplay = hostActionForDisplay,
                         onRetry = onRetry,
                         onRemediate = { onRemediate(it, hostActions) },
                     )
-                    is MobileWalletProximityState.Preparing ->
+                    is ProximityState.Preparing ->
                         ProgressContent(stringResource(Res.string.proximity_preparing))
-                    is MobileWalletProximityState.EngagementReady -> EngagementContent(
+                    is ProximityState.EngagementReady -> EngagementContent(
                         engagements = sessionState.engagements,
                         connecting = false,
                     )
-                    is MobileWalletProximityState.Connecting -> EngagementContent(
+                    is ProximityState.Connecting -> EngagementContent(
                         engagements = sessionState.engagements,
                         connecting = true,
                     )
-                    is MobileWalletProximityState.AwaitingRequest ->
+                    is ProximityState.AwaitingRequest ->
                         ProgressContent(stringResource(Res.string.proximity_awaiting_request))
-                    is MobileWalletProximityState.ReviewRequired -> Unit
-                    is MobileWalletProximityState.AuthorizingHolderKey ->
+                    is ProximityState.ReviewRequired -> Unit
+                    is ProximityState.AuthorizingHolderKey ->
                         ProgressContent(stringResource(Res.string.proximity_authenticating))
-                    is MobileWalletProximityState.SendingResponse ->
+                    is ProximityState.SendingResponse ->
                         ProgressContent(stringResource(Res.string.proximity_send_response))
-                    is MobileWalletProximityState.AwaitingNextRequest ->
+                    is ProximityState.AwaitingNextRequest ->
                         ProgressContent(stringResource(Res.string.proximity_awaiting_next_request))
-                    is MobileWalletProximityState.Terminating ->
+                    is ProximityState.Terminating ->
                         ProgressContent(stringResource(Res.string.proximity_terminating))
-                    is MobileWalletProximityState.Completed -> TerminalContent(
+                    is ProximityState.Completed -> TerminalContent(
                         title = if (sessionState.declined) {
                             stringResource(Res.string.proximity_declined_title)
                         } else {
@@ -262,15 +262,15 @@ internal fun WalletDemoProximityScreen(
                         },
                         onDismiss = onDismiss,
                     )
-                    MobileWalletProximityState.Cancelled -> TerminalContent(
+                    ProximityState.Cancelled -> TerminalContent(
                         title = stringResource(Res.string.proximity_cancelled_title),
                         message = stringResource(Res.string.proximity_cancelled_message),
                         onDismiss = onDismiss,
                     )
-                    is MobileWalletProximityState.Failed -> FailedContent(
+                    is ProximityState.Failed -> FailedContent(
                         error = sessionState.error,
                         onDismiss = onDismiss,
-                        onRetry = if (sessionState.error.recovery == MobileWalletProximityRecovery.StartNewSession) onRestart else null,
+                        onRetry = if (sessionState.error.recovery == ProximityRecovery.StartNewSession) onRestart else null,
                     )
                 }
             }
@@ -281,10 +281,10 @@ internal fun WalletDemoProximityScreen(
 @Composable
 private fun WalletDemoProximityReview(
     state: WalletDemoProximityUiState,
-    review: MobileWalletProximityReview,
+    review: ProximityReview,
     credentialDetailsById: Map<String, CredentialDetails>,
     onSelectCredential: (Int, String) -> Unit,
-    onToggleElement: (Int, MobileWalletProximityElementReference) -> Unit,
+    onToggleElement: (Int, ProximityElementReference) -> Unit,
     onContinueAfterResponseChange: (Boolean) -> Unit,
     onApprove: () -> Unit,
     onDecline: () -> Unit,
@@ -320,11 +320,11 @@ private fun WalletDemoProximityReview(
 
 @Composable
 private fun PrerequisiteContent(
-    capabilities: MobileWalletProximityCapabilities,
-    hostActionInProgress: MobileWalletProximityRemediationAction?,
-    hostActionForDisplay: (MobileWalletProximityRemediationAction) -> MobileWalletProximityRemediationAction,
+    capabilities: ProximityCapabilities,
+    hostActionInProgress: ProximityRemediationAction?,
+    hostActionForDisplay: (ProximityRemediationAction) -> ProximityRemediationAction,
     onRetry: () -> Unit,
-    onRemediate: (MobileWalletProximityRemediationAction) -> Unit,
+    onRemediate: (ProximityRemediationAction) -> Unit,
 ) {
     ReviewMetadataSection(
         title = stringResource(
@@ -364,10 +364,10 @@ private fun PrerequisiteContent(
 
 @Composable
 private fun EngagementContent(
-    engagements: List<MobileWalletProximityEngagement>,
+    engagements: List<ProximityEngagement>,
     connecting: Boolean,
 ) {
-    val qr = engagements.filterIsInstance<MobileWalletProximityEngagement.Qr>().singleOrNull()
+    val qr = engagements.filterIsInstance<ProximityEngagement.Qr>().singleOrNull()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -425,12 +425,12 @@ private fun EngagementContent(
 
 @Composable
 private fun ReviewContent(
-    review: MobileWalletProximityReview,
+    review: ProximityReview,
     selections: List<WalletDemoProximityDocumentSelection>,
     credentialDetailsById: Map<String, CredentialDetails>,
     continueAfterResponse: Boolean,
     onSelectCredential: (Int, String) -> Unit,
-    onToggleElement: (Int, MobileWalletProximityElementReference) -> Unit,
+    onToggleElement: (Int, ProximityElementReference) -> Unit,
     onContinueAfterResponseChange: (Boolean) -> Unit,
 ) {
     Column(
@@ -499,11 +499,11 @@ private fun ReviewContent(
 
 @Composable
 private fun ReaderMetadataCard(
-    review: MobileWalletProximityReview,
+    review: ProximityReview,
     credentialDetailsById: Map<String, CredentialDetails>,
 ) {
     val suppliedAuthentications = review.readerAuthentication.filterNot {
-        it.validity == MobileWalletProximityReaderAuthenticationValidity.Absent
+        it.validity == ProximityReaderAuthenticationValidity.Absent
     }
     if (suppliedAuthentications.isEmpty()) {
         ReviewMetadataSection(
@@ -526,7 +526,7 @@ private fun ReaderMetadataCard(
     var expanded by rememberSaveable { mutableStateOf(false) }
     val mostSevereAuthentication = review.readerAuthentication.maxByOrNull { it.summarySeverity() }
     val hasMissingAuthentication = review.readerAuthentication.any {
-        it.validity == MobileWalletProximityReaderAuthenticationValidity.Absent
+        it.validity == ProximityReaderAuthenticationValidity.Absent
     }
     val displayNames = suppliedAuthentications.mapNotNull { authentication ->
         authentication.displayName?.trim()?.takeIf(String::isNotEmpty)
@@ -538,13 +538,13 @@ private fun ReaderMetadataCard(
     }
     val supportingText = mostSevereAuthentication?.let { authentication ->
         when {
-            authentication.validity == MobileWalletProximityReaderAuthenticationValidity.Malformed ||
-                authentication.validity == MobileWalletProximityReaderAuthenticationValidity.Invalid ->
+            authentication.validity == ProximityReaderAuthenticationValidity.Malformed ||
+                authentication.validity == ProximityReaderAuthenticationValidity.Invalid ->
                 authentication.validity.displayName()
-            authentication.trust == MobileWalletProximityReaderTrustState.Revoked ->
+            authentication.trust == ProximityReaderTrustState.Revoked ->
                 authentication.trust.displayName()
             hasMissingAuthentication -> stringResource(Res.string.proximity_reader_authentication_partial)
-            authentication.validity != MobileWalletProximityReaderAuthenticationValidity.Valid ->
+            authentication.validity != ProximityReaderAuthenticationValidity.Valid ->
                 authentication.validity.displayName()
             else -> authentication.trust.displayName()
         }
@@ -586,23 +586,23 @@ private fun ReaderMetadataCard(
     )
 }
 
-private fun MobileWalletProximityReaderAuthentication.summarySeverity(): Int = when {
-    validity == MobileWalletProximityReaderAuthenticationValidity.Malformed -> 7
-    validity == MobileWalletProximityReaderAuthenticationValidity.Invalid -> 6
-    trust == MobileWalletProximityReaderTrustState.Revoked -> 5
-    validity == MobileWalletProximityReaderAuthenticationValidity.Absent -> 4
-    trust == MobileWalletProximityReaderTrustState.ValidButUntrusted -> 3
-    trust == MobileWalletProximityReaderTrustState.NotEvaluated -> 2
+private fun ProximityReaderAuthentication.summarySeverity(): Int = when {
+    validity == ProximityReaderAuthenticationValidity.Malformed -> 7
+    validity == ProximityReaderAuthenticationValidity.Invalid -> 6
+    trust == ProximityReaderTrustState.Revoked -> 5
+    validity == ProximityReaderAuthenticationValidity.Absent -> 4
+    trust == ProximityReaderTrustState.ValidButUntrusted -> 3
+    trust == ProximityReaderTrustState.NotEvaluated -> 2
     else -> 1
 }
 
 @Composable
 private fun ReaderAuthenticationContent(
-    authentication: MobileWalletProximityReaderAuthentication,
-    documents: List<MobileWalletProximityDocumentReview>,
+    authentication: ProximityReaderAuthentication,
+    documents: List<ProximityDocumentReview>,
     credentialDetailsById: Map<String, CredentialDetails>,
 ) {
-    val trusted = authentication.trust == MobileWalletProximityReaderTrustState.Trusted
+    val trusted = authentication.trust == ProximityReaderTrustState.Trusted
     Text(
         authentication.displayName ?: stringResource(Res.string.proximity_reader_identity_unavailable),
         fontWeight = FontWeight.SemiBold,
@@ -612,9 +612,9 @@ private fun ReaderAuthenticationContent(
             MetadataDetailItem(
                 stringResource(Res.string.proximity_applies_to),
                 when (val scope = authentication.scope) {
-                    MobileWalletProximityReaderAuthenticationScope.WholeRequest ->
+                    ProximityReaderAuthenticationScope.WholeRequest ->
                         stringResource(Res.string.proximity_whole_request)
-                    is MobileWalletProximityReaderAuthenticationScope.Document -> {
+                    is ProximityReaderAuthenticationScope.Document -> {
                         val document = documents.singleOrNull {
                             it.requestIndex == scope.index
                         }
@@ -653,7 +653,7 @@ private fun ReaderAuthenticationContent(
         )
     )
     authentication.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-    if (!trusted && authentication.validity == MobileWalletProximityReaderAuthenticationValidity.Valid) {
+    if (!trusted && authentication.validity == ProximityReaderAuthenticationValidity.Valid) {
         Text(
             stringResource(Res.string.proximity_reader_trust_warning),
             style = MaterialTheme.typography.bodySmall,
@@ -664,11 +664,11 @@ private fun ReaderAuthenticationContent(
 
 @Composable
 private fun DocumentReviewContent(
-    document: MobileWalletProximityDocumentReview,
+    document: ProximityDocumentReview,
     selection: WalletDemoProximityDocumentSelection?,
     credentialDetailsById: Map<String, CredentialDetails>,
     onSelectCredential: (Int, String) -> Unit,
-    onToggleElement: (Int, MobileWalletProximityElementReference) -> Unit,
+    onToggleElement: (Int, ProximityElementReference) -> Unit,
 ) {
     ReviewMetadataSection(stringResource(Res.string.proximity_credential_to_share)) {
         if (document.credentialOptions.size > 1) {
@@ -692,7 +692,7 @@ private fun DocumentReviewContent(
             HorizontalDivider()
             Text(stringResource(Res.string.proximity_data_to_share), style = MaterialTheme.typography.labelLarge)
             credential.requestedElements.forEach { element ->
-                val reference = MobileWalletProximityElementReference(
+                val reference = ProximityElementReference(
                     namespace = element.namespace,
                     elementIdentifier = element.elementIdentifier,
                 )
@@ -776,7 +776,7 @@ private fun DocumentReviewContent(
 @Composable
 private fun CredentialOption(
     requestIndex: Int,
-    credential: MobileWalletProximityCredentialOption,
+    credential: ProximityCredentialOption,
     details: CredentialDetails?,
     showSelectionControl: Boolean,
     selected: Boolean,
@@ -859,7 +859,7 @@ private fun TerminalContent(title: String, message: String, onDismiss: () -> Uni
 
 @Composable
 private fun FailedContent(
-    error: MobileWalletProximityError,
+    error: ProximityError,
     onDismiss: () -> Unit,
     onRetry: (() -> Unit)?,
 ) {
@@ -879,7 +879,7 @@ private fun FailedContent(
 }
 
 @Composable
-private fun ProximityErrorCard(error: MobileWalletProximityError) {
+private fun ProximityErrorCard(error: ProximityError) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -896,78 +896,78 @@ private fun ProximityErrorCard(error: MobileWalletProximityError) {
     }
 }
 
-private fun MobileWalletProximityState?.engagements(): List<MobileWalletProximityEngagement> = when (this) {
-    is MobileWalletProximityState.EngagementReady -> engagements
-    is MobileWalletProximityState.Connecting -> engagements
+private fun ProximityState?.engagements(): List<ProximityEngagement> = when (this) {
+    is ProximityState.EngagementReady -> engagements
+    is ProximityState.Connecting -> engagements
     else -> emptyList()
 }
 
 @Composable
-private fun MobileWalletProximityRemediationAction.label(): String = stringResource(
+private fun ProximityRemediationAction.label(): String = stringResource(
     when (this) {
-        MobileWalletProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
-        MobileWalletProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings
-        MobileWalletProximityRemediationAction.EnableBluetooth -> Res.string.proximity_enable_bluetooth
-        MobileWalletProximityRemediationAction.UseSupportedDevice -> Res.string.proximity_use_supported_device
-        MobileWalletProximityRemediationAction.Retry -> Res.string.proximity_try_again
+        ProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
+        ProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings
+        ProximityRemediationAction.EnableBluetooth -> Res.string.proximity_enable_bluetooth
+        ProximityRemediationAction.UseSupportedDevice -> Res.string.proximity_use_supported_device
+        ProximityRemediationAction.Retry -> Res.string.proximity_try_again
     }
 )
 
 @Composable
-private fun MobileWalletProximityReaderAuthenticationValidity.displayName(): String = stringResource(
+private fun ProximityReaderAuthenticationValidity.displayName(): String = stringResource(
     when (this) {
-        MobileWalletProximityReaderAuthenticationValidity.Absent -> Res.string.proximity_auth_absent
-        MobileWalletProximityReaderAuthenticationValidity.Malformed -> Res.string.proximity_auth_malformed
-        MobileWalletProximityReaderAuthenticationValidity.Invalid -> Res.string.proximity_auth_invalid
-        MobileWalletProximityReaderAuthenticationValidity.Valid -> Res.string.proximity_auth_valid
+        ProximityReaderAuthenticationValidity.Absent -> Res.string.proximity_auth_absent
+        ProximityReaderAuthenticationValidity.Malformed -> Res.string.proximity_auth_malformed
+        ProximityReaderAuthenticationValidity.Invalid -> Res.string.proximity_auth_invalid
+        ProximityReaderAuthenticationValidity.Valid -> Res.string.proximity_auth_valid
     }
 )
 
 @Composable
-private fun MobileWalletProximityReaderTrustState.displayName(): String = stringResource(
+private fun ProximityReaderTrustState.displayName(): String = stringResource(
     when (this) {
-        MobileWalletProximityReaderTrustState.NotEvaluated -> Res.string.proximity_trust_not_evaluated
-        MobileWalletProximityReaderTrustState.ValidButUntrusted -> Res.string.proximity_trust_untrusted
-        MobileWalletProximityReaderTrustState.Revoked -> Res.string.proximity_trust_revoked
-        MobileWalletProximityReaderTrustState.Trusted -> Res.string.proximity_trust_trusted
+        ProximityReaderTrustState.NotEvaluated -> Res.string.proximity_trust_not_evaluated
+        ProximityReaderTrustState.ValidButUntrusted -> Res.string.proximity_trust_untrusted
+        ProximityReaderTrustState.Revoked -> Res.string.proximity_trust_revoked
+        ProximityReaderTrustState.Trusted -> Res.string.proximity_trust_trusted
     }
 )
 
 @Composable
-private fun MobileWalletProximityReaderCertificatePathState.displayName(): String = stringResource(
+private fun ProximityReaderCertificatePathState.displayName(): String = stringResource(
     when (this) {
-        MobileWalletProximityReaderCertificatePathState.NotEvaluated -> Res.string.proximity_not_evaluated
-        MobileWalletProximityReaderCertificatePathState.UnknownAuthority -> Res.string.proximity_unknown_authority
-        MobileWalletProximityReaderCertificatePathState.Invalid -> Res.string.proximity_auth_invalid
-        MobileWalletProximityReaderCertificatePathState.Valid -> Res.string.proximity_auth_valid
+        ProximityReaderCertificatePathState.NotEvaluated -> Res.string.proximity_not_evaluated
+        ProximityReaderCertificatePathState.UnknownAuthority -> Res.string.proximity_unknown_authority
+        ProximityReaderCertificatePathState.Invalid -> Res.string.proximity_auth_invalid
+        ProximityReaderCertificatePathState.Valid -> Res.string.proximity_auth_valid
     }
 )
 
 @Composable
-private fun MobileWalletProximityReaderRevocationState.displayName(): String = stringResource(
+private fun ProximityReaderRevocationState.displayName(): String = stringResource(
     when (this) {
-        MobileWalletProximityReaderRevocationState.NotChecked -> Res.string.proximity_not_checked
-        MobileWalletProximityReaderRevocationState.Good -> Res.string.proximity_revocation_good
-        MobileWalletProximityReaderRevocationState.Revoked -> Res.string.proximity_trust_revoked
-        MobileWalletProximityReaderRevocationState.Indeterminate -> Res.string.proximity_indeterminate
+        ProximityReaderRevocationState.NotChecked -> Res.string.proximity_not_checked
+        ProximityReaderRevocationState.Good -> Res.string.proximity_revocation_good
+        ProximityReaderRevocationState.Revoked -> Res.string.proximity_trust_revoked
+        ProximityReaderRevocationState.Indeterminate -> Res.string.proximity_indeterminate
     }
 )
 
 @Composable
-private fun MobileWalletProximityRicalState.displayName(): String = stringResource(
+private fun ProximityRicalState.displayName(): String = stringResource(
     when (this) {
-        MobileWalletProximityRicalState.NotEvaluated -> Res.string.proximity_not_evaluated
-        MobileWalletProximityRicalState.Unavailable -> Res.string.proximity_unavailable
-        MobileWalletProximityRicalState.Invalid -> Res.string.proximity_auth_invalid
-        MobileWalletProximityRicalState.NoMatchingAuthority -> Res.string.proximity_no_matching_authority
-        MobileWalletProximityRicalState.Matched -> Res.string.proximity_matched_authority
+        ProximityRicalState.NotEvaluated -> Res.string.proximity_not_evaluated
+        ProximityRicalState.Unavailable -> Res.string.proximity_unavailable
+        ProximityRicalState.Invalid -> Res.string.proximity_auth_invalid
+        ProximityRicalState.NoMatchingAuthority -> Res.string.proximity_no_matching_authority
+        ProximityRicalState.Matched -> Res.string.proximity_matched_authority
     }
 )
 
 @Composable
-private fun MobileWalletProximityDeviceAuthenticationMethod.displayName(): String = stringResource(
+private fun ProximityDeviceAuthenticationMethod.displayName(): String = stringResource(
     when (this) {
-        MobileWalletProximityDeviceAuthenticationMethod.Signature -> Res.string.proximity_auth_signature
-        MobileWalletProximityDeviceAuthenticationMethod.Mac -> Res.string.proximity_auth_mac
+        ProximityDeviceAuthenticationMethod.Signature -> Res.string.proximity_auth_signature
+        ProximityDeviceAuthenticationMethod.Mac -> Res.string.proximity_auth_mac
     }
 )

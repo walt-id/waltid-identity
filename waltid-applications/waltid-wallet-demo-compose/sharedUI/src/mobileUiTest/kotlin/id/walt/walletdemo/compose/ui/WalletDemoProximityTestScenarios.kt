@@ -1,10 +1,10 @@
 package id.walt.walletdemo.compose.ui
 
-import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustDecision
-import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthenticationOutcome
-import id.walt.wallet2.mobile.MobileWalletProximityReviewId
-import id.walt.wallet2.mobile.MobileWalletProximityRecovery
-import id.walt.wallet2.mobile.MobileWalletProximityRuntimeObservation
+import id.walt.wallet2.mobile.ProximityReaderTrustDecision
+import id.walt.wallet2.mobile.ProximityReaderAuthenticationOutcome
+import id.walt.wallet2.mobile.ProximityReviewId
+import id.walt.wallet2.mobile.ProximityRecovery
+import id.walt.wallet2.mobile.ProximityRuntimeObservation
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -17,27 +17,27 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
-import id.walt.wallet2.mobile.MobileWalletProximityCredentialOption
-import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
-import id.walt.wallet2.mobile.MobileWalletProximityDeviceAuthenticationMethod
-import id.walt.wallet2.mobile.MobileWalletProximityDocumentReview
-import id.walt.wallet2.mobile.MobileWalletProximityElementReference
-import id.walt.wallet2.mobile.MobileWalletProximityEngagement
-import id.walt.wallet2.mobile.MobileWalletProximityError
-import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
-import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
-import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthentication
-import id.walt.wallet2.mobile.MobileWalletProximityReaderAuthenticationScope
-import id.walt.wallet2.mobile.MobileWalletProximityReaderCertificatePathState
-import id.walt.wallet2.mobile.MobileWalletProximityReaderRevocationState
-import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustState
-import id.walt.wallet2.mobile.MobileWalletProximityRequestedElement
-import id.walt.wallet2.mobile.MobileWalletProximityProfile
-import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
-import id.walt.wallet2.mobile.MobileWalletProximityReview
-import id.walt.wallet2.mobile.MobileWalletProximityRicalState
-import id.walt.wallet2.mobile.MobileWalletProximityState
-import id.walt.wallet2.mobile.MobileWalletProximityTransportCapability
+import id.walt.wallet2.mobile.ProximityCredentialOption
+import id.walt.wallet2.mobile.ProximityCapabilities
+import id.walt.wallet2.mobile.ProximityDeviceAuthenticationMethod
+import id.walt.wallet2.mobile.ProximityDocumentReview
+import id.walt.wallet2.mobile.ProximityElementReference
+import id.walt.wallet2.mobile.ProximityEngagement
+import id.walt.wallet2.mobile.ProximityError
+import id.walt.wallet2.mobile.ProximityErrorCategory
+import id.walt.wallet2.mobile.ProximityHostActionResult
+import id.walt.wallet2.mobile.ProximityReaderAuthentication
+import id.walt.wallet2.mobile.ProximityReaderAuthenticationScope
+import id.walt.wallet2.mobile.ProximityReaderCertificatePathState
+import id.walt.wallet2.mobile.ProximityReaderRevocationState
+import id.walt.wallet2.mobile.ProximityReaderTrustState
+import id.walt.wallet2.mobile.ProximityRequestedElement
+import id.walt.wallet2.mobile.ProximityProfile
+import id.walt.wallet2.mobile.ProximityRemediationAction
+import id.walt.wallet2.mobile.ProximityReview
+import id.walt.wallet2.mobile.ProximityRicalState
+import id.walt.wallet2.mobile.ProximityState
+import id.walt.wallet2.mobile.ProximityTransportCapability
 import id.walt.walletdemo.compose.logic.ClaimGroup
 import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.ClaimItemPath
@@ -54,18 +54,18 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoProximityTestScenarios {
     fun userFixedPermissionShowsSettingsWithoutChangingTheSdkAction() = runComposeUiTest {
-        var remediated: MobileWalletProximityRemediationAction? = null
+        var remediated: ProximityRemediationAction? = null
         setContent {
             WalletDemoProximityScreen(
                 state = WalletDemoProximityUiState(
                     active = true,
-                    sessionState = MobileWalletProximityState.CheckingPrerequisites(permissionBlockedCapabilities),
+                    sessionState = ProximityState.CheckingPrerequisites(permissionBlockedCapabilities),
                 ),
                 credentialDetailsById = emptyMap(),
                 hostActions = hostActions,
                 hostActionForDisplay = { action ->
-                    if (action == MobileWalletProximityRemediationAction.RequestBluetoothPermission) {
-                        MobileWalletProximityRemediationAction.OpenApplicationSettings
+                    if (action == ProximityRemediationAction.RequestBluetoothPermission) {
+                        ProximityRemediationAction.OpenApplicationSettings
                     } else {
                         action
                     }
@@ -84,7 +84,7 @@ class WalletDemoProximityTestScenarios {
         }
 
         onNodeWithText("Open app settings").assertIsDisplayed().performClick()
-        assertEquals(MobileWalletProximityRemediationAction.RequestBluetoothPermission, remediated)
+        assertEquals(ProximityRemediationAction.RequestBluetoothPermission, remediated)
     }
 
     fun engagementKeepsTheExactDeviceQRCodeVisibleWhileConnecting() = runComposeUiTest {
@@ -92,8 +92,8 @@ class WalletDemoProximityTestScenarios {
             WalletDemoProximityScreen(
                 state = WalletDemoProximityUiState(
                     active = true,
-                    sessionState = MobileWalletProximityState.Connecting(
-                        listOf(MobileWalletProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(120)))
+                    sessionState = ProximityState.Connecting(
+                        listOf(ProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(120)))
                     ),
                 ),
                 credentialDetailsById = emptyMap(),
@@ -118,18 +118,18 @@ class WalletDemoProximityTestScenarios {
     }
 
     fun reviewSeparatesReaderTrustAndSendsOnlyExplicitHolderActions() = runComposeUiTest {
-        var toggled: MobileWalletProximityElementReference? = null
+        var toggled: ProximityElementReference? = null
         var approved = false
         var declined = false
         var cancelled = false
         var continued = false
         val review = proximityReview()
-        val element = MobileWalletProximityElementReference(namespace, "portrait")
+        val element = ProximityElementReference(namespace, "portrait")
         setContent {
             WalletDemoProximityScreen(
                 state = WalletDemoProximityUiState(
                     active = true,
-                    sessionState = MobileWalletProximityState.ReviewRequired(review),
+                    sessionState = ProximityState.ReviewRequired(review),
                     selections = listOf(
                         WalletDemoProximityDocumentSelection(
                             requestIndex = 0,
@@ -140,7 +140,7 @@ class WalletDemoProximityTestScenarios {
                             requestIndex = 1,
                             credentialId = "proof-credential",
                             disclosedElements = setOf(
-                                MobileWalletProximityElementReference(proofNamespace, "eligible")
+                                ProximityElementReference(proofNamespace, "eligible")
                             ),
                         ),
                     ),
@@ -207,9 +207,9 @@ class WalletDemoProximityTestScenarios {
     fun reviewDoesNotInventAnIdentityForAnUnsignedReader() = runComposeUiTest {
         val review = proximityReview().copy(
             readerAuthentication = listOf(
-                MobileWalletProximityReaderAuthentication(
-            scope = MobileWalletProximityReaderAuthenticationScope.Document(0),
-            outcome = MobileWalletProximityReaderAuthenticationOutcome.Absent,
+                ProximityReaderAuthentication(
+            scope = ProximityReaderAuthenticationScope.Document(0),
+            outcome = ProximityReaderAuthenticationOutcome.Absent,
         )
             )
         )
@@ -217,7 +217,7 @@ class WalletDemoProximityTestScenarios {
             WalletDemoProximityScreen(
                 state = WalletDemoProximityUiState(
                     active = true,
-                    sessionState = MobileWalletProximityState.ReviewRequired(review),
+                    sessionState = ProximityState.ReviewRequired(review),
                     selections = emptyList(),
                 ),
                 credentialDetailsById = proximityCredentialDetails(),
@@ -245,38 +245,38 @@ class WalletDemoProximityTestScenarios {
 }
 
 private val hostActions = WalletDemoProximityHostActionExecutor {
-    MobileWalletProximityHostActionResult.Completed
+    ProximityHostActionResult.Completed
 }
 
-private val permissionBlockedCapabilities = MobileWalletProximityCapabilities(
-    profile = MobileWalletProximityProfile.Iso180135Edition2Dis2026,
-    qrEngagement = MobileWalletProximityTransportCapability(
+private val permissionBlockedCapabilities = ProximityCapabilities(
+    profile = ProximityProfile.Iso180135Edition2Dis2026,
+    qrEngagement = ProximityTransportCapability(
         implemented = true,
         profilePermitted = true,
         selected = true,
-        runtime = MobileWalletProximityRuntimeObservation.Available,
+        runtime = ProximityRuntimeObservation.Available,
     ),
     nfcEngagement = availableUnselectedCapability(),
-    bluetoothLowEnergy = MobileWalletProximityTransportCapability(
+    bluetoothLowEnergy = ProximityTransportCapability(
         implemented = true,
         profilePermitted = true,
         selected = true,
-        runtime = MobileWalletProximityRuntimeObservation.Unavailable(MobileWalletProximityError(
-            category = MobileWalletProximityErrorCategory.Capability,
+        runtime = ProximityRuntimeObservation.Unavailable(ProximityError(
+            category = ProximityErrorCategory.Capability,
             code = "bluetooth_permission_required",
             message = "Bluetooth permission is required",
-            recovery = MobileWalletProximityRecovery.RetryPrerequisites,
-        ), listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission)),
+            recovery = ProximityRecovery.RetryPrerequisites,
+        ), listOf(ProximityRemediationAction.RequestBluetoothPermission)),
     ),
     nfcRetrieval = availableUnselectedCapability(),
     wifiAwareRetrieval = availableUnselectedCapability(),
 )
 
-private fun availableUnselectedCapability() = MobileWalletProximityTransportCapability(
+private fun availableUnselectedCapability() = ProximityTransportCapability(
         implemented = true,
         profilePermitted = true,
         selected = false,
-        runtime = MobileWalletProximityRuntimeObservation.Available,
+        runtime = ProximityRuntimeObservation.Available,
     )
 
 private const val namespace = "org.iso.18013.5.1"
@@ -327,22 +327,22 @@ private fun proximityCredentialDetails(): Map<String, CredentialDetails> = listO
     ),
 ).associateBy { details -> details.summary.id }
 
-private fun proximityReview(): MobileWalletProximityReview = MobileWalletProximityReview(
-    reviewId = MobileWalletProximityReviewId(kotlin.uuid.Uuid.random().toString()),
+private fun proximityReview(): ProximityReview = ProximityReview(
+    reviewId = ProximityReviewId(kotlin.uuid.Uuid.random().toString()),
     exchange = 1,
     documents = listOf(
-        MobileWalletProximityDocumentReview(
+        ProximityDocumentReview(
             requestIndex = 0,
             docType = "org.iso.18013.5.1.mDL",
             credentialOptions = listOf(
-                MobileWalletProximityCredentialOption(
+                ProximityCredentialOption(
                     credentialId = "credential-1",
                     label = "Driving licence",
                     issuer = "Example issuer",
                     validUntil = Instant.DISTANT_FUTURE,
-                    deviceAuthentication = MobileWalletProximityDeviceAuthenticationMethod.Signature,
+                    deviceAuthentication = ProximityDeviceAuthenticationMethod.Signature,
                     requestedElements = listOf(
-                        MobileWalletProximityRequestedElement(
+                        ProximityRequestedElement(
                             namespace = namespace,
                             elementIdentifier = "portrait",
                             intentToRetain = true,
@@ -351,18 +351,18 @@ private fun proximityReview(): MobileWalletProximityReview = MobileWalletProximi
                 )
             ),
         ),
-        MobileWalletProximityDocumentReview(
+        ProximityDocumentReview(
             requestIndex = 1,
             docType = proofNamespace,
             credentialOptions = listOf(
-                MobileWalletProximityCredentialOption(
+                ProximityCredentialOption(
                     credentialId = "proof-credential",
                     label = "Proof of eligibility",
                     issuer = "Example issuer",
                     validUntil = Instant.DISTANT_FUTURE,
-                    deviceAuthentication = MobileWalletProximityDeviceAuthenticationMethod.Signature,
+                    deviceAuthentication = ProximityDeviceAuthenticationMethod.Signature,
                     requestedElements = listOf(
-                        MobileWalletProximityRequestedElement(
+                        ProximityRequestedElement(
                             namespace = proofNamespace,
                             elementIdentifier = "eligible",
                             intentToRetain = false,
@@ -373,24 +373,24 @@ private fun proximityReview(): MobileWalletProximityReview = MobileWalletProximi
         ),
     ),
     readerAuthentication = listOf(
-        MobileWalletProximityReaderAuthentication(
-            scope = MobileWalletProximityReaderAuthenticationScope.WholeRequest,
-            outcome = MobileWalletProximityReaderAuthenticationOutcome.Valid(MobileWalletProximityReaderTrustDecision(
-                state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
-                certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
-                revocation = MobileWalletProximityReaderRevocationState.Good,
-                rical = MobileWalletProximityRicalState.Matched,
+        ProximityReaderAuthentication(
+            scope = ProximityReaderAuthenticationScope.WholeRequest,
+            outcome = ProximityReaderAuthenticationOutcome.Valid(ProximityReaderTrustDecision(
+                state = ProximityReaderTrustState.ValidButUntrusted,
+                certificatePath = ProximityReaderCertificatePathState.Valid,
+                revocation = ProximityReaderRevocationState.Good,
+                rical = ProximityRicalState.Matched,
                 displayName = "Example reader",
                 reason = "No reader trust policy is configured",
             )),
         ),
-        MobileWalletProximityReaderAuthentication(
-            scope = MobileWalletProximityReaderAuthenticationScope.Document(0),
-            outcome = MobileWalletProximityReaderAuthenticationOutcome.Valid(MobileWalletProximityReaderTrustDecision(
-                state = MobileWalletProximityReaderTrustState.Trusted,
-                certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
-                revocation = MobileWalletProximityReaderRevocationState.Good,
-                rical = MobileWalletProximityRicalState.Matched,
+        ProximityReaderAuthentication(
+            scope = ProximityReaderAuthenticationScope.Document(0),
+            outcome = ProximityReaderAuthenticationOutcome.Valid(ProximityReaderTrustDecision(
+                state = ProximityReaderTrustState.Trusted,
+                certificatePath = ProximityReaderCertificatePathState.Valid,
+                revocation = ProximityReaderRevocationState.Good,
+                rical = ProximityRicalState.Matched,
                 displayName = "Document reader",
             )),
         ),

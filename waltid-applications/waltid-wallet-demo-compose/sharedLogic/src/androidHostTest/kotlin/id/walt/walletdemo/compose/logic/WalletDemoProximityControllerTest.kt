@@ -1,27 +1,27 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.MobileWalletProximityReviewId
-import id.walt.wallet2.mobile.MobileWalletProximityRecovery
-import id.walt.wallet2.mobile.MobileWalletProximityRuntimeObservation
-import id.walt.wallet2.mobile.MobileWalletProximityAction
-import id.walt.wallet2.mobile.MobileWalletProximityActionResult
-import id.walt.wallet2.mobile.MobileWalletProximityCapabilities
-import id.walt.wallet2.mobile.MobileWalletProximityConfiguration
-import id.walt.wallet2.mobile.MobileWalletProximityCredentialOption
-import id.walt.wallet2.mobile.MobileWalletProximityDeviceAuthenticationMethod
-import id.walt.wallet2.mobile.MobileWalletProximityDocumentReview
-import id.walt.wallet2.mobile.MobileWalletProximityElementReference
-import id.walt.wallet2.mobile.MobileWalletProximityError
-import id.walt.wallet2.mobile.MobileWalletProximityErrorCategory
-import id.walt.wallet2.mobile.MobileWalletProximityHostActionResult
-import id.walt.wallet2.mobile.MobileWalletProximityProfile
-import id.walt.wallet2.mobile.MobileWalletProximityReaderPolicy
-import id.walt.wallet2.mobile.MobileWalletProximityRemediationAction
-import id.walt.wallet2.mobile.MobileWalletProximityRequestedElement
-import id.walt.wallet2.mobile.MobileWalletProximityReview
-import id.walt.wallet2.mobile.MobileWalletProximitySession
-import id.walt.wallet2.mobile.MobileWalletProximityState
-import id.walt.wallet2.mobile.MobileWalletProximityTransportCapability
+import id.walt.wallet2.mobile.ProximityReviewId
+import id.walt.wallet2.mobile.ProximityRecovery
+import id.walt.wallet2.mobile.ProximityRuntimeObservation
+import id.walt.wallet2.mobile.ProximityAction
+import id.walt.wallet2.mobile.ProximityActionResult
+import id.walt.wallet2.mobile.ProximityCapabilities
+import id.walt.wallet2.mobile.ProximityConfiguration
+import id.walt.wallet2.mobile.ProximityCredentialOption
+import id.walt.wallet2.mobile.ProximityDeviceAuthenticationMethod
+import id.walt.wallet2.mobile.ProximityDocumentReview
+import id.walt.wallet2.mobile.ProximityElementReference
+import id.walt.wallet2.mobile.ProximityError
+import id.walt.wallet2.mobile.ProximityErrorCategory
+import id.walt.wallet2.mobile.ProximityHostActionResult
+import id.walt.wallet2.mobile.ProximityProfile
+import id.walt.wallet2.mobile.ProximityReaderPolicy
+import id.walt.wallet2.mobile.ProximityRemediationAction
+import id.walt.wallet2.mobile.ProximityRequestedElement
+import id.walt.wallet2.mobile.ProximityReview
+import id.walt.wallet2.mobile.ProximitySession
+import id.walt.wallet2.mobile.ProximityState
+import id.walt.wallet2.mobile.ProximityTransportCapability
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -45,11 +45,11 @@ class WalletDemoProximityControllerTest {
     fun `selected runtime permission is resolved before the SDK session starts`() = runTest {
         var capabilities = blockedCapabilities
         val session = FakeSession(
-            MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026)
+            ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026)
         )
         val backend = FakeBackend(session = session, capabilities = { capabilities })
         val controller = controller(backend)
-        val performed = mutableListOf<MobileWalletProximityRemediationAction>()
+        val performed = mutableListOf<ProximityRemediationAction>()
 
         controller.start()
         advanceUntilIdle()
@@ -57,21 +57,21 @@ class WalletDemoProximityControllerTest {
         assertEquals(1, backend.capabilityCalls)
         assertEquals(0, backend.startCalls)
         assertEquals(
-            MobileWalletProximityState.CheckingPrerequisites(blockedCapabilities),
+            ProximityState.CheckingPrerequisites(blockedCapabilities),
             controller.state.value.sessionState,
         )
 
         controller.remediate(
-            MobileWalletProximityRemediationAction.RequestBluetoothPermission,
+            ProximityRemediationAction.RequestBluetoothPermission,
             WalletDemoProximityHostActionExecutor { action ->
                 performed += action
                 capabilities = readyCapabilities
-                MobileWalletProximityHostActionResult.Completed
+                ProximityHostActionResult.Completed
             },
         )
         advanceUntilIdle()
 
-        assertEquals(listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission), performed)
+        assertEquals(listOf(ProximityRemediationAction.RequestBluetoothPermission), performed)
         assertEquals(2, backend.capabilityCalls)
         assertEquals(1, backend.startCalls)
         assertEquals(session.state.value, controller.state.value.sessionState)
@@ -83,7 +83,7 @@ class WalletDemoProximityControllerTest {
     fun `optional BLE permission does not block a viable selected NFC route`() = runTest {
         assertTrue(fallbackCapabilities.mayStart)
         val session = FakeSession(
-            MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026)
+            ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026)
         )
         val backend = FakeBackend(session = session, capabilities = { fallbackCapabilities })
         val controller = controller(backend)
@@ -99,7 +99,7 @@ class WalletDemoProximityControllerTest {
 
     @Test
     fun `start observes the SDK session without copying protocol state`() = runTest {
-        val session = FakeSession(MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026))
+        val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
         val backend = FakeBackend(session = session)
         val controller = controller(backend)
 
@@ -115,7 +115,7 @@ class WalletDemoProximityControllerTest {
 
     @Test
     fun `review defaults are complete and approval contains only the current holder choices`() = runTest {
-        val session = FakeSession(MobileWalletProximityState.ReviewRequired(review()))
+        val session = FakeSession(ProximityState.ReviewRequired(review()))
         val controller = controller(FakeBackend(session = session))
         controller.start()
         advanceUntilIdle()
@@ -152,7 +152,7 @@ class WalletDemoProximityControllerTest {
         controller.approve()
         advanceUntilIdle()
 
-        val approval = session.actions.single() as MobileWalletProximityAction.Approve
+        val approval = session.actions.single() as ProximityAction.Approve
         assertEquals(controller.state.value.review?.reviewId, approval.reviewId)
         assertEquals(2, approval.submission.documents.size)
         val primary = approval.submission.documents.single { it.requestIndex == 0 }
@@ -168,7 +168,7 @@ class WalletDemoProximityControllerTest {
 
     @Test
     fun `repeated requests require an explicit choice and reset it for fresh consent`() = runTest {
-        val session = FakeSession(MobileWalletProximityState.ReviewRequired(review()))
+        val session = FakeSession(ProximityState.ReviewRequired(review()))
         val controller = controller(FakeBackend(session = session))
         controller.start()
         advanceUntilIdle()
@@ -178,16 +178,16 @@ class WalletDemoProximityControllerTest {
         controller.approve()
         advanceUntilIdle()
 
-        val firstApproval = session.actions.single() as MobileWalletProximityAction.Approve
+        val firstApproval = session.actions.single() as ProximityAction.Approve
         assertTrue(firstApproval.submission.continueAfterResponse)
 
-        session.mutableState.value = MobileWalletProximityState.AwaitingNextRequest(completedExchanges = 1)
+        session.mutableState.value = ProximityState.AwaitingNextRequest(completedExchanges = 1)
         advanceUntilIdle()
         assertEquals(
-            MobileWalletProximityState.AwaitingNextRequest(completedExchanges = 1),
+            ProximityState.AwaitingNextRequest(completedExchanges = 1),
             controller.state.value.sessionState,
         )
-        session.mutableState.value = MobileWalletProximityState.ReviewRequired(review().copy(exchange = 2))
+        session.mutableState.value = ProximityState.ReviewRequired(review().copy(exchange = 2))
         advanceUntilIdle()
 
         assertFalse(controller.state.value.continueAfterResponse)
@@ -201,7 +201,7 @@ class WalletDemoProximityControllerTest {
 
     @Test
     fun `lifecycle interruption preserves prerequisite remediation but cancels an active exchange`() = runTest {
-        val session = FakeSession(MobileWalletProximityState.CheckingPrerequisites(blockedCapabilities))
+        val session = FakeSession(ProximityState.CheckingPrerequisites(blockedCapabilities))
         val controller = controller(FakeBackend(session = session))
         controller.start()
         advanceUntilIdle()
@@ -210,40 +210,40 @@ class WalletDemoProximityControllerTest {
         advanceUntilIdle()
         assertTrue(session.actions.isEmpty())
 
-        session.mutableState.value = MobileWalletProximityState.AwaitingRequest(exchange = 1)
+        session.mutableState.value = ProximityState.AwaitingRequest(exchange = 1)
         advanceUntilIdle()
         controller.handleLifecycleInterruption()
         advanceUntilIdle()
-        assertEquals(listOf<MobileWalletProximityAction>(MobileWalletProximityAction.Cancel), session.actions)
+        assertEquals(listOf<ProximityAction>(ProximityAction.Cancel), session.actions)
     }
 
     @Test
     fun `remediation dispatches only an advertised privacy-safe result and surfaces rejection`() = runTest {
-        val rejection = MobileWalletProximityError(
-            category = MobileWalletProximityErrorCategory.Capability,
+        val rejection = ProximityError(
+            category = ProximityErrorCategory.Capability,
             code = "bluetooth_still_unavailable",
             message = "Bluetooth is still unavailable",
-            recovery = MobileWalletProximityRecovery.RetryPrerequisites,
+            recovery = ProximityRecovery.RetryPrerequisites,
         )
         val session = FakeSession(
-            initialState = MobileWalletProximityState.CheckingPrerequisites(blockedCapabilities),
-            actionResult = MobileWalletProximityActionResult.Rejected(rejection),
+            initialState = ProximityState.CheckingPrerequisites(blockedCapabilities),
+            actionResult = ProximityActionResult.Rejected(rejection),
         )
         val controller = controller(FakeBackend(session = session))
         controller.start()
         advanceUntilIdle()
 
         controller.remediate(
-            MobileWalletProximityRemediationAction.RequestBluetoothPermission,
-            WalletDemoProximityHostActionExecutor { MobileWalletProximityHostActionResult.Completed },
+            ProximityRemediationAction.RequestBluetoothPermission,
+            WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
         )
         advanceUntilIdle()
 
         assertEquals(
-            listOf<MobileWalletProximityAction>(
-                MobileWalletProximityAction.ReportRemediation(
-                    MobileWalletProximityRemediationAction.RequestBluetoothPermission,
-                    MobileWalletProximityHostActionResult.Completed,
+            listOf<ProximityAction>(
+                ProximityAction.ReportRemediation(
+                    ProximityRemediationAction.RequestBluetoothPermission,
+                    ProximityHostActionResult.Completed,
                 )
             ),
             session.actions,
@@ -251,8 +251,8 @@ class WalletDemoProximityControllerTest {
         assertEquals(rejection, controller.state.value.actionError)
 
         controller.remediate(
-            MobileWalletProximityRemediationAction.OpenApplicationSettings,
-            WalletDemoProximityHostActionExecutor { MobileWalletProximityHostActionResult.Completed },
+            ProximityRemediationAction.OpenApplicationSettings,
+            WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
         )
         advanceUntilIdle()
         assertEquals(1, session.actions.size)
@@ -262,14 +262,14 @@ class WalletDemoProximityControllerTest {
 
     @Test
     fun `dismiss cancels an in-flight host action without reporting a late result`() = runTest {
-        val session = FakeSession(MobileWalletProximityState.CheckingPrerequisites(blockedCapabilities))
+        val session = FakeSession(ProximityState.CheckingPrerequisites(blockedCapabilities))
         val controller = controller(FakeBackend(session = session))
         val cancelled = CompletableDeferred<Unit>()
         controller.start()
         advanceUntilIdle()
 
         controller.remediate(
-            MobileWalletProximityRemediationAction.RequestBluetoothPermission,
+            ProximityRemediationAction.RequestBluetoothPermission,
             WalletDemoProximityHostActionExecutor {
                 try {
                     awaitCancellation()
@@ -280,7 +280,7 @@ class WalletDemoProximityControllerTest {
         )
         advanceUntilIdle()
         assertEquals(
-            MobileWalletProximityRemediationAction.RequestBluetoothPermission,
+            ProximityRemediationAction.RequestBluetoothPermission,
             controller.state.value.hostActionInProgress,
         )
 
@@ -295,7 +295,7 @@ class WalletDemoProximityControllerTest {
     @Test
     fun `startup cancellation closes a session returned by a cancellation-insensitive late start`() = runTest {
         val startGate = CompletableDeferred<Unit>()
-        val session = FakeSession(MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026))
+        val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
         val backend = FakeBackend(session = session, startGate = startGate)
         val controller = controller(backend)
 
@@ -315,17 +315,17 @@ class WalletDemoProximityControllerTest {
     @Test
     fun `configuration provider is resolved once for each new session`() = runTest {
         val session = FakeSession(
-            MobileWalletProximityState.Completed(
+            ProximityState.Completed(
                 exchanges = 1,
                 declined = false,
             )
         )
         val backend = FakeBackend(session)
-        var policy = MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted
+        var policy = ProximityReaderPolicy.AllowAnonymousOrUntrusted
         val controller = WalletDemoProximityController(
             wallet = backend,
             configurationProvider = {
-                MobileWalletProximityConfiguration(readerPolicy = policy)
+                ProximityConfiguration(readerPolicy = policy)
             },
             scope = this,
             dispatcher = StandardTestDispatcher(testScheduler),
@@ -333,9 +333,9 @@ class WalletDemoProximityControllerTest {
 
         controller.start()
         advanceUntilIdle()
-        policy = MobileWalletProximityReaderPolicy.RequireTrusted
+        policy = ProximityReaderPolicy.RequireTrusted
         assertEquals(
-            MobileWalletProximityReaderPolicy.AllowAnonymousOrUntrusted,
+            ProximityReaderPolicy.AllowAnonymousOrUntrusted,
             backend.configurations.single().readerPolicy,
         )
 
@@ -344,7 +344,7 @@ class WalletDemoProximityControllerTest {
         controller.start()
         advanceUntilIdle()
         assertEquals(
-            MobileWalletProximityReaderPolicy.RequireTrusted,
+            ProximityReaderPolicy.RequireTrusted,
             backend.configurations.last().readerPolicy,
         )
     }
@@ -359,26 +359,26 @@ class WalletDemoProximityControllerTest {
 }
 
 private class FakeBackend(
-    private val session: MobileWalletProximitySession,
+    private val session: ProximitySession,
     private val startGate: CompletableDeferred<Unit>? = null,
-    private val capabilities: () -> MobileWalletProximityCapabilities = { readyCapabilities },
+    private val capabilities: () -> ProximityCapabilities = { readyCapabilities },
 ) : ProximityPresentationBackend {
     var capabilityCalls: Int = 0
         private set
     var startCalls: Int = 0
         private set
-    val configurations = mutableListOf<MobileWalletProximityConfiguration>()
+    val configurations = mutableListOf<ProximityConfiguration>()
 
     override suspend fun proximityPresentationCapabilities(
-        configuration: MobileWalletProximityConfiguration,
-    ): MobileWalletProximityCapabilities {
+        configuration: ProximityConfiguration,
+    ): ProximityCapabilities {
         capabilityCalls += 1
         return capabilities()
     }
 
     override suspend fun startProximityPresentation(
-        configuration: MobileWalletProximityConfiguration,
-    ): MobileWalletProximitySession {
+        configuration: ProximityConfiguration,
+    ): ProximitySession {
         startCalls += 1
         configurations += configuration
         startGate?.let { withContext(NonCancellable) { it.await() } }
@@ -387,19 +387,19 @@ private class FakeBackend(
 }
 
 private class FakeSession(
-    initialState: MobileWalletProximityState,
-    private val actionResult: MobileWalletProximityActionResult = MobileWalletProximityActionResult.Accepted,
-) : MobileWalletProximitySession {
+    initialState: ProximityState,
+    private val actionResult: ProximityActionResult = ProximityActionResult.Accepted,
+) : ProximitySession {
     val mutableState = MutableStateFlow(initialState)
-    override val state: StateFlow<MobileWalletProximityState> = mutableState
-    val actions = mutableListOf<MobileWalletProximityAction>()
+    override val state: StateFlow<ProximityState> = mutableState
+    val actions = mutableListOf<ProximityAction>()
     var closeCalls = 0
         private set
 
-    override suspend fun dispatch(action: MobileWalletProximityAction): MobileWalletProximityActionResult {
+    override suspend fun dispatch(action: ProximityAction): ProximityActionResult {
         actions += action
-        if (action == MobileWalletProximityAction.Cancel && actionResult == MobileWalletProximityActionResult.Accepted) {
-            mutableState.value = MobileWalletProximityState.Cancelled
+        if (action == ProximityAction.Cancel && actionResult == ProximityActionResult.Accepted) {
+            mutableState.value = ProximityState.Cancelled
         }
         return actionResult
     }
@@ -409,16 +409,16 @@ private class FakeSession(
     }
 }
 
-private val familyName = MobileWalletProximityElementReference("org.iso.18013.5.1", "family_name")
-private val portrait = MobileWalletProximityElementReference("org.iso.18013.5.1", "portrait")
-private val eligibility = MobileWalletProximityElementReference("org.waltid.example.proof", "eligible")
-private val unoffered = MobileWalletProximityElementReference("org.iso.18013.5.1", "age_over_18")
+private val familyName = ProximityElementReference("org.iso.18013.5.1", "family_name")
+private val portrait = ProximityElementReference("org.iso.18013.5.1", "portrait")
+private val eligibility = ProximityElementReference("org.waltid.example.proof", "eligible")
+private val unoffered = ProximityElementReference("org.iso.18013.5.1", "age_over_18")
 
-private fun review(): MobileWalletProximityReview = MobileWalletProximityReview(
-    reviewId = MobileWalletProximityReviewId(kotlin.uuid.Uuid.random().toString()),
+private fun review(): ProximityReview = ProximityReview(
+    reviewId = ProximityReviewId(kotlin.uuid.Uuid.random().toString()),
     exchange = 1,
     documents = listOf(
-        MobileWalletProximityDocumentReview(
+        ProximityDocumentReview(
             requestIndex = 0,
             docType = "org.iso.18013.5.1.mDL",
             credentialOptions = listOf(
@@ -426,7 +426,7 @@ private fun review(): MobileWalletProximityReview = MobileWalletProximityReview(
                 credential("credential-b", listOf(familyName)),
             ),
         ),
-        MobileWalletProximityDocumentReview(
+        ProximityDocumentReview(
             requestIndex = 1,
             docType = "org.waltid.example.proof",
             credentialOptions = listOf(credential("proof-credential", listOf(eligibility))),
@@ -439,15 +439,15 @@ private fun review(): MobileWalletProximityReview = MobileWalletProximityReview(
 
 private fun credential(
     id: String,
-    elements: List<MobileWalletProximityElementReference>,
-): MobileWalletProximityCredentialOption = MobileWalletProximityCredentialOption(
+    elements: List<ProximityElementReference>,
+): ProximityCredentialOption = ProximityCredentialOption(
     credentialId = id,
     label = id,
     issuer = "Example issuer",
     validUntil = Instant.DISTANT_FUTURE,
-    deviceAuthentication = MobileWalletProximityDeviceAuthenticationMethod.Signature,
+    deviceAuthentication = ProximityDeviceAuthenticationMethod.Signature,
     requestedElements = elements.map {
-        MobileWalletProximityRequestedElement(
+        ProximityRequestedElement(
             namespace = it.namespace,
             elementIdentifier = it.elementIdentifier,
             intentToRetain = it == portrait,
@@ -455,17 +455,17 @@ private fun credential(
     },
 )
 
-private val availableSelected = MobileWalletProximityTransportCapability(
+private val availableSelected = ProximityTransportCapability(
         implemented = true,
         profilePermitted = true,
         selected = true,
-        runtime = MobileWalletProximityRuntimeObservation.Available,
+        runtime = ProximityRuntimeObservation.Available,
     )
 
 private val availableUnselected = availableSelected.copy(selected = false)
 
-private val readyCapabilities = MobileWalletProximityCapabilities(
-    profile = MobileWalletProximityProfile.Iso180135Edition2Dis2026,
+private val readyCapabilities = ProximityCapabilities(
+    profile = ProximityProfile.Iso180135Edition2Dis2026,
     qrEngagement = availableSelected,
     nfcEngagement = availableUnselected,
     bluetoothLowEnergy = availableSelected,
@@ -473,19 +473,19 @@ private val readyCapabilities = MobileWalletProximityCapabilities(
     wifiAwareRetrieval = availableUnselected,
 )
 
-private val bluetoothUnavailable = MobileWalletProximityError(
-    category = MobileWalletProximityErrorCategory.Capability,
+private val bluetoothUnavailable = ProximityError(
+    category = ProximityErrorCategory.Capability,
     code = "bluetooth_permission_required",
     message = "Bluetooth permission is required",
-    recovery = MobileWalletProximityRecovery.RetryPrerequisites,
+    recovery = ProximityRecovery.RetryPrerequisites,
 )
 
 private val blockedCapabilities = readyCapabilities.copy(
-    bluetoothLowEnergy = MobileWalletProximityTransportCapability(
+    bluetoothLowEnergy = ProximityTransportCapability(
         implemented = true,
         profilePermitted = true,
         selected = true,
-        runtime = MobileWalletProximityRuntimeObservation.Unavailable(bluetoothUnavailable, listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission)),
+        runtime = ProximityRuntimeObservation.Unavailable(bluetoothUnavailable, listOf(ProximityRemediationAction.RequestBluetoothPermission)),
     )
 )
 

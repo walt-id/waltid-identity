@@ -407,12 +407,12 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
 }
 
 private protocol KMPBackedProximityReaderTrustEvaluator {
-    var kmpReaderTrustEvaluator: any MobileWalletProximityReaderTrustEvaluator { get }
+    var kmpReaderTrustEvaluator: any WalletCore.ProximityReaderTrustEvaluator { get }
 }
 
-private extension ProximityPresentationConfiguration {
-    func toKMPConfiguration() -> MobileWalletProximityConfiguration {
-        MobileWalletProximityConfiguration(
+private extension ProximityConfiguration {
+    func toKMPConfiguration() -> WalletCore.ProximityConfiguration {
+        WalletCore.ProximityConfiguration(
             profile: profile.toKMPProfile(),
             bleRoles: bleRoles.toKMPRoles(),
             bearerPolicy: bearerPolicy.toKMPPolicy(),
@@ -423,7 +423,7 @@ private extension ProximityPresentationConfiguration {
             readerTrustEvaluator: readerTrustEvaluator.map { evaluator in
                 (evaluator as? any KMPBackedProximityReaderTrustEvaluator)?.kmpReaderTrustEvaluator ??
                     KMPProximityReaderTrustEvaluatorAdapter(evaluator: evaluator)
-            } ?? UnconfiguredMobileWalletProximityReaderTrustEvaluator.shared,
+            } ?? WalletCore.UnconfiguredProximityReaderTrustEvaluator.shared,
             credentialStatusEvaluator: credentialStatusEvaluator.map {
                 KMPProximityCredentialStatusEvaluatorAdapter(evaluator: $0)
             } ?? WalletCore.UnconfiguredProximityCredentialStatusEvaluator.shared,
@@ -440,15 +440,15 @@ public final class ProximityConfiguredReaderTrustEvaluator:
     ProximityReaderTrustEvaluator,
     KMPBackedProximityReaderTrustEvaluator,
     @unchecked Sendable {
-    private let evaluator: MobileWalletProximityConfiguredReaderTrustEvaluator
+    private let evaluator: WalletCore.ProximityConfiguredReaderTrustEvaluator
 
     public init(configuration: ProximityReaderTrustConfiguration) {
-        evaluator = MobileWalletProximityConfiguredReaderTrustEvaluator(
+        evaluator = WalletCore.ProximityConfiguredReaderTrustEvaluator(
             configuration: configuration.toKMPConfiguration()
         )
     }
 
-    fileprivate var kmpReaderTrustEvaluator: any MobileWalletProximityReaderTrustEvaluator {
+    fileprivate var kmpReaderTrustEvaluator: any WalletCore.ProximityReaderTrustEvaluator {
         evaluator
     }
 
@@ -465,7 +465,7 @@ public final class ProximityConfiguredReaderTrustEvaluator:
 /// transport/cache policy. Lookup certificates do not establish trust. Unsupported CRL forms and
 /// unavailable status remain indeterminate; verified revocation prevents disclosure.
 public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEvaluator, @unchecked Sendable {
-    private let evaluator: MobileWalletProximityCrlRevocationEvaluator
+    private let evaluator: WalletCore.ProximityCrlRevocationEvaluator
 
     /// Creates an explicit CRL evaluator for a reader revocation policy.
     /// - Parameters:
@@ -483,7 +483,7 @@ public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEva
             throw WalletError.invalidInput("CRL issuer certificates exceed the supported bounds.")
         }
         do {
-            evaluator = try MobileWalletProximityCrlRevocationEvaluator(
+            evaluator = try WalletCore.ProximityCrlRevocationEvaluator(
                 issuerCertificatesDerBase64Url: issuerCertificatesDER.map { $0.base64URLEncodedString() },
                 scope: scope == .readerCertificate ? .readerCertificate : .readerCertificateAndIssuingAuthorities,
                 fetcher: KMPProximityCRLFetcherAdapter(fetcher)
@@ -498,7 +498,7 @@ public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEva
     /// - Returns: Good, revoked or indeterminate status, independently of certificate-path trust.
     public func evaluate(_ evidence: ProximityReaderEvidence) async throws -> ProximityCertificateRevocationResult {
         try Task.checkCancellation()
-        let result: any MobileWalletProximityCertificateRevocationResult
+        let result: any WalletCore.ProximityCertificateRevocationResult
         do {
             result = try await evaluator.evaluate(evidence: evidence.toKMPEvidence())
         } catch {
@@ -517,31 +517,31 @@ public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEva
     }
 }
 
-private final class KMPProximityCRLFetcherAdapter: MobileWalletProximityCrlFetcher, @unchecked Sendable {
+private final class KMPProximityCRLFetcherAdapter: WalletCore.ProximityCrlFetcher, @unchecked Sendable {
     private let fetcher: any ProximityCRLFetcher
 
     init(_ fetcher: any ProximityCRLFetcher) {
         self.fetcher = fetcher
     }
 
-    func __fetch(url: String, maximumBytes: Int32) async throws -> any MobileWalletProximityCrlFetchResult {
+    func __fetch(url: String, maximumBytes: Int32) async throws -> any WalletCore.ProximityCrlFetchResult {
         guard let destination = URL(string: url) else {
-            return MobileWalletProximityCrlFetchResultUnavailable.shared
+            return WalletCore.ProximityCrlFetchResultUnavailable.shared
         }
         switch try await fetcher.fetch(from: destination, maximumBytes: Int(maximumBytes)) {
         case let .available(data):
             guard !data.isEmpty, data.count <= Int(maximumBytes) else {
-                return MobileWalletProximityCrlFetchResultUnavailable.shared
+                return WalletCore.ProximityCrlFetchResultUnavailable.shared
             }
-            return MobileWalletProximityCrlFetchResultAvailable(crlDerBase64Url: data.base64URLEncodedString())
+            return WalletCore.ProximityCrlFetchResultAvailable(crlDerBase64Url: data.base64URLEncodedString())
         case .unavailable:
-            return MobileWalletProximityCrlFetchResultUnavailable.shared
+            return WalletCore.ProximityCrlFetchResultUnavailable.shared
         }
     }
 }
 
 private final class KMPProximityReaderRevocationEvaluatorAdapter:
-    MobileWalletProximityReaderRevocationEvaluator,
+    WalletCore.ProximityReaderRevocationEvaluator,
     @unchecked Sendable {
     private let evaluator: any ProximityReaderRevocationEvaluator
 
@@ -550,21 +550,21 @@ private final class KMPProximityReaderRevocationEvaluatorAdapter:
     }
 
     func __evaluate(
-        evidence: MobileWalletProximityReaderEvidence
-    ) async throws -> any MobileWalletProximityCertificateRevocationResult {
+        evidence: WalletCore.ProximityReaderEvidence
+    ) async throws -> any WalletCore.ProximityCertificateRevocationResult {
         switch try await evaluator.evaluate(evidence.toSwiftEvidence()).storage {
         case .good:
-            return MobileWalletProximityCertificateRevocationResultGood.shared
+            return WalletCore.ProximityCertificateRevocationResultGood.shared
         case let .revoked(reason):
-            return MobileWalletProximityCertificateRevocationResultRevoked(reason: reason)
+            return WalletCore.ProximityCertificateRevocationResultRevoked(reason: reason)
         case let .indeterminate(reason):
-            return MobileWalletProximityCertificateRevocationResultIndeterminate(reason: reason)
+            return WalletCore.ProximityCertificateRevocationResultIndeterminate(reason: reason)
         }
     }
 }
 
 private final class KMPProximityRICALSignerRevocationEvaluatorAdapter:
-    MobileWalletProximityRicalSignerRevocationEvaluator,
+    WalletCore.ProximityRicalSignerRevocationEvaluator,
     @unchecked Sendable {
     private let evaluator: any ProximityRICALSignerRevocationEvaluator
 
@@ -573,8 +573,8 @@ private final class KMPProximityRICALSignerRevocationEvaluatorAdapter:
     }
 
     func __evaluate(
-        evidence: MobileWalletProximityRicalSignerEvidence
-    ) async throws -> any MobileWalletProximityCertificateRevocationResult {
+        evidence: WalletCore.ProximityRicalSignerEvidence
+    ) async throws -> any WalletCore.ProximityCertificateRevocationResult {
         let result = try await evaluator.evaluate(
             ProximityRICALSignerEvidence(
                 providerID: evidence.providerId,
@@ -585,17 +585,17 @@ private final class KMPProximityRICALSignerRevocationEvaluatorAdapter:
         )
         switch result.storage {
         case .good:
-            return MobileWalletProximityCertificateRevocationResultGood.shared
+            return WalletCore.ProximityCertificateRevocationResultGood.shared
         case let .revoked(reason):
-            return MobileWalletProximityCertificateRevocationResultRevoked(reason: reason)
+            return WalletCore.ProximityCertificateRevocationResultRevoked(reason: reason)
         case let .indeterminate(reason):
-            return MobileWalletProximityCertificateRevocationResultIndeterminate(reason: reason)
+            return WalletCore.ProximityCertificateRevocationResultIndeterminate(reason: reason)
         }
     }
 }
 
 private final class KMPProximityRICALProviderAdapter:
-    MobileWalletProximityRicalProvider,
+    WalletCore.ProximityRicalProvider,
     @unchecked Sendable {
     private let provider: any ProximityRICALProvider
 
@@ -603,22 +603,22 @@ private final class KMPProximityRICALProviderAdapter:
         self.provider = provider
     }
 
-    func __current() async throws -> any MobileWalletProximityRicalProviderResult {
+    func __current() async throws -> any WalletCore.ProximityRicalProviderResult {
         switch try await provider.current().storage {
         case let .available(signedRICAL):
-            return MobileWalletProximityRicalProviderResultAvailable(
+            return WalletCore.ProximityRicalProviderResultAvailable(
                 signedRicalBase64Url: signedRICAL.base64URLEncodedString()
             )
         case let .unavailable(reason):
-            return MobileWalletProximityRicalProviderResultUnavailable(reason: reason)
+            return WalletCore.ProximityRicalProviderResultUnavailable(reason: reason)
         case let .conflict(reason):
-            return MobileWalletProximityRicalProviderResultConflict(reason: reason)
+            return WalletCore.ProximityRicalProviderResultConflict(reason: reason)
         }
     }
 }
 
 private final class KMPProximityRICALConstraintEvaluatorAdapter:
-    MobileWalletProximityRicalConstraintEvaluator,
+    WalletCore.ProximityRicalConstraintEvaluator,
     @unchecked Sendable {
     private let evaluator: any ProximityRICALConstraintEvaluator
 
@@ -627,8 +627,8 @@ private final class KMPProximityRICALConstraintEvaluatorAdapter:
     }
 
     func __accepts(
-        constraints: [MobileWalletProximityRicalTrustConstraint],
-        reader: MobileWalletProximityReaderEvidence
+        constraints: [WalletCore.ProximityRicalTrustConstraint],
+        reader: WalletCore.ProximityReaderEvidence
     ) async throws -> KotlinBoolean {
         let values = try constraints.map { constraint in
             ProximityRICALTrustConstraint(
@@ -642,20 +642,20 @@ private final class KMPProximityRICALConstraintEvaluatorAdapter:
 }
 
 private extension ProximityReaderTrustConfiguration {
-    func toKMPConfiguration() -> MobileWalletProximityReaderTrustConfiguration {
-        MobileWalletProximityReaderTrustConfiguration(
+    func toKMPConfiguration() -> WalletCore.ProximityReaderTrustConfiguration {
+        WalletCore.ProximityReaderTrustConfiguration(
             trustAnchors: trustAnchors.map {
-                MobileWalletProximityReaderTrustAnchor(
+                WalletCore.ProximityReaderTrustAnchor(
                     certificateDerBase64Url: $0.certificateDER.base64URLEncodedString(),
                     displayName: $0.displayName
                 )
             },
             ricalProviders: ricalProviders.map { configuration in
-                MobileWalletProximityRicalConfiguration(
+                WalletCore.ProximityRicalConfiguration(
                     providerId: configuration.providerID,
                     acceptedTypes: configuration.acceptedTypes,
                     providerTrustAnchors: configuration.providerTrustAnchors.map {
-                        MobileWalletProximityRicalProviderTrustAnchor(
+                        WalletCore.ProximityRicalProviderTrustAnchor(
                             certificateDerBase64Url: $0.certificateDER.base64URLEncodedString()
                         )
                     },
@@ -674,12 +674,12 @@ private extension ProximityReaderTrustConfiguration {
 }
 
 private extension ProximityRICALSignerRevocationPolicy {
-    func toKMPPolicy() -> any MobileWalletProximityRicalSignerRevocationPolicy {
+    func toKMPPolicy() -> any WalletCore.ProximityRicalSignerRevocationPolicy {
         switch self {
         case .notChecked:
-            return MobileWalletProximityRicalSignerRevocationPolicyNotChecked.shared
+            return WalletCore.ProximityRicalSignerRevocationPolicyNotChecked.shared
         case let .check(evaluator):
-            return MobileWalletProximityRicalSignerRevocationPolicyCheck(
+            return WalletCore.ProximityRicalSignerRevocationPolicyCheck(
                 evaluator: KMPProximityRICALSignerRevocationEvaluatorAdapter(evaluator)
             )
         }
@@ -687,12 +687,12 @@ private extension ProximityRICALSignerRevocationPolicy {
 }
 
 private extension ProximityReaderRevocationPolicy {
-    func toKMPPolicy() -> any MobileWalletProximityReaderRevocationPolicy {
+    func toKMPPolicy() -> any WalletCore.ProximityReaderRevocationPolicy {
         switch self {
         case .notChecked:
-            return MobileWalletProximityReaderRevocationPolicyNotChecked.shared
+            return WalletCore.ProximityReaderRevocationPolicyNotChecked.shared
         case let .check(evaluator):
-            return MobileWalletProximityReaderRevocationPolicyCheck(
+            return WalletCore.ProximityReaderRevocationPolicyCheck(
                 evaluator: KMPProximityReaderRevocationEvaluatorAdapter(evaluator)
             )
         }
@@ -700,8 +700,8 @@ private extension ProximityReaderRevocationPolicy {
 }
 
 private extension ProximityReaderEvidence {
-    func toKMPEvidence() -> MobileWalletProximityReaderEvidence {
-        MobileWalletProximityReaderEvidence(
+    func toKMPEvidence() -> WalletCore.ProximityReaderEvidence {
+        WalletCore.ProximityReaderEvidence(
             scope: scope.toKMPScope(),
             authenticationIndex: Int32(authenticationIndex),
             certificateChainDerBase64Url: certificateChainDER.map { $0.base64URLEncodedString() }
@@ -709,7 +709,7 @@ private extension ProximityReaderEvidence {
     }
 }
 
-private extension MobileWalletProximityReaderEvidence {
+private extension WalletCore.ProximityReaderEvidence {
     func toSwiftEvidence() throws -> ProximityReaderEvidence {
         ProximityReaderEvidence(
             scope: scope.toSwiftScope(),
@@ -721,7 +721,7 @@ private extension MobileWalletProximityReaderEvidence {
     }
 }
 
-private extension MobileWalletProximityReaderTrustDecision {
+private extension WalletCore.ProximityReaderTrustDecision {
     func toSwiftDecision() -> ProximityReaderTrustDecision {
         ProximityReaderTrustDecision(
             state: state.toSwiftTrust(),
@@ -744,10 +744,10 @@ private final class KMPProximityReaderTrustEvaluatorAdapter:
     }
 
     func __evaluate(
-        evidence: MobileWalletProximityReaderEvidence
-    ) async throws -> MobileWalletProximityReaderTrustDecision {
+        evidence: WalletCore.ProximityReaderEvidence
+    ) async throws -> WalletCore.ProximityReaderTrustDecision {
         let decision = try await evaluator.evaluate(evidence.toSwiftEvidence())
-        return MobileWalletProximityReaderTrustDecision(
+        return WalletCore.ProximityReaderTrustDecision(
             state: decision.state.toKMPState(),
             certificatePath: decision.certificatePath.toKMPState(),
             revocation: decision.revocation.toKMPState(),
@@ -1963,10 +1963,10 @@ private extension WalletCore.ProximityReaderAuthenticationScope {
 }
 
 private extension ProximityReaderAuthenticationScope {
-    func toKMPScope() -> MobileWalletProximityReaderAuthenticationScope {
+    func toKMPScope() -> WalletCore.ProximityReaderAuthenticationScope {
         switch self {
-        case .document(let index): return MobileWalletProximityReaderAuthenticationScopeDocument(index: Int32(index.value))
-        case .wholeRequest: return MobileWalletProximityReaderAuthenticationScopeWholeRequest.shared
+        case .document(let index): return WalletCore.ProximityReaderAuthenticationScopeDocument(index: Int32(index.value))
+        case .wholeRequest: return WalletCore.ProximityReaderAuthenticationScopeWholeRequest.shared
         }
     }
 }

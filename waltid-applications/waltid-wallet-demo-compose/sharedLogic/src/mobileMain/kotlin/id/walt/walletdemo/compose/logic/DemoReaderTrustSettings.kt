@@ -1,9 +1,9 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.MobileWalletProximityReaderPolicy
-import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustImportPreview
-import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettings
-import id.walt.wallet2.mobile.MobileWalletProximityReaderTrustSettingsCodec
+import id.walt.wallet2.mobile.ProximityReaderPolicy
+import id.walt.wallet2.mobile.ProximityReaderTrustImportPreview
+import id.walt.wallet2.mobile.ProximityReaderTrustSettings
+import id.walt.wallet2.mobile.ProximityReaderTrustSettingsCodec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -17,18 +17,18 @@ import kotlinx.coroutines.launch
 
 /** App-private persistence boundary for the canonical Reader Authentication settings JSON. */
 interface DemoReaderTrustSettingsStore {
-    fun load(): MobileWalletProximityReaderTrustSettings
-    fun save(settings: MobileWalletProximityReaderTrustSettings)
+    fun load(): ProximityReaderTrustSettings
+    fun save(settings: ProximityReaderTrustSettings)
 }
 
 class InMemoryDemoReaderTrustSettingsStore(
-    initial: MobileWalletProximityReaderTrustSettings = MobileWalletProximityReaderTrustSettings(),
+    initial: ProximityReaderTrustSettings = ProximityReaderTrustSettings(),
 ) : DemoReaderTrustSettingsStore {
     private var stored = initial
 
-    override fun load(): MobileWalletProximityReaderTrustSettings = stored
+    override fun load(): ProximityReaderTrustSettings = stored
 
-    override fun save(settings: MobileWalletProximityReaderTrustSettings) {
+    override fun save(settings: ProximityReaderTrustSettings) {
         stored = settings
     }
 }
@@ -37,19 +37,19 @@ internal class PersistentDemoReaderTrustSettingsStore(
     private val read: () -> String?,
     private val write: (String) -> Unit,
 ) : DemoReaderTrustSettingsStore {
-    override fun load(): MobileWalletProximityReaderTrustSettings = read()?.let(
-        MobileWalletProximityReaderTrustSettingsCodec::decode
-    ) ?: MobileWalletProximityReaderTrustSettings()
+    override fun load(): ProximityReaderTrustSettings = read()?.let(
+        ProximityReaderTrustSettingsCodec::decode
+    ) ?: ProximityReaderTrustSettings()
 
-    override fun save(settings: MobileWalletProximityReaderTrustSettings) {
-        write(MobileWalletProximityReaderTrustSettingsCodec.encode(settings))
+    override fun save(settings: ProximityReaderTrustSettings) {
+        write(ProximityReaderTrustSettingsCodec.encode(settings))
     }
 }
 
 data class DemoReaderTrustSettingsUiState(
-    val settings: MobileWalletProximityReaderTrustSettings,
+    val settings: ProximityReaderTrustSettings,
     val importInProgress: Boolean = false,
-    val pendingImport: MobileWalletProximityReaderTrustImportPreview? = null,
+    val pendingImport: ProximityReaderTrustImportPreview? = null,
     val error: String? = null,
 )
 
@@ -62,7 +62,7 @@ class DemoReaderTrustSettingsController(
     private val mutableState = MutableStateFlow(
         runCatching { DemoReaderTrustSettingsUiState(store.load()) }.getOrElse { error ->
             DemoReaderTrustSettingsUiState(
-                settings = MobileWalletProximityReaderTrustSettings(),
+                settings = ProximityReaderTrustSettings(),
                 error = "Stored Reader Authentication settings were invalid and were not loaded: " +
                     (error.message ?: "unknown error"),
             )
@@ -71,9 +71,9 @@ class DemoReaderTrustSettingsController(
     val state: StateFlow<DemoReaderTrustSettingsUiState> = mutableState.asStateFlow()
 
     /** Read once by a new proximity session; later settings changes cannot mutate that snapshot. */
-    fun sessionSnapshot(): MobileWalletProximityReaderTrustSettings = mutableState.value.settings
+    fun sessionSnapshot(): ProximityReaderTrustSettings = mutableState.value.settings
 
-    fun setReaderPolicy(policy: MobileWalletProximityReaderPolicy) {
+    fun setReaderPolicy(policy: ProximityReaderPolicy) {
         persist(mutableState.value.settings.copy(readerPolicy = policy))
     }
 
@@ -82,7 +82,7 @@ class DemoReaderTrustSettingsController(
         mutableState.update { it.copy(importInProgress = true, pendingImport = null, error = null) }
         scope.launch(dispatcher) {
             try {
-                val preview = MobileWalletProximityReaderTrustSettingsCodec.prepareImport(
+                val preview = ProximityReaderTrustSettingsCodec.prepareImport(
                     sourceName = sourceName,
                     bytes = bytes,
                     existing = mutableState.value.settings,
@@ -134,7 +134,7 @@ class DemoReaderTrustSettingsController(
     }
 
     fun reset() {
-        persist(MobileWalletProximityReaderTrustSettings())
+        persist(ProximityReaderTrustSettings())
     }
 
     fun dismissError() {
@@ -147,7 +147,7 @@ class DemoReaderTrustSettingsController(
         }
     }
 
-    private fun persist(settings: MobileWalletProximityReaderTrustSettings) {
+    private fun persist(settings: ProximityReaderTrustSettings) {
         try {
             store.save(settings)
             mutableState.value = DemoReaderTrustSettingsUiState(settings)
