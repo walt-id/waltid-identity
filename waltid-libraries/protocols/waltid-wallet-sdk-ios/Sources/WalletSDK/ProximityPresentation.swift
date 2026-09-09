@@ -72,11 +72,11 @@ public struct ProximityNFCRetrievalConfiguration: Sendable, Hashable {
 }
 
 /// A nonempty retrieval plan used by QR, Static Handover, or Negotiated Handover.
-public struct ProximityPresentationConventionalRetrievalConfiguration: Sendable, Hashable {
+public struct ProximityRetrievalOptions: Sendable, Hashable {
     /// Optional BLE role and bearer policy.
     public let bluetoothLowEnergy: ProximityBLEConfiguration?
     /// Optional conventional NFC command/response contract.
-    public let nfc: ProximityPresentationNFCRetrievalConfiguration?
+    public let nfc: ProximityNFCRetrievalConfiguration?
     /// Whether to offer Wi-Fi Aware with mandatory NCS-SK-128 security.
     public let wifiAware: Bool
 
@@ -86,8 +86,8 @@ public struct ProximityPresentationConventionalRetrievalConfiguration: Sendable,
     ///   - nfc: Optional conventional NFC command/response configuration.
     ///   - wifiAware: Whether to offer Wi-Fi Aware retrieval.
     public init(
-        bluetoothLowEnergy: ProximityPresentationBLEConfiguration? = .init(),
-        nfc: ProximityPresentationNFCRetrievalConfiguration? = nil,
+        bluetoothLowEnergy: ProximityBLEConfiguration? = .init(),
+        nfc: ProximityNFCRetrievalConfiguration? = nil,
         wifiAware: Bool = false
     ) {
         precondition(bluetoothLowEnergy != nil || nfc != nil || wifiAware)
@@ -138,7 +138,7 @@ public struct ProximityNFCV2SessionConfiguration: Sendable, Hashable {
     /// Maximum command-data length accepted by the provisional holder application.
     public let maximumCommandDataLength: Int
     /// Optional NFCv2 alternate BLE bearer.
-    public let bluetoothLowEnergy: ProximityPresentationBLEConfiguration?
+    public let bluetoothLowEnergy: ProximityBLEConfiguration?
     /// Whether to offer an alternate Wi-Fi Aware bearer with mandatory NCS-SK-128 security.
     public let wifiAware: Bool
     /// Optional nonempty retrieval plan offered through QR.
@@ -152,8 +152,8 @@ public struct ProximityNFCV2SessionConfiguration: Sendable, Hashable {
     ///   - wifiAware: Whether to offer an alternate Wi-Fi Aware bearer.
     public init(
         maximumCommandDataLength: Int = 65_536,
-        bluetoothLowEnergy: ProximityPresentationBLEConfiguration? = nil,
-        qrFallback: ProximityPresentationConventionalRetrievalConfiguration? = nil,
+        bluetoothLowEnergy: ProximityBLEConfiguration? = nil,
+        qrFallback: ProximityRetrievalOptions? = nil,
         wifiAware: Bool = false
     ) {
         precondition((1...65_536).contains(maximumCommandDataLength))

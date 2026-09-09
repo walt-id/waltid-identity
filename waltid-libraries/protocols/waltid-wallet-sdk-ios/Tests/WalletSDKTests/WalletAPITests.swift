@@ -370,11 +370,11 @@ final class WalletAPITests: XCTestCase {
 
     func testProximityConfigurationRepresentsWifiAwareWithoutEnablingBLE() {
         let wifiAware = true
-        let conventional = ProximityPresentationConventionalRetrievalConfiguration(
+        let conventional = ProximityRetrievalOptions(
             bluetoothLowEnergy: nil,
             wifiAware: wifiAware
         )
-        let provisionalNFCV2 = ProximityPresentationNFCV2SessionConfiguration(
+        let provisionalNFCV2 = ProximityNFCV2SessionConfiguration(
             wifiAware: wifiAware
         )
 
@@ -382,12 +382,12 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(conventional.wifiAware, wifiAware)
         XCTAssertNil(provisionalNFCV2.bluetoothLowEnergy)
         XCTAssertEqual(provisionalNFCV2.wifiAware, wifiAware)
-        let remediations: [ProximityPresentationRemediationAction] = [
+        let remediations: [ProximityRemediationAction] = [
             .requestNearbyWifiPermission,
             .requestLocalNetworkPermission,
             .enableWifi,
         ]
-        let unavailable = ProximityPresentationTransportCapability(
+        let unavailable = ProximityTransportCapability(
             implemented: true,
             profilePermitted: true,
             runtime: .unavailable(.init(category: .capability, code: "wifi_unavailable", message: "Wi-Fi unavailable", recovery: .retryPrerequisites), remediationActions: remediations),
@@ -397,16 +397,16 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testWifiOnlyQRFallbackAndNFCV2DeriveIndependentViableRoutes() {
-        let wifiOnly = ProximityPresentationConventionalRetrievalConfiguration(bluetoothLowEnergy: nil, wifiAware: true)
+        let wifiOnly = ProximityRetrievalOptions(bluetoothLowEnergy: nil, wifiAware: true)
         for nfcAvailable in [false, true] {
             for wifiAvailable in [false, true] {
-                func capability(_ available: Bool, selected: Bool) -> ProximityPresentationTransportCapability {
+                func capability(_ available: Bool, selected: Bool) -> ProximityTransportCapability {
                     .init(implemented: true, profilePermitted: true,
                         runtime: available ? .available : .unavailable(.init(category: .capability,
                             code: "unavailable", message: "Unavailable", recovery: .retryPrerequisites), remediationActions: []),
                         selected: selected)
                 }
-                let result = ProximityPresentationCapabilities(
+                let result = ProximityCapabilities(
                     profile: .iso180135Edition2DIS2026,
                     session: .provisionalNFCV2(.init(qrFallback: wifiOnly, wifiAware: true)),
                     qrEngagement: capability(true, selected: true),
