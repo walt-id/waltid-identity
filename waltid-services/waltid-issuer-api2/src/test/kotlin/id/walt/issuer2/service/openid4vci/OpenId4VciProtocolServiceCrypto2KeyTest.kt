@@ -6,6 +6,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.repository.IssuanceSessionCrypto2Keys
 import id.walt.openid4vci.offers.AuthenticationMethod
 import kotlinx.coroutines.test.runTest
@@ -27,7 +28,7 @@ class OpenId4VciProtocolServiceCrypto2KeyTest {
     @Test
     fun `JWK session without validated sidecar cannot downgrade to v1`() = runTest {
         assertFailsWith<IllegalArgumentException> {
-            restoreSessionIssuerCrypto2Key(session(), runtime)
+            restoreSessionIssuerCrypto2Key(session().issuanceRequests.single(), runtime)
         }
     }
 
@@ -35,10 +36,10 @@ class OpenId4VciProtocolServiceCrypto2KeyTest {
     fun `JSON-persisted JWK session restores after attaching from the legacy issuer key`() = runTest {
         val encoded = Json.encodeToString(IssuanceSession.serializer(), session())
         val decoded = Json.decodeFromString(IssuanceSession.serializer(), encoded)
-        assertNull(decoded.crypto2IssuerStoredKey)
+        assertNull(decoded.issuanceRequests.single().crypto2IssuerStoredKey)
         assertNotNull(
             restoreSessionIssuerCrypto2Key(
-                IssuanceSessionCrypto2Keys.attachFromIssuerKey(decoded),
+                IssuanceSessionCrypto2Keys.attachFromIssuerKeys(decoded).issuanceRequests.single(),
                 runtime,
             )
         )
@@ -48,7 +49,9 @@ class OpenId4VciProtocolServiceCrypto2KeyTest {
     fun `non-JWK managed session retains provider compatibility fallback`() = runTest {
         assertNull(
             restoreSessionIssuerCrypto2Key(
-                session().copy(issuerKey = JsonObject(mapOf("type" to JsonPrimitive("managed-provider")))),
+                session().issuanceRequests.single().copy(
+                    issuerKey = JsonObject(mapOf("type" to JsonPrimitive("managed-provider")))
+                ),
                 runtime,
             )
         )
@@ -56,11 +59,16 @@ class OpenId4VciProtocolServiceCrypto2KeyTest {
 
     private suspend fun session() = IssuanceSession(
         sessionId = "session",
-        profileId = "profile",
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
-        credentialConfigurationId = "identity_credential",
-        issuerKey = KeySerialization.serializeKeyToJson(JWKKey.generate(KeyType.secp256r1)).jsonObject,
-        credentialData = buildJsonObject {},
+        issuanceRequests = listOf(
+            IssuanceRequest(
+                credentialIdentifier = "credential",
+                profileId = "profile",
+                credentialConfigurationId = "identity_credential",
+                issuerKey = KeySerialization.serializeKeyToJson(JWKKey.generate(KeyType.secp256r1)).jsonObject,
+                credentialData = buildJsonObject {},
+            )
+        ),
         expiresAt = Clock.System.now() + 5.minutes,
     )
 }

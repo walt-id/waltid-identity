@@ -21,13 +21,13 @@ enum class IssuanceSessionStatus {
 }
 
 @Serializable
-data class IssuanceSession(
-    val sessionId: String,
+data class IssuanceRequest(
+    val credentialIdentifier: String,
     val profileId: String,
-    val authenticationMethod: AuthenticationMethod,
     val credentialConfigurationId: String,
     val issuerKey: JsonObject,
-    val expectedCredentialProofKeyJwk: JsonObject? = null,
+    /** Ordered proof keys pinned for an issuance retry; one configured key applies to every proof. */
+    val expectedCredentialProofKeyJwks: List<JsonObject>? = null,
     val credentialData: JsonObject,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
@@ -37,6 +37,23 @@ data class IssuanceSession(
     val authorizedTransactionDataTypes: List<String>? = null,
     val x5Chain: List<String>? = null,
     val issuerDid: String? = null,
+    val credentialStatus: JsonElement? = null,
+    @Transient
+    val crypto2IssuerStoredKey: String? = null,
+)
+
+@Serializable
+data class IssuanceResult(
+    val issuedAt: Instant,
+    val issuedCredentialFormat: String,
+)
+
+@Serializable
+data class IssuanceSession(
+    val sessionId: String,
+    val authenticationMethod: AuthenticationMethod,
+    val issuanceRequests: List<IssuanceRequest>,
+    val issuanceResults: Map<String, IssuanceResult> = emptyMap(),
     val credentialOffer: CredentialOffer? = null,
     val authorizationRequest: Map<String, List<String>>? = null,
     val externalAuthorizationState: String? = null,
@@ -44,11 +61,17 @@ data class IssuanceSession(
     val expiresAt: Instant,
     val status: IssuanceSessionStatus = IssuanceSessionStatus.ACTIVE,
     val statusReason: String? = null,
-    val issuedCredentialFormat: String? = null,
     val notifications: IssuanceNotifications? = null,
     val isClosed: Boolean = false,
-    val credentialStatus: JsonElement? = null,
     val failure: IssuanceSessionFailure? = null,
-    @Transient
-    val crypto2IssuerStoredKey: String? = null,
-)
+) {
+    init {
+        require(issuanceRequests.isNotEmpty()) { "issuanceRequests must not be empty" }
+        require(issuanceRequests.map { it.credentialIdentifier }.distinct().size == issuanceRequests.size) {
+            "credentialIdentifier values must be unique within an issuance session"
+        }
+        require(issuanceResults.keys.all { resultId ->
+            issuanceRequests.any { it.credentialIdentifier == resultId }
+        }) { "issuanceResults must reference issuanceRequests in the same session" }
+    }
+}

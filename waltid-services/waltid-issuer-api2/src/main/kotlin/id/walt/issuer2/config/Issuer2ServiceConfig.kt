@@ -6,6 +6,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
+import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import kotlinx.coroutines.runBlocking
 
 data class Issuer2ServiceConfig(
@@ -17,6 +18,8 @@ data class Issuer2ServiceConfig(
     val clientAuthenticationConfig: ClientAuthenticationConfig? = null,
     /** Preferred encoded crypto2 StoredKey. Invalid or mismatched values fail startup. */
     val ciTokenStoredKey: String? = null,
+    /** Enables batch credential issuance and defines the maximum accepted batch size. */
+    val batchCredentialIssuance: BatchCredentialIssuance? = null,
 ) : WaltConfig() {
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(
@@ -31,6 +34,7 @@ data class Issuer2ServiceConfig(
         credentialEncryptionKey,
         enforcePushedAuthorizationRequests,
         clientAuthenticationConfig,
+        null,
         null,
     )
 

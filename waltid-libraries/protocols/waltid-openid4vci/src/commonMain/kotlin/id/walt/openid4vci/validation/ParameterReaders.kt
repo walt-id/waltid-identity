@@ -46,7 +46,9 @@ internal fun Map<String, List<String>>.rejectDuplicate(name: String) {
 internal fun Map<String, List<String>>.optionalAuthorizationDetails(): List<AuthorizationDetail> {
     val value = optionalSingle("authorization_details") ?: return emptyList()
     return try {
-        authorizationDetailsJson.decodeFromString(ListSerializer(AuthorizationDetail.serializer()), value)
+        authorizationDetailsJson.decodeFromString(ListSerializer(AuthorizationDetail.serializer()), value).also {
+            if (it.isEmpty()) throw SerializationException("authorization_details must not be empty")
+        }
     } catch (e: Exception) {
         throw SerializationException("Invalid authorization_details: ${e.message}")
     }

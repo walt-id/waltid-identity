@@ -26,24 +26,20 @@ class ConfiguredIssuanceSessionRepository(
     override suspend fun save(session: IssuanceSession): IssuanceSession {
         val ttl = ttlUntil(session.expiresAt)
         val existingSidecar = crypto2Keys[session.sessionId]
-        val sidecar = session.crypto2IssuerStoredKey ?: IssuanceSessionCrypto2Keys.migrateLegacyKey(session)
-        sidecar?.let {
-            require(IssuanceSessionCrypto2Keys.sidecarMatchesSession(session, it)) {
-                "Issuer2 crypto2 sidecar does not match the legacy session key"
-            }
-        }
-        sidecar?.let { crypto2Keys.set(session.sessionId, it, ttl) }
+        val sidecars = IssuanceSessionCrypto2Keys.migrateLegacyKeys(session)
+        IssuanceSessionCrypto2Keys.validateStoredKeys(session, sidecars)
+        persistSidecars(session.sessionId, sidecars, ttl)
         try {
             sessions.set(session.sessionId, session, ttl)
         } catch (cause: Exception) {
             if (existingSidecar == null) {
-                if (sidecar != null) crypto2Keys.remove(session.sessionId)
+                crypto2Keys.remove(session.sessionId)
             } else {
                 crypto2Keys.set(session.sessionId, existingSidecar, ttl)
             }
             throw cause
         }
-        return session.copy(crypto2IssuerStoredKey = sidecar)
+        return IssuanceSessionCrypto2Keys.attachStoredKeys(session, sidecars)
     }
 
     override suspend fun get(sessionId: String): IssuanceSession? = sessions[sessionId]?.let { attachCrypto2Key(it, backfill = true) }
@@ -70,20 +66,27 @@ class ConfiguredIssuanceSessionRepository(
     private suspend fun attachCrypto2Key(session: IssuanceSession, backfill: Boolean): IssuanceSession {
         val persisted = crypto2Keys[session.sessionId]
         if (persisted != null) {
-            if (IssuanceSessionCrypto2Keys.sidecarMatchesSession(session, persisted)) {
-                return session.copy(crypto2IssuerStoredKey = persisted)
+            val storedKeys = Json.decodeFromString<Map<String, String>>(persisted)
+            val attached = IssuanceSessionCrypto2Keys.attachStoredKeys(session, storedKeys)
+            if (backfill) {
+                val normalizedKeys = IssuanceSessionCrypto2Keys.migrateLegacyKeys(attached)
+                if (normalizedKeys != storedKeys) {
+                    persistSidecars(session.sessionId, normalizedKeys, ttlUntil(session.expiresAt))
+                }
             }
-            val repaired = IssuanceSessionCrypto2Keys.migrateLegacyKey(session)
-            if (repaired != null) {
-                if (backfill) crypto2Keys.set(session.sessionId, repaired, ttlUntil(session.expiresAt))
-                return session.copy(crypto2IssuerStoredKey = repaired)
-            }
-            if (backfill) crypto2Keys.remove(session.sessionId)
-            return session
+            return attached
         }
-        val migrated = IssuanceSessionCrypto2Keys.migrateLegacyKey(session) ?: return session
-        if (backfill) crypto2Keys.set(session.sessionId, migrated, ttlUntil(session.expiresAt))
-        return session.copy(crypto2IssuerStoredKey = migrated)
+        val migrated = IssuanceSessionCrypto2Keys.migrateLegacyKeys(session)
+        if (backfill) persistSidecars(session.sessionId, migrated, ttlUntil(session.expiresAt))
+        return IssuanceSessionCrypto2Keys.attachStoredKeys(session, migrated)
+    }
+
+    private suspend fun persistSidecars(sessionId: String, sidecars: Map<String, String>, ttl: Duration) {
+        if (sidecars.isEmpty()) {
+            crypto2Keys.remove(sessionId)
+        } else {
+            crypto2Keys.set(sessionId, Json.encodeToString(sidecars), ttl)
+        }
     }
 }
 

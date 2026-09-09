@@ -26,8 +26,8 @@ import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
 import id.walt.crypto.keys.Key
-import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
@@ -133,13 +133,12 @@ interface OAuth2Provider {
         accessTokenContext: CredentialAccessTokenContext? = null,
     ): CredentialRequestResult
 
-    @Deprecated("Use the Crypto2CredentialSigningKey overload")
     suspend fun createCredentialResponse(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
         issuerKey: Key,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceInputData: CredentialIssuanceInputProvider,
         dataMapping: JsonObject? = null,
         selectiveDisclosure: SDMap? = null,
         x5Chain: List<X509Certificate>? = null,
@@ -147,7 +146,6 @@ interface OAuth2Provider {
         w3cVersion: String? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         authorizedTransactionDataTypes: List<String>? = null,
-        credentialStatus: Status? = null,
         validFrom: Instant? = null,
         validUntil: Instant? = null,
         proofValidationContext: CredentialProofValidationContext? = null,
@@ -158,7 +156,7 @@ interface OAuth2Provider {
         configuration: CredentialConfiguration,
         issuerKey: Crypto2CredentialSigningKey,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceInputData: CredentialIssuanceInputProvider,
         dataMapping: JsonObject? = null,
         selectiveDisclosure: SDMap? = null,
         x5Chain: List<X509Certificate>? = null,
@@ -166,7 +164,6 @@ interface OAuth2Provider {
         w3cVersion: String? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         authorizedTransactionDataTypes: List<String>? = null,
-        credentialStatus: Status? = null,
         validFrom: Instant? = null,
         validUntil: Instant? = null,
         proofValidationContext: CredentialProofValidationContext? = null,

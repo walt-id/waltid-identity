@@ -5,6 +5,7 @@ import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.serialization.SerializationException
@@ -18,9 +19,12 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             val grantType = GrantType.fromValue(grantTypeRaw)
 
             when (grantType) {
-                GrantType.AuthorizationCode -> validateAuthorizationCodeGrant(parameters, session)
-                GrantType.PreAuthorizedCode -> validatePreAuthorizedCodeGrant(parameters, session)
-                GrantType.RefreshToken -> validateRefreshTokenGrant(parameters, session)
+                GrantType.AuthorizationCode ->
+                    validateAuthorizationCodeGrant(parameters, session, parameters.optionalAuthorizationDetails())
+                GrantType.PreAuthorizedCode ->
+                    validatePreAuthorizedCodeGrant(parameters, session, parameters.optionalAuthorizationDetails())
+                GrantType.RefreshToken ->
+                    validateRefreshTokenGrant(parameters, session)
                 else -> AccessTokenRequestResult.Failure(
                     OAuthError(
                         error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_GRANT_TYPE,
@@ -41,6 +45,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
     private fun validateAuthorizationCodeGrant(
         parameters: Map<String, List<String>>,
         session: Session,
+        authorizationDetails: List<AuthorizationDetail>,
     ): AccessTokenRequestResult {
         // RFC6749 §4.1.3: client_id is optional; required only if client auth is not used.
         val clientId = parameters.optionalSingle("client_id")?.takeIf { it.isNotBlank() }
@@ -74,6 +79,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             requestedScopes = requestedScopes.toSet(),
             requestedAudience = emptySet(),
             grantedAudience = emptySet(),
+            authorizationDetails = authorizationDetails,
             requestForm = parameters.toMap(),
             session = session,
         )
@@ -84,6 +90,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
     private fun validatePreAuthorizedCodeGrant(
         parameters: Map<String, List<String>>,
         session: Session,
+        authorizationDetails: List<AuthorizationDetail>,
     ): AccessTokenRequestResult {
         // OpenID4VCI (Pre-Authorized Code Flow): pre-authorized_code is required and must be single-valued.
         val code = parameters.requireSingle("pre-authorized_code").takeIf { it.isNotBlank() }
@@ -113,6 +120,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             requestedScopes = requestedScopes.toSet(),
             requestedAudience = emptySet(),
             grantedAudience = emptySet(),
+            authorizationDetails = authorizationDetails,
             requestForm = parameters.toMap(),
             session = session,
         )

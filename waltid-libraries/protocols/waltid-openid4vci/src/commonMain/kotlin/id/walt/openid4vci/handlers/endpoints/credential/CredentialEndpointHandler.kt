@@ -14,10 +14,8 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.sdjwt.SDMap
-import id.walt.mdoc.objects.mso.Status
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 
@@ -30,7 +28,7 @@ fun interface CredentialEndpointHandler {
         configuration: CredentialConfiguration,
         issuerKey: Key,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceBatch: CredentialIssuanceBatch,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
@@ -38,10 +36,8 @@ fun interface CredentialEndpointHandler {
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult
 }
 
@@ -159,7 +155,7 @@ fun interface Crypto2CredentialEndpointHandler {
         configuration: CredentialConfiguration,
         issuerKey: Crypto2CredentialSigningKey,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceBatch: CredentialIssuanceBatch,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
@@ -167,9 +163,7 @@ fun interface Crypto2CredentialEndpointHandler {
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult
 }
