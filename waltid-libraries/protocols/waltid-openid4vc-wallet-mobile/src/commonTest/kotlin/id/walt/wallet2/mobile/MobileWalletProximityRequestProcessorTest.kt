@@ -328,9 +328,9 @@ class ProximityRequestProcessorTest {
     @Test
     fun `review retains authentication only for the satisfiable alternative document set`() = runTest {
         withFixture { fixture ->
-            val processor = MobileWalletProximityRequestProcessor(
+            val processor = ProximityRequestProcessor(
                 wallet = fixture.wallet,
-                configuration = MobileWalletProximityConfiguration(),
+                configuration = ProximityConfiguration(),
                 readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
             )
             val request = DeviceRequest(

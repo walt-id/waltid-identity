@@ -422,6 +422,9 @@ class NfcMdocEngagementSourceTest {
             assertStatus(NfcStatusWord.SUCCESS, router.process(selectFile(0xe104)))
             val ndefFile = NfcResponseApdu.decode(router.process(readBinary(0, 65_536)).copy()).data.copy()
             val handoverSelect = ndefFile.copyOfRange(2, ndefFile.size)
+            val carrier = NfcHandoverCodec.validateSelect(handoverSelect).carriers.single()
+            assertEquals(ImmutableBytes.of("nfc".encodeToByteArray()), carrier.carrierRecord.identifier)
+            assertEquals(carrier.carrierRecord.identifier, carrier.alternative.carrierDataReference)
             assertStatus(NfcStatusWord.SUCCESS, router.process(select(MdocNfcAid.DATA_TRANSFER)))
 
             val engaged = selection.await()
@@ -687,9 +690,12 @@ class NfcMdocEngagementSourceTest {
             val selected = NfcHandoverCodec.validateSelect(
                 assertIs<MdocSessionHandover.NfcConnection>(engaged.sessionHandover).handoverSelect.copy()
             )
+            val carrier = selected.carriers.single()
+            assertEquals(ImmutableBytes.of("nfc".encodeToByteArray()), carrier.carrierRecord.identifier)
+            assertEquals(carrier.carrierRecord.identifier, carrier.alternative.carrierDataReference)
             assertEquals(
                 DeviceRetrievalMethod.Nfc(65_535u, 65_536u),
-                NfcMdocCarrierCodec.decode(selected.carriers.single(), NfcMdocActor.HOLDER),
+                NfcMdocCarrierCodec.decode(carrier, NfcMdocActor.HOLDER),
             )
             prepared.close(ProximityCloseReason.COMPLETED)
         }
