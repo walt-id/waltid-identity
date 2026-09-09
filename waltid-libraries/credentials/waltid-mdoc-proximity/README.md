@@ -59,6 +59,11 @@ same lifecycle scope when rendering protocol progress. Run an engine once;
 cancel its coroutine when the host ends an active session. Do not reuse session
 keys or engagement material for a later presentation.
 
+A valid request with no returnable data sends an encrypted empty response and
+ends in `MdocHolderSessionResult.NoData` without requesting consent or resolving
+holder keys. `NoData.exchange` identifies that final request; an earlier exchange
+may already have shared approved data. Holder decline remains a distinct outcome.
+
 ## Integration boundaries
 
 | Component | Responsibility |
