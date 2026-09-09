@@ -45,7 +45,7 @@ import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocConsentPrompt
 import id.walt.mdoc.proximity.MdocHolderRequestContext
 import id.walt.mdoc.proximity.MdocResponseResolution
-import id.walt.mdoc.proximity.ProximityError
+import id.walt.mdoc.proximity.ProximityError as EngineProximityError
 import id.walt.mdoc.proximity.ProximityException
 import id.walt.wallet2.data.HolderKeyBindingErrorCode
 import id.walt.wallet2.data.HolderKeyBindingException
@@ -89,7 +89,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class MobileWalletProximityRequestProcessorTest {
+class ProximityRequestProcessorTest {
     @Test
     fun `Appendix holder use-case matrix preserves request consent portrait and offline boundaries`() = runTest {
         data class Scenario(
@@ -139,9 +139,9 @@ class MobileWalletProximityRequestProcessorTest {
                     ),
                 )
                 val context = requestContext(request, transcript(), fixture.readerEphemeralKey)
-                val processor = MobileWalletProximityRequestProcessor(
+                val processor = ProximityRequestProcessor(
                     wallet = fixture.wallet,
-                    configuration = MobileWalletProximityConfiguration(),
+                    configuration = ProximityConfiguration(),
                     readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
                 )
                 val preview = processor.preview(context)
@@ -157,13 +157,13 @@ class MobileWalletProximityRequestProcessorTest {
                     option.requestedElements.map { it.elementIdentifier }.toSet(),
                     scenario.id,
                 )
-                val submission = MobileWalletProximitySubmission(
+                val submission = ProximitySubmission(
                     documents = listOf(
-                        MobileWalletProximityDocumentSubmission(
+                        ProximityDocumentSubmission(
                             requestIndex = 0,
                             credentialId = option.credentialId,
                             disclosedElements = scenario.disclosed.mapTo(linkedSetOf()) {
-                                MobileWalletProximityElementReference("org.iso.18013.5.1", it)
+                                ProximityElementReference("org.iso.18013.5.1", it)
                             },
                         )
                     )
@@ -199,9 +199,9 @@ class MobileWalletProximityRequestProcessorTest {
                 ),
             )
             val context = requestContext(request, transcript(), fixture.readerEphemeralKey)
-            val processor = MobileWalletProximityRequestProcessor(
+            val processor = ProximityRequestProcessor(
                 wallet = fixture.wallet,
-                configuration = MobileWalletProximityConfiguration(),
+                configuration = ProximityConfiguration(),
                 readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
             )
             val preview = processor.preview(context)
@@ -217,13 +217,13 @@ class MobileWalletProximityRequestProcessorTest {
                 option.requestedElements.mapTo(linkedSetOf()) { it.elementIdentifier },
                 "UC_DOMESTIC_DATA:review",
             )
-            val submission = MobileWalletProximitySubmission(
+            val submission = ProximitySubmission(
                 documents = listOf(
-                    MobileWalletProximityDocumentSubmission(
+                    ProximityDocumentSubmission(
                         requestIndex = 0,
                         credentialId = option.credentialId,
                         disclosedElements = option.requestedElements.mapTo(linkedSetOf()) {
-                            MobileWalletProximityElementReference(it.namespace, it.elementIdentifier)
+                            ProximityElementReference(it.namespace, it.elementIdentifier)
                         },
                     )
                 )
@@ -260,9 +260,9 @@ class MobileWalletProximityRequestProcessorTest {
                 },
             )
             val context = requestContext(request, transcript(), fixture.readerEphemeralKey)
-            val processor = MobileWalletProximityRequestProcessor(
+            val processor = ProximityRequestProcessor(
                 wallet = fixture.wallet,
-                configuration = MobileWalletProximityConfiguration(),
+                configuration = ProximityConfiguration(),
                 readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
             )
             val preview = processor.preview(context)
@@ -272,14 +272,14 @@ class MobileWalletProximityRequestProcessorTest {
                 preview = preview,
             )
             val review = processor.review(prompt)
-            val submission = MobileWalletProximitySubmission(
+            val submission = ProximitySubmission(
                 documents = review.documents.map { document ->
                     val option = document.credentialOptions.first()
-                    MobileWalletProximityDocumentSubmission(
+                    ProximityDocumentSubmission(
                         requestIndex = document.requestIndex,
                         credentialId = option.credentialId,
                         disclosedElements = option.requestedElements.mapTo(linkedSetOf()) {
-                            MobileWalletProximityElementReference(it.namespace, it.elementIdentifier)
+                            ProximityElementReference(it.namespace, it.elementIdentifier)
                         },
                     )
                 }
@@ -307,10 +307,10 @@ class MobileWalletProximityRequestProcessorTest {
     fun `review binds exact request profile constraint holder choice and response`() = runTest {
         withFixture { fixture ->
             val profile = RecordingProfile(compatibleCredentialId = "mdl-2")
-            val processor = MobileWalletProximityRequestProcessor(
+            val processor = ProximityRequestProcessor(
                 wallet = fixture.wallet,
-                configuration = MobileWalletProximityConfiguration(
-                    applicationProfiles = MobileWalletProximityApplicationProfileRegistry(listOf(profile)),
+                configuration = ProximityConfiguration(
+                    applicationProfiles = ProximityApplicationProfileRegistry(listOf(profile)),
                 ),
                 readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
             )
@@ -327,33 +327,33 @@ class MobileWalletProximityRequestProcessorTest {
             val document = review.documents.single()
             val option = document.credentialOptions.single()
             assertEquals("mdl-2", option.credentialId)
-            assertEquals(MobileWalletProximityDeviceAuthenticationMethod.Signature, option.deviceAuthentication)
+            assertEquals(ProximityDeviceAuthenticationMethod.Signature, option.deviceAuthentication)
             assertEquals(false, option.requestedElements.single().intentToRetain)
             assertEquals("org.iso.18013.5.1.mDL", profile.input?.requestedDocuments?.single()?.docType)
             assertTrue(profile.input?.readerAuthentication.orEmpty().isNotEmpty())
             assertEquals("test-profile", review.applicationAuthorizations.single().profileId)
 
-            val submission = MobileWalletProximitySubmission(
+            val submission = ProximitySubmission(
                 documents = listOf(
-                    MobileWalletProximityDocumentSubmission(
+                    ProximityDocumentSubmission(
                         requestIndex = document.requestIndex,
                         credentialId = option.credentialId,
                         disclosedElements = option.requestedElements.mapTo(linkedSetOf()) {
-                            MobileWalletProximityElementReference(it.namespace, it.elementIdentifier)
+                            ProximityElementReference(it.namespace, it.elementIdentifier)
                         },
                     )
                 )
             )
             assertEquals(null, processor.accept(prompt, review.reviewId, submission))
             assertEquals(
-                MobileWalletProximityHolderAuthorization(
+                ProximityHolderAuthorization(
                     reviewId = review.reviewId,
                     exchange = 1,
                     requests = listOf(
-                        MobileWalletProximityHolderAuthorizationRequest(
+                        ProximityHolderAuthorizationRequest(
                             requestIndex = document.requestIndex,
                             credentialId = option.credentialId,
-                            deviceAuthentication = MobileWalletProximityDeviceAuthenticationMethod.Signature,
+                            deviceAuthentication = ProximityDeviceAuthenticationMethod.Signature,
                         )
                     ),
                 ),
@@ -372,11 +372,11 @@ class MobileWalletProximityRequestProcessorTest {
             holderSpec = KeySpec.Ec(EcCurve.P256),
             holderUsages = setOf(KeyUsage.KEY_AGREEMENT),
         ) { fixture ->
-            val processor = MobileWalletProximityRequestProcessor(
+            val processor = ProximityRequestProcessor(
                 wallet = fixture.wallet,
-                configuration = MobileWalletProximityConfiguration(
+                configuration = ProximityConfiguration(
                     deviceAuthenticationPolicy =
-                        MobileWalletProximityDeviceAuthenticationPolicy.PreferSignature,
+                        ProximityDeviceAuthenticationPolicy.PreferSignature,
                 ),
                 readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
             )
@@ -389,12 +389,12 @@ class MobileWalletProximityRequestProcessorTest {
             )
             val review = processor.review(prompt)
             val option = review.documents.single().credentialOptions.first()
-            assertEquals(MobileWalletProximityDeviceAuthenticationMethod.Mac, option.deviceAuthentication)
+            assertEquals(ProximityDeviceAuthenticationMethod.Mac, option.deviceAuthentication)
             val submission = submissionFor(review, option)
 
             assertEquals(null, processor.accept(prompt, review.reviewId, submission))
             assertEquals(
-                MobileWalletProximityDeviceAuthenticationMethod.Mac,
+                ProximityDeviceAuthenticationMethod.Mac,
                 processor.holderAuthorization(review.reviewId).requests.single().deviceAuthentication,
             )
             val resolution = assertIs<MdocResponseResolution.Send>(processor.resolve(context, lowerPreview))
@@ -409,11 +409,11 @@ class MobileWalletProximityRequestProcessorTest {
             holderSpec = KeySpec.Ec(EcCurve.P256),
             holderUsages = setOf(KeyUsage.KEY_AGREEMENT),
         ) { fixture ->
-            val processor = MobileWalletProximityRequestProcessor(
+            val processor = ProximityRequestProcessor(
                 wallet = fixture.wallet,
-                configuration = MobileWalletProximityConfiguration(
+                configuration = ProximityConfiguration(
                     deviceAuthenticationPolicy =
-                        MobileWalletProximityDeviceAuthenticationPolicy.SignatureOnly,
+                        ProximityDeviceAuthenticationPolicy.SignatureOnly,
                 ),
                 readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
             )
@@ -440,9 +440,9 @@ class MobileWalletProximityRequestProcessorTest {
                     )
                 )
             )
-            val processor = MobileWalletProximityRequestProcessor(
+            val processor = ProximityRequestProcessor(
                 wallet = wallet,
-                configuration = MobileWalletProximityConfiguration(),
+                configuration = ProximityConfiguration(),
                 readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
             )
 
@@ -459,19 +459,19 @@ class MobileWalletProximityRequestProcessorTest {
     fun `multiple whole-request authentications retain independent trust decisions`() = runTest {
         withFixture { fixture ->
             val observedIndices = mutableListOf<Int>()
-            val processor = MobileWalletProximityRequestProcessor(
+            val processor = ProximityRequestProcessor(
                 wallet = fixture.wallet,
-                configuration = MobileWalletProximityConfiguration(
-                    readerTrustEvaluator = MobileWalletProximityReaderTrustEvaluator { evidence ->
+                configuration = ProximityConfiguration(
+                    readerTrustEvaluator = ProximityReaderTrustEvaluator { evidence ->
                         observedIndices += evidence.authenticationIndex
                         if (evidence.authenticationIndex == 0) {
-                            MobileWalletProximityReaderTrustDecision(
-                                state = MobileWalletProximityReaderTrustState.Trusted,
-                                certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
+                            ProximityReaderTrustDecision(
+                                state = ProximityReaderTrustState.Trusted,
+                                certificatePath = ProximityReaderCertificatePathState.Valid,
                             )
                         } else {
-                            MobileWalletProximityReaderTrustDecision(
-                                state = MobileWalletProximityReaderTrustState.ValidButUntrusted,
+                            ProximityReaderTrustDecision(
+                                state = ProximityReaderTrustState.ValidButUntrusted,
                             )
                         }
                     },
@@ -490,13 +490,13 @@ class MobileWalletProximityRequestProcessorTest {
 
             assertEquals(listOf(0, 1), observedIndices)
             val wholeRequest = review.readerAuthentication.filter {
-                it.scope == MobileWalletProximityReaderAuthenticationScope.WholeRequest
+                it.scope == ProximityReaderAuthenticationScope.WholeRequest
             }
             assertEquals(listOf(0, 1), wholeRequest.map { it.authenticationIndex })
             assertEquals(
                 listOf(
-                    MobileWalletProximityReaderTrustState.Trusted,
-                    MobileWalletProximityReaderTrustState.ValidButUntrusted,
+                    ProximityReaderTrustState.Trusted,
+                    ProximityReaderTrustState.ValidButUntrusted,
                 ),
                 wholeRequest.map { it.trust },
             )
@@ -510,7 +510,7 @@ class MobileWalletProximityRequestProcessorTest {
             val scenarios = listOf(
                 listOf(
                     TestProfile("registered") {
-                        MobileWalletProximityApplicationProfileResult.Recognized(
+                        ProximityApplicationProfileResult.Recognized(
                             profileAuthorization("different")
                         )
                     }
@@ -520,19 +520,19 @@ class MobileWalletProximityRequestProcessorTest {
                 ) to "application_profile_failed",
                 listOf(
                     TestProfile("first") {
-                        MobileWalletProximityApplicationProfileResult.Recognized(profileAuthorization("first"))
+                        ProximityApplicationProfileResult.Recognized(profileAuthorization("first"))
                     },
                     TestProfile("second") {
-                        MobileWalletProximityApplicationProfileResult.Recognized(profileAuthorization("second"))
+                        ProximityApplicationProfileResult.Recognized(profileAuthorization("second"))
                     },
                 ) to "application_profile_ambiguous",
             )
 
             scenarios.forEach { (profiles, expectedCode) ->
-                val processor = MobileWalletProximityRequestProcessor(
+                val processor = ProximityRequestProcessor(
                     wallet = fixture.wallet,
-                    configuration = MobileWalletProximityConfiguration(
-                        applicationProfiles = MobileWalletProximityApplicationProfileRegistry(profiles),
+                    configuration = ProximityConfiguration(
+                        applicationProfiles = ProximityApplicationProfileRegistry(profiles),
                     ),
                     readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
                 )
@@ -548,11 +548,11 @@ class MobileWalletProximityRequestProcessorTest {
     @Test
     fun `status change after consent fails closed before response`() = runTest {
         withFixture { fixture ->
-            var status = MobileWalletProximityCredentialStatus.Valid
-            val processor = MobileWalletProximityRequestProcessor(
+            var status = ProximityCredentialStatus.Valid
+            val processor = ProximityRequestProcessor(
                 wallet = fixture.wallet,
-                configuration = MobileWalletProximityConfiguration(
-                    credentialStatusEvaluator = MobileWalletProximityCredentialStatusEvaluator { status },
+                configuration = ProximityConfiguration(
+                    credentialStatusEvaluator = ProximityCredentialStatusEvaluator { status },
                 ),
                 readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
             )
@@ -565,20 +565,20 @@ class MobileWalletProximityRequestProcessorTest {
             )
             val review = processor.review(prompt)
             val option = review.documents.single().credentialOptions.first()
-            val submission = MobileWalletProximitySubmission(
+            val submission = ProximitySubmission(
                 listOf(
-                    MobileWalletProximityDocumentSubmission(
+                    ProximityDocumentSubmission(
                         requestIndex = 0,
                         credentialId = option.credentialId,
                         disclosedElements = option.requestedElements.mapTo(linkedSetOf()) {
-                            MobileWalletProximityElementReference(it.namespace, it.elementIdentifier)
+                            ProximityElementReference(it.namespace, it.elementIdentifier)
                         },
                     )
                 )
             )
             assertEquals(null, processor.accept(prompt, review.reviewId, submission))
 
-            status = MobileWalletProximityCredentialStatus.Revoked
+            status = ProximityCredentialStatus.Revoked
 
             val failure = kotlin.test.assertFailsWith<ProximityException> {
                 processor.resolve(context, lowerPreview)
@@ -591,12 +591,12 @@ class MobileWalletProximityRequestProcessorTest {
     fun `reader trust change after approval prevents response`() = runTest {
         withFixture { fixture ->
             var trusted = true
-            val processor = processor(fixture, MobileWalletProximityConfiguration(
-                readerTrustEvaluator = MobileWalletProximityReaderTrustEvaluator {
-                    if (trusted) MobileWalletProximityReaderTrustDecision(
-                        MobileWalletProximityReaderTrustState.Trusted,
-                        certificatePath = MobileWalletProximityReaderCertificatePathState.Valid,
-                    ) else MobileWalletProximityReaderTrustDecision(MobileWalletProximityReaderTrustState.ValidButUntrusted)
+            val processor = processor(fixture, ProximityConfiguration(
+                readerTrustEvaluator = ProximityReaderTrustEvaluator {
+                    if (trusted) ProximityReaderTrustDecision(
+                        ProximityReaderTrustState.Trusted,
+                        certificatePath = ProximityReaderCertificatePathState.Valid,
+                    ) else ProximityReaderTrustDecision(ProximityReaderTrustState.ValidButUntrusted)
                 },
             ))
             val context = signedWholeRequestContext(fixture)
@@ -614,16 +614,16 @@ class MobileWalletProximityRequestProcessorTest {
     fun `application authorization change after approval prevents response`() = runTest {
         withFixture { fixture ->
             var authorization = profileAuthorization("changing-profile")
-            val profile = TestProfile("changing-profile") { MobileWalletProximityApplicationProfileResult.Recognized(authorization) }
-            val processor = processor(fixture, MobileWalletProximityConfiguration(
-                applicationProfiles = MobileWalletProximityApplicationProfileRegistry(listOf(profile)),
+            val profile = TestProfile("changing-profile") { ProximityApplicationProfileResult.Recognized(authorization) }
+            val processor = processor(fixture, ProximityConfiguration(
+                applicationProfiles = ProximityApplicationProfileRegistry(listOf(profile)),
             ))
             val context = requestContext(fixture.readerEphemeralKey)
             val preview = processor.preview(context)
             val prompt = prompt(preview, 1)
             val review = processor.review(prompt)
             assertEquals(null, processor.accept(prompt, review.reviewId, submissionFor(review, review.documents.single().credentialOptions.single())))
-            authorization = authorization.copy(details = listOf(MobileWalletProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 2.00")))
+            authorization = authorization.copy(details = listOf(ProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 2.00")))
             val failure = kotlin.test.assertFailsWith<ProximityException> { processor.resolve(context, preview) }
             assertEquals("changed_submission", failure.error.code)
         }
@@ -654,37 +654,37 @@ class MobileWalletProximityRequestProcessorTest {
             val firstPreview = processor.preview(firstContext)
             val firstPrompt = prompt(firstPreview, 1)
             val firstDecision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(firstPrompt) }
-            val firstReview = assertIs<MobileWalletProximityState.ReviewRequired>(owner.state.value).review
+            val firstReview = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
             val submission = submissionFor(firstReview, firstReview.documents.single().credentialOptions.first())
                 .copy(continueAfterResponse = true)
             val invalid = submission.copy(documents = submission.documents.map { it.copy(credentialId = "not-offered") })
-            assertIs<MobileWalletProximityActionResult.Rejected>(owner.dispatch(MobileWalletProximityAction.Approve(firstReview.reviewId, invalid)))
-            assertIs<MobileWalletProximityState.ReviewRequired>(owner.state.value)
-            assertEquals(MobileWalletProximityActionResult.Accepted, owner.dispatch(MobileWalletProximityAction.Approve(firstReview.reviewId, submission)))
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Approve(firstReview.reviewId, invalid)))
+            assertIs<ProximityState.ReviewRequired>(owner.state.value)
+            assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Approve(firstReview.reviewId, submission)))
             assertIs<MdocConsentDecision.Approve>(firstDecision.await())
-            assertIs<MobileWalletProximityActionResult.Rejected>(owner.dispatch(MobileWalletProximityAction.Approve(firstReview.reviewId, submission.copy(continueAfterResponse = false))))
-            assertIs<MobileWalletProximityActionResult.Rejected>(owner.dispatch(MobileWalletProximityAction.Decline(firstReview.reviewId)))
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Approve(firstReview.reviewId, submission.copy(continueAfterResponse = false))))
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Decline(firstReview.reviewId)))
             val resolution = assertIs<MdocResponseResolution.Send>(processor.resolve(firstContext, firstPreview))
             assertEquals(MdocSessionContinuation.CONTINUE, resolution.continuation)
 
             val secondContext = requestContext(unsignedRequest(), transcript(), fixture.readerEphemeralKey, exchange = 2)
             val secondPreview = processor.preview(secondContext)
             val secondDecision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt(secondPreview, 2)) }
-            val secondReview = assertIs<MobileWalletProximityState.ReviewRequired>(owner.state.value).review
+            val secondReview = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
             kotlin.test.assertNotEquals(firstReview.reviewId, secondReview.reviewId)
-            assertIs<MobileWalletProximityActionResult.Rejected>(owner.dispatch(MobileWalletProximityAction.Approve(firstReview.reviewId, submission)))
-            assertIs<MobileWalletProximityActionResult.Rejected>(owner.dispatch(MobileWalletProximityAction.Decline(firstReview.reviewId)))
-            owner.publish(MobileWalletProximityState.AwaitingRequest(2))
-            owner.publish(MobileWalletProximityState.SendingResponse(1))
-            owner.publish(MobileWalletProximityState.AwaitingNextRequest(1))
-            owner.publish(MobileWalletProximityState.Completed(1, false))
-            assertEquals(secondReview.reviewId, assertIs<MobileWalletProximityState.ReviewRequired>(owner.state.value).review.reviewId)
-            assertEquals(MobileWalletProximityActionResult.Accepted, owner.dispatch(MobileWalletProximityAction.Decline(secondReview.reviewId)))
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Approve(firstReview.reviewId, submission)))
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Decline(firstReview.reviewId)))
+            owner.publish(ProximityState.AwaitingRequest(2))
+            owner.publish(ProximityState.SendingResponse(1))
+            owner.publish(ProximityState.AwaitingNextRequest(1))
+            owner.publish(ProximityState.Completed(1, false))
+            assertEquals(secondReview.reviewId, assertIs<ProximityState.ReviewRequired>(owner.state.value).review.reviewId)
+            assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Decline(secondReview.reviewId)))
             assertIs<MdocConsentDecision.Deny>(secondDecision.await())
-            assertIs<MobileWalletProximityActionResult.Rejected>(owner.dispatch(MobileWalletProximityAction.Decline(secondReview.reviewId)))
-            owner.publish(MobileWalletProximityState.Completed(2, true))
-            owner.publish(MobileWalletProximityState.Preparing(MobileWalletProximityProfile.Iso180135Edition2Dis2026))
-            assertIs<MobileWalletProximityState.Completed>(owner.state.value)
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Decline(secondReview.reviewId)))
+            owner.publish(ProximityState.Completed(2, true))
+            owner.publish(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
+            assertIs<ProximityState.Completed>(owner.state.value)
         }
     }
 
@@ -695,13 +695,13 @@ class MobileWalletProximityRequestProcessorTest {
             val owner = owner(fixture, processor)
             val preview = processor.preview(requestContext(fixture.readerEphemeralKey))
             val decision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt(preview, 1)) }
-            val review = assertIs<MobileWalletProximityState.ReviewRequired>(owner.state.value).review
-            owner.publish(MobileWalletProximityState.AwaitingRequest(1))
-            assertIs<MobileWalletProximityState.ReviewRequired>(owner.state.value)
-            owner.dispatch(MobileWalletProximityAction.Approve(review.reviewId, submissionFor(review, review.documents.single().credentialOptions.first())))
+            val review = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
+            owner.publish(ProximityState.AwaitingRequest(1))
+            assertIs<ProximityState.ReviewRequired>(owner.state.value)
+            owner.dispatch(ProximityAction.Approve(review.reviewId, submissionFor(review, review.documents.single().credentialOptions.first())))
             decision.await()
-            owner.publish(MobileWalletProximityState.AwaitingRequest(1))
-            assertIs<MobileWalletProximityState.AuthorizingHolderKey>(owner.state.value)
+            owner.publish(ProximityState.AwaitingRequest(1))
+            assertIs<ProximityState.AuthorizingHolderKey>(owner.state.value)
             owner.cancel()
         }
     }
@@ -717,17 +717,17 @@ class MobileWalletProximityRequestProcessorTest {
             val owner = owner(fixture, second)
             val secondPreview = second.preview(firstContext)
             val decision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt(secondPreview, 1)) }
-            val current = assertIs<MobileWalletProximityState.ReviewRequired>(owner.state.value).review
+            val current = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
             val submission = submissionFor(current, current.documents.single().credentialOptions.first())
-            assertIs<MobileWalletProximityActionResult.Rejected>(owner.dispatch(MobileWalletProximityAction.Approve(oldReview.reviewId, submission)))
-            assertIs<MobileWalletProximityActionResult.Rejected>(owner.dispatch(MobileWalletProximityAction.Decline(oldReview.reviewId)))
-            assertEquals(MobileWalletProximityActionResult.Accepted, owner.dispatch(MobileWalletProximityAction.Cancel))
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Approve(oldReview.reviewId, submission)))
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Decline(oldReview.reviewId)))
+            assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Cancel))
             decision.join()
             kotlin.test.assertTrue(decision.isCancelled)
-            assertIs<MobileWalletProximityActionResult.Rejected>(owner.dispatch(MobileWalletProximityAction.Approve(current.reviewId, submission)))
-            owner.publish(MobileWalletProximityState.SendingResponse(1))
-            owner.publish(MobileWalletProximityState.Failed(ProximityError.Policy("late", "Late failure").toWalletError()))
-            assertEquals(MobileWalletProximityState.Cancelled, owner.state.value)
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Approve(current.reviewId, submission)))
+            owner.publish(ProximityState.SendingResponse(1))
+            owner.publish(ProximityState.Failed(EngineProximityError.Policy("late", "Late failure").toWalletError()))
+            assertEquals(ProximityState.Cancelled, owner.state.value)
             first.cancel()
         }
     }
@@ -738,19 +738,19 @@ class MobileWalletProximityRequestProcessorTest {
             val freshEntered = CompletableDeferred<Unit>()
             val resumeFresh = CompletableDeferred<Unit>()
             var suspendFresh = false
-            val processor = processor(fixture, MobileWalletProximityConfiguration(
-                credentialStatusEvaluator = MobileWalletProximityCredentialStatusEvaluator {
+            val processor = processor(fixture, ProximityConfiguration(
+                credentialStatusEvaluator = ProximityCredentialStatusEvaluator {
                     if (suspendFresh) { freshEntered.complete(Unit); resumeFresh.await() }
-                    MobileWalletProximityCredentialStatus.Valid
+                    ProximityCredentialStatus.Valid
                 },
             ))
             val context = requestContext(requestWithNames("given_name", "family_name"), transcript(), fixture.readerEphemeralKey)
             val preview = processor.preview(context)
             val prompt = prompt(preview, 1)
             val review = processor.review(prompt)
-            val selected = linkedSetOf(MobileWalletProximityElementReference("org.iso.18013.5.1", "given_name"))
-            val documents = mutableListOf(MobileWalletProximityDocumentSubmission(0, "mdl-1", selected))
-            val submission = MobileWalletProximitySubmission(documents, continueAfterResponse = true)
+            val selected = linkedSetOf(ProximityElementReference("org.iso.18013.5.1", "given_name"))
+            val documents = mutableListOf(ProximityDocumentSubmission(0, "mdl-1", selected))
+            val submission = ProximitySubmission(documents, continueAfterResponse = true)
             assertEquals(null, processor.accept(prompt, review.reviewId, submission))
             val authorization = processor.holderAuthorization(review.reviewId)
             runCatching { (review.documents.single().credentialOptions as MutableList).clear() }
@@ -759,8 +759,8 @@ class MobileWalletProximityRequestProcessorTest {
             suspendFresh = true
             val response = async { processor.resolve(context, preview) }
             freshEntered.await()
-            selected += MobileWalletProximityElementReference("org.iso.18013.5.1", "family_name")
-            documents[0] = MobileWalletProximityDocumentSubmission(0, "mdl-2", selected)
+            selected += ProximityElementReference("org.iso.18013.5.1", "family_name")
+            documents[0] = ProximityDocumentSubmission(0, "mdl-2", selected)
             runCatching { (review.documents.single().credentialOptions as MutableList).clear() }
             runCatching { (authorization.requests as MutableList).clear() }
             resumeFresh.complete(Unit)
@@ -780,14 +780,14 @@ class MobileWalletProximityRequestProcessorTest {
             val context = requestContext(fixture.readerEphemeralKey)
             val preview = processor.preview(context)
             val decision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt(preview, 1)) }
-            val review = assertIs<MobileWalletProximityState.ReviewRequired>(owner.state.value).review
+            val review = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
             val submission = submissionFor(review, review.documents.single().credentialOptions.first())
-            assertEquals(MobileWalletProximityActionResult.Accepted, owner.dispatch(MobileWalletProximityAction.Approve(review.reviewId, submission)))
-            assertEquals(MobileWalletProximityActionResult.Accepted, owner.dispatch(MobileWalletProximityAction.Cancel))
+            assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Approve(review.reviewId, submission)))
+            assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Cancel))
             assertIs<MdocConsentDecision.Approve>(decision.await())
-            assertIs<MobileWalletProximityActionResult.Rejected>(owner.dispatch(MobileWalletProximityAction.Decline(review.reviewId)))
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Decline(review.reviewId)))
             kotlin.test.assertFailsWith<IllegalArgumentException> { processor.resolve(context, preview) }
-            assertEquals(MobileWalletProximityState.Cancelled, owner.state.value)
+            assertEquals(ProximityState.Cancelled, owner.state.value)
         }
     }
 
@@ -809,18 +809,18 @@ class MobileWalletProximityRequestProcessorTest {
             val context = requestContext(fixture.readerEphemeralKey)
             val preview = processor.preview(context)
             val decision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt(preview, 1)) }
-            val review = assertIs<MobileWalletProximityState.ReviewRequired>(owner.state.value).review
-            assertEquals(MobileWalletProximityActionResult.Accepted, owner.dispatch(MobileWalletProximityAction.Approve(
+            val review = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
+            assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Approve(
                 review.reviewId, submissionFor(review, review.documents.single().credentialOptions.first()),
             )))
             decision.await()
             val response = async { processor.resolve(context, preview) }
             signingEntered.await()
-            owner.dispatch(MobileWalletProximityAction.Cancel)
+            owner.dispatch(ProximityAction.Cancel)
             response.cancelAndJoin()
             releaseSigning.complete(Unit)
             assertTrue(response.isCancelled)
-            assertEquals(MobileWalletProximityState.Cancelled, owner.state.value)
+            assertEquals(ProximityState.Cancelled, owner.state.value)
             blockSigning = false
             val fresh = processor(fixture)
             val freshPreview = fresh.preview(context)
@@ -844,22 +844,22 @@ class MobileWalletProximityRequestProcessorTest {
                 })
             }
         }) { fixture ->
-            val details = mutableListOf(MobileWalletProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 1.00"))
+            val details = mutableListOf(ProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 1.00"))
             val compatible = linkedSetOf("mdl-1")
-            val elements = mutableListOf(MobileWalletProximityDeviceSignedElement(
+            val elements = mutableListOf(ProximityDeviceSignedElement(
                 "mdl-1", "org.example.application", "amount", byteArrayOf(0x01).encodeToBase64Url(),
             ))
             val returned = profileAuthorization("owned-profile").copy(details = details, compatibleCredentialIds = compatible, deviceSignedElements = elements)
             var evaluations = 0
-            val profile = object : MobileWalletProximityApplicationProfile {
+            val profile = object : ProximityApplicationProfile {
                 override val id = "owned-profile"
-                override suspend fun evaluate(input: MobileWalletProximityApplicationProfileInput): MobileWalletProximityApplicationProfileResult {
+                override suspend fun evaluate(input: ProximityApplicationProfileInput): ProximityApplicationProfileResult {
                     evaluations++
                     runCatching { (input.readerAuthentication as MutableList).clear() }
-                    return MobileWalletProximityApplicationProfileResult.Recognized(returned)
+                    return ProximityApplicationProfileResult.Recognized(returned)
                 }
             }
-            val processor = processor(fixture, MobileWalletProximityConfiguration(applicationProfiles = MobileWalletProximityApplicationProfileRegistry(listOf(profile))))
+            val processor = processor(fixture, ProximityConfiguration(applicationProfiles = ProximityApplicationProfileRegistry(listOf(profile))))
             val context = requestContext(fixture.readerEphemeralKey)
             val preview = processor.preview(context)
             val prompt = prompt(preview, 1)
@@ -871,7 +871,7 @@ class MobileWalletProximityRequestProcessorTest {
             assertEquals(null, processor.accept(prompt, stable.reviewId, submissionFor(stable, stable.documents.single().credentialOptions.single())))
             val response = async { processor.resolve(context, preview) }
             signingEntered.await()
-            details[0] = MobileWalletProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 9.00")
+            details[0] = ProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 9.00")
             compatible += "mdl-2"
             elements[0] = elements[0].copy(valueCborBase64Url = byteArrayOf(0x09).encodeToBase64Url())
             releaseSigning.complete(Unit)
@@ -1007,7 +1007,7 @@ class MobileWalletProximityRequestProcessorTest {
     private suspend fun wireExchange(
         fixture: Fixture,
         request: DeviceRequest,
-        configuration: MobileWalletProximityConfiguration = MobileWalletProximityConfiguration(),
+        configuration: ProximityConfiguration = ProximityConfiguration(),
         denyFamilyName: Boolean = false,
     ): WireOutcome {
         suspend fun key(id: String) = fixture.runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
@@ -1055,12 +1055,12 @@ class MobileWalletProximityRequestProcessorTest {
         }
     }
 
-    private fun processor(fixture: Fixture, configuration: MobileWalletProximityConfiguration = MobileWalletProximityConfiguration()) =
-        MobileWalletProximityRequestProcessor(fixture.wallet, configuration, setOf(Cose.Algorithm.ES256))
+    private fun processor(fixture: Fixture, configuration: ProximityConfiguration = ProximityConfiguration()) =
+        ProximityRequestProcessor(fixture.wallet, configuration, setOf(Cose.Algorithm.ES256))
 
-    private suspend fun owner(fixture: Fixture, processor: MobileWalletProximityRequestProcessor): MobileWalletProximitySessionOwner =
-        MobileWalletProximitySessionOwner(
-            MobileWalletProximityState.CheckingPrerequisites(MobileWalletProximityCoordinator(fixture.wallet, null).capabilities(MobileWalletProximityConfiguration())),
+    private suspend fun owner(fixture: Fixture, processor: ProximityRequestProcessor): ProximitySessionOwner =
+        ProximitySessionOwner(
+            ProximityState.CheckingPrerequisites(ProximityCoordinator(fixture.wallet, null).capabilities(ProximityConfiguration())),
             Channel(Channel.CONFLATED),
         ).also { it.attach(processor) }
 
@@ -1288,15 +1288,15 @@ class MobileWalletProximityRequestProcessorTest {
         )
 
     private fun submissionFor(
-        review: MobileWalletProximityReview,
-        option: MobileWalletProximityCredentialOption,
-    ): MobileWalletProximitySubmission = MobileWalletProximitySubmission(
+        review: ProximityReview,
+        option: ProximityCredentialOption,
+    ): ProximitySubmission = ProximitySubmission(
         documents = listOf(
-            MobileWalletProximityDocumentSubmission(
+            ProximityDocumentSubmission(
                 requestIndex = review.documents.single().requestIndex,
                 credentialId = option.credentialId,
                 disclosedElements = option.requestedElements.mapTo(linkedSetOf()) {
-                    MobileWalletProximityElementReference(it.namespace, it.elementIdentifier)
+                    ProximityElementReference(it.namespace, it.elementIdentifier)
                 },
             )
         )
@@ -1304,20 +1304,20 @@ class MobileWalletProximityRequestProcessorTest {
 
     private class RecordingProfile(
         private val compatibleCredentialId: String,
-    ) : MobileWalletProximityApplicationProfile {
+    ) : ProximityApplicationProfile {
         override val id: String = "test-profile"
-        var input: MobileWalletProximityApplicationProfileInput? = null
+        var input: ProximityApplicationProfileInput? = null
 
         override suspend fun evaluate(
-            input: MobileWalletProximityApplicationProfileInput,
-        ): MobileWalletProximityApplicationProfileResult {
+            input: ProximityApplicationProfileInput,
+        ): ProximityApplicationProfileResult {
             this.input = input
-            return MobileWalletProximityApplicationProfileResult.Recognized(
-                MobileWalletProximityApplicationAuthorization(
+            return ProximityApplicationProfileResult.Recognized(
+                ProximityApplicationAuthorization(
                     profileId = id,
                     displayTitle = "Test authorization",
                     details = listOf(
-                        MobileWalletProximityApplicationAuthorizationDetail(
+                        ProximityApplicationAuthorizationDetail(
                             id = "amount",
                             label = "Amount",
                             value = "EUR 1.00",
@@ -1334,11 +1334,11 @@ class MobileWalletProximityRequestProcessorTest {
 
     private class TestProfile(
         override val id: String,
-        private val evaluate: suspend () -> MobileWalletProximityApplicationProfileResult,
-    ) : MobileWalletProximityApplicationProfile {
+        private val evaluate: suspend () -> ProximityApplicationProfileResult,
+    ) : ProximityApplicationProfile {
         override suspend fun evaluate(
-            input: MobileWalletProximityApplicationProfileInput,
-        ): MobileWalletProximityApplicationProfileResult = evaluate()
+            input: ProximityApplicationProfileInput,
+        ): ProximityApplicationProfileResult = evaluate()
     }
 
     private class FailingCredentialStore(
@@ -1353,12 +1353,12 @@ class MobileWalletProximityRequestProcessorTest {
         override suspend fun removeCredential(id: String): Boolean = false
     }
 
-    private fun profileAuthorization(profileId: String): MobileWalletProximityApplicationAuthorization =
-        MobileWalletProximityApplicationAuthorization(
+    private fun profileAuthorization(profileId: String): ProximityApplicationAuthorization =
+        ProximityApplicationAuthorization(
             profileId = profileId,
             displayTitle = "Test authorization",
             details = listOf(
-                MobileWalletProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 1.00")
+                ProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 1.00")
             ),
             compatibleCredentialIds = setOf("mdl-1"),
             resultBindingDigestBase64Url = Base64.UrlSafe
