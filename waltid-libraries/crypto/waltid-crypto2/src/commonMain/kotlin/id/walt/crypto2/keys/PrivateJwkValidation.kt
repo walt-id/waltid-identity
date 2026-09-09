@@ -9,22 +9,57 @@ import dev.whyoleg.cryptography.algorithms.RSA
 import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.algorithms.XDH
 import id.walt.crypto2.serialization.BinaryData
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+
+/**
+ * Material whose private and public members have already been proven consistent.
+ *
+ * [validatePrivatePublicConsistency] derives the public key from the private scalar, which for an
+ * elliptic curve is a full scalar multiplication - measured at roughly 470 microseconds for P-256.
+ * `CryptographySoftwareKeyProvider.restore` calls it on **every** restore, so a service that loads its
+ * signing key repeatedly pays that cost every time: a Verifier2 presentation was spending about 1.3
+ * CPU-seconds almost entirely here, and the whole verifier was limited to roughly 2 presentations per
+ * second as a result.
+ *
+ * Identical bytes cannot produce a different answer, so proving it once is enough. Any change to any
+ * member - including a tampered `d` - yields a different key and is validated again, so this caches the
+ * result of the check rather than skipping it.
+ *
+ * The cache is bounded and evicts in insertion order: it exists to collapse repeated loads of the same
+ * few keys, not to hold a service's entire key set. Entries are keyed by normalised material, which is
+ * already resident in memory as part of the stored key, and hold no derived secret of their own.
+ */
+private const val VALIDATION_CACHE_LIMIT = 512
+private val validationCacheMutex = Mutex()
+private val validatedMaterial = LinkedHashMap<String, Unit>()
 
 internal suspend fun EncodedKey.Jwk.validatePrivatePublicConsistency(
     spec: KeySpec,
     provider: CryptographyProvider,
 ) {
     if (!privateMaterial) return
+    val cacheKey = validationCacheKey(spec)
+    if (validationCacheMutex.withLock { validatedMaterial.containsKey(cacheKey) }) return
     val claimed = canonicalPublicJwk()
     val derived = derivePublicJwk(spec, provider)
     require(claimed == derived.canonicalPublicJwk()) {
         "Private JWK public members do not match its private material"
     }
+    validationCacheMutex.withLock {
+        if (validatedMaterial.size >= VALIDATION_CACHE_LIMIT) {
+            validatedMaterial.keys.firstOrNull()?.let(validatedMaterial::remove)
+        }
+        validatedMaterial[cacheKey] = Unit
+    }
 }
+
+private fun EncodedKey.Jwk.validationCacheKey(spec: KeySpec): String =
+    "$spec|${normalizeJwk(data.toByteArray()).decodeToString()}"
 
 private suspend fun EncodedKey.Jwk.derivePublicJwk(
     spec: KeySpec,
