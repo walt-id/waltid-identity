@@ -66,6 +66,8 @@ object MdocIssuer {
         protectedHeaderX5t: CoseCertHash? = null,
         /** Optional restriction on what the holder's device key may sign, embedded in the MSO. */
         keyAuthorizations: KeyAuthorization? = null,
+        /** Optional signing time with reduced precision, chosen by the issuing service. */
+        signedAt: Instant? = null,
     ): IssuerSigned {
         return signMsoForIssuerSignedObjects(
             namespaceIssuerSignedItems = namespaceIssuerSignedItems,
@@ -80,6 +82,7 @@ object MdocIssuer {
             protectedHeaderX5t = protectedHeaderX5t,
             keyAuthorizations = keyAuthorizations,
             coseSigner = issuerKey.toCoseSigner(),
+            signedAt = signedAt,
             coseAlgorithm = requireNotNull(issuerKey.keyType.toCoseAlgorithm()) {
                 "Issuer key type has no COSE signing algorithm: ${issuerKey.keyType}"
             },
@@ -100,6 +103,7 @@ object MdocIssuer {
         protectedHeaderX5u: String? = null,
         protectedHeaderX5t: CoseCertHash? = null,
         keyAuthorizations: KeyAuthorization? = null,
+        signedAt: Instant? = null,
     ): IssuerSigned = signMsoForIssuerSignedObjects(
         namespaceIssuerSignedItems = namespaceIssuerSignedItems,
         issuerCertificate = issuerCertificate,
@@ -114,6 +118,7 @@ object MdocIssuer {
         keyAuthorizations = keyAuthorizations,
         coseSigner = issuerKey.toCoseSigner(signatureAlgorithm),
         coseAlgorithm = signatureAlgorithm,
+        signedAt = signedAt,
     )
 
     private suspend fun signMsoForIssuerSignedObjects(
@@ -130,6 +135,7 @@ object MdocIssuer {
         keyAuthorizations: KeyAuthorization?,
         coseSigner: CoseSigner,
         coseAlgorithm: Int,
+        signedAt: Instant?,
     ): IssuerSigned {
 
         val valueDigests = namespaceIssuerSignedItems.mapValues { (namespace, issuerSignedItems) ->
@@ -137,7 +143,7 @@ object MdocIssuer {
                 ValueDigest.fromIssuerSignedItem(issuerSignedItem, namespace, digestAlgorithm)
             })
         }
-        val signedTimestamp = Instant.fromEpochSeconds(Clock.System.now().epochSeconds)
+        val signedTimestamp = Instant.fromEpochSeconds((signedAt ?: Clock.System.now()).epochSeconds)
         val effectiveValidFrom = if (validFrom != null && validFrom > signedTimestamp)
             Instant.fromEpochSeconds(validFrom.epochSeconds) else signedTimestamp
 
@@ -229,6 +235,8 @@ object MdocIssuer {
         /** Optional restriction on what the holder's device key may sign, embedded in the MSO. */
         keyAuthorizations: KeyAuthorization? = null,
 
+        /** Optional signing time with reduced precision, chosen by the issuing service. */
+        signedAt: Instant? = null,
         /** Custom value serialization (null returns are explicitly NOT mapped) */
         valueMappingFunction: (
             docType: String,
@@ -251,7 +259,8 @@ object MdocIssuer {
             digestAlgorithm = digestAlgorithm,
             protectedHeaderX5u = protectedHeaderX5u,
             protectedHeaderX5t = protectedHeaderX5t,
-            keyAuthorizations = keyAuthorizations
+            keyAuthorizations = keyAuthorizations,
+            signedAt = signedAt,
         )
     }
 
@@ -269,6 +278,7 @@ object MdocIssuer {
         protectedHeaderX5u: String? = null,
         protectedHeaderX5t: CoseCertHash? = null,
         keyAuthorizations: KeyAuthorization? = null,
+        signedAt: Instant? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -277,6 +287,7 @@ object MdocIssuer {
         ) -> CborElement? = defaultSchemalessMappingFunction,
     ): IssuerSigned = signMsoForIssuerSignedObjects(
         namespaceIssuerSignedItems = mapUniversalData(docType, data, valueMappingFunction),
+        signedAt = signedAt,
         issuerKey = issuerKey,
         signatureAlgorithm = signatureAlgorithm,
         issuerCertificate = issuerCertificate,
