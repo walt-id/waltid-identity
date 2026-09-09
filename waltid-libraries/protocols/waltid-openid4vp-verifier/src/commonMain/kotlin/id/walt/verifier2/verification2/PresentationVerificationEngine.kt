@@ -2,6 +2,7 @@
 
 package id.walt.verifier2.verification2
 
+import kotlin.time.TimeSource
 import id.walt.cose.protectedAlgorithm
 import id.walt.cose.Cose
 import id.walt.cose.acceptsCoseAlgorithm
@@ -289,8 +290,15 @@ object PresentationVerificationEngine {
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ) {
         // syntax sugar:
-        suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) =
+        suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) {
+            // Timed per event: the happy path writes the session five times, and one such write measured
+            // 5.9ms, so persistence may dominate this function (~40ms) over the actual verification work.
+            // Logged per call so the events can be ranked and, where they are only intermediate state,
+            // considered for coalescing into fewer writes.
+            val started = TimeSource.Monotonic.markNow()
             updateSessionCallback.invoke(this, event, block)
+            log.debug { "Session write '${event.name}' took ${started.elapsedNow()}" }
+        }
 
         suspend fun Verification2Session.failSession(event: SessionEvent) =
             failSessionCallback.invoke(this, event, updateSessionCallback)
