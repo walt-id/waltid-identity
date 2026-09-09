@@ -22,22 +22,28 @@ import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.WalletIssuanceHandler.exchangeCode
+import id.walt.wallet2.handlers.WalletIssuanceHandler.generateAuthorizationUrl
 import id.walt.wallet2.handlers.WalletIssuanceHandler.pollDeferredFlow
+import id.walt.wallet2.handlers.WalletIssuanceHandler.previewOffer
+import id.walt.wallet2.handlers.WalletIssuanceHandler.receiveCredential
+import id.walt.wallet2.handlers.WalletIssuanceHandler.receiveCredentialAuthCodeFlow
+import id.walt.wallet2.handlers.WalletIssuanceHandler.receiveCredentialFlow
 import id.walt.wallet2.handlers.WalletIssuanceHandler.resolveOffer
+import id.walt.wallet2.handlers.WalletIssuanceHandler.tokenClientAttestation
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
-import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
-import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeRequestBuilder
+import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
+import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
 import id.waltid.openid4vci.wallet.clientauth.ClientAssertionBuilder
 import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
-import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
@@ -133,8 +139,11 @@ data class ReceiveCredentialRequest(
      */
     val keyId: String? = null,
 
-    /** DID to use as the credential subject / holder binding. Defaults to wallet's default DID. */
+    /** Inline DID to use as the credential subject / holder binding. Defaults to wallet's default DID. */
     val did: String? = null,
+
+    /** Reference to a DID in the wallet's DID store for holder binding. Ignored when [did] is provided. Defaults to wallet's default DID. */
+    val didReference: String? = null,
 
     /** Transaction code (PIN) required by some pre-authorized code flows. */
     val txCode: String? = null,
@@ -189,6 +198,8 @@ data class ReceiveCredentialFromPreviewRequest(
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     val did: String? = null,
+    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
+    val didReference: String? = null,
     val txCode: String? = null,
     val clientId: String = DEFAULT_CLIENT_ID,
     val redirectUri: Url = Url("openid://"),
@@ -206,7 +217,7 @@ data class ReceiveCredentialResult(
      * that should be used with [WalletIssuanceHandler.pollDeferredFlow] to
      * retrieve the credential once it becomes available.
      */
-    val deferredTransactionIds: Map<String, String> = emptyMap()
+    val deferredTransactionIds: Map<String, String> = emptyMap(),
 )
 
 // Isolated step types
@@ -214,7 +225,7 @@ data class ReceiveCredentialResult(
 @Serializable
 data class ResolveOfferRequest(
     override val offerUrl: Url? = null,
-    override val offerJson: JsonObject? = null
+    override val offerJson: JsonObject? = null,
 ) : CredentialOfferSource {
     init {
         checkOfferSource()
@@ -357,6 +368,8 @@ data class SignProofRequest(
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     val did: String? = null,
+    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. */
+    val didReference: String? = null,
 ) {
     init {
         require(credentialConfigurationId.isNotBlank()) {
@@ -367,7 +380,7 @@ data class SignProofRequest(
 
 @Serializable
 data class SignProofResult(
-    val proofJwt: String
+    val proofJwt: String,
 )
 
 @Serializable
@@ -404,7 +417,7 @@ data class FetchCredentialRequest(
 
 @Serializable
 data class FetchCredentialResult(
-    val rawCredentials: List<String>
+    val rawCredentials: List<String>,
 )
 
 /**
@@ -448,6 +461,8 @@ data class ReceiveAuthorizedCredentialRequest(
     val keyId: String? = null,
     /** Holder DID; when absent the proof is bound to the raw JWK. */
     val did: String? = null,
+    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
+    val didReference: String? = null,
     /** Optional metadata stored alongside the received credential(s). */
     val metadata: JsonObject? = null,
     /** Optional label override; otherwise derived from the credential configuration display. */
@@ -598,7 +613,10 @@ object WalletIssuanceHandler {
     private suspend fun resolveOffer(source: CredentialOfferSource, httpClient: HttpClient) =
         if (source.offerJson != null) {
             val inlineOffer = lenientJson.decodeFromString<CredentialOffer>(source.getEffectiveOfferString())
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = inlineOffer, credentialOfferUri = null)
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(
+                credentialOffer = inlineOffer,
+                credentialOfferUri = null
+            )
         } else {
             val req = CredentialOfferParser.parseCredentialOfferUrl(source.getEffectiveOfferString())
             CredentialOfferResolver(httpClient).resolveCredentialOffer(
@@ -695,7 +713,9 @@ object WalletIssuanceHandler {
                     "${wallet.keyStores.size} key store(s) contained a key permitting KeyUsage.SIGN, " +
                     "there is no static key, and neither an inline key nor a keyId was supplied"
             )
-        val did = request.did ?: wallet.defaultDid()
+        val did = request.did
+            ?: request.didReference?.let { wallet.didStore?.getDid(it)?.did }
+            ?: wallet.defaultDid()
         val requestMetadata = request.metadata
 
         val clientConfig = ClientConfiguration(
@@ -1002,6 +1022,7 @@ object WalletIssuanceHandler {
         key = key,
         keyId = keyId,
         did = did,
+        didReference = didReference,
         txCode = txCode,
         clientId = clientId,
         redirectUri = redirectUri,
@@ -1159,12 +1180,14 @@ object WalletIssuanceHandler {
                         "does not advertise JWT proof types"
             )
         val preferJwkBinding = shouldPreferJwkBinding(configuration.cryptographicBindingMethodsSupported)
+        val resolvedDid = request.did
+            ?: request.didReference?.let { wallet.didStore?.getDid(it)?.did }
         val proofs = buildJwtProof(
             proofBuilder = JwtProofBuilder(),
             keyMaterial = keyMaterial,
             audience = issuerMetadata.credentialIssuer,
             nonce = request.nonce,
-            did = request.did?.takeUnless { preferJwkBinding },
+            did = resolvedDid?.takeUnless { preferJwkBinding },
             acceptedAlgorithms = acceptedAlgorithms,
         )
         return SignProofResult(proofJwt = proofs.jwt?.firstOrNull() ?: error("Proof signing produced no JWT"))
@@ -1703,7 +1726,7 @@ object WalletIssuanceHandler {
     private suspend fun postFollowingRedirects(
         httpClient: HttpClient,
         url: String,
-        block: HttpRequestBuilder.() -> Unit
+        block: HttpRequestBuilder.() -> Unit,
     ): HttpResponse {
         var response = httpClient.post(url, block)
         if (response.status.value in REDIRECT_STATUS_CODES) {
@@ -1732,7 +1755,7 @@ object WalletIssuanceHandler {
     }
 
     private fun shouldPreferJwkBinding(
-        methods: Set<CryptographicBindingMethod>?
+        methods: Set<CryptographicBindingMethod>?,
     ): Boolean {
         if (methods.isNullOrEmpty()) return false
         val supportsJwk = methods.any {
@@ -1790,7 +1813,8 @@ object WalletIssuanceHandler {
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): GenerateAuthorizationUrlResult {
         val offer = resolveOffer(request, httpClient)
-        val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer).metadata
+        val issuerMetadata =
+            IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer).metadata
         val asMetadata =
             IssuerMetadataResolver(httpClient).resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
 
@@ -2085,6 +2109,8 @@ object WalletIssuanceHandler {
         keyReference: String? = null,
         /** Inline DID for holder binding; defaults to the wallet's default DID. */
         did: String? = null,
+        /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
+        didReference: String? = null,
         /** Optional sidecar metadata merged with resolved issuer display when storing. */
         metadata: JsonObject? = null,
         /**
@@ -2105,7 +2131,9 @@ object WalletIssuanceHandler {
         val keyMaterial = key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(keyReference, setOf(KeyUsage.SIGN))
             ?: error("No key available for proof-of-possession")
-        val holderDid = did ?: wallet.defaultDid()
+        val holderDid = did
+            ?: didReference?.let { wallet.didStore?.getDid(it)?.did }
+            ?: wallet.defaultDid()
 
         // Exchange code for token
         val exchangeRequest = ExchangeCodeRequest(
@@ -2234,6 +2262,7 @@ object WalletIssuanceHandler {
             key = request.key,
             keyReference = request.keyId,
             did = request.did,
+            didReference = request.didReference,
             metadata = request.metadata,
             label = request.label,
             attestationAssembler = attestationAssembler,

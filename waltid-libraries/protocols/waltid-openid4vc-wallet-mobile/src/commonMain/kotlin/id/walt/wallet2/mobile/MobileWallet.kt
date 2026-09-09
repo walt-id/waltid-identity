@@ -660,6 +660,7 @@ public class MobileWallet internal constructor(
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
         did: String? = null,
+        didReference: String? = null,
     ): MobileWalletDigitalCredentialResponse {
         require(selectedCredentialOptions.isNotEmpty()) { "At least one credential must be selected after consent" }
         val response = WalletPresentationHandler.submitDcApiPresentation(
@@ -673,6 +674,7 @@ public class MobileWallet internal constructor(
                     PresentationDisclosureSelection(it.queryId, it.credentialId, it.path)
                 },
                 did = did,
+                didReference = didReference,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
@@ -729,6 +731,7 @@ public class MobileWallet internal constructor(
     public suspend fun present(
         requestUrl: String,
         did: String? = null,
+        didReference: String? = null,
         runPolicies: Boolean? = null,
     ): MobileWalletPresentationResult {
         val result = WalletPresentationHandler.presentCredentialWithTrust(
@@ -736,6 +739,7 @@ public class MobileWallet internal constructor(
             request = PresentCredentialRequest(
                 requestUrl = Url(requestUrl.trim()),
                 did = did,
+                didReference = didReference,
                 runPolicies = runPolicies,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
@@ -812,6 +816,7 @@ public class MobileWallet internal constructor(
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
         did: String? = null,
+        didReference: String? = null,
         runPolicies: Boolean? = null,
     ): MobileWalletPresentationResult =
         WalletPresentationHandler.submitPresentation(
@@ -832,6 +837,7 @@ public class MobileWallet internal constructor(
                     )
                 },
                 did = did,
+                didReference = didReference,
                 runPolicies = runPolicies,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),

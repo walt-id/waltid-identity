@@ -183,6 +183,8 @@ data class WalletIssuanceSessionRequest(
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     val did: String? = null,
+    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
+    val didReference: String? = null,
     val clientId: String = "eudiw-abca",
     val redirectUri: Url = Url("openid://"),
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
@@ -325,7 +327,9 @@ class WalletIssuanceSessionService(
             resolved = resolved,
             keyMaterial = keyMaterial,
             keyId = selectedKeyId,
-            did = request.did ?: wallet.defaultDid(),
+            did = request.did
+                ?: request.didReference?.let { wallet.didStore?.getDid(it)?.did }
+                ?: wallet.defaultDid(),
             authorization = null,
             state = SessionState.AWAITING_ACCEPTANCE,
             expiresAtEpochMilliseconds = nowEpochMilliseconds() +
