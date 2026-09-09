@@ -3,7 +3,14 @@ set -euo pipefail
 
 RUNNER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IDENTITY_ROOT="$(cd "$RUNNER_DIR/../.." && pwd)"
+UNIFIED_ROOT="$(cd "$IDENTITY_ROOT/.." && pwd)"
 COMPOSE_FILE="${CONFORMANCE_COMPOSE_FILE:-$RUNNER_DIR/docker-compose-walt.yml}"
+CONFORMANCE_SUITE_SOURCE_DIR="${CONFORMANCE_SUITE_SOURCE_DIR:-$UNIFIED_ROOT/conformance-suite}"
+CONFORMANCE_SUITE_EXPECTED_REVISION="db1080a4821eac6952beaed369904c862c98dd82"
+CONFORMANCE_SUITE_EXPECTED_SHORT_REVISION="db1080a"
+CONFORMANCE_SUITE_EXPECTED_TAG="release-v5.2.3"
+CONFORMANCE_SUITE_EXPECTED_VERSION="5.2.4"
+export CONFORMANCE_SUITE_SOURCE_DIR
 BASE_TRUSTSTORE="$RUNNER_DIR/conformance-truststore.jks"
 TRUSTSTORE="$RUNNER_DIR/build/conformance/conformance-truststore.jks"
 CLIENT_ATTESTER_JWK_FILE="$RUNNER_DIR/src/test/resources/keys/attester-key.json"
@@ -199,6 +206,46 @@ require_command docker
 require_command openssl
 require_command keytool
 require_command curl
+require_command git
+require_command mvn
+
+prepare_exact_conformance_suite() {
+  local actual_revision
+  local generated_revision=""
+  local jar="$CONFORMANCE_SUITE_SOURCE_DIR/target/fapi-test-suite.jar"
+  local git_properties="$CONFORMANCE_SUITE_SOURCE_DIR/target/classes/git.properties"
+
+  if [[ ! -d "$CONFORMANCE_SUITE_SOURCE_DIR/.git" ]]; then
+    echo "Cannot find the conformance-suite clone at: $CONFORMANCE_SUITE_SOURCE_DIR" >&2
+    echo "Set CONFORMANCE_SUITE_SOURCE_DIR to the clone containing revision $CONFORMANCE_SUITE_EXPECTED_REVISION." >&2
+    exit 1
+  fi
+
+  actual_revision="$(git -C "$CONFORMANCE_SUITE_SOURCE_DIR" rev-parse HEAD)"
+  if [[ "$actual_revision" != "$CONFORMANCE_SUITE_EXPECTED_REVISION" ]]; then
+    echo "The local conformance suite is at $actual_revision, not the hosted revision." >&2
+    echo "Run: git -C \"$CONFORMANCE_SUITE_SOURCE_DIR\" switch --detach $CONFORMANCE_SUITE_EXPECTED_REVISION" >&2
+    exit 1
+  fi
+
+  if ! git -C "$CONFORMANCE_SUITE_SOURCE_DIR" diff --quiet ||
+    ! git -C "$CONFORMANCE_SUITE_SOURCE_DIR" diff --cached --quiet; then
+    echo "The conformance-suite checkout has tracked changes; refusing to label it as the exact hosted revision." >&2
+    exit 1
+  fi
+
+  if [[ -f "$git_properties" ]]; then
+    generated_revision="$(sed -n 's/^git.commit.id.abbrev=//p' "$git_properties" | head -n 1)"
+  fi
+
+  if [[ ! -f "$jar" || "$generated_revision" != "$CONFORMANCE_SUITE_EXPECTED_SHORT_REVISION" ]]; then
+    echo "Building conformance suite revision $CONFORMANCE_SUITE_EXPECTED_SHORT_REVISION..."
+    (
+      cd "$CONFORMANCE_SUITE_SOURCE_DIR"
+      mvn -B -Dmaven.test.skip -Dpmd.skip clean package
+    )
+  fi
+}
 
 load_optional_pem_file() {
   local file_env="$1"
@@ -291,6 +338,8 @@ if [[ "$OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL" == "$LOCAL_CREDENTIAL_ISSU
   fi
 fi
 
+prepare_exact_conformance_suite
+
 echo "Starting local OpenID conformance suite..."
 docker compose -f "$COMPOSE_FILE" up -d --build
 
@@ -334,8 +383,9 @@ keytool -importcert \
   -noprompt
 
 echo "Checking conformance suite health..."
+CONFORMANCE_SERVER_INFO=""
 for attempt in $(seq 1 60); do
-  if curl -ksf "https://$CONFORMANCE_HOST:$CONFORMANCE_PORT/api/server" >/dev/null; then
+  if CONFORMANCE_SERVER_INFO="$(curl -ksf "https://$CONFORMANCE_HOST:$CONFORMANCE_PORT/api/server")"; then
     echo "Conformance suite is reachable at https://$CONFORMANCE_HOST:$CONFORMANCE_PORT"
     break
   fi
@@ -349,6 +399,15 @@ for attempt in $(seq 1 60); do
 
   sleep 2
 done
+
+if [[ "$CONFORMANCE_SERVER_INFO" != *"\"tag\":\"$CONFORMANCE_SUITE_EXPECTED_TAG\""* ||
+  "$CONFORMANCE_SERVER_INFO" != *"\"version\":\"$CONFORMANCE_SUITE_EXPECTED_VERSION\""* ||
+  "$CONFORMANCE_SERVER_INFO" != *"\"revision\":\"$CONFORMANCE_SUITE_EXPECTED_SHORT_REVISION\""* ]]; then
+  echo "Unexpected conformance suite build: $CONFORMANCE_SERVER_INFO" >&2
+  echo "Expected tag=$CONFORMANCE_SUITE_EXPECTED_TAG version=$CONFORMANCE_SUITE_EXPECTED_VERSION revision=$CONFORMANCE_SUITE_EXPECTED_SHORT_REVISION." >&2
+  exit 1
+fi
+echo "Conformance suite build: $CONFORMANCE_SERVER_INFO"
 
 echo "Checking issuer metadata through the configured HTTPS endpoint..."
 if ! curl -ksf --connect-timeout 5 --max-time 15 "$ISSUER_METADATA_URL" >/dev/null; then
