@@ -151,7 +151,6 @@ class IssuanceNotificationRouteTest {
 
             val status = receivedUpdates.first { it.event == IssuanceSessionEvent.ISSUANCE_STATUS_CHANGED.value }
             assertEquals("SUCCESSFUL", status.session["status"]?.jsonPrimitive?.contentOrNull)
-            assertEquals("true", status.session["isClosed"]?.jsonPrimitive?.contentOrNull)
         } finally {
             notificationServer.stopServer()
         }

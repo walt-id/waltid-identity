@@ -205,8 +205,30 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("Street address").performScrollTo().assertIsDisplayed()
         onNodeWithText("Main Street 1").performScrollTo().assertIsDisplayed()
         onNodeWithText("Portrait").performScrollTo().assertIsDisplayed()
-        onNodeWithContentDescription("Credential image").performScrollTo().assertIsDisplayed()
-        onNodeWithText("image/png").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage("portrait"))
+            .performScrollTo()
+            .assertIsDisplayed()
+        onNodeWithText("Signature or usual mark").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage("signature_usual_mark"))
+            .performScrollTo()
+            .assertIsDisplayed()
+        onAllNodesWithText("image/jpeg").assertCountEquals(2)
+        onAllNodesWithText("image/png").assertCountEquals(1)
+        onNodeWithText("Verification artifact").performScrollTo().assertIsDisplayed()
+        val artifactPath = "verification_artifact"
+        onNodeWithTag(WalletUiTestTags.claimImage(artifactPath))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.claimImageViewer(artifactPath)).assertIsDisplayed()
+        onNodeWithContentDescription("Full-screen credential image").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImageViewerClose(artifactPath))
+            .assertIsDisplayed()
+            .performClick()
+        onAllNodesWithTag(WalletUiTestTags.claimImageViewer(artifactPath)).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage(artifactPath)).assertIsDisplayed()
         onAllNodesWithText("Raw credential data").assertCountEquals(0)
         onNodeWithTag("wallet.detailsBack").performClick()
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
@@ -681,7 +703,19 @@ class WalletDemoAppTestScenarios {
         onAllNodesWithTag(WalletUiTestTags.CredentialDetailsScreen).assertCountEquals(0)
         onAllNodesWithText("$.portrait").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.claimImageViewer(portraitDisclosurePath)).assertIsDisplayed()
+        onNodeWithContentDescription("Full-screen credential image").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImageViewerClose(portraitDisclosurePath))
+            .assertIsDisplayed()
+            .performClick()
+        onAllNodesWithTag(WalletUiTestTags.claimImageViewer(portraitDisclosurePath)).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).assertIsDisplayed()
     }
 
     fun presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails() = runComposeUiTest {
@@ -1208,108 +1242,117 @@ class WalletDemoAppTestScenarios {
     }
 
     companion object {
-        val sampleCredential = WalletDemoCredential(
-            id = "cred-1",
-            format = "jwt_vc_json",
-            issuer = "Example Issuer",
-            label = "Example Credential",
-            addedAt = "2026-07-09",
-            credentialDataJson = """
-                {
-                  "vct": "https://issuer.example/credential-types/mobile-driving-licence",
-                  "given_name": "Ada",
-                  "family_name": "Lovelace",
-                  "valid_to": 1781654400,
-                  "resident_address": {
-                    "street_address": "Main Street 1",
-                    "locality": "Vienna"
-                  },
-                  "portrait": {
-                    "elementValue": [-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]
-                  }
-                }
-            """.trimIndent(),
-        )
+        private val samplePortraitDisclosureValueJson by lazy {
+            SyntheticCredentialImageFixtures.portraitByteArrayJson
+        }
 
-        val samplePresentationPreview = WalletDemoPresentationPreview(
-            previewHandle = WalletDemoPresentationPreviewHandle("sample-presentation-preview"),
-            verifierMetadata = WalletDemoVerifierMetadata(
-                display = WalletDemoMetadataDisplay(
-                    name = "Example Verifier",
-                    logoUri = null,
-                    logoAltText = null,
+        val sampleCredential by lazy {
+            WalletDemoCredential(
+                id = "cred-1",
+                format = "jwt_vc_json",
+                issuer = "Example Issuer",
+                label = "Example Credential",
+                addedAt = "2026-07-09",
+                credentialDataJson = """
+                    {
+                      "vct": "https://issuer.example/credential-types/mobile-driving-licence",
+                      "given_name": "Ada",
+                      "family_name": "Lovelace",
+                      "valid_to": 1781654400,
+                      "resident_address": {
+                        "street_address": "Main Street 1",
+                        "locality": "Vienna"
+                      },
+                      "portrait": "${SyntheticCredentialImageFixtures.portraitDataUrl}",
+                      "signature_usual_mark": "${SyntheticCredentialImageFixtures.signatureDataUrl}",
+                      "verification_artifact": "${SyntheticCredentialImageFixtures.verificationDocumentDataUrl}"
+                    }
+                """.trimIndent(),
+            )
+        }
+
+        val samplePresentationPreview by lazy {
+            WalletDemoPresentationPreview(
+                previewHandle = WalletDemoPresentationPreviewHandle("sample-presentation-preview"),
+                verifierMetadata = WalletDemoVerifierMetadata(
+                    display = WalletDemoMetadataDisplay(
+                        name = "Example Verifier",
+                        logoUri = null,
+                        logoAltText = null,
+                    ),
+                    clientUri = "https://verifier.example",
+                    policyUri = "https://verifier.example/privacy",
+                    termsOfServiceUri = "https://verifier.example/terms",
                 ),
-                clientUri = "https://verifier.example",
-                policyUri = "https://verifier.example/privacy",
-                termsOfServiceUri = "https://verifier.example/terms",
-            ),
-            clientId = "https://verifier.example/client",
-            responseUri = "https://verifier.example/response",
-            state = "state-123",
-            nonce = "nonce-456",
-            responseEncryption = WalletDemoResponseEncryption.Required(
-                keyManagementAlgorithm = "ECDH-ES",
-                contentEncryptionAlgorithm = "A256GCM",
-                verifierKeyId = "verifier-key-1",
-                verifierKeyThumbprint = "thumbprint-1",
-            ),
-            credentialOptions = listOf(
-                WalletDemoPresentationCredentialOption(
-                    queryId = "pid",
-                    credentialId = "cred-1",
-                    label = "Example Credential",
-                    issuer = "Example Issuer",
-                    format = "jwt_vc_json",
-                    credentialDataJson = checkNotNull(sampleCredential.credentialDataJson),
-                    disclosures = (1..7).map { index ->
-                        WalletDemoPresentationDisclosure(
-                            label = "Disclosure $index",
-                            valueJson = "\"Value $index\"",
-                            displayValue = "Value $index",
+                clientId = "https://verifier.example/client",
+                responseUri = "https://verifier.example/response",
+                state = "state-123",
+                nonce = "nonce-456",
+                responseEncryption = WalletDemoResponseEncryption.Required(
+                    keyManagementAlgorithm = "ECDH-ES",
+                    contentEncryptionAlgorithm = "A256GCM",
+                    verifierKeyId = "verifier-key-1",
+                    verifierKeyThumbprint = "thumbprint-1",
+                ),
+                credentialOptions = listOf(
+                    WalletDemoPresentationCredentialOption(
+                        queryId = "pid",
+                        credentialId = "cred-1",
+                        label = "Example Credential",
+                        issuer = "Example Issuer",
+                        format = "jwt_vc_json",
+                        credentialDataJson = checkNotNull(sampleCredential.credentialDataJson),
+                        disclosures = (1..7).map { index ->
+                            WalletDemoPresentationDisclosure(
+                                label = "Disclosure $index",
+                                valueJson = "\"Value $index\"",
+                                displayValue = "Value $index",
+                                selectivelyDisclosable = true,
+                            )
+                        } + WalletDemoPresentationDisclosure(
+                            label = "Portrait",
+                            path = "$.portrait",
+                            valueJson = samplePortraitDisclosureValueJson,
+                            displayValue = null,
                             selectivelyDisclosable = true,
-                        )
-                    } + WalletDemoPresentationDisclosure(
+                        ),
+                    )
+                ),
+                credentialRequirements = listOf(
+                    WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
+                ),
+            )
+        }
+
+        val compactPresentationPreview by lazy {
+            samplePresentationPreview.copy(
+                credentialOptions = listOf(
+                    samplePresentationPreview.credentialOptions.single().copy(disclosures = emptyList()),
+                ),
+            )
+        }
+
+        val pathOnlyPortraitDisclosureCredentialOption by lazy {
+            WalletDemoPresentationCredentialOption(
+                queryId = "pid",
+                credentialId = "cred-1",
+                label = "Example Credential",
+                issuer = "Example Issuer",
+                format = "jwt_vc_json",
+                credentialDataJson = checkNotNull(sampleCredential.credentialDataJson),
+                disclosures = listOf(
+                    WalletDemoPresentationDisclosure(
                         label = "Portrait",
                         path = "$.portrait",
                         valueJson = samplePortraitDisclosureValueJson,
                         displayValue = null,
                         selectivelyDisclosable = true,
-                    ),
-                )
-            ),
-            credentialRequirements = listOf(
-                WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
-            ),
-        )
-
-        val compactPresentationPreview = samplePresentationPreview.copy(
-            credentialOptions = listOf(
-                samplePresentationPreview.credentialOptions.single().copy(disclosures = emptyList()),
-            ),
-        )
-
-        val pathOnlyPortraitDisclosureCredentialOption = WalletDemoPresentationCredentialOption(
-            queryId = "pid",
-            credentialId = "cred-1",
-            label = "Example Credential",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = checkNotNull(sampleCredential.credentialDataJson),
-            disclosures = listOf(
-                WalletDemoPresentationDisclosure(
-                    label = "Portrait",
-                    path = "$.portrait",
-                    valueJson = samplePortraitDisclosureValueJson,
-                    displayValue = null,
-                    selectivelyDisclosable = true,
-                )
-            ),
-        )
+                    )
+                ),
+            )
+        }
 
         const val sampleDidClientId = "decentralized_identifier:did:jwk:abc"
-        private const val samplePortraitDisclosureValueJson =
-            "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
-
         private val samplePresentationCredentialOption: WalletDemoPresentationCredentialOption
             get() = samplePresentationPreview.credentialOptions.single()
     }

@@ -92,7 +92,6 @@ class AuthorizationEventTest {
     fun `unusable authorization sessions publish correlated failures`() = runTest {
         val sessions = listOf(
             session("pre-authorized").copy(authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED),
-            session("inactive").copy(status = IssuanceSessionStatus.SUCCESSFUL),
             session("closed").copy(isClosed = true),
             session("expired").copy(expiresAt = Instant.DISTANT_PAST),
         )
@@ -114,6 +113,23 @@ class AuthorizationEventTest {
             assertEquals(OAuthErrorCodes.INVALID_REQUEST, event.error, session.sessionId)
             assertEquals("issuer_state is invalid", event.errorDescription, session.sessionId)
         }
+    }
+
+    @Test
+    fun `successful open authorization session remains usable`() = runTest {
+        val session = session("successful-open-authorization").copy(
+            status = IssuanceSessionStatus.SUCCESSFUL,
+        )
+        val service = protocolService(session)
+        val (response, events) = service.processAuthorizationAndCaptureEvents(
+            requestId = "authorize-successful-open",
+            parameters = validAuthorizationParameters(issuerState = session.sessionId),
+        )
+
+        assertEquals(302, response.status)
+        val redirectUri = assertNotNull(response.redirectUri)
+        assertEquals(true, redirectUri.contains("/external_login/"))
+        assertEquals(emptyList(), events)
     }
 
     @Test

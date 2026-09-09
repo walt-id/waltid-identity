@@ -45,7 +45,7 @@ public enum CredentialDisplayNormalizer {
                     name: disclosure.name,
                     path: disclosure.path
                 ),
-                value: disclosureValue(for: disclosure, path: path),
+                value: disclosureValue(for: disclosure, path: path, format: option.format),
                 rawValue: disclosure.valueJSON,
                 roles: CredentialDisplayVocabulary.roles(for: path.components)
             )
@@ -92,7 +92,8 @@ public enum CredentialDisplayNormalizer {
             var items = claimItems(
                 fromJSON: item.detailsJSON,
                 pathPrefix: .transactionData(index: index, field: .details),
-                fallbackLabel: CredentialDisplayVocabulary.transactionDataLabel(.details)
+                fallbackLabel: CredentialDisplayVocabulary.transactionDataLabel(.details),
+                format: nil
             )
 
             items.append(
@@ -164,7 +165,12 @@ public enum CredentialDisplayNormalizer {
         let displayMembers = format == mdocFormat ? members.compactMap(sanitizedMdocMember) : members
         let groupedItems = displayMembers.flatMap { member in
             let path = DisplayClaimPath.topLevel(member.key)
-            return claimRows(path: path, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
+            return claimRows(
+                path: path,
+                label: CredentialDisplayVocabulary.humanizedLabel(member.key),
+                value: member.value,
+                format: format
+            )
                 .map { row in
                     let displayRow = row.withMdocDisplaySemantics(format: format)
                     return (CredentialDisplayVocabulary.groupKind(for: displayRow.path.components, format: format), displayRow)
@@ -197,12 +203,17 @@ public enum CredentialDisplayNormalizer {
         )
     }
 
-    private static func claimItem(path: DisplayClaimPath, label: String, value: CredentialDisplayJSONValue) -> ClaimItem {
+    private static func claimItem(
+        path: DisplayClaimPath,
+        label: String,
+        value: CredentialDisplayJSONValue,
+        format: String?
+    ) -> ClaimItem {
         ClaimItem(
             path: path.itemPath,
             pathComponents: path.components,
             label: label,
-            value: protocolDisplayValue(for: value, path: path) ?? displayValue(for: value, path: path),
+            value: protocolDisplayValue(for: value, path: path) ?? displayValue(for: value, path: path, format: format),
             rawValue: rawString(value),
             roles: CredentialDisplayVocabulary.roles(for: path.components)
         )
@@ -211,7 +222,8 @@ public enum CredentialDisplayNormalizer {
     private static func claimItems(
         fromJSON rawJSON: String,
         pathPrefix: DisplayClaimPath,
-        fallbackLabel: String
+        fallbackLabel: String,
+        format: String?
     ) -> [ClaimItem] {
         guard let parsed = CredentialDisplayJSONParser.parse(rawJSON) else {
             let trimmed = rawJSON.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -229,13 +241,18 @@ public enum CredentialDisplayNormalizer {
 
         guard case .object(let members) = parsed else {
             return [
-                claimItem(path: pathPrefix, label: fallbackLabel, value: parsed)
+                claimItem(path: pathPrefix, label: fallbackLabel, value: parsed, format: format)
             ]
         }
 
         return members.flatMap { member in
             let path = pathPrefix.child(member.key)
-            return claimRows(path: path, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
+            return claimRows(
+                path: path,
+                label: CredentialDisplayVocabulary.humanizedLabel(member.key),
+                value: member.value,
+                format: format
+            )
                 .map(\.item)
         }
     }
@@ -265,15 +282,21 @@ public enum CredentialDisplayNormalizer {
         }
     }
 
-    private static func claimRows(path: DisplayClaimPath, label: String, value: CredentialDisplayJSONValue) -> [ClaimRow] {
-        let item = claimItem(path: path, label: label, value: value)
-        return flattenObjectForClaimRows(path: path, item: item, value: value)
+    private static func claimRows(
+        path: DisplayClaimPath,
+        label: String,
+        value: CredentialDisplayJSONValue,
+        format: String?
+    ) -> [ClaimRow] {
+        let item = claimItem(path: path, label: label, value: value, format: format)
+        return flattenObjectForClaimRows(path: path, item: item, value: value, format: format)
     }
 
     private static func flattenObjectForClaimRows(
         path: DisplayClaimPath,
         item: ClaimItem,
-        value: CredentialDisplayJSONValue
+        value: CredentialDisplayJSONValue,
+        format: String?
     ) -> [ClaimRow] {
         guard case .object(let members) = value else {
             if case .object = item.value {
@@ -287,8 +310,18 @@ public enum CredentialDisplayNormalizer {
 
         return members.flatMap { member in
             let childPath = path.child(member.key)
-            let childItem = claimItem(path: childPath, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
-            let rows = flattenObjectForClaimRows(path: childPath, item: childItem, value: member.value)
+            let childItem = claimItem(
+                path: childPath,
+                label: CredentialDisplayVocabulary.humanizedLabel(member.key),
+                value: member.value,
+                format: format
+            )
+            let rows = flattenObjectForClaimRows(
+                path: childPath,
+                item: childItem,
+                value: member.value,
+                format: format
+            )
             if rows.count == 1,
                case .image = rows[0].item.value,
                rows[0].item.label == CredentialDisplayVocabulary.humanizedLabel(imageWrapperClaimName) {
@@ -319,7 +352,11 @@ public enum CredentialDisplayNormalizer {
         }
     }
 
-    private static func displayValue(for value: CredentialDisplayJSONValue, path: DisplayClaimPath) -> DisplayValue {
+    private static func displayValue(
+        for value: CredentialDisplayJSONValue,
+        path: DisplayClaimPath,
+        format: String?
+    ) -> DisplayValue {
         switch value {
         case .null:
             return .null
@@ -330,7 +367,8 @@ public enum CredentialDisplayNormalizer {
             return CredentialDisplayValueDecoder.decodedValue(
                 for: string,
                 path: path,
-                renderJSON: { json, jsonPath in displayValue(for: json, path: jsonPath) }
+                imagePolicy: imageDecodingPolicy(path: path, format: format),
+                renderJSON: { json, jsonPath in displayValue(for: json, path: jsonPath, format: format) }
             ) ?? .text(string)
         case .number(let number):
             if let dateText = epochDateStringIfTemporal(value: number, path: path) {
@@ -341,7 +379,12 @@ public enum CredentialDisplayNormalizer {
             return .bool(bool)
         case .object(let members):
             let items = members.map { member in
-                claimItem(path: path.child(member.key), label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
+                claimItem(
+                    path: path.child(member.key),
+                    label: CredentialDisplayVocabulary.humanizedLabel(member.key),
+                    value: member.value,
+                    format: format
+                )
             }
             return .object(items)
         case .array(let list):
@@ -352,7 +395,7 @@ public enum CredentialDisplayNormalizer {
                 return image
             }
             return .list(list.enumerated().map { index, element in
-                displayValue(for: element, path: path.indexed(index))
+                displayValue(for: element, path: path.indexed(index), format: format)
             })
         }
     }
@@ -391,10 +434,11 @@ public enum CredentialDisplayNormalizer {
 
     private static func disclosureValue(
         for disclosure: PresentationDisclosure,
-        path: DisplayClaimPath
+        path: DisplayClaimPath,
+        format: String
     ) -> DisplayValue {
         if let parsed = CredentialDisplayJSONParser.parse(disclosure.valueJSON) {
-            let parsedValue = displayValue(for: parsed, path: path)
+            let parsedValue = displayValue(for: parsed, path: path, format: format)
             if case .text = parsedValue,
                let displayValue = disclosure.displayValue?.trimmingCharacters(in: .whitespacesAndNewlines),
                !displayValue.isEmpty {
@@ -409,6 +453,23 @@ public enum CredentialDisplayNormalizer {
         }
 
         return .raw(disclosure.valueJSON)
+    }
+
+    private static func imageDecodingPolicy(
+        path: DisplayClaimPath,
+        format: String?
+    ) -> ImageDecodingPolicy {
+        let roles = CredentialDisplayVocabulary.roles(for: path.components)
+        if roles.contains(.image) {
+            return .schemaImage
+        }
+        if CredentialDisplayVocabulary.hasLeafDescriptor(for: path.components) {
+            return .disabled
+        }
+        if let format, dataURLFallbackFormats.contains(format.lowercased()) {
+            return .dataURLFallback
+        }
+        return .disabled
     }
 
     private static func epochDateStringIfTemporal(value: String, path: DisplayClaimPath) -> String? {
@@ -434,6 +495,14 @@ public enum CredentialDisplayNormalizer {
     private static let epochMillisecondsThreshold: Int64 = 10_000_000_000
     private static let imageWrapperClaimName = "elementValue"
     private static let mdocFormat = "mso_mdoc"
+    private static let dataURLFallbackFormats: Set<String> = [
+        "vc+sd-jwt",
+        "dc+sd-jwt",
+        "jwt_vc",
+        "jwt_vc_json",
+        "jwt_vc_json-ld",
+        "ldp_vc"
+    ]
 }
 
 private extension String {

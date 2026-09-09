@@ -115,19 +115,26 @@ class Issuer2PreAuthorizedWalletFlowTest {
         assertEquals(HttpStatusCode.OK, credentialResponse.status, credentialResponse.bodyAsText())
         assertJwtVcJsonCredentialPayload(credentialResponse.body<JsonObject>())
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+        assertFalse(client.getSession(createdOffer.offerId).isClosed)
 
-        val replay = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
+        val nextProofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
+        val nextCredentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
             setBody(
                 credentialRequest(
                     credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
-                    proofs = proofs,
+                    proofs = nextProofs,
                 )
             )
         }
-        assertEquals(HttpStatusCode.BadRequest, replay.status, replay.bodyAsText())
-        assertFalse("credentials" in replay.body<JsonObject>())
+        assertEquals(HttpStatusCode.OK, nextCredentialResponse.status, nextCredentialResponse.bodyAsText())
+        assertJwtVcJsonCredentialPayload(nextCredentialResponse.body<JsonObject>())
+        assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+        assertFalse(client.getSession(createdOffer.offerId).isClosed)
     }
 
     @Test
@@ -582,7 +589,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
         assertEquals(1, acceptanceCalls.get())
         val session = client.getSession(createdOffer.offerId)
         assertEquals(IssuanceSessionStatus.SUCCESSFUL, session.status)
-        assertTrue(session.isClosed)
+        assertFalse(session.isClosed)
     }
 
     @Test

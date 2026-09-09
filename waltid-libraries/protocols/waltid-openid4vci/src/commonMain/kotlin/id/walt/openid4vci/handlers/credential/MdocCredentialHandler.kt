@@ -63,14 +63,15 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             computeCredentialResult(
                 request = request,
                 configuration = configuration,
-                issue = { certificateChain, docType, effectiveValidUntil, instance ->
+                issue = { certificateChain, docType, signedAt, effectiveValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
                         credentialData = instance.input.credentialData,
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
                         docType = docType,
-                        validFrom = validFrom,
+                        signedAt = signedAt,
+                        validFrom = effectiveValidFrom,
                         validUntil = effectiveValidUntil,
                         status = instance.input.credentialStatus,
                         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
@@ -81,6 +82,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                 issuanceBatch = issuanceBatch,
                 x5Chain = x5Chain,
                 mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+                validFrom = validFrom,
                 validUntil = validUntil,
             )
         } catch (e: CancellationException) {
@@ -112,8 +114,9 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             issuanceBatch = issuanceBatch,
             x5Chain = x5Chain,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            validFrom = validFrom,
             validUntil = validUntil,
-            issue = { certificateChain, docType, effectiveValidUntil, instance ->
+            issue = { certificateChain, docType, signedAt, effectiveValidUntil, instance ->
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
                     credentialData = instance.input.credentialData,
@@ -121,7 +124,8 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),
                     issuerCertificate = certificateChain,
                     docType = docType,
-                    validFrom = validFrom,
+                    signedAt = signedAt,
+                    validFrom = effectiveValidFrom,
                     validUntil = effectiveValidUntil,
                     status = instance.input.credentialStatus,
                     mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
@@ -143,16 +147,25 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         issuanceBatch: CredentialIssuanceBatch,
         x5Chain: List<X509Certificate>?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        validFrom: Instant?,
         validUntil: Instant?,
         issue: suspend (
             certificateChain: List<CoseCertificate>,
             docType: String,
+            signedAt: Instant?,
+            validFrom: Instant?,
             validUntil: Instant,
             instance: CredentialIssuanceInstance,
         ) -> String,
     ): CredentialResponseResult.Success {
         val docType = configuration.doctype
             ?: throw IllegalArgumentException("Missing doctype for mDoc credential configuration")
+
+        val issuerCertificateChain = requireNotNull(x5Chain?.takeIf { it.isNotEmpty() }) {
+            "mDoc issuance requests require that the x5Chain parameter contains at least one entry"
+        }.map { CoseCertificate(it.encodedDer.toByteArray()) }
+
+        val effectiveValidUntil = resolveValidUntil(request, validUntil)
 
         val issuerCertificateChain = requireNotNull(x5Chain?.takeIf { it.isNotEmpty() }) {
             "mDoc issuance requests require that the x5Chain parameter contains at least one entry"
@@ -178,16 +191,5 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             issue(issuerCertificateChain, docType, effectiveValidUntil, instance)
         }
     }
-
-    private fun resolveValidUntil(
-        request: CredentialRequest,
-        configuredValidUntil: Instant?,
-    ): Instant =
-        request.requestForm["validUntil"]
-            ?.firstOrNull()
-            ?.toLongOrNull()
-            ?.let(Instant::fromEpochMilliseconds)
-            ?: configuredValidUntil
-            ?: Clock.System.now().plus(365.days)
 
 }

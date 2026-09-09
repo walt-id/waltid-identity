@@ -47,6 +47,7 @@ fun WalletDemoPresentationCredentialOption.toRequestedDisclosureGroup(): ClaimGr
                 valueJson = disclosure.valueJson,
                 displayValue = disclosure.displayValue,
                 path = path,
+                format = format,
             ),
             rawValue = disclosure.valueJson,
             roles = CredentialDisplayVocabulary.roles(path),

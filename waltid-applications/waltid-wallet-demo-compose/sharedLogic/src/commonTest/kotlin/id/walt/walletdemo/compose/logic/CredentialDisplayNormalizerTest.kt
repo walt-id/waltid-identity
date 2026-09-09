@@ -244,7 +244,7 @@ class CredentialDisplayNormalizerTest {
                 label = "PID",
                 credentialDataJson = """
                     {
-                      "portrait": "data:image/png;base64,$onePixelPngBase64",
+                      "portrait": "data:image/png;base64,$syntheticPngBase64",
                       "nationalities": ["AT", "CH"],
                       "place_of_birth": {
                         "region": "Vienna",
@@ -423,7 +423,7 @@ class CredentialDisplayNormalizerTest {
                       "credentialSubject": {
                         "given_name": "Ada",
                         "family_name": "Lovelace",
-                        "portrait": "data:image/png;base64,$onePixelPngBase64"
+                        "portrait": "data:image/png;base64,$syntheticPngBase64"
                       }
                     }
                 """.trimIndent(),
@@ -722,7 +722,7 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun validatesDataUriImageBytesBeforeUsingMimeHint() {
+    fun usesDetectedImageTypeInsteadOfDeclaredDataUrlType() {
         val encodedJson = Base64.Default.encode("""{"purpose":"age proof"}""".encodeToByteArray())
         val encodedText = Base64.Default.encode("Hello, wallet".encodeToByteArray())
         val details = CredentialDisplayNormalizer.toDetails(
@@ -735,7 +735,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "json_note": "data:image/png;base64,$encodedJson",
                       "plain_note": "data:image/webp;base64,$encodedText",
-                      "portrait": "data:image/png;base64,$onePixelPngBase64"
+                      "portrait": "data:image/png;base64,$syntheticPngBase64"
                     }
                 """.trimIndent(),
             )
@@ -748,6 +748,41 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun explicitNonImageSchemaAndUnsupportedPayloadsDoNotRenderAsImages() {
+        val svg = Base64.Default.encode(
+            """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/></svg>"""
+                .encodeToByteArray()
+        )
+        val dataImage = "data:image/png;base64,$syntheticPngBase64"
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "vc+sd-jwt",
+                issuer = null,
+                label = "vc+sd-jwt",
+                credentialDataJson = """
+                    {
+                      "given_name": "$dataImage",
+                      "invalid_image": "data:image/png;base64,not-base64!",
+                      "unsupported_image": "data:image/svg+xml;base64,$svg",
+                      "non_image_data_url": "data:text/plain;base64,$syntheticPngBase64",
+                      "plain_base64": "$syntheticPngBase64"
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val claims = details.groups.flatMap { it.items }
+        listOf("given_name", "invalid_image", "unsupported_image", "non_image_data_url", "plain_base64")
+            .forEach { path ->
+                assertFalse(claims.first { it.path.id == path }.value is DisplayValue.Image)
+            }
+        val invalidImage = claims.first { it.path.id == "invalid_image" }
+        assertEquals(DisplayValue.Text(CredentialDisplayText.ImageUnavailable), invalidImage.value)
+        assertTrue(invalidImage.rawValue?.contains("not-base64!") == true)
+    }
+
+    @Test
     fun classifiesPortraitByteArrayDataAsImageAndUsesItForCards() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
@@ -755,7 +790,7 @@ class CredentialDisplayNormalizerTest {
                 format = "mso_mdoc",
                 issuer = null,
                 label = "mso_mdoc",
-                credentialDataJson = """{"portrait":{"elementValue":${onePixelPngByteArrayJson()}}}""",
+                credentialDataJson = """{"portrait":{"elementValue":${syntheticPngByteArrayJson()}}}""",
             )
         )
 
@@ -766,7 +801,7 @@ class CredentialDisplayNormalizerTest {
         val image = assertIs<DisplayValue.Image>(portrait.value)
 
         assertEquals("image/png", image.mimeType)
-        assertTrue(image.bytes.contentEquals(Base64.Default.decode(onePixelPngBase64)))
+        assertTrue(image.bytes.contentEquals(Base64.Default.decode(syntheticPngBase64)))
         assertEquals(image, details.toCardDisplayData().portrait)
     }
 
@@ -782,7 +817,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "eu.europa.ec.eudi.pid.1": {
                         "portrait": {
-                          "elementValue": ${onePixelPngByteArrayJson()}
+                          "elementValue": ${syntheticPngByteArrayJson()}
                         }
                       }
                     }
@@ -809,7 +844,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "org.iso.18013.5.1": {
                         "signature_usual_mark": {
-                          "elementValue": ${onePixelPngByteArrayJson()}
+                          "elementValue": ${syntheticPngByteArrayJson()}
                         }
                       }
                     }
@@ -835,10 +870,10 @@ class CredentialDisplayNormalizerTest {
                 credentialDataJson = """
                     {
                       "org.iso.18013.5.1": {
-                        "biometric_template_face": ${onePixelPngByteArrayJson()},
-                        "biometric_template_finger": ${onePixelPngByteArrayJson()},
-                        "biometric_template_signature_sign": ${onePixelPngByteArrayJson()},
-                        "biometric_template_iris": ${onePixelPngByteArrayJson()}
+                        "biometric_template_face": ${syntheticPngByteArrayJson()},
+                        "biometric_template_finger": ${syntheticPngByteArrayJson()},
+                        "biometric_template_signature_sign": ${syntheticPngByteArrayJson()},
+                        "biometric_template_iris": ${syntheticPngByteArrayJson()}
                       }
                     }
                 """.trimIndent(),
@@ -887,7 +922,7 @@ class CredentialDisplayNormalizerTest {
                 WalletDemoPresentationDisclosure(
                     label = CredentialDisplayVocabulary.disclosureLabel("portrait", """["eu.europa.ec.eudi.pid.1","portrait"]"""),
                     path = """["eu.europa.ec.eudi.pid.1","portrait"]""",
-                    valueJson = onePixelPngByteArrayJson(),
+                    valueJson = syntheticPngByteArrayJson(),
                     displayValue = null,
                     selectivelyDisclosable = true,
                     required = false,
@@ -1131,14 +1166,19 @@ class CredentialDisplayNormalizerTest {
         assertEquals("Country", claims.first { it.path.id == "place_of_birth.country" }.label)
     }
 
-    private fun onePixelPngByteArrayJson(): String =
-        Base64.Default.decode(onePixelPngBase64).joinToString(prefix = "[", postfix = "]") { byte ->
+    private fun syntheticPngByteArrayJson(): String =
+        syntheticPngBytes.joinToString(prefix = "[", postfix = "]") { byte ->
             (byte.toInt() and 0xFF).toString()
         }
 
     private companion object {
-        // Deterministic 1 x 1 PNG fixture containing no third-party artwork.
-        const val onePixelPngBase64 =
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+        val syntheticPngBytes = byteArrayOf(
+            0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        )
+        val syntheticJpegBytes = byteArrayOf(
+            0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46,
+        )
+        val syntheticPngBase64 = Base64.Default.encode(syntheticPngBytes)
+        val syntheticJpegBase64 = Base64.Default.encode(syntheticJpegBytes)
     }
 }
