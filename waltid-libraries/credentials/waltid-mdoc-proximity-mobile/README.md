@@ -29,6 +29,13 @@ commonMain.dependencies {
 }
 ```
 
+Most wallet apps should use the
+[Mobile Wallet SDK's `ProximityConfiguration`](../../protocols/waltid-openid4vc-wallet-mobile/README.md#in-person-proximity-presentation)
+or [Swift WalletSDK](../../protocols/waltid-wallet-sdk-ios/README.md). Those APIs
+coordinate transports, stored credentials, Reader CA policy and the complete
+review/approval lifecycle. The transport provider itself does not select
+credentials or request consent.
+
 ### Check Android BLE availability
 
 ```kotlin
@@ -104,3 +111,4 @@ From the unified-build root:
 ```
 
 - [BLE building blocks and qualification boundary](docs/adr/0001-ble-building-block-selection.md)
+- [Wallet integration, reader trust and credential selection](../../protocols/waltid-openid4vc-wallet-mobile/README.md#in-person-proximity-presentation)

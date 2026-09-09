@@ -8,10 +8,10 @@ authoritative ISO/IEC 18013-5 session.
 Proximity presentation is separate from the OpenID4VP URL flow. Query
 ``Wallet/proximityPresentationCapabilities(configuration:)`` without creating
 session material, then start one single-use
-``ProximityPresentationSession``:
+``ProximitySession``:
 
 ```swift
-let configuration = ProximityPresentationConfiguration()
+let configuration = ProximityConfiguration()
 let capabilities = try await wallet.proximityPresentationCapabilities(
     configuration: configuration
 )
@@ -53,14 +53,14 @@ currently requires ``ProximityDeviceAuthenticationPolicy/signatureOnly``.
 
 ### Resolve prerequisites
 
-Render ``ProximityPresentationCapabilities/remediationActions`` in product
+Render ``ProximityCapabilities/remediationActions`` in product
 language. The host app owns permission prompts and settings navigation. After
 performing an effect, report its privacy-safe result without attaching platform
 objects or raw error text:
 
 ```swift
 let result = await requestBluetoothPermission()
-let outcome: ProximityPresentationHostActionResult = result ? .completed : .failed
+let outcome: ProximityHostActionResult = result ? .completed : .failed
 _ = try await session.dispatch(
     .reportRemediation(.requestBluetoothPermission, outcome)
 )
@@ -72,19 +72,19 @@ fresh engagement material.
 
 ### Review and approve
 
-``ProximityPresentationReview`` contains display-safe reader authentication and
+``ProximityReview`` contains display-safe reader authentication and
 trust facts, document requests, retention intent, eligible credentials,
 disclosure alternatives, use-case and purpose assertions, and any recognized
 application authorization. These are protocol facts, not UI-derived state.
 
-Build ``ProximityPresentationSubmission`` only from the current review. The SDK
+Build ``ProximitySubmission`` only from the current review. The SDK
 binds and revalidates credential, holder-key, reader-trust, status, disclosure,
 and application-profile state before it sends a response. A stale or changed
 selection returns a typed rejection and does not disclose data.
 
 Reader-authentication statements remain distinct by scope, document index, and
 statement index. During protected-key work,
-``ProximityPresentationState/authorizingHolderKey(_:)`` carries one
+``ProximityState/authorizingHolderKey(_:)`` carries one
 ``ProximityHolderAuthorizationRequest`` per approved document so a mixed
 signature/MAC response cannot be collapsed into a global authorization method.
 
@@ -92,6 +92,6 @@ signature/MAC response cannot be collapsed into a global authorization method.
 
 Only one proximity session can be active per wallet. Cancellation is available
 in every non-terminal state where the SDK reports it as legal. Call
-``ProximityPresentationSession/close()`` when navigation or app lifecycle ends
+``ProximitySession/close()`` when navigation or app lifecycle ends
 the journey. Closing is idempotent, and a new session always creates fresh
 engagement identifiers and ephemeral key material.
