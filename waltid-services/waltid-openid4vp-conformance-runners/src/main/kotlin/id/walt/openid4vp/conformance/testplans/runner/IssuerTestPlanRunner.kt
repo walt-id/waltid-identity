@@ -330,7 +330,7 @@ class IssuerTestPlanRunner(
     ) {
         var counter = 0
         val attemptedBrowserUrls = mutableSetOf<String>()
-        val attemptedCredentialOfferEndpoints = mutableSetOf<String>()
+        val credentialOfferDelivery = IssuerCredentialOfferDelivery()
         while (true) {
             counter++
             val testRunInfo = conformance.getTestRunInfo(testId)
@@ -354,7 +354,7 @@ class IssuerTestPlanRunner(
                 attemptCredentialOfferDelivery(
                     testId,
                     credentialOfferProvider,
-                    attemptedCredentialOfferEndpoints,
+                    credentialOfferDelivery,
                     shouldLog = counter == 1 || counter % 10 == 0,
                 )
             ) {
@@ -365,7 +365,7 @@ class IssuerTestPlanRunner(
                 if (testRunInfo.status == "WAITING") {
                     throw IllegalStateException(
                         "Test $testId is stuck in WAITING status after ${counter - 1} seconds. " +
-                        "This typically means the test requires user interaction (OAuth login). " +
+                        "The suite may be waiting for a credential offer, transaction code, or OAuth login. " +
                         "Please complete the test manually at https://$conformanceHost:$conformancePort/test-info/$testId " +
                         "or set OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION=true to let Playwright complete the login."
                     )
@@ -380,7 +380,7 @@ class IssuerTestPlanRunner(
     private suspend fun attemptCredentialOfferDelivery(
         testId: String,
         credentialOfferProvider: suspend () -> String,
-        attemptedCredentialOfferEndpoints: MutableSet<String>,
+        credentialOfferDelivery: IssuerCredentialOfferDelivery,
         shouldLog: Boolean,
     ): Boolean {
         val testRun = runCatching { conformance.getTestRun(testId) }
@@ -402,23 +402,28 @@ class IssuerTestPlanRunner(
                 return false
             }
 
-        if (credentialOfferEndpoint in attemptedCredentialOfferEndpoints) {
-            if (shouldLog) {
-                println("Credential offer was already delivered to $credentialOfferEndpoint; waiting for suite status to change.")
+        val testLog = runCatching { conformance.getTestLog(testId) }
+            .getOrElse {
+                if (shouldLog) {
+                    println("Credential offer delivery is pending, but test log is not available yet: ${it.compactMessage()}")
+                }
+                return false
             }
-            return false
-        }
 
-        val credentialOffer = credentialOfferProvider()
-        val delivery = credentialOffer.toConformanceCredentialOfferDelivery()
-        println("Delivering issuer credential offer to conformance suite: $credentialOfferEndpoint")
-        conformance.deliverCredentialOffer(
-            credentialOfferEndpoint = credentialOfferEndpoint,
-            parameterName = delivery.parameterName,
-            parameterValue = delivery.parameterValue,
-        )
-        attemptedCredentialOfferEndpoints += credentialOfferEndpoint
-        return true
+        val delivered = credentialOfferDelivery.deliverIfRequested(testLog) {
+            val credentialOffer = credentialOfferProvider()
+            val delivery = credentialOffer.toConformanceCredentialOfferDelivery()
+            println("Delivering issuer credential offer to conformance suite: $credentialOfferEndpoint")
+            conformance.deliverCredentialOffer(
+                credentialOfferEndpoint = credentialOfferEndpoint,
+                parameterName = delivery.parameterName,
+                parameterValue = delivery.parameterValue,
+            )
+        }
+        if (!delivered && shouldLog) {
+            println("No new credential-offer request at $credentialOfferEndpoint; waiting for suite progress.")
+        }
+        return delivered
     }
 
     private suspend fun attemptBrowserAutomation(
