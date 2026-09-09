@@ -259,7 +259,7 @@ public class MobileWallet internal constructor(
         readerTrustEvaluator = readerTrustEvaluator,
         registryRecords = ::registryRecords,
     )
-    private val proximityCoordinator = MobileWalletProximityCoordinator(
+    private val proximityCoordinator = ProximityCoordinator(
         wallet = wallet,
         transportFactory = proximityTransportFactory,
     )
@@ -269,8 +269,8 @@ public class MobileWallet internal constructor(
      * scanners, or advertisers.
      */
     public suspend fun proximityPresentationCapabilities(
-        configuration: MobileWalletProximityConfiguration = MobileWalletProximityConfiguration(),
-    ): MobileWalletProximityCapabilities = proximityCoordinator.capabilities(configuration)
+        configuration: ProximityConfiguration = ProximityConfiguration(),
+    ): ProximityCapabilities = proximityCoordinator.capabilities(configuration)
 
     /**
      * Starts one single-use in-person presentation session.
@@ -279,8 +279,8 @@ public class MobileWallet internal constructor(
      * transaction material or radio resource is created.
      */
     public suspend fun startProximityPresentation(
-        configuration: MobileWalletProximityConfiguration = MobileWalletProximityConfiguration(),
-    ): MobileWalletProximitySession = proximityCoordinator.start(configuration)
+        configuration: ProximityConfiguration = ProximityConfiguration(),
+    ): ProximitySession = proximityCoordinator.start(configuration)
 
     private val issuanceSessions = WalletIssuanceSessionService(
         wallet = wallet,

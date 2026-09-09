@@ -26,6 +26,13 @@ commonMain.dependencies {
 }
 ```
 
+Wallet applications normally integrate through the
+[Mobile Wallet SDK](../../protocols/waltid-openid4vc-wallet-mobile/README.md#in-person-proximity-presentation),
+which supplies stored credentials, protected keys, capabilities and the public
+`ProximitySession` API. Its guide includes exhaustive state handling, Reader CA
+configuration, credential selection and approval. Native iOS applications use
+[Swift WalletSDK](../../protocols/waltid-wallet-sdk-ios/README.md).
+
 Use this lower-level engine directly when implementing a wallet integration or a
 protocol harness with its own credential source and consent boundary:
 
@@ -112,3 +119,4 @@ From the unified-build root, run the focused engine suite with:
 
 - [mdoc data model and issuance](../waltid-mdoc-credentials2/README.md)
 - [Android and iOS transport adapters](../waltid-mdoc-proximity-mobile/README.md)
+- [Mobile Wallet SDK session and consent API](../../protocols/waltid-openid4vc-wallet-mobile/README.md#in-person-proximity-presentation)

@@ -111,7 +111,7 @@ Use the Swift-native proximity API for ISO/IEC 18013-5 device engagement and
 retrieval. It is separate from the URL-based OpenID4VP methods:
 
 ```swift
-let configuration = ProximityPresentationConfiguration()
+let configuration = ProximityConfiguration()
 let capabilities = try await wallet.proximityPresentationCapabilities(
     configuration: configuration
 )
@@ -153,13 +153,13 @@ each document request. The pinned EUDI profile currently requires
 Approval uses `.approve(reviewID: review.reviewID, submission: submission)`;
 decline uses `.decline(reviewID: review.reviewID)`. Accepted decisions consume the
 review once; delayed or duplicate UI actions cannot act on a later review.
-`ProximityPresentationError.recovery` distinguishes prerequisite retry from a
+`ProximityError.recovery` distinguishes prerequisite retry from a
 fresh session after terminal failure. Runtime capability observations distinguish
 `.notChecked`, `.available`, and `.unavailable` independently of selection.
 Reader scopes use `.document(index:)` or `.wholeRequest`; only the valid
 authentication outcome carries an evaluated trust decision.
 
-`ProximityPresentationSession` is an actor over the KMP source of truth. Its
+`ProximitySession` is an actor over the KMP source of truth. Its
 state stream, typed actions, immutable review, trust facts, disclosure choices,
 application-profile result, and terminal states contain no generated Kotlin,
 Bluetooth, COSE, or platform objects. Call `close()` when the journey ends;

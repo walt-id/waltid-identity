@@ -270,8 +270,8 @@ public actor Wallet {
     /// - Parameter configuration: Capability dimensions and policy to evaluate.
     /// - Returns: A truthful capability report for every modeled dimension.
     public func proximityPresentationCapabilities(
-        configuration: ProximityPresentationConfiguration = .init()
-    ) async throws -> ProximityPresentationCapabilities {
+        configuration: ProximityConfiguration = .init()
+    ) async throws -> ProximityCapabilities {
         try await bridge.proximityPresentationCapabilities(configuration: configuration)
     }
 
@@ -279,9 +279,9 @@ public actor Wallet {
     /// - Parameter configuration: Immutable configuration for this session.
     /// - Returns: A session whose state stream drives all host presentation and actions.
     public func startProximityPresentation(
-        configuration: ProximityPresentationConfiguration = .init()
-    ) async throws -> ProximityPresentationSession {
-        ProximityPresentationSession(
+        configuration: ProximityConfiguration = .init()
+    ) async throws -> ProximitySession {
+        ProximitySession(
             bridge: try await bridge.startProximityPresentation(configuration: configuration)
         )
     }

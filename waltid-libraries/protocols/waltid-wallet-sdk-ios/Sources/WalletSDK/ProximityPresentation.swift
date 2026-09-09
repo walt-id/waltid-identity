@@ -1,7 +1,7 @@
 import Foundation
 
 /// Versioned mdoc interoperability boundary selected for one proximity session.
-public enum ProximityPresentationProfile: String, Sendable, CaseIterable, Equatable {
+public enum ProximityProfile: String, Sendable, CaseIterable, Equatable {
     /// ISO/IEC 18013-5:2021 behavior.
     case iso1801352021
     /// ISO/IEC 18013-5 second-edition DIS behavior.
@@ -11,7 +11,7 @@ public enum ProximityPresentationProfile: String, Sendable, CaseIterable, Equata
 }
 
 /// BLE roles the holder prepares for one session.
-public enum ProximityPresentationBLERoles: Sendable {
+public enum ProximityBLERoles: Sendable {
     /// Connect to a reader that advertises the GATT service.
     case centralClient
     /// Advertise a GATT service for a reader to connect to.
@@ -21,7 +21,7 @@ public enum ProximityPresentationBLERoles: Sendable {
 }
 
 /// BLE bearer selection policy. This is intended for integration and debug configuration, not normal UI.
-public enum ProximityPresentationBLEBearerPolicy: Sendable {
+public enum ProximityBLEBearerPolicy: Sendable {
     /// Use the interoperable GATT bearer only.
     case gattOnly
     /// Prefer L2CAP when negotiated and otherwise use GATT.
@@ -29,7 +29,7 @@ public enum ProximityPresentationBLEBearerPolicy: Sendable {
 }
 
 /// Holder-to-reader engagement methods selected for a session.
-public enum ProximityPresentationEngagementMethod: Sendable, Hashable {
+public enum ProximityEngagementMethod: Sendable, Hashable {
     /// Display an ISO device-engagement QR code.
     case qr
     /// Use NFC static handover for device engagement.
@@ -37,7 +37,7 @@ public enum ProximityPresentationEngagementMethod: Sendable, Hashable {
 }
 
 /// Device-retrieval transports selected for a session.
-public enum ProximityPresentationRetrievalMethod: Sendable, Hashable {
+public enum ProximityRetrievalMethod: Sendable, Hashable {
     /// Retrieve the response over Bluetooth Low Energy.
     case bluetoothLowEnergy
     /// Retrieve the response over NFC.
@@ -47,7 +47,7 @@ public enum ProximityPresentationRetrievalMethod: Sendable, Hashable {
 }
 
 /// Reader-authentication policy applied before disclosure review.
-public enum ProximityPresentationReaderPolicy: Sendable, Equatable {
+public enum ProximityReaderPolicy: Sendable, Equatable {
     /// Allow absent or untrusted reader authentication and expose its exact state for review.
     case allowAnonymousOrUntrusted
     /// Require a reader that the application trust policy accepts.
@@ -427,19 +427,19 @@ public protocol ProximityApplicationProfile: Sendable {
 }
 
 /// Swift-native immutable configuration for one single-use session.
-public struct ProximityPresentationConfiguration: Sendable {
+public struct ProximityConfiguration: Sendable {
     /// Versioned interoperability profile.
-    public let profile: ProximityPresentationProfile
+    public let profile: ProximityProfile
     /// BLE roles prepared for the session.
-    public let bleRoles: ProximityPresentationBLERoles
+    public let bleRoles: ProximityBLERoles
     /// BLE bearer-selection policy.
-    public let bearerPolicy: ProximityPresentationBLEBearerPolicy
+    public let bearerPolicy: ProximityBLEBearerPolicy
     /// Engagement methods the host intends to offer.
-    public let engagementMethods: Set<ProximityPresentationEngagementMethod>
+    public let engagementMethods: Set<ProximityEngagementMethod>
     /// Retrieval methods the host intends to offer.
-    public let retrievalMethods: Set<ProximityPresentationRetrievalMethod>
+    public let retrievalMethods: Set<ProximityRetrievalMethod>
     /// Reader-authentication policy.
-    public let readerPolicy: ProximityPresentationReaderPolicy
+    public let readerPolicy: ProximityReaderPolicy
     /// Holder-authentication policy frozen before review.
     public let deviceAuthenticationPolicy: ProximityDeviceAuthenticationPolicy
     /// Optional application-owned reader-trust evaluator.
@@ -465,12 +465,12 @@ public struct ProximityPresentationConfiguration: Sendable {
     ///   - applicationProfiles: Ordered application profiles.
     ///   - maximumMessageBytes: Positive limit of at most 16 MiB.
     public init(
-        profile: ProximityPresentationProfile = .iso180135Edition2DIS2026,
-        bleRoles: ProximityPresentationBLERoles = .dual,
-        bearerPolicy: ProximityPresentationBLEBearerPolicy = .preferL2CAP,
-        engagementMethods: Set<ProximityPresentationEngagementMethod> = [.qr],
-        retrievalMethods: Set<ProximityPresentationRetrievalMethod> = [.bluetoothLowEnergy],
-        readerPolicy: ProximityPresentationReaderPolicy = .allowAnonymousOrUntrusted,
+        profile: ProximityProfile = .iso180135Edition2DIS2026,
+        bleRoles: ProximityBLERoles = .dual,
+        bearerPolicy: ProximityBLEBearerPolicy = .preferL2CAP,
+        engagementMethods: Set<ProximityEngagementMethod> = [.qr],
+        retrievalMethods: Set<ProximityRetrievalMethod> = [.bluetoothLowEnergy],
+        readerPolicy: ProximityReaderPolicy = .allowAnonymousOrUntrusted,
         deviceAuthenticationPolicy: ProximityDeviceAuthenticationPolicy = .signatureOnly,
         readerTrustEvaluator: (any ProximityReaderTrustEvaluator)? = nil,
         credentialStatusEvaluator: (any ProximityCredentialStatusEvaluator)? = nil,
@@ -499,7 +499,7 @@ public struct ProximityPresentationConfiguration: Sendable {
 }
 
 /// Stable error category for host presentation and recovery policy.
-public enum ProximityPresentationErrorCategory: Sendable, Equatable {
+public enum ProximityErrorCategory: Sendable, Equatable {
     /// Device or runtime capability is unavailable.
     case capability
     /// Device engagement failed.
@@ -527,19 +527,19 @@ public enum ProximityPresentationErrorCategory: Sendable, Equatable {
 }
 
 /// Display-safe, typed proximity failure.
-public struct ProximityPresentationError: Error, Sendable, Equatable {
+public struct ProximityError: Error, Sendable, Equatable {
     /// Stable failure category.
-    public let category: ProximityPresentationErrorCategory
+    public let category: ProximityErrorCategory
     /// Stable machine-readable error code.
     public let code: String
     /// Display-safe error message.
     public let message: String
     /// Recovery supported by the phase that reported this failure.
-    public let recovery: ProximityPresentationRecovery
+    public let recovery: ProximityRecovery
 }
 
 /// Recovery distinguishes an active prerequisite loop from a terminal session.
-public enum ProximityPresentationRecovery: Sendable, Equatable {
+public enum ProximityRecovery: Sendable, Equatable {
     /// No retry is suggested.
     case none
     /// Recheck prerequisites in this still-active session after remediation.
@@ -549,7 +549,7 @@ public enum ProximityPresentationRecovery: Sendable, Equatable {
 }
 
 /// Host action that may restore a selected proximity capability.
-public enum ProximityPresentationRemediationAction: Sendable, Hashable {
+public enum ProximityRemediationAction: Sendable, Hashable {
     /// Request Bluetooth permission using the platform system surface.
     case requestBluetoothPermission
     /// Open application settings using the platform system surface.
@@ -563,7 +563,7 @@ public enum ProximityPresentationRemediationAction: Sendable, Hashable {
 }
 
 /// One engagement or retrieval dimension reported independently.
-public struct ProximityPresentationTransportCapability: Sendable, Equatable {
+public struct ProximityTransportCapability: Sendable, Equatable {
     /// Whether this SDK build implements the dimension.
     public let implemented: Bool
     /// Whether the selected interoperability profile permits it.
@@ -575,11 +575,11 @@ public struct ProximityPresentationTransportCapability: Sendable, Equatable {
     /// Whether a runtime probe established availability.
     public var runtimeAvailable: Bool { if case .available = runtime { true } else { false } }
     /// Observed runtime failure, if checked and unavailable.
-    public var unavailable: ProximityPresentationError? {
+    public var unavailable: ProximityError? {
         if case let .unavailable(error, _) = runtime { error } else { nil }
     }
     /// Ordered actions supplied by the runtime observation.
-    public var remediationActions: [ProximityPresentationRemediationAction] {
+    public var remediationActions: [ProximityRemediationAction] {
         if case let .unavailable(_, actions) = runtime { actions } else { [] }
     }
     /// Whether this selected dimension may start now.
@@ -593,31 +593,31 @@ public enum ProximityRuntimeObservation: Sendable, Equatable {
     /// The runtime probe succeeded.
     case available
     /// The runtime probe failed with these possible host actions.
-    case unavailable(ProximityPresentationError, remediationActions: [ProximityPresentationRemediationAction])
+    case unavailable(ProximityError, remediationActions: [ProximityRemediationAction])
 }
 
 /// Truthful capability report for every modeled engagement and retrieval dimension.
-public struct ProximityPresentationCapabilities: Sendable, Equatable {
+public struct ProximityCapabilities: Sendable, Equatable {
     /// Profile used to evaluate capability policy.
-    public let profile: ProximityPresentationProfile
+    public let profile: ProximityProfile
     /// QR device-engagement capability.
-    public let qrEngagement: ProximityPresentationTransportCapability
+    public let qrEngagement: ProximityTransportCapability
     /// NFC device-engagement capability.
-    public let nfcEngagement: ProximityPresentationTransportCapability
+    public let nfcEngagement: ProximityTransportCapability
     /// Bluetooth Low Energy retrieval capability.
-    public let bluetoothLowEnergy: ProximityPresentationTransportCapability
+    public let bluetoothLowEnergy: ProximityTransportCapability
     /// NFC retrieval capability.
-    public let nfcRetrieval: ProximityPresentationTransportCapability
+    public let nfcRetrieval: ProximityTransportCapability
     /// Wi-Fi Aware retrieval capability.
-    public let wifiAwareRetrieval: ProximityPresentationTransportCapability
+    public let wifiAwareRetrieval: ProximityTransportCapability
     /// Whether at least one selected engagement and one selected retrieval method may start now.
     public var mayStart: Bool {
         [qrEngagement, nfcEngagement].contains(where: \.mayStart)
             && [bluetoothLowEnergy, nfcRetrieval, wifiAwareRetrieval].contains(where: \.mayStart)
     }
     /// Stable, de-duplicated remediation actions for unavailable selected dimensions.
-    public var remediationActions: [ProximityPresentationRemediationAction] {
-        var seen = Set<ProximityPresentationRemediationAction>()
+    public var remediationActions: [ProximityRemediationAction] {
+        var seen = Set<ProximityRemediationAction>()
         return [qrEngagement, nfcEngagement, bluetoothLowEnergy, nfcRetrieval, wifiAwareRetrieval]
             .filter(\.selected)
             .flatMap(\.remediationActions)
@@ -775,7 +775,7 @@ public struct ProximityReviewID: Sendable, Equatable, Hashable {
 }
 
 /// Frozen, display-safe review model for one exchange.
-public struct ProximityPresentationReview: Sendable, Equatable {
+public struct ProximityReview: Sendable, Equatable {
     /// Identity required when approving or declining this review.
     public let reviewID: ProximityReviewID
     /// One-based exchange number.
@@ -814,7 +814,7 @@ public struct ProximityDocumentSubmission: Sendable, Equatable {
 }
 
 /// Complete holder-approved submission for the current exchange.
-public struct ProximityPresentationSubmission: Sendable, Equatable {
+public struct ProximitySubmission: Sendable, Equatable {
     /// Nonempty document submissions.
     public let documents: [ProximityDocumentSubmission]
     /// Whether to keep the transport alive for another device request.
@@ -833,9 +833,9 @@ public struct ProximityPresentationSubmission: Sendable, Equatable {
 }
 
 /// Host intent accepted by a session only when legal for its current state.
-public enum ProximityPresentationAction: Sendable, Equatable {
+public enum ProximityAction: Sendable, Equatable {
     /// Approve a submission derived from the current frozen review.
-    case approve(reviewID: ProximityReviewID, submission: ProximityPresentationSubmission)
+    case approve(reviewID: ProximityReviewID, submission: ProximitySubmission)
     /// Decline the current disclosure request without sharing documents.
     case decline(reviewID: ProximityReviewID)
     /// Cancel the session and release its resources.
@@ -843,11 +843,11 @@ public enum ProximityPresentationAction: Sendable, Equatable {
     /// Re-run prerequisite checks after external conditions may have changed.
     case retryPrerequisites
     /// Report the privacy-safe outcome of a host remediation surface.
-    case reportRemediation(ProximityPresentationRemediationAction, ProximityPresentationHostActionResult)
+    case reportRemediation(ProximityRemediationAction, ProximityHostActionResult)
 }
 
 /// Privacy-safe outcome of a system surface performed by the host application.
-public enum ProximityPresentationHostActionResult: Sendable, Equatable {
+public enum ProximityHostActionResult: Sendable, Equatable {
     /// The host completed the requested platform action.
     case completed
     /// The user cancelled the platform action.
@@ -857,7 +857,7 @@ public enum ProximityPresentationHostActionResult: Sendable, Equatable {
 }
 
 /// Prepared engagement presented by the host UI.
-public enum ProximityPresentationEngagement: Sendable, Equatable {
+public enum ProximityEngagement: Sendable, Equatable {
     /// QR engagement payload to render locally without transformation.
     case qr(payload: String)
     /// NFC engagement is prepared and awaits a platform interaction.
@@ -887,15 +887,15 @@ public struct ProximityHolderAuthorization: Sendable, Equatable {
 }
 
 /// Result of attempting a host action.
-public enum ProximityPresentationActionResult: Sendable, Equatable {
+public enum ProximityActionResult: Sendable, Equatable {
     /// The session accepted the action.
     case accepted
     /// The session rejected the action without changing its approved state.
-    case rejected(ProximityPresentationError)
+    case rejected(ProximityError)
 }
 
 /// Coarse action identity used to drive host controls from state.
-public enum ProximityPresentationActionType: Sendable, Hashable {
+public enum ProximityActionType: Sendable, Hashable {
     /// Approve the current review.
     case approve
     /// Decline the current review.
@@ -909,19 +909,19 @@ public enum ProximityPresentationActionType: Sendable, Hashable {
 }
 
 /// Display-safe session state projected exhaustively from the KMP source of truth.
-public enum ProximityPresentationState: Sendable, Equatable {
+public enum ProximityState: Sendable, Equatable {
     /// The session is waiting for selected capabilities to become available.
-    case checkingPrerequisites(ProximityPresentationCapabilities)
+    case checkingPrerequisites(ProximityCapabilities)
     /// Session-owned cryptographic and transport resources are being prepared.
-    case preparing(profile: ProximityPresentationProfile)
+    case preparing(profile: ProximityProfile)
     /// At least one engagement is ready for the host to present.
-    case engagementReady([ProximityPresentationEngagement])
+    case engagementReady([ProximityEngagement])
     /// A reader is connecting through a prepared engagement.
-    case connecting([ProximityPresentationEngagement])
+    case connecting([ProximityEngagement])
     /// The holder is waiting for a device request.
     case awaitingRequest(exchange: Int)
     /// The host must present the frozen review and collect explicit holder intent.
-    case reviewRequired(ProximityPresentationReview)
+    case reviewRequired(ProximityReview)
     /// A protected holder key is authorizing the frozen approved submission.
     case authorizingHolderKey(ProximityHolderAuthorization)
     /// The response for an exchange is being sent.
@@ -935,10 +935,10 @@ public enum ProximityPresentationState: Sendable, Equatable {
     /// The host cancelled the session.
     case cancelled
     /// The session failed with a display-safe typed error.
-    case failed(ProximityPresentationError)
+    case failed(ProximityError)
 
     /// Actions legal in this exact state.
-    public var legalActions: Set<ProximityPresentationActionType> {
+    public var legalActions: Set<ProximityActionType> {
         switch self {
         case .checkingPrerequisites: [.retryPrerequisites, .reportRemediation, .cancel]
         case .reviewRequired: [.approve, .decline, .cancel]
@@ -952,21 +952,21 @@ public enum ProximityPresentationState: Sendable, Equatable {
 }
 
 @available(macOS 10.15, *)
-protocol ProximityPresentationSessionBridge: Sendable {
-    var states: AsyncStream<ProximityPresentationState> { get }
-    func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult
+protocol ProximitySessionBridge: Sendable {
+    var states: AsyncStream<ProximityState> { get }
+    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult
     func close() async
 }
 
 /// Actor-safe, single-use native facade over one KMP proximity session.
 @available(macOS 10.15, *)
-public actor ProximityPresentationSession {
+public actor ProximitySession {
     /// Exhaustive state stream whose terminal state is emitted before completion.
-    public nonisolated let states: AsyncStream<ProximityPresentationState>
-    private let bridge: any ProximityPresentationSessionBridge
+    public nonisolated let states: AsyncStream<ProximityState>
+    private let bridge: any ProximitySessionBridge
     private var closed = false
 
-    init(bridge: any ProximityPresentationSessionBridge) {
+    init(bridge: any ProximitySessionBridge) {
         self.bridge = bridge
         self.states = AsyncStream { continuation in
             let task = Task {
@@ -986,12 +986,12 @@ public actor ProximityPresentationSession {
     }
 
     /// Dispatches one host intent against the current session state.
-    /// - Parameter action: Action derived from the current state's ``ProximityPresentationState/legalActions``.
+    /// - Parameter action: Action derived from the current state's ``ProximityState/legalActions``.
     /// - Returns: Whether the session accepted the action.
-    public func dispatch(_ action: ProximityPresentationAction) async throws -> ProximityPresentationActionResult {
+    public func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult {
         guard !closed else {
             return .rejected(
-                ProximityPresentationError(
+                ProximityError(
                     category: .policy,
                     code: "session_closed",
                     message: "The proximity presentation session is closed",

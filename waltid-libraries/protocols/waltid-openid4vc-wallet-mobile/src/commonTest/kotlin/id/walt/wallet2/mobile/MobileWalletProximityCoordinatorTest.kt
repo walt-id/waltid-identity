@@ -30,26 +30,26 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
-class MobileWalletProximityCoordinatorTest {
+class ProximityCoordinatorTest {
     @Test
     fun `closing or cancelling before the worker starts releases the wallet for a fresh session`() = runTest {
         for (dispatchCancel in listOf(false, true)) {
             val factory = RecordingTransportFactory(
                 BleProximityAvailability.Unavailable("ble_powered_off", "Bluetooth is off"),
             )
-            val coordinator = MobileWalletProximityCoordinator(
+            val coordinator = ProximityCoordinator(
                 Wallet("cancel-before-worker-$dispatchCancel"), factory,
                 sessionDispatcher = StandardTestDispatcher(testScheduler),
             )
-            val first = coordinator.start(MobileWalletProximityConfiguration())
+            val first = coordinator.start(ProximityConfiguration())
             if (dispatchCancel) {
-                assertEquals(MobileWalletProximityActionResult.Accepted, first.dispatch(MobileWalletProximityAction.Cancel))
+                assertEquals(ProximityActionResult.Accepted, first.dispatch(ProximityAction.Cancel))
             } else {
                 first.close()
             }
-            assertIs<MobileWalletProximityState.Cancelled>(first.state.value)
-            val restarted = coordinator.start(MobileWalletProximityConfiguration())
-            assertIs<MobileWalletProximityState.CheckingPrerequisites>(restarted.state.value)
+            assertIs<ProximityState.Cancelled>(first.state.value)
+            val restarted = coordinator.start(ProximityConfiguration())
+            assertIs<ProximityState.CheckingPrerequisites>(restarted.state.value)
             restarted.close()
             assertTrue(factory.configurations.isEmpty())
         }
@@ -63,16 +63,16 @@ class MobileWalletProximityCoordinatorTest {
                 message = "Bluetooth permission is missing",
             )
         )
-        val coordinator = MobileWalletProximityCoordinator(Wallet("preflight"), factory)
+        val coordinator = ProximityCoordinator(Wallet("preflight"), factory)
 
-        val capabilities = coordinator.capabilities(MobileWalletProximityConfiguration())
+        val capabilities = coordinator.capabilities(ProximityConfiguration())
 
         assertEquals(1, factory.capabilityCalls)
         assertTrue(factory.configurations.isEmpty())
         assertFalse(capabilities.mayStart)
         assertEquals("ble_permission_missing", capabilities.bluetoothLowEnergy.unavailable?.code)
         assertEquals(
-            listOf(MobileWalletProximityRemediationAction.RequestBluetoothPermission),
+            listOf(ProximityRemediationAction.RequestBluetoothPermission),
             capabilities.bluetoothLowEnergy.remediationActions,
         )
     }
@@ -80,16 +80,16 @@ class MobileWalletProximityCoordinatorTest {
     @Test
     fun `wallet admits one active session and rotates session key and UUIDs`() = runTest {
         val factory = RecordingTransportFactory(BleProximityAvailability.Available)
-        val coordinator = MobileWalletProximityCoordinator(Wallet("single-session"), factory)
+        val coordinator = ProximityCoordinator(Wallet("single-session"), factory)
 
-        val first = coordinator.start(MobileWalletProximityConfiguration())
+        val first = coordinator.start(ProximityConfiguration())
         first.awaitConnection()
         assertFailsWith<IllegalStateException> {
-            coordinator.start(MobileWalletProximityConfiguration())
+            coordinator.start(ProximityConfiguration())
         }
         first.close()
 
-        val second = coordinator.start(MobileWalletProximityConfiguration())
+        val second = coordinator.start(ProximityConfiguration())
         second.awaitConnection()
         second.close()
 
@@ -116,26 +116,26 @@ class MobileWalletProximityCoordinatorTest {
                 message = "Bluetooth is powered off",
             )
         )
-        val coordinator = MobileWalletProximityCoordinator(Wallet("remediation"), factory)
-        val session = coordinator.start(MobileWalletProximityConfiguration())
-        val blocked = assertIs<MobileWalletProximityState.CheckingPrerequisites>(session.state.value)
+        val coordinator = ProximityCoordinator(Wallet("remediation"), factory)
+        val session = coordinator.start(ProximityConfiguration())
+        val blocked = assertIs<ProximityState.CheckingPrerequisites>(session.state.value)
 
         assertFalse(blocked.capabilities.mayStart)
         assertTrue(factory.configurations.isEmpty())
-        assertIs<MobileWalletProximityActionResult.Rejected>(
+        assertIs<ProximityActionResult.Rejected>(
             session.dispatch(
-                MobileWalletProximityAction.ReportRemediation(
-                    MobileWalletProximityRemediationAction.OpenApplicationSettings,
-                    MobileWalletProximityHostActionResult.Completed,
+                ProximityAction.ReportRemediation(
+                    ProximityRemediationAction.OpenApplicationSettings,
+                    ProximityHostActionResult.Completed,
                 )
             )
         )
         assertEquals(
-            MobileWalletProximityActionResult.Accepted,
+            ProximityActionResult.Accepted,
             session.dispatch(
-                MobileWalletProximityAction.ReportRemediation(
-                    MobileWalletProximityRemediationAction.EnableBluetooth,
-                    MobileWalletProximityHostActionResult.Failed,
+                ProximityAction.ReportRemediation(
+                    ProximityRemediationAction.EnableBluetooth,
+                    ProximityHostActionResult.Failed,
                 )
             )
         )
@@ -143,11 +143,11 @@ class MobileWalletProximityCoordinatorTest {
 
         factory.availability = BleProximityAvailability.Available
         assertEquals(
-            MobileWalletProximityActionResult.Accepted,
+            ProximityActionResult.Accepted,
             session.dispatch(
-                MobileWalletProximityAction.ReportRemediation(
-                    MobileWalletProximityRemediationAction.EnableBluetooth,
-                    MobileWalletProximityHostActionResult.Completed,
+                ProximityAction.ReportRemediation(
+                    ProximityRemediationAction.EnableBluetooth,
+                    ProximityHostActionResult.Completed,
                 )
             )
         )
@@ -168,10 +168,10 @@ class MobileWalletProximityCoordinatorTest {
                 return BleProximityAvailability.Available
             }
         }
-        val engagements = linkedSetOf(MobileWalletProximityEngagementMethod.Qr)
-        val retrieval = linkedSetOf(MobileWalletProximityRetrievalMethod.BluetoothLowEnergy)
-        val configuration = MobileWalletProximityConfiguration(engagementMethods = engagements, retrievalMethods = retrieval)
-        val coordinator = MobileWalletProximityCoordinator(Wallet("owned-configuration"), factory)
+        val engagements = linkedSetOf(ProximityEngagementMethod.Qr)
+        val retrieval = linkedSetOf(ProximityRetrievalMethod.BluetoothLowEnergy)
+        val configuration = ProximityConfiguration(engagementMethods = engagements, retrievalMethods = retrieval)
+        val coordinator = ProximityCoordinator(Wallet("owned-configuration"), factory)
         val pending = async { coordinator.start(configuration) }
         entered.await()
         engagements.clear()
@@ -183,10 +183,10 @@ class MobileWalletProximityCoordinatorTest {
         session.close()
     }
 
-    private suspend fun MobileWalletProximitySession.awaitConnection() {
+    private suspend fun ProximitySession.awaitConnection() {
         withContext(Dispatchers.Default) {
             withTimeout(5.seconds) {
-                state.first { it is MobileWalletProximityState.Connecting }
+                state.first { it is ProximityState.Connecting }
             }
         }
     }

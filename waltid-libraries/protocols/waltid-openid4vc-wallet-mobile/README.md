@@ -131,26 +131,41 @@ flow. Query capabilities without creating ephemeral keys or radio resources,
 then create one single-use session and render its authoritative state:
 
 ```kotlin
-val configuration = MobileWalletProximityConfiguration()
+val configuration = ProximityConfiguration()
 val capabilities = wallet.proximityPresentationCapabilities(configuration)
 val session = wallet.startProximityPresentation(configuration)
 
-session.state.collect { state ->
-    when (state) {
-        is MobileWalletProximityState.CheckingPrerequisites -> {
-            showUnavailableMethods(state.capabilities)
+try {
+    session.state.collect { state ->
+        when (state) {
+            is ProximityState.CheckingPrerequisites -> showUnavailableMethods(state.capabilities)
+            is ProximityState.EngagementReady -> showEngagements(state.engagements)
+            is ProximityState.ReviewRequired -> showProximityReview(state.review)
+            is ProximityState.AuthorizingHolderKey -> showHolderAuthorization(state.authorization)
+            is ProximityState.Completed -> showCompletion(state.exchanges, state.declined)
+            is ProximityState.Failed -> showProximityError(state.error)
+            ProximityState.Cancelled -> showCancelled()
+            is ProximityState.Preparing,
+            is ProximityState.Connecting,
+            is ProximityState.AwaitingRequest,
+            is ProximityState.SendingResponse,
+            is ProximityState.AwaitingNextRequest,
+            is ProximityState.Terminating -> showProximityProgress(state)
         }
-        is MobileWalletProximityState.EngagementReady -> {
-            val qr = state.engagements.filterIsInstance<MobileWalletProximityEngagement.Qr>().single()
-            showEngagementQr(qr.payload)
-        }
-        is MobileWalletProximityState.ReviewRequired -> showProximityReview(state.review)
-        is MobileWalletProximityState.Completed -> showCompletion(state.exchanges)
-        is MobileWalletProximityState.Failed -> showProximityError(state.error)
-        else -> showProximityProgress(state)
     }
+} finally {
+    withContext(NonCancellable) { session.close() }
 }
 ```
+
+The `show*` functions are application UI callbacks. Collect in a screen-owned
+coroutine and cancel it on leaving the screen; the `finally` block releases the
+session even during cancellation. Import `NonCancellable` and `withContext` from
+`kotlinx.coroutines`. Handle the capability snapshot before starting; remediations
+and protected-key authorization remain explicit host actions. A `StateFlow` does
+not complete automatically on a terminal state.
+
+Kotlin and Swift proximity types use the `Proximity` prefix.
 
 The default configuration selects QR engagement and BLE retrieval. NFC and
 Wi-Fi Aware are represented in the capability contract as unimplemented in this
@@ -166,7 +181,7 @@ pinned EUDI profile currently requires device signature.
 
 Host applications perform permission or settings effects named by
 `capabilities.remediationActions`, report the privacy-safe outcome with
-`MobileWalletProximityAction.ReportRemediation`, and let the SDK re-check the
+`ProximityAction.ReportRemediation`, and let the SDK re-check the
 platform. Approve and decline require the `reviewId` from the displayed review.
 A successful decision consumes that identity once; stale, duplicate, and
 cross-session actions are rejected. Invalid submissions leave the review open
