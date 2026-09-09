@@ -28,4 +28,12 @@ class IssuerModuleSelectionTest {
         assertTrue(!IssuerModuleSelection(groups = setOf("metadata")).matches(module))
         assertTrue(IssuerModuleSelection(groups = setOf("fapi")).matches(module))
     }
+
+    @Test
+    fun batchIssuanceBelongsToPositiveGroup() {
+        val module = "oid4vci-1_0-issuer-batch-issuance"
+
+        assertTrue(IssuerModuleSelection(groups = setOf("positive")).matches(module))
+        assertTrue(!IssuerModuleSelection(groups = setOf("metadata")).matches(module))
+    }
 }
