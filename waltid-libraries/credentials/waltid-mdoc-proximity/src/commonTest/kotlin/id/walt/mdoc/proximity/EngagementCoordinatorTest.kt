@@ -498,8 +498,10 @@ class EngagementCoordinatorTest {
     }
 
     private class TrackingConnection(override val kind: ProximityTransportKind) : ProximityConnection {
+        private val closure = kotlinx.coroutines.CompletableDeferred<ProximityCloseReason>()
+        override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
         override suspend fun receive(): ImmutableBytes? = null
         override suspend fun send(message: ImmutableBytes) = Unit
-        override suspend fun close(reason: ProximityCloseReason) = Unit
+        override suspend fun close(reason: ProximityCloseReason) { closure.complete(reason) }
     }
 }

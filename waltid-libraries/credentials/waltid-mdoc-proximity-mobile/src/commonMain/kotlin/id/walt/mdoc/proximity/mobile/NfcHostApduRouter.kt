@@ -162,6 +162,9 @@ internal class NfcApduProximityConnection : ProximityConnection {
     private val pendingExchanges = ArrayDeque<PendingExchange>()
     private val queuedResponses = ArrayDeque<ImmutableBytes>()
     private var closed = false
+    private val closure = CompletableDeferred<ProximityCloseReason>()
+
+    override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
 
     internal suspend fun exchange(
         identifier: ULong,
@@ -231,6 +234,7 @@ internal class NfcApduProximityConnection : ProximityConnection {
         val pending = mutex.withLock {
             if (closed) return
             closed = true
+            closure.complete(reason)
             queuedResponses.clear()
             pendingExchanges.toList().also { pendingExchanges.clear() }
         }
