@@ -24,6 +24,10 @@ import id.walt.mdoc.objects.session.SessionEstablishment
 import id.walt.mdoc.objects.session.SessionStatusCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.coroutineScope
@@ -499,7 +503,7 @@ class MdocHolderProtocolEngine(
                 val preparation = phase(
                     timeouts.request,
                     ProximityError.Protocol("request_processing_timeout", "Request preview processing timed out"),
-                ) { requestProcessor.prepare(context) }
+                ) { whileConnected(connection) { requestProcessor.prepare(context) } }
                 if (preparation !is MdocRequestPreparation.Review) {
                     mutableState.value = MdocHolderSessionState.Terminating(exchange)
                     phase(timeouts.gracefulTermination, ProximityError.Transport("termination_timeout", "Session termination timed out")) {
@@ -517,7 +521,7 @@ class MdocHolderProtocolEngine(
                 val decision = phase(
                     timeouts.consent,
                     ProximityError.Policy("consent_timeout", "Holder consent timed out"),
-                ) { consentHandler.decide(prompt) }
+                ) { whileConnected(connection) { consentHandler.decide(prompt) } }
                 if (decision.bindingToken != token) throw ProximityException(
                     ProximityError.Security("stale_consent", "Consent does not belong to the active request preview")
                 )
@@ -534,7 +538,7 @@ class MdocHolderProtocolEngine(
                 val resolution = phase(
                     timeouts.keyAuthorization,
                     ProximityError.Policy("response_authorization_timeout", "Response authorization timed out"),
-                ) { requestProcessor.resolve(context, preview) }
+                ) { whileConnected(connection) { requestProcessor.resolve(context, preview) } }
                 if (resolution.submissionBindingDigest != preview.submissionBindingDigest) throw ProximityException(
                     ProximityError.Security("changed_submission", "The approved request state changed before submission")
                 )
@@ -595,7 +599,11 @@ class MdocHolderProtocolEngine(
                 incoming = decryptOrReport(connection, cipher, ImmutableBytes.of(encryptedRequest))
             }
         } catch (failure: ProximityException) {
-            if (failure.error.code.endsWith("timeout")) closeReason = ProximityCloseReason.TIMEOUT
+            closeReason = when {
+                failure.error.code.endsWith("timeout") -> ProximityCloseReason.TIMEOUT
+                failure.error.code == "peer_disconnected" -> ProximityCloseReason.PEER_DISCONNECTED
+                else -> closeReason
+            }
             throw failure
         } catch (cancelled: CancellationException) {
             closeReason = if (cancelled is TimeoutCancellationException) {
@@ -636,6 +644,27 @@ class MdocHolderProtocolEngine(
             ProximityError.Transport("peer_disconnected", "Reader disconnected before session establishment")
         )
         return winner to firstBytes
+    }
+
+    /** A lost selected connection invalidates application work, including pending holder consent. */
+    private suspend fun <T> whileConnected(connection: ProximityConnection, block: suspend () -> T): T = supervisorScope {
+        val disconnected = async(start = CoroutineStart.UNDISPATCHED) {
+            connection.awaitClosed()
+            throw ProximityException(
+                ProximityError.Transport("peer_disconnected", "The connection to the reader was lost"),
+            )
+        }
+        // Register closure first so an already closed connection cannot start a new review or signing operation.
+        val operation = async(start = CoroutineStart.LAZY) { block() }
+        try {
+            select {
+                disconnected.onAwait { it }
+                operation.onAwait { it }
+            }
+        } finally {
+            disconnected.cancel()
+            operation.cancel()
+        }
     }
 
     private suspend fun receive(connection: ProximityConnection, budget: MdocSessionBudget): ImmutableBytes? =

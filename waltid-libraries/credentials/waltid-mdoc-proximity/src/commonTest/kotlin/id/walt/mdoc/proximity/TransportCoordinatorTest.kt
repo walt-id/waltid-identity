@@ -227,8 +227,13 @@ class TransportCoordinatorTest {
     private class TrackingConnection : ProximityConnection {
         override val kind = ProximityTransportKind.BLE
         val closeReasons = mutableListOf<ProximityCloseReason>()
+        private val closure = kotlinx.coroutines.CompletableDeferred<ProximityCloseReason>()
+        override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
         override suspend fun receive(): ImmutableBytes? = null
         override suspend fun send(message: ImmutableBytes) = Unit
-        override suspend fun close(reason: ProximityCloseReason) { closeReasons += reason }
+        override suspend fun close(reason: ProximityCloseReason) {
+            closure.complete(reason)
+            closeReasons += reason
+        }
     }
 }

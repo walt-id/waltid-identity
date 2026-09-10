@@ -59,6 +59,15 @@ same lifecycle scope when rendering protocol progress. Run an engine once;
 cancel its coroutine when the host ends an active session. Do not reuse session
 keys or engagement material for a later presentation.
 
+`ProximityConnection.awaitClosed()` reports the first observed connection closure
+without receiving messages or starting another inactivity timer. The engine races
+this signal against request preparation, consent and response authorization. Loss
+of the selected connection cancels that application work and produces a transport
+failure; a disconnected reader cannot leave an actionable review waiting for a tap.
+Consent handlers and request processors must cooperate with coroutine cancellation.
+Cancelling a closure observer does not close the connection. Hybrid adapters report
+closure only when no bearer can continue.
+
 A valid request with no returnable data sends an encrypted empty response and
 ends in `MdocHolderSessionResult.NoData` without requesting consent or resolving
 holder keys. `NoData.exchange` identifies that final request; an earlier exchange

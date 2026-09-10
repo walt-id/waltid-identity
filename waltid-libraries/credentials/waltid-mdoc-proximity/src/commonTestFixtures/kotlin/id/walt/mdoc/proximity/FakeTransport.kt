@@ -1,6 +1,7 @@
 package id.walt.mdoc.proximity
 
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
@@ -15,9 +16,10 @@ class FakeProximityLoopback private constructor(
         fun create(capacity: Int = Channel.UNLIMITED, kind: ProximityTransportKind = ProximityTransportKind.BLE): FakeProximityLoopback {
             val holderInbound = Channel<ImmutableBytes>(capacity)
             val readerInbound = Channel<ImmutableBytes>(capacity)
+            val closure = CompletableDeferred<ProximityCloseReason>()
             return FakeProximityLoopback(
-                holder = FakeProximityConnection(holderInbound, readerInbound, kind),
-                reader = FakeProximityConnection(readerInbound, holderInbound, kind),
+                holder = FakeProximityConnection(holderInbound, readerInbound, kind, closure),
+                reader = FakeProximityConnection(readerInbound, holderInbound, kind, closure),
             )
         }
     }
@@ -27,10 +29,13 @@ class FakeProximityConnection internal constructor(
     private val inbound: Channel<ImmutableBytes>,
     private val outbound: Channel<ImmutableBytes>,
     override val kind: ProximityTransportKind,
+    private val closure: CompletableDeferred<ProximityCloseReason>,
 ) : ProximityConnection {
     private val stateMutex = Mutex()
     private val sendMutex = Mutex()
     private var terminal = false
+
+    override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
 
     override suspend fun receive(): ImmutableBytes? = inbound.receiveCatching().getOrNull()
 
@@ -42,6 +47,7 @@ class FakeProximityConnection internal constructor(
     override suspend fun close(reason: ProximityCloseReason): Unit = stateMutex.withLock {
         if (terminal) return
         terminal = true
+        closure.complete(reason)
         inbound.close()
         outbound.close()
     }
