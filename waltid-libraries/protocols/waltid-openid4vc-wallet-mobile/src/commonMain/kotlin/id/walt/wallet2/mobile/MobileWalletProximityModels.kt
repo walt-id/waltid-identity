@@ -1336,7 +1336,9 @@ public sealed interface ProximityState {
 
     /** Connection ended without disclosure. Review this verified request before explicitly preparing a new connection. */
     public data class PreparationRequired(
+        /** Verified request to review and explicitly approve before reconnecting. */
         public val plan: ProximitySharingPlan,
+        /** Whether this is the initial request or a change from the earlier prepared approval. */
         public val reason: ProximityReviewReason = ProximityReviewReason.RequestReceived,
     ) : ProximityState
 
