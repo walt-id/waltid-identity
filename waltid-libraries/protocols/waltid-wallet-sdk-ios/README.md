@@ -158,6 +158,11 @@ ready, and is idempotent while emulation is starting or active. The optional pre
 expire or be unavailable during its cooldown; explicit presentation does not require it. Calls outside
 NFC engagement readiness are ignored. Failures and cancellation still arrive through `session.states`.
 
+After an NFC-only response is submitted, keep the devices together until the reader shows its result,
+then separate them. The adapter drains pending response fragments and keeps the NFC session active
+until reader deselection, cancellation, or a platform timeout. Bluetooth handover closes NFC after
+its response drains. Response submission alone does not confirm the reader's verification result.
+
 NFC card presentation requires Apple's managed HCE capability and a matching
 provisioning profile. [`HCE.entitlements.example`](HCE.entitlements.example) is
 an unreferenced host-app template containing the Type 4/NDEF, conventional mdoc
