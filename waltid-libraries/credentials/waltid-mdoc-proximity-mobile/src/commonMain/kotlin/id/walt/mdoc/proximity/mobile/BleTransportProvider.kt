@@ -17,6 +17,7 @@ import id.walt.mdoc.proximity.ProximityTransportKind
 import id.walt.mdoc.proximity.ProximityTransportProvider
 import id.walt.mdoc.proximity.SessionTranscriptFactory
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -258,6 +259,13 @@ private class BleMessageConnection(
     private val decodedL2cap = ArrayDeque<ImmutableBytes>()
     private val maximumMessageBytes = maximumMessageBytes
     private var closed = false
+    private val closure = CompletableDeferred<ProximityCloseReason>()
+
+    init {
+        raw.incoming.invokeOnClose { closure.complete(ProximityCloseReason.PEER_DISCONNECTED) }
+    }
+
+    override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
 
     override suspend fun receive(): ImmutableBytes? {
         if (!receiveMutex.tryLock()) throw ProximityException(
@@ -413,6 +421,7 @@ private class BleMessageConnection(
                         }
                     }
                 } finally {
+                    closure.complete(finalReason)
                     raw.close(finalReason)
                 }
             }
@@ -426,7 +435,10 @@ private class BleMessageConnection(
                 true
             }
         }
-        if (shouldClose) raw.close(reason)
+        if (shouldClose) {
+            closure.complete(reason)
+            raw.close(reason)
+        }
     }
 
     private companion object {
