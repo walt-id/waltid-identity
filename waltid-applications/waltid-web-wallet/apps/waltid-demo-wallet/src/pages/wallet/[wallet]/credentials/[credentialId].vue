@@ -169,7 +169,8 @@ const {
   refresh,
   error,
 } = await useFetch<WalletCredential>(
-  `/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`,
+  `${runtimeConfig.public.walletApiBaseUrl}/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`,
+  { credentials: 'include' },
 );
 const {
   jwtJson,
@@ -223,9 +224,10 @@ const credentialManifest = computedAsync(async () => {
 
 async function deleteCredential() {
   await $fetch(
-    `/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}?permanent=true`,
+    `${runtimeConfig.public.walletApiBaseUrl}/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}?permanent=true`,
     {
       method: "DELETE",
+      credentials: 'include',
     },
   );
   await navigateTo({ path: `/wallet/${currentWallet.value}` });

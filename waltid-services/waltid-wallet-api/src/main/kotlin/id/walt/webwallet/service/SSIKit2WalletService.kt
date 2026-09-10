@@ -36,7 +36,11 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.webwallet.config.TrustedCAConfig
 import id.walt.dcql.DcqlMatcher
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.webwallet.FeatureCatalog
@@ -108,10 +112,33 @@ class SSIKit2WalletService(
     private val credentialService = CredentialsService()
     private val eventService = EventService()
     private val credentialReportsService = ReportService.Credentials(credentialService, eventService)
-    private val openId4VpPresentationService = OpenId4VpPresentationService(credentialService)
+    private val openId4VpPresentationService = OpenId4VpPresentationService(
+        credentialService,
+        clientIdTrustConfiguration = clientIdTrustConfiguration,
+    )
 
     companion object {
         val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
+
+        // PTRID-753: OpenId4VpPresentationService defaults to ClientIdTrustConfiguration(x509TrustAnchors = null),
+        // which fails every x509_san_dns Verifier with MissingX509TrustAnchors regardless of the "trusted-ca"
+        // feature/config -- nothing in this codebase wires TrustedCAConfig into it (X5CAccountStrategy is the
+        // only other TrustedCAConfig consumer, and that's an unrelated account-login strategy). Falls back to
+        // the same empty default when "trusted-ca" isn't enabled/configured, so this is a no-op for any
+        // deployment that doesn't need x509_san_dns.
+        private val clientIdTrustConfiguration by lazy {
+            runCatching { ConfigManager.getConfig<TrustedCAConfig>() }
+                .getOrNull()
+                ?.takeIf { it.certificates.isNotEmpty() }
+                ?.let { config ->
+                    ClientIdTrustConfiguration(
+                        x509TrustAnchors = InMemoryTrustStore(
+                            config.certificates.map { X509CertificateUtil.Default.parseCertificatePem(it) }
+                        )
+                    )
+                }
+                ?: ClientIdTrustConfiguration()
+        }
 
         init {
             runBlocking {
@@ -1169,6 +1196,13 @@ class SSIKit2WalletService(
             holderPoliciesToRun = null,
             runPolicies = null,
             transactionDataTypeRegistry = ConfigManager.getConfig<TransactionDataProfilesConfig>().toTypeRegistry(),
+            // PTRID-753: the (holderKey: Key, ...) overload this used to resolve to has no
+            // clientIdTrustConfiguration parameter at all -- it can never see the x509_san_dns trust
+            // anchors set up above, independently of the OpenId4VpPresentationService fix. Passing
+            // holderCrypto2Key selects the overload that does; no Crypto2Key is available here, same
+            // as before this fix.
+            holderCrypto2Key = null,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
         ).mapCatching { result ->
             val redirect = extractRedirect(result)
             logPresentedCredentials(
