@@ -9,6 +9,8 @@ import java.net.Socket
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -21,6 +23,23 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertTrue
 
 class AndroidWifiAwareRawConnectionTest {
+    @Test fun platformClosureEndsPassiveHttpObservationWithoutReadingTheSocket() = runBlocking {
+        val socket = BlockedSocket()
+        val raw = AndroidWifiAwareRawConnection(BlockingSocket(socket))
+        val connection = WifiAwareHttpConnection(raw, 16)
+        val cancelled = async(start = CoroutineStart.UNDISPATCHED) { connection.awaitClosed() }
+        val observer = async(start = CoroutineStart.UNDISPATCHED) { connection.awaitClosed() }
+        cancelled.cancelAndJoin()
+        assertEquals(1L, socket.entered.count)
+        assertEquals(0, socket.closes.get())
+        assertTrue(observer.isActive)
+        raw.close(ProximityCloseReason.PEER_DISCONNECTED)
+        connection.close(ProximityCloseReason.COMPLETED)
+        assertEquals(ProximityCloseReason.PEER_DISCONNECTED, withTimeout(5_000) { observer.await() })
+        assertEquals(ProximityCloseReason.PEER_DISCONNECTED, connection.awaitClosed())
+        assertEquals(1, socket.closes.get())
+    }
+
     @Test fun cancellationClosesTheActualPendingReadOrWrite() = runBlocking {
         for (writing in listOf(false, true)) {
             val socket = BlockedSocket()

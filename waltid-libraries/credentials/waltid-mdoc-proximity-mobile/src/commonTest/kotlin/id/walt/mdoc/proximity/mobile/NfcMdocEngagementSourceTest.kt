@@ -376,12 +376,14 @@ class NfcMdocEngagementSourceTest {
         var awaitCount = 0
         val raw = EngagementWifiRawConnection()
         class EngagementWifiRawConnection : WifiAwareRawConnection {
+            private val closure = CompletableDeferred<ProximityCloseReason>()
+            override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
             var closed = false
             val input = Channel<ByteArray>(1)
             val writes = mutableListOf<ByteArray>()
             override suspend fun read(maximumBytes: Int): ByteArray? = input.receiveCatching().getOrNull()
             override suspend fun write(bytes: ByteArray) { writes += bytes.copyOf() }
-            override fun close(reason: ProximityCloseReason) { closed = true; input.close() }
+            override fun close(reason: ProximityCloseReason) { closed = true; closure.complete(reason); input.close() }
         }
         override suspend fun awaitConnection(): WifiAwareRawConnection {
             check(++awaitCount == 1)
