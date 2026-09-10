@@ -2,7 +2,7 @@ package id.walt.mdoc.proximity.mobile
 
 import id.walt.mdoc.proximity.ProximityCloseReason
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.Channel
 
 internal enum class BlePlatformRole { CENTRAL_CLIENT, PERIPHERAL_SERVER }
 internal enum class BleRawBearer { GATT, L2CAP }
@@ -36,7 +36,7 @@ internal interface BlePreparedPlatformRole {
 /** Platform-owned GATT packets or L2CAP stream fragments with suspendable write backpressure. */
 internal interface BleRawConnection {
     val bearer: BleRawBearer
-    val incoming: ReceiveChannel<ByteArray>
+    val incoming: Channel<ByteArray>
 
     /** Current maximum complete GATT characteristic value, including the ISO continuation marker. */
     val maximumGattPacketBytes: Int?

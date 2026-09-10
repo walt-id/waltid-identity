@@ -25,6 +25,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -108,6 +110,35 @@ class BleTransportProviderTest {
         assertTrue(platform.peripheral.closeReasons.isEmpty())
         connection.close(ProximityCloseReason.COMPLETED)
         assertEquals(1, peripheralRaw.finishCount)
+    }
+
+    @Test
+    fun `closure observation neither consumes packets nor starts the receive inactivity timeout`() = runTest {
+        for (bearer in BleRawBearer.entries) {
+            val platform = FakePlatform()
+            val prepared = provider(BleMdocRoles.CentralClient(centralUuid), platform).prepare(context, this)
+            val raw = FakeRawConnection(bearer, if (bearer == BleRawBearer.GATT) 23 else null)
+            platform.central.connection.complete(raw)
+            val connection = prepared.awaitConnection()
+            val closed = async { connection.awaitClosed() }
+            val cancelledWait = async { connection.awaitClosed() }
+            runCurrent()
+            cancelledWait.cancel()
+
+            val packet = byteArrayOf(0, 1, 2)
+            raw.incomingPackets.send(packet)
+            advanceTimeBy(45_000)
+            runCurrent()
+            assertTrue(closed.isActive)
+            assertContentEquals(packet, raw.incomingPackets.tryReceive().getOrThrow())
+            assertTrue(raw.closeReasons.isEmpty())
+
+            raw.incomingPackets.close()
+            runCurrent()
+            assertTrue(closed.isCompleted)
+            assertEquals(ProximityCloseReason.PEER_DISCONNECTED, closed.await())
+            prepared.close(ProximityCloseReason.PEER_DISCONNECTED)
+        }
     }
 
     @Test
