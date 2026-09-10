@@ -689,6 +689,34 @@ class ProximityRequestProcessorTest {
     }
 
     @Test
+    fun `connection loss replaces pending review and rejects late approve or decline`() = runTest {
+        withFixture { fixture ->
+            val processor = processor(fixture)
+            val owner = owner(fixture, processor)
+            val preview = processor.preview(requestContext(fixture.readerEphemeralKey))
+            val decision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt(preview, 1)) }
+            val review = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
+            val submission = submissionFor(review, review.documents.single().credentialOptions.first())
+            val failure = ProximityState.Failed(
+                EngineProximityError.Transport("peer_disconnected", "The connection to the reader was lost").toWalletError(),
+            )
+
+            owner.publish(failure)
+            decision.join()
+            kotlin.test.assertTrue(decision.isCancelled)
+            assertEquals(failure, owner.state.value)
+            assertEquals(ProximityErrorCategory.Transport, failure.error.category)
+            assertEquals(ProximityRecovery.StartNewSession, failure.error.recovery)
+            kotlin.test.assertTrue(failure.legalActions.isEmpty())
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Approve(review.reviewId, submission)))
+            assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Decline(review.reviewId)))
+            owner.publish(ProximityState.ReviewRequired(review))
+            owner.publish(ProximityState.Completed(1, false))
+            assertEquals(failure, owner.state.value)
+        }
+    }
+
+    @Test
     fun `no-data terminal state rejects late observations and holder actions`() = runTest {
         withFixture { fixture ->
             val owner = owner(fixture, processor(fixture))
