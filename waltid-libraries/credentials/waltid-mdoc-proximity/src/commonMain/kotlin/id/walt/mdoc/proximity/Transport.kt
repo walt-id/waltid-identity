@@ -71,6 +71,15 @@ interface PreparedTransport {
 interface ProximityConnection {
     val kind: ProximityTransportKind
 
+    /**
+     * Awaits the first observed closure without consuming messages or starting an I/O timeout.
+     *
+     * Implementations report local closure and platform-observed peer loss even while no receive is
+     * pending. A hybrid connection ends only when no bearer can continue. Cancelling this wait must
+     * neither close the connection nor cancel other waiters; subsequent calls return the same reason.
+     */
+    suspend fun awaitClosed(): ProximityCloseReason
+
     /** Receives one complete protocol message, or `null` after an orderly peer disconnect. */
     suspend fun receive(): ImmutableBytes?
 
