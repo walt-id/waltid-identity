@@ -442,6 +442,9 @@ internal class AndroidWifiAwareRawConnection(
     val ownedSocket: BlockingSocket<Socket>,
 ) : WifiAwareRawConnection {
     private val closed = atomic(false)
+    private val closure = CompletableDeferred<ProximityCloseReason>()
+
+    override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
 
     override suspend fun read(maximumBytes: Int): ByteArray? = ownedSocket.run { socket ->
         require(maximumBytes > 0)
@@ -462,7 +465,10 @@ internal class AndroidWifiAwareRawConnection(
     }
 
     override fun close(reason: ProximityCloseReason) {
-        if (closed.compareAndSet(expect = false, update = true)) ownedSocket.close()
+        if (closed.compareAndSet(expect = false, update = true)) {
+            closure.complete(reason)
+            ownedSocket.close()
+        }
     }
 }
 

@@ -101,6 +101,8 @@ private class FakeWifiAwareRawConnection(
 ) : WifiAwareRawConnection {
     val writes = mutableListOf<ByteArray>()
     val closeReasons = mutableListOf<ProximityCloseReason>()
+    private val closure = kotlinx.coroutines.CompletableDeferred<ProximityCloseReason>()
+    override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
 
     override suspend fun read(maximumBytes: Int): ByteArray? {
         val next = if (reads.isEmpty()) null else reads.removeAt(0)
@@ -115,5 +117,6 @@ private class FakeWifiAwareRawConnection(
 
     override fun close(reason: ProximityCloseReason) {
         closeReasons += reason
+        closure.complete(reason)
     }
 }
