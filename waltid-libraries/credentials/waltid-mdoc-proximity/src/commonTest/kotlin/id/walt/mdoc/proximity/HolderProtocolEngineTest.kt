@@ -53,6 +53,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.seconds
 
@@ -481,6 +482,78 @@ class HolderProtocolEngineTest {
     }
 
     @Test
+    fun `an already closed connection cannot start application processing`() = realDispatcherTest {
+        val result = runSingleRequestSession(
+            onPreview = { error("Closed connection must not start preview") },
+            closeAfterFirstReceive = true,
+        )
+        assertEquals("peer_disconnected", result.error.code)
+        assertEquals(0, result.resolveCalls)
+        assertEquals(0, result.responseMessages)
+    }
+
+    @Test
+    fun `disconnect during review cancels consent without a holder action or response`() = realDispatcherTest {
+        val entered = CompletableDeferred<Unit>()
+        var cancelled = false
+        val result = runSingleRequestSession(
+            consent = {
+                entered.complete(Unit)
+                try { awaitCancellation() } finally { cancelled = true }
+            },
+            readerAfterRequest = { reader ->
+                entered.await()
+                reader.close(ProximityCloseReason.PEER_DISCONNECTED)
+            },
+        )
+        assertEquals("peer_disconnected", result.error.code)
+        assertTrue(cancelled)
+        assertEquals(0, result.resolveCalls)
+        assertEquals(0, result.responseMessages)
+    }
+
+    @Test
+    fun `disconnect during preview cancels processing before consent`() = realDispatcherTest {
+        val entered = CompletableDeferred<Unit>()
+        var cancelled = false
+        val result = runSingleRequestSession(
+            onPreview = {
+                entered.complete(Unit)
+                try { awaitCancellation() } finally { cancelled = true }
+            },
+            consent = { error("A disconnected reader must not reach review") },
+            readerAfterRequest = { reader ->
+                entered.await()
+                reader.close(ProximityCloseReason.PEER_DISCONNECTED)
+            },
+        )
+        assertEquals("peer_disconnected", result.error.code)
+        assertTrue(cancelled)
+        assertEquals(0, result.resolveCalls)
+        assertEquals(0, result.responseMessages)
+    }
+
+    @Test
+    fun `disconnect during response authorization cancels signing without sending`() = realDispatcherTest {
+        val entered = CompletableDeferred<Unit>()
+        var cancelled = false
+        val result = runSingleRequestSession(
+            onResolve = {
+                entered.complete(Unit)
+                try { awaitCancellation() } finally { cancelled = true }
+            },
+            readerAfterRequest = { reader ->
+                entered.await()
+                reader.close(ProximityCloseReason.PEER_DISCONNECTED)
+            },
+        )
+        assertEquals("peer_disconnected", result.error.code)
+        assertTrue(cancelled)
+        assertEquals(1, result.resolveCalls)
+        assertEquals(0, result.responseMessages)
+    }
+
+    @Test
     fun `a denied consent decision cannot disclose credential data`() = realDispatcherTest {
         val denied = runSingleRequestSession(
             consent = { MdocConsentDecision.Deny(it.bindingToken) },
@@ -553,7 +626,11 @@ class HolderProtocolEngineTest {
         return response
     }
 
-    private data class SessionRun(val result: MdocHolderSessionResult, val resolveCalls: Int) {
+    private data class SessionRun(
+        val result: MdocHolderSessionResult,
+        val resolveCalls: Int,
+        val responseMessages: Int,
+    ) {
         val error: ProximityError get() = assertIs<MdocHolderSessionResult.Failed>(result).error
     }
 
@@ -634,6 +711,10 @@ class HolderProtocolEngineTest {
         maximumTransportMessageBytes: Int = 8 * 1024 * 1024,
         disconnectBeforeEstablishment: Boolean = false,
         encodedRequest: ByteArray = encodeRequest("org.example.rejected"),
+        onPreview: suspend () -> Unit = {},
+        onResolve: suspend () -> Unit = {},
+        readerAfterRequest: suspend (FakeProximityConnection) -> Unit = {},
+        closeAfterFirstReceive: Boolean = false,
     ): SessionRun {
         val deviceKey = agreementKey("rejected-device-${deviceKeyCounter++}")
         val readerKey = agreementKey("rejected-reader-${deviceKeyCounter++}")
@@ -659,20 +740,29 @@ class HolderProtocolEngineTest {
             )
         )
         var resolveCalls = 0
+        val holder = if (closeAfterFirstReceive) object : ProximityConnection by loopback.holder {
+            override suspend fun receive(): ImmutableBytes? = loopback.holder.receive().also {
+                loopback.holder.close(ProximityCloseReason.PEER_DISCONNECTED)
+            }
+        } else loopback.holder
         val engine = MdocHolderProtocolEngine(
             eDeviceKey = deviceKey,
-            transportProviders = listOf(FakeTransportProvider(method, loopback.holder)),
+            transportProviders = listOf(FakeTransportProvider(method, holder)),
             requestProcessor = object : MdocHolderRequestProcessor {
-                override suspend fun preview(context: MdocHolderRequestContext) = preview(
-                    context.request.value,
-                    applicationAuthorizations = listOfNotNull(applicationAuthorization),
-                    submissionBindingDigest = applicationAuthorization?.consentBindingDigest() ?: digest("preview"),
-                )
+                override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview {
+                    onPreview()
+                    return preview(
+                        context.request.value,
+                        applicationAuthorizations = listOfNotNull(applicationAuthorization),
+                        submissionBindingDigest = applicationAuthorization?.consentBindingDigest() ?: digest("preview"),
+                    )
+                }
                 override suspend fun resolve(
                     context: MdocHolderRequestContext,
                     preview: MdocRequestPreview,
                 ): MdocResponseResolution {
                     resolveCalls++
+                    onResolve()
                     return MdocResponseResolution.Send(
                         ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(DeviceResponse("1.0", status = 10u))),
                         continuation = MdocSessionContinuation.TERMINATE,
@@ -697,13 +787,16 @@ class HolderProtocolEngineTest {
                 loopback.reader.close(ProximityCloseReason.PEER_DISCONNECTED)
             } else {
                 loopback.reader.send(establishment)
+                readerAfterRequest(loopback.reader)
             }
             readerSession.cipher.close()
         }
 
         val result = engine.run()
         reader.await()
-        return SessionRun(result, resolveCalls)
+        var responseMessages = 0
+        while (loopback.reader.receive() != null) responseMessages++
+        return SessionRun(result, resolveCalls, responseMessages)
     }
 
     private fun encodeRequest(docType: String): ByteArray = encodeRequest(listOf(docType))
