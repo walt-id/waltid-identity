@@ -69,6 +69,9 @@ internal class NfcV2HybridProximityConnection(
     private var alternateFailure: Throwable? = null
     private var sentMessages = 0L
     private var closed = false
+    private val closure = CompletableDeferred<ProximityCloseReason>()
+
+    override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
 
     init {
         require(maximumMessagesPerDirection > 0) {
@@ -193,6 +196,7 @@ internal class NfcV2HybridProximityConnection(
                 false
             } else {
                 closed = true
+                closure.complete(reason)
                 true
             }
         }
@@ -308,6 +312,7 @@ internal class NfcV2HybridProximityConnection(
             }
         }
         if (!first) return
+        if (terminal) closure.complete(ProximityCloseReason.PEER_DISCONNECTED)
         if (bearer == Bearer.ALTERNATE) {
             val sendFailure = failure ?: IllegalStateException("NFCv2 alternate bearer ended")
             alternateSends.close()

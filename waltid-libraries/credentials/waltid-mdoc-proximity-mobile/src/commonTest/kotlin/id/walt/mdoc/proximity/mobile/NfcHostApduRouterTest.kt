@@ -57,8 +57,15 @@ class NfcHostApduRouterTest {
         runCurrent()
         assertContentEquals(byteArrayOf(1), router.retrievalConnection.receive()!!.copy())
 
+        val closed = async { router.retrievalConnection.awaitClosed() }
+        val cancelledWait = async { router.retrievalConnection.awaitClosed() }
+        runCurrent()
+        cancelledWait.cancel()
+        assertTrue(closed.isActive)
         router.deactivate(ProximityCloseReason.PEER_DISCONNECTED)
 
+        assertEquals(ProximityCloseReason.PEER_DISCONNECTED, closed.await())
+        assertEquals(ProximityCloseReason.PEER_DISCONNECTED, router.nfcV2Connection.awaitClosed())
         assertEquals(true, response.await().isFailure)
         assertNull(router.retrievalConnection.receive())
     }
@@ -77,6 +84,7 @@ class NfcHostApduRouterTest {
         router.deactivate(ProximityCloseReason.CANCELLED)
 
         assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), closeReasons)
+        assertEquals(ProximityCloseReason.PEER_DISCONNECTED, router.retrievalConnection.awaitClosed())
         val response = router.process(select(MdocNfcAid.DATA_TRANSFER))
         assertStatus(NfcStatusWord.CONDITIONS_NOT_SATISFIED, response)
         assertTrue(router.retrievalConnection.receive() == null)
