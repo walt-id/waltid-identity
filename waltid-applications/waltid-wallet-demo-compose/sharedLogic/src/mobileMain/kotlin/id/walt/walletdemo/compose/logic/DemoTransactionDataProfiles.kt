@@ -25,7 +25,7 @@ internal suspend fun DemoWalletConfig.resolveDemoTransactionDataProfiles(
     }
 
     return try {
-        DemoTransactionDataProfilesResult(profiles = loadProfiles(url))
+        DemoTransactionDataProfilesResult(profiles = loadProfiles(url).withTemporaryVerificationPaymentCard())
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (error: Throwable) {
@@ -47,10 +47,25 @@ private suspend fun fetchTransactionDataProfiles(url: String) =
 private fun transactionDataProfilesUnavailable(reason: String): DemoTransactionDataProfilesResult {
     println("Transaction data profiles unavailable: $reason")
     return DemoTransactionDataProfilesResult(
-        profiles = emptyList(),
-        warning = "Transaction data profiles could not be loaded; transaction-data presentation requests will be rejected.",
+        profiles = listOf(temporaryVerificationPaymentCardProfile),
+        warning = "Remote transaction data profiles could not be loaded; only the local verification payment_card profile is available.",
     )
 }
+
+/**
+ * Temporary local verification aid. The live request uses type `payment_card` from a
+ * different issuer; do not treat this as a product seed. Remove once the loaded
+ * profiles already include this type.
+ */
+private val temporaryVerificationPaymentCardProfile = MobileWalletTransactionDataProfile(
+    type = "payment_card",
+    displayName = "Payment Card",
+    fields = listOf("merchant_name", "amount"),
+)
+
+private fun List<MobileWalletTransactionDataProfile>.withTemporaryVerificationPaymentCard(): List<MobileWalletTransactionDataProfile> =
+    if (any { it.type == temporaryVerificationPaymentCardProfile.type }) this
+    else this + temporaryVerificationPaymentCardProfile
 
 private val transactionDataProfilesClient: HttpClient
     get() = HttpClient {

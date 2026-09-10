@@ -140,6 +140,70 @@ class PresentationRequestValidatorTest {
     }
 
     @Test
+    fun mdocEs256HolderAlgorithmIsAcceptedWhenAdvertisedByVerifier() {
+        val result = validate(
+            request(
+                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.MSO_MDOC))),
+                clientMetadata = ClientMetadata(
+                    vpFormatsSupported = mapOf(
+                        "mso_mdoc" to buildJsonObject {
+                            put(
+                                "issuerauth_alg_values",
+                                JsonArray(listOf(JsonPrimitive(-7), JsonPrimitive(-35), JsonPrimitive(-36))),
+                            )
+                            put(
+                                "deviceauth_alg_values",
+                                JsonArray(listOf(JsonPrimitive(-7), JsonPrimitive(-35), JsonPrimitive(-36))),
+                            )
+                        },
+                    ),
+                ),
+            ),
+        )
+
+        assertIs<PresentationRequestValidationResult.Valid>(result)
+    }
+
+    @Test
+    fun mdocEsp256OnlyHolderAlgorithmIsAcceptedForP256Wallet() {
+        val result = validate(
+            request(
+                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.MSO_MDOC))),
+                clientMetadata = ClientMetadata(
+                    vpFormatsSupported = mapOf(
+                        "mso_mdoc" to buildJsonObject {
+                            put("deviceauth_alg_values", JsonArray(listOf(JsonPrimitive(-9))))
+                        },
+                    ),
+                ),
+            ),
+        )
+
+        assertIs<PresentationRequestValidationResult.Valid>(result)
+    }
+
+    @Test
+    fun mdocEs384OnlyHolderAlgorithmIsRejectedForP256Wallet() {
+        val result = validate(
+            request(
+                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.MSO_MDOC))),
+                clientMetadata = ClientMetadata(
+                    vpFormatsSupported = mapOf(
+                        "mso_mdoc" to buildJsonObject {
+                            put("deviceauth_alg_values", JsonArray(listOf(JsonPrimitive(-35))))
+                        },
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(
+            WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED,
+            assertIs<PresentationRequestValidationResult.Invalid>(result).error.code,
+        )
+    }
+
+    @Test
     fun mdocEdDsaHolderAlgorithmIsAcceptedWhenAdvertisedByVerifier() {
         val request = request(
             dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.MSO_MDOC))),

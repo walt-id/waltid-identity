@@ -1756,6 +1756,7 @@ class MobileWalletTest {
         val requestObject = verifierKey.signJws(
             buildJsonObject {
                 put("client_id", "verifier2")
+                put("aud", AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE)
                 put("nonce", "nonce-123")
                 put("response_type", "vp_token")
                 put("response_mode", "direct_post")

@@ -38,7 +38,7 @@ import kotlin.uuid.Uuid
 class OpenId4VpPresentationService(
     private val credentialService: CredentialsService,
     private val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
     private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
 ) {
     private val logger = KotlinLogging.logger { }

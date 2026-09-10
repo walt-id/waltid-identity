@@ -10,6 +10,7 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.mobile.test.backend.EudiTestBackend
+import id.walt.mobile.test.backend.PublicDemoSignedRequestContractUnavailable
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -181,7 +182,12 @@ class MobileWalletIntegrationTest {
         val credentialIds = client.continuePreAuthorizedIssuance(issuanceSession.id, offer.txCode).storedCredentialIds()
         assertTrue(credentialIds.isNotEmpty(), "Should receive a credential from reviewed signed metadata")
 
-        val signedSession = DemoTestBackend.createVerifierSession(scenario, signedRequest = true)
+        val signedSession = try {
+            DemoTestBackend.createVerifierSession(scenario, signedRequest = true)
+        } catch (e: PublicDemoSignedRequestContractUnavailable) {
+            println("Skipping signed public-demo presentation: ${e.message}")
+            return@runBlocking
+        }
         val preview = client.previewPresentation(signedSession.authorizationRequestUri).requireReadyPreview()
         val verifierAuthentication = assertIs<MobileWalletRequestAuthentication.Authenticated>(
             preview.request.requestAuthentication,

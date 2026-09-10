@@ -158,6 +158,11 @@ fun validateClientAuthenticationCertificateChain(
     chain: List<CertificateDer>,
     trustAnchors: List<CertificateDer>,
 ) {
+    if (!platformSupportsPkixCertificatePathValidation) {
+        throw X509ValidationException(
+            "X.509 client authentication is not supported on this platform because complete PKIX path validation is unavailable.",
+        )
+    }
     validatePlatformClientAuthenticationCertificateChain(leaf, chain, trustAnchors)
     validateCertificateChainWithExplicitTrust(
         leaf = leaf,

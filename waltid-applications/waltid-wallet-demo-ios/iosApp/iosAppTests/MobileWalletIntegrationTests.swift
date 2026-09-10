@@ -151,6 +151,51 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     // MARK: - Tests (mirror Android MobileWalletIntegrationTest.kt)
 
+    func testAppHostedWalletValidatesSignedRequestObjectCertificateChain() async throws {
+        let wallet = try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: testWalletId,
+                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
+                    x509TrustAnchorsPEM: [X509RequestObjectFixture.trustAnchorPEM]
+                ),
+                defaultKeyUseAuthorizationPolicy: .none
+            )
+        )
+        _ = try await wallet.bootstrap()
+
+        let result = try await wallet.previewPresentation(request: X509RequestObjectFixture.authorizationRequestURL)
+        guard case let .ready(preview) = result else {
+            XCTFail("The pinned X.509 Request Object should authenticate and produce a preview: \(result)")
+            return
+        }
+        XCTAssertTrue(preview.credentialOptions.isEmpty)
+        XCTAssertTrue(preview.credentialRequirements.isEmpty)
+    }
+
+    func testAppHostedWalletRejectsUntrustedSignedRequestObjectCertificateChain() async throws {
+        let wallet = try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: testWalletId,
+                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
+                    x509TrustAnchorsPEM: [EudiTestBackend.verifierTrustAnchorPEM]
+                ),
+                defaultKeyUseAuthorizationPolicy: .none
+            )
+        )
+
+        do {
+            _ = try await wallet.previewPresentation(request: X509RequestObjectFixture.authorizationRequestURL)
+            XCTFail("Expected the signed Request Object to be rejected without the pinned trust anchor")
+        } catch {
+            let description = String(describing: error)
+            XCTAssertFalse(description.contains("No matches found for required credential queries"), description)
+            XCTAssertTrue(
+                description.contains("InvalidSignature") || description.contains("MissingX509TrustAnchors"),
+                description
+            )
+        }
+    }
+
     func testBootstrapCreatesKeyAndDid() async throws {
         let wallet = try await makeWallet()
 
@@ -356,7 +401,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
         }
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive a credential from reviewed signed metadata")
 
-        let signedSession = try await DemoBackend.shared.createVerifierSession(scenario: scenario, signedRequest: true)
+        let signedSession: DemoVerifierSession
+        do {
+            signedSession = try await DemoBackend.shared.createVerifierSession(scenario: scenario, signedRequest: true)
+        } catch is PublicDemoSignedRequestContractUnavailable {
+            throw XCTSkip("Public demo verifier2 has not deployed the signed inline Request Object contract")
+        }
         let presentationURL = try XCTUnwrap(URL(string: signedSession.authorizationRequestUri))
         let preview = try requireReadyPreview(try await wallet.previewPresentation(request: presentationURL))
         guard case let .authenticated(compactRequestObject, algorithm, keyID, clientIDScheme) = preview.request.requestAuthentication else {

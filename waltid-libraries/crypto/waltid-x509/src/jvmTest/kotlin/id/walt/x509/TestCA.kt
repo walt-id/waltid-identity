@@ -37,7 +37,9 @@ object TestCA {
 
     fun generateChain(
         notBefore: Date = Date(System.currentTimeMillis() - 1000),
-        notAfter: Date = Date(System.currentTimeMillis() + oneYearInMillis)
+        notAfter: Date = Date(System.currentTimeMillis() + oneYearInMillis),
+        leafKeyUsage: Int? = KeyUsage.digitalSignature,
+        caKeyUsage: Int? = KeyUsage.keyCertSign or KeyUsage.cRLSign,
     ): Chain {
         val rootKey = genKey()
         val interKey = genKey()
@@ -48,7 +50,8 @@ object TestCA {
             subjectDn = "CN=Test Root CA",
             subjectKey = rootKey.public,
             notBefore = notBefore, notAfter = notAfter,
-            isCa = true
+            isCa = true,
+            keyUsageBits = caKeyUsage,
         )
 
         val interCert = signedCertificate(
@@ -58,7 +61,8 @@ object TestCA {
             subjectKey = interKey.public,
             notBefore = notBefore,
             notAfter = notAfter,
-            isCa = true
+            isCa = true,
+            keyUsageBits = caKeyUsage,
         )
 
         val leafCert = signedCertificate(
@@ -68,7 +72,8 @@ object TestCA {
             subjectKey = leafKey.public,
             notBefore = notBefore,
             notAfter = notAfter,
-            isCa = false
+            isCa = false,
+            keyUsageBits = leafKeyUsage,
         )
 
         return Chain(rootKey, rootCert, interKey, interCert, leafKey, leafCert)
@@ -83,7 +88,8 @@ object TestCA {
         subjectKey: PublicKey,
         notBefore: Date,
         notAfter: Date,
-        isCa: Boolean
+        isCa: Boolean,
+        keyUsageBits: Int?,
     ): X509Certificate {
 
         val subject = X500Name(subjectDn)
@@ -97,7 +103,7 @@ object TestCA {
             issuerKey.public
         )
 
-        addExtension(isCa, subjectKey, issuerKey.public, builder)
+        addExtension(isCa, subjectKey, issuerKey.public, builder, keyUsageBits)
 
         return sign(issuerKey.private, builder)
     }
@@ -110,7 +116,8 @@ object TestCA {
         subjectKey: PublicKey,
         notBefore: Date,
         notAfter: Date,
-        isCa: Boolean
+        isCa: Boolean,
+        keyUsageBits: Int?,
     ): X509Certificate {
         val builder: X509v3CertificateBuilder = JcaX509v3CertificateBuilder(
             issuerCert,
@@ -121,7 +128,7 @@ object TestCA {
             subjectKey
         )
 
-        addExtension(isCa, subjectKey, issuerKey.public, builder)
+        addExtension(isCa, subjectKey, issuerKey.public, builder, keyUsageBits)
 
         return sign(issuerKey.private, builder)
     }
@@ -130,7 +137,8 @@ object TestCA {
         isCa: Boolean,
         subjectKey: PublicKey,
         issuerPublicKey: PublicKey,
-        builder: X509v3CertificateBuilder
+        builder: X509v3CertificateBuilder,
+        keyUsageBits: Int?,
     ) {
 
         val ext = JcaX509ExtensionUtils()
@@ -145,11 +153,9 @@ object TestCA {
             )
 
             builder.addExtension(Extension.basicConstraints, true, BasicConstraints(true))
-            builder.addExtension(
-                Extension.keyUsage, true, KeyUsage(KeyUsage.keyCertSign or KeyUsage.cRLSign)
-            )
-        } else {
-            builder.addExtension(Extension.keyUsage, true, KeyUsage(KeyUsage.digitalSignature))
+        }
+        if (keyUsageBits != null) {
+            builder.addExtension(Extension.keyUsage, true, KeyUsage(keyUsageBits))
         }
     }
 

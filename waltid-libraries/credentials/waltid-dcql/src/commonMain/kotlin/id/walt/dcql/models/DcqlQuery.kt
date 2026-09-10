@@ -4,6 +4,7 @@ import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Represents the top-level DCQL query structure.
@@ -24,6 +25,9 @@ data class DcqlQuery(
         if (credentials.any { it.id.isEmpty() }) {
             throw IllegalArgumentException("Requested dcql query: credential has empty id")
         }
+        if (credentials.map { it.id }.distinct().size != credentials.size) {
+            throw IllegalArgumentException("Requested dcql query: credential IDs must be unique")
+        }
 
         /* // See OSS #1270
         if (credentials.any { it.meta == NoMeta }) {
@@ -33,6 +37,56 @@ data class DcqlQuery(
         if (credentials.any { it.claims != null && it.claims.isEmpty() }) {
             throw IllegalArgumentException("Requested dcql query: claims was set, but has no elements")
         }
+
+        credentials.forEach { credential ->
+            val claims = credential.claims.orEmpty()
+            val claimIds = claims.mapNotNull { it.id }
+            require(claimIds.distinct().size == claimIds.size) {
+                "Requested dcql query: claim IDs must be unique"
+            }
+            if (credential.claimSets != null && credential.claimSets.isEmpty()) {
+                throw IllegalArgumentException("Requested dcql query: claim_sets was set, but has no elements")
+            }
+            credential.claimSets?.forEach { claimSet ->
+                require(claimSet.isNotEmpty()) {
+                    "Requested dcql query: claim-set alternatives must not be empty"
+                }
+                require(claimSet.distinct().size == claimSet.size) {
+                    "Requested dcql query: claim-set alternatives must not contain duplicate claim IDs"
+                }
+                require(claimSet.all { it in claimIds }) {
+                    "Requested dcql query: claim-set references an unknown claim ID"
+                }
+            }
+            credential.claimSets?.let { claimSets ->
+                require(claimSets.map { it.toSet() }.distinct().size == claimSets.size) {
+                    "Requested dcql query: claim-set alternatives must not be duplicated independent of order"
+                }
+            }
+        }
+
+        credentialSets?.let { sets ->
+            if (sets.isEmpty()) {
+                throw IllegalArgumentException("Requested dcql query: credential_sets was set, but has no elements")
+            }
+            val credentialIds = credentials.map { it.id }.toSet()
+            sets.forEach { set ->
+                require(set.options.flatten().all { it in credentialIds }) {
+                    "Requested dcql query: credential set references an unknown credential ID"
+                }
+            }
+        }
+
+        credentials.filter { it.format == CredentialFormat.MSO_MDOC }
+            .flatMap { it.claims.orEmpty() }
+            .forEach { claim ->
+                require(claim.path.size == 2) {
+                    "mso_mdoc Claims Query path must contain exactly namespace and data element identifier"
+                }
+                require(claim.path.all { it is JsonPrimitive && it.isString }) {
+                    "mso_mdoc Claims Query path elements must be strings"
+                }
+            }
     }
 
     object DcqlQueryExamples {

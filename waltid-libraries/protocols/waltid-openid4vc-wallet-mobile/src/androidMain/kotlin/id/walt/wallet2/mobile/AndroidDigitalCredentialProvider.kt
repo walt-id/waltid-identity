@@ -69,6 +69,7 @@ public object AndroidDigitalCredentialProvider {
      */
     private val supportedProtocols = setOf(
         MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+        MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
         MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
     )
 
