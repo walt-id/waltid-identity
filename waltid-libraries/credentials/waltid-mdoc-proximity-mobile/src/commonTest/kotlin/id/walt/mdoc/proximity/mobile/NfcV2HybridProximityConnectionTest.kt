@@ -83,10 +83,12 @@ class NfcV2HybridProximityConnectionTest {
         val prepared = DeferredPreparedTransport()
         val connection = hybrid(nfc, prepared)
         val incoming = async { connection.receive() }
+        val closed = async { connection.awaitClosed() }
 
         nfc.close(ProximityCloseReason.PEER_DISCONNECTED)
         runCurrent()
         assertTrue(incoming.isActive)
+        assertTrue(closed.isActive)
 
         prepared.connect(alternate.holder)
         runCurrent()
@@ -97,7 +99,28 @@ class NfcV2HybridProximityConnectionTest {
         val response = ImmutableBytes.of(byteArrayOf(5, 6))
         connection.send(response)
         assertEquals(response, alternate.reader.receive())
+        assertTrue(closed.isActive)
         connection.close(ProximityCloseReason.COMPLETED)
+        assertEquals(ProximityCloseReason.COMPLETED, closed.await())
+    }
+
+    @Test
+    fun `both lost bearers notify closure while the holder is not receiving`() = runTest {
+        val nfc = NfcApduProximityConnection()
+        val alternate = FakeProximityLoopback.create()
+        val prepared = DeferredPreparedTransport().also { it.connect(alternate.holder) }
+        val connection = hybrid(nfc, prepared)
+        val closed = async { connection.awaitClosed() }
+        runCurrent()
+
+        alternate.reader.close(ProximityCloseReason.PEER_DISCONNECTED)
+        runCurrent()
+        assertTrue(closed.isActive)
+        nfc.close(ProximityCloseReason.PEER_DISCONNECTED)
+        runCurrent()
+        assertTrue(closed.isCompleted)
+        assertEquals(ProximityCloseReason.PEER_DISCONNECTED, closed.await())
+        connection.close(ProximityCloseReason.PEER_DISCONNECTED)
     }
 
     @Test
@@ -286,6 +309,7 @@ class NfcV2HybridProximityConnectionTest {
         private val release: CompletableDeferred<Unit>,
     ) : ProximityConnection {
         override val kind: ProximityTransportKind = delegate.kind
+        override suspend fun awaitClosed(): ProximityCloseReason = delegate.awaitClosed()
 
         override suspend fun send(message: ImmutableBytes) {
             release.await()
@@ -331,6 +355,9 @@ class NfcV2HybridProximityConnectionTest {
             private set
         private var closed = false
 
+        private val closure = CompletableDeferred<ProximityCloseReason>()
+        override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
+
         override suspend fun send(message: ImmutableBytes) = Unit
 
         override suspend fun receive(): ImmutableBytes? = withContext(NonCancellable) {
@@ -342,6 +369,7 @@ class NfcV2HybridProximityConnectionTest {
             if (closed) return
             closed = true
             closeCalls++
+            closure.complete(reason)
             released.complete(Unit)
         }
     }
