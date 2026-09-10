@@ -20,6 +20,8 @@ internal class WifiAwareHttpConnection(
 ) : ProximityConnection {
     override val kind: ProximityTransportKind = ProximityTransportKind.WIFI_AWARE
 
+    override suspend fun awaitClosed(): ProximityCloseReason = raw.awaitClosed()
+
     private val receiveMutex = Mutex()
     private val sendMutex = Mutex()
     // HTTP remains request/response even when the NFCv2 coordinator reads ahead or queues a duplicate response.

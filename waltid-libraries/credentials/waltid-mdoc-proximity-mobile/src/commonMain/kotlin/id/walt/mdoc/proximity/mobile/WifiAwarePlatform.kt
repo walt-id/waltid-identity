@@ -23,6 +23,9 @@ internal interface WifiAwarePreparedPlatformPublisher {
 
 /** Platform-owned TCP stream fragments with suspendable writes and deterministic close. */
 internal interface WifiAwareRawConnection {
+    /** Signals platform-observed or local closure without reading from the socket. */
+    suspend fun awaitClosed(): ProximityCloseReason
+
     /** Reads at most [maximumBytes], returns an empty array only when no bytes are currently possible. */
     suspend fun read(maximumBytes: Int): ByteArray?
 
