@@ -163,6 +163,30 @@ class Issuer2PARRouteTest {
     }
 
     @Test
+    fun `par accepts a successful open authorization session`() {
+        val session = authorizedSession("successful-open-session").copy(
+            status = IssuanceSessionStatus.SUCCESSFUL,
+        )
+        testParApplication(
+            issuanceSessionRepository = TestIssuanceSessionRepository(session),
+        ) { client ->
+            val requestId = "par-successful-open-session"
+            val (response, event) = client.postParAndCaptureEvent(
+                requestId = requestId,
+            ) {
+                setBody(validParForm(issuerState = session.sessionId))
+            }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            assertEquals(IssuanceSessionEvent.PUSHED_AUTHORIZATION_REQUEST_SUCCEEDED.value, event.event)
+            assertEquals(session.sessionId, event.target)
+            assertEquals(session.sessionId, event.session["sessionId"]?.jsonPrimitive?.content)
+            assertNull(event.error)
+            assertNull(event.errorDescription)
+        }
+    }
+
+    @Test
     fun `par rejects unknown issuer state without session correlation`() = testParApplication { client ->
         val requestId = "par-invalid-issuer-state"
         val (response, event) = client.postParAndCaptureEvent(
@@ -185,7 +209,6 @@ class Issuer2PARRouteTest {
     fun `par rejects sessions that cannot authorize issuance`() {
         val sessions = listOf(
             authorizedSession("pre-authorized").copy(authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED),
-            authorizedSession("inactive").copy(status = IssuanceSessionStatus.SUCCESSFUL),
             authorizedSession("closed").copy(isClosed = true),
             authorizedSession("expired").copy(expiresAt = Instant.DISTANT_PAST),
         )
