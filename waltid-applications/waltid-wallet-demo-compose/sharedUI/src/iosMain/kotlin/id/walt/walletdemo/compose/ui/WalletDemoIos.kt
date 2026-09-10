@@ -124,6 +124,7 @@ fun walletDemoViewController(
     val proximityController = WalletDemoProximityController(
         wallet = wallet,
         profileProvider = sharingSettings::proximityTransportProfile,
+        approvalModeProvider = sharingSettings::proximityApprovalMode,
         readerTrustSettingsProvider = readerTrustSettingsController::sessionSnapshot,
         systemPresentationActive = systemPresentationActive,
         requestNfcPresentment = requestNfcPresentment,

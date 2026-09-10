@@ -11,16 +11,23 @@ interface DemoSharingSettingsStore {
     fun setShowDcApiPresentationPreview(enabled: Boolean)
     fun proximityTransportProfile(): WalletDemoProximityTransportProfile
     fun setProximityTransportProfile(profile: WalletDemoProximityTransportProfile)
+    fun proximityApprovalMode(): WalletDemoProximityApprovalMode
+    fun setProximityApprovalMode(mode: WalletDemoProximityApprovalMode)
 }
 
 class InMemoryDemoSharingSettingsStore(
     initialShowDcApiPresentationPreview: Boolean = true,
     initialProximityTransportProfile: WalletDemoProximityTransportProfile =
         WalletDemoProximityTransportProfile.Default,
+    initialProximityApprovalMode: WalletDemoProximityApprovalMode = WalletDemoProximityApprovalMode.AskEachTime,
 ) : DemoSharingSettingsStore {
     private var showDcApiPresentationPreview: Boolean = initialShowDcApiPresentationPreview
     private var proximityTransportProfile: WalletDemoProximityTransportProfile =
         initialProximityTransportProfile
+    private var approvalMode = initialProximityApprovalMode
+
+    override fun proximityApprovalMode(): WalletDemoProximityApprovalMode = approvalMode
+    override fun setProximityApprovalMode(mode: WalletDemoProximityApprovalMode) { approvalMode = mode }
 
     override fun showDcApiPresentationPreview(): Boolean = showDcApiPresentationPreview
 
@@ -41,7 +48,16 @@ internal class PersistentDemoSharingSettingsStore(
     private val writeEnabled: (Boolean) -> Unit,
     private val readProximityTransportProfile: () -> String?,
     private val writeProximityTransportProfile: (String) -> Unit,
+    private val readProximityApprovalMode: () -> String?,
+    private val writeProximityApprovalMode: (String) -> Unit,
 ) : DemoSharingSettingsStore {
+    override fun proximityApprovalMode(): WalletDemoProximityApprovalMode =
+        WalletDemoProximityApprovalMode.fromPersistedValue(readProximityApprovalMode())
+
+    override fun setProximityApprovalMode(mode: WalletDemoProximityApprovalMode) {
+        writeProximityApprovalMode(mode.persistedValue)
+    }
+
     override fun showDcApiPresentationPreview(): Boolean = readEnabled() ?: true
 
     override fun setShowDcApiPresentationPreview(enabled: Boolean) {
@@ -60,3 +76,5 @@ internal const val SHOW_DC_API_PRESENTATION_PREVIEW_KEY =
     "id.walt.walletdemo.sharing.showDcApiPresentationPreview"
 internal const val PROXIMITY_TRANSPORT_PROFILE_KEY =
     "id.walt.walletdemo.sharing.proximityTransportProfile"
+internal const val PROXIMITY_APPROVAL_MODE_KEY =
+    "id.walt.walletdemo.sharing.proximityApprovalMode"

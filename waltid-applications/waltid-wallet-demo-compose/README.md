@@ -57,6 +57,28 @@ transfer to Bluetooth, or select provisional NFCv2 direct/handover modes. These 
 are kept out of the sharing journey and cannot change an active exchange. Device support and permissions
 are checked at startup; NFCv2 retains its mandatory NFC channel.
 
+**Approval** in Nearby sharing settings stores **Ask each time** (default) or
+**Prepare sharing**, independently of the connection profile. The same choice is
+available before connecting. Preparation first identifies a named authenticated
+trusted reader and collects its request without sharing credentials. After the
+connection closes, review the reader, purpose, retention and selected data, then
+choose **Approve and get ready**. Several matching credentials require an explicit
+choice; requested mDL portrait data is marked required. Missing required data
+prevents approval and explains why another credential is needed.
+
+The ready screen shows a cancellable 60-second, one-use approval and its scope.
+Approval automatically reopens the previous engagement method when available.
+The reader must start a fresh request; additional data, another reader or changed
+purpose/retention requires another decision. iOS NFC-only uses this review/reconnect
+flow because Core NFC owns the screen during transfer; Bluetooth retains ordinary
+connected review. Only an actively owned NFC sheet exempts background cancellation.
+
+Completion shows the locally shared selection and **Prepare another share** while
+the recent request remains valid. Preparing again requires a new review and approval;
+retry never reuses an armed approval. **Done** forgets the plan. Plans expire after
+ten minutes, approvals after 60 seconds, and neither is persisted. Reader/key checks
+remain in the SDK. A local receipt does not confirm the reader's verification result.
+
 The current journey displays Device Engagement as an accessible QR code and retrieves over the
 available Bluetooth Low Energy or NFC method. It supports per-document credential and element selection,
 shows reader-stated purpose and retention intent, and presents authentication scope, signature
@@ -79,6 +101,13 @@ Reader CAs/RICAL providers, and imports DER, certificate-only PEM, or versioned 
 bundles through the platform document picker. Every import is validated and previewed before an atomic
 save to app-private storage; private keys and PKCS#12/PFX reader identities are deliberately rejected.
 Each new proximity session freezes the current settings, so an active exchange cannot be reconfigured.
+
+The ready screen prioritizes the full QR within the available space. **Prepare sharing** is a single
+switch: off means review each request; on means review, approve, then reconnect. Selecting the mode
+does not authorize disclosure. The same switch is available in Nearby sharing settings. Once armed,
+the reader and expiry countdown stay visible, and **Approved data** opens the already reviewed
+selection. Cancel stays separate from scrolling content. Short screens and larger text retain
+scrolling for secondary controls; landscape places the QR beside the controls.
 
 ## Local wallet data
 

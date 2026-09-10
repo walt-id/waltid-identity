@@ -50,6 +50,7 @@ internal fun WalletScreen(
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
             sharingSettingsContent = sharingSettingsContent,
+            onProximityApprovalModeChange = onStartProximityPresentation?.let { controller::setProximityApprovalMode },
         )
         return
     }

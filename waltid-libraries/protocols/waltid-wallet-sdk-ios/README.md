@@ -125,9 +125,11 @@ for await state in session.states {
         showUnavailableMethods(current)
     case .engagementReady(let engagements):
         showEngagements(engagements)
-    case .reviewRequired(let review):
+    case .reviewRequired(let review, _):
         showReview(review)
-    case .completed(let exchanges, _):
+    case .preparationRequired(let plan, let reason):
+        showPreparationReview(plan, reason: reason)
+    case .completed(let exchanges, _, _):
         showCompletion(exchanges: exchanges)
     case .noData(let exchange):
         showNoData(exchange: exchange)
@@ -151,6 +153,33 @@ conventional NFC length limits must match across routes. The SDK prepares only
 viable selected routes. Perform a suggested permission or settings effect in app
 UI and report its privacy-safe
 outcome with `.reportRemediation`. The SDK alone advances protocol state.
+
+`ProximityConfiguration.approval` selects `.askEachTime` (default) or
+`.prepareBeforeSharing`. Preparation first authenticates the reader and declines
+its request without credential disclosure. After the connection closes,
+`.preparationRequired(plan, reason)` supplies a recent request for an explicit
+review. Display `plan.review`, let the holder choose credentials/fields, and honour
+`requiredElements`. Call `try plan.approve(submission)` only from the approval action;
+on `.prepared(sharing)`, start a new session with
+`configuration.withApproval(.prepared(sharing))`. The old connection is finished.
+
+The shared SDK binds that approval to the exact authenticated reader, request,
+selected credentials, retention/purpose and application requirements. It lasts 60
+seconds, uses a monotonic deadline, and permits one connection attempt. A plan
+expires after ten minutes and is not permission to disclose. Keep both objects
+in memory within the journey; persist only the mode. `sharing.remainingSeconds`
+supports a countdown, and `await sharing.revoke()` cancels future use. Close and
+revoke on dismissal/backgrounding, preserving only actual Core NFC system presentation.
+Retries require a fresh review; changed requests never inherit a broader approval.
+
+The bundled iOS adapter cannot host interactive review during NFC-only retrieval.
+It first declines and collects an eligible reader request even in `.askEachTime`,
+then lets the holder review and reconnect. NFC-to-Bluetooth handover can still
+review while connected. Preparation needs one named authenticated trusted reader;
+other readers need an interactive route. Normal trust, credential and holder-key
+checks remain mandatory, and protected-key prompts still depend on OS availability.
+`.completed` may include a display-only receipt; this records local response
+completion, not the reader's verification result.
 
 When the user chooses a prepared NFC engagement, call `await session.presentNfc()` to open Core NFC's
 system sheet. The request preserves the current engagement and keys, waits for the NFC resource to be

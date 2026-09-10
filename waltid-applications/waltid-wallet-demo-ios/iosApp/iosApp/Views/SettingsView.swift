@@ -111,6 +111,11 @@ struct SettingsView: View {
     private var proximityPresentationSettings: some View {
         NavigationLink {
             List {
+                Section("Approval") {
+                    ProximityApprovalModeToggle(mode: $viewModel.proximityApprovalMode, compact: false)
+                    Text("Only the mode is remembered. Each prepared share needs a new approval.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 Section {
                     ForEach(WalletDemoProximityTransportProfile.allCases) { profile in
                         Button {
@@ -131,9 +136,9 @@ struct SettingsView: View {
                         .accessibilityValue(viewModel.proximityTransportProfile == profile ? "Selected" : "Not selected")
                     }
                 } header: {
-                    Text("Use Automatic unless your reader requires a specific connection.")
+                    Text("Connection")
                 } footer: {
-                    Text("Applies to your next presentation. Availability depends on your device and permissions.")
+                    Text("Use Automatic unless your reader requires a specific connection. Changes apply to your next presentation.")
                 }
             }
             .navigationTitle("Nearby sharing")

@@ -35,6 +35,7 @@ data class WalletDemoUiState(
     val showDcApiPresentationPreview: Boolean = true,
     val proximityTransportProfile: WalletDemoProximityTransportProfile =
         WalletDemoProximityTransportProfile.Default,
+    val proximityApprovalMode: WalletDemoProximityApprovalMode = WalletDemoProximityApprovalMode.AskEachTime,
 ) {
     val presentationPreview: WalletDemoPresentationPreview?
         get() = (presentationReview as? WalletDemoPresentationPreviewResult.Ready)?.preview
