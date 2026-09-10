@@ -97,6 +97,17 @@ retaining incomplete messages; callbacks after closure are ignored. Android
 blocking socket operations register cancellation-driven closure before native
 connect, accept, read or write operations begin.
 
+Active connections expose passive closure observation to the shared engine. BLE
+observes closure of its platform packet channel without consuming packets or
+starting the receive inactivity timeout.
+
+NFC host deactivation ends a direct APDU connection even while the wallet awaits
+consent. Conventional handover does not close the selected BLE connection; NFCv2
+hybrid retrieval remains viable while its alternate bearer is active or connecting.
+
+Wi-Fi Aware forwards local and observed platform closure without starting an
+additional socket read.
+
 Successful L2CAP completion permits a one-second drain before native cleanup.
 This allows queued response bytes to leave the radio stack; it is not a reader
 acknowledgement. Cancellation and error cleanup remain immediate.
