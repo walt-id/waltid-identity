@@ -162,6 +162,14 @@ class WalletViewModel: ObservableObject {
                 )
             }
         }
+    @Published var proximityApprovalMode: WalletDemoProximityApprovalMode = DemoSharingSettings.proximityApprovalMode(
+        appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+    ) {
+        didSet {
+            DemoSharingSettings.setProximityApprovalMode(proximityApprovalMode,
+                appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier)
+        }
+    }
     @Published var pinError: String?
     @Published var isAuthenticating = false
     @Published private(set) var pendingPresentationContinuationURL: URL?
@@ -646,7 +654,9 @@ class WalletViewModel: ObservableObject {
                 readerTrustSettings.sessionSnapshot().applying(
                     to: DemoSharingSettings.proximityTransportProfile(
                         appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
-                    ).configuration
+                    ).configuration.withApproval(DemoSharingSettings.proximityApprovalMode(
+                        appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+                    ).approval)
                 )
             }
         )

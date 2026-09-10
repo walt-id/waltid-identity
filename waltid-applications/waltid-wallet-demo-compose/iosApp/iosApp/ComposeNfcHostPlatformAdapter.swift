@@ -11,6 +11,8 @@ final class ComposeNfcHostPlatformAdapter:
     @unchecked Sendable {
     private let bridge = IOSNfcHostBridge()
 
+    var supportsInSessionUserInteraction: Bool { false }
+
     var isPresenting: Bool { bridge.isPresenting }
 
     func present() async {

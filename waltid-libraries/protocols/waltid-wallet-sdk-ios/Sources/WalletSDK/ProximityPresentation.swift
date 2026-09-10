@@ -879,6 +879,8 @@ public struct ProximityConfiguration: Sendable {
     public let applicationProfiles: [any ProximityApplicationProfile]
     /// Maximum accepted protocol message size in bytes.
     public let maximumMessageBytes: Int
+    /// Explicit holder-approval behavior; a stored preference never creates an approval.
+    public let approval: ProximityApproval
 
     /// Creates immutable configuration for one single-use session.
     /// - Parameters:
@@ -898,7 +900,8 @@ public struct ProximityConfiguration: Sendable {
         readerTrustEvaluator: (any ProximityReaderTrustEvaluator)? = nil,
         credentialStatusEvaluator: (any ProximityCredentialStatusEvaluator)? = nil,
         applicationProfiles: [any ProximityApplicationProfile] = [],
-        maximumMessageBytes: Int = 1_048_576
+        maximumMessageBytes: Int = 1_048_576,
+        approval: ProximityApproval = .askEachTime
     ) {
         precondition(maximumMessageBytes > 0 && maximumMessageBytes <= 16_777_216)
         precondition(profile != .eudiARF3FCAF202608 || readerPolicy == .requireTrusted)
@@ -917,6 +920,15 @@ public struct ProximityConfiguration: Sendable {
         self.credentialStatusEvaluator = credentialStatusEvaluator
         self.applicationProfiles = applicationProfiles
         self.maximumMessageBytes = maximumMessageBytes
+        self.approval = approval
+    }
+
+    /// Replaces only approval behavior, preserving the profile, trust and transport policies.
+    public func withApproval(_ approval: ProximityApproval) -> ProximityConfiguration {
+        .init(profile: profile, session: session, readerPolicy: readerPolicy,
+              deviceAuthenticationPolicy: deviceAuthenticationPolicy, readerTrustEvaluator: readerTrustEvaluator,
+              credentialStatusEvaluator: credentialStatusEvaluator, applicationProfiles: applicationProfiles,
+              maximumMessageBytes: maximumMessageBytes, approval: approval)
     }
 }
 
@@ -1213,6 +1225,15 @@ public struct ProximityDocumentReview: Sendable, Equatable, Identifiable {
     public let documentType: String
     /// Credentials that can satisfy the request.
     public let credentialOptions: [ProximityCredentialOption]
+    /// Profile-defined data required when sharing this document.
+    public let requiredElements: Set<ProximityElementReference>
+
+    init(requestIndex: Int, documentType: String, credentialOptions: [ProximityCredentialOption], requiredElements: Set<ProximityElementReference> = []) {
+        self.requestIndex = requestIndex
+        self.documentType = documentType
+        self.credentialOptions = credentialOptions
+        self.requiredElements = requiredElements
+    }
 }
 
 /// Reader-asserted purpose hint preserved as untrusted request data.
@@ -1411,7 +1432,9 @@ public enum ProximityState: Sendable, Equatable {
     /// The holder is waiting for a device request.
     case awaitingRequest(exchange: Int)
     /// The host must present the frozen review and collect explicit holder intent.
-    case reviewRequired(ProximityReview)
+    case reviewRequired(ProximityReview, reason: ProximityReviewReason = .requestReceived)
+    /// The connection ended without disclosure. Review and approve before a fresh connection.
+    case preparationRequired(ProximitySharingPlan, reason: ProximityReviewReason = .requestReceived)
     /// A protected holder key is authorizing the frozen approved submission.
     case authorizingHolderKey(ProximityHolderAuthorization)
     /// The response for an exchange is being sent.
@@ -1421,7 +1444,7 @@ public enum ProximityState: Sendable, Equatable {
     /// The protocol is terminating the transport for an exchange.
     case terminating(exchange: Int)
     /// The session completed normally.
-    case completed(exchanges: Int, declined: Bool)
+    case completed(exchanges: Int, declined: Bool, receipt: ProximitySharingReceipt? = nil)
     /// The final request ended without credential data; earlier exchanges may have shared data.
     case noData(exchange: Int)
     /// The host cancelled the session.
@@ -1437,7 +1460,7 @@ public enum ProximityState: Sendable, Equatable {
         case .preparing, .engagementReady, .connecting,
              .awaitingRequest, .authorizingHolderKey, .sendingResponse, .awaitingNextRequest:
             [.cancel]
-        case .terminating, .completed, .noData, .cancelled, .failed:
+        case .terminating, .preparationRequired, .completed, .noData, .cancelled, .failed:
             []
         }
     }
@@ -1481,6 +1504,7 @@ public struct ProximityConnectedRoute: Sendable, Equatable {
 @available(macOS 10.15, *)
 protocol ProximitySessionBridge: Sendable {
     var connectedRoute: ProximityConnectedRoute? { get }
+    var sharingPlan: ProximitySharingPlan? { get }
     var systemPresentationActive: Bool { get }
     var states: AsyncStream<ProximityState> { get }
     func presentNfc() async
@@ -1491,6 +1515,7 @@ protocol ProximitySessionBridge: Sendable {
 @available(macOS 10.15, *)
 extension ProximitySessionBridge {
     var connectedRoute: ProximityConnectedRoute? { nil }
+    var sharingPlan: ProximitySharingPlan? { nil }
 }
 
 /// Actor-safe, single-use native facade over one KMP proximity session.
@@ -1503,6 +1528,8 @@ public actor ProximitySession {
     public nonisolated var systemPresentationActive: Bool { bridge.systemPresentationActive }
     /// Winning route once connected, independent of configured and advertised methods.
     public nonisolated var connectedRoute: ProximityConnectedRoute? { bridge.connectedRoute }
+    /// Recent authenticated request, usable only after a separate explicit approval.
+    public nonisolated var sharingPlan: ProximitySharingPlan? { bridge.sharingPlan }
     private let bridge: any ProximitySessionBridge
     private var closed = false
 
@@ -1513,7 +1540,7 @@ public actor ProximitySession {
                 for await state in bridge.states {
                     continuation.yield(state)
                     switch state {
-                    case .completed, .noData, .cancelled, .failed:
+                    case .preparationRequired, .completed, .noData, .cancelled, .failed:
                         continuation.finish()
                         return
                     default: break

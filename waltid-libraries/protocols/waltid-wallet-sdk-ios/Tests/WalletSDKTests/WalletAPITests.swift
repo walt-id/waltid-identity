@@ -3,7 +3,16 @@ import XCTest
 
 final class WalletAPITests: XCTestCase {
     func testProximityStreamCompletesAtEveryTerminalStateWithoutForwardingLaterStates() async {
+        let review = ProximityReview(reviewID: .init(value: UUID().uuidString), exchange: 1,
+            documents: [.init(requestIndex: 0, documentType: "org.iso.18013.5.1.mDL", credentialOptions: [
+                .init(credentialID: "fixture", label: "Identity", issuer: nil, validUntil: .distantFuture,
+                    deviceAuthentication: .signature, requestedElements: [.init(namespace: "org.iso.18013.5.1",
+                        elementIdentifier: "given_name", intentToRetain: false, satisfiesRequestedElements: [])])])],
+            readerAuthentication: [], readerAuthenticationSummary: .absent, useCases: [], applicationAuthorizations: [])
+        let plan = ProximitySharingPlan(review: review, expiresAt: .distantFuture,
+            readerCertificateSHA256: "display-fixture", bridge: DisplayOnlySharingPlanBridge())
         let terminals: [ProximityState] = [
+            .preparationRequired(plan),
             .completed(exchanges: 1, declined: false), .noData(exchange: 2), .cancelled,
             .failed(.init(category: .transport, code: "closed", message: "Closed", recovery: .startNewSession)),
         ]
@@ -1547,4 +1556,11 @@ private struct TerminalProximityStreamBridge: ProximitySessionBridge {
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult { .accepted }
     func close() async { continuation.finish() }
     func presentNfc() async {}
+}
+
+private struct DisplayOnlySharingPlanBridge: ProximitySharingPlanBridge {
+    var isExpired: Bool { false }
+    func approve(_ submission: ProximitySubmission) throws -> ProximityPreparationResult {
+        .rejected(.init(category: .policy, code: "display_fixture", message: "Display fixture only", recovery: .none))
+    }
 }

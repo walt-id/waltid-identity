@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 import XCTest
 import WalletDemoSharingUI
 import ZXingCpp
@@ -255,12 +256,9 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         await session.emit(.reviewRequired(review))
         try await waitUntil { viewModel.review == review }
 
-        XCTAssertEqual(viewModel.selections.count, 2)
-        XCTAssertEqual(
-            viewModel.selections.first(where: { $0.requestIndex == 0 })?.credentialID,
-            "payment-a"
-        )
-        XCTAssertTrue(viewModel.canApprove)
+        XCTAssertEqual(viewModel.selections.count, 1)
+        XCTAssertNil(viewModel.selections.first(where: { $0.requestIndex == 0 }))
+        XCTAssertFalse(viewModel.canApprove)
 
         viewModel.selectCredential(requestIndex: 0, credentialID: "payment-b")
         XCTAssertEqual(
@@ -297,16 +295,219 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         try await waitUntil { viewModel.review?.exchange == 2 }
 
         XCTAssertFalse(viewModel.continueAfterResponse)
-        XCTAssertEqual(
-            viewModel.selections.first(where: { $0.requestIndex == 0 })?.credentialID,
-            "payment-a"
-        )
+        XCTAssertNil(viewModel.selections.first(where: { $0.requestIndex == 0 }))
+        XCTAssertFalse(viewModel.canApprove)
         let nextReviewID = try XCTUnwrap(viewModel.review?.reviewID)
         XCTAssertNotEqual(nextReviewID, review.reviewID)
         viewModel.decline()
         try await waitUntilAsync { await session.actions.count == 2 }
         let laterActions = await session.actions
         XCTAssertEqual(laterActions.last, .decline(reviewID: nextReviewID))
+    }
+
+    @MainActor
+    func testPreparingCreatesOneFreshSessionReopensNfcAndRevokesOnDismissal() async throws {
+        let review = combinedProximityReview()
+        let bridge = FakePreparedSharingBridge()
+        let submission = fixtureSubmission(review)
+        let sharing = WalletSDK.ProximityPreparedSharing(review: review, submission: submission,
+            expiresAt: Date().addingTimeInterval(60), bridge: bridge)
+        let plan = WalletSDK.ProximitySharingPlan(review: review, expiresAt: Date().addingTimeInterval(600),
+            readerCertificateSHA256: "test-fingerprint", bridge: FakeSharingPlanBridge(sharing: sharing))
+        let session = FakeProximitySession(connectedRoute: .init(engagement: .nfc, transport: .nfc))
+        let next = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session, nextSession: next)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.preparationRequired(plan))
+        try await waitUntil { viewModel.preparingApproval }
+        XCTAssertFalse(viewModel.canApprove)
+        viewModel.selectCredential(requestIndex: 0, credentialID: "payment-b")
+        viewModel.setContinueAfterResponse(true)
+        XCTAssertFalse(viewModel.continueAfterResponse)
+        viewModel.approve()
+        viewModel.approve()
+        try await waitUntil { client.startCount == 2 }
+        let oldActions = await session.actions
+        XCTAssertTrue(oldActions.isEmpty, "Preparation cannot approve the first connection")
+        guard case .prepared(let issued) = client.lastConfiguration?.approval else {
+            return XCTFail("Expected the explicit approval in the new configuration")
+        }
+        XCTAssertTrue(issued === sharing)
+        await next.emit(.engagementReady([.qr(payload: "mdoc:new"), .nfc]))
+        try await waitUntilAsync { await next.presentNfcCalls == 1 }
+        await next.emit(.engagementReady([.qr(payload: "mdoc:new"), .nfc]))
+        try await Task.sleep(nanoseconds: 20_000_000)
+        let presentCount = await next.presentNfcCalls
+        XCTAssertEqual(presentCount, 1)
+        viewModel.dismiss()
+        try await waitUntilAsync { await bridge.revoked }
+        XCTAssertNil(viewModel.review)
+        XCTAssertNil(viewModel.preparedSharing)
+    }
+
+    @MainActor
+    func testPreparedRetryReturnsToReviewBeforeCreatingAnotherSession() async throws {
+        let review = combinedProximityReview()
+        let sharing = WalletSDK.ProximityPreparedSharing(review: review,
+            submission: fixtureSubmission(review), expiresAt: Date().addingTimeInterval(60),
+            bridge: FakePreparedSharingBridge())
+        let plan = WalletSDK.ProximitySharingPlan(review: review, expiresAt: Date().addingTimeInterval(600),
+            readerCertificateSHA256: "test-fingerprint", bridge: FakeSharingPlanBridge(sharing: sharing))
+        let session = FakeProximitySession()
+        let next = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session, nextSession: next)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.preparationRequired(plan))
+        try await waitUntil { viewModel.preparingApproval }
+        viewModel.selectCredential(requestIndex: 0, credentialID: "payment-a")
+        viewModel.approve()
+        try await waitUntil { client.startCount == 2 }
+        await next.emit(.failed(.init(category: .policy, code: "prepared_sharing_expired",
+            message: "Prepared sharing expired", recovery: .startNewSession)))
+        try await waitUntil { viewModel.isTerminal }
+        viewModel.restart()
+        XCTAssertTrue(viewModel.preparingApproval)
+        XCTAssertFalse(viewModel.canApprove, "A new approval requires choosing among multiple credentials again")
+        XCTAssertEqual(client.startCount, 2)
+        XCTAssertNil(viewModel.preparedSharing)
+        viewModel.dismiss()
+    }
+
+    @MainActor
+    func testBackgroundDuringPreparedPermissionSetupRevokesAndCloses() async throws {
+        let review = combinedProximityReview()
+        let bridge = FakePreparedSharingBridge()
+        let sharing = WalletSDK.ProximityPreparedSharing(review: review, submission: fixtureSubmission(review),
+            expiresAt: Date().addingTimeInterval(60), bridge: bridge)
+        let plan = WalletSDK.ProximitySharingPlan(review: review, expiresAt: Date().addingTimeInterval(600),
+            readerCertificateSHA256: "fixture", bridge: FakeSharingPlanBridge(sharing: sharing))
+        let first = FakeProximitySession()
+        let next = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: first, nextSession: next)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        await first.emit(.preparationRequired(plan))
+        try await waitUntil { viewModel.preparingApproval }
+        viewModel.selectCredential(requestIndex: 0, credentialID: "payment-a")
+        viewModel.approve()
+        try await waitUntil { client.startCount == 2 }
+        let checking = WalletSDK.ProximityState.checkingPrerequisites(makeProximityCapabilities(bluetoothAvailable: false, nfcAvailable: false))
+        await next.emit(checking)
+        try await waitUntil { viewModel.sessionState == checking }
+        viewModel.handleLifecycleInterruption()
+        try await waitUntilAsync { await bridge.revoked }
+        try await waitUntilAsync { await next.closeCount == 1 }
+        XCTAssertFalse(viewModel.active)
+        XCTAssertNil(viewModel.preparedSharing)
+    }
+
+    @MainActor
+    func testPreparedSharingScreensRenderReviewReadyAndReceipt() async throws {
+        let base = combinedProximityReview()
+        let review = WalletSDK.ProximityReview(reviewID: base.reviewID, exchange: 1,
+            documents: [WalletSDK.ProximityDocumentReview(requestIndex: 0, documentType: "org.iso.18013.5.1.mDL",
+                credentialOptions: [.init(credentialID: "credential", label: "Mobile Driving Licence", issuer: "Example issuer",
+                    validUntil: Date(timeIntervalSince1970: 1_893_456_000), deviceAuthentication: .signature,
+                    requestedElements: [.init(namespace: "org.iso.18013.5.1", elementIdentifier: "given_name",
+                        intentToRetain: false, satisfiesRequestedElements: [])])])],
+            readerAuthentication: [.init(scope: .wholeRequest, authenticationIndex: 0,
+                outcome: .valid(.init(state: .trusted, certificatePath: .valid, displayName: "City service desk")))],
+            readerAuthenticationSummary: .trusted, useCases: [], applicationAuthorizations: [])
+        let selection = fixtureSubmission(review)
+        let sharing = WalletSDK.ProximityPreparedSharing(review: review, submission: selection,
+            expiresAt: Date().addingTimeInterval(60), bridge: FakePreparedSharingBridge())
+        let plan = WalletSDK.ProximitySharingPlan(review: review, expiresAt: Date().addingTimeInterval(600),
+            readerCertificateSHA256: "fixture-certificate", bridge: FakeSharingPlanBridge(sharing: sharing))
+        let first = FakeProximitySession(connectedRoute: .init(engagement: .nfc, transport: .nfc))
+        let next = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: first, nextSession: next)
+        let wallet = WalletViewModel(walletID: "proximity-ui-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+        wallet.selectedTab = .present
+        wallet.dismissStatus()
+        let viewModel = wallet.proximityPresentation
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        await first.emit(.preparationRequired(plan))
+        try await waitUntil { viewModel.preparingApproval }
+        XCTAssertTrue(viewModel.canApprove)
+
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = UIHostingController(rootView: PresentView(viewModel: wallet))
+        window.makeKeyAndVisible()
+        defer { viewModel.dismiss(); window.isHidden = true; previous?.makeKeyAndVisible() }
+        func capture(_ name: String) async throws {
+            try await Task.sleep(nanoseconds: 500_000_000)
+            window.layoutIfNeeded()
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true))
+            }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        try await capture("native-preparation")
+        viewModel.approve()
+        try await waitUntil { client.startCount == 2 }
+        await next.emit(.engagementReady([.nfc]))
+        try await waitUntil { viewModel.displayedEngagement == .nfc }
+        try await capture("native-prepared-ready")
+        await next.emit(.completed(exchanges: 1, declined: false,
+            receipt: .init(review: review, submission: selection, approvalTiming: .beforeConnection, completedAt: Date())))
+        try await waitUntil { viewModel.isTerminal }
+        try await capture("native-sharing-receipt")
+    }
+
+    @MainActor
+    func testQRCodeIsScannableInsideWalletChromeAtPhoneSizes() async throws {
+        try await assertScannableWalletQr(name: "phone", size: CGSize(width: 390, height: 844))
+    }
+
+    @MainActor
+    func testQRCodeIsScannableInsideWalletChromeOnSmallPhone() async throws {
+        try await assertScannableWalletQr(name: "small", size: CGSize(width: 360, height: 640))
+    }
+
+    @MainActor
+    private func assertScannableWalletQr(name: String, size: CGSize) async throws {
+        let payload = "mdoc:" + String(repeating: "A7v9kQ2_x-", count: 30)
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let wallet = WalletViewModel(walletID: "proximity-qr-layout-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+        wallet.selectedTab = .present
+        wallet.dismissStatus()
+        let model = wallet.proximityPresentation
+        model.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.engagementReady([.qr(payload: payload), .nfc]))
+        try await waitUntil { model.engagementChoices.count == 2 }
+        model.showEngagement(.qr)
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        defer { model.dismiss(); window.isHidden = true; previous?.makeKeyAndVisible() }
+            window.rootViewController = UIHostingController(rootView: HomeView(viewModel: wallet)
+                .frame(width: size.width, height: size.height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading))
+            window.makeKeyAndVisible()
+            try await Task.sleep(nanoseconds: 700_000_000)
+            window.layoutIfNeeded()
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true))
+            }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "native-qr-\(name)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            let result = try XCTUnwrap(try ZXIBarcodeReader().read(try XCTUnwrap(image.cgImage)).first)
+            XCTAssertEqual(result.text, payload, "Full QR must be scannable without scrolling at \(size)")
     }
 
     func testQRCodeRendererRoundTripsRealisticLongDeviceEngagementPayload() throws {
@@ -444,6 +645,15 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let suiteName = "id.walt.walletdemo.tests.\(UUID().uuidString)"
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
 
+        XCTAssertEqual(DemoSharingSettings.proximityApprovalMode(appGroupIdentifier: suiteName), .askEachTime)
+        DemoSharingSettings.setProximityApprovalMode(.prepareSharing, appGroupIdentifier: suiteName)
+        XCTAssertEqual(DemoSharingSettings.proximityApprovalMode(appGroupIdentifier: suiteName), .prepareSharing)
+        XCTAssertEqual(UserDefaults(suiteName: suiteName)?.string(forKey: DemoSharingSettings.proximityApprovalModeKey), "prepare_sharing")
+        UserDefaults(suiteName: suiteName)?.set("unknown", forKey: DemoSharingSettings.proximityApprovalModeKey)
+        XCTAssertEqual(DemoSharingSettings.proximityApprovalMode(appGroupIdentifier: suiteName), .askEachTime)
+        let prepareConfiguration = WalletSDK.ProximityConfiguration().withApproval(.prepareBeforeSharing)
+        XCTAssertTrue(prepareConfiguration.toKMPConfiguration().approval is WalletCore.ProximityApprovalPrepareBeforeSharing)
+
         XCTAssertEqual(
             DemoSharingSettings.proximityTransportProfile(appGroupIdentifier: suiteName),
             .defaultProfile
@@ -543,6 +753,8 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             let closeCount = await session.closeCount
             XCTAssertEqual(closeCount, 0)
         }
+        XCTAssertFalse(viewModel.canApprove)
+        viewModel.selectCredential(requestIndex: 0, credentialID: "payment-a")
         XCTAssertTrue(viewModel.canApprove)
         viewModel.dismiss()
     }
@@ -643,6 +855,16 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
 
+}
+
+private func fixtureSubmission(_ review: WalletSDK.ProximityReview) -> WalletSDK.ProximitySubmission {
+    .init(documents: review.documents.map { document in
+        let credential = document.credentialOptions[0]
+        return .init(requestIndex: document.requestIndex, credentialID: credential.credentialID,
+            disclosedElements: Set(credential.requestedElements.map {
+                .init(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+            }))
+    })
 }
 
 private func combinedProximityReview(exchange: Int = 1) -> WalletSDK.ProximityReview {
@@ -901,4 +1123,18 @@ private final class FakePresentmentState: @unchecked Sendable {
         self.value = value
         lock.unlock()
     }
+}
+
+private struct FakeSharingPlanBridge: ProximitySharingPlanBridge {
+    let sharing: WalletSDK.ProximityPreparedSharing
+    var isExpired: Bool { false }
+    func approve(_ submission: WalletSDK.ProximitySubmission) throws -> WalletSDK.ProximityPreparationResult {
+        .prepared(sharing)
+    }
+}
+
+private actor FakePreparedSharingBridge: ProximityPreparedSharingBridge {
+    nonisolated let remainingSeconds = 60
+    private(set) var revoked = false
+    func revoke() { revoked = true }
 }

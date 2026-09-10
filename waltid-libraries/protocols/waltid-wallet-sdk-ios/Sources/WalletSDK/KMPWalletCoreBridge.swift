@@ -430,8 +430,87 @@ extension ProximityConfiguration {
             applicationProfiles: WalletCore.ProximityApplicationProfileRegistry(
                 profiles: applicationProfiles.map(KMPProximityApplicationProfileAdapter.init)
             ),
-            maximumMessageBytes: Int32(maximumMessageBytes)
+            maximumMessageBytes: Int32(maximumMessageBytes),
+            approval: approval.toKMPApproval()
         )
+    }
+}
+
+private extension ProximityApproval {
+    func toKMPApproval() -> any WalletCore.ProximityApproval {
+        switch self {
+        case .askEachTime: return WalletCore.ProximityApprovalAskEachTime.shared
+        case .prepareBeforeSharing: return WalletCore.ProximityApprovalPrepareBeforeSharing.shared
+        case .prepared(let sharing):
+            guard let bridge = sharing.bridge as? KMPPreparedSharingBridge else {
+                preconditionFailure("Prepared sharing must be issued by this wallet SDK")
+            }
+            return WalletCore.ProximityApprovalPrepared(sharing: bridge.sharing)
+        }
+    }
+}
+
+private final class KMPSharingPlanBridge: ProximitySharingPlanBridge, @unchecked Sendable {
+    let plan: WalletCore.ProximitySharingPlan
+    init(_ plan: WalletCore.ProximitySharingPlan) { self.plan = plan }
+    var isExpired: Bool { plan.isExpired }
+
+    func approve(_ submission: ProximitySubmission) throws -> ProximityPreparationResult {
+        switch onEnum(of: plan.approve(submission: submission.toKMPSubmission())) {
+        case .prepared(let value): return .prepared(try value.sharing.toSwiftPreparedSharing())
+        case .rejected(let value): return .rejected(value.error.toSwiftError())
+        }
+    }
+}
+
+private final class KMPPreparedSharingBridge: ProximityPreparedSharingBridge, @unchecked Sendable {
+    let sharing: WalletCore.ProximityPreparedSharing
+    init(_ sharing: WalletCore.ProximityPreparedSharing) { self.sharing = sharing }
+    var remainingSeconds: Int { Int(sharing.remainingSeconds) }
+    func revoke() async { try? await sharing.revoke() }
+}
+
+private extension WalletCore.ProximitySharingPlan {
+    func toSwiftSharingPlan() throws -> ProximitySharingPlan {
+        .init(review: try review.toSwiftReview(), expiresAt: expiresAt.toDate(),
+              readerCertificateSHA256: readerCertificateSha256, bridge: KMPSharingPlanBridge(self))
+    }
+}
+
+private extension WalletCore.ProximityPreparedSharing {
+    func toSwiftPreparedSharing() throws -> ProximityPreparedSharing {
+        .init(review: try review.toSwiftReview(), submission: submission.toSwiftSubmission(),
+              expiresAt: expiresAt.toDate(), bridge: KMPPreparedSharingBridge(self))
+    }
+}
+
+private extension WalletCore.ProximitySharingReceipt {
+    func toSwiftReceipt() throws -> ProximitySharingReceipt {
+        .init(review: try review.toSwiftReview(), submission: submission.toSwiftSubmission(),
+              approvalTiming: approvalTiming == .beforeConnection ? .beforeConnection : .duringConnection,
+              completedAt: completedAt.toDate())
+    }
+}
+
+private extension ProximitySubmission {
+    func toKMPSubmission() -> WalletCore.ProximitySubmission {
+        .init(documents: documents.map { document in
+            WalletCore.ProximityDocumentSubmission(requestIndex: Int32(document.requestIndex), credentialId: document.credentialID,
+                disclosedElements: Set(document.disclosedElements.map {
+                    WalletCore.ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+                }))
+        }, continueAfterResponse: continueAfterResponse)
+    }
+}
+
+private extension WalletCore.ProximitySubmission {
+    func toSwiftSubmission() -> ProximitySubmission {
+        .init(documents: swiftArray(documents, of: WalletCore.ProximityDocumentSubmission.self).map { document in
+            ProximityDocumentSubmission(requestIndex: Int(document.requestIndex), credentialID: document.credentialId,
+                disclosedElements: Set(swiftArray(document.disclosedElements, of: WalletCore.ProximityElementReference.self).map {
+                    ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+                }))
+        }, continueAfterResponse: continueAfterResponse)
     }
 }
 
@@ -883,6 +962,8 @@ private final class KMPProximityPresentationSessionBridge:
         }
         return .init(engagement: engagement, transport: transport)
     }
+
+    var sharingPlan: ProximitySharingPlan? { try? session.sharingPlan?.toSwiftSharingPlan() }
 
     var systemPresentationActive: Bool {
         guard let projected = try? session.state.value.toSwiftState(),
@@ -2224,21 +2305,7 @@ private extension ProximityAction {
         case let .approve(reviewID, submission):
             return WalletCore.ProximityActionApprove(
                 reviewId: WalletCore.ProximityReviewId(value: reviewID.value),
-                submission: WalletCore.ProximitySubmission(
-                    documents: submission.documents.map {
-                        WalletCore.ProximityDocumentSubmission(
-                            requestIndex: Int32($0.requestIndex),
-                            credentialId: $0.credentialID,
-                            disclosedElements: Set($0.disclosedElements.map {
-                                WalletCore.ProximityElementReference(
-                                    namespace: $0.namespace,
-                                    elementIdentifier: $0.elementIdentifier
-                                )
-                            })
-                        )
-                    },
-                    continueAfterResponse: submission.continueAfterResponse
-                )
+                submission: submission.toKMPSubmission()
             )
         }
     }
@@ -2300,7 +2367,9 @@ private extension WalletCore.ProximityState {
         case let .awaitingRequest(value):
             return .awaitingRequest(exchange: Int(value.exchange))
         case let .reviewRequired(value):
-            return .reviewRequired(try value.review.toSwiftReview())
+            return .reviewRequired(try value.review.toSwiftReview(), reason: value.reason.toSwiftReason())
+        case let .preparationRequired(value):
+            return .preparationRequired(try value.plan.toSwiftSharingPlan(), reason: value.reason.toSwiftReason())
         case let .authorizingHolderKey(value):
             return .authorizingHolderKey(value.authorization.toSwiftAuthorization())
         case let .sendingResponse(value):
@@ -2312,11 +2381,20 @@ private extension WalletCore.ProximityState {
         case let .noData(value):
             return .noData(exchange: Int(value.exchange))
         case let .completed(value):
-            return .completed(exchanges: Int(value.exchanges), declined: value.declined)
+            return .completed(exchanges: Int(value.exchanges), declined: value.declined, receipt: try value.receipt?.toSwiftReceipt())
         case .cancelled:
             return .cancelled
         case let .failed(value):
             return .failed(value.error.toSwiftError())
+        }
+    }
+}
+
+private extension WalletCore.ProximityReviewReason {
+    func toSwiftReason() -> ProximityReviewReason {
+        switch self {
+        case .requestReceived: .requestReceived
+        case .preparedSharingChanged: .preparedSharingChanged
         }
     }
 }
@@ -2381,7 +2459,10 @@ private extension WalletCore.ProximityDocumentReview {
             credentialOptions: try swiftArray(
                 credentialOptions,
                 of: WalletCore.ProximityCredentialOption.self
-            ).map { try $0.toSwiftOption() }
+            ).map { try $0.toSwiftOption() },
+            requiredElements: Set(swiftArray(requiredElements, of: WalletCore.ProximityElementReference.self).map {
+                ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+            })
         )
     }
 }

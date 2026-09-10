@@ -42,6 +42,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletDemoProximityTransportProfile
+import id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode
+import id.walt.walletdemo.compose.ui.components.ProximityApprovalModeChoice
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.displayMessage
 import id.walt.walletdemo.compose.logic.isBusy
@@ -62,6 +64,7 @@ internal fun SettingsScreen(
     onConfirmSigningProtectionChange: () -> Unit,
     onCancelSigningProtectionChange: () -> Unit,
     sharingSettingsContent: (@Composable () -> Unit)? = null,
+    onProximityApprovalModeChange: ((WalletDemoProximityApprovalMode) -> Unit)? = null,
 ) {
     val ready = state.session as? WalletSessionState.Ready
     val clipboard = LocalClipboardManager.current
@@ -173,6 +176,8 @@ internal fun SettingsScreen(
                     ProximityPresentationSettings(
                         selected = state.proximityTransportProfile,
                         onSelect = onProximityTransportProfileChange,
+                        approvalMode = state.proximityApprovalMode,
+                        onSelectApprovalMode = onProximityApprovalModeChange,
                     )
                 }
                 sharingSettingsContent?.invoke()
@@ -255,6 +260,8 @@ internal fun SettingsScreen(
 private fun ProximityPresentationSettings(
     selected: WalletDemoProximityTransportProfile,
     onSelect: (WalletDemoProximityTransportProfile) -> Unit,
+    approvalMode: WalletDemoProximityApprovalMode,
+    onSelectApprovalMode: ((WalletDemoProximityApprovalMode) -> Unit)?,
 ) {
     var choosing by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -279,6 +286,11 @@ private fun ProximityPresentationSettings(
             title = { Text("Nearby sharing") },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    if (onSelectApprovalMode != null) {
+                        ProximityApprovalModeChoice(approvalMode, onSelectApprovalMode)
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                    }
+                    Text("Connection", style = MaterialTheme.typography.titleSmall)
                     Text("Use Automatic unless your reader requires a specific connection.")
                     WalletDemoProximityTransportProfile.entries.forEach { profile ->
                         Row(

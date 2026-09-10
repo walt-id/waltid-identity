@@ -19,7 +19,7 @@ private fun ProximityRequestedElement.snapshot(): ProximityRequestedElement = co
 
 internal fun ProximityReview.snapshot(): ProximityReview = copy(
     documents = documents.map { document ->
-        document.copy(credentialOptions = document.credentialOptions.map { option ->
+        document.copy(requiredElements = document.requiredElements.toSet(), credentialOptions = document.credentialOptions.map { option ->
             option.copy(requestedElements = option.requestedElements.map { it.snapshot() })
         })
     },

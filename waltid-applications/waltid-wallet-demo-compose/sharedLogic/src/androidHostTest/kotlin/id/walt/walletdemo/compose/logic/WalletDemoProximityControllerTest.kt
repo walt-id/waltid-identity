@@ -1,7 +1,10 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.mobile.ProximityApproval
 import id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration
 import id.walt.wallet2.mobile.ProximityRetrievalOptions
+import id.walt.wallet2.mobile.ProximitySharingPlan
+import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.wallet2.mobile.ProximityConnectedRoute
 import id.walt.wallet2.mobile.ProximityEngagementMethod
 import id.walt.wallet2.mobile.ProximityTransport
@@ -218,22 +221,18 @@ class WalletDemoProximityControllerTest {
     }
 
     @Test
-    fun `review defaults are complete and approval contains only the current holder choices`() = runTest {
+    fun `only unambiguous credentials are selected and approval contains the explicit holder choices`() = runTest {
         val session = FakeSession(ProximityState.ReviewRequired(review()))
         val controller = controller(FakeBackend(session = session))
         controller.start()
         advanceUntilIdle()
 
-        assertTrue(controller.state.value.canApprove)
-        assertEquals(2, controller.state.value.selections.size)
-        assertEquals(
-            "credential-a",
-            controller.state.value.selections.single { it.requestIndex == 0 }.credentialId,
-        )
-        assertEquals(
-            setOf(familyName, portrait),
-            controller.state.value.selections.single { it.requestIndex == 0 }.disclosedElements,
-        )
+        assertFalse(controller.state.value.canApprove)
+        assertEquals(1, controller.state.value.selections.size)
+        assertTrue(controller.state.value.selections.none { it.requestIndex == 0 })
+        controller.approve()
+        advanceUntilIdle()
+        assertTrue(session.actions.isEmpty())
 
         controller.selectCredential(requestIndex = 0, credentialId = "credential-b")
         assertEquals(
@@ -278,6 +277,7 @@ class WalletDemoProximityControllerTest {
         advanceUntilIdle()
 
         assertFalse(controller.state.value.continueAfterResponse)
+        controller.selectCredential(0, "credential-a")
         controller.setContinueAfterResponse(true)
         controller.approve()
         advanceUntilIdle()
@@ -295,10 +295,8 @@ class WalletDemoProximityControllerTest {
         advanceUntilIdle()
 
         assertFalse(controller.state.value.continueAfterResponse)
-        assertEquals(
-            "credential-a",
-            controller.state.value.selections.single { it.requestIndex == 0 }.credentialId,
-        )
+        assertFalse(controller.state.value.canApprove)
+        assertTrue(controller.state.value.selections.none { it.requestIndex == 0 })
         controller.dismiss()
         advanceUntilIdle()
     }
@@ -543,6 +541,8 @@ class WalletDemoProximityControllerTest {
             assertEquals(1, backend.startCalls)
             assertEquals(0, session.closeCalls)
         }
+        assertFalse(controller.state.value.canApprove)
+        controller.selectCredential(0, "credential-a")
         assertTrue(controller.state.value.canApprove)
         controller.dismiss()
         advanceUntilIdle()
@@ -686,6 +686,87 @@ class WalletDemoProximityControllerTest {
         advanceUntilIdle()
     }
 
+    @Test
+    fun `preparing creates one new session resumes NFC and retries return to explicit review`() = runTest {
+        val plan = fixtureSharingPlan(review())
+        val first = FakeSession(ProximityState.PreparationRequired(plan), connectedRoute =
+            ProximityConnectedRoute(ProximityEngagementMethod.Nfc, ProximityTransport.Nfc))
+        val next = FakeSession(ProximityState.EngagementReady(listOf(ProximityEngagement.Nfc)))
+        val backend = FakeBackend(first, nextSession = next)
+        var presentCalls = 0
+        val controller = controller(backend, requestNfcPresentment = { presentCalls++ })
+        controller.start()
+        advanceUntilIdle()
+        assertTrue(controller.state.value.preparingApproval)
+        assertFalse(controller.state.value.canApprove)
+        controller.selectCredential(0, "credential-a")
+        controller.setContinueAfterResponse(true)
+        assertFalse(controller.state.value.continueAfterResponse)
+        controller.approve()
+        controller.approve()
+        advanceUntilIdle()
+        assertEquals(2, backend.startCalls)
+        assertTrue(first.actions.isEmpty())
+        assertIs<ProximityApproval.Prepared>(backend.lastConfiguration!!.approval)
+        assertEquals(1, presentCalls)
+        assertEquals(1, first.closeCalls)
+        next.mutableState.value = ProximityState.Failed(ProximityError(ProximityErrorCategory.Policy,
+            "prepared_sharing_expired", "Expired", ProximityRecovery.StartNewSession))
+        advanceUntilIdle()
+        controller.restart()
+        advanceUntilIdle()
+        assertTrue(controller.state.value.preparingApproval)
+        assertFalse(controller.state.value.canApprove)
+        assertEquals(2, backend.startCalls)
+        assertNull(controller.state.value.preparedSharing)
+        controller.dismiss()
+        advanceUntilIdle()
+        assertNull(controller.state.value.review)
+    }
+
+    @Test
+    fun `backgrounding revokes preparation even while the new session waits for permissions`() = runTest {
+        val plan = fixtureSharingPlan(review())
+        val first = FakeSession(ProximityState.PreparationRequired(plan))
+        val next = FakeSession(ProximityState.CheckingPrerequisites(blockedCapabilities))
+        val backend = FakeBackend(first, nextSession = next)
+        val controller = controller(backend)
+        controller.start()
+        advanceUntilIdle()
+        controller.selectCredential(0, "credential-a")
+        controller.approve()
+        advanceUntilIdle()
+        assertIs<ProximityState.CheckingPrerequisites>(controller.state.value.sessionState)
+        assertNotNull(controller.state.value.preparedSharing)
+        controller.handleLifecycleInterruption()
+        advanceUntilIdle()
+        assertFalse(controller.state.value.active)
+        assertNull(controller.state.value.preparedSharing)
+        assertEquals(1, next.closeCalls)
+    }
+
+    @Test
+    fun `requested required fields cannot be deselected and incomplete credentials cannot be approved`() = runTest {
+        val required = review().let { it.copy(documents = it.documents.map { document ->
+            if (document.requestIndex == 0) document.copy(requiredElements = setOf(portrait)) else document
+        }) }
+        val session = FakeSession(ProximityState.ReviewRequired(required))
+        val controller = controller(FakeBackend(session))
+        controller.start()
+        advanceUntilIdle()
+        controller.selectCredential(0, "credential-a")
+        controller.toggleElement(0, portrait)
+        assertTrue(controller.state.value.canApprove)
+        assertTrue(portrait in controller.state.value.selections.first().disclosedElements)
+        controller.selectCredential(0, "credential-b")
+        assertFalse(controller.state.value.canApprove)
+        controller.approve()
+        advanceUntilIdle()
+        assertTrue(session.actions.isEmpty())
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
     private fun TestScope.controller(
         backend: ProximityPresentationBackend,
         requestNfcPresentment: (() -> Unit)? = null,
@@ -704,6 +785,7 @@ class WalletDemoProximityControllerTest {
 private class FakeBackend(
     private val session: ProximitySession,
     private val startGate: CompletableDeferred<Unit>? = null,
+    private val nextSession: ProximitySession? = null,
     private val capabilities: () -> ProximityCapabilities = { readyCapabilities },
 ) : ProximityPresentationBackend {
     var capabilityCalls: Int = 0
@@ -727,7 +809,7 @@ private class FakeBackend(
         startCalls += 1
         configurations += configuration
         startGate?.let { withContext(NonCancellable) { it.await() } }
-        return session
+        return if (startCalls > 1) nextSession ?: session else session
     }
 }
 
@@ -850,3 +932,15 @@ private val fallbackCapabilities = blockedCapabilities.copy(
     nfcEngagement = availableSelected,
     nfcRetrieval = availableSelected,
 )
+
+/** Host-only fixture. Permission invariants are covered by real signed-request tests in the SDK module. */
+private fun fixtureSharingPlan(review: ProximityReview): ProximitySharingPlan {
+    val scopeType = Class.forName("id.walt.wallet2.mobile.ProximityApprovalScope")
+    val digest = ImmutableBytes.of(ByteArray(32) { 1 })
+    val credentials = review.documents.flatMap { it.credentialOptions }.associate { it.credentialId to digest }
+    val scope = scopeType.declaredConstructors.single().apply { isAccessible = true }.newInstance(
+        ProximityProfile.Iso180135Edition2Dis2026, "fixture-reader", digest, credentials, emptyList<Any>(),
+    )
+    return ProximitySharingPlan::class.java.declaredConstructors.single { it.parameterCount == 8 }
+        .apply { isAccessible = true }.newInstance(Any(), review, scope, null, null, null, 56, null) as ProximitySharingPlan
+}

@@ -274,6 +274,9 @@ public final class IOSNfcHostPlatformAdapter:
     @unchecked Sendable {
     private let bridge: IOSNfcHostBridge
 
+    /// Core NFC owns modal UI throughout an NFC-only exchange.
+    public var supportsInSessionUserInteraction: Bool { false }
+
     var isPresenting: Bool { bridge.isPresenting }
 
     func present() async {

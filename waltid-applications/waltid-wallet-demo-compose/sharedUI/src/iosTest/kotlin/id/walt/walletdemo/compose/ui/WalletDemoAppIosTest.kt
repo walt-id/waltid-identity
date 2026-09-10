@@ -6,6 +6,10 @@ class WalletDemoAppIosTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test
+    @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+    fun proximityQrFitsWalletChromeWithoutScrolling() = scenarios.proximityQrFitsWalletChromeWithoutScrolling()
+
+    @Test
     fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 

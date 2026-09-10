@@ -25,9 +25,11 @@ for await state in session.states {
         showUnavailableMethods(current)
     case .engagementReady(let engagements):
         showEngagements(engagements)
-    case .reviewRequired(let review):
+    case .reviewRequired(let review, _):
         showReview(review)
-    case .completed(let exchanges, _):
+    case .preparationRequired(let plan, let reason):
+        showPreparationReview(plan, reason: reason)
+    case .completed(let exchanges, _, _):
         showCompletion(exchanges: exchanges)
     case .noData(let exchange):
         showNoData(exchange: exchange)
@@ -154,6 +156,37 @@ statement index. During protected-key work,
 ``ProximityState/authorizingHolderKey(_:)`` carries one
 ``ProximityHolderAuthorizationRequest`` per approved document so a mixed
 signature/MAC response cannot be collapsed into a global authorization method.
+
+### Approve before reconnecting
+
+``ProximityApproval`` keeps approval timing separate from transport selection.
+The default is `.askEachTime`. `.prepareBeforeSharing` authenticates the reader,
+collects its request without credential disclosure, and ends that connection with
+`.preparationRequired(plan, reason)` after transport cleanup. Show the plan's
+reader, credential choices, selected fields, declared purpose/retention, and
+application requirements before calling `try plan.approve(submission)` from the
+holder's deliberate approval action. Honour `requiredElements`, including a
+requested mDL portrait. A `.prepared(sharing)` result is used only in a new session
+with `configuration.withApproval(.prepared(sharing))`.
+
+Plans expire after ten minutes. Prepared approvals are opaque, wallet-bound,
+one-use objects with a 60-second monotonic deadline; they are never persisted.
+The SDK compares the exact authenticated reader certificate, request, selected
+credential contents and application conditions, and repeats normal reader, key
+and credential checks. Changed requests require a new holder decision, and
+retries cannot reuse the approval. Use `remainingSeconds` for the ready countdown;
+revoke and close on cancellation or backgrounding, except during the actively
+owned Core NFC sheet. Permission setup must not retain an armed approval when the
+holder leaves the app.
+
+The bundled iOS NFC adapter cannot show an app review during NFC-only retrieval.
+It collects an eligible request and closes before review, including in
+`.askEachTime`, then requires a second connection. NFC-to-Bluetooth handover
+retains connected review. Preparation needs one named, authenticated trusted
+reader covering all requested documents; other readers require an interactive
+route. Protected-key authorization remains mandatory and subject to OS prompt
+availability. A completion receipt describes the locally sent selection and
+approval timing; it does not confirm reader-side verification.
 
 ### Configure reader trust
 

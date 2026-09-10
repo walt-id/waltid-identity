@@ -8,6 +8,7 @@ import id.walt.cose.selectCoseSignatureAlgorithm
 import id.walt.cose.toCoseSigner
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ElementReference
 import id.walt.mdoc.objects.deviceretrieval.EncryptedDocuments
@@ -102,6 +103,7 @@ internal class ProximityRequestProcessor(
         val applicationProfiles: List<ApplicationProfileSnapshot>,
         val bindingDigest: ImmutableBytes,
         val lowerPreview: MdocRequestPreview,
+        val approvalScope: ProximityApprovalScope?,
     )
 
     private data class Approved(
@@ -132,6 +134,7 @@ internal class ProximityRequestProcessor(
     private val responseBuilder = MdocResponseBuilder()
     private val stateMutex = Mutex()
     private val evaluatedReaderTrust = mutableMapOf<ReaderTrustKey, ProximityReaderTrustDecision>()
+    private val readerFingerprints = mutableMapOf<ReaderTrustKey, String>()
     private var currentSnapshot: Snapshot? = null
     private var approved: Approved? = null
 
@@ -163,6 +166,12 @@ internal class ProximityRequestProcessor(
         snapshot.review.snapshot()
     }
 
+    suspend fun sharingPlan(prompt: MdocConsentPrompt): ProximitySharingPlan? = stateMutex.withLock {
+        val snapshot = requireNotNull(currentSnapshot)
+        require(snapshot.exchange == prompt.exchange && snapshot.bindingDigest == prompt.preview.submissionBindingDigest)
+        snapshot.approvalScope?.let { ProximitySharingPlan(wallet, snapshot.review, it) }
+    }
+
     suspend fun cancel() = stateMutex.withLock {
         closed = true
         approved = null
@@ -185,7 +194,7 @@ internal class ProximityRequestProcessor(
                 snapshot.bindingDigest != prompt.preview.submissionBindingDigest) {
                 return@withLock staleError("The proximity action does not belong to the current review")
             }
-            validateSubmission(snapshot.review, owned)?.let { return@withLock it }
+            validateProximitySubmission(snapshot.review, owned)?.let { return@withLock it }
             if (approved != null) return@withLock staleError("The proximity review was already submitted")
             approved = Approved(
                 prompt.exchange, reviewId, owned, snapshot.applicationProfiles,
@@ -239,7 +248,7 @@ internal class ProximityRequestProcessor(
                 )
             )
         }
-        validateSubmission(fresh.review, retained.submission)?.let { error ->
+        validateProximitySubmission(fresh.review, retained.submission)?.let { error ->
             throw ProximityException(EngineProximityError.Security(error.code, error.message))
         }
         stateMutex.withLock { check(!closed) { "The proximity processor is closed" } }
@@ -308,6 +317,7 @@ internal class ProximityRequestProcessor(
             }
         }
         evaluatedReaderTrust.clear()
+        readerFingerprints.clear()
         val readerAuthentication = readerVerifier.verify(request, context.transcript.value)
         val selectedRequestIndices = selection.documents.map(SelectedDocument::requestIndex).toSet()
         enforceReaderPolicy(readerAuthentication, selectedRequestIndices)
@@ -363,6 +373,10 @@ internal class ProximityRequestProcessor(
                 credentialOptions = eligible.filter { it.requestIndex == requestIndex }
                     .sortedBy(SelectedDocument::credentialId)
                     .map { selected -> selected.toPublicOption(inventoryById.getValue(selected.credentialId)) },
+                requiredElements = if (request.docRequests[requestIndex].itemsRequest.value.namespaces[MDL_PORTRAIT.namespace]
+                        ?.entries?.any { it.key == MDL_PORTRAIT.elementIdentifier } == true) {
+                    setOf(ProximityElementReference(MDL_PORTRAIT.namespace, MDL_PORTRAIT.elementIdentifier))
+                } else emptySet(),
             )
         }
         val useCases = selection.useCases.map { selected ->
@@ -414,6 +428,7 @@ internal class ProximityRequestProcessor(
             applicationProfiles = profileSnapshots,
             bindingDigest = bindingDigest,
             lowerPreview = lowerPreview,
+            approvalScope = approvalScope(context, review, inventory),
         )
     }
 
@@ -650,6 +665,11 @@ internal class ProximityRequestProcessor(
             authenticationIndex = evidence.authenticationIndex,
             certificateChainDerBase64Url = evidence.certificateChainDer.map { it.copy().toBase64Url() },
         )
+        val leaf = evidence.certificateChainDer.firstOrNull()
+        if (leaf != null) {
+            readerFingerprints[ReaderTrustKey(publicEvidence.scope, publicEvidence.authenticationIndex)] =
+                SHA256().digest(leaf.copy()).joinToString("") { byte -> (byte.toInt() and 0xff).toString(16).padStart(2, '0') }
+        }
         val decision = configuration.readerTrustEvaluator.evaluate(publicEvidence)
         evaluatedReaderTrust[
             ReaderTrustKey(
@@ -769,28 +789,6 @@ internal class ProximityRequestProcessor(
         )
     }
 
-    private fun validateSubmission(
-        review: ProximityReview,
-        submission: ProximitySubmission,
-    ): ProximityError? {
-        if (submission.documents.map { it.requestIndex }.toSet() != review.documents.map { it.requestIndex }.toSet()) {
-            return staleError("Exactly one current credential choice is required for every reviewed document")
-        }
-        submission.documents.forEach { selected ->
-            val document = review.documents.singleOrNull { it.requestIndex == selected.requestIndex }
-                ?: return staleError("A submitted document was not part of the current review")
-            val credential = document.credentialOptions.singleOrNull { it.credentialId == selected.credentialId }
-                ?: return staleError("A submitted credential was not offered by the current review")
-            val offered = credential.requestedElements.map {
-                ProximityElementReference(it.namespace, it.elementIdentifier)
-            }.toSet()
-            if (!selected.disclosedElements.all { it in offered }) {
-                return staleError("A submitted disclosure was not offered by the current review")
-            }
-        }
-        return null
-    }
-
     private fun SelectedDocument.toPublicOption(
         inventory: InventoryDocument,
     ): ProximityCredentialOption = ProximityCredentialOption(
@@ -834,6 +832,43 @@ internal class ProximityRequestProcessor(
                     requireNotNull(decision) { "Verified reader trust evaluation is missing" },
                 )
             },
+        )
+    }
+
+    private fun approvalScope(
+        context: MdocHolderRequestContext,
+        review: ProximityReview,
+        inventory: List<InventoryDocument>,
+    ): ProximityApprovalScope? {
+        if (review.readerAuthenticationSummary != ProximityReaderAuthenticationSummary.Trusted) return null
+        val authenticated = review.readerAuthentication.filter { it.validity != ProximityReaderAuthenticationValidity.Absent }
+        if (authenticated.any { it.validity != ProximityReaderAuthenticationValidity.Valid ||
+                it.trust != ProximityReaderTrustState.Trusted || it.displayName.isNullOrBlank() }) return null
+        val fingerprints = authenticated.map {
+            readerFingerprints[ReaderTrustKey(it.scope, it.authenticationIndex)] ?: return null
+        }.distinct()
+        // Multi-reader requests need their own recipient-selection UX; never merge identities into one approval.
+        val fingerprint = fingerprints.singleOrNull() ?: return null
+        val request = context.request.value
+        val unsigned = request.copy(
+            version = if (request.deviceRequestInfo != null) DeviceRequest.VERSION_WITH_SIGNING else DeviceRequest.VERSION,
+            docRequests = request.docRequests.map { it.copy(readerAuth = null) },
+            readerAuthAll = null,
+        )
+        // Preserve every requested field and extension. Only session-bound authentication signatures are removed.
+        val scopeBytes = lengthPrefixed(request.version.encodeToByteArray()) +
+            coseCompliantCbor.encodeToByteArray(DeviceRequest.serializer(), unsigned)
+        return ProximityApprovalScope(
+            profile = configuration.profile,
+            readerCertificateSha256 = fingerprint,
+            requestDigest = ImmutableBytes.of(SHA256().digest(scopeBytes)),
+            credentials = inventory.associate { item ->
+                item.stored.id to ImmutableBytes.of(SHA256().digest(
+                    lengthPrefixed(requireNotNull(item.credential.signed).encodeToByteArray()) +
+                        lengthPrefixed(item.deviceAuthentication.name.encodeToByteArray()),
+                ))
+            },
+            applicationAuthorizations = review.applicationAuthorizations.map { it.snapshot() },
         )
     }
 

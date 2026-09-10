@@ -161,7 +161,7 @@ class WalletDemoProximityTestScenarios {
             assertEquals(ProximityEngagementMethod.Nfc, state.value.preferredEngagement)
         }
         onNodeWithText("Hold near the reader").assertIsDisplayed()
-        onNodeWithText("Keep your phone near the reader while it connects. You’ll review the request before sharing.").assertIsDisplayed()
+        onNodeWithText("Keep your phone near the reader while it connects.").assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
     }
 

@@ -141,6 +141,7 @@ try {
             is ProximityState.CheckingPrerequisites -> showUnavailableMethods(state.capabilities)
             is ProximityState.EngagementReady -> showEngagements(state.engagements)
             is ProximityState.ReviewRequired -> showProximityReview(state.review)
+            is ProximityState.PreparationRequired -> showPreparationReview(state.plan, state.reason)
             is ProximityState.AuthorizingHolderKey -> showHolderAuthorization(state.authorization)
             is ProximityState.Completed -> showCompletion(state.exchanges, state.declined)
             is ProximityState.NoData -> showNoData(state.exchange)
@@ -165,6 +166,51 @@ session even during cancellation. Import `NonCancellable` and `withContext` from
 `kotlinx.coroutines`. Handle the capability snapshot before starting; remediations
 and protected-key authorization remain explicit host actions. A `StateFlow` does
 not complete automatically on a terminal state.
+
+### Approving before connection
+
+`ProximityConfiguration.approval` defaults to `AskEachTime`. `PrepareBeforeSharing`
+authenticates the reader and collects a request, declines that connection without
+credential disclosure, then emits terminal `PreparationRequired` after transport
+cleanup. Close that session and show the plan's reader, credential choices, exact
+fields, declared retention, purpose and application authorizations. Require a
+credential choice when several match; honour `requiredElements` (including a
+requested mDL portrait). The existing wire-level portrait-denial rule remains in force.
+
+Only after the holder deliberately approves that review, call `plan.approve(submission)`.
+A `Prepared` result supplies an opaque `sharing` for a **new** configuration with
+`approval = ProximityApproval.Prepared(sharing)`. Do not dispatch `Approve` to the
+old connection. `Rejected` gives a display-safe error and requires another review
+or reader connection. Plans are recent, in-memory requests that expire after ten
+minutes; they are not authorizations or persistent reader templates.
+
+A prepared approval lasts 60 seconds (monotonic time) and is claimed once, before
+prerequisites or radios start. It is bound to one wallet, the exact authenticated
+reader leaf certificate, request/profile, selected credential contents, fields,
+retention, purpose and application authorizations. Fresh reader, credential,
+revocation and holder-key checks still run. A changed request falls back to
+`ReviewRequired(PreparedSharingChanged)` on interactive routes, or ends with a new
+`PreparationRequired` on a noninteractive route. It never expands an earlier
+approval. Matching requests proceed through normal protected-key authorization;
+advance consent does not bypass device authentication or guarantee that an OS
+prompt can run during NFC emulation.
+
+Preparation requires one named, authenticated, trusted reader covering all
+requested documents. Unnamed, unsigned, untrusted or multiple-reader requests
+cannot produce a plan; their ordinary interactive policies remain unchanged.
+`NfcHostPlatformAdapter.supportsInSessionUserInteraction` describes whether the
+host can review during actual NFC retrieval. The bundled iOS adapters report
+`false`: even `AskEachTime` first collects and declines a trusted request, allowing
+review after the system sheet closes and a second connection. NFC-to-Bluetooth
+handover retains interactive review after NFC closes.
+
+Persist a mode preference only. Keep a plan/approval inside the active journey,
+call `sharing.revoke()` and `session.close()` on cancellation or genuine backgrounding,
+and exempt only the lifecycle transition owned by the active Core NFC sheet.
+Every retry requires a fresh deliberate approval; repeated exchanges cannot use
+one prepared approval. `remainingSeconds` is suitable for a ready-screen countdown.
+`Completed.receipt` records the most recent locally completed approved selection
+and its approval timing; it neither authorizes reuse nor confirms reader verification.
 
 Kotlin and Swift proximity types use the `Proximity` prefix.
 `ProximityRetrievalOptions` selects conventional retrieval bearers and defaults to BLE.

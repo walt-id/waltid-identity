@@ -125,7 +125,8 @@ public struct ProximityReaderTrustSettings: Sendable, Equatable {
             readerTrustEvaluator: evaluator,
             credentialStatusEvaluator: configuration.credentialStatusEvaluator,
             applicationProfiles: configuration.applicationProfiles,
-            maximumMessageBytes: configuration.maximumMessageBytes
+            maximumMessageBytes: configuration.maximumMessageBytes,
+            approval: configuration.approval
         )
     }
 }

@@ -34,6 +34,7 @@ struct PresentView: View {
                 }
             }
             .navigationTitle("Present")
+            .navigationBarTitleDisplayMode(proximityPresentation.active ? .inline : .large)
             .walletSettingsToolbar(viewModel: viewModel)
             .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }
@@ -70,6 +71,9 @@ struct PresentView: View {
         .onChange(of: proximityPresentation.isTerminal) { _ in
             updateProximityScreenPolicy()
         }
+        .onChange(of: proximityPresentation.preparingApproval) { _ in
+            updateProximityScreenPolicy()
+        }
         .onChange(of: viewModel.selectedTab) { selectedTab in
             updateProximityScreenPolicy()
             if selectedTab != .present && proximityPresentation.active {
@@ -89,7 +93,7 @@ struct PresentView: View {
         let qrVisible = foreground && viewModel.selectedTab == .present
             && proximityPresentation.qrPayload != nil
         proximityScreenPolicy.update(
-            active: foreground && proximityPresentation.active && !proximityPresentation.isTerminal,
+            active: foreground && proximityPresentation.active && (!proximityPresentation.isTerminal || proximityPresentation.preparingApproval),
             qrVisible: qrVisible
         )
     }
@@ -204,14 +208,29 @@ struct PresentView: View {
 
     private var proximityContent: some View {
         presentationContent(
-            showsActions: proximityPresentation.review != nil || canCancelProximityPresentation
+            showsActions: proximityPresentation.review != nil || canCancelProximityPresentation,
+            scrolls: !proximityEngagementReady
         ) {
             ProximityPresentationView(
                 viewModel: proximityPresentation,
                 credentialDetailsByID: credentialDetailsByID
             )
         } actions: {
-            if proximityPresentation.review != nil {
+            if proximityPresentation.preparingApproval {
+                let expired = proximityPresentation.recentPlan?.isExpired == true
+                VStack(spacing: 8) {
+                    Button {
+                        if expired { proximityPresentation.restart() } else { proximityPresentation.approve() }
+                    } label: {
+                        Text(expired ? String(localized: "Get a new request") : String(localized: "Approve and get ready"))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                        .buttonStyle(.borderedProminent).disabled(!expired && !proximityPresentation.canApprove)
+                        .accessibilityIdentifier(WalletAccessibilityID.proximityApproveButton)
+                    Button("Cancel", action: proximityPresentation.cancel).frame(minHeight: 44)
+                        .accessibilityIdentifier(WalletAccessibilityID.proximityCancelButton)
+                }
+            } else if proximityPresentation.review != nil {
                 ReviewActions(
                     selectionComplete: proximityPresentation.canApprove,
                     isLoading: false,
@@ -227,6 +246,12 @@ struct PresentView: View {
                     .accessibilityIdentifier(WalletAccessibilityID.proximityCancelButton)
             }
         }
+        .id(proximityPresentation.review?.reviewID)
+    }
+
+    private var proximityEngagementReady: Bool {
+        if case .engagementReady = proximityPresentation.sessionState { return true }
+        return false
     }
 
     private var canCancelProximityPresentation: Bool {
@@ -237,15 +262,26 @@ struct PresentView: View {
 
     private func presentationContent<Content: View, Actions: View>(
         showsActions: Bool,
+        scrolls: Bool = true,
         @ViewBuilder content: () -> Content,
         @ViewBuilder actions: () -> Actions
     ) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
-                content()
+        Group {
+            if scrolls {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+                        content()
+                    }
+                    .padding()
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+                    content()
+                }
+                .padding(.horizontal).padding(.vertical, 8)
             }
-            .padding()
         }
         .safeAreaInset(edge: .bottom) {
             if showsActions {

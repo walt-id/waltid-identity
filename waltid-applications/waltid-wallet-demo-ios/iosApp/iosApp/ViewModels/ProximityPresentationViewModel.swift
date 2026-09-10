@@ -3,10 +3,12 @@ import Combine
 import Foundation
 import UIKit
 import WalletSDK
+import WalletDemoIdentityDocumentSupport
 
 protocol DemoProximityPresentationSession: Sendable {
     var systemPresentationActive: Bool { get }
     var connectedRoute: ProximityConnectedRoute? { get }
+    var sharingPlan: ProximitySharingPlan? { get }
     var states: AsyncStream<ProximityState> { get }
     func presentNfc() async
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult
@@ -15,6 +17,7 @@ protocol DemoProximityPresentationSession: Sendable {
 
 extension DemoProximityPresentationSession {
     var connectedRoute: ProximityConnectedRoute? { nil }
+    var sharingPlan: ProximitySharingPlan? { nil }
 }
 
 extension ProximitySession: DemoProximityPresentationSession {}
@@ -55,6 +58,9 @@ final class ProximityPresentationViewModel: ObservableObject {
     @Published private(set) var capabilities: ProximityCapabilities?
     @Published private(set) var connectedRoute: ProximityConnectedRoute?
     @Published private(set) var preferredEngagement: ProximityEngagementMethod?
+    @Published private(set) var approvalMode: WalletDemoProximityApprovalMode = .askEachTime
+    @Published private(set) var preparedSharing: ProximityPreparedSharing?
+    @Published private(set) var recentPlan: ProximitySharingPlan?
 
     private let client: any ProximityWalletClient
     private let configurationProvider: @MainActor () -> ProximityConfiguration
@@ -66,6 +72,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     private var effectiveConfiguration: ProximityConfiguration?
     private var pendingConfiguration: ProximityConfiguration?
     private var sessionGeneration: UInt64 = 0
+    private var preparedEngagementLaunched = false
 
     init(
         client: any ProximityWalletClient,
@@ -86,14 +93,25 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     var review: ProximityReview? {
-        guard case .reviewRequired(let review) = sessionState else { return nil }
-        return review
+        switch sessionState {
+        case .reviewRequired(let review, _): return review
+        case .preparationRequired(let plan, _): return plan.review
+        default: return nil
+        }
+    }
+
+    var preparingApproval: Bool {
+        if case .preparationRequired = sessionState { return true }
+        return false
     }
 
     var canApprove: Bool {
         guard let review else { return false }
         return Set(selections.map(\.requestIndex)) == Set(review.documents.map(\.requestIndex))
-            && selections.allSatisfy { !$0.disclosedElements.isEmpty }
+            && selections.allSatisfy { selected in
+                !selected.disclosedElements.isEmpty && review.documents.first(where: { $0.requestIndex == selected.requestIndex })?
+                    .requiredElements.isSubset(of: selected.disclosedElements) == true
+            }
     }
 
     var isTerminal: Bool {
@@ -145,6 +163,11 @@ final class ProximityPresentationViewModel: ObservableObject {
         sessionGeneration &+= 1
         let generation = sessionGeneration
         let configuration = configurationProvider()
+        switch configuration.approval {
+        case .askEachTime: approvalMode = .askEachTime
+        case .prepareBeforeSharing: approvalMode = .prepareSharing
+        case .prepared(let sharing): approvalMode = .prepareSharing; preparedSharing = sharing
+        }
         pendingConfiguration = configuration
         effectiveConfiguration = configuration
         checkPrerequisitesAndStart(configuration, generation: generation)
@@ -168,12 +191,14 @@ final class ProximityPresentationViewModel: ObservableObject {
                 guard active, sessionGeneration == generation else { return }
                 self.capabilities = capabilities
                 sessionState = .checkingPrerequisites(capabilities)
-                if !automaticPermissionAttempted,
+                let usesPreparedApproval: Bool
+                if case .prepared = configuration.approval { usesPreparedApproval = true } else { usesPreparedApproval = false }
+                if !usesPreparedApproval, !automaticPermissionAttempted,
                    capabilities.remediationActions.contains(.requestBluetoothPermission) {
                     // Let the host explain the request before opening the OS permission prompt.
                     return
                 }
-                guard capabilities.mayStart else { return }
+                guard capabilities.mayStart || usesPreparedApproval else { return }
                 let started = try await client.startProximityPresentation(configuration: configuration)
                 guard active, sessionGeneration == generation else {
                     await started.close()
@@ -233,6 +258,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func toggleElement(requestIndex: Int, element: ProximityElementReference) {
+        guard review?.documents.first(where: { $0.requestIndex == requestIndex })?.requiredElements.contains(element) != true else { return }
         guard let current = selections.first(where: { $0.requestIndex == requestIndex }),
               let credential = review?.documents.first(where: { $0.requestIndex == requestIndex })?
                 .credentialOptions.first(where: { $0.credentialID == current.credentialID }),
@@ -255,7 +281,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func setContinueAfterResponse(_ enabled: Bool) {
-        guard review != nil else { return }
+        guard review != nil, !preparingApproval else { return }
         continueAfterResponse = enabled
         actionErrorMessage = nil
     }
@@ -273,18 +299,21 @@ final class ProximityPresentationViewModel: ObservableObject {
             )
         }
         guard documents.count == review.documents.count else { return }
-        dispatch(
-            .approve(
-                reviewID: review.reviewID,
-                submission: ProximitySubmission(
-                    documents: documents,
-                    continueAfterResponse: continueAfterResponse
-                )
-            )
-        )
+        let submission = ProximitySubmission(documents: documents, continueAfterResponse: continueAfterResponse)
+        if case .preparationRequired(let plan, _) = sessionState {
+            do {
+                switch try plan.approve(submission) {
+                case .prepared(let sharing):
+                    guard let configuration = effectiveConfiguration else { return }
+                    replaceSession(configuration.withApproval(.prepared(sharing)))
+                case .rejected(let error): actionErrorMessage = error.message
+                }
+            } catch { actionErrorMessage = Self.demoSessionFailureMessage }
+        } else { dispatch(.approve(reviewID: review.reviewID, submission: submission)) }
     }
 
     func decline() {
+        if preparingApproval { dismiss(); return }
         guard let review else { return }
         dispatch(.decline(reviewID: review.reviewID))
     }
@@ -307,7 +336,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     func remediate(_ action: ProximityRemediationAction) {
         if case .failed(let error) = sessionState, error.remediationActions.contains(action),
            let effectiveConfiguration, hostActionInProgress == nil {
-            replaceSession(effectiveConfiguration, action: action)
+            replaceSession(effectiveConfiguration.withApproval(approvalMode.approval), action: action)
             return
         }
         guard case .checkingPrerequisites(let capabilities) = sessionState,
@@ -351,20 +380,23 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func cancel() {
+        if preparingApproval { dismiss(); return }
         guard session != nil else {
             dismiss()
             return
         }
-        guard sessionState?.legalActions.contains(.cancel) == true else { return }
+        guard let sessionState else { dismiss(); return }
+        guard sessionState.legalActions.contains(.cancel) else { return }
         dispatch(.cancel)
     }
 
     func handleLifecycleInterruption() {
-        guard hostActionInProgress == nil else { return }
         // CardSession presents system UI in a separate full-screen process. That transition can
         // background the host application while HCE is active, so the protocol session must stay
         // alive until CardSession, the reader, the user, or the protocol timeout closes it.
         guard session?.systemPresentationActive != true else { return }
+        if preparedSharing != nil { dismiss(); return }
+        guard hostActionInProgress == nil else { return }
         guard case .checkingPrerequisites = sessionState else {
             cancel()
             return
@@ -384,6 +416,10 @@ final class ProximityPresentationViewModel: ObservableObject {
         capabilities = nil
         connectedRoute = nil
         preferredEngagement = nil
+        let revoking = preparedSharing
+        preparedSharing = nil
+        recentPlan = nil
+        if let revoking { Task { await revoking.revoke() } }
         active = false
         sessionState = nil
         selections = []
@@ -397,7 +433,25 @@ final class ProximityPresentationViewModel: ObservableObject {
     func restart() {
         guard isTerminal else { return }
         guard let effectiveConfiguration else { return }
-        replaceSession(effectiveConfiguration)
+        if case .prepared = effectiveConfiguration.approval, showRecentRequest() { return }
+        replaceSession(effectiveConfiguration.withApproval(approvalMode.approval))
+    }
+
+    func reviewRecentRequest() { _ = showRecentRequest() }
+
+    private func showRecentRequest() -> Bool {
+        guard isTerminal, let plan = recentPlan, !plan.isExpired else { return false }
+        publish(.preparationRequired(plan))
+        selections = plan.review.defaultSelections
+        preparedSharing = nil
+        return true
+    }
+
+    func setApprovalMode(_ mode: WalletDemoProximityApprovalMode) {
+        guard case .engagementReady = sessionState, preparedSharing == nil,
+              let effectiveConfiguration else { return }
+        approvalMode = mode
+        replaceSession(effectiveConfiguration.withApproval(mode.approval))
     }
 
     private func replaceSession(
@@ -411,13 +465,20 @@ final class ProximityPresentationViewModel: ObservableObject {
         let closing = session
         session = nil
         effectiveConfiguration = configuration
+        let previousApproval = preparedSharing
+        if case .prepared(let sharing) = configuration.approval { preparedSharing = sharing }
+        else { preparedSharing = nil }
+        if let previousApproval, previousApproval !== preparedSharing {
+            Task { await previousApproval.revoke() }
+        }
         pendingConfiguration = configuration
         active = true
         sessionState = nil
         selections = []
         continueAfterResponse = false
+        preferredEngagement = preparedSharing != nil ? connectedRoute?.engagement : nil
         connectedRoute = nil
-        preferredEngagement = nil
+        preparedEngagementLaunched = false
         actionErrorMessage = nil
         startupFailed = false
         hostActionInProgress = action
@@ -470,11 +531,18 @@ final class ProximityPresentationViewModel: ObservableObject {
         sessionState = state
         connectedRoute = session?.connectedRoute ?? connectedRoute
         if case .checkingPrerequisites(let latest) = state { capabilities = latest }
-        if case .reviewRequired(let review) = state, previousReviewID != review.reviewID {
+        if case .preparationRequired(let plan, _) = state { recentPlan = plan }
+        else if let plan = session?.sharingPlan { recentPlan = plan }
+        if let review, previousReviewID != review.reviewID {
             selections = review.defaultSelections
             continueAfterResponse = false
         }
         actionErrorMessage = nil
+        if case .engagementReady = state, preparedSharing != nil, !preparedEngagementLaunched,
+           let preferredEngagement, engagementChoices.contains(preferredEngagement) {
+            preparedEngagementLaunched = true
+            showEngagement(preferredEngagement)
+        }
     }
 
     private func replaceSelection(_ selection: ProximityDocumentSelection) {
@@ -607,7 +675,7 @@ extension ProximityState {
 
     var isTerminal: Bool {
         switch self {
-        case .completed, .noData, .cancelled, .failed:
+        case .preparationRequired, .completed, .noData, .cancelled, .failed:
             return true
         default:
             return false
@@ -618,7 +686,7 @@ extension ProximityState {
 private extension ProximityReview {
     var defaultSelections: [ProximityDocumentSelection] {
         documents.compactMap { document in
-            guard let credential = document.credentialOptions.first else { return nil }
+            guard document.credentialOptions.count == 1, let credential = document.credentialOptions.first else { return nil }
             return ProximityDocumentSelection(
                 requestIndex: document.requestIndex,
                 credentialID: credential.credentialID,
