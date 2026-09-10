@@ -53,9 +53,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
@@ -173,9 +175,14 @@ private class ProximitySessionImpl(
     private val prerequisiteRetry = Channel<Unit>(Channel.CONFLATED)
     private val owner = ProximitySessionOwner(
         ProximityState.CheckingPrerequisites(initialCapabilities), prerequisiteRetry,
+        approval = configuration.approval,
+        canReviewWhileConnected = {
+            connectedRoute?.transport != ProximityTransport.Nfc || nfcHostPlatformAdapter?.supportsInSessionUserInteraction != false
+        },
     )
     private val initialCapabilities = initialCapabilities
     override val state: StateFlow<ProximityState> = owner.state
+    override val sharingPlan: ProximitySharingPlan? get() = owner.sharingPlan
     private lateinit var sessionJob: Job
     private val engineReference = MutableStateFlow<MdocHolderProtocolEngine?>(null)
     override val connectedRoute: ProximityConnectedRoute?
@@ -202,6 +209,7 @@ private class ProximitySessionImpl(
     override suspend fun dispatch(action: ProximityAction): ProximityActionResult {
         val result = owner.dispatch(action)
         if (action is ProximityAction.Cancel && result is ProximityActionResult.Accepted) {
+            (configuration.approval as? ProximityApproval.Prepared)?.sharing?.revoke()
             sessionJob.cancelAndJoin()
         }
         return result
@@ -209,14 +217,36 @@ private class ProximitySessionImpl(
 
     override suspend fun close() {
         owner.cancel()
+        (configuration.approval as? ProximityApproval.Prepared)?.sharing?.revoke()
         if (::sessionJob.isInitialized) sessionJob.cancelAndJoin()
     }
 
     private suspend fun runSession() {
         var runtime: CryptoRuntime? = null
         var eDeviceKey: Key? = null
+        var expiryJob: Job? = null
+        var revocationJob: Job? = null
         try {
             currentCoroutineContext().ensureActive()
+            val prepared = (configuration.approval as? ProximityApproval.Prepared)?.sharing
+            if (prepared != null) {
+                prepared.claim(wallet)?.let {
+                    owner.publish(ProximityState.Failed(it))
+                    return
+                }
+                expiryJob = scope.launch {
+                    delay(prepared.remaining)
+                    if (owner.invalidatePrepared(approvalError("prepared_sharing_expired", "Prepared sharing expired. Approve again before connecting."))) {
+                        sessionJob.cancel()
+                    }
+                }
+                revocationJob = scope.launch {
+                    prepared.revoked.first { it }
+                    if (owner.invalidatePrepared(approvalError("prepared_sharing_cancelled", "Prepared sharing was cancelled."))) {
+                        sessionJob.cancel()
+                    }
+                }
+            }
             var prerequisites = initialCapabilities
             while (!prerequisites.mayStart) {
                 owner.publish(ProximityState.CheckingPrerequisites(prerequisites))
@@ -308,6 +338,8 @@ private class ProximitySessionImpl(
             ))
         } finally {
             withContext(NonCancellable) {
+                expiryJob?.cancelAndJoin()
+                revocationJob?.cancelAndJoin()
                 owner.cancel()
                 eDeviceKey?.capabilities?.deleter?.let { deleter -> runCatching { deleter.delete() } }
                 runtime?.let { runCatching { it.close() } }
@@ -391,13 +423,13 @@ private class ProximitySessionImpl(
                 ProximityState.AwaitingNextRequest(engineState.completedExchanges)
             is MdocHolderSessionState.Terminating ->
                 ProximityState.Terminating(engineState.exchange)
-            is MdocHolderSessionState.Declined ->
-                ProximityState.Completed(engineState.exchange, declined = true)
-            is MdocHolderSessionState.NoData -> ProximityState.NoData(engineState.exchange)
-            is MdocHolderSessionState.Completed ->
-                ProximityState.Completed(engineState.exchanges, declined = false)
-            is MdocHolderSessionState.Failed -> ProximityState.Failed(engineState.error.toWalletError())
-            MdocHolderSessionState.Cancelled -> ProximityState.Cancelled
+            // A protocol result can precede physical response draining, notably Core NFC GET RESPONSE.
+            // Publish terminal results only after engine.run() has closed the winning bearer.
+            is MdocHolderSessionState.Declined,
+            is MdocHolderSessionState.NoData,
+            is MdocHolderSessionState.Completed,
+            is MdocHolderSessionState.Failed,
+            MdocHolderSessionState.Cancelled -> return
         }
         owner.publish(next)
     }

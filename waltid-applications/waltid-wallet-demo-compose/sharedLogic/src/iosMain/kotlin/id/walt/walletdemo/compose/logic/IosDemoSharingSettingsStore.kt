@@ -24,5 +24,7 @@ fun createIosDemoSharingSettingsStore(appGroupIdentifier: String): DemoSharingSe
         writeProximityTransportProfile = { profile ->
             defaults.setObject(profile, forKey = PROXIMITY_TRANSPORT_PROFILE_KEY)
         },
+        readProximityApprovalMode = { defaults.stringForKey(PROXIMITY_APPROVAL_MODE_KEY) },
+        writeProximityApprovalMode = { mode -> defaults.setObject(mode, forKey = PROXIMITY_APPROVAL_MODE_KEY) },
     )
 }

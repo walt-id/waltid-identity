@@ -6,6 +6,10 @@ import id.walt.wallet2.mobile.ProximityEngagementMethod
 import id.walt.wallet2.mobile.ProximityAction
 import id.walt.wallet2.mobile.ProximityActionResult
 import id.walt.wallet2.mobile.ProximityActionType
+import id.walt.wallet2.mobile.ProximityApproval
+import id.walt.wallet2.mobile.ProximityPreparationResult
+import id.walt.wallet2.mobile.ProximityPreparedSharing
+import id.walt.wallet2.mobile.ProximitySharingPlan
 import id.walt.wallet2.mobile.ProximityCapabilities
 import id.walt.wallet2.mobile.ProximityBleBearerPolicy
 import id.walt.wallet2.mobile.ProximityBleConfiguration
@@ -68,6 +72,9 @@ data class WalletDemoProximityUiState(
     val automaticPermissionAttempts: Set<ProximityRemediationAction> = emptySet(),
     val preferredEngagement: ProximityEngagementMethod? = null,
     val nfcRequiresUserAction: Boolean = false,
+    val approvalMode: WalletDemoProximityApprovalMode = WalletDemoProximityApprovalMode.AskEachTime,
+    val preparedSharing: ProximityPreparedSharing? = null,
+    val recentPlan: ProximitySharingPlan? = null,
 ) {
     /** Only prepared SDK engagements are offered as ready user actions. */
     val engagementChoices: List<ProximityEngagementMethod>
@@ -84,12 +91,19 @@ data class WalletDemoProximityUiState(
     val qrVisible: Boolean get() = displayedEngagement == ProximityEngagementMethod.Qr
 
     val review: ProximityReview?
-        get() = (sessionState as? ProximityState.ReviewRequired)?.review
+        get() = when (val state = sessionState) {
+            is ProximityState.ReviewRequired -> state.review
+            is ProximityState.PreparationRequired -> state.plan.review
+            else -> null
+        }
+
+    val preparingApproval: Boolean get() = sessionState is ProximityState.PreparationRequired
 
     val canApprove: Boolean
         get() = review?.let { current ->
             selections.map { it.requestIndex }.toSet() == current.documents.map { it.requestIndex }.toSet() &&
-                selections.all { it.disclosedElements.isNotEmpty() }
+                selections.all { selected -> selected.disclosedElements.isNotEmpty() &&
+                    current.documents.single { it.requestIndex == selected.requestIndex }.requiredElements.all { it in selected.disclosedElements } }
         } == true
 
     /** Runtime permission the demo host must resolve before the SDK session may be created. */
@@ -124,6 +138,7 @@ class WalletDemoProximityController(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
     private val systemPresentationActive: () -> Boolean = { false },
     private val requestNfcPresentment: (() -> Unit)? = null,
+    private val approvalModeProvider: () -> WalletDemoProximityApprovalMode = { WalletDemoProximityApprovalMode.AskEachTime },
 ) {
     private val mutableState = MutableStateFlow(initialUiState())
     val state: StateFlow<WalletDemoProximityUiState> = mutableState.asStateFlow()
@@ -135,17 +150,19 @@ class WalletDemoProximityController(
     private var sessionJob: Job? = null
     private var hostActionJob: Job? = null
     private var generation: Long = 0
+    private var preparedEngagementLaunched = false
 
     fun start() {
         if (mutableState.value.active) return
+        val mode = approvalModeProvider()
         val configuration = readerTrustSettingsProvider().applyTo(
             profileProvider().configuration()
-        )
+        ).copy(approval = mode.toApproval())
         generation += 1
         val startGeneration = generation
         pendingConfiguration = configuration
         effectiveConfiguration = configuration
-        mutableState.value = initialUiState().copy(active = true)
+        mutableState.value = initialUiState().copy(active = true, approvalMode = mode)
         checkPrerequisitesAndStart(configuration, startGeneration)
     }
 
@@ -162,7 +179,8 @@ class WalletDemoProximityController(
                 if (!isCurrent(startGeneration)) return@launch
                 mutableState.update { it.copy(capabilities = capabilities) }
                 publish(ProximityState.CheckingPrerequisites(capabilities))
-                if (mutableState.value.automaticPermissionAction != null || !capabilities.mayStart) return@launch
+                if (configuration.approval !is ProximityApproval.Prepared &&
+                    (mutableState.value.automaticPermissionAction != null || !capabilities.mayStart)) return@launch
 
                 val started = wallet.startProximityPresentation(configuration)
                 if (!isCurrent(startGeneration)) {
@@ -209,6 +227,7 @@ class WalletDemoProximityController(
         val current = mutableState.value
         val review = current.review ?: return
         val selection = current.selections.singleOrNull { it.requestIndex == requestIndex } ?: return
+        if (element in review.documents.single { it.requestIndex == requestIndex }.requiredElements) return
         val credential = review.documents.singleOrNull { it.requestIndex == requestIndex }
             ?.credentialOptions?.singleOrNull { it.credentialId == selection.credentialId }
             ?: return
@@ -226,7 +245,7 @@ class WalletDemoProximityController(
     }
 
     fun setContinueAfterResponse(enabled: Boolean) {
-        if (mutableState.value.review == null) return
+        if (mutableState.value.review == null || mutableState.value.preparingApproval) return
         mutableState.update { it.copy(continueAfterResponse = enabled, actionError = null) }
     }
 
@@ -234,25 +253,31 @@ class WalletDemoProximityController(
         val current = mutableState.value
         val review = current.review ?: return
         if (!current.canApprove) return
-        dispatch(
-            ProximityAction.Approve(
-                reviewId = review.reviewId,
-                submission = ProximitySubmission(
-                    documents = review.documents.map { document ->
-                        val selection = current.selections.single { it.requestIndex == document.requestIndex }
-                        ProximityDocumentSubmission(
-                            requestIndex = selection.requestIndex,
-                            credentialId = selection.credentialId,
-                            disclosedElements = selection.disclosedElements,
-                        )
-                    },
-                    continueAfterResponse = current.continueAfterResponse,
+        val submission = ProximitySubmission(
+            documents = review.documents.map { document ->
+                val selection = current.selections.single { it.requestIndex == document.requestIndex }
+                ProximityDocumentSubmission(
+                    requestIndex = selection.requestIndex,
+                    credentialId = selection.credentialId,
+                    disclosedElements = selection.disclosedElements,
                 )
-            )
+            },
+            continueAfterResponse = current.continueAfterResponse,
         )
+        val preparation = current.sessionState as? ProximityState.PreparationRequired
+        if (preparation != null) {
+            when (val result = preparation.plan.approve(submission)) {
+                is ProximityPreparationResult.Rejected -> mutableState.update { it.copy(actionError = result.error) }
+                is ProximityPreparationResult.Prepared -> {
+                    val configuration = effectiveConfiguration ?: return
+                    replaceSession(configuration.copy(approval = ProximityApproval.Prepared(result.sharing)))
+                }
+            }
+        } else dispatch(ProximityAction.Approve(review.reviewId, submission))
     }
 
     fun decline() {
+        if (mutableState.value.preparingApproval) { dismiss(); return }
         val review = mutableState.value.review ?: return
         dispatch(ProximityAction.Decline(review.reviewId))
     }
@@ -284,7 +309,8 @@ class WalletDemoProximityController(
         val current = mutableState.value
         val terminalError = (current.sessionState as? ProximityState.Failed)?.error
         if (terminalError != null && action in terminalError.remediationActions) {
-            replaceSession(effectiveConfiguration ?: return, action, executor)
+            val configuration = effectiveConfiguration ?: return
+            replaceSession(configuration.copy(approval = mutableState.value.approvalMode.toApproval()), action, executor)
             return
         }
         val capabilities = (current.sessionState as? ProximityState.CheckingPrerequisites)
@@ -332,6 +358,7 @@ class WalletDemoProximityController(
     }
 
     fun cancel() {
+        if (mutableState.value.preparingApproval) { dismiss(); return }
         if (session == null) {
             dismiss()
             return
@@ -349,6 +376,7 @@ class WalletDemoProximityController(
     fun handleLifecycleInterruption() {
         if (systemPresentationActive()) return
         val current = mutableState.value
+        if (current.preparedSharing != null) { dismiss(); return }
         if (current.hostActionInProgress == null &&
             current.sessionState !is ProximityState.CheckingPrerequisites
         ) {
@@ -363,6 +391,8 @@ class WalletDemoProximityController(
         hostActionJob?.cancel()
         hostActionJob = null
         val closing = session
+        val revoking = mutableState.value.preparedSharing
+        if (revoking != null) scope.launch(dispatcher) { revoking.revoke() }
         session = null
         pendingConfiguration = null
         effectiveConfiguration = null
@@ -373,7 +403,25 @@ class WalletDemoProximityController(
     /** Closes a terminal session before starting a fresh capability check and exchange. */
     fun restart() {
         if (!mutableState.value.isTerminal) return
-        replaceSession(effectiveConfiguration ?: return)
+        if (effectiveConfiguration?.approval is ProximityApproval.Prepared && reviewRecentRequest()) return
+        replaceSession((effectiveConfiguration ?: return).copy(approval = mutableState.value.approvalMode.toApproval()))
+    }
+
+    /** Shows the recent request again; only the subsequent Approve button can issue another grant. */
+    fun reviewRecentRequest(): Boolean {
+        val plan = mutableState.value.recentPlan?.takeUnless { it.isExpired } ?: return false
+        if (!mutableState.value.isTerminal) return false
+        publish(ProximityState.PreparationRequired(plan))
+        mutableState.update { it.copy(preparedSharing = null, selections = plan.review.defaultSelections()) }
+        return true
+    }
+
+    /** Changes this journey's mode before a reader connects. It never creates an approval. */
+    fun setApprovalMode(mode: WalletDemoProximityApprovalMode) {
+        val current = mutableState.value
+        if (current.sessionState !is ProximityState.EngagementReady || current.preparedSharing != null) return
+        mutableState.update { it.copy(approvalMode = mode) }
+        replaceSession((effectiveConfiguration ?: return).copy(approval = mode.toApproval()))
     }
 
     /** Reveals the prepared engagement and requests platform NFC UI after an explicit user choice. */
@@ -401,7 +449,18 @@ class WalletDemoProximityController(
         session = null
         effectiveConfiguration = configuration
         pendingConfiguration = configuration
-        mutableState.value = initialUiState().copy(active = true, hostActionInProgress = action)
+        val previous = mutableState.value
+        val nextApproval = (configuration.approval as? ProximityApproval.Prepared)?.sharing
+        previous.preparedSharing?.takeIf { it !== nextApproval }?.let { oldApproval ->
+            scope.launch(dispatcher) { oldApproval.revoke() }
+        }
+        preparedEngagementLaunched = false
+        mutableState.value = initialUiState().copy(
+            active = true, hostActionInProgress = action, approvalMode = previous.approvalMode,
+            recentPlan = previous.recentPlan,
+            preparedSharing = nextApproval,
+            preferredEngagement = previous.connectedRoute?.engagement.takeIf { configuration.approval is ProximityApproval.Prepared },
+        )
         scheduleClose(closing)
         sessionJob = scope.launch(dispatcher) {
             closingJob?.join()
@@ -452,17 +511,28 @@ class WalletDemoProximityController(
 
     private fun publish(sessionState: ProximityState) {
         mutableState.update { current ->
-            val reviewForNewExchange = (sessionState as? ProximityState.ReviewRequired)
-                ?.review
-                ?.takeIf { current.review?.reviewId != it.reviewId }
+            val reviewForNewExchange = when (sessionState) {
+                is ProximityState.ReviewRequired -> sessionState.review
+                is ProximityState.PreparationRequired -> sessionState.plan.review
+                else -> null
+            }?.takeIf { current.review?.reviewId != it.reviewId }
             current.copy(
                 sessionState = sessionState,
                 capabilities = (sessionState as? ProximityState.CheckingPrerequisites)?.capabilities ?: current.capabilities,
                 connectedRoute = session?.connectedRoute ?: current.connectedRoute,
+                recentPlan = (sessionState as? ProximityState.PreparationRequired)?.plan ?: session?.sharingPlan ?: current.recentPlan,
                 selections = reviewForNewExchange?.defaultSelections() ?: current.selections,
                 continueAfterResponse = if (reviewForNewExchange != null) false else current.continueAfterResponse,
                 actionError = null,
             )
+        }
+        val current = mutableState.value
+        if (sessionState is ProximityState.EngagementReady && current.preparedSharing != null && !preparedEngagementLaunched) {
+            current.preferredEngagement?.takeIf { it in current.engagementChoices }?.let {
+                // Approve and get ready also authorizes reopening the connection the holder just reviewed.
+                preparedEngagementLaunched = true
+                showEngagement(it)
+            }
         }
     }
 
@@ -518,8 +588,8 @@ internal fun WalletDemoProximityTransportProfile.configuration(): ProximityConfi
     }
 
 private fun ProximityReview.defaultSelections(): List<WalletDemoProximityDocumentSelection> =
-    documents.map { document ->
-        val credential = document.credentialOptions.first()
+    documents.mapNotNull { document ->
+        val credential = document.credentialOptions.singleOrNull() ?: return@mapNotNull null
         WalletDemoProximityDocumentSelection(
             requestIndex = document.requestIndex,
             credentialId = credential.credentialId,
@@ -530,11 +600,17 @@ private fun ProximityReview.defaultSelections(): List<WalletDemoProximityDocumen
     }
 
 private fun ProximityState?.isTerminal(): Boolean = when (this) {
+    is ProximityState.PreparationRequired,
     is ProximityState.Completed,
     is ProximityState.NoData,
     ProximityState.Cancelled,
     is ProximityState.Failed -> true
     else -> false
+}
+
+private fun WalletDemoProximityApprovalMode.toApproval(): ProximityApproval = when (this) {
+    WalletDemoProximityApprovalMode.AskEachTime -> ProximityApproval.AskEachTime
+    WalletDemoProximityApprovalMode.PrepareSharing -> ProximityApproval.PrepareBeforeSharing
 }
 
 private val demoSessionFailure = ProximityError(

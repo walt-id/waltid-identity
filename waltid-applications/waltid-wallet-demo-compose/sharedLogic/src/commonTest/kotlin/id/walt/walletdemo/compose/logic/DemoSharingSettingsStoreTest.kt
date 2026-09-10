@@ -10,14 +10,24 @@ class DemoSharingSettingsStoreTest {
     fun missingValueDefaultsToShowingTheDcApiPreview() {
         var stored: Boolean? = null
         var storedProfile: String? = null
+        var storedMode: String? = null
         val store = PersistentDemoSharingSettingsStore(
             readEnabled = { stored },
             writeEnabled = { stored = it },
             readProximityTransportProfile = { storedProfile },
             writeProximityTransportProfile = { storedProfile = it },
+            readProximityApprovalMode = { storedMode },
+            writeProximityApprovalMode = { storedMode = it },
         )
 
         assertTrue(store.showDcApiPresentationPreview())
+
+        assertEquals(WalletDemoProximityApprovalMode.AskEachTime, store.proximityApprovalMode())
+        store.setProximityApprovalMode(WalletDemoProximityApprovalMode.PrepareSharing)
+        assertEquals("prepare_sharing", storedMode)
+        assertEquals(WalletDemoProximityApprovalMode.PrepareSharing, store.proximityApprovalMode())
+        storedMode = "unknown_future_mode"
+        assertEquals(WalletDemoProximityApprovalMode.AskEachTime, store.proximityApprovalMode())
 
         store.setShowDcApiPresentationPreview(false)
         assertFalse(store.showDcApiPresentationPreview())

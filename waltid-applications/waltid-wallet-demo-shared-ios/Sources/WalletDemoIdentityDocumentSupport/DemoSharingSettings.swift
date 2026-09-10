@@ -1,6 +1,24 @@
 import Foundation
 import WalletSDK
 
+/// A persistent preference, never a persistent disclosure permission.
+public enum WalletDemoProximityApprovalMode: String, CaseIterable, Identifiable, Sendable {
+    case askEachTime = "ask_each_time"
+    case prepareSharing = "prepare_sharing"
+    public var id: String { rawValue }
+    public var title: String {
+        self == .askEachTime ? String(localized: "Ask each time") : String(localized: "Prepare sharing")
+    }
+    public var explanation: String {
+        self == .askEachTime
+            ? String(localized: "Review the reader and requested data before sharing. NFC on iPhone may require a second tap after approval.")
+            : String(localized: "Approve a recent request from a known reader, then connect within 60 seconds. Each approval works once.")
+    }
+    public var approval: ProximityApproval {
+        self == .askEachTime ? .askEachTime : .prepareBeforeSharing
+    }
+}
+
 /// Stable demo choices for one immutable proximity-presentation session.
 public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifiable, Sendable {
     case defaultProfile = "default"
@@ -52,6 +70,17 @@ public enum DemoSharingSettings {
         "id.walt.walletdemo.sharing.showDcApiPresentationPreview"
     public static let proximityTransportProfileKey =
         "id.walt.walletdemo.sharing.proximityTransportProfile"
+    public static let proximityApprovalModeKey =
+        "id.walt.walletdemo.sharing.proximityApprovalMode"
+
+    public static func proximityApprovalMode(appGroupIdentifier: String) -> WalletDemoProximityApprovalMode {
+        UserDefaults(suiteName: appGroupIdentifier)?.string(forKey: proximityApprovalModeKey)
+            .flatMap(WalletDemoProximityApprovalMode.init(rawValue:)) ?? .askEachTime
+    }
+
+    public static func setProximityApprovalMode(_ mode: WalletDemoProximityApprovalMode, appGroupIdentifier: String) {
+        UserDefaults(suiteName: appGroupIdentifier)?.set(mode.rawValue, forKey: proximityApprovalModeKey)
+    }
 
     public static func showDcApiPresentationPreview(appGroupIdentifier: String) -> Bool {
         let defaults = UserDefaults(suiteName: appGroupIdentifier)

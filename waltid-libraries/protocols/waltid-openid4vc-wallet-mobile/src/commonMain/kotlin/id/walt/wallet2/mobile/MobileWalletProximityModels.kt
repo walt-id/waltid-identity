@@ -225,6 +225,8 @@ public data class ProximityConfiguration(
     public val applicationProfiles: ProximityApplicationProfileRegistry =
         ProximityApplicationProfileRegistry.Empty,
     public val maximumMessageBytes: Int = 1_048_576,
+    /** Explicit holder-approval behavior, independent of engagement and retrieval methods. */
+    public val approval: ProximityApproval = ProximityApproval.AskEachTime,
 ) {
     init {
         require(maximumMessageBytes in 1..16_777_216) {
@@ -1020,6 +1022,8 @@ public data class ProximityDocumentReview(
     public val requestIndex: Int,
     public val docType: String,
     public val credentialOptions: List<ProximityCredentialOption>,
+    /** Profile-defined data required if this document is shared, such as the requested mDL portrait. */
+    public val requiredElements: Set<ProximityElementReference> = emptySet(),
 ) {
     init {
         require(requestIndex >= 0 && docType.isNotBlank())
@@ -1325,8 +1329,16 @@ public sealed interface ProximityState {
     public data class ReviewRequired(
         /** Exact review snapshot to render and approve or decline. */
         public val review: ProximityReview,
+        /** Explains why an earlier prepared approval could not be used. */
+        public val reason: ProximityReviewReason = ProximityReviewReason.RequestReceived,
     ) :
         ProximityState
+
+    /** Connection ended without disclosure. Review this verified request before explicitly preparing a new connection. */
+    public data class PreparationRequired(
+        public val plan: ProximitySharingPlan,
+        public val reason: ProximityReviewReason = ProximityReviewReason.RequestReceived,
+    ) : ProximityState
 
     /** The approved response is awaiting protected holder-key authorization. */
     public data class AuthorizingHolderKey(
@@ -1375,6 +1387,8 @@ public sealed interface ProximityState {
         public val exchanges: Int,
         /** Whether the holder declined the final reviewed request. */
         public val declined: Boolean,
+        /** Last locally completed response; does not assert that the reader verified or accepted it. */
+        public val receipt: ProximitySharingReceipt? = null,
     ) :
         ProximityState {
         init { require(exchanges > 0) }
@@ -1411,6 +1425,7 @@ public val ProximityState.legalActions: Set<ProximityActionType>
         is ProximityState.SendingResponse,
         is ProximityState.AwaitingNextRequest -> setOf(ProximityActionType.Cancel)
         is ProximityState.Terminating,
+        is ProximityState.PreparationRequired,
         is ProximityState.Completed,
         is ProximityState.NoData,
         ProximityState.Cancelled,
@@ -1446,6 +1461,9 @@ public data class ProximityConnectedRoute(
 public interface ProximitySession {
     /** Winning route once connected; remains available through review and termination. */
     public val connectedRoute: ProximityConnectedRoute? get() = null
+
+    /** Most recent request eligible for explicit preparation. Never authorizes disclosure by itself. */
+    public val sharingPlan: ProximitySharingPlan? get() = null
 
     /** Hot state stream whose variants define the only legal phase data and actions. */
     public val state: StateFlow<ProximityState>

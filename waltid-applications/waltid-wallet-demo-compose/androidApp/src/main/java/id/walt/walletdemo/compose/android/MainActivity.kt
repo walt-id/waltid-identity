@@ -70,6 +70,7 @@ class MainActivity : FragmentActivity() {
         proximityController = WalletDemoProximityController(
             wallet = wallet,
             profileProvider = sharingSettings::proximityTransportProfile,
+        approvalModeProvider = sharingSettings::proximityApprovalMode,
             readerTrustSettingsProvider = readerTrustSettingsController::sessionSnapshot,
         )
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
