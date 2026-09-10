@@ -558,6 +558,10 @@ actor IOSCardSessionCore {
     private var apduTask: Task<Void, Never>?
     private var closed = false
     private var apduInFlight = false
+    private var waitingForReaderDeselection = false
+    private var successfulCloseRequested = false
+    private var responseContinuationExpected = false
+    private var responseDeliveryWaiters: [CheckedContinuation<Void, Never>] = []
     private var apduDrainWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(
@@ -619,6 +623,21 @@ actor IOSCardSessionCore {
     }
 
     func close(reason: IOSNfcHostBridgeCloseReason) async {
+        if reason == .completed || reason == .handoverCompleted {
+            // The common message send stages an APDU response before Core NFC has transmitted it.
+            // Drain all GET RESPONSE fragments. For NFC retrieval, Core NFC returning from
+            // respond does not guarantee the reader received the bytes; keep RF alive until deselection.
+            successfulCloseRequested = true
+            if reason == .completed && presenting && !closed {
+                waitingForReaderDeselection = true
+                cardSession?.setAlertMessage(String(localized: "Response submitted. Keep near reader until its result, then separate devices."))
+            }
+            await withTaskCancellationHandler {
+                await awaitResponseDelivery()
+            } onCancel: {
+                Task { await self.close(reason: .cancelled) }
+            }
+        }
         await finish(reason: reason, emulationStatus: status(for: reason), invalidate: true)
     }
 
@@ -674,7 +693,9 @@ actor IOSCardSessionCore {
                         await respondIgnoringFailure(Self.conditionsNotSatisfied, to: apdu)
                     }
                 case .readerDeselected:
-                    await finish(reason: .peerDisconnected, emulationStatus: .failure, invalidate: true)
+                    let completed = waitingForReaderDeselection && !apduInFlight && !responseContinuationExpected
+                    await finish(reason: completed ? .completed : .peerDisconnected,
+                                 emulationStatus: completed ? .success : .failure, invalidate: true)
                     return
                 case let .sessionInvalidated(reason):
                     await finish(
@@ -695,6 +716,10 @@ actor IOSCardSessionCore {
 
     private func startProcessing(apdu: any IOSNfcCardSessionAPDU) -> Bool {
         guard !closed, !apduInFlight else { return false }
+        if successfulCloseRequested {
+            guard responseContinuationExpected, apdu.payload.count >= 2,
+                  apdu.payload[apdu.payload.index(after: apdu.payload.startIndex)] == 0xc0 else { return false }
+        }
         apduInFlight = true
         apduTask = Task { [weak self] in
             await self?.process(apdu: apdu)
@@ -733,7 +758,13 @@ actor IOSCardSessionCore {
             await finish(reason: .peerDisconnected, emulationStatus: .failure, invalidate: true)
             return
         }
+        if response.count >= 2 {
+            let status = response.suffix(2)
+            if status.first == 0x61 { responseContinuationExpected = true }
+            else if status.elementsEqual([0x90, 0x00]) { responseContinuationExpected = false }
+        }
         finishAPDU()
+        if !responseContinuationExpected && !waitingForReaderDeselection { resumeResponseDeliveryWaiters() }
     }
 
     private func send(_ response: Data, to apdu: any IOSNfcCardSessionAPDU) async throws {
@@ -782,6 +813,19 @@ actor IOSCardSessionCore {
         await awaitAPDUDrain()
         await router.deactivate(reason: reason)
         await onClose(generation)
+        resumeResponseDeliveryWaiters()
+    }
+
+    private func awaitResponseDelivery() async {
+        guard !closed, apduInFlight || responseContinuationExpected || waitingForReaderDeselection else { return }
+        // Reader loss, cancellation, or CardSession's own maximum-duration event also releases this wait.
+        await withCheckedContinuation { responseDeliveryWaiters.append($0) }
+    }
+
+    private func resumeResponseDeliveryWaiters() {
+        let waiters = responseDeliveryWaiters
+        responseDeliveryWaiters.removeAll()
+        waiters.forEach { $0.resume() }
     }
 
     private func finishAPDU() {
