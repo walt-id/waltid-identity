@@ -47,18 +47,16 @@ class BouncyPkcs10CertificateSigningRequestSigner : Pkcs10CertificateSigningRequ
         val subject = X500Name(csrBuilder.requestedCertificate.subjectDn)
         val bouncyBuilder = PKCS10CertificationRequestBuilder(subject, publicKeyInfo.bouncyCastleSubjectPublicKeyInfo)
 
-        if (csrBuilder.requestedCertificate.extensions.isNotEmpty()) {
-            val extGen = ExtensionsGenerator()
-            csrBuilder.requestedCertificate.extensions.values.map {
-                BouncyExtensionFactory.createExtension(it)
-            }.forEach {
-                extGen.addExtension(it)
-            }
-            bouncyBuilder.setAttribute(
-                PKCSObjectIdentifiers.pkcs_9_at_extensionRequest,
-                extGen.generate()
-            )
+        val extGen = ExtensionsGenerator()
+        csrBuilder.requestedCertificate.extensions.values.map {
+            BouncyExtensionFactory.createExtension(it)
+        }.forEach {
+            extGen.addExtension(it)
         }
+        bouncyBuilder.setAttribute(
+            PKCSObjectIdentifiers.pkcs_9_at_extensionRequest,
+            extGen.generate()
+        )
         return bouncyBuilder
     }
 
