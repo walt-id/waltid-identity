@@ -46,13 +46,30 @@ export function useVerifierSession(verifierBase: string) {
   const sse = useSSE();
 
   async function createSession(payload: unknown) {
+    return createQrSession(`${verifierBase}/verification-session/create`, payload);
+  }
+
+  async function createPidSession(
+    materialId: string | undefined,
+    payload: unknown,
+  ) {
+    const body =
+      payload && typeof payload === "object" && !Array.isArray(payload)
+        ? { ...(payload as Record<string, unknown>) }
+        : {};
+    if (materialId) body.materialId = materialId;
+
+    return createQrSession("/api/pid-verification-session/create", body);
+  }
+
+  async function createQrSession(url: string, payload: unknown) {
     loading.value = true;
     error.value = null;
     result.value = null;
     sse.close();
 
     try {
-      const res = await fetch(`${verifierBase}/verification-session/create`, {
+      const res = await fetch(url, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -195,6 +212,7 @@ export function useVerifierSession(verifierBase: string) {
     loading,
     error,
     createSession,
+    createPidSession,
     createDcApiSession,
     clear,
     sse,

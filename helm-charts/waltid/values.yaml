@@ -129,6 +129,17 @@ portal2:
     NUXT_PUBLIC_ISSUER_BASE: "https://issuer2.portal.test.waltid.cloud"
     NUXT_PUBLIC_VERIFIER_BASE: "https://verifier2.portal.test.waltid.cloud"
     NUXT_PUBLIC_WALLET_URL: "https://wallet.test.waltid.cloud"
+    # Simple PID signing materials belong in a Kubernetes secret, not this values file.
+    NUXT_PID_GERMAN_KEY_JWK: ""
+    NUXT_PID_GERMAN_X5C: ""
+    NUXT_PID_GERMAN_CLIENT_ID: ""
+    NUXT_PID_GERMAN_VERIFIER_INFO: ""
+    NUXT_PID_FRANCE_KEY_JWK: ""
+    NUXT_PID_FRANCE_X5C: ""
+    NUXT_PID_FRANCE_CLIENT_ID: ""
+    NUXT_PID_EUDI_REF_KEY_JWK: ""
+    NUXT_PID_EUDI_REF_X5C: ""
+    NUXT_PID_EUDI_REF_CLIENT_ID: ""
   ingress:
     ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
