@@ -71,7 +71,7 @@ jobs:
       reason: ${{ steps.decide.outputs.reason }}
     steps:
       - name: Checkout macOS lane predicates
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           sparse-checkout: |
             .github/ci

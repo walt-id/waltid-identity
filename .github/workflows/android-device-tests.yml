@@ -75,7 +75,7 @@ jobs:
       - name: Restore configured DC API AVD
         if: matrix.phase == 'dc-api-compose'
         id: dc-api-avd-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           # Cache the configured AVD disk plus the host ADB key pair that authorizes it. The restored
           # userdata contains that key in its adbd authorization list; omitting the matching host key
@@ -147,7 +147,7 @@ jobs:
 
       - name: Save configured DC API AVD baseline
         if: matrix.phase == 'dc-api-compose' && steps.dc-api-avd-cache.outputs.cache-hit != 'true' && steps.dc-api-avd-preparation.outcome == 'success'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             ~/.android/avd/dc-api-api37-pixel7-google-apis.ini
@@ -199,7 +199,7 @@ jobs:
 
       - name: Upload Android device test reports
         if: always() && steps.android-device-phase.outputs.artifact_paths != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-device-test-reports-${{ matrix.phase }}
           path: ${{ steps.android-device-phase.outputs.artifact_paths }}

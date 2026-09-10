@@ -51,7 +51,7 @@ jobs:
     needs: enterprise-ref
     steps:
       - name: Dispatch integration-test-aws.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: integration-test-aws.yml
           repo: walt-id/waltid-identity-enterprise
@@ -65,7 +65,7 @@ jobs:
     needs: enterprise-ref
     steps:
       - name: Dispatch integration-test-azure.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: integration-test-azure.yml
           repo: walt-id/waltid-identity-enterprise
@@ -126,7 +126,7 @@ jobs:
     needs: [ enterprise-ref, enterprise-image-digests ]
     steps:
       - name: Dispatch enterprise-supply-chain.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: enterprise-supply-chain.yml
           repo: walt-id/waltid-identity-enterprise
@@ -142,7 +142,7 @@ jobs:
     if: ${{ !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
     steps:
       - name: Dispatch deploy-k8s-license.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: deploy-k8s-license.yml
           repo: walt-id/waltid-identity-enterprise
