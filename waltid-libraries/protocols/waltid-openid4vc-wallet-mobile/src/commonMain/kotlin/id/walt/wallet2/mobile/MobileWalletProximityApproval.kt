@@ -23,7 +23,10 @@ public sealed interface ProximityApproval {
     public data object PrepareBeforeSharing : ProximityApproval
 
     /** Use an explicit, wallet-bound approval once. Changed requests require another holder decision. */
-    public data class Prepared(public val sharing: ProximityPreparedSharing) : ProximityApproval
+    public data class Prepared(
+        /** One-use approval created from the holder's reviewed sharing plan. */
+        public val sharing: ProximityPreparedSharing,
+    ) : ProximityApproval
 }
 
 /** Why a request needs a fresh review. */
@@ -40,13 +43,16 @@ public enum class ProximityApprovalTiming { DuringConnection, BeforeConnection }
 public class ProximitySharingReceipt internal constructor(
     review: ProximityReview,
     submission: ProximitySubmission,
+    /** Whether the holder approved the response before or during the connection. */
     public val approvalTiming: ProximityApprovalTiming,
 ) {
     /** Local response-completion time; this is not a reader verification timestamp. */
     public val completedAt: Instant = Clock.System.now()
     private val ownedReview = review.snapshot()
     private val ownedSubmission = submission.snapshot()
+    /** Reviewed reader request. Each access returns an independently owned snapshot. */
     public val review: ProximityReview get() = ownedReview.snapshot()
+    /** Holder-approved credential and field choices. Each access returns an independently owned snapshot. */
     public val submission: ProximitySubmission get() = ownedSubmission.snapshot()
 }
 
@@ -97,8 +103,17 @@ public class ProximitySharingPlan internal constructor(
 
 /** Result of an explicit holder decision made before connection. */
 public sealed interface ProximityPreparationResult {
-    public data class Prepared(public val sharing: ProximityPreparedSharing) : ProximityPreparationResult
-    public data class Rejected(public val error: ProximityError) : ProximityPreparationResult
+    /** The reviewed selection was accepted for one subsequent connection attempt. */
+    public data class Prepared(
+        /** Wallet-bound approval to supply through [ProximityApproval.Prepared]. */
+        public val sharing: ProximityPreparedSharing,
+    ) : ProximityPreparationResult
+
+    /** The plan or selection could not be approved; no sharing approval was created. */
+    public data class Rejected(
+        /** Reason preparation failed and the available recovery action. */
+        public val error: ProximityError,
+    ) : ProximityPreparationResult
 }
 
 /** Opaque one-use approval. Hosts may display or cancel it, but cannot construct or expand its scope. */
