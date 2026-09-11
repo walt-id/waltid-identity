@@ -514,7 +514,7 @@ class WalletDemoProximityController(
         if (closing == null) return
         val previous = closingJob
         closingJob = scope.launch(dispatcher) {
-            kotlinx.coroutines.withContext(NonCancellable) {
+            withContext(NonCancellable) {
                 previous?.join()
                 closing.close()
             }
