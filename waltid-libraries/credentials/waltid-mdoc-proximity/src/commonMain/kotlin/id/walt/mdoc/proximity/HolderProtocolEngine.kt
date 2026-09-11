@@ -1,6 +1,6 @@
 @file:OptIn(
-    kotlinx.serialization.ExperimentalSerializationApi::class,
-    kotlinx.coroutines.ExperimentalCoroutinesApi::class,
+    ExperimentalSerializationApi::class,
+    ExperimentalCoroutinesApi::class,
 )
 
 package id.walt.mdoc.proximity
@@ -25,6 +25,7 @@ import id.walt.mdoc.objects.session.SessionStatusCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.supervisorScope
@@ -38,6 +39,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborMap

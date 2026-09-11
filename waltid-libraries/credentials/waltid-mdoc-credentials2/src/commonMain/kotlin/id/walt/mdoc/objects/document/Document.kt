@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.objects.document
 
@@ -9,6 +9,7 @@ import id.walt.mdoc.encoding.fromCborElement
 import id.walt.mdoc.encoding.requireNoExtensionCollisions
 import id.walt.mdoc.encoding.toCborElement
 import id.walt.mdoc.objects.DeviceSigned
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.SerializationException

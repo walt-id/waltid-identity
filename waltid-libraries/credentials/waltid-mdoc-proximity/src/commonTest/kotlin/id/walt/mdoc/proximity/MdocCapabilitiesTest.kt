@@ -1,6 +1,6 @@
 @file:OptIn(
-    kotlinx.serialization.ExperimentalSerializationApi::class,
-    kotlin.ExperimentalUnsignedTypes::class,
+    ExperimentalSerializationApi::class,
+    ExperimentalUnsignedTypes::class,
 )
 
 package id.walt.mdoc.proximity
@@ -18,6 +18,7 @@ import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborBoolean
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborInteger

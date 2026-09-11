@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.objects.deviceretrieval
 
@@ -8,12 +8,14 @@ import id.walt.mdoc.encoding.extensionsExcluding
 import id.walt.mdoc.encoding.fromCborElement
 import id.walt.mdoc.encoding.requireNoExtensionCollisions
 import id.walt.mdoc.encoding.toCborElement
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -109,7 +111,7 @@ object UseCaseSerializer : KSerializer<UseCase> {
         )
         value.purposeHints?.let {
             fields["purposeHints"] = it.toCborElement(
-                kotlinx.serialization.builtins.MapSerializer(String.serializer(), Int.serializer())
+                MapSerializer(String.serializer(), Int.serializer())
             )
         }
         fields.putAll(value.extensions)
@@ -122,7 +124,7 @@ object UseCaseSerializer : KSerializer<UseCase> {
             mandatory = fields["mandatory"]?.fromCborElement(Boolean.serializer())
                 ?: throw SerializationException("UseCase mandatory is required"),
             purposeHints = fields["purposeHints"]?.fromCborElement(
-                kotlinx.serialization.builtins.MapSerializer(String.serializer(), Int.serializer())
+                MapSerializer(String.serializer(), Int.serializer())
             ),
             documentSets = fields["documentSets"]?.fromCborElement(
                 ListSerializer(ListSerializer(UInt.serializer()))

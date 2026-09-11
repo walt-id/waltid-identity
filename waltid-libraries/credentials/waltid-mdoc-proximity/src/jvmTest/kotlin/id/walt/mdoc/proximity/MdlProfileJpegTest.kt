@@ -1,10 +1,11 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
 import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborByteString
 import kotlin.test.Test
 import kotlin.test.assertEquals

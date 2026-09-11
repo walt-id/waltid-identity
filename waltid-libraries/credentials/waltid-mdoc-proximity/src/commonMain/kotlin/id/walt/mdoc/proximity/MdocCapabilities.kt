@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
@@ -8,6 +8,7 @@ import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.MontgomeryCurve
 import id.walt.mdoc.objects.engagement.DeviceEngagementCapabilities
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Versioned interoperability profile boundaries known to the proximity capability registry.

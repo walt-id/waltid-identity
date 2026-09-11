@@ -1,11 +1,13 @@
 @file:OptIn(
-    dev.whyoleg.cryptography.CryptographyProviderApi::class,
-    dev.whyoleg.cryptography.DelicateCryptographyApi::class,
+    CryptographyProviderApi::class,
+    DelicateCryptographyApi::class,
 )
 
 package id.walt.mdoc.proximity
 
 import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.CryptographyProviderApi
+import dev.whyoleg.cryptography.DelicateCryptographyApi
 import dev.whyoleg.cryptography.algorithms.EC
 import dev.whyoleg.cryptography.algorithms.ECDH
 import dev.whyoleg.cryptography.algorithms.XDH

@@ -1,7 +1,8 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
+import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
 import id.walt.crypto2.CryptoRuntime
@@ -19,6 +20,7 @@ import id.walt.mdoc.crypto.MdocKdf
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.objects.SessionTranscript
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
@@ -136,8 +138,8 @@ class MdocSessionCipherTest {
             val readerCose = (reader.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey()
             val transcript = MdocCryptoHelper.buildSessionTranscriptBytes(
                 SessionTranscript.forQr(
-                    coseCompliantCbor.encodeToByteArray(id.walt.cose.CoseKey.serializer(), deviceCose),
-                    coseCompliantCbor.encodeToByteArray(id.walt.cose.CoseKey.serializer(), readerCose),
+                    coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), deviceCose),
+                    coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), readerCose),
                 )
             )
             val holderCipher = MdocSessionCipher.establishForHolder(device, readerCose, transcript)

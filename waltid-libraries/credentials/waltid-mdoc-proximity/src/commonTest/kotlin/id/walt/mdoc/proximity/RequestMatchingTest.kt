@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
@@ -14,6 +14,7 @@ import id.walt.mdoc.objects.deviceretrieval.ItemsRequest
 import id.walt.mdoc.objects.deviceretrieval.ItemsRequestList
 import id.walt.mdoc.objects.deviceretrieval.UseCase
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

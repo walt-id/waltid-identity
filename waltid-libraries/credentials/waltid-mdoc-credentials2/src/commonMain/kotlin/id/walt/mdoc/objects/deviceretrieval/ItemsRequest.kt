@@ -13,6 +13,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborString
@@ -63,7 +64,7 @@ object ItemsRequestSerializer : KSerializer<ItemsRequest> {
         val fields = linkedMapOf<String, CborElement>()
         fields["docType"] = CborString(value.docType)
         fields["nameSpaces"] = value.namespaces.toCborElement(
-            kotlinx.serialization.builtins.MapSerializer(
+            MapSerializer(
                 String.serializer(),
                 ItemsRequestList.serializer(),
             )
@@ -79,7 +80,7 @@ object ItemsRequestSerializer : KSerializer<ItemsRequest> {
             docType = (fields["docType"] as? CborString)?.value
                 ?: throw SerializationException("ItemsRequest docType is required and must be text"),
             namespaces = fields["nameSpaces"]?.fromCborElement(
-                kotlinx.serialization.builtins.MapSerializer(
+                MapSerializer(
                     String.serializer(),
                     ItemsRequestList.serializer(),
                 )

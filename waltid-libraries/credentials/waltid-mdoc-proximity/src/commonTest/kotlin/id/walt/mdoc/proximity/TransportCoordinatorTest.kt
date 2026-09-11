@@ -1,11 +1,12 @@
 @file:OptIn(
-    kotlinx.serialization.ExperimentalSerializationApi::class,
-    kotlinx.coroutines.ExperimentalCoroutinesApi::class,
+    ExperimentalSerializationApi::class,
+    ExperimentalCoroutinesApi::class,
 )
 
 package id.walt.mdoc.proximity
 
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.CoroutineScope
@@ -15,6 +16,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -227,7 +229,7 @@ class TransportCoordinatorTest {
     private class TrackingConnection : ProximityConnection {
         override val kind = ProximityTransportKind.BLE
         val closeReasons = mutableListOf<ProximityCloseReason>()
-        private val closure = kotlinx.coroutines.CompletableDeferred<ProximityCloseReason>()
+        private val closure = CompletableDeferred<ProximityCloseReason>()
         override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
         override suspend fun receive(): ImmutableBytes? = null
         override suspend fun send(message: ImmutableBytes) = Unit
