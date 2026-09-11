@@ -5,6 +5,32 @@ import XCTest
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
 
+    func testDefersAcceptedImageWhitespaceWithoutChangingBytes() throws {
+        let encoded = Self.validPNGBase64
+        let values = [
+            "data:image/png;base64,\(encoded)",
+            "data: \timage/png ;base64,\(encoded)",
+            "data:image/png;base64, \t\n\(encoded)",
+            String(repeating: " ", count: 160) + "DATA: image/png;BASE64,"
+                + String(repeating: " ", count: 160) + encoded + "\n",
+        ]
+        for (format, claim) in [("dc+sd-jwt", "visual_proof"), ("mso_mdoc", "portrait")] {
+            let inputs = format == "mso_mdoc" ? values + [String(repeating: " ", count: 160) + encoded] : values
+            for (index, value) in inputs.enumerated() {
+                let json = try JSONSerialization.data(withJSONObject: [claim: value])
+                let details = CredentialDisplayNormalizer.details(
+                    id: "image", title: "Image", issuer: nil, subject: nil, format: format, addedAt: nil,
+                    credentialDataJSON: String(decoding: json, as: UTF8.self)
+                )
+                guard case .deferredImage(let source) = details.groups.first?.items.first?.value,
+                      case .image(_, let data, _, _) = source.resolve() else {
+                    return XCTFail("\(format) input \(index) must stay deferred and resolve as an image")
+                }
+                XCTAssertEqual(data, Self.validPNGData)
+            }
+        }
+    }
+
     func testDefersImagesWithLongDataURLMetadata() throws {
         let metadata = "profile=" + String(repeating: "x", count: 160)
         let details = CredentialDisplayNormalizer.details(

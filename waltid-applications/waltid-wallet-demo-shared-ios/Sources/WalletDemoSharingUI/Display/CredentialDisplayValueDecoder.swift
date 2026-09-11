@@ -276,15 +276,18 @@ private extension String {
 }
 
 private func isImageCandidate(_ value: String, policy: ImageDecodingPolicy) -> Bool {
-    let prefix = String(value.prefix(128)).trimmingCharacters(in: .whitespacesAndNewlines)
-    let isDataURL = prefix.lowercased().hasPrefix("data:")
-    guard policy == .schemaImage || prefix.lowercased().hasPrefix("data:image/") else { return false }
-    let encodedPrefix: Substring
-    if isDataURL {
-        guard let marker = value.range(of: ";base64,", options: .caseInsensitive) else { return false }
-        encodedPrefix = value[marker.upperBound...].prefix(12)
-    } else {
-        encodedPrefix = prefix[...]
-    }
+    let whitespace = CharacterSet.whitespacesAndNewlines
+    guard let start = value.unicodeScalars.firstIndex(where: { !whitespace.contains($0) }) else { return false }
+    let trimmed = value[start...]
+    var payload = trimmed
+    if let scheme = trimmed.range(of: "data:", options: [.anchored, .caseInsensitive]) {
+        guard let marker = trimmed.range(of: ";base64,", options: .caseInsensitive) else { return false }
+        guard policy == .schemaImage || MediaTypeHint.isImage(String(trimmed[scheme.upperBound..<marker.lowerBound])) else {
+            return false
+        }
+        payload = trimmed[marker.upperBound...]
+    } else if policy != .schemaImage { return false }
+    guard let payloadStart = payload.unicodeScalars.firstIndex(where: { !whitespace.contains($0) }) else { return false }
+    let encodedPrefix = payload[payloadStart...].prefix(12)
     return ["iVBOR", "/9j/", "_9j_", "R0lGOD", "UklGR"].contains { encodedPrefix.hasPrefix($0) }
 }

@@ -271,13 +271,17 @@ private val unavailableImageValue = DisplayValue.Text(CredentialDisplayText.Imag
 
 // Inspect the data URL header and a short encoded prefix; full decoding belongs to the visible row.
 private fun isImageCandidate(value: String, policy: ImageDecodingPolicy): Boolean {
-    val prefix = value.take(128).trimStart()
-    val isDataUrl = prefix.startsWith("data:", ignoreCase = true)
-    if (policy != ImageDecodingPolicy.SchemaImage && !prefix.startsWith("data:image/", ignoreCase = true)) return false
-    val encodedPrefix = if (isDataUrl) {
-        val marker = value.indexOf(";base64,", ignoreCase = true)
+    val start = value.indexOfFirst { !it.isWhitespace() }
+    if (start < 0) return false
+    var payloadStart = start
+    if (value.startsWith("data:", start, ignoreCase = true)) {
+        val marker = value.indexOf(";base64,", startIndex = start, ignoreCase = true)
         if (marker < 0) return false
-        value.substring(marker + 8, (marker + 20).coerceAtMost(value.length))
-    } else prefix
-    return listOf("iVBOR", "/9j/", "_9j_", "R0lGOD", "UklGR").any(encodedPrefix::startsWith)
+        if (policy != ImageDecodingPolicy.SchemaImage &&
+            !MediaTypeHint.isImage(value.substring(start + 5, marker))
+        ) return false
+        payloadStart = marker + 8
+        while (payloadStart < value.length && value[payloadStart].isWhitespace()) payloadStart++
+    } else if (policy != ImageDecodingPolicy.SchemaImage) return false
+    return listOf("iVBOR", "/9j/", "_9j_", "R0lGOD", "UklGR").any { value.startsWith(it, payloadStart) }
 }
