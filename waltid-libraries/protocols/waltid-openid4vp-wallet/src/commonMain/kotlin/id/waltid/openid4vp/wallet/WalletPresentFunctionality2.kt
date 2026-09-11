@@ -2,6 +2,7 @@
 
 package id.waltid.openid4vp.wallet
 
+import kotlin.time.TimeSource
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.keys.Key
@@ -965,8 +966,13 @@ object WalletPresentFunctionality2 {
         val validatedTransactionData = (validation as PresentationRequestValidationResult.Valid).transactionData
 
         // Step 2: Select credentials via the caller-supplied lambda.
+        // Phase timings: the wallet leg is ~15ms of a 40ms presentation and had never been attributed
+        // beyond the credential selection, so this separates resolving the request, selecting credentials,
+        // building the vp_token (holder signing) and posting the response.
+        val walletPhaseStart = TimeSource.Monotonic.markNow()
         val query = requireNotNull(authorizationRequest.dcqlQuery)
         val credentials = selectCredentialsForQuery(query)
+        val afterSelection = walletPhaseStart.elapsedNow()
         log.trace { "Auto-selected credential count: ${credentials.mapValues { it.value.count() }}" }
         val availabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
             transactionData = validatedTransactionData,
@@ -1036,7 +1042,14 @@ object WalletPresentFunctionality2 {
         }
 
         // Step 4: Send response.
-        return sendAuthorizationResponse(authorizationRequest, vpToken, idToken)
+        val afterVpToken = walletPhaseStart.elapsedNow()
+        return sendAuthorizationResponse(authorizationRequest, vpToken, idToken).also {
+            log.debug {
+                "Wallet phases: selection=$afterSelection, " +
+                    "vpTokenBuild=${afterVpToken - afterSelection}, " +
+                    "postResponse=${walletPhaseStart.elapsedNow() - afterVpToken}"
+            }
+        }
     }
 
     internal fun distinctCredentialCount(

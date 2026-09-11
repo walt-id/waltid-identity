@@ -2,6 +2,7 @@
 
 package id.walt.verifier2.verification2
 
+import kotlin.time.TimeSource
 import id.walt.cose.protectedAlgorithm
 import id.walt.cose.Cose
 import id.walt.cose.acceptsCoseAlgorithm
@@ -289,8 +290,15 @@ object PresentationVerificationEngine {
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ) {
         // syntax sugar:
-        suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) =
+        suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) {
+            // Timed per event: the happy path writes the session five times, and one such write measured
+            // 5.9ms, so persistence may dominate this function (~40ms) over the actual verification work.
+            // Logged per call so the events can be ranked and, where they are only intermediate state,
+            // considered for coalescing into fewer writes.
+            val started = TimeSource.Monotonic.markNow()
             updateSessionCallback.invoke(this, event, block)
+            log.debug { "Session write '${event.name}' took ${started.elapsedNow()}" }
+        }
 
         suspend fun Verification2Session.failSession(event: SessionEvent) =
             failSessionCallback.invoke(this, event, updateSessionCallback)
@@ -319,14 +327,23 @@ object PresentationVerificationEngine {
         //      an unprocessable credential should not be a 500)
         try {
 
-
+            // Phase timings for the verifier's real work. The enclosing call is ~13ms of a 40ms
+            // presentation while an isolated mdoc verification is 1.4ms, so most of it is elsewhere in
+            // these phases and this is what says where.
+            val phaseStart = TimeSource.Monotonic.markNow()
             val parsedPresentations = parseAllPresentations(vpTokenContents, session)
+            val afterParse = phaseStart.elapsedNow()
 
             session.updateSession(SessionEvent.parsed_presentation_available) {
                 presentedPresentations = parsedPresentations.map { it.key.second.id to it.value }.toMap()
             }
 
             val presentationValidationResult = verifyAllPresentations(parsedPresentations, session, verificationTime)
+            val afterPresentationPolicies = phaseStart.elapsedNow()
+            log.debug {
+                "Verification phases: parsePresentations=$afterParse, " +
+                    "presentationPolicies=${afterPresentationPolicies - afterParse}"
+            }
 
             session.updateSession(SessionEvent.presentation_validation_available) {
                 presentationValidationResults = presentationValidationResult
@@ -464,11 +481,13 @@ object PresentationVerificationEngine {
 
             // --- Credential verification ---
 
+            val credentialPolicyStart = TimeSource.Monotonic.markNow()
             val credentialPolicyResults = Verifier2SessionCredentialPolicyValidation.validateCredentialPolicies(
                 session.policies,
                 allSuccessfullyValidatedAndProcessedData,
                 policyContext
             )
+            log.debug { "Verification phases: credentialPolicies=${credentialPolicyStart.elapsedNow()}" }
 
             val verificationSessionPolicyResults = Verifier2PolicyResults(
                 vpPolicies = presentationValidationResult,
