@@ -95,6 +95,15 @@ kotlin {
     }
 }
 
+tasks.clean {
+    delete("root-ca-cert.pem")
+    delete("root-ca-priv.pem")
+    delete("root-ca-pub.pem")
+    delete("issuer-cert.pem")
+    delete("issuer-priv.pem")
+    delete("issuer-pub.pem")
+}
+
 mavenPublishing {
     pom {
         name.set("walt.id OpenId4VC library")
