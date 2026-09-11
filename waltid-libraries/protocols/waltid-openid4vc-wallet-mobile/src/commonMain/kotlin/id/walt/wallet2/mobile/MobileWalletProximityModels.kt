@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -1015,7 +1016,7 @@ public data class ProximityReviewId(
     /** Stable representation used by the Swift bridge and host state restoration. */
     public val value: String,
 ) {
-    init { kotlin.uuid.Uuid.parse(value) }
+    init { Uuid.parse(value) }
 }
 
 /** User or host action accepted by a proximity session. */
