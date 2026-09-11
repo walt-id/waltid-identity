@@ -16,6 +16,7 @@ import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.proximity.DeviceRequestReaderAuthentication
+import id.walt.mdoc.proximity.DeviceRequestReaderAuthenticationDisplay
 import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocApplicationAuthorization
 import id.walt.mdoc.proximity.MdocApplicationAuthorizationDetail
@@ -395,7 +396,7 @@ internal class ProximityRequestProcessor(
             },
             purposeHints = useCases.flatMap { it.purposeHints }.associate { it.type to it.code },
             readerAuthentication = readerAuthentication.toDisplaySafe().let { display ->
-                id.walt.mdoc.proximity.DeviceRequestReaderAuthenticationDisplay(
+                DeviceRequestReaderAuthenticationDisplay(
                     wholeRequest = display.wholeRequest,
                     documents = display.documents.filter { entry ->
                         (entry.scope as ReaderAuthenticationScope.Document).index in selectedRequestIndices

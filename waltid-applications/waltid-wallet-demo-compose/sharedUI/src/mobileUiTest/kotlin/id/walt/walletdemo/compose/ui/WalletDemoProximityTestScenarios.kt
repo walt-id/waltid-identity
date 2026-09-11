@@ -39,6 +39,7 @@ import id.walt.wallet2.mobile.ProximityProfile
 import id.walt.wallet2.mobile.ProximityRemediationAction
 import id.walt.wallet2.mobile.ProximityReview
 import id.walt.wallet2.mobile.ProximityRicalState
+import id.walt.wallet2.mobile.ProximitySessionConfiguration
 import id.walt.wallet2.mobile.ProximityState
 import id.walt.wallet2.mobile.ProximityTransportCapability
 import id.walt.walletdemo.compose.logic.ClaimGroup
@@ -277,7 +278,7 @@ private val hostActions = WalletDemoProximityHostActionExecutor {
 }
 
 private val permissionBlockedCapabilities = ProximityCapabilities(
-    session = id.walt.wallet2.mobile.ProximitySessionConfiguration.Qr(),
+    session = ProximitySessionConfiguration.Qr(),
     profile = ProximityProfile.Iso180135Edition2Dis2026,
     qrEngagement = ProximityTransportCapability(
         implemented = true,

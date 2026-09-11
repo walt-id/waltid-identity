@@ -1,6 +1,6 @@
 @file:OptIn(
-    kotlinx.serialization.ExperimentalSerializationApi::class,
-    kotlin.ExperimentalUnsignedTypes::class,
+    ExperimentalSerializationApi::class,
+    ExperimentalUnsignedTypes::class,
 )
 
 package id.walt.mdoc.proximity.mobile
@@ -13,6 +13,7 @@ import id.walt.mdoc.objects.engagement.DeviceRetrievalMethodCodec
 import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
 import id.walt.mdoc.proximity.ImmutableBytes
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborInteger
