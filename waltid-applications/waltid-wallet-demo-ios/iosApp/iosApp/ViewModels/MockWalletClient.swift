@@ -75,7 +75,8 @@ actor MockWalletClient: WalletClient {
     }
 
     func credentials() async throws -> [Credential] {
-        storedCredentials
+        try await delayOperation()
+        return storedCredentials
     }
 
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {

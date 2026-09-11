@@ -161,6 +161,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         walletId: String,
     ) -> SqlDriver,
     deleteDatabase: (databaseName: String) -> Unit,
+    registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
 ): MobileWallet {
     val databaseName = "wallet_${config.walletId}"
     val databaseKeyProvider = when (val databaseKey = config.persistence.databaseKey) {
@@ -180,6 +181,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         db = db,
         keyProvider = platformKeyProvider,
+        registrationProjection = registrationProjection,
         deleteLocalPersistence = {
             runCatching { driver.close() }
             deleteDatabase(databaseName)
@@ -195,6 +197,7 @@ internal fun createSqlDelightMobileWallet(
     keyProvider: PlatformManagedKeyProvider,
     didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
+    registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
 ): MobileWallet {
     val queries = db.walletPersistenceQueries
     val keyStore = SqlDelightKeyStore(keyProvider, queries)
@@ -239,6 +242,7 @@ internal fun createSqlDelightMobileWallet(
         credentialIssuerMetadataTrustResolver = config.credentialIssuerMetadataTrustResolver,
         onEvent = config.onEvent,
         credentialRegistry = config.credentialRegistry,
+        registrationProjection = registrationProjection,
         onDigitalCredentialRegistryChanged = config.onDigitalCredentialRegistryChanged,
         readerTrustEvaluator = config.readerTrustEvaluator,
         deleteLocalPersistence = deleteLocalPersistence,

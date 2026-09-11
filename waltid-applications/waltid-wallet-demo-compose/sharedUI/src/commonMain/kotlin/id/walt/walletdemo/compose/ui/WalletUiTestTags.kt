@@ -4,6 +4,7 @@ internal object WalletUiTestTags {
     val Status = tag("status")
     val StatusDismiss = tag("statusDismiss")
     val StatusExpand = tag("statusExpand")
+    val CredentialsLoading = tag("credentials", "loading")
     val CredentialsEmpty = tag("credentials", "empty")
     val CredentialDetailsScreen = tag("credentialDetailsScreen")
     val DetailsBack = tag("detailsBack")

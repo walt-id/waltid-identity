@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.ui.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,16 +21,16 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
 
 @Composable
 internal fun CredentialCardStack(
-    details: List<CredentialDetails>,
+    cards: List<CredentialCardDisplayData>,
     onOpenDetails: (String) -> Unit,
     modifier: Modifier = Modifier,
     expandedId: String? = null,
 ) {
-    if (details.isEmpty()) return
+    if (cards.isEmpty()) return
     val othersVisibility = remember { Animatable(1f) }
     val selectedProgress = remember { Animatable(0f) }
     var displayedExpandedId by remember { mutableStateOf(expandedId) }
@@ -49,7 +50,7 @@ internal fun CredentialCardStack(
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val cardHeight = maxWidth / Id1AspectRatio
         val offsets = cardOffsets(
-            count = details.size,
+            count = cards.size,
             peek = CredentialCardPeek,
             cardHeight = cardHeight,
         )
@@ -62,20 +63,20 @@ internal fun CredentialCardStack(
                 .height(stackHeight)
                 .clipToBounds(),
         ) {
-            details.forEachIndexed { index, item ->
-                val id = item.summary.id
+            cards.forEachIndexed { index, item ->
+                val id = item.id
                 val isSelected = id == displayedExpandedId
                 val restOffset = offsets.getOrElse(index) { 0.dp }
                 val y = if (isSelected) restOffset * (1f - selectedProgress.value) else restOffset
                 Box(
                     modifier = Modifier
                         .offset(y = y)
-                        .zIndex(if (isSelected) details.size.toFloat() else index.toFloat())
+                        .zIndex(if (isSelected) cards.size.toFloat() else index.toFloat())
                         .alpha(if (isSelected) 1f else othersVisibility.value),
                 ) {
-                    CredentialCard(
-                        details = item,
-                        onClick = { onOpenDetails(id) },
+                    CredentialCardArt(
+                        art = remember(item) { item.toCardArt() },
+                        modifier = Modifier.fillMaxWidth().clickable { onOpenDetails(id) },
                     )
                 }
             }

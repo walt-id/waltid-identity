@@ -123,6 +123,22 @@ when (val encryption = preview.request.responseEncryption) {
 Response-encryption metadata describes protection of the authorization response. It
 does not establish verifier trust and does not expose verifier key material.
 
+### Android credential registry
+
+Android registers claim paths and scalar matching values with Credential Manager.
+Compound values, JSON null, data URIs and recognized base64 image payloads retain
+their paths without a matching value. They can be requested by field presence,
+but cannot satisfy an exact-value constraint in the platform matcher. Ordinary
+scalar values retain their types and full matching values; picker display text
+is limited to 128 characters. Full claim payloads remain in wallet storage and
+presentation processing.
+
+This follows AndroidX's nullable [`MdocField.fieldValue`](https://developer.android.com/reference/kotlin/androidx/credentials/registry/digitalcredentials/mdoc/MdocField)
+contract for fields such as photos, and also applies to SD-JWT registry claims.
+Check `digitalCredentialRegistration` or the result of
+`refreshDigitalCredentialRegistration()` to detect and retry platform indexing
+failures independently of wallet loading.
+
 ## Persistence and encryption
 
 `MobileWalletConfig()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.

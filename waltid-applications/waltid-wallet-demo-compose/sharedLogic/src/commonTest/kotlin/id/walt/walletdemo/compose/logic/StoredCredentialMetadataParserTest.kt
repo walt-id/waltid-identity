@@ -135,5 +135,6 @@ class StoredCredentialMetadataParserTest {
         assertEquals("#12107c", details.toCardDisplayData().backgroundColor)
         assertEquals("https://issuer.example/pid.png", details.toCardDisplayData().logoUri)
         assertEquals("Personal ID", details.toCardDisplayData().title)
+        assertEquals(details.toCardDisplayData(), details.summary.toCardDisplayData())
     }
 }

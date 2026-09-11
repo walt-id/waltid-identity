@@ -645,6 +645,58 @@ class MobileWalletTest {
     }
 
     @Test
+    fun mdocIdentityRegistrationPreservesOpaqueIdsWithoutDisplayOrClaimData() = runTest {
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "mdl-1",
+                credential = MdocsCredential(
+                    credentialData = buildJsonObject {
+                        put("org.iso.18013.5.1", buildJsonObject { put("given_name", "Ada") })
+                    },
+                    signed = null,
+                    docType = "org.iso.18013.5.1.mDL",
+                ),
+                label = "My driving licence",
+            ),
+            StoredCredential(
+                id = "pid-1",
+                credential = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2).second,
+            ),
+        )
+        suspend fun records(projection: MobileWalletRegistryProjection, walletId: String = "projection-wallet"):
+            Pair<String, List<MobileWalletCredentialRegistryRecord>> {
+            val registry = RecordingMetadataRegistry()
+            MobileWallet(
+                walletId = walletId,
+                keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+                didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+                credentialStore = credentialStore,
+                generateAndPersistKey = unusedKeyGenerator(),
+                credentialRegistry = registry,
+                registrationProjection = projection,
+            ).refreshDigitalCredentialRegistration()
+            return registry.replacements.single()
+        }
+
+        val full = records(MobileWalletRegistryProjection.Full)
+        val minimal = records(MobileWalletRegistryProjection.MdocIdentity)
+        assertEquals(2, full.second.size)
+        val fullMdoc = full.second.single { it.format == MobileWalletDigitalCredentialFormat.MDOC }
+        assertTrue(fullMdoc.fields.isNotEmpty())
+        assertEquals(full.first, minimal.first)
+        assertEquals(
+            fullMdoc.copy(fields = emptyList(), displayName = "", subtitle = ""),
+            minimal.second.single(),
+        )
+        assertEquals(minimal, records(MobileWalletRegistryProjection.MdocIdentity))
+        assertFalse(minimal.second.single().registryEntryId.contains("mdl-1"))
+        assertFalse(
+            minimal.second.single().registryEntryId ==
+                records(MobileWalletRegistryProjection.MdocIdentity, "other-wallet").second.single().registryEntryId,
+        )
+    }
+
+    @Test
     fun digitalCredentialRegistryUsesStableOpaqueMetadataAndExcludesSdJwtInfrastructureClaims() = runTest {
         val registry = RecordingMetadataRegistry()
         val credentialStore = RecordingCredentialStore(
@@ -1185,6 +1237,7 @@ class MobileWalletTest {
             WalletKeyInfo(keyId = holderKeyId, keyType = "Ed25519"),
             managedKey = holderSigner,
         )
+        val registry = RecordingMetadataRegistry()
         val wallet = MobileWallet(
             walletId = "annex-c-reader-auth-wallet",
             keyStore = holderKeyStore,
@@ -1193,12 +1246,16 @@ class MobileWalletTest {
                 annexCBoundMdl(holderSigner, holderKeyStore),
             ),
             generateAndPersistKey = { _, _ -> error("Reader-authentication preview must not generate keys") },
+            credentialRegistry = registry,
+            registrationProjection = MobileWalletRegistryProjection.MdocIdentity,
             readerTrustEvaluator = MobileWalletReaderTrustEvaluator { chain ->
                 assertEquals(1, chain.size)
                 assertContentEquals(readerCertificate, chain.single())
                 MobileWalletReaderTrust.Trusted("CN=Example")
             },
         )
+        wallet.refreshDigitalCredentialRegistration()
+        assertTrue(registry.replacements.single().second.single().fields.isEmpty())
         val parsedRequest = wallet.parseAnnexCDeviceRequest(signedRequest.encodeToBase64Url())
 
         val preview = wallet.previewAnnexCPresentation(
@@ -1207,10 +1264,12 @@ class MobileWalletTest {
                 verifiedOrigin = origin,
                 deviceRequestBase64Url = SIGNED_READER_REQUEST,
                 encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                selectedRegistryEntryIds = listOf(registry.replacements.single().second.single().registryEntryId),
             )
         )
 
         assertEquals(MobileWalletReaderTrust.Trusted("CN=Example"), preview.readerTrust)
+        assertEquals("Ada", preview.credentialOptions.single().disclosures.single().displayValue)
         val submission = MobileWalletAnnexCSubmission(
             requestId = preview.requestId,
             verifiedOrigin = origin,

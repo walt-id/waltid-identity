@@ -6,8 +6,15 @@ enum CredentialDisplayValueDecoder {
         for value: String,
         path: DisplayClaimPath,
         imagePolicy: ImageDecodingPolicy,
-        renderJSON: (CredentialDisplayJSONValue, DisplayClaimPath) -> DisplayValue
+        deferImages: Bool = true,
+        renderJSON: @escaping (CredentialDisplayJSONValue, DisplayClaimPath) -> DisplayValue
     ) -> DisplayValue? {
+        if deferImages, imagePolicy != .disabled, isImageCandidate(value, policy: imagePolicy) {
+            return .deferredImage(DeferredCredentialImage {
+                decodedValue(for: value, path: path, imagePolicy: imagePolicy,
+                             deferImages: false, renderJSON: renderJSON) ?? .text(value)
+            })
+        }
         let payload: EncodedPayload
         switch EncodedPayload.parse(
             value,
@@ -38,13 +45,18 @@ enum CredentialDisplayValueDecoder {
         return .decodedText(decoded)
     }
 
-    static func imageDisplayValue(for list: [CredentialDisplayJSONValue], roles: Set<ClaimRole>) -> DisplayValue? {
+    static func imageDisplayValue(
+        for list: [CredentialDisplayJSONValue],
+        roles: Set<ClaimRole>,
+        renderList: @escaping () -> DisplayValue
+    ) -> DisplayValue? {
         guard roles.contains(.image),
-              let data = byteArrayData(from: list),
-              let mimeType = ImageBytes.mimeType(for: data) else {
-            return nil
-        }
-        return imageValue(for: data, mimeType: mimeType)
+              let prefix = byteArrayData(from: Array(list.prefix(12))),
+              let mimeType = ImageBytes.mimeType(for: prefix) else { return nil }
+        return .deferredImage(DeferredCredentialImage(byteCount: list.count) {
+            guard let data = byteArrayData(from: list) else { return renderList() }
+            return imageValue(for: data, mimeType: mimeType)
+        })
     }
 
     private static func byteArrayData(from list: [CredentialDisplayJSONValue]) -> Data? {
@@ -261,4 +273,21 @@ private extension String {
     }
 
     private static let readableCharacterRatio = 0.9
+}
+
+private func isImageCandidate(_ value: String, policy: ImageDecodingPolicy) -> Bool {
+    let whitespace = CharacterSet.whitespacesAndNewlines
+    guard let start = value.unicodeScalars.firstIndex(where: { !whitespace.contains($0) }) else { return false }
+    let trimmed = value[start...]
+    var payload = trimmed
+    if let scheme = trimmed.range(of: "data:", options: [.anchored, .caseInsensitive]) {
+        guard let marker = trimmed.range(of: ";base64,", options: .caseInsensitive) else { return false }
+        guard policy == .schemaImage || MediaTypeHint.isImage(String(trimmed[scheme.upperBound..<marker.lowerBound])) else {
+            return false
+        }
+        payload = trimmed[marker.upperBound...]
+    } else if policy != .schemaImage { return false }
+    guard let payloadStart = payload.unicodeScalars.firstIndex(where: { !whitespace.contains($0) }) else { return false }
+    let encodedPrefix = payload[payloadStart...].prefix(12)
+    return ["iVBOR", "/9j/", "_9j_", "R0lGOD", "UklGR"].contains { encodedPrefix.hasPrefix($0) }
 }

@@ -11,11 +11,14 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.crypto.utils.Base64Utils.base64Url
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
@@ -25,7 +28,14 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.issuance.MdocIssuer
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
+import id.walt.sdjwt.Crypto2AsyncJWTCryptoProvider
+import id.walt.sdjwt.Crypto2SdJwtKey
+import id.walt.sdjwt.SDField
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
 import id.walt.wallet2.data.HolderKeyBindingErrorCode
 import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
@@ -37,13 +47,19 @@ import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.cbor.CborByteString
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -123,6 +139,96 @@ class MobileWalletDigitalCredentialPresentationTest {
             fixture.presentationFor("mdl", data).isNotBlank(),
             "mdoc DeviceResponse missing from the vp_token: $data",
         )
+    }
+
+    @Test
+    fun requestedMdocImageBytesSurviveRegistrySelectionAndSubmission() = runTest {
+        val holderKey = signingKey("image-holder-key")
+        val fixture = walletFixtureWithKeys(
+            keys = listOf(holderKey),
+            credentials = arrayOf(mdocCredential(holderKey = holderKey, imageBytes = IMAGE_BYTES)),
+            registrationProjection = MobileWalletRegistryProjection.MdocIdentity,
+        )
+        val preview = fixture.wallet.previewDigitalCredentialPresentation(
+            dcApiRequest(
+                data = dcApiRequestData(
+                    credentialQuery = """{
+                      "id":"mdl", "format":"mso_mdoc",
+                      "meta":{"doctype_value":"$MDOC_DOCTYPE"},
+                      "claims":[{"path":["$MDOC_NAMESPACE","arbitrary_attachment"]}]
+                    }""",
+                ),
+                selectedRegistryEntryIds = listOf(fixture.registryEntryId("mdl-1")),
+            ),
+        )
+        val option = preview.credentialOptions.single()
+        val disclosure = option.disclosures.single()
+        assertTrue(disclosure.required)
+        val response = fixture.wallet.submitDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+            // Required mdoc claims are retained by the query and are not optional UI toggles.
+            selectedDisclosureOptions = emptyList(),
+        )
+        val data = Json.parseToJsonElement(response.dataJson).jsonObject
+        val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(
+            fixture.presentationFor("mdl", data).decodeFromBase64Url(),
+        )
+        val items = assertNotNull(deviceResponse.documents).single().issuerSigned.namespaces
+            ?.get(MDOC_NAMESPACE)?.entries
+        val item = assertNotNull(items).single().value
+        assertEquals("arbitrary_attachment", item.elementIdentifier)
+        assertContentEquals(IMAGE_BYTES, (item.elementValue as CborByteString).toByteArray())
+    }
+
+    @Test
+    fun requestedSdJwtImageDataSurvivesRegistrySelectionAndExplicitDisclosure() = runTest {
+        val imageDataUrl = "data:image/png;base64,$IMAGE_BASE64"
+        val issuer = signingKey("image-issuer-key")
+        val payload = SDPayload.createSDPayload(
+            fullPayload = buildJsonObject {
+                put("iss", "https://issuer.example")
+                put("vct", SD_JWT_VCT)
+                put("arbitrary_attachment", imageDataUrl)
+                put("unrequested_attachment", imageDataUrl)
+            },
+            disclosureMap = SDMap(mapOf(
+                "arbitrary_attachment" to SDField(sd = true),
+                "unrequested_attachment" to SDField(sd = true),
+            )),
+        )
+        val provider = Crypto2AsyncJWTCryptoProvider(
+            mapOf("issuer" to Crypto2SdJwtKey(issuer, JwsAlgorithm.ES256)),
+        )
+        val signed = SDJwt.createFromSignedJwt(
+            signedJwt = provider.sign(payload.undisclosedPayload, "issuer", "dc+sd-jwt", emptyMap()),
+            sdPayload = payload,
+        )
+        val fixture = walletFixture(StoredCredential(
+            id = "pid-1",
+            credential = CredentialParser.detectAndParse(signed.toString()).second,
+        ))
+        val preview = fixture.wallet.previewDigitalCredentialPresentation(dcApiRequest(
+            data = dcApiRequestData(credentialQuery = """{
+              "id":"pid", "format":"dc+sd-jwt",
+              "meta":{"vct_values":["$SD_JWT_VCT"]},
+              "claims":[{"path":["arbitrary_attachment"]}]
+            }"""),
+            selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
+        ))
+        val option = preview.credentialOptions.single()
+        val response = fixture.wallet.submitDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selectedDisclosureOptions = listOf(MobileWalletPresentationDisclosureSelection(
+                option.queryId, option.credentialId, option.disclosures.single().path,
+            )),
+        )
+        val data = Json.parseToJsonElement(response.dataJson).jsonObject
+        val presented = SDJwt.parse(fixture.presentationFor("pid", data))
+        assertEquals(imageDataUrl, presented.fullPayload["arbitrary_attachment"]?.jsonPrimitive?.content)
+        assertFalse(presented.fullPayload.containsKey("unrequested_attachment"))
+        assertTrue(presented.sdPayload.verifyDisclosures())
     }
 
     @Test
@@ -485,6 +591,7 @@ class MobileWalletDigitalCredentialPresentationTest {
         credentials: Array<out StoredCredential>,
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
         bindMdocs: Boolean = true,
+        registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
     ): Fixture {
         val registry = CapturingRegistry()
         val keyStore = InMemoryMobileWalletKeyStore().also { store ->
@@ -508,6 +615,7 @@ class MobileWalletDigitalCredentialPresentationTest {
             generateAndPersistKey = { _, _ -> error("Digital Credentials presentation must not bootstrap a key") },
             transactionDataProfiles = transactionDataProfiles,
             credentialRegistry = registry,
+            registrationProjection = registrationProjection,
         )
         return Fixture(wallet, registry, credentialStore)
     }
@@ -595,9 +703,11 @@ class MobileWalletDigitalCredentialPresentationTest {
      * the only key DCQL's `doctype_value` constraint reads. A fixture omitting it matches nothing, which
      * would be indistinguishable here from a routing bug.
      */
+    @OptIn(ExperimentalUnsignedTypes::class)
     private suspend fun mdocCredential(
         id: String = "mdl-1",
         holderKey: Crypto2Key? = null,
+        imageBytes: ByteArray? = null,
     ): StoredCredential {
         if (holderKey == null) {
             return StoredCredential(
@@ -623,9 +733,16 @@ class MobileWalletDigitalCredentialPresentationTest {
             docType = MDOC_DOCTYPE,
             data = MdocIssuer.MdocUniversalIssuanceData(
                 namespaces = mapOf(
-                    MDOC_NAMESPACE to JsonObject(mapOf("given_name" to kotlinx.serialization.json.JsonPrimitive("Inga")))
+                    MDOC_NAMESPACE to buildJsonObject {
+                        put("given_name", "Inga")
+                        if (imageBytes != null) put("arbitrary_attachment", JsonPrimitive("image"))
+                    }
                 )
             ),
+            valueMappingFunction = { docType, namespace, name, value ->
+                if (name == "arbitrary_attachment" && imageBytes != null) CborByteString(imageBytes)
+                else MdocIssuer.defaultSchemalessMappingFunction(docType, namespace, name, value)
+            },
         )
         val raw = coseCompliantCbor.encodeToByteArray(
             Document.serializer(),
@@ -682,6 +799,8 @@ class MobileWalletDigitalCredentialPresentationTest {
     }
 
     private companion object {
+        const val IMAGE_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
+        val IMAGE_BYTES = IMAGE_BASE64.decodeFromBase64()
         const val MDOC_DOCTYPE = "org.iso.18013.5.1.mDL"
         const val MDOC_NAMESPACE = "org.iso.18013.5.1"
         const val SD_JWT_VCT = "https://credentials.example.com/identity_credential"
