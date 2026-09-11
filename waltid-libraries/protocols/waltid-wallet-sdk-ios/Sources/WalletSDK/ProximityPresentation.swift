@@ -892,6 +892,7 @@ public struct ProximityConfiguration: Sendable {
     ///   - credentialStatusEvaluator: Optional explicit status boundary.
     ///   - applicationProfiles: Ordered application profiles.
     ///   - maximumMessageBytes: Positive limit of at most 16 MiB.
+    ///   - approval: Explicit holder-approval behavior for this session; defaults to reviewing each connected request.
     public init(
         profile: ProximityProfile = .iso180135Edition2DIS2026,
         session: ProximitySessionConfiguration = .qr(),
@@ -924,6 +925,7 @@ public struct ProximityConfiguration: Sendable {
     }
 
     /// Replaces only approval behavior, preserving the profile, trust and transport policies.
+    /// - Parameter approval: Holder-approval behavior to use in the returned configuration.
     public func withApproval(_ approval: ProximityApproval) -> ProximityConfiguration {
         .init(profile: profile, session: session, readerPolicy: readerPolicy,
               deviceAuthenticationPolicy: deviceAuthenticationPolicy, readerTrustEvaluator: readerTrustEvaluator,
