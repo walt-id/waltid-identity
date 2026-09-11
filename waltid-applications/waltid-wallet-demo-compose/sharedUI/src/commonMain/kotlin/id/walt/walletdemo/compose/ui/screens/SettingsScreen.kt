@@ -275,7 +275,7 @@ private fun ProximityPresentationSettings(
             }
         }
         Text(
-            "Applies to your next presentation.",
+            "Updates sharing before connection or approval. Otherwise applies to your next presentation.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

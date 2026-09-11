@@ -138,7 +138,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Connection")
                 } footer: {
-                    Text("Use Automatic unless your reader requires a specific connection. Changes apply to your next presentation.")
+                    Text("Use Automatic unless your reader requires a specific connection. Changes update sharing before connection or approval. Otherwise they apply to your next presentation.")
                 }
             }
             .navigationTitle("Nearby sharing")

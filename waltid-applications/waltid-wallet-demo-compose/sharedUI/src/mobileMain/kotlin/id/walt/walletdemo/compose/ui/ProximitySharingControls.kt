@@ -28,10 +28,11 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 internal fun ProximityEngagementChoice(
     method: ProximityEngagementMethod,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val nfc = method == ProximityEngagementMethod.Nfc
-    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().testTag("proximity-show-${method.name}")) {
+    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().testTag("proximity-show-${method.name}")) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),

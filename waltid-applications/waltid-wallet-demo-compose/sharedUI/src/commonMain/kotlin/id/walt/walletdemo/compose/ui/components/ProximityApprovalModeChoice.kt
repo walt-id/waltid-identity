@@ -29,11 +29,12 @@ internal fun ProximityApprovalModeChoice(
     selected: WalletDemoProximityApprovalMode,
     onSelect: (WalletDemoProximityApprovalMode) -> Unit,
     compact: Boolean = false,
+    enabled: Boolean = true,
 ) {
     val prepared = selected == WalletDemoProximityApprovalMode.PrepareSharing
     Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-            .toggleable(value = prepared, role = Role.Switch) {
+            .toggleable(value = prepared, enabled = enabled, role = Role.Switch) {
                 onSelect(if (it) WalletDemoProximityApprovalMode.PrepareSharing else WalletDemoProximityApprovalMode.AskEachTime)
             }
             .testTag("proximity-approval-mode"),
@@ -53,6 +54,6 @@ internal fun ProximityApprovalModeChoice(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = prepared, onCheckedChange = null)
+        Switch(checked = prepared, onCheckedChange = null, enabled = enabled)
     }
 }
