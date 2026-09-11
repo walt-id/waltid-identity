@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(ExperimentalForeignApi::class)
 
 package id.walt.walletdemo.compose.ui
 
@@ -9,6 +9,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import id.walt.wallet2.mobile.ProximityHostActionResult
 import id.walt.wallet2.mobile.ProximityRemediationAction
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
