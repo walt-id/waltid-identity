@@ -3,6 +3,7 @@ package id.walt.mdoc.proximity.mobile
 import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -101,7 +102,7 @@ private class FakeWifiAwareRawConnection(
 ) : WifiAwareRawConnection {
     val writes = mutableListOf<ByteArray>()
     val closeReasons = mutableListOf<ProximityCloseReason>()
-    private val closure = kotlinx.coroutines.CompletableDeferred<ProximityCloseReason>()
+    private val closure = CompletableDeferred<ProximityCloseReason>()
     override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
 
     override suspend fun read(maximumBytes: Int): ByteArray? {

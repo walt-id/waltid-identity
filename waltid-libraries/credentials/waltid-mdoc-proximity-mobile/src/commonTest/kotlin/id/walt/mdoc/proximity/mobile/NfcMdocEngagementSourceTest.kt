@@ -279,7 +279,7 @@ class NfcMdocEngagementSourceTest {
             val nfc = FakeNfcPlatform()
             val radio = EngagementWifiPlatform(maximumPublications = 1)
             val factory = MdocDeviceEngagementFactory()
-            suspend fun provider(key: id.walt.crypto2.keys.Key) = DefaultWifiAwareProximityTransportProvider(
+            suspend fun provider(key: Key) = DefaultWifiAwareProximityTransportProvider(
                 WifiAwareProximityTransportConfiguration(factory.encodeEDeviceKeyBytes(key)), radio,
             )
             val source = NfcMdocEngagementSource(
