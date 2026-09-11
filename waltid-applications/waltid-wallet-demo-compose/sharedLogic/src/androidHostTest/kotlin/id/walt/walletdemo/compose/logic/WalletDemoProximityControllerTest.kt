@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 import id.walt.wallet2.mobile.ProximityApproval
+import id.walt.wallet2.mobile.ProximityBleConfiguration
 import id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration
 import id.walt.wallet2.mobile.ProximityRetrievalOptions
 import id.walt.wallet2.mobile.ProximitySharingPlan
@@ -1196,9 +1197,9 @@ private fun wifiPermissionCapabilities(
     bleSelected: Boolean = true,
 ): ProximityCapabilities = readyCapabilities.copy(
     bluetoothLowEnergy = availableSelected.copy(selected = bleSelected),
-    session = id.walt.wallet2.mobile.ProximitySessionConfiguration.Qr(
-        id.walt.wallet2.mobile.ProximityRetrievalOptions(
-            bluetoothLowEnergy = if (bleSelected) id.walt.wallet2.mobile.ProximityBleConfiguration() else null,
+    session = ProximitySessionConfiguration.Qr(
+        ProximityRetrievalOptions(
+            bluetoothLowEnergy = if (bleSelected) ProximityBleConfiguration() else null,
             wifiAware = true,
         ),
     ),
