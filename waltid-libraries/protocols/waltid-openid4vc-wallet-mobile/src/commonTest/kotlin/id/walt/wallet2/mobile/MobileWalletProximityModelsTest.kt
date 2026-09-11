@@ -6,6 +6,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class ProximityModelsTest {
     @Test
@@ -235,7 +237,7 @@ class ProximityModelsTest {
     }
 
     private fun review() = ProximityReview(
-        reviewId = ProximityReviewId(kotlin.uuid.Uuid.random().toString()),
+        reviewId = ProximityReviewId(Uuid.random().toString()),
         exchange = 1,
         documents = listOf(
             ProximityDocumentReview(
@@ -246,7 +248,7 @@ class ProximityModelsTest {
                         credentialId = "credential-1",
                         label = "Example",
                         issuer = null,
-                        validUntil = kotlin.time.Instant.DISTANT_FUTURE,
+                        validUntil = Instant.DISTANT_FUTURE,
                         deviceAuthentication = ProximityDeviceAuthenticationMethod.Signature,
                         requestedElements = listOf(
                             ProximityRequestedElement(
