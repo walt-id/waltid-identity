@@ -418,6 +418,9 @@ class Issuer2CredentialStatusIntegrationTest {
 
         val embeddedStatus = sdJwtPayload["status"]
         assertNull(embeddedStatus, "SD-JWT VC should not contain status claim when not configured")
+        assertEquals(0L, sdJwtPayload["iat"]!!.jsonPrimitive.long % 86_400L)
+        assertEquals(sdJwtPayload["iat"], sdJwtPayload["nbf"])
+        assertEquals(0L, sdJwtPayload["exp"]!!.jsonPrimitive.long % 3_600L)
     }
 
     // ==================== mDoc Tests ====================
