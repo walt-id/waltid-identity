@@ -1,12 +1,15 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
+import dev.whyoleg.cryptography.CryptographyProvider
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseHmacKey
+import id.walt.cose.CoseKey
 import id.walt.cose.CoseMac0
 import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
 import id.walt.cose.createAndSignDetached
 import id.walt.cose.selectCoseSignatureAlgorithm
 import id.walt.cose.toEncodedJwk
@@ -30,7 +33,9 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.IssuerSignedList
+import id.walt.mdoc.objects.mso.KeyAuthorization
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.kotlincrypto.hash.sha2.SHA256
 
 sealed interface MdocAuthenticationMethod {
@@ -41,15 +46,15 @@ sealed interface MdocAuthenticationMethod {
             }
         }
     }
-    data class Mac(val eReaderKey: id.walt.cose.CoseKey) : MdocAuthenticationMethod
+    data class Mac(val eReaderKey: CoseKey) : MdocAuthenticationMethod
 }
 
 /** Whether this live holder key can create an ISO device MAC with the established reader key. */
-suspend fun Key.supportsMdocDeviceMac(eReaderKey: id.walt.cose.CoseKey): Boolean = try {
+suspend fun Key.supportsMdocDeviceMac(eReaderKey: CoseKey): Boolean = try {
     MdocSessionKeyValidator.requireCompatiblePeerKey(
         localKey = this,
         peerKey = eReaderKey.toEncodedJwk(),
-        provider = dev.whyoleg.cryptography.CryptographyProvider.Default,
+        provider = CryptographyProvider.Default,
     )
     true
 } catch (cancelled: CancellationException) {
@@ -93,7 +98,7 @@ class MdocResponseBuilder {
         requireHolderKeyMatchesMso(presentation.holderKey, mso.deviceKeyInfo.deviceKey)
         val selectedIssuer = selectIssuerSigned(source.issuerSigned, presentation.selectedIssuerElements)
         requireDeviceNamespacesAuthorized(presentation.deviceNameSpaces, mso.deviceKeyInfo.keyAuthorizations)
-        val encodedNamespaces = id.walt.cose.coseCompliantCbor.encodeToByteArray(
+        val encodedNamespaces = coseCompliantCbor.encodeToByteArray(
             DeviceNameSpaces.serializer(),
             presentation.deviceNameSpaces,
         )
@@ -157,7 +162,7 @@ class MdocResponseBuilder {
             "An encrypted document response must contain a document"
         }
         val exactParameters = encryptionParameters.serialized.takeIf { it.isNotEmpty() }
-            ?: id.walt.cose.coseCompliantCbor.encodeToByteArray(
+            ?: coseCompliantCbor.encodeToByteArray(
                 EncryptionParameters.serializer(),
                 encryptionParameters.value,
             )
@@ -168,11 +173,11 @@ class MdocResponseBuilder {
         )
         val sealed = Hpke.sealBase(
             recipientPublicKey = encryptionParameters.value.recipientPublicKey.toEncodedJwk(),
-            plaintext = id.walt.cose.coseCompliantCbor.encodeToByteArray(
+            plaintext = coseCompliantCbor.encodeToByteArray(
                 EncryptedDocumentsPlaintext.serializer(),
                 plaintext,
             ),
-            info = id.walt.cose.coseCompliantCbor.encodeToByteArray(
+            info = coseCompliantCbor.encodeToByteArray(
                 SessionTranscript.serializer(),
                 encryptionTranscript,
             ),
@@ -210,7 +215,7 @@ class MdocResponseBuilder {
         )
     }
 
-    private suspend fun requireHolderKeyMatchesMso(holderKey: Key, msoKey: id.walt.cose.CoseKey) {
+    private suspend fun requireHolderKeyMatchesMso(holderKey: Key, msoKey: CoseKey) {
         val holderPublic = requireNotNull(holderKey.capabilities.publicKeyExporter) {
             "Selected holder key cannot export public material"
         }.exportPublicKey() as? EncodedKey.Jwk
@@ -226,7 +231,7 @@ class MdocResponseBuilder {
 
     private fun requireDeviceNamespacesAuthorized(
         namespaces: DeviceNameSpaces,
-        authorizations: id.walt.mdoc.objects.mso.KeyAuthorization?,
+        authorizations: KeyAuthorization?,
     ) {
         if (namespaces.entries.isEmpty()) return
         val policy = requireNotNull(authorizations) { "Device-signed elements require MSO keyAuthorizations" }
@@ -244,7 +249,7 @@ class MdocResponseBuilder {
 
     private suspend fun createMac(
         holderKey: Key,
-        eReaderKey: id.walt.cose.CoseKey,
+        eReaderKey: CoseKey,
         transcript: SessionTranscript,
         deviceAuthentication: ByteArray,
     ): CoseMac0 {
@@ -253,7 +258,7 @@ class MdocResponseBuilder {
         val readerPublic = MdocSessionKeyValidator.requireCompatiblePeerKey(
             holderKey,
             eReaderKey.toEncodedJwk(),
-            dev.whyoleg.cryptography.CryptographyProvider.Default,
+            CryptographyProvider.Default,
         )
         val sharedSecret = agreement.generateSharedSecret(readerPublic, keyAgreementAlgorithm).toByteArray()
         val transcriptBytes = MdocCryptoHelper.buildSessionTranscriptBytes(transcript)

@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
@@ -11,6 +11,7 @@ import id.walt.cose.createAndSignDetached
 import id.walt.cose.toCoseSigner
 import id.walt.cose.CoseContentType
 import id.walt.cose.coseCompliantCbor
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.*
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.decodeFromByteArray

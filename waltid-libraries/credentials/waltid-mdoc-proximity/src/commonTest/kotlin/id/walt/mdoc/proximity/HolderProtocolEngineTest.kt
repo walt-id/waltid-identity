@@ -1,6 +1,6 @@
 @file:OptIn(
-    kotlinx.serialization.ExperimentalSerializationApi::class,
-    kotlin.ExperimentalUnsignedTypes::class,
+    ExperimentalSerializationApi::class,
+    ExperimentalUnsignedTypes::class,
 )
 
 package id.walt.mdoc.proximity
@@ -10,6 +10,7 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.crypto.MdocCryptoHelper
@@ -43,6 +44,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.cbor.CborString
@@ -56,6 +58,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.seconds
+import org.kotlincrypto.hash.sha2.SHA256
 
 class HolderProtocolEngineTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
@@ -913,7 +916,7 @@ class HolderProtocolEngineTest {
     }
 
     private fun digest(value: String): ImmutableBytes = ImmutableBytes.of(
-        org.kotlincrypto.hash.sha2.SHA256().digest(value.encodeToByteArray())
+        SHA256().digest(value.encodeToByteArray())
     )
 
     private fun applicationAuthorization(result: String) = MdocApplicationAuthorization(
@@ -933,8 +936,8 @@ class HolderProtocolEngineTest {
     )
 
     private suspend fun readerSession(
-        deviceKey: id.walt.crypto2.keys.Key,
-        readerKey: id.walt.crypto2.keys.Key,
+        deviceKey: Key,
+        readerKey: Key,
         method: DeviceRetrievalMethod,
         context: EngagementContext,
         capabilities: MdocSessionCapabilities,

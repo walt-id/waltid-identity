@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.proximity
 
@@ -7,6 +7,7 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.crypto.MdocCryptoHelper
@@ -18,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.*
 import kotlinx.serialization.decodeFromByteArray
 import kotlin.test.*
@@ -186,7 +188,7 @@ class HolderWireErrorTest {
     private data class Exchange(val result: MdocHolderSessionResult, val messages: List<SessionData>, val previewCalls: Int, val resolveCalls: Int)
 
     private class Session(
-        val deviceKey: id.walt.crypto2.keys.Key,
+        val deviceKey: Key,
         val method: DeviceRetrievalMethod,
         val context: EngagementContext,
         val capabilities: MdocSessionCapabilities,
