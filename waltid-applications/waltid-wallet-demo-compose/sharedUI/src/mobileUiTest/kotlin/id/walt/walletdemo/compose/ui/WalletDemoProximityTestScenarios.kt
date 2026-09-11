@@ -53,6 +53,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoProximityTestScenarios {
@@ -355,7 +356,7 @@ private fun proximityCredentialDetails(): Map<String, CredentialDetails> = listO
 ).associateBy { details -> details.summary.id }
 
 private fun proximityReview(): ProximityReview = ProximityReview(
-    reviewId = ProximityReviewId(kotlin.uuid.Uuid.random().toString()),
+    reviewId = ProximityReviewId(Uuid.random().toString()),
     exchange = 1,
     documents = listOf(
         ProximityDocumentReview(

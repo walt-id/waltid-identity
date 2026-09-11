@@ -5,6 +5,7 @@ import at.asitplus.signum.indispensable.asn1.ObjectIdentifier
 import at.asitplus.signum.indispensable.asn1.encoding.parse
 import at.asitplus.signum.indispensable.asn1.readOid
 import at.asitplus.signum.indispensable.pki.X509Certificate as SignumX509Certificate
+import id.walt.certificate.x509.dn.AttributeTypeAndValue
 import id.walt.certificate.x509.dn.DistinguishedName
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Companion.extensionCrlDistributionPoints
@@ -152,7 +153,7 @@ fun validateRicalSignerCertificateChain(
 }
 
 private fun requireSubjectValue(
-    subject: List<id.walt.certificate.x509.dn.AttributeTypeAndValue>,
+    subject: List<AttributeTypeAndValue>,
     oid: String,
     label: String,
 ) {
