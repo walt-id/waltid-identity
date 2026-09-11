@@ -30,8 +30,11 @@ import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
@@ -202,7 +205,7 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
     private var serverSocket: BlockingSocket<ServerSocket>? = null
     private var rawConnection: AndroidWifiAwareRawConnection? = null
     private val networkRegistration = WifiAwareNativeResource<Closeable>()
-    private var sessionHandle: kotlinx.coroutines.DisposableHandle? = null
+    private var sessionHandle: DisposableHandle? = null
 
     @SuppressLint("MissingPermission")
     override suspend fun awaitConnection(): WifiAwareRawConnection = coroutineScope {
@@ -250,7 +253,7 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
                 close(ProximityCloseReason.PEER_DISCONNECTED)
             }
         }
-        var accepted: kotlinx.coroutines.Deferred<BlockingSocket<Socket>>? = null
+        var accepted: Deferred<BlockingSocket<Socket>>? = null
         try {
             ensureOpen()
             connectivityManager.requestNetwork(request, callback)
@@ -289,7 +292,7 @@ private class AndroidWifiAwarePreparedPublisher private constructor(
             }
         } catch (failure: Throwable) {
             // Close accept/read resources before coroutineScope joins a blocked IO worker.
-            close(if (failure is kotlinx.coroutines.CancellationException) ProximityCloseReason.CANCELLED
+            close(if (failure is CancellationException) ProximityCloseReason.CANCELLED
                 else ProximityCloseReason.PLATFORM_UNAVAILABLE)
             accepted?.cancel()
             throw failure

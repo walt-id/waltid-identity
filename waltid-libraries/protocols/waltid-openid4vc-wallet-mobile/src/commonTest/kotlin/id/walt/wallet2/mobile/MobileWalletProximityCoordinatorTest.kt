@@ -8,6 +8,7 @@ import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.FakeProximityLoopback
 import id.walt.mdoc.proximity.FakeTransportProvider
 import id.walt.mdoc.proximity.ProximityCloseReason
+import id.walt.mdoc.proximity.ProximityTransportKind
 import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 import id.walt.mdoc.proximity.mobile.BleMdocRoles
 import id.walt.mdoc.proximity.mobile.BleMdocRoleSelection
@@ -697,7 +698,7 @@ class ProximityCoordinatorTest {
                     passphraseInfo = "holder-secret-123456",
                     supportedBands = byteArrayOf(0x04),
                 ),
-                connection = FakeProximityLoopback.create(kind = id.walt.mdoc.proximity.ProximityTransportKind.WIFI_AWARE).holder,
+                connection = FakeProximityLoopback.create(kind = ProximityTransportKind.WIFI_AWARE).holder,
             )
         }
     }
