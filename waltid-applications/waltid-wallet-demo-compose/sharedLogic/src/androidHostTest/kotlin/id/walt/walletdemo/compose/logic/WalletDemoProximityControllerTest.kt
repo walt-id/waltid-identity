@@ -28,6 +28,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -35,6 +36,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -365,7 +367,7 @@ class WalletDemoProximityControllerTest {
         assertNull(controller.state.value.sessionState)
     }
 
-    private fun kotlinx.coroutines.test.TestScope.controller(
+    private fun TestScope.controller(
         backend: ProximityPresentationBackend,
     ): WalletDemoProximityController = WalletDemoProximityController(
         wallet = backend,
@@ -431,7 +433,7 @@ private val eligibility = ProximityElementReference("org.waltid.example.proof", 
 private val unoffered = ProximityElementReference("org.iso.18013.5.1", "age_over_18")
 
 private fun review(): ProximityReview = ProximityReview(
-    reviewId = ProximityReviewId(kotlin.uuid.Uuid.random().toString()),
+    reviewId = ProximityReviewId(Uuid.random().toString()),
     exchange = 1,
     documents = listOf(
         ProximityDocumentReview(

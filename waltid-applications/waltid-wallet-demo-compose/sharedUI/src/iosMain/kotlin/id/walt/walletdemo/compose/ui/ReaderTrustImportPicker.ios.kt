@@ -1,10 +1,11 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(ExperimentalForeignApi::class)
 
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import id.walt.wallet2.mobile.ProximityReaderTrustSettingsCodec
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
 import platform.Foundation.NSData

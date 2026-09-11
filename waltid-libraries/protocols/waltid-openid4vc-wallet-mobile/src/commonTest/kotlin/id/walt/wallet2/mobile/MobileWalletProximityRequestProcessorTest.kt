@@ -1124,7 +1124,7 @@ class ProximityRequestProcessorTest {
                         "26" -> {
                             val wire = CborArray(listOf(CborByteString(signed.protected),
                                 CborMap(mapOf(CborInteger(32) to CborByteString(certificates.leaf.encodedDer.toByteArray()))),
-                                kotlinx.serialization.cbor.CborNull(), CborByteString(signed.signature)))
+                                CborNull(), CborByteString(signed.signature)))
                             coseCompliantCbor.decodeFromByteArray<CoseSign1>(coseCompliantCbor.encodeToByteArray<CborElement>(wire))
                         }
                         "27" -> {

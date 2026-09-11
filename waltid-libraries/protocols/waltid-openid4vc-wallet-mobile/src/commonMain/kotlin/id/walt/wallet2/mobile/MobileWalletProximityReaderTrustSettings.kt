@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.wallet2.mobile
 
@@ -11,6 +11,7 @@ import id.walt.mdoc.proximity.X509RicalSignatureValidator
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateAuthorityUsage
 import kotlinx.io.bytestring.ByteString
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
