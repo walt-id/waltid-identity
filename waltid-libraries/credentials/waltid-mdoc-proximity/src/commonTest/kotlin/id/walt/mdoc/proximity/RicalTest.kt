@@ -1,6 +1,6 @@
 @file:OptIn(
     ExperimentalUnsignedTypes::class,
-    kotlinx.serialization.ExperimentalSerializationApi::class,
+    ExperimentalSerializationApi::class,
 )
 
 package id.walt.mdoc.proximity
@@ -11,6 +11,7 @@ import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborMap

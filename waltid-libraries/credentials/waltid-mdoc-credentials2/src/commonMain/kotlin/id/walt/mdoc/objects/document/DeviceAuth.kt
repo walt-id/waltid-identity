@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.objects.document
 
@@ -10,6 +10,7 @@ import id.walt.mdoc.encoding.extensionsExcluding
 import id.walt.mdoc.encoding.fromCborElement
 import id.walt.mdoc.encoding.requireNoExtensionCollisions
 import id.walt.mdoc.encoding.toCborElement
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable

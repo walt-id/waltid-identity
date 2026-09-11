@@ -1,10 +1,11 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.proximity
 
 import id.walt.mdoc.objects.engagement.BleCentralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborBoolean
 import kotlinx.serialization.cbor.CborByteString

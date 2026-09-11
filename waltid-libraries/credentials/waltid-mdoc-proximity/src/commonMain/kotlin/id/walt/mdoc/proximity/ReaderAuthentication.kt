@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
@@ -14,6 +14,7 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import kotlinx.io.bytestring.ByteString
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /** Scope is part of the statement identity; whole-request statements have no document index. */
 sealed interface ReaderAuthenticationScope {

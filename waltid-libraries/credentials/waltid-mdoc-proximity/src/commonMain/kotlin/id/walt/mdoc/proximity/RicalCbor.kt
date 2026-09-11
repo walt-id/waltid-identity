@@ -1,11 +1,12 @@
 @file:OptIn(
     ExperimentalUnsignedTypes::class,
-    kotlinx.serialization.ExperimentalSerializationApi::class,
+    ExperimentalSerializationApi::class,
 )
 
 package id.walt.mdoc.proximity
 
 import id.walt.mdoc.encoding.toMdocTDateString
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.cbor.CborArray

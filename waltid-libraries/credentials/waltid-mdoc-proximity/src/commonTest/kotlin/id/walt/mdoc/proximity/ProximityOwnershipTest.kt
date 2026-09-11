@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
@@ -9,6 +9,7 @@ import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.ElementReference
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

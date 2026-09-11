@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.objects.deviceretrieval
 

@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.objects.engagement
 
@@ -6,7 +6,9 @@ import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.MdocVersion
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborBoolean
@@ -20,7 +22,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /** ISO/IEC 18013-5 DeviceEngagement with typed retrieval methods and preserved extension fields. */
-@kotlinx.serialization.Serializable(with = DeviceEngagementSerializer::class)
+@Serializable(with = DeviceEngagementSerializer::class)
 data class DeviceEngagement(
     val version: String,
     val security: DeviceEngagementSecurity,

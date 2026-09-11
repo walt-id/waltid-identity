@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.objects.deviceretrieval
 
@@ -14,6 +14,7 @@ import id.walt.mdoc.encoding.toCborElement
 import id.walt.mdoc.encoding.toTaggedByteString
 import id.walt.mdoc.objects.document.Document
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.SerializationException
@@ -25,6 +26,7 @@ import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.cbor.CborObjectAsArray
 import kotlinx.serialization.cbor.CborString
+import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -80,10 +82,10 @@ object DocRequestInfoSerializer : KSerializer<DocRequestInfo> {
         val fields = linkedMapOf<CborElement, CborElement>()
         fun put(name: String, element: CborElement?) { if (element != null) fields[CborString(name)] = element }
         put("alternativeDataElements", value.alternativeDataElements?.toRequestElement(
-            kotlinx.serialization.builtins.ListSerializer(AlternativeDataElementsSet.serializer())
+            ListSerializer(AlternativeDataElementsSet.serializer())
         ))
         put("issuerIdentifiers", value.issuerIdentifiers?.toRequestElement(
-            kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.builtins.ByteArraySerializer())
+            ListSerializer(ByteArraySerializer())
         ))
         put("uniqueDocSetRequired", value.uniqueDocSetRequired?.toRequestElement(Boolean.serializer()))
         put("maximumResponseSize", value.maximumResponseSize?.toRequestElement(UInt.serializer()))
@@ -105,10 +107,10 @@ object DocRequestInfoSerializer : KSerializer<DocRequestInfo> {
         fun <T> get(name: String, serializer: KSerializer<T>): T? = fields[name]?.fromRequestElement(serializer)
         return DocRequestInfo(
             alternativeDataElements = get(
-                "alternativeDataElements", kotlinx.serialization.builtins.ListSerializer(AlternativeDataElementsSet.serializer())
+                "alternativeDataElements", ListSerializer(AlternativeDataElementsSet.serializer())
             ),
             issuerIdentifiers = get(
-                "issuerIdentifiers", kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.builtins.ByteArraySerializer())
+                "issuerIdentifiers", ListSerializer(ByteArraySerializer())
             ),
             uniqueDocSetRequired = get("uniqueDocSetRequired", Boolean.serializer()),
             maximumResponseSize = get("maximumResponseSize", UInt.serializer()),
@@ -556,12 +558,12 @@ object EncryptedDocumentsPlaintextSerializer : KSerializer<EncryptedDocumentsPla
         val fields = linkedMapOf<String, CborElement>()
         value.documents?.let {
             fields["documents"] = it.toCborElement(
-                kotlinx.serialization.builtins.ListSerializer(Document.serializer())
+                ListSerializer(Document.serializer())
             )
         }
         value.zkDocuments?.let {
             fields["zkDocuments"] = it.toCborElement(
-                kotlinx.serialization.builtins.ListSerializer(ZkDocument.serializer())
+                ListSerializer(ZkDocument.serializer())
             )
         }
         fields.putAll(value.extensions)
@@ -572,10 +574,10 @@ object EncryptedDocumentsPlaintextSerializer : KSerializer<EncryptedDocumentsPla
         val fields = decoder.decodeTextMap("EncryptedDocumentsPlaintext")
         return EncryptedDocumentsPlaintext(
             documents = fields["documents"]?.fromCborElement(
-                kotlinx.serialization.builtins.ListSerializer(Document.serializer())
+                ListSerializer(Document.serializer())
             ),
             zkDocuments = fields["zkDocuments"]?.fromCborElement(
-                kotlinx.serialization.builtins.ListSerializer(ZkDocument.serializer())
+                ListSerializer(ZkDocument.serializer())
             ),
             extensions = fields.extensionsExcluding(ENCRYPTED_DOCUMENTS_PLAINTEXT_FIELDS),
         )
