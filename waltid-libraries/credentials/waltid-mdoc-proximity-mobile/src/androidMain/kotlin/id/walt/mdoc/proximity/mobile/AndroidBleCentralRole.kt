@@ -31,6 +31,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -52,7 +53,7 @@ internal class AndroidBleCentralRole(
     @Volatile private var scanCallback: ScanCallback? = null
     @Volatile private var gattSession: AndroidCentralGattSession? = null
     @Volatile private var connection: BleRawConnection? = null
-    private val completion: DisposableHandle? = sessionScope.coroutineContext[kotlinx.coroutines.Job]?.invokeOnCompletion {
+    private val completion: DisposableHandle? = sessionScope.coroutineContext[Job]?.invokeOnCompletion {
         close(ProximityCloseReason.CANCELLED)
     }
 

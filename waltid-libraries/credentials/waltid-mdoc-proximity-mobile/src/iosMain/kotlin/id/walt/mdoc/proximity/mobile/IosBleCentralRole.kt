@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(ExperimentalForeignApi::class)
 
 package id.walt.mdoc.proximity.mobile
 
@@ -6,11 +6,13 @@ import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
 import kotlinx.atomicfu.atomic
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -44,7 +46,7 @@ internal class IosBleCentralRole(
     private val closed = atomic(false)
     private val session = IosCentralGattSession(serviceUuid)
     private var connection: BleRawConnection? = null
-    private val completion: DisposableHandle? = sessionScope.coroutineContext[kotlinx.coroutines.Job]?.invokeOnCompletion {
+    private val completion: DisposableHandle? = sessionScope.coroutineContext[Job]?.invokeOnCompletion {
         close(ProximityCloseReason.CANCELLED)
     }
 

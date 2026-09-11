@@ -31,6 +31,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -250,7 +251,7 @@ internal class AndroidBlePeripheralRole private constructor(
         )
         serviceAdded.await()
         startAdvertising()
-        completion = sessionScope.coroutineContext[kotlinx.coroutines.Job]?.invokeOnCompletion {
+        completion = sessionScope.coroutineContext[Job]?.invokeOnCompletion {
             close(ProximityCloseReason.CANCELLED)
         }
     }

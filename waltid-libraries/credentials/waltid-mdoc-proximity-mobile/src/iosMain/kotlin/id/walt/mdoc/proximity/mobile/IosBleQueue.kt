@@ -1,7 +1,8 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(ExperimentalForeignApi::class)
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSThread
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue

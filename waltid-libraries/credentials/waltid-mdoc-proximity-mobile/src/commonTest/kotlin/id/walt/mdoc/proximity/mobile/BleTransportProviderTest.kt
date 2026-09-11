@@ -1,6 +1,6 @@
 @file:OptIn(
-    kotlinx.coroutines.ExperimentalCoroutinesApi::class,
-    kotlinx.serialization.ExperimentalSerializationApi::class,
+    ExperimentalCoroutinesApi::class,
+    ExperimentalSerializationApi::class,
 )
 
 package id.walt.mdoc.proximity.mobile
@@ -17,6 +17,7 @@ import id.walt.mdoc.proximity.ProximityTransportKind
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
@@ -28,6 +29,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

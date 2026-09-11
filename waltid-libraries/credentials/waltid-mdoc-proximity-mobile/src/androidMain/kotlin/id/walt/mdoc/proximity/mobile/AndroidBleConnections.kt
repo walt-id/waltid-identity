@@ -1,6 +1,7 @@
 package id.walt.mdoc.proximity.mobile
 
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
@@ -12,6 +13,7 @@ import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
 import java.io.IOException
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,9 +71,9 @@ internal sealed interface AndroidGattOperation {
     data class Connected(val status: Int) : AndroidGattOperation
     data class MtuChanged(val mtu: Int, val status: Int) : AndroidGattOperation
     data class ServicesDiscovered(val status: Int) : AndroidGattOperation
-    data class CharacteristicRead(val uuid: java.util.UUID, val value: ByteArray, val status: Int) : AndroidGattOperation
-    data class CharacteristicWrite(val uuid: java.util.UUID, val status: Int) : AndroidGattOperation
-    data class DescriptorWrite(val uuid: java.util.UUID, val status: Int) : AndroidGattOperation
+    data class CharacteristicRead(val uuid: UUID, val value: ByteArray, val status: Int) : AndroidGattOperation
+    data class CharacteristicWrite(val uuid: UUID, val status: Int) : AndroidGattOperation
+    data class DescriptorWrite(val uuid: UUID, val status: Int) : AndroidGattOperation
     data class NotificationSent(val status: Int) : AndroidGattOperation
     data class Disconnected(val status: Int) : AndroidGattOperation
 }
@@ -116,7 +118,7 @@ internal fun BluetoothGatt.writeDescriptorCompat(
 
 @SuppressLint("MissingPermission")
 internal fun BluetoothGattServer.notifyCompat(
-    device: android.bluetooth.BluetoothDevice,
+    device: BluetoothDevice,
     characteristic: BluetoothGattCharacteristic,
     value: ByteArray,
 ): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

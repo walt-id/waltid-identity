@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import id.walt.mdoc.proximity.ProximityTransportProvider
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Android ISO mdoc BLE provider.
@@ -69,7 +70,7 @@ internal class AndroidBlePlatformAdapter(
         serviceUuid: BleServiceUuid,
         expectedIdent: ByteArray,
         preferL2cap: Boolean,
-        sessionScope: kotlinx.coroutines.CoroutineScope,
+        sessionScope: CoroutineScope,
     ): BlePreparedPlatformRole = AndroidBleCentralRole(
         context,
         requireNotNull(adapter),
@@ -82,7 +83,7 @@ internal class AndroidBlePlatformAdapter(
     override suspend fun preparePeripheralServer(
         serviceUuid: BleServiceUuid,
         preferL2cap: Boolean,
-        sessionScope: kotlinx.coroutines.CoroutineScope,
+        sessionScope: CoroutineScope,
     ): BlePreparedPlatformRole = AndroidBlePeripheralRole.create(
         context,
         requireNotNull(manager),
