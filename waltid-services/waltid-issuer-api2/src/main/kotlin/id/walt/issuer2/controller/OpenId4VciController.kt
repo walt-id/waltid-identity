@@ -92,7 +92,10 @@ class OpenId4VciController(
     fun register(route: Route, surfaces: Set<Issuer2RouteSurface> = Issuer2RouteSurface.all) {
         require(surfaces.isNotEmpty()) { "At least one issuer route surface must be registered" }
         if (Issuer2RouteSurface.METADATA in surfaces) {
-            route.get(".well-known/openid-credential-issuer/openid4vci", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
+            route.get(
+                ".well-known/openid-credential-issuer/openid4vci",
+                OpenId4VciRoutesDocs.credentialIssuerMetadata()
+            ) {
                 call.response.headers.append(HttpHeaders.Vary, HttpHeaders.Accept)
                 val signedContentType = call.requestedSignedCredentialIssuerMetadataContentType()
                 if (signedContentType == null) {
@@ -105,7 +108,10 @@ class OpenId4VciController(
                 }
             }
 
-            route.get(".well-known/oauth-authorization-server/openid4vci", OpenId4VciRoutesDocs.authorizationServerMetadata()) {
+            route.get(
+                ".well-known/oauth-authorization-server/openid4vci",
+                OpenId4VciRoutesDocs.authorizationServerMetadata()
+            ) {
                 call.respond(metadataService.getAuthorizationServerMetadata())
             }
 
@@ -181,7 +187,8 @@ class OpenId4VciController(
                             ?: return@onCallRespond
                         val requestId = requireNotNull(call.callId) { "Missing call ID" }
                         protocolService.processExternalLoginInterception(
-                            externalAuthorizationRequest = call.response.headers.allValues().toMap()["Location"]?.firstOrNull(),
+                            externalAuthorizationRequest = call.response.headers.allValues()
+                                .toMap()["Location"]?.firstOrNull(),
                             authorizationRequestEnvelope = authorizationRequestEnvelope,
                             requestId = requestId,
                         )
