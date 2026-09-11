@@ -1,7 +1,7 @@
 @file:OptIn(
     ExperimentalSerializationApi::class,
     ExperimentalCoroutinesApi::class,
-    kotlin.ExperimentalUnsignedTypes::class,
+    ExperimentalUnsignedTypes::class,
 )
 
 package id.walt.mdoc.proximity

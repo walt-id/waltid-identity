@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class, kotlinx.cinterop.BetaInteropApi::class)
+@file:OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 
 package id.walt.mdoc.proximity.mobile
 
@@ -6,6 +6,8 @@ import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
 import kotlinx.atomicfu.atomic
+import kotlinx.cinterop.BetaInteropApi
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.reinterpret
