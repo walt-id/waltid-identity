@@ -1,17 +1,20 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.wallet2.mobile
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile.profileDocumentSignerCertificate
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseKey
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.createAndSignDetached
 import id.walt.cose.toCoseKey
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
@@ -32,9 +35,11 @@ import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DocRequest
+import id.walt.mdoc.objects.deviceretrieval.DocRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.DeviceAuth
+import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.proximity.*
 import id.walt.mdoc.crypto.MdocCryptoHelper
@@ -63,6 +68,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.serialization.cbor.CborString
+import kotlinx.serialization.ExperimentalSerializationApi
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.Signer
 import id.walt.mdoc.proximity.MdocConsentDecision
@@ -83,6 +89,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -418,7 +427,7 @@ class ProximityRequestProcessorTest {
                 readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
             )
 
-            val failure = kotlin.test.assertFailsWith<ProximityException> {
+            val failure = assertFailsWith<ProximityException> {
                 processor.preview(requestContext(fixture.readerEphemeralKey))
             }
 
@@ -446,7 +455,7 @@ class ProximityRequestProcessorTest {
                 readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
             )
 
-            val failure = kotlin.test.assertFailsWith<ProximityException> {
+            val failure = assertFailsWith<ProximityException> {
                 processor.preview(requestContext(fixture.readerEphemeralKey))
             }
 
@@ -536,7 +545,7 @@ class ProximityRequestProcessorTest {
                     ),
                     readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
                 )
-                val failure = kotlin.test.assertFailsWith<ProximityException> {
+                val failure = assertFailsWith<ProximityException> {
                     processor.preview(context)
                 }
                 assertEquals(expectedCode, failure.error.code)
@@ -580,7 +589,7 @@ class ProximityRequestProcessorTest {
 
             status = ProximityCredentialStatus.Revoked
 
-            val failure = kotlin.test.assertFailsWith<ProximityException> {
+            val failure = assertFailsWith<ProximityException> {
                 processor.resolve(context, lowerPreview)
             }
             assertEquals("credential_unavailable", failure.error.code)
@@ -605,7 +614,7 @@ class ProximityRequestProcessorTest {
             val review = processor.review(prompt)
             assertEquals(null, processor.accept(prompt, review.reviewId, submissionFor(review, review.documents.single().credentialOptions.first())))
             trusted = false
-            val failure = kotlin.test.assertFailsWith<ProximityException> { processor.resolve(context, preview) }
+            val failure = assertFailsWith<ProximityException> { processor.resolve(context, preview) }
             assertEquals("changed_submission", failure.error.code)
         }
     }
@@ -624,7 +633,7 @@ class ProximityRequestProcessorTest {
             val review = processor.review(prompt)
             assertEquals(null, processor.accept(prompt, review.reviewId, submissionFor(review, review.documents.single().credentialOptions.single())))
             authorization = authorization.copy(details = listOf(ProximityApplicationAuthorizationDetail("amount", "Amount", "EUR 2.00")))
-            val failure = kotlin.test.assertFailsWith<ProximityException> { processor.resolve(context, preview) }
+            val failure = assertFailsWith<ProximityException> { processor.resolve(context, preview) }
             assertEquals("changed_submission", failure.error.code)
         }
     }
@@ -640,7 +649,7 @@ class ProximityRequestProcessorTest {
             val option = review.documents.single().credentialOptions.first()
             assertEquals(null, processor.accept(prompt, review.reviewId, submissionFor(review, option)))
             fixture.wallet.credentialStores.forEach { it.removeCredential(option.credentialId) }
-            val failure = kotlin.test.assertFailsWith<ProximityException> { processor.resolve(context, preview) }
+            val failure = assertFailsWith<ProximityException> { processor.resolve(context, preview) }
             assertEquals("changed_submission", failure.error.code)
         }
     }
@@ -671,7 +680,7 @@ class ProximityRequestProcessorTest {
             val secondPreview = processor.preview(secondContext)
             val secondDecision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt(secondPreview, 2)) }
             val secondReview = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
-            kotlin.test.assertNotEquals(firstReview.reviewId, secondReview.reviewId)
+            assertNotEquals(firstReview.reviewId, secondReview.reviewId)
             assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Approve(firstReview.reviewId, submission)))
             assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Decline(firstReview.reviewId)))
             owner.publish(ProximityState.AwaitingRequest(2))
@@ -703,11 +712,11 @@ class ProximityRequestProcessorTest {
 
             owner.publish(failure)
             decision.join()
-            kotlin.test.assertTrue(decision.isCancelled)
+            assertTrue(decision.isCancelled)
             assertEquals(failure, owner.state.value)
             assertEquals(ProximityErrorCategory.Transport, failure.error.category)
             assertEquals(ProximityRecovery.StartNewSession, failure.error.recovery)
-            kotlin.test.assertTrue(failure.legalActions.isEmpty())
+            assertTrue(failure.legalActions.isEmpty())
             assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Approve(review.reviewId, submission)))
             assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Decline(review.reviewId)))
             owner.publish(ProximityState.ReviewRequired(review))
@@ -766,7 +775,7 @@ class ProximityRequestProcessorTest {
             assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Decline(oldReview.reviewId)))
             assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Cancel))
             decision.join()
-            kotlin.test.assertTrue(decision.isCancelled)
+            assertTrue(decision.isCancelled)
             assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Approve(current.reviewId, submission)))
             owner.publish(ProximityState.SendingResponse(1))
             owner.publish(ProximityState.Failed(EngineProximityError.Policy("late", "Late failure").toWalletError()))
@@ -829,7 +838,7 @@ class ProximityRequestProcessorTest {
             assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Cancel))
             assertIs<MdocConsentDecision.Approve>(decision.await())
             assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Decline(review.reviewId)))
-            kotlin.test.assertFailsWith<IllegalArgumentException> { processor.resolve(context, preview) }
+            assertFailsWith<IllegalArgumentException> { processor.resolve(context, preview) }
             assertEquals(ProximityState.Cancelled, owner.state.value)
         }
     }
@@ -929,7 +938,7 @@ class ProximityRequestProcessorTest {
     @Test
     fun `mutating cached credential projections cannot replace authoritative signed claims`() = runTest {
         withFixture { fixture ->
-            val original = assertIs<id.walt.credentials.formats.MdocsCredential>(fixture.wallet.findCredential("mdl-1")!!.credential)
+            val original = assertIs<MdocsCredential>(fixture.wallet.findCredential("mdl-1")!!.credential)
             val cached = original.document.issuerSigned.namespaces!!
             (cached as MutableMap).clear()
             val processor = processor(fixture)
@@ -971,9 +980,9 @@ class ProximityRequestProcessorTest {
             }
             val intermediateAki = requireNotNull(CertificateDer(intermediate.encodedDer.toByteArray()).authorityKeyIdentifier)
             val leafAki = requireNotNull(CertificateDer(signer.encodedDer.toByteArray()).authorityKeyIdentifier)
-            kotlin.test.assertFalse(intermediateAki.contentEquals(leafAki))
+            assertFalse(intermediateAki.contentEquals(leafAki))
             val stored = fixture.wallet.findCredential("mdl-1")!!
-            val existing = stored.credential as id.walt.credentials.formats.MdocsCredential
+            val existing = stored.credential as MdocsCredential
             val issuerSigned = MdocIssuer.issueUniversal(
                 issuerKey = signerKey, signatureAlgorithm = Cose.Algorithm.ES256,
                 issuerCertificate = listOf(signer, intermediate).map { CoseCertificate(it.encodedDer.toByteArray()) },
@@ -990,8 +999,8 @@ class ProximityRequestProcessorTest {
             fun context(aki: ByteArray): MdocHolderRequestContext {
                 val ordinary = unsignedRequest()
                 val requested = ordinary.docRequests.single()
-                val constrained = requested.copy(itemsRequest = id.walt.mdoc.encoding.ByteStringWrapper(
-                    requested.itemsRequest.value.copy(requestInfo = id.walt.mdoc.objects.deviceretrieval.DocRequestInfo(issuerIdentifiers = listOf(aki))),
+                val constrained = requested.copy(itemsRequest = ByteStringWrapper(
+                    requested.itemsRequest.value.copy(requestInfo = DocRequestInfo(issuerIdentifiers = listOf(aki))),
                 ))
                 return requestContext(ordinary.copy(docRequests = listOf(constrained)), transcript(), fixture.readerEphemeralKey)
             }
@@ -1001,14 +1010,14 @@ class ProximityRequestProcessorTest {
             val review = processor.review(prompt(preview, 1))
             assertEquals(listOf("mdl-1"), review.documents.single().credentialOptions.map { it.credentialId })
             processor.cancel()
-            val noMatch = kotlin.test.assertFailsWith<ProximityException> { processor(fixture).preview(context(ByteArray(20) { 99 })) }
+            val noMatch = assertFailsWith<ProximityException> { processor(fixture).preview(context(ByteArray(20) { 99 })) }
             assertEquals("request_unsatisfied", noMatch.error.code)
-            val malformed = document.copy(issuerSigned = id.walt.mdoc.objects.document.IssuerSigned.fromIssuerSignedLists(
+            val malformed = document.copy(issuerSigned = IssuerSigned.fromIssuerSignedLists(
                 namespaces = issuerSigned.namespaces.orEmpty(), issuerAuth = issuerSigned.issuerAuth.copy(
                 unprotected = issuerSigned.issuerAuth.unprotected.copy(x5chain = listOf(CoseCertificate(intermediate.encodedDer.toByteArray()))),
             )))
             install(malformed)
-            val invalid = kotlin.test.assertFailsWith<ProximityException> { processor(fixture).preview(matching) }
+            val invalid = assertFailsWith<ProximityException> { processor(fixture).preview(matching) }
             assertEquals("credential_unavailable", invalid.error.code)
         }
     }
@@ -1107,7 +1116,7 @@ class ProximityRequestProcessorTest {
             Channel(Channel.CONFLATED),
         ).also { it.attach(processor) }
 
-    private fun prompt(preview: id.walt.mdoc.proximity.MdocRequestPreview, exchange: Int) =
+    private fun prompt(preview: MdocRequestPreview, exchange: Int) =
         MdocConsentPrompt(ImmutableBytes.of(ByteArray(32) { exchange.toByte() }), exchange, preview)
 
     private fun decodeResponse(response: MdocResponseResolution.Send): DeviceResponse =
@@ -1193,7 +1202,7 @@ class ProximityRequestProcessorTest {
             runtime = runtime,
             readerEphemeralKey = ExactCbor.of(
                 readerPublic,
-                coseCompliantCbor.encodeToByteArray(id.walt.cose.CoseKey.serializer(), readerPublic),
+                coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), readerPublic),
             ),
         )
     }
@@ -1216,7 +1225,7 @@ class ProximityRequestProcessorTest {
         id: String,
         holderKey: Key,
         issuerKey: Key,
-        documentSignerCertificate: id.walt.certificate.x509.X509Certificate,
+        documentSignerCertificate: X509Certificate,
     ): StoredCredential {
         val holderPublicJwk = assertIs<EncodedKey.Jwk>(
             assertNotNull(holderKey.capabilities.publicKeyExporter).exportPublicKey()
@@ -1258,7 +1267,7 @@ class ProximityRequestProcessorTest {
     }
 
     private fun requestContext(
-        readerEphemeralKey: ExactCbor<id.walt.cose.CoseKey>,
+        readerEphemeralKey: ExactCbor<CoseKey>,
     ): MdocHolderRequestContext {
         val request = unsignedRequest()
         val transcript = transcript()
@@ -1315,7 +1324,7 @@ class ProximityRequestProcessorTest {
     private fun requestContext(
         request: DeviceRequest,
         transcript: SessionTranscript,
-        readerEphemeralKey: ExactCbor<id.walt.cose.CoseKey>,
+        readerEphemeralKey: ExactCbor<CoseKey>,
         exchange: Int = 1,
     ): MdocHolderRequestContext = MdocHolderRequestContext(
             request = ExactCbor.of(
@@ -1324,7 +1333,7 @@ class ProximityRequestProcessorTest {
             ),
             transcript = ExactCbor.of(
                 transcript,
-                id.walt.mdoc.crypto.MdocCryptoHelper.buildSessionTranscriptBytes(transcript),
+                MdocCryptoHelper.buildSessionTranscriptBytes(transcript),
             ),
             readerEphemeralKey = readerEphemeralKey,
             exchange = exchange,
@@ -1417,7 +1426,7 @@ class ProximityRequestProcessorTest {
     private class Fixture(
         val wallet: Wallet,
         val runtime: CryptoRuntime,
-        val readerEphemeralKey: ExactCbor<id.walt.cose.CoseKey>,
+        val readerEphemeralKey: ExactCbor<CoseKey>,
     ) {
         suspend fun close() = runtime.close()
     }
