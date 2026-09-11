@@ -1,9 +1,17 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.InternalComposeUiApi
+import androidx.compose.ui.LocalSystemTheme
+import androidx.compose.ui.SystemTheme
 import kotlin.test.Test
 
+@OptIn(InternalComposeUiApi::class)
 class WalletDemoAppIosTest {
-    private val scenarios = WalletDemoAppTestScenarios()
+    private val scenarios = WalletDemoAppTestScenarios { content ->
+        // Headless Skiko tests have no UIKit window; reading its fallback display theme can block.
+        CompositionLocalProvider(LocalSystemTheme provides SystemTheme.Light, content = content)
+    }
 
     @Test
     fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
