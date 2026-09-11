@@ -48,6 +48,9 @@ class BouncyPkcs10CertificateSigningRequestSigner : Pkcs10CertificateSigningRequ
         val bouncyBuilder = PKCS10CertificationRequestBuilder(subject, publicKeyInfo.bouncyCastleSubjectPublicKeyInfo)
 
         if (csrBuilder.requestedCertificate.extensions.isNotEmpty()) {
+            // BouncyCastle's ExtensionsGenerator.generate() throws IllegalArgumentException on an
+            // empty extension set, so the extensionRequest attribute can only be added when there
+            // is at least one extension.
             val extGen = ExtensionsGenerator()
             csrBuilder.requestedCertificate.extensions.values.map {
                 BouncyExtensionFactory.createExtension(it)

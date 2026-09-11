@@ -115,7 +115,7 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         require(subjectPublicKeyInfo.key != null || subjectPublicKeyInfo.spki != null) {
             "Certificate subject public key missing"
         }
-        require(subjectPublicKeyInfo.crypto1key == null) { "For subject public key info key or SPKI must be set" }
+        require(subjectPublicKeyInfo.crypto1key == null) { "Certificate subject public key must not mix Crypto1Key with key or SPKI" }
         builder.extensionAuthorityKeyIdentifier()
         issuerCert.data.extensionSubjectKeyIdentifier?.let { subjectKeyId ->
             val issuerPublicKeyInfo = services.certificateSigner.convertKeyToPublicKeyInfo(issuerKey)
@@ -138,12 +138,13 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
             subjectDn = "OU=issuer, DC=test, O=Walt.id",
         )
         block.invoke(builder)
+        builder.issuerDnRaw = issuerCert.data.subjectDnRaw
         val subjectPublicKeyInfo =
             builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder
         require(subjectPublicKeyInfo.crypto1key != null || subjectPublicKeyInfo.spki != null) {
             "Certificate subject public key missing"
         }
-        require(subjectPublicKeyInfo.key == null) { "For subject public key info Crypto1Key or SPKI must be set" }
+        require(subjectPublicKeyInfo.key == null) { "Certificate subject public key must not mix key with Crypto1Key or SPKI" }
         builder.extensionAuthorityKeyIdentifier()
         issuerCert.data.extensionSubjectKeyIdentifier?.let { subjectKeyId ->
             val issuerPublicKeyInfo = services.certificateSigner.convertKeyToPublicKeyInfo(issuerKey)
