@@ -33,7 +33,10 @@ import kotlin.time.Instant
  * new mdoc issuer directly.
  */
 @OptIn(ExperimentalSerializationApi::class)
-class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
+class MdocCredentialHandler(
+    private val roundValidityToTwelveHours: Boolean = false,
+    private val now: () -> Instant = { Clock.System.now() },
+) : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
     override suspend fun sign(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
@@ -63,7 +66,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             computeCredentialResult(
                 request = request,
                 configuration = configuration,
-                issue = { certificateChain, docType, signedAt, effectiveValidUntil, instance ->
+                issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
                         credentialData = instance.input.credentialData,
@@ -116,7 +119,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             validFrom = validFrom,
             validUntil = validUntil,
-            issue = { certificateChain, docType, signedAt, effectiveValidUntil, instance ->
+            issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
                     credentialData = instance.input.credentialData,
@@ -161,17 +164,20 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         val docType = configuration.doctype
             ?: throw IllegalArgumentException("Missing doctype for mDoc credential configuration")
 
-        val issuerCertificateChain = requireNotNull(x5Chain?.takeIf { it.isNotEmpty() }) {
+        val certificates = requireNotNull(x5Chain?.takeIf { it.isNotEmpty() }) {
             "mDoc issuance requests require that the x5Chain parameter contains at least one entry"
-        }.map { CoseCertificate(it.encodedDer.toByteArray()) }
+        }
+        val issuerCertificateChain = certificates.map { CoseCertificate(it.encodedDer.toByteArray()) }
 
-        val effectiveValidUntil = resolveValidUntil(request, validUntil)
-
-        val issuerCertificateChain = requireNotNull(x5Chain?.takeIf { it.isNotEmpty() }) {
-            "mDoc issuance requests require that the x5Chain parameter contains at least one entry"
-        }.map { CoseCertificate(it.encodedDer.toByteArray()) }
-
-        val effectiveValidUntil = resolveValidUntil(request, validUntil)
+        val requestedValidUntil = request.requestForm["validUntil"]
+            ?.firstOrNull()
+            ?.toLongOrNull()
+            ?.let(Instant::fromEpochMilliseconds)
+            ?: validUntil
+        val roundedValidity = if (roundValidityToTwelveHours) {
+            roundedMdocValidity(now(), certificates.first().data.validity, validFrom, requestedValidUntil)
+        } else null
+        val effectiveValidUntil = roundedValidity?.validUntil ?: requestedValidUntil ?: now().plus(365.days)
         return issuanceBatch.signEach { instance ->
             val credentialData = instance.input.credentialData
             val namespaceIdentifiers = credentialData.keys
@@ -188,7 +194,10 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                     "Credential data for namespace $namespaceIdentifier must be a JSON object"
                 }
             }
-            issue(issuerCertificateChain, docType, effectiveValidUntil, instance)
+            issue(
+                issuerCertificateChain, docType, roundedValidity?.signed,
+                roundedValidity?.validFrom ?: validFrom, effectiveValidUntil, instance,
+            )
         }
     }
 
