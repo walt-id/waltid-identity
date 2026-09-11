@@ -2,10 +2,12 @@ package id.walt.mdoc.proximity.mobile
 
 import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ProximityCloseReason
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
@@ -61,7 +63,7 @@ class AndroidNfcSessionRegistryTest {
         val parent = Job().also { it.cancel() }
         val router = RecordingRouter()
 
-        assertFailsWith<kotlinx.coroutines.CancellationException> {
+        assertFailsWith<CancellationException> {
             AndroidNfcSessionRegistry.arm(router, parent)
         }
 
@@ -141,7 +143,7 @@ class AndroidNfcSessionRegistryTest {
     private suspend fun eventually(condition: () -> Boolean) {
         repeat(100) {
             if (condition()) return
-            kotlinx.coroutines.delay(10)
+            delay(10)
         }
         assertTrue(condition(), "Condition was not satisfied before timeout")
     }

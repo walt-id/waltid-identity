@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.nfc.NfcAdapter
 import android.nfc.cardemulation.CardEmulation
 import android.nfc.cardemulation.HostApduService
@@ -181,7 +182,7 @@ internal class AndroidSystemNfcHostEnvironment(
         )
     }
 
-    private fun serviceMetadata(info: android.content.pm.ServiceInfo): AndroidNfcServiceMetadata {
+    private fun serviceMetadata(info: ServiceInfo): AndroidNfcServiceMetadata {
         val parser = info.loadXmlMetaData(applicationContext.packageManager, HostApduService.SERVICE_META_DATA)
             ?: error("The mdoc NFC host service metadata is missing")
         return parser.use {

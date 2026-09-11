@@ -1,6 +1,6 @@
 @file:OptIn(
     ExperimentalUnsignedTypes::class,
-    kotlinx.serialization.ExperimentalSerializationApi::class,
+    ExperimentalSerializationApi::class,
 )
 
 package id.walt.mdoc.proximity.mobile
@@ -12,6 +12,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlinx.serialization.ExperimentalSerializationApi
 
 class NfcRetrievalApduProcessorTest {
     @Test

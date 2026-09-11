@@ -126,7 +126,7 @@ class ProximityModelsTest {
 
         assertFailsWith<IllegalArgumentException> {
             ProximityCapabilities(
-                session = id.walt.wallet2.mobile.ProximitySessionConfiguration.Qr(),
+                session = ProximitySessionConfiguration.Qr(),
                 profile = ProximityProfile.Iso180135Edition2Dis2026,
                 qrEngagement = available,
                 nfcEngagement = unselected,

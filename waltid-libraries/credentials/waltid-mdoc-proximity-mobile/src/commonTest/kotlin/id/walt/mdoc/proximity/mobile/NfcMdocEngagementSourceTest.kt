@@ -1,7 +1,7 @@
 @file:OptIn(
-    kotlinx.coroutines.ExperimentalCoroutinesApi::class,
-    kotlinx.serialization.ExperimentalSerializationApi::class,
-    kotlin.ExperimentalUnsignedTypes::class,
+    ExperimentalCoroutinesApi::class,
+    ExperimentalSerializationApi::class,
+    ExperimentalUnsignedTypes::class,
 )
 
 package id.walt.mdoc.proximity.mobile
@@ -9,6 +9,7 @@ package id.walt.mdoc.proximity.mobile
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
@@ -49,10 +50,12 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborElement
@@ -815,7 +818,7 @@ class NfcMdocEngagementSourceTest {
         }
     }
 
-    private suspend fun <T> withKey(block: suspend (id.walt.crypto2.keys.Key) -> T): T {
+    private suspend fun <T> withKey(block: suspend (Key) -> T): T {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val key = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
@@ -833,7 +836,7 @@ class NfcMdocEngagementSourceTest {
     }
 
     private fun context(
-        key: id.walt.crypto2.keys.Key,
+        key: Key,
         limits: MdocProximityLimits = MdocProximityLimits(maximumSessionMessageBytes = 4096),
         maximumMessageBytes: Int = 4096,
     ): MdocEngagementPreparationContext {

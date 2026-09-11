@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@file:OptIn(ExperimentalCoroutinesApi::class)
 
 package id.walt.mdoc.proximity
 
@@ -8,6 +8,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
@@ -498,7 +499,7 @@ class EngagementCoordinatorTest {
     }
 
     private class TrackingConnection(override val kind: ProximityTransportKind) : ProximityConnection {
-        private val closure = kotlinx.coroutines.CompletableDeferred<ProximityCloseReason>()
+        private val closure = CompletableDeferred<ProximityCloseReason>()
         override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
         override suspend fun receive(): ImmutableBytes? = null
         override suspend fun send(message: ImmutableBytes) = Unit

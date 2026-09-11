@@ -374,7 +374,7 @@ class ProximityRequestProcessorTest {
             assertEquals(listOf(0), review.readerAuthentication.mapNotNull { it.scope.documentRequestIndex })
             assertEquals(
                 listOf(0),
-                assertNotNull(preview.readerAuthentication).documents.map { (it.scope as id.walt.mdoc.proximity.ReaderAuthenticationScope.Document).index },
+                assertNotNull(preview.readerAuthentication).documents.map { (it.scope as ReaderAuthenticationScope.Document).index },
             )
         }
     }

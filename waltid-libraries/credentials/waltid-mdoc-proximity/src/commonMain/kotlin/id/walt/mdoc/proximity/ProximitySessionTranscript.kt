@@ -1,10 +1,11 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.handover.NFCHandover
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.cbor.CborObjectAsArray
