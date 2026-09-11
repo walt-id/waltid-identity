@@ -7,6 +7,7 @@ import id.walt.mdoc.credsdata.Mdl
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ItemsRequestList
+import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.digest.ValueDigestList
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
@@ -23,6 +24,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertIs
 import kotlin.time.Instant
 
 class MdlCborTest {
@@ -372,7 +374,7 @@ class MdlCborTest {
             "4D80E1E2E4FB246D97895427CE7000BB59BB24C8CD003ECF94BF35BBD2917E34"
         )
 
-        assertNotNull(document.deviceSigned?.deviceAuth?.deviceMac)
+        assertIs<DeviceAuth.Mac>(document.deviceSigned?.deviceAuth)
 
         assertEquals(coseCompliantCbor.encodeToByteArray(deviceResponse).toHexString().uppercase(), input)
     }

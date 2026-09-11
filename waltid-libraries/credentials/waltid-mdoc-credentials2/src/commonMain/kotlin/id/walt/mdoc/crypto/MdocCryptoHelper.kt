@@ -26,28 +26,17 @@ object MdocCryptoHelper {
 
     private val log = KotlinLogging.logger { }
 
-    /**
-     * @param handoverInfoBytes: cannot serialize generic, serialize in caller function where type information is available
-     */
-    fun reconstructSessionTranscript(handoverInfo: BaseHandoverInfo, handoverInfoBytes: ByteArray): SessionTranscript {
+    private fun reconstructOpenIdSessionTranscript(
+        identifier: String,
+        handoverInfoBytes: ByteArray,
+    ): SessionTranscript {
         val infoHash = handoverInfoBytes.sha256()
         log.trace { "Handover info SHA-256 hash (hex): ${infoHash.toHexString()}" }
-
-        // Step 3: Create the OpenID4VPHandover structure
         val handover = OpenID4VPHandover(
-            identifier = when (handoverInfo) {
-                is OpenID4VPHandoverInfo -> "OpenID4VPHandover"
-                is OpenID4VPDCAPIHandoverInfo -> "OpenID4VPDCAPIHandover"
-                is NFCHandover -> TODO()
-            },
-            infoHash = infoHash
+            identifier = identifier,
+            infoHash = infoHash,
         )
-
-        // Step 4: Create the final SessionTranscript
-        return when (handoverInfo) {
-            is NFCHandover -> TODO()
-            is OpenID4VPHandoverInfo, is OpenID4VPDCAPIHandoverInfo -> SessionTranscript.forOpenId(handover)
-        }
+        return SessionTranscript.forOpenId(handover)
     }
 
     fun reconstructDcApiOid4vpSessionTranscript(context: MdocVerificationContext): SessionTranscript {
@@ -63,7 +52,7 @@ object MdocCryptoHelper {
         val handoverInfoBytes = coseCompliantCbor.encodeToByteArray(handoverInfo)
         log.trace { "Reconstructed CBOR handoverInfoBytes (hex): ${handoverInfoBytes.toHexString()}" }
 
-        return reconstructSessionTranscript(handoverInfo, handoverInfoBytes)
+        return reconstructOpenIdSessionTranscript("OpenID4VPDCAPIHandover", handoverInfoBytes)
     }
 
     fun reconstructAnnexCSessionTranscript(
@@ -120,12 +109,13 @@ object MdocCryptoHelper {
         val handoverInfoBytes = coseCompliantCbor.encodeToByteArray(handoverInfo)
         log.trace { "Reconstructed CBOR handoverInfoBytes (hex): ${handoverInfoBytes.toHexString()}" }
 
-        return reconstructSessionTranscript(handoverInfo, handoverInfoBytes)
+        return reconstructOpenIdSessionTranscript("OpenID4VPHandover", handoverInfoBytes)
     }
 
     /**
-     * Builds and serializes the DeviceAuthentication structure to be used as the detached payload for device signature verification.
-     * As per ISO/IEC 18013-5:2021, 9.1.3.4.
+     * Builds `DeviceAuthenticationBytes`, the detached payload used for device authentication.
+     *
+     * @see ISO/IEC 18013-5, DeviceAuthenticationBytes CDDL
      */
     fun buildDeviceAuthenticationBytes(
         transcript: SessionTranscript,
@@ -152,9 +142,16 @@ object MdocCryptoHelper {
         return byteArrayOf(0xd8.toByte(), 24.toByte()) + cborByteString
     }
 
+    /** Exact `SessionTranscriptBytes = #6.24(bstr .cbor SessionTranscript)` cryptographic input. */
+    fun buildSessionTranscriptBytes(transcript: SessionTranscript): ByteArray {
+        val encoded = coseCompliantCbor.encodeToByteArray(transcript)
+        return byteArrayOf(0xd8.toByte(), 0x18) + coseCompliantCbor.encodeToByteArray(encoded)
+    }
+
     /**
-     * Calculates the digest of a serialized IssuerSignedItem.
-     * As per ISO/IEC 18013-5:2021, 9.1.2.5.
+     * Calculates the digest of the exact serialized `IssuerSignedItemBytes` value.
+     *
+     * @see ISO/IEC 18013-5, issuer data authentication
      */
     fun calculateDigest(serializedItem: ByteArray, algorithm: String): ByteArray {
         return when (algorithm.uppercase()) {

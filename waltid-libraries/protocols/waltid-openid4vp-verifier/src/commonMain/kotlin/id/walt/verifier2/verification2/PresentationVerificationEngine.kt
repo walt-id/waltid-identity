@@ -14,6 +14,7 @@ import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.TrustedAuthoritiesQuery
+import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
@@ -130,8 +131,9 @@ object PresentationVerificationEngine {
                     document.issuerSigned.getParsedIssuerAuthCrypto2().signerKey.spec == KeySpec.Ec(EcCurve.P256),
                     "mso_mdoc issuer authentication",
                 )
-                val deviceSignature = requireNotNull(document.deviceSigned?.deviceAuth?.deviceSignature) {
-                    "mso_mdoc device signature is missing"
+                val deviceSignature = when (val authentication = document.deviceSigned?.deviceAuth) {
+                    is DeviceAuth.Signature -> authentication.signature
+                    is DeviceAuth.Mac, null -> error("mso_mdoc device signature is missing")
                 }
                 requireCoseAlgorithm(
                     deviceSignature.protectedAlgorithm(),

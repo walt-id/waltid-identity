@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class VerifyConformanceMdoc {
@@ -42,12 +43,12 @@ class VerifyConformanceMdoc {
         }
 
         val deviceSigned = requireNotNull(document.deviceSigned)
-        val signature = requireNotNull(deviceSigned.deviceAuth.deviceSignature)
+        val signature = assertIs<DeviceAuth.Signature>(deviceSigned.deviceAuth).signature
         val tamperedSignature = signature.copy(
             signature = signature.signature.copyOf().also { it[0] = (it[0].toInt() xor 1).toByte() }
         )
         val tamperedDocument = document.copy(
-            deviceSigned = deviceSigned.copy(deviceAuth = DeviceAuth(deviceSignature = tamperedSignature))
+            deviceSigned = deviceSigned.copy(deviceAuth = DeviceAuth.Signature(tamperedSignature))
         )
         assertFailsWith<IllegalArgumentException> {
             verifyDeviceAuthentication(tamperedDocument, mso, sessionTranscript)
