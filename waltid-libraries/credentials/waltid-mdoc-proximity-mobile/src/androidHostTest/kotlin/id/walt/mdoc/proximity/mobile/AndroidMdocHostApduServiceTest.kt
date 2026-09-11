@@ -9,6 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -173,7 +174,7 @@ class AndroidMdocHostApduServiceTest {
 
     private suspend fun eventually(condition: () -> Boolean) {
         withTimeout(TEST_TIMEOUT_MILLIS) {
-            while (!condition()) kotlinx.coroutines.yield()
+            while (!condition()) yield()
         }
     }
 

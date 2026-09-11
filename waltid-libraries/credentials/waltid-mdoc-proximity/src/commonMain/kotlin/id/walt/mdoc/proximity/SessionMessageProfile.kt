@@ -1,9 +1,10 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
 import id.walt.mdoc.objects.session.SessionData
 import id.walt.mdoc.objects.session.SessionEstablishment
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /** Wire profile selected by the exact winning handover. */
 internal sealed interface MdocSessionMessageProfile {

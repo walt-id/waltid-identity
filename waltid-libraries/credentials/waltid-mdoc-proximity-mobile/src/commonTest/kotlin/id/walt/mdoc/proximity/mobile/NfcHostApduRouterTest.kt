@@ -1,6 +1,6 @@
 @file:OptIn(
-    kotlinx.coroutines.ExperimentalCoroutinesApi::class,
-    kotlinx.serialization.ExperimentalSerializationApi::class,
+    ExperimentalCoroutinesApi::class,
+    ExperimentalSerializationApi::class,
 )
 
 package id.walt.mdoc.proximity.mobile
@@ -9,9 +9,11 @@ import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ProximityCloseReason
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

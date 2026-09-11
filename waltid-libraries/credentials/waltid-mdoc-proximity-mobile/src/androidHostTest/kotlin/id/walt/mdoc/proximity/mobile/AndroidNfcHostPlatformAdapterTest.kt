@@ -1,6 +1,6 @@
 @file:OptIn(
-    kotlinx.coroutines.ExperimentalCoroutinesApi::class,
-    kotlinx.serialization.ExperimentalSerializationApi::class,
+    ExperimentalCoroutinesApi::class,
+    ExperimentalSerializationApi::class,
 )
 
 package id.walt.mdoc.proximity.mobile
@@ -8,9 +8,13 @@ package id.walt.mdoc.proximity.mobile
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.ProximityCloseReason
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.After
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -20,7 +24,7 @@ import kotlin.test.assertTrue
 
 class AndroidNfcHostPlatformAdapterTest {
     @After
-    fun cleanRegistry() = kotlinx.coroutines.runBlocking {
+    fun cleanRegistry() = runBlocking {
         AndroidNfcSessionRegistry.resetForTest()
     }
 
@@ -205,7 +209,7 @@ class AndroidNfcHostPlatformAdapterTest {
     private suspend fun eventually(condition: () -> Boolean) {
         repeat(100) {
             if (condition()) return
-            kotlinx.coroutines.delay(10)
+            delay(10)
         }
         assertTrue(condition(), "Condition was not satisfied before timeout")
     }
