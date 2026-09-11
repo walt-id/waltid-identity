@@ -503,11 +503,11 @@ private extension ProximitySubmission {
     }
 }
 
-private extension WalletCore.ProximitySubmission {
+extension WalletCore.ProximitySubmission {
     func toSwiftSubmission() -> ProximitySubmission {
         .init(documents: swiftArray(documents, of: WalletCore.ProximityDocumentSubmission.self).map { document in
             ProximityDocumentSubmission(requestIndex: Int(document.requestIndex), credentialID: document.credentialId,
-                disclosedElements: Set(swiftArray(document.disclosedElements, of: WalletCore.ProximityElementReference.self).map {
+                disclosedElements: Set(swiftSet(document.disclosedElements, of: WalletCore.ProximityElementReference.self).map {
                     ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
                 }))
         }, continueAfterResponse: continueAfterResponse)
@@ -2451,7 +2451,7 @@ private extension WalletCore.ProximityReview {
     }
 }
 
-private extension WalletCore.ProximityDocumentReview {
+extension WalletCore.ProximityDocumentReview {
     func toSwiftReview() throws -> ProximityDocumentReview {
         ProximityDocumentReview(
             requestIndex: Int(requestIndex),
@@ -2460,7 +2460,7 @@ private extension WalletCore.ProximityDocumentReview {
                 credentialOptions,
                 of: WalletCore.ProximityCredentialOption.self
             ).map { try $0.toSwiftOption() },
-            requiredElements: Set(swiftArray(requiredElements, of: WalletCore.ProximityElementReference.self).map {
+            requiredElements: Set(swiftSet(requiredElements, of: WalletCore.ProximityElementReference.self).map {
                 ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
             })
         )
