@@ -117,6 +117,11 @@ class OpenId4VciController(
                 val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
                 call.respond(metadataService.getVctTypeMetadata(credentialType))
             }
+
+            route.get("openid4vci/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
+                val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
+                call.respond(metadataService.getVctTypeMetadata(credentialType))
+            }
         }
 
         route.route("openid4vci", { tags = listOf(OpenId4VciRoutesDocs.OPENID4VCI_TAG) }) {
