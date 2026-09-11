@@ -222,7 +222,7 @@ object CredentialDisplayNormalizer {
 
     private fun JsonElement.toClaimRows(path: ClaimPath, label: String, format: String?): List<ClaimRow> {
         val item = toClaimItem(path = path, label = label, format = format)
-        return flattenObjectForClaimRows(path = path, item = item, format = format)
+        return flattenObjectForClaimRows(path = path, item = item)
     }
 
     private fun ClaimRow.withMdocDisplaySemantics(format: String): ClaimRow {
@@ -248,6 +248,7 @@ object CredentialDisplayNormalizer {
     private fun DisplayValue.toBinaryAvailability(): DisplayValue.Text {
         val byteCount = when (this) {
             is DisplayValue.Image -> byteCount
+            is DisplayValue.DeferredImage -> byteCount
             is DisplayValue.ListValue -> values
                 .takeIf { it.isNotEmpty() && it.all { value -> value is DisplayValue.NumberValue } }
                 ?.size
@@ -278,21 +279,16 @@ object CredentialDisplayNormalizer {
     private fun JsonElement.flattenObjectForClaimRows(
         path: ClaimPath,
         item: ClaimItem,
-        format: String?,
     ): List<ClaimRow> =
         when {
             item.value !is DisplayValue.ObjectValue -> listOf(ClaimRow(path = path, item = item))
-            this is JsonObject -> entries.flatMap { (key, value) ->
+            this is JsonObject -> entries.flatMapIndexed { index, (key, value) ->
                 val childPath = ClaimPath.child(path, key)
-                val childItem = value.toClaimItem(
-                    path = childPath,
-                    label = CredentialDisplayVocabulary.humanizedClaimLabel(key),
-                    format = format,
-                )
-                val rows = value.flattenObjectForClaimRows(path = childPath, item = childItem, format = format)
+                val childItem = item.value.entries[index]
+                val rows = value.flattenObjectForClaimRows(path = childPath, item = childItem)
                 if (
                     rows.size == 1 &&
-                    rows.single().item.value is DisplayValue.Image &&
+                    (rows.single().item.value is DisplayValue.Image || rows.single().item.value is DisplayValue.DeferredImage) &&
                     rows.single().item.label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName)
                 ) {
                     listOf(rows.single().copy(item = rows.single().item.copy(label = item.label)))
@@ -320,7 +316,7 @@ object CredentialDisplayNormalizer {
                 val rows = entry.flattenDisplayObjectForClaimRows()
                 if (
                     rows.size == 1 &&
-                    rows.single().item.value is DisplayValue.Image &&
+                    (rows.single().item.value is DisplayValue.Image || rows.single().item.value is DisplayValue.DeferredImage) &&
                     rows.single().item.label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName)
                 ) {
                     listOf(rows.single().copy(item = rows.single().item.copy(label = label)))
@@ -343,10 +339,15 @@ object CredentialDisplayNormalizer {
                     )
                 }
             )
-            is JsonArray -> valueDecoder.imageFromByteArray(this, CredentialDisplayVocabulary.roles(path))
-                ?: DisplayValue.ListValue(mapIndexed { index, value ->
-                    value.toDisplayValue(ClaimPath.indexed(path, index), format)
-                })
+            is JsonArray -> {
+                val renderList = {
+                    DisplayValue.ListValue(mapIndexed { index, value ->
+                        value.toDisplayValue(ClaimPath.indexed(path, index), format)
+                    })
+                }
+                valueDecoder.imageFromByteArray(this, CredentialDisplayVocabulary.roles(path), renderList)
+                    ?: renderList()
+            }
             is JsonPrimitive -> toPrimitiveDisplayValue(path, format)
         }
 

@@ -5,6 +5,32 @@ import XCTest
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
 
+    func testDefersImagesWithLongDataURLMetadata() throws {
+        let metadata = "profile=" + String(repeating: "x", count: 160)
+        let details = CredentialDisplayNormalizer.details(
+            id: "image", title: "Image", issuer: nil, subject: nil, format: "dc+sd-jwt", addedAt: nil,
+            credentialDataJSON: #"{"visual_proof":"data:image/png;\#(metadata);base64,\#(Self.validPNGBase64)"}"#
+        )
+        guard case .deferredImage(let source) = details.groups.first?.items.first?.value,
+              case .image(_, let data, _, _) = source.resolve() else {
+            return XCTFail("Image metadata length must not cause eager decoding")
+        }
+        XCTAssertEqual(data, Self.validPNGData)
+    }
+
+    func testDeferredByteArrayValidatesValuesAfterTheImageHeader() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "bad-image", title: "Portrait", issuer: nil, subject: nil,
+            format: "mso_mdoc", addedAt: nil,
+            credentialDataJSON: #"{"portrait":[137,80,78,71,13,10,26,10,0,0,0,13,999]}"#
+        )
+        guard case .deferredImage(let source) = details.groups.first?.items.first?.value,
+              case .list(let values) = source.resolve() else {
+            return XCTFail("Malformed image arrays must keep their list fallback")
+        }
+        XCTAssertEqual(values.last, .number("999"))
+    }
+
     func testFlattensNamespacedMdocObjectClaimsIntoDisplayRows() {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",
@@ -214,7 +240,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             details.groups.flatMap(\.items).first { $0.path.id == "eu.europa.ec.eudi.pid.1.portrait.elementValue" }
         )
         XCTAssertEqual(portrait.label, "Portrait")
-        guard case .image(_, let data, let mimeType, let byteCount) = portrait.value else {
+        guard case .image(_, let data, let mimeType, let byteCount) = portrait.value.resolvedImage else {
             return XCTFail("Expected portrait to decode as image")
         }
         XCTAssertEqual(mimeType, "image/png")
@@ -346,7 +372,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     }
 
     func testRendersAllSupportedCredentialFormats() {
-        let cases: [(format: String, title: String, credentialDataJSON: String, expectedHolderName: String, expectedCredentialType: String?, expectedClaimPath: String)] = [
+        let cases: [(format: String, title: String, credentialDataJSON: String, expectedClaimPath: String)] = [
             (
                 format: "jwt_vc_json",
                 title: "Person credential",
@@ -362,8 +388,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   }
                 }
                 """,
-                expectedHolderName: "Ada Lovelace",
-                expectedCredentialType: "Person credential",
                 expectedClaimPath: "credentialSubject.portrait"
             ),
             (
@@ -381,8 +405,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   }
                 }
                 """,
-                expectedHolderName: "Jane Employee",
-                expectedCredentialType: "Employee credential",
                 expectedClaimPath: "credentialSubject.role"
             ),
             (
@@ -407,8 +429,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   }
                 }
                 """,
-                expectedHolderName: "Lin Graduate",
-                expectedCredentialType: "University degree credential",
                 expectedClaimPath: "credentialSubject.degree.name"
             ),
             (
@@ -426,8 +446,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   }
                 }
                 """,
-                expectedHolderName: "Legacy Holder",
-                expectedCredentialType: "Legacy person credential",
                 expectedClaimPath: "vc.credentialSubject.member_id"
             ),
             (
@@ -443,8 +461,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   "exp": 1894699800
                 }
                 """,
-                expectedHolderName: "Alice Tester",
-                expectedCredentialType: "Pid 1",
                 expectedClaimPath: "cnf"
             ),
             (
@@ -459,8 +475,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   "iss": "https://issuer.example"
                 }
                 """,
-                expectedHolderName: "Ali Alias",
-                expectedCredentialType: "Pid 1",
                 expectedClaimPath: "_sd"
             ),
             (
@@ -474,8 +488,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   "cnf": {"kid": "holder-key-2"}
                 }
                 """,
-                expectedHolderName: "Sam Stored",
-                expectedCredentialType: "Mobile driving licence",
                 expectedClaimPath: "cnf"
             ),
             (
@@ -491,8 +503,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   }
                 }
                 """,
-                expectedHolderName: "Anna Musterfrau",
-                expectedCredentialType: nil,
                 expectedClaimPath: "eu.europa.ec.eudi.pid.1.resident_state"
             ),
             (
@@ -508,8 +518,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                   }
                 }
                 """,
-                expectedHolderName: "Max Driver",
-                expectedCredentialType: nil,
                 expectedClaimPath: "org.iso.18013.5.1.document_number"
             )
         ]
@@ -526,8 +534,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             )
             let claims = details.groups.flatMap(\.items)
 
-            XCTAssertEqual(details.cardSummary.holderName, credential.expectedHolderName, credential.title)
-            XCTAssertEqual(details.cardSummary.credentialType, credential.expectedCredentialType, credential.title)
             XCTAssertTrue(claims.contains { $0.path.id == credential.expectedClaimPath }, credential.title)
             XCTAssertFalse(claims.contains { item in
                 if case .object = item.value { return true }
@@ -631,7 +637,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         )
     }
 
-    func testUsesPortraitImageForCardSummary() {
+    func testDetailsRetainDeferredByteArrayImage() {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",
             title: "mso_mdoc",
@@ -642,8 +648,13 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             credentialDataJSON: #"{"portrait":{"elementValue":\#(syntheticPNGByteArrayJSON())}}"#
         )
 
-        XCTAssertEqual(details.cardSummary.portraitData, syntheticPNGData)
-        XCTAssertEqual(details.cardSummary.portraitMimeType, "image/png")
+        guard let portrait = details.groups.flatMap(\.items).first(where: { $0.path.id == "portrait.elementValue" }),
+              case .deferredImage = portrait.value,
+              case .image(_, let data, let mimeType, _) = portrait.value.resolvedImage else {
+            return XCTFail("Expected the claim to retain an unresolved image")
+        }
+        XCTAssertEqual(data, syntheticPNGData)
+        XCTAssertEqual(mimeType, "image/png")
     }
 
     func testUsesDetectedImageTypeInsteadOfDeclaredDataURLType() throws {
@@ -668,7 +679,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let claims = details.groups.flatMap(\.items)
         XCTAssertEqual(claims.first { $0.path.id == "json_note.purpose" }?.value, .text("age proof"))
         XCTAssertEqual(claims.first { $0.path.id == "plain_note" }?.value, .decodedText("Hello, wallet"))
-        guard case .image(_, _, let mimeType, _) = claims.first(where: { $0.path.id == "portrait" })?.value else {
+        guard case .image(_, _, let mimeType, _) = claims.first(where: { $0.path.id == "portrait" })?.value.resolvedImage else {
             return XCTFail("Expected valid PNG data URI to render as an image")
         }
         XCTAssertEqual(mimeType, "image/png")
@@ -697,7 +708,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 .flatMap(\.items)
                 .first(where: { $0.path.id == "verification_artifact" })
             XCTAssertEqual(claim?.label, "Verification artifact")
-            guard case .image(_, let data, let mimeType, _) = claim?.value else {
+            guard case .image(_, let data, let mimeType, _) = claim?.value.resolvedImage else {
                 XCTFail("Expected a valid data image claim to render for \(format)")
                 continue
             }
@@ -706,7 +717,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
             guard case .image(_, _, let nestedMimeType, _) = details.groups
                 .flatMap(\.items)
-                .first(where: { $0.path.id == "resident_address.visual_proof" })?.value else {
+                .first(where: { $0.path.id == "resident_address.visual_proof" })?.value.resolvedImage else {
                 XCTFail("Expected a nested data image claim to render for \(format)")
                 continue
             }
@@ -744,8 +755,11 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 XCTFail("Missing claim at \(path)")
                 continue
             }
-            if case .image = value {
+            switch value {
+            case .image, .deferredImage:
                 XCTFail("Unexpected image rendering at \(path)")
+            default:
+                break
             }
         }
         let invalidImage = claims.first { $0.path.id == "invalid_image" }
@@ -770,7 +784,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         )
 
         for claim in details.groups.flatMap(\.items) {
-            XCTAssertEqual(claim.value, .text(CredentialDisplayText.imageUnavailable))
+            XCTAssertEqual(claim.value.resolvedImage, .text(CredentialDisplayText.imageUnavailable))
         }
     }
 
@@ -790,7 +804,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         guard let claim = details.groups.flatMap(\.items).first else {
             return XCTFail("Missing oversized image claim")
         }
-        XCTAssertEqual(claim.value, .text(CredentialDisplayText.imageUnavailable))
+        XCTAssertEqual(claim.value.resolvedImage, .text(CredentialDisplayText.imageUnavailable))
         XCTAssertTrue(claim.rawValue?.contains("data:image/png;base64,") == true)
     }
 
@@ -817,7 +831,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         )
 
         let value = CredentialDisplayNormalizer.details(for: option).groups.first?.items.first?.value
-        guard case .image(_, _, let mimeType, _) = value else {
+        guard case .image(_, _, let mimeType, _) = value?.resolvedImage else {
             return XCTFail("Expected the requested data image disclosure to render")
         }
         XCTAssertEqual(mimeType, "image/png")
@@ -866,7 +880,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(requested.items.map(\.label), ["Given name", "Portrait"])
         XCTAssertEqual(requested.items.map(\.path.id), ["disclosures[0].given_name", "disclosures[1].portrait"])
         XCTAssertEqual(requested.items.first?.value, .text("Alice"))
-        guard case .image(_, _, let mimeType, let byteCount) = requested.items.last?.value else {
+        guard case .image(_, _, let mimeType, let byteCount) = requested.items.last?.value.resolvedImage else {
             return XCTFail("Expected requested portrait disclosure to render as an image")
         }
         XCTAssertEqual(mimeType, "image/png")
@@ -966,7 +980,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 .first { $0.path.id == "org.iso.18013.5.1.signature_usual_mark.elementValue" }
         )
         XCTAssertEqual(signature.label, "Signature or usual mark")
-        guard case .image = signature.value else {
+        guard case .image = signature.value.resolvedImage else {
             return XCTFail("Expected signature_usual_mark to use the image display path")
         }
     }
@@ -1002,7 +1016,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             "biometric_template_iris"
         ] {
             let claim = try XCTUnwrap(claims["org.iso.18013.5.1.\(elementIdentifier)"])
-            guard case .image = claim.value else {
+            guard case .image = claim.value.resolvedImage else {
                 return XCTFail("Expected \(elementIdentifier) to use the image display path")
             }
         }
@@ -1218,6 +1232,13 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.cardSummary.logoURI, "https://issuer.example/pid.png")
         XCTAssertEqual(details.cardSummary.logoAltText, "PID logo")
         XCTAssertEqual(details.cardSummary.title, "Personal ID")
+        let storedCard = CredentialCardSummary.stored(from: credential)
+        XCTAssertEqual(storedCard.title, details.cardSummary.title)
+        XCTAssertEqual(storedCard.backgroundColor, details.cardSummary.backgroundColor)
+        XCTAssertEqual(storedCard.backgroundImageURI, details.cardSummary.backgroundImageURI)
+        XCTAssertEqual(storedCard.textColor, details.cardSummary.textColor)
+        XCTAssertEqual(storedCard.logoURI, details.cardSummary.logoURI)
+        XCTAssertEqual(storedCard.logoAltText, details.cardSummary.logoAltText)
     }
 
     private func syntheticPNGByteArrayJSON() -> String {
@@ -1276,5 +1297,12 @@ private extension ClaimItem {
 private extension Collection {
     var single: Element? {
         count == 1 ? first : nil
+    }
+}
+
+private extension DisplayValue {
+    var resolvedImage: DisplayValue {
+        if case .deferredImage(let source) = self { return source.resolve() }
+        return self
     }
 }

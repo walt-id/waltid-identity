@@ -29,7 +29,7 @@ object JsonUtils {
                 is CborInteger -> JsonPrimitive(this.long)
                 is CborFloat -> JsonPrimitive(this.value)
                 is CborString -> JsonPrimitive(this.value)
-                is CborByteString -> JsonArray(this.toByteArray().map { JsonPrimitive(it) })
+                is CborByteString -> JsonArray(JsonByteArray(this.toByteArray().copyOf()))
                 is CborArray -> JsonArray(this.map { it.toJsonElement() })
                 is CborMap -> {
                     // We must unwrap the CborElement key into a standard Kotlin String
@@ -175,5 +175,17 @@ object JsonUtils {
 
     fun stringToJsonPrimitive(value: String): JsonPrimitive {
         return JsonPrimitive(value)
+    }
+}
+
+// Preserve the existing signed-byte JSON representation without allocating a number and its
+// decimal string for every byte of a binary value. The private snapshot also keeps
+// the resulting JsonArray immutable if the source byte string was backed by a mutable array.
+private class JsonByteArray(private val bytes: ByteArray) : AbstractList<JsonElement>() {
+    override val size: Int get() = bytes.size
+    override fun get(index: Int): JsonElement = ByteValues[bytes[index].toInt() + 128]
+
+    private companion object {
+        val ByteValues = List(256) { JsonPrimitive(it - 128) }
     }
 }

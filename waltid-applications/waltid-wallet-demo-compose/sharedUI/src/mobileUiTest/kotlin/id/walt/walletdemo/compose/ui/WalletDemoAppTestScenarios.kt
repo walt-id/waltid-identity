@@ -176,6 +176,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithContentDescription("Credentials tab").assertIsDisplayed()
         onNodeWithContentDescription("Receive tab").assertIsDisplayed()
         onNodeWithContentDescription("Present tab").assertIsDisplayed()
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
         onNodeWithText("Example Credential").assertIsDisplayed()
 
@@ -204,17 +205,27 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
         onNodeWithText("Street address").performScrollTo().assertIsDisplayed()
         onNodeWithText("Main Street 1").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Portrait").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim("portrait")).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Portrait").assertIsDisplayed()
+        waitUntil(timeoutMillis = 10_000) {
+            onAllNodesWithTag(WalletUiTestTags.claimImage("portrait")).fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithTag(WalletUiTestTags.claimImage("portrait"))
             .performScrollTo()
             .assertIsDisplayed()
-        onNodeWithText("Signature or usual mark").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim("signature_usual_mark")).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Signature or usual mark").assertIsDisplayed()
+        waitUntil(timeoutMillis = 10_000) {
+            onAllNodesWithTag(WalletUiTestTags.claimImage("signature_usual_mark")).fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithTag(WalletUiTestTags.claimImage("signature_usual_mark"))
             .performScrollTo()
             .assertIsDisplayed()
-        onAllNodesWithText("image/jpeg").assertCountEquals(2)
-        onAllNodesWithText("image/png").assertCountEquals(1)
-        onNodeWithText("Verification artifact").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim("verification_artifact")).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Verification artifact").assertIsDisplayed()
+        waitUntil(timeoutMillis = 10_000) {
+            onAllNodesWithTag(WalletUiTestTags.claimImage("verification_artifact")).fetchSemanticsNodes().isNotEmpty()
+        }
         val artifactPath = "verification_artifact"
         onNodeWithTag(WalletUiTestTags.claimImage(artifactPath))
             .performScrollTo()
@@ -231,12 +242,39 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.claimImage(artifactPath)).assertIsDisplayed()
         onAllNodesWithText("Raw credential data").assertCountEquals(0)
         onNodeWithTag("wallet.detailsBack").performClick()
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
         waitUntil(timeoutMillis = 5_000) {
             onAllNodesWithTag(WalletUiTestTags.SettingsButton).fetchSemanticsNodes().isNotEmpty()
         }
         onNodeWithText("walt.id Wallet").assertIsDisplayed()
         assertEquals(1, wallet.bootstrapCalls)
+    }
+
+    fun credentialsTabWaitsForCredentialRead() = runComposeUiTest {
+        val gate = CompletableDeferred<Unit>()
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential), credentialsGate = gate)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        awaitTaggedNode(WalletUiTestTags.CredentialsLoading)
+        onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertDoesNotExist()
+        gate.complete(Unit)
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
+        onNodeWithTag(WalletUiTestTags.CredentialsLoading).assertDoesNotExist()
+        onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertDoesNotExist()
+    }
+
+    fun credentialsTabDoesNotShowEmptyOnLoadFailure() = runComposeUiTest {
+        val gate = CompletableDeferred<Unit>()
+        val controller = WalletDemoController(FakeDemoWallet(credentialsGate = gate), InMemoryDemoPinStore())
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        awaitTaggedNode(WalletUiTestTags.CredentialsLoading)
+        gate.completeExceptionally(IllegalStateException("Credential storage unavailable"))
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Failed }
+        onNodeWithTag(WalletUiTestTags.CredentialsLoading).assertDoesNotExist()
+        onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertDoesNotExist()
     }
 
     fun credentialsTabShowsEmptyStateAndUpdatesAfterReceive() = runComposeUiTest {
@@ -262,12 +300,15 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         onNodeWithTag("wallet.status").assertTextContains("Received 1 credential(s)")
         onAllNodesWithTag("wallet.receiveNewButton").assertCountEquals(0)
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
         onNodeWithTag("wallet.credentialCard.cred-1").performClick()
         onNodeWithTag("wallet.credentialDetailsScreen").assertIsDisplayed()
+        awaitTaggedNode(WalletUiTestTags.claim("given_name"))
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
         onNodeWithTag("wallet.detailsBack").performClick()
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
 
         onNodeWithTag("wallet.tab.receive").performClick()
@@ -290,6 +331,7 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
 
         onNodeWithTag("wallet.tab.receive").performClick()
@@ -312,6 +354,7 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
         onNodeWithTag("wallet.credentialCard.cred-1").performClick()
         onNodeWithTag("wallet.credentialDetailsScreen").assertIsDisplayed()
@@ -348,6 +391,7 @@ class WalletDemoAppTestScenarios {
 
         receiveGate.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
     }
 
@@ -703,6 +747,7 @@ class WalletDemoAppTestScenarios {
         onAllNodesWithTag(WalletUiTestTags.CredentialDetailsScreen).assertCountEquals(0)
         onAllNodesWithText("$.portrait").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
+        awaitTaggedNode(WalletUiTestTags.claimImage(portraitDisclosurePath))
         onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath))
             .performScrollTo()
             .assertIsDisplayed()
@@ -826,6 +871,7 @@ class WalletDemoAppTestScenarios {
         onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
 
         onNodeWithTag("wallet.tab.credentials").performClick()
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
 
         onNodeWithTag("wallet.tab.present").performClick()
@@ -891,6 +937,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         onNodeWithTag("wallet.status").assertTextContains("Received 1 credential(s)")
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
 
         controller.handleDeepLink(requestUrl)
@@ -926,6 +973,7 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
 
         controller.handleDeepLink(offerUrl)
@@ -961,6 +1009,7 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.offerPreview != null }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.statusText.startsWith("Received") }
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
 
         val recreatedController = WalletDemoController(wallet, pinStore)
@@ -971,6 +1020,7 @@ class WalletDemoAppTestScenarios {
         loginWithPin()
         waitUntil(timeoutMillis = 5_000) { recreatedController.state.value.session is WalletSessionState.Ready }
 
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
         assertEquals(2, wallet.bootstrapCalls)
     }
@@ -1094,6 +1144,7 @@ class WalletDemoAppTestScenarios {
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").performClick()
         onNodeWithTag(WalletUiTestTags.DetailsMenu).assertIsDisplayed().performClick()
         waitUntil(timeoutMillis = 5_000) {
@@ -1136,6 +1187,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
 
         onNodeWithTag(WalletUiTestTags.CredentialsTab).performClick()
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag(WalletUiTestTags.credentialCard("cred-1")).performClick()
         awaitTaggedNode(WalletUiTestTags.DetailsMenu)
         onNodeWithTag(WalletUiTestTags.DetailsMenu).performClick()
@@ -1397,6 +1449,7 @@ private class FakeDemoWallet(
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success("Presentation sent"),
     private val presentationPreview: WalletDemoPresentationPreview = WalletDemoAppTestScenarios.samplePresentationPreview,
     private val presentationPreviewResult: WalletDemoPresentationPreviewResult? = null,
+    private val credentialsGate: CompletableDeferred<Unit>? = null,
     private val receiveGate: CompletableDeferred<Unit>? = null,
     private val previewGate: CompletableDeferred<Unit>? = null,
     private val transactionCodeRequired: Boolean = false,
@@ -1443,7 +1496,10 @@ private class FakeDemoWallet(
         signingProtection: WalletDemoSigningProtection,
     ): WalletDemoSigningProtectionAvailability = signingProtectionAvailability
 
-    override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
+    override suspend fun listCredentials(): List<WalletDemoCredential> {
+        credentialsGate?.await()
+        return credentials
+    }
 
     override suspend fun startIssuance(
         offerUrl: String,

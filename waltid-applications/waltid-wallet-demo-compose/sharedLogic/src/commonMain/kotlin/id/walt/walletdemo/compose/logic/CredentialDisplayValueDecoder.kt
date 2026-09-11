@@ -18,7 +18,14 @@ internal class CredentialDisplayValueDecoder(
         path: ClaimPath,
         format: String?,
         imagePolicy: ImageDecodingPolicy,
+        deferImages: Boolean = true,
     ): DisplayValue? {
+        if (deferImages && imagePolicy != ImageDecodingPolicy.Disabled && isImageCandidate(value, imagePolicy)) {
+            return DisplayValue.DeferredImage {
+                decodedString(value, path, format, imagePolicy, deferImages = false)
+                    ?: DisplayValue.Text(value)
+            }
+        }
         val payload = when (val result = EncodedPayload.parse(
             rawValue = value,
             maxImageBytes = maxFallbackImageBytes.takeIf { imagePolicy.requiresDecodableContent },
@@ -50,11 +57,17 @@ internal class CredentialDisplayValueDecoder(
         return DisplayValue.DecodedText(decodedText)
     }
 
-    fun imageFromByteArray(value: JsonArray, roles: Set<ClaimRole>): DisplayValue.Image? {
+    fun imageFromByteArray(
+        value: JsonArray,
+        roles: Set<ClaimRole>,
+        renderList: () -> DisplayValue,
+    ): DisplayValue? {
         if (ClaimRole.Image !in roles) return null
-        val bytes = value.toByteArrayOrNull() ?: return null
-        val mime = ImageBytes.detectMime(bytes) ?: return null
-        return bytes.toImageValue(mime)
+        val prefix = JsonArray(value.take(12)).toByteArrayOrNull() ?: return null
+        val mime = ImageBytes.detectMime(prefix) ?: return null
+        return DisplayValue.DeferredImage(byteCount = value.size) {
+            value.toByteArrayOrNull()?.toImageValue(mime) ?: renderList()
+        }
     }
 
     private fun JsonArray.toByteArrayOrNull(): ByteArray? {
@@ -255,3 +268,16 @@ private const val readableCharacterRatio = 0.9
 private const val maxFallbackImageBytes = 2_000_000
 private const val maxFallbackImagePixels = 2_048L * 2_048L
 private val unavailableImageValue = DisplayValue.Text(CredentialDisplayText.ImageUnavailable)
+
+// Inspect the data URL header and a short encoded prefix; full decoding belongs to the visible row.
+private fun isImageCandidate(value: String, policy: ImageDecodingPolicy): Boolean {
+    val prefix = value.take(128).trimStart()
+    val isDataUrl = prefix.startsWith("data:", ignoreCase = true)
+    if (policy != ImageDecodingPolicy.SchemaImage && !prefix.startsWith("data:image/", ignoreCase = true)) return false
+    val encodedPrefix = if (isDataUrl) {
+        val marker = value.indexOf(";base64,", ignoreCase = true)
+        if (marker < 0) return false
+        value.substring(marker + 8, (marker + 20).coerceAtMost(value.length))
+    } else prefix
+    return listOf("iVBOR", "/9j/", "_9j_", "R0lGOD", "UklGR").any(encodedPrefix::startsWith)
+}

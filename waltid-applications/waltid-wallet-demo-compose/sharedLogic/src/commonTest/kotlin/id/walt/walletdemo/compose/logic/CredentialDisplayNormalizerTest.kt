@@ -13,6 +13,17 @@ import kotlin.test.assertTrue
 class CredentialDisplayNormalizerTest {
 
     @Test
+    fun deferredByteArrayStillValidatesValuesAfterTheImageHeader() {
+        val details = CredentialDisplayNormalizer.toDetails(CredentialSummary(
+            id = "bad-image", format = "mso_mdoc", issuer = null, label = "Portrait",
+            credentialDataJson = """{"portrait":[137,80,78,71,13,10,26,10,0,0,0,13,999]}""",
+        ))
+        val deferred = assertIs<DisplayValue.DeferredImage>(details.groups.single().items.single().value)
+        val fallback = assertIs<DisplayValue.ListValue>(deferred.resolve())
+        assertEquals(DisplayValue.NumberValue("999"), fallback.values.last())
+    }
+
+    @Test
     fun parsesCredentialJsonIntoReadableClaimGroups() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
@@ -406,8 +417,6 @@ class CredentialDisplayNormalizerTest {
             val format: String,
             val label: String,
             val credentialDataJson: String,
-            val expectedHolderName: String,
-            val expectedCredentialType: String?,
             val expectedClaimPath: String,
         )
 
@@ -427,8 +436,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Ada Lovelace",
-                expectedCredentialType = "Person credential",
                 expectedClaimPath = "credentialSubject.portrait",
             ),
             FormatCase(
@@ -446,8 +453,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Jane Employee",
-                expectedCredentialType = "Employee credential",
                 expectedClaimPath = "credentialSubject.role",
             ),
             FormatCase(
@@ -472,8 +477,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Lin Graduate",
-                expectedCredentialType = "University degree credential",
                 expectedClaimPath = "credentialSubject.degree.name",
             ),
             FormatCase(
@@ -491,8 +494,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Legacy Holder",
-                expectedCredentialType = "Legacy person credential",
                 expectedClaimPath = "vc.credentialSubject.member_id",
             ),
             FormatCase(
@@ -508,8 +509,6 @@ class CredentialDisplayNormalizerTest {
                       "exp": 1894699800
                     }
                 """.trimIndent(),
-                expectedHolderName = "Alice Tester",
-                expectedCredentialType = "Pid 1",
                 expectedClaimPath = "cnf",
             ),
             FormatCase(
@@ -524,8 +523,6 @@ class CredentialDisplayNormalizerTest {
                       "iss": "https://issuer.example"
                     }
                 """.trimIndent(),
-                expectedHolderName = "Ali Alias",
-                expectedCredentialType = "Pid 1",
                 expectedClaimPath = "_sd",
             ),
             FormatCase(
@@ -539,8 +536,6 @@ class CredentialDisplayNormalizerTest {
                       "cnf": {"kid": "holder-key-2"}
                     }
                 """.trimIndent(),
-                expectedHolderName = "Sam Stored",
-                expectedCredentialType = "Mobile driving licence",
                 expectedClaimPath = "cnf",
             ),
             FormatCase(
@@ -556,8 +551,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Anna Musterfrau",
-                expectedCredentialType = null,
                 expectedClaimPath = "eu.europa.ec.eudi.pid.1.resident_state",
             ),
             FormatCase(
@@ -573,8 +566,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Max Driver",
-                expectedCredentialType = null,
                 expectedClaimPath = "org.iso.18013.5.1.document_number",
             ),
         )
@@ -591,10 +582,8 @@ class CredentialDisplayNormalizerTest {
                 )
             )
             val claims = details.groups.flatMap { it.items }
-            val card = details.toCardDisplayData()
 
-            assertEquals(case.expectedHolderName, card.holderName, case.label)
-            assertEquals(case.expectedCredentialType, card.credentialType, case.label)
+            assertEquals(details.toCardDisplayData(), details.summary.toCardDisplayData(), case.label)
             assertTrue(claims.any { it.path.id == case.expectedClaimPath }, case.label)
             assertTrue(claims.none { it.value is DisplayValue.ObjectValue }, case.label)
         }
@@ -744,7 +733,7 @@ class CredentialDisplayNormalizerTest {
         val claims = details.groups.flatMap { it.items }
         assertEquals(DisplayValue.Text("age proof"), claims.first { it.path.id == "json_note.purpose" }.value)
         assertEquals(DisplayValue.DecodedText("Hello, wallet"), claims.first { it.path.id == "plain_note" }.value)
-        assertIs<DisplayValue.Image>(claims.first { it.path.id == "portrait" }.value)
+        assertIs<DisplayValue.Image>((claims.first { it.path.id == "portrait" }.value as DisplayValue.DeferredImage).resolve())
     }
 
     @Test
@@ -776,6 +765,7 @@ class CredentialDisplayNormalizerTest {
         listOf("given_name", "invalid_image", "unsupported_image", "non_image_data_url", "plain_base64")
             .forEach { path ->
                 assertFalse(claims.first { it.path.id == path }.value is DisplayValue.Image)
+                assertFalse(claims.first { it.path.id == path }.value is DisplayValue.DeferredImage)
             }
         val invalidImage = claims.first { it.path.id == "invalid_image" }
         assertEquals(DisplayValue.Text(CredentialDisplayText.ImageUnavailable), invalidImage.value)
@@ -783,7 +773,7 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun classifiesPortraitByteArrayDataAsImageAndUsesItForCards() {
+    fun defersPortraitByteArrayUntilResolved() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
                 id = "cred-1",
@@ -798,11 +788,10 @@ class CredentialDisplayNormalizerTest {
             .flatMap { it.items }
             .first { it.path.id == "portrait.elementValue" }
         assertEquals("Portrait", portrait.label)
-        val image = assertIs<DisplayValue.Image>(portrait.value)
+        val image = assertIs<DisplayValue.Image>((portrait.value as DisplayValue.DeferredImage).resolve())
 
         assertEquals("image/png", image.mimeType)
         assertTrue(image.bytes.contentEquals(Base64.Default.decode(syntheticPngBase64)))
-        assertEquals(image, details.toCardDisplayData().portrait)
     }
 
     @Test
@@ -829,7 +818,7 @@ class CredentialDisplayNormalizerTest {
             .flatMap { it.items }
             .first { it.path.id == "eu.europa.ec.eudi.pid.1.portrait.elementValue" }
         assertEquals("Portrait", portrait.label)
-        assertIs<DisplayValue.Image>(portrait.value)
+        assertIs<DisplayValue.Image>((portrait.value as DisplayValue.DeferredImage).resolve())
     }
 
     @Test
@@ -856,7 +845,7 @@ class CredentialDisplayNormalizerTest {
             .flatMap { it.items }
             .first { it.path.id == "org.iso.18013.5.1.signature_usual_mark.elementValue" }
         assertEquals("Signature or usual mark", signature.label)
-        assertIs<DisplayValue.Image>(signature.value)
+        assertIs<DisplayValue.Image>((signature.value as DisplayValue.DeferredImage).resolve())
     }
 
     @Test
@@ -890,7 +879,7 @@ class CredentialDisplayNormalizerTest {
             "biometric_template_iris",
         ).forEach { elementIdentifier ->
             val claim = assertNotNull(claimsByPath["org.iso.18013.5.1.$elementIdentifier"])
-            assertIs<DisplayValue.Image>(claim.value)
+            assertIs<DisplayValue.Image>((claim.value as DisplayValue.DeferredImage).resolve())
         }
     }
 
@@ -938,7 +927,7 @@ class CredentialDisplayNormalizerTest {
         assertEquals(listOf("Given name", "Portrait"), requested.items.map { it.label })
         assertEquals(listOf("disclosures[0].given_name", "disclosures[1].portrait"), requested.items.map { it.path.id })
         assertEquals(DisplayValue.Text("Ada"), requested.items.first().value)
-        assertIs<DisplayValue.Image>(requested.items.last().value)
+        assertIs<DisplayValue.Image>((requested.items.last().value as DisplayValue.DeferredImage).resolve())
 
         val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
         assertEquals(listOf("Given name", "Family name"), personal.items.map { it.label })
@@ -1013,7 +1002,7 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun derivesCardSummaryFromClaims() {
+    fun derivesCardTitleFromCredentialType() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
                 id = "cred-1",
@@ -1035,9 +1024,6 @@ class CredentialDisplayNormalizerTest {
 
         assertEquals("cred-1", details.id)
         assertEquals("Mobile Driving Licence", details.title)
-        assertEquals("Mobile driving licence", details.credentialType)
-        assertEquals("Ada Lovelace", details.holderName)
-        assertEquals("Expires 2026-06-17", details.validity)
     }
 
     @Test

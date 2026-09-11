@@ -1,8 +1,10 @@
 package id.walt.wallet2.mobile
 
 import androidx.credentials.registry.digitalcredentials.mdoc.MdocEntry
+import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegistry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
 import androidx.credentials.registry.provider.digitalcredentials.VerificationEntryDisplayProperties
+import androidx.credentials.registry.provider.digitalcredentials.VerificationFieldDisplayProperties
 import id.walt.cose.coseCompliantCbor
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
@@ -17,6 +19,7 @@ import org.junit.runner.RunWith
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
@@ -126,6 +129,81 @@ class AndroidDigitalCredentialRegistryTest {
         assertEquals("Vienna", entry.claims.single().value)
         assertTrue(entry.claims.single().isSelectivelyDisclosable)
         assertEquals("opaque-id", entry.id)
+    }
+
+    @Test
+    fun registryRetainsMediaPathsWithoutEmbeddingPayloadsAndPreservesScalarMatching() {
+        val mediaValues = mapOf(
+            "arbitrary_binary" to List(50_000) { it % 128 }.joinToString(prefix = "[", postfix = "]"),
+            "arbitrary_attachment" to "\"data:image/png;base64,${"A".repeat(100_000)}\"",
+            "raw_image" to "\"/9j/${"A".repeat(100_000)}\"",
+            "structured_value" to """{"member":"value"}""",
+            "null_value" to "null",
+        )
+        val scalarValues = mapOf(
+            "empty_text" to "\"\"",
+            "null_text" to "\"null\"",
+            "age" to "42",
+            "eligible" to "false",
+            "description" to "\"${"D".repeat(300)}\"",
+        )
+        val records = MobileWalletDigitalCredentialFormat.entries.map { format ->
+            MobileWalletCredentialRegistryRecord(
+                registryEntryId = "entry-$format",
+                credentialId = "credential-$format",
+                format = format,
+                type = "example.credential",
+                fields = (mediaValues + scalarValues).map { (name, value) ->
+                    MobileWalletCredentialRegistryField(listOf("namespace", name), value, true)
+                },
+                displayName = "Example",
+            )
+        }
+        val entries = records.map { record -> with(registry) { record.toAndroidEntry() } }
+        entries.forEach { entry ->
+            val values = when (entry) {
+                is MdocEntry -> entry.fields.associate { it.identifier to it.fieldValue }
+                is SdJwtEntry -> entry.claims.associate { it.path.last() to it.value }
+                else -> error("Unexpected entry")
+            }
+            assertEquals(mediaValues.keys + scalarValues.keys, values.keys)
+            mediaValues.keys.forEach { assertNull(values.getValue(it)) }
+            assertEquals("", values.getValue("empty_text"))
+            assertEquals("null", values.getValue("null_text"))
+            assertEquals(42L, values.getValue("age"))
+            assertEquals(false, values.getValue("eligible"))
+            assertEquals("D".repeat(300), values.getValue("description"))
+        }
+        val bytes = OpenId4VpRegistry(entries, "registry").credentials
+        assertTrue(bytes.size < 50_000, "Platform registry must not contain encoded media payloads")
+        val offset = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+        val payload = Json.parseToJsonElement(bytes.copyOfRange(offset, bytes.size).decodeToString()).jsonObject
+        val jsonText = payload.toString()
+        mediaValues.keys.forEach { assertTrue(jsonText.contains(it), "Field presence must survive: $it") }
+        assertFalse(jsonText.contains("data:image"))
+        val mdoc = entries.filterIsInstance<MdocEntry>().single()
+        val display = mdoc.fields.first { it.identifier == "description" }.fieldDisplayPropertySet
+            .filterIsInstance<VerificationFieldDisplayProperties>().single()
+        assertEquals("D".repeat(128), display.displayValue)
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Test
+    fun annexCMediaFieldRemainsSelectableWithoutPayloadOrFakeMatchValue() {
+        val bytes = registry.encodeAnnexCCredentialDatabase(listOf(
+            MobileWalletCredentialRegistryRecord(
+                registryEntryId = "opaque-id", credentialId = "private-id",
+                format = MobileWalletDigitalCredentialFormat.MDOC, type = "example.credential",
+                fields = listOf(MobileWalletCredentialRegistryField(
+                    listOf("namespace", "arbitrary_attachment"),
+                    "\"data:application/pdf;base64,${"A".repeat(100_000)}\"", true,
+                )), displayName = "Example",
+            ),
+        ))
+        val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
+        assertEquals(listOf("arbitrary_attachment", "", ""), database.credentials.single().mdoc.namespaces
+            .getValue("namespace").getValue("arbitrary_attachment"))
+        assertTrue(bytes.size < 50_000)
     }
 
     @Test

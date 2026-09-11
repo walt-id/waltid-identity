@@ -19,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,6 +35,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelectio
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.resolvedCardTitle
+import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
 import id.walt.walletdemo.compose.ui.SystemBackHandler
@@ -81,7 +83,9 @@ internal fun SharingReviewSection(
                 claimsOptionId = null
             }
             CredentialCardStack(
-                details = review.credentialOptions.map { it.toCredentialDetails() },
+                cards = remember(review.credentialOptions) {
+                    review.credentialOptions.map { it.toCredentialDetails().toCardDisplayData() }
+                },
                 onOpenDetails = { detailsId ->
                     claimsOptionId = detailsId
                 },
@@ -89,10 +93,10 @@ internal fun SharingReviewSection(
             claimsOption?.let { option ->
                 SharingClaimsDialog(
                     option = option,
-                    details = option.toCredentialDetails(),
+                    details = remember(option) { option.toCredentialDetails() },
                     credentialSelected = option.selection in selectedCredentialOptions,
                     selectedDisclosureOptions = selectedDisclosureOptions,
-                    requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty(),
+                    requestedDisclosureItems = remember(option) { option.toRequestedDisclosureGroup()?.items.orEmpty() },
                     enabled = enabled,
                     readOnly = readOnly,
                     onToggleDisclosure = onToggleDisclosure,
@@ -148,8 +152,8 @@ private fun SelectableCredentialRow(
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
 ) {
-    val details = option.toCredentialDetails()
-    val requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty()
+    val details = remember(option) { option.toCredentialDetails() }
+    val requestedDisclosureItems = remember(option) { option.toRequestedDisclosureGroup()?.items.orEmpty() }
     var claimsOpen by rememberSaveable(option.selection.id) { mutableStateOf(false) }
 
     Row(

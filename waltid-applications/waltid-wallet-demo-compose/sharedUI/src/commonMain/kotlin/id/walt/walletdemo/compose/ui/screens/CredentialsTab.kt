@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,9 +22,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -31,30 +32,46 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import id.walt.walletdemo.compose.logic.WalletDemoCredential
+import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
+import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun CredentialsTab(
-    credentials: List<WalletDemoCredential>,
+    session: WalletSessionState,
     modifier: Modifier = Modifier,
     onDeleteCredential: ((String) -> Unit)? = null,
     onDetailsChromeChange: (CredentialDetailsChrome?) -> Unit = {},
 ) {
-    val details = remember(credentials) { credentials.map { it.toCredentialDetails() } }
+    val credentials = (session as? WalletSessionState.Ready)?.credentials.orEmpty()
+    val cards by produceState<List<CredentialCardDisplayData>>(emptyList(), credentials) {
+        value = emptyList()
+        value = withContext(Dispatchers.Default) { credentials.map { it.toCardDisplayData() } }
+    }
     var expandedId by remember { mutableStateOf<String?>(null) }
     var showDetailsBody by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
-    val expanded = details.firstOrNull { it.summary.id == expandedId }
-    val rawCredential = expanded?.summary?.credentialDataJson?.takeIf { it.isNotBlank() }
+    val selectedCredential = credentials.firstOrNull { it.id == expandedId }
+    val expanded by produceState<CredentialDetails?>(null, selectedCredential) {
+        value = null
+        value = selectedCredential?.let { credential ->
+            withContext(Dispatchers.Default) { credential.toCredentialDetails() }
+        }
+    }
+    val rawCredential = selectedCredential?.credentialDataJson?.takeIf { it.isNotBlank() }
         ?: "No raw credential available"
-    val showingDetails = expanded != null || closing
+    val showingDetails = selectedCredential != null || closing
 
     fun requestClose() {
         if (expandedId == null || closing) return
@@ -127,14 +144,23 @@ internal fun CredentialsTab(
                 .padding(top = 8.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (credentials.isEmpty()) {
+            if (session is WalletSessionState.NotBootstrapped || session is WalletSessionState.Bootstrapping) {
+                CircularProgressIndicator(Modifier.testTag(WalletUiTestTags.CredentialsLoading))
+            } else if (session is WalletSessionState.Failed) {
+                Text(session.message)
+            } else if (credentials.isEmpty()) {
                 EmptyCredentialsState()
+            } else if (cards.isEmpty()) {
+                CircularProgressIndicator(Modifier.testTag(WalletUiTestTags.CredentialsLoading))
             } else {
                 CredentialCardStack(
-                    details = details,
+                    cards = cards,
                     expandedId = expandedId,
                     onOpenDetails = ::toggleCard,
                 )
+                if (showDetailsBody && selectedCredential != null && expanded == null) {
+                    CircularProgressIndicator()
+                }
                 AnimatedVisibility(
                     visible = showDetailsBody && expanded != null,
                     enter = fadeIn(tween(160)),

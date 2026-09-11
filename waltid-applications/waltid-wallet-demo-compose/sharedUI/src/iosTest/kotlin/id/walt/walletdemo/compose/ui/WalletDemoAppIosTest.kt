@@ -30,6 +30,12 @@ class WalletDemoAppIosTest {
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
 
     @Test
+    fun credentialsTabWaitsForCredentialRead() = scenarios.credentialsTabWaitsForCredentialRead()
+
+    @Test
+    fun credentialsTabDoesNotShowEmptyOnLoadFailure() = scenarios.credentialsTabDoesNotShowEmptyOnLoadFailure()
+
+    @Test
     fun credentialsTabShowsEmptyStateAndUpdatesAfterReceive() =
         scenarios.credentialsTabShowsEmptyStateAndUpdatesAfterReceive()
 

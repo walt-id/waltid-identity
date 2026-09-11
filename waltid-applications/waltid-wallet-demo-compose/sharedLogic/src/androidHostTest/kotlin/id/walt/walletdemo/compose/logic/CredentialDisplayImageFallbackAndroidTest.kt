@@ -16,6 +16,19 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class CredentialDisplayImageFallbackAndroidTest {
     @Test
+    fun defersImagesWithLongDataUrlMetadata() {
+        val png = fixture("synthetic-signature.png")
+        val metadata = "profile=" + "x".repeat(160)
+        val details = details(
+            format = "dc+sd-jwt",
+            credentialDataJson = """{"visual_proof":"data:image/png;$metadata;base64,${Base64.Default.encode(png)}"}""",
+        )
+        val deferred = assertIs<DisplayValue.DeferredImage>(details.groups.single().items.single().value)
+        val image = assertIs<DisplayValue.Image>(deferred.resolve())
+        assertTrue(image.bytes.contentEquals(png))
+    }
+
+    @Test
     fun rendersDecodableDataImageClaimsForSdJwtAndW3cCredentialsUsingDetectedMimeType() {
         val jpeg = fixture("synthetic-verification-document.jpg")
         val png = fixture("synthetic-signature.png")
@@ -33,12 +46,12 @@ class CredentialDisplayImageFallbackAndroidTest {
             val claims = details.groups.flatMap { it.items }
             val claim = claims.first { it.path.id == "verification_artifact" }
             assertEquals("Verification artifact", claim.label)
-            val image = assertIs<DisplayValue.Image>(claim.value)
+            val image = assertIs<DisplayValue.Image>((claim.value as DisplayValue.DeferredImage).resolve())
             assertEquals("image/jpeg", image.mimeType)
             assertTrue(image.bytes.contentEquals(jpeg))
 
             val nestedImage = assertIs<DisplayValue.Image>(
-                claims.first { it.path.id == "resident_address.visual_proof" }.value
+                (claims.first { it.path.id == "resident_address.visual_proof" }.value as DisplayValue.DeferredImage).resolve()
             )
             assertEquals("image/png", nestedImage.mimeType)
             assertTrue(nestedImage.bytes.contentEquals(png))
@@ -66,7 +79,7 @@ class CredentialDisplayImageFallbackAndroidTest {
         )
 
         val image = assertIs<DisplayValue.Image>(
-            option.toCredentialDetails().groups.first().items.single().value
+            (option.toCredentialDetails().groups.first().items.single().value as DisplayValue.DeferredImage).resolve()
         )
         assertEquals("image/png", image.mimeType)
     }
@@ -83,7 +96,7 @@ class CredentialDisplayImageFallbackAndroidTest {
         )
 
         details.groups.flatMap { it.items }.forEach { claim ->
-            assertEquals(DisplayValue.Text(CredentialDisplayText.ImageUnavailable), claim.value)
+            assertEquals(DisplayValue.Text(CredentialDisplayText.ImageUnavailable), (claim.value as DisplayValue.DeferredImage).resolve())
         }
     }
 
@@ -97,7 +110,7 @@ class CredentialDisplayImageFallbackAndroidTest {
         )
 
         val claim = details.groups.flatMap { it.items }.single()
-        assertEquals(DisplayValue.Text(CredentialDisplayText.ImageUnavailable), claim.value)
+        assertEquals(DisplayValue.Text(CredentialDisplayText.ImageUnavailable), (claim.value as DisplayValue.DeferredImage).resolve())
         assertTrue(claim.rawValue?.contains("data:image/png;base64,") == true)
     }
 
