@@ -709,7 +709,7 @@ class ProtocolModelsTest {
                 )
             ),
         )
-        assertFailsWith<kotlinx.serialization.SerializationException> {
+        assertFailsWith<SerializationException> {
             coseCompliantCbor.decodeFromByteArray<SessionData>(malformedSequence)
         }
     }

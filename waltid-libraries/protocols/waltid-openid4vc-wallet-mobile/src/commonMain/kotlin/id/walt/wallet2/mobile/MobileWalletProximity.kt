@@ -12,6 +12,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.proximity.EngagementContext
 import id.walt.mdoc.proximity.MdocDeviceEngagementFactory
 import id.walt.mdoc.proximity.MdocEngagementMode
+import id.walt.mdoc.proximity.MdocEngagementSource
 import id.walt.mdoc.proximity.MdocHolderProtocolEngine
 import id.walt.mdoc.proximity.MdocHolderSessionResult
 import id.walt.mdoc.proximity.MdocHolderSessionState
@@ -19,6 +20,7 @@ import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocProtocolFeature
 import id.walt.mdoc.proximity.MdocProximityProfile
 import id.walt.mdoc.proximity.MdocSessionCapabilities
+import id.walt.mdoc.proximity.ProximityTransportKind
 import id.walt.mdoc.proximity.ProximityTransportProvider
 import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ProximityError as EngineProximityError
@@ -59,6 +61,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.uuid.Uuid
 
 internal class ProximityCoordinator(
@@ -183,9 +186,9 @@ private class ProximitySessionImpl(
                     MdocEngagementMode.Nfc -> ProximityEngagementMethod.Nfc
                 },
                 transport = when (route.transport) {
-                    id.walt.mdoc.proximity.ProximityTransportKind.BLE -> ProximityTransport.BluetoothLowEnergy
-                    id.walt.mdoc.proximity.ProximityTransportKind.NFC -> ProximityTransport.Nfc
-                    id.walt.mdoc.proximity.ProximityTransportKind.WIFI_AWARE -> ProximityTransport.WifiAware
+                    ProximityTransportKind.BLE -> ProximityTransport.BluetoothLowEnergy
+                    ProximityTransportKind.NFC -> ProximityTransport.Nfc
+                    ProximityTransportKind.WIFI_AWARE -> ProximityTransport.WifiAware
                 },
             )
         }
@@ -319,7 +322,7 @@ private class ProximitySessionImpl(
         prerequisites: ProximityCapabilities,
         eDeviceKeyBytes: ImmutableBytes,
         engagementFactory: MdocDeviceEngagementFactory,
-    ): List<id.walt.mdoc.proximity.MdocEngagementSource> {
+    ): List<MdocEngagementSource> {
         val selected = configuration.session
         fun newBleProviders(ble: ProximityBleConfiguration?, sharedUuid: Boolean = false): List<ProximityTransportProvider> =
             if (ble == null || !prerequisites.bluetoothLowEnergy.mayStart) emptyList() else listOf(
@@ -430,7 +433,7 @@ private class ProximitySessionImpl(
     }
 }
 
-@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class)
 private fun ProximityNfcRetrievalConfiguration.toTransportMethod(): DeviceRetrievalMethod.Nfc =
     DeviceRetrievalMethod.Nfc(maximumCommandDataLength.toUInt(), maximumResponseDataLength.toUInt())
 

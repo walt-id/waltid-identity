@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration
+import id.walt.wallet2.mobile.ProximityRetrievalOptions
 import id.walt.wallet2.mobile.ProximityReviewId
 import id.walt.wallet2.mobile.ProximityRecovery
 import id.walt.wallet2.mobile.ProximityRuntimeObservation
@@ -13,7 +15,9 @@ import id.walt.wallet2.mobile.ProximityDocumentReview
 import id.walt.wallet2.mobile.ProximityElementReference
 import id.walt.wallet2.mobile.ProximityError
 import id.walt.wallet2.mobile.ProximityErrorCategory
+import id.walt.wallet2.mobile.ProximitySessionConfiguration
 import id.walt.wallet2.mobile.ProximityHostActionResult
+import id.walt.wallet2.mobile.ProximityNfcHandover
 import id.walt.wallet2.mobile.ProximityProfile
 import id.walt.wallet2.mobile.ProximityReaderPolicy
 import id.walt.wallet2.mobile.ProximityRemediationAction
@@ -483,7 +487,7 @@ private val availableSelected = ProximityTransportCapability(
 private val availableUnselected = availableSelected.copy(selected = false)
 
 private val readyCapabilities = ProximityCapabilities(
-    session = id.walt.wallet2.mobile.ProximitySessionConfiguration.Qr(),
+    session = ProximitySessionConfiguration.Qr(),
     profile = ProximityProfile.Iso180135Edition2Dis2026,
     qrEngagement = availableSelected,
     nfcEngagement = availableUnselected,
@@ -510,12 +514,12 @@ private val blockedCapabilities = readyCapabilities.copy(
 )
 
 private val fallbackCapabilities = blockedCapabilities.copy(
-    session = id.walt.wallet2.mobile.ProximitySessionConfiguration.ConventionalNfc(
-        handover = id.walt.wallet2.mobile.ProximityNfcHandover.Static,
-        retrieval = id.walt.wallet2.mobile.ProximityRetrievalOptions(
-            nfc = id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration(),
+    session = ProximitySessionConfiguration.ConventionalNfc(
+        handover = ProximityNfcHandover.Static,
+        retrieval = ProximityRetrievalOptions(
+            nfc = ProximityNfcRetrievalConfiguration(),
         ),
-        qrFallback = id.walt.wallet2.mobile.ProximityRetrievalOptions(),
+        qrFallback = ProximityRetrievalOptions(),
     ),
     nfcEngagement = availableSelected,
     nfcRetrieval = availableSelected,
