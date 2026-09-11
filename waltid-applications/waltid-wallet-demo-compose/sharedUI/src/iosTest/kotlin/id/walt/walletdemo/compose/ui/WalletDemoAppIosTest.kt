@@ -1,9 +1,14 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.ui.test.ExperimentalTestApi
 import kotlin.test.Test
 
 class WalletDemoAppIosTest {
     private val scenarios = WalletDemoAppTestScenarios()
+
+    @Test
+    @OptIn(ExperimentalTestApi::class)
+    fun proximityQrFitsWalletChromeWithoutScrolling() = scenarios.proximityQrFitsWalletChromeWithoutScrolling()
 
     @Test
     fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
@@ -120,6 +125,10 @@ class WalletDemoAppIosTest {
     @Test
     fun customBrandingTitleAppearsInTheHeader() =
         scenarios.customBrandingTitleAppearsInTheHeader()
+
+    @Test
+    fun sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys() =
+        scenarios.sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys()
 
     @Test
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =

@@ -151,6 +151,27 @@ class WalletViewModel: ObservableObject {
             )
         }
     }
+    @Published var proximityTransportProfile: WalletDemoProximityTransportProfile =
+        DemoSharingSettings.proximityTransportProfile(
+            appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+        ) {
+            didSet {
+                DemoSharingSettings.setProximityTransportProfile(
+                    proximityTransportProfile,
+                    appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+                )
+                proximityPresentation.refreshPreferences()
+            }
+        }
+    @Published var proximityApprovalMode: WalletDemoProximityApprovalMode = DemoSharingSettings.proximityApprovalMode(
+        appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+    ) {
+        didSet {
+            DemoSharingSettings.setProximityApprovalMode(proximityApprovalMode,
+                appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier)
+            proximityPresentation.refreshPreferences()
+        }
+    }
     @Published var pinError: String?
     @Published var isAuthenticating = false
     @Published private(set) var pendingPresentationContinuationURL: URL?
@@ -632,7 +653,13 @@ class WalletViewModel: ObservableObject {
                 ?? (resolvedWalletClient as? any ProximityWalletClient)
                 ?? UnavailableProximityWalletClient(),
             configurationProvider: {
-                readerTrustSettings.sessionSnapshot().applying()
+                readerTrustSettings.sessionSnapshot().applying(
+                    to: DemoSharingSettings.proximityTransportProfile(
+                        appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+                    ).configuration.withApproval(DemoSharingSettings.proximityApprovalMode(
+                        appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+                    ).approval)
+                )
             }
         )
         self.identityDocumentRegistrationUpdate = identityDocumentRegistrationUpdate ?? {

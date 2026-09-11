@@ -93,6 +93,38 @@ public enum IOSNfcHostBridgeAvailability: Sendable, Equatable {
     case unavailable(IOSNfcHostBridgeUnavailable)
 }
 
+/// Actual Core NFC modal-presentment transitions, independent of session configuration.
+@_spi(KmpHostBridge)
+public enum IOSNfcPresentmentEvent: Sendable, Equatable {
+    case began
+    case ended(IOSNfcHostBridgeCloseReason)
+    case invalidated(IOSNfcHostBridgeCloseReason)
+}
+
+/// Synchronous observation prevents a background notification from overtaking stream delivery.
+private final class IOSNfcPresentmentState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = false
+    private let observer: @Sendable (IOSNfcPresentmentEvent) -> Void
+
+    init(observer: @escaping @Sendable (IOSNfcPresentmentEvent) -> Void) {
+        self.observer = observer
+    }
+
+    var isActive: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return active
+    }
+
+    func update(_ event: IOSNfcPresentmentEvent) {
+        lock.lock()
+        active = event == .began
+        lock.unlock()
+        observer(event)
+    }
+}
+
 /// Result of arming one generation-bound Swift CardSession bridge.
 @_spi(KmpHostBridge)
 public enum IOSNfcHostBridgePreparation: Sendable {
@@ -126,14 +158,34 @@ public final class IOSNfcHostBridgeSession: @unchecked Sendable {
 public final class IOSNfcHostBridge: @unchecked Sendable {
     private let environment: any IOSNfcCardSessionEnvironment
     private let coordinator: CardSessionNfcHostCoordinator
+    private let presentment: IOSNfcPresentmentState
 
-    public convenience init() {
-        self.init(environment: CoreNfcCardSessionEnvironment())
+    /// True only while Core NFC is entering or displaying its emulation UI.
+    public var isPresenting: Bool { presentment.isActive }
+
+    /// Opens Core NFC's sheet for the prepared session after an explicit user action.
+    /// This preserves the engagement and keys already advertised to the reader.
+    public func present() async {
+        await coordinator.present()
     }
 
-    init(environment: any IOSNfcCardSessionEnvironment) {
+    public convenience init(
+        onPresentment: @escaping @Sendable (IOSNfcPresentmentEvent) -> Void = { _ in }
+    ) {
+        self.init(environment: CoreNfcCardSessionEnvironment(), onPresentment: onPresentment)
+    }
+
+    init(
+        environment: any IOSNfcCardSessionEnvironment,
+        onPresentment: @escaping @Sendable (IOSNfcPresentmentEvent) -> Void = { _ in }
+    ) {
         self.environment = environment
-        coordinator = CardSessionNfcHostCoordinator(environment: environment)
+        let presentment = IOSNfcPresentmentState(observer: onPresentment)
+        self.presentment = presentment
+        coordinator = CardSessionNfcHostCoordinator(
+            environment: environment,
+            onPresentment: { event in presentment.update(event) }
+        )
     }
 
     public func capability() async -> IOSNfcHostBridgeAvailability {
@@ -221,6 +273,15 @@ public final class IOSNfcHostPlatformAdapter:
     Waltid_mdoc_proximity_mobileNfcHostPlatformAdapter,
     @unchecked Sendable {
     private let bridge: IOSNfcHostBridge
+
+    /// Core NFC owns modal UI throughout an NFC-only exchange.
+    public var supportsInSessionUserInteraction: Bool { false }
+
+    var isPresenting: Bool { bridge.isPresenting }
+
+    func present() async {
+        await bridge.present()
+    }
 
     /// Creates the Core NFC host adapter used by an iOS KMP wallet host.
     ///
@@ -407,9 +468,15 @@ actor CardSessionNfcHostCoordinator {
     private let environment: any IOSNfcCardSessionEnvironment
     private var nextGeneration: UInt64 = 1
     private var activeGeneration: UInt64?
+    private weak var activeCore: IOSCardSessionCore?
+    private let onPresentment: @Sendable (IOSNfcPresentmentEvent) -> Void
 
-    init(environment: any IOSNfcCardSessionEnvironment) {
+    init(
+        environment: any IOSNfcCardSessionEnvironment,
+        onPresentment: @escaping @Sendable (IOSNfcPresentmentEvent) -> Void = { _ in }
+    ) {
         self.environment = environment
+        self.onPresentment = onPresentment
     }
 
     func prepare(router: any IOSNfcHostApduRouting) async throws -> IOSNfcHostBridgeSession {
@@ -427,28 +494,35 @@ actor CardSessionNfcHostCoordinator {
             generation: generation,
             environment: environment,
             router: router,
+            onPresentment: onPresentment,
             onClose: { [weak self] closedGeneration in
                 await self?.release(generation: closedGeneration)
             }
         )
         do {
             try await core.prepare()
+            if activeGeneration == generation { activeCore = core }
             return IOSNfcHostBridgeSession(core: core)
         } catch let failure as CardSessionNfcHostError {
-            activeGeneration = nil
+            release(generation: generation)
             throw failure
         } catch let failure as IOSNfcCardSessionFailure {
-            activeGeneration = nil
+            release(generation: generation)
             throw CardSessionNfcHostError(failure)
         } catch {
-            activeGeneration = nil
+            release(generation: generation)
             throw CardSessionNfcHostError.systemUnavailable
         }
+    }
+
+    func present() async {
+        await activeCore?.present()
     }
 
     private func release(generation: UInt64) {
         if activeGeneration == generation {
             activeGeneration = nil
+            activeCore = nil
         }
     }
 }
@@ -475,48 +549,76 @@ actor IOSCardSessionCore {
     private let environment: any IOSNfcCardSessionEnvironment
     private let router: any IOSNfcHostApduRouting
     private let onClose: @Sendable (UInt64) async -> Void
+    private let onPresentment: @Sendable (IOSNfcPresentmentEvent) -> Void
+    private enum PresentmentPhase {
+        case awaitingSession, requested, ready, presenting
+    }
+    private var presentmentPhase = PresentmentPhase.awaitingSession
+    private var presenting: Bool { presentmentPhase == .presenting }
     private var presentmentIntent: (any IOSNfcPresentmentIntent)?
     private var cardSession: (any IOSNfcCardSession)?
     private var eventTask: Task<Void, Never>?
     private var apduTask: Task<Void, Never>?
     private var closed = false
     private var apduInFlight = false
+    private var waitingForReaderDeselection = false
+    private var successfulCloseRequested = false
+    private var responseContinuationExpected = false
+    private var responseDeliveryWaiters: [CheckedContinuation<Void, Never>] = []
     private var apduDrainWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(
         generation: UInt64,
         environment: any IOSNfcCardSessionEnvironment,
         router: any IOSNfcHostApduRouting,
+        onPresentment: @escaping @Sendable (IOSNfcPresentmentEvent) -> Void = { _ in },
         onClose: @escaping @Sendable (UInt64) async -> Void = { _ in }
     ) {
         self.generation = generation
         self.environment = environment
         self.router = router
+        self.onPresentment = onPresentment
         self.onClose = onClose
     }
 
     func prepare() async throws {
+        try await withTaskCancellationHandler {
+            do {
+                try await prepareResources()
+            } catch {
+                await close(reason: .cancelled)
+                throw error
+            }
+        } onCancel: {
+            Task { await self.close(reason: .cancelled) }
+        }
+    }
+
+    private func prepareResources() async throws {
         guard !closed, cardSession == nil else {
             throw CardSessionNfcHostError.sessionAlreadyActive
         }
-        // Apple documents the presentment-intent assertion as an optional, 15-second suppression
-        // of the default contactless app. Hold it when acquisition succeeds, but do not make
-        // CardSession availability depend on it and do not renew it without a fresh user action.
+        try Task.checkCancellation()
+        // The optional assertion suppresses the default contactless app for up to 15 seconds.
+        // It neither owns the emulation UI nor changes the host's background policy.
         do {
-            presentmentIntent = try await environment.acquirePresentmentIntent()
-        } catch let error as CancellationError {
-            throw error
+            let intent = try await environment.acquirePresentmentIntent()
+            try Task.checkCancellation()
+            guard !closed else { throw CancellationError() }
+            presentmentIntent = intent
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             presentmentIntent = nil
         }
-
-        do {
-            cardSession = try await environment.makeCardSession()
-        } catch {
-            presentmentIntent = nil
-            throw error
+        try Task.checkCancellation()
+        guard !closed else { throw CancellationError() }
+        let created = try await environment.makeCardSession()
+        guard !closed, !Task.isCancelled else {
+            created.invalidate()
+            throw CancellationError()
         }
-
+        cardSession = created
         eventTask = Task { [weak self] in
             guard let self else { return }
             await self.runEventLoop()
@@ -524,26 +626,79 @@ actor IOSCardSessionCore {
     }
 
     func close(reason: IOSNfcHostBridgeCloseReason) async {
+        if reason == .completed || reason == .handoverCompleted {
+            // The common message send stages an APDU response before Core NFC has transmitted it.
+            // Drain all GET RESPONSE fragments. For NFC retrieval, Core NFC returning from
+            // respond does not guarantee the reader received the bytes; keep RF alive until deselection.
+            successfulCloseRequested = true
+            if reason == .completed && presenting && !closed {
+                waitingForReaderDeselection = true
+                cardSession?.setAlertMessage(String(localized: "Response submitted. Keep near reader until its result, then separate devices."))
+            }
+            await withTaskCancellationHandler {
+                await awaitResponseDelivery()
+            } onCancel: {
+                Task { await self.close(reason: .cancelled) }
+            }
+        }
         await finish(reason: reason, emulationStatus: status(for: reason), invalidate: true)
+    }
+
+    func present() async {
+        guard !closed else { return }
+        switch presentmentPhase {
+        case .awaitingSession, .requested:
+            presentmentPhase = .requested
+        case .ready:
+            await startPresentment()
+        case .presenting:
+            break
+        }
+    }
+
+    private func startPresentment() async {
+        guard !closed, !presenting, let cardSession else { return }
+        // Core NFC can background the host before startEmulation returns.
+        presentmentPhase = .presenting
+        onPresentment(.began)
+        cardSession.setAlertMessage(String(localized: "Hold your iPhone near the reader"))
+        do {
+            try await cardSession.startEmulation()
+            guard !closed else {
+                await cardSession.stopEmulation(status: .failure)
+                cardSession.invalidate()
+                return
+            }
+            cardSession.setAlertMessage(String(localized: "Presenting credential to nearby reader"))
+        } catch {
+            await finish(reason: .platformUnavailable, emulationStatus: .failure, invalidate: true)
+        }
     }
 
     private func runEventLoop() async {
         guard let cardSession else { return }
         do {
             for try await event in cardSession.events {
-                if Task.isCancelled { return }
+                if Task.isCancelled || closed { return }
                 switch event {
                 case .sessionStarted:
                     cardSession.setAlertMessage(String(localized: "Ready to present credential"))
+                    if presentmentPhase == .requested {
+                        await startPresentment()
+                    } else if presentmentPhase == .awaitingSession {
+                        presentmentPhase = .ready
+                    }
                 case .readerDetected:
-                    try await cardSession.startEmulation()
-                    cardSession.setAlertMessage(String(localized: "Presenting credential to nearby reader"))
+                    await startPresentment()
+                    if closed { return }
                 case let .received(apdu):
                     if !startProcessing(apdu: apdu) {
                         await respondIgnoringFailure(Self.conditionsNotSatisfied, to: apdu)
                     }
                 case .readerDeselected:
-                    await finish(reason: .peerDisconnected, emulationStatus: .failure, invalidate: true)
+                    let completed = waitingForReaderDeselection && !apduInFlight && !responseContinuationExpected
+                    await finish(reason: completed ? .completed : .peerDisconnected,
+                                 emulationStatus: completed ? .success : .failure, invalidate: true)
                     return
                 case let .sessionInvalidated(reason):
                     await finish(
@@ -564,6 +719,10 @@ actor IOSCardSessionCore {
 
     private func startProcessing(apdu: any IOSNfcCardSessionAPDU) -> Bool {
         guard !closed, !apduInFlight else { return false }
+        if successfulCloseRequested {
+            guard responseContinuationExpected, apdu.payload.count >= 2,
+                  apdu.payload[apdu.payload.index(after: apdu.payload.startIndex)] == 0xc0 else { return false }
+        }
         apduInFlight = true
         apduTask = Task { [weak self] in
             await self?.process(apdu: apdu)
@@ -602,7 +761,13 @@ actor IOSCardSessionCore {
             await finish(reason: .peerDisconnected, emulationStatus: .failure, invalidate: true)
             return
         }
+        if response.count >= 2 {
+            let status = response.suffix(2)
+            if status.first == 0x61 { responseContinuationExpected = true }
+            else if status.elementsEqual([0x90, 0x00]) { responseContinuationExpected = false }
+        }
         finishAPDU()
+        if !responseContinuationExpected && !waitingForReaderDeselection { resumeResponseDeliveryWaiters() }
     }
 
     private func send(_ response: Data, to apdu: any IOSNfcCardSessionAPDU) async throws {
@@ -634,8 +799,6 @@ actor IOSCardSessionCore {
         task?.cancel()
         apduTask?.cancel()
 
-        await awaitAPDUDrain()
-        await router.deactivate(reason: reason)
         if let session = cardSession {
             if let emulationStatus, await session.isEmulationInProgress() {
                 await session.stopEmulation(status: emulationStatus)
@@ -644,9 +807,28 @@ actor IOSCardSessionCore {
                 session.invalidate()
             }
         }
+        if presenting || !invalidate {
+            presentmentPhase = .ready
+            onPresentment(invalidate ? .ended(reason) : .invalidated(reason))
+        }
         cardSession = nil
         presentmentIntent = nil
+        await awaitAPDUDrain()
+        await router.deactivate(reason: reason)
         await onClose(generation)
+        resumeResponseDeliveryWaiters()
+    }
+
+    private func awaitResponseDelivery() async {
+        guard !closed, apduInFlight || responseContinuationExpected || waitingForReaderDeselection else { return }
+        // Reader loss, cancellation, or CardSession's own maximum-duration event also releases this wait.
+        await withCheckedContinuation { responseDeliveryWaiters.append($0) }
+    }
+
+    private func resumeResponseDeliveryWaiters() {
+        let waiters = responseDeliveryWaiters
+        responseDeliveryWaiters.removeAll()
+        waiters.forEach { $0.resume() }
     }
 
     private func finishAPDU() {

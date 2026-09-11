@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/mdoc_hce_service_description"
+    android:requireDeviceUnlock="true">
+    <aid-group
+        android:description="@string/mdoc_hce_aid_group_description"
+        android:category="other">
+        <aid-filter android:name="D2760000850101" />
+        <aid-filter android:name="A0000002480400" />
+        <aid-filter android:name="A0000002480401" />
+    </aid-group>
+</host-apdu-service>

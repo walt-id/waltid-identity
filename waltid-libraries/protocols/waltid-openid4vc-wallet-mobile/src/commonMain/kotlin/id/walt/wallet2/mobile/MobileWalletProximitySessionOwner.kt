@@ -16,6 +16,8 @@ import kotlinx.coroutines.sync.withLock
 internal class ProximitySessionOwner(
     initial: ProximityState.CheckingPrerequisites,
     private val prerequisiteRetry: Channel<Unit>,
+    private val approval: ProximityApproval = ProximityApproval.AskEachTime,
+    private val canReviewWhileConnected: () -> Boolean = { true },
 ) : MdocConsentHandler {
     private data class Pending(
         val prompt: MdocConsentPrompt,
@@ -29,6 +31,12 @@ internal class ProximitySessionOwner(
     val state: StateFlow<ProximityState> = mutableState.asStateFlow()
     private var processor: ProximityRequestProcessor? = null
     private var pending: Pending? = null
+    private val mutableSharingPlan = MutableStateFlow<ProximitySharingPlan?>(null)
+    val sharingPlan: ProximitySharingPlan? get() = mutableSharingPlan.value
+    private var preparationRequired: ProximityState.PreparationRequired? = null
+    private var preparationError: ProximityError? = null
+    private var preparedDecisionFinished = approval !is ProximityApproval.Prepared
+    private var receipt: (() -> ProximitySharingReceipt)? = null
 
     suspend fun attach(processor: ProximityRequestProcessor) = mutex.withLock {
         check(this.processor == null)
@@ -39,7 +47,19 @@ internal class ProximitySessionOwner(
         this.processor = processor
     }
 
-    suspend fun publish(next: ProximityState) = mutex.withLock { publishLocked(next) }
+    suspend fun publish(next: ProximityState) = mutex.withLock {
+        val projected = if (next is ProximityState.Completed) {
+            preparationRequired ?: preparationError?.let { ProximityState.Failed(it) } ?: next.copy(receipt = receipt?.invoke())
+        } else next
+        publishLocked(projected)
+    }
+
+    /** Cancels an armed approval only before its request has been decided. Never interrupts response draining. */
+    suspend fun invalidatePrepared(error: ProximityError): Boolean = mutex.withLock {
+        if (preparedDecisionFinished || current.isTerminal) return@withLock false
+        preparedDecisionFinished = true
+        publishLocked(ProximityState.Failed(error))
+    }
 
     private suspend fun publishLocked(next: ProximityState): Boolean {
         if (current.isTerminal || next.position() < current.position()) return false
@@ -54,13 +74,52 @@ internal class ProximitySessionOwner(
     }
 
     override suspend fun decide(prompt: MdocConsentPrompt): MdocConsentDecision {
-        val review = requireNotNull(processor).review(prompt)
+        val requestProcessor = requireNotNull(processor)
+        val review = requestProcessor.review(prompt)
+        val plan = requestProcessor.sharingPlan(prompt)
         val waiting = Pending(prompt, review.reviewId, CompletableDeferred())
         mutex.withLock {
             if (current.isTerminal) throw CancellationException("The proximity session is terminal")
             check(pending == null) { "A previous proximity review is still awaiting a decision" }
+            mutableSharingPlan.value = plan
+            receipt = null // A receipt belongs to this request, never to an earlier continued exchange.
+            val prepared = (approval as? ProximityApproval.Prepared)?.sharing
+            val reason = if (prepared != null) ProximityReviewReason.PreparedSharingChanged else ProximityReviewReason.RequestReceived
+            if (prepared != null && !preparedDecisionFinished) {
+                val submission = plan?.let { prepared.accept(it.scope, review) }
+                preparedDecisionFinished = true
+                if (submission == null && (prepared.revoked.value || prepared.remainingSeconds == 0)) {
+                    publishLocked(ProximityState.Failed(if (prepared.revoked.value) {
+                        approvalError("prepared_sharing_cancelled", "Prepared sharing was cancelled.")
+                    } else {
+                        approvalError("prepared_sharing_expired", "Prepared sharing expired. Approve again before connecting.")
+                    }))
+                    return MdocConsentDecision.Deny(prompt.bindingToken)
+                }
+                if (submission != null) {
+                    requestProcessor.accept(prompt, review.reviewId, submission)?.let {
+                        publishLocked(ProximityState.Failed(it))
+                        return MdocConsentDecision.Deny(prompt.bindingToken)
+                    }
+                    receipt = { ProximitySharingReceipt(review, submission, ProximityApprovalTiming.BeforeConnection) }
+                    check(publishLocked(ProximityState.AuthorizingHolderKey(requestProcessor.holderAuthorization(review.reviewId))))
+                    return MdocConsentDecision.Approve(prompt.bindingToken)
+                }
+            }
+            if (approval == ProximityApproval.PrepareBeforeSharing || !canReviewWhileConnected()) {
+                if (plan != null) {
+                    preparationRequired = ProximityState.PreparationRequired(plan, reason)
+                } else {
+                    preparationError = approvalError(
+                        "reader_not_eligible_for_preparation",
+                        "Prepared sharing needs one authenticated, trusted reader with a verified name. Use a connection that allows review, such as Bluetooth.",
+                    )
+                }
+                check(publishLocked(ProximityState.Terminating(prompt.exchange)))
+                return MdocConsentDecision.Deny(prompt.bindingToken)
+            }
             pending = waiting
-            check(publishLocked(ProximityState.ReviewRequired(review))) {
+            check(publishLocked(ProximityState.ReviewRequired(review, reason))) {
                 "An obsolete proximity review cannot replace a newer session phase"
             }
         }
@@ -121,6 +180,10 @@ internal class ProximitySessionOwner(
                                 return@withLock ProximityActionResult.Rejected(it)
                             }
                             val authorization = processor.holderAuthorization(id)
+                            val approvedReview = processor.review(waiting.prompt)
+                            receipt = if (owned.submission.disclosesRequestedPortrait(approvedReview)) {
+                                { ProximitySharingReceipt(approvedReview, owned.submission, ProximityApprovalTiming.DuringConnection) }
+                            } else null // The response builder suppresses data after portrait denial; do not report selected fields as sent.
                             check(publishLocked(ProximityState.AuthorizingHolderKey(authorization)))
                             MdocConsentDecision.Approve(waiting.prompt.bindingToken)
                         }
@@ -148,7 +211,7 @@ internal class ProximitySessionOwner(
 
 private val ProximityState.isTerminal: Boolean
     get() = this is ProximityState.Completed || this is ProximityState.NoData || this is ProximityState.Failed ||
-        this is ProximityState.Cancelled
+        this is ProximityState.Cancelled || this is ProximityState.PreparationRequired
 
 /** Exchange and phase order rejects delayed observations even when they acquire the lock later. */
 private fun ProximityState.position(): Long = when (this) {
@@ -164,6 +227,7 @@ private fun ProximityState.position(): Long = when (this) {
     is ProximityState.Terminating -> exchange.toLong() * 10 + 5
     is ProximityState.Completed -> exchanges.toLong() * 10 + 6
     is ProximityState.NoData -> exchange.toLong() * 10 + 6
+    is ProximityState.PreparationRequired -> plan.review.exchange.toLong() * 10 + 6
     is ProximityState.Cancelled, is ProximityState.Failed -> Long.MAX_VALUE
 }
 

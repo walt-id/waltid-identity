@@ -2,24 +2,53 @@ package id.walt.walletdemo.compose.logic
 
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DemoSharingSettingsStoreTest {
     @Test
     fun missingValueDefaultsToShowingTheDcApiPreview() {
         var stored: Boolean? = null
+        var storedProfile: String? = null
+        var storedMode: String? = null
         val store = PersistentDemoSharingSettingsStore(
             readEnabled = { stored },
             writeEnabled = { stored = it },
+            readProximityTransportProfile = { storedProfile },
+            writeProximityTransportProfile = { storedProfile = it },
+            readProximityApprovalMode = { storedMode },
+            writeProximityApprovalMode = { storedMode = it },
         )
 
         assertTrue(store.showDcApiPresentationPreview())
+
+        assertEquals(WalletDemoProximityApprovalMode.AskEachTime, store.proximityApprovalMode())
+        store.setProximityApprovalMode(WalletDemoProximityApprovalMode.PrepareSharing)
+        assertEquals("prepare_sharing", storedMode)
+        assertEquals(WalletDemoProximityApprovalMode.PrepareSharing, store.proximityApprovalMode())
+        storedMode = "unknown_future_mode"
+        assertEquals(WalletDemoProximityApprovalMode.AskEachTime, store.proximityApprovalMode())
 
         store.setShowDcApiPresentationPreview(false)
         assertFalse(store.showDcApiPresentationPreview())
 
         store.setShowDcApiPresentationPreview(true)
         assertTrue(store.showDcApiPresentationPreview())
+
+        assertEquals(
+            WalletDemoProximityTransportProfile.Default,
+            store.proximityTransportProfile(),
+        )
+        store.setProximityTransportProfile(WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid)
+        assertEquals(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid,
+            store.proximityTransportProfile(),
+        )
+        storedProfile = "unknown_future_profile"
+        assertEquals(
+            WalletDemoProximityTransportProfile.Default,
+            store.proximityTransportProfile(),
+        )
     }
 
     @Test
@@ -29,5 +58,15 @@ class DemoSharingSettingsStoreTest {
 
         store.setShowDcApiPresentationPreview(false)
         assertFalse(store.showDcApiPresentationPreview())
+
+        assertEquals(
+            WalletDemoProximityTransportProfile.Default,
+            store.proximityTransportProfile(),
+        )
+        store.setProximityTransportProfile(WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct)
+        assertEquals(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct,
+            store.proximityTransportProfile(),
+        )
     }
 }

@@ -879,6 +879,8 @@ public struct ProximityConfiguration: Sendable {
     public let applicationProfiles: [any ProximityApplicationProfile]
     /// Maximum accepted protocol message size in bytes.
     public let maximumMessageBytes: Int
+    /// Explicit holder-approval behavior; a stored preference never creates an approval.
+    public let approval: ProximityApproval
 
     /// Creates immutable configuration for one single-use session.
     /// - Parameters:
@@ -890,6 +892,7 @@ public struct ProximityConfiguration: Sendable {
     ///   - credentialStatusEvaluator: Optional explicit status boundary.
     ///   - applicationProfiles: Ordered application profiles.
     ///   - maximumMessageBytes: Positive limit of at most 16 MiB.
+    ///   - approval: Explicit holder-approval behavior for this session; defaults to reviewing each connected request.
     public init(
         profile: ProximityProfile = .iso180135Edition2DIS2026,
         session: ProximitySessionConfiguration = .qr(),
@@ -898,7 +901,8 @@ public struct ProximityConfiguration: Sendable {
         readerTrustEvaluator: (any ProximityReaderTrustEvaluator)? = nil,
         credentialStatusEvaluator: (any ProximityCredentialStatusEvaluator)? = nil,
         applicationProfiles: [any ProximityApplicationProfile] = [],
-        maximumMessageBytes: Int = 1_048_576
+        maximumMessageBytes: Int = 1_048_576,
+        approval: ProximityApproval = .askEachTime
     ) {
         precondition(maximumMessageBytes > 0 && maximumMessageBytes <= 16_777_216)
         precondition(profile != .eudiARF3FCAF202608 || readerPolicy == .requireTrusted)
@@ -917,6 +921,16 @@ public struct ProximityConfiguration: Sendable {
         self.credentialStatusEvaluator = credentialStatusEvaluator
         self.applicationProfiles = applicationProfiles
         self.maximumMessageBytes = maximumMessageBytes
+        self.approval = approval
+    }
+
+    /// Replaces only approval behavior, preserving the profile, trust and transport policies.
+    /// - Parameter approval: Holder-approval behavior to use in the returned configuration.
+    public func withApproval(_ approval: ProximityApproval) -> ProximityConfiguration {
+        .init(profile: profile, session: session, readerPolicy: readerPolicy,
+              deviceAuthenticationPolicy: deviceAuthenticationPolicy, readerTrustEvaluator: readerTrustEvaluator,
+              credentialStatusEvaluator: credentialStatusEvaluator, applicationProfiles: applicationProfiles,
+              maximumMessageBytes: maximumMessageBytes, approval: approval)
     }
 }
 
@@ -958,6 +972,27 @@ public struct ProximityError: Error, Sendable, Equatable {
     public let message: String
     /// Recovery supported by the phase that reported this failure.
     public let recovery: ProximityRecovery
+    /// Host actions supplied by the SDK for this error.
+    public let remediationActions: [ProximityRemediationAction]
+
+    /// Creates a display-safe failure with optional host recovery actions.
+    /// - Parameters:
+    ///   - category: Stable failure category.
+    ///   - code: Stable machine-readable error code.
+    ///   - message: Display-safe explanation without raw exception content.
+    ///   - recovery: Whether recovery requires a fresh session.
+    ///   - remediationActions: Host actions that may restore availability.
+    public init(
+        category: ProximityErrorCategory, code: String, message: String,
+        recovery: ProximityRecovery,
+        remediationActions: [ProximityRemediationAction] = []
+    ) {
+        self.category = category
+        self.code = code
+        self.message = message
+        self.recovery = recovery
+        self.remediationActions = remediationActions
+    }
 }
 
 /// Recovery distinguishes an active prerequisite loop from a terminal session.
@@ -1192,6 +1227,15 @@ public struct ProximityDocumentReview: Sendable, Equatable, Identifiable {
     public let documentType: String
     /// Credentials that can satisfy the request.
     public let credentialOptions: [ProximityCredentialOption]
+    /// Profile-defined data required when sharing this document.
+    public let requiredElements: Set<ProximityElementReference>
+
+    init(requestIndex: Int, documentType: String, credentialOptions: [ProximityCredentialOption], requiredElements: Set<ProximityElementReference> = []) {
+        self.requestIndex = requestIndex
+        self.documentType = documentType
+        self.credentialOptions = credentialOptions
+        self.requiredElements = requiredElements
+    }
 }
 
 /// Reader-asserted purpose hint preserved as untrusted request data.
@@ -1390,7 +1434,9 @@ public enum ProximityState: Sendable, Equatable {
     /// The holder is waiting for a device request.
     case awaitingRequest(exchange: Int)
     /// The host must present the frozen review and collect explicit holder intent.
-    case reviewRequired(ProximityReview)
+    case reviewRequired(ProximityReview, reason: ProximityReviewReason = .requestReceived)
+    /// The connection ended without disclosure. Review and approve before a fresh connection.
+    case preparationRequired(ProximitySharingPlan, reason: ProximityReviewReason = .requestReceived)
     /// A protected holder key is authorizing the frozen approved submission.
     case authorizingHolderKey(ProximityHolderAuthorization)
     /// The response for an exchange is being sent.
@@ -1400,7 +1446,7 @@ public enum ProximityState: Sendable, Equatable {
     /// The protocol is terminating the transport for an exchange.
     case terminating(exchange: Int)
     /// The session completed normally.
-    case completed(exchanges: Int, declined: Bool)
+    case completed(exchanges: Int, declined: Bool, receipt: ProximitySharingReceipt? = nil)
     /// The final request ended without credential data; earlier exchanges may have shared data.
     case noData(exchange: Int)
     /// The host cancelled the session.
@@ -1416,17 +1462,62 @@ public enum ProximityState: Sendable, Equatable {
         case .preparing, .engagementReady, .connecting,
              .awaitingRequest, .authorizingHolderKey, .sendingResponse, .awaitingNextRequest:
             [.cancel]
-        case .terminating, .completed, .noData, .cancelled, .failed:
+        case .terminating, .preparationRequired, .completed, .noData, .cancelled, .failed:
             []
         }
     }
 }
 
+/// Engagement that actually won the reader connection.
+public enum ProximityEngagementMethod: Sendable, Equatable {
+    /// The reader scanned a QR engagement.
+    case qr
+    /// The reader used NFC engagement.
+    case nfc
+}
+
+/// Bearer carrying the connected session.
+public enum ProximityTransport: Sendable, Equatable {
+    /// Bluetooth Low Energy carries the session.
+    case bluetoothLowEnergy
+    /// The NFC channel carries the session.
+    case nfc
+    /// Wi-Fi Aware carries the session.
+    case wifiAware
+}
+
+/// Actual route retained through review and termination.
+public struct ProximityConnectedRoute: Sendable, Equatable {
+    /// Engagement that won the reader connection.
+    public let engagement: ProximityEngagementMethod
+    /// Bearer carrying the connected session.
+    public let transport: ProximityTransport
+
+    /// Creates a snapshot of the actual connected route.
+    /// - Parameters:
+    ///   - engagement: Engagement that won the connection.
+    ///   - transport: Actual connected bearer.
+    public init(engagement: ProximityEngagementMethod, transport: ProximityTransport) {
+        self.engagement = engagement
+        self.transport = transport
+    }
+}
+
 @available(macOS 10.15, *)
 protocol ProximitySessionBridge: Sendable {
+    var connectedRoute: ProximityConnectedRoute? { get }
+    var sharingPlan: ProximitySharingPlan? { get }
+    var systemPresentationActive: Bool { get }
     var states: AsyncStream<ProximityState> { get }
+    func presentNfc() async
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult
     func close() async
+}
+
+@available(macOS 10.15, *)
+extension ProximitySessionBridge {
+    var connectedRoute: ProximityConnectedRoute? { nil }
+    var sharingPlan: ProximitySharingPlan? { nil }
 }
 
 /// Actor-safe, single-use native facade over one KMP proximity session.
@@ -1434,6 +1525,13 @@ protocol ProximitySessionBridge: Sendable {
 public actor ProximitySession {
     /// Exhaustive state stream whose terminal state is emitted before completion.
     public nonisolated let states: AsyncStream<ProximityState>
+    /// Whether this live session currently owns Core NFC's modal emulation UI.
+    /// Hosts may preserve the session during the resulting background transition.
+    public nonisolated var systemPresentationActive: Bool { bridge.systemPresentationActive }
+    /// Winning route once connected, independent of configured and advertised methods.
+    public nonisolated var connectedRoute: ProximityConnectedRoute? { bridge.connectedRoute }
+    /// Recent authenticated request, usable only after a separate explicit approval.
+    public nonisolated var sharingPlan: ProximitySharingPlan? { bridge.sharingPlan }
     private let bridge: any ProximitySessionBridge
     private var closed = false
 
@@ -1444,7 +1542,7 @@ public actor ProximitySession {
                 for await state in bridge.states {
                     continuation.yield(state)
                     switch state {
-                    case .completed, .noData, .cancelled, .failed:
+                    case .preparationRequired, .completed, .noData, .cancelled, .failed:
                         continuation.finish()
                         return
                     default: break
@@ -1454,6 +1552,13 @@ public actor ProximitySession {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    /// Opens the iOS NFC sheet after an explicit user choice of a prepared NFC engagement.
+    /// Calls outside NFC engagement readiness are ignored; failures arrive through ``states``.
+    public func presentNfc() async {
+        guard !closed else { return }
+        await bridge.presentNfc()
     }
 
     /// Dispatches one host intent against the current session state.

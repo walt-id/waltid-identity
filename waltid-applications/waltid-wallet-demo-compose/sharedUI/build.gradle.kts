@@ -55,6 +55,7 @@ kotlin {
                 dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
                     implementation(identityLibs.easyqrscan)
+                    implementation(identityLibs.kotlinx.datetime)
                 }
             }
 

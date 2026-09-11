@@ -280,6 +280,17 @@ final enum class id.walt.wallet2.mobile/ProximityActionType : kotlin/Enum<id.wal
     final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityActionType> // id.walt.wallet2.mobile/ProximityActionType.values|values#static(){}[0]
 }
 
+final enum class id.walt.wallet2.mobile/ProximityApprovalTiming : kotlin/Enum<id.walt.wallet2.mobile/ProximityApprovalTiming> { // id.walt.wallet2.mobile/ProximityApprovalTiming|null[0]
+    enum entry BeforeConnection // id.walt.wallet2.mobile/ProximityApprovalTiming.BeforeConnection|null[0]
+    enum entry DuringConnection // id.walt.wallet2.mobile/ProximityApprovalTiming.DuringConnection|null[0]
+
+    final val entries // id.walt.wallet2.mobile/ProximityApprovalTiming.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/ProximityApprovalTiming> // id.walt.wallet2.mobile/ProximityApprovalTiming.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile/ProximityApprovalTiming // id.walt.wallet2.mobile/ProximityApprovalTiming.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityApprovalTiming> // id.walt.wallet2.mobile/ProximityApprovalTiming.values|values#static(){}[0]
+}
+
 final enum class id.walt.wallet2.mobile/ProximityBleBearerPolicy : kotlin/Enum<id.walt.wallet2.mobile/ProximityBleBearerPolicy> { // id.walt.wallet2.mobile/ProximityBleBearerPolicy|null[0]
     enum entry GattOnly // id.walt.wallet2.mobile/ProximityBleBearerPolicy.GattOnly|null[0]
     enum entry PreferL2cap // id.walt.wallet2.mobile/ProximityBleBearerPolicy.PreferL2cap|null[0]
@@ -536,6 +547,17 @@ final enum class id.walt.wallet2.mobile/ProximityRemediationAction : kotlin/Enum
     final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityRemediationAction> // id.walt.wallet2.mobile/ProximityRemediationAction.values|values#static(){}[0]
 }
 
+final enum class id.walt.wallet2.mobile/ProximityReviewReason : kotlin/Enum<id.walt.wallet2.mobile/ProximityReviewReason> { // id.walt.wallet2.mobile/ProximityReviewReason|null[0]
+    enum entry PreparedSharingChanged // id.walt.wallet2.mobile/ProximityReviewReason.PreparedSharingChanged|null[0]
+    enum entry RequestReceived // id.walt.wallet2.mobile/ProximityReviewReason.RequestReceived|null[0]
+
+    final val entries // id.walt.wallet2.mobile/ProximityReviewReason.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/ProximityReviewReason> // id.walt.wallet2.mobile/ProximityReviewReason.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile/ProximityReviewReason // id.walt.wallet2.mobile/ProximityReviewReason.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityReviewReason> // id.walt.wallet2.mobile/ProximityReviewReason.values|values#static(){}[0]
+}
+
 final enum class id.walt.wallet2.mobile/ProximityRicalState : kotlin/Enum<id.walt.wallet2.mobile/ProximityRicalState> { // id.walt.wallet2.mobile/ProximityRicalState|null[0]
     enum entry Invalid // id.walt.wallet2.mobile/ProximityRicalState.Invalid|null[0]
     enum entry Matched // id.walt.wallet2.mobile/ProximityRicalState.Matched|null[0]
@@ -637,6 +659,8 @@ abstract interface id.walt.wallet2.mobile/ProximitySession { // id.walt.wallet2.
         abstract fun <get-state>(): kotlinx.coroutines.flow/StateFlow<id.walt.wallet2.mobile/ProximityState> // id.walt.wallet2.mobile/ProximitySession.state.<get-state>|<get-state>(){}[0]
     open val connectedRoute // id.walt.wallet2.mobile/ProximitySession.connectedRoute|{}connectedRoute[0]
         open fun <get-connectedRoute>(): id.walt.wallet2.mobile/ProximityConnectedRoute? // id.walt.wallet2.mobile/ProximitySession.connectedRoute.<get-connectedRoute>|<get-connectedRoute>(){}[0]
+    open val sharingPlan // id.walt.wallet2.mobile/ProximitySession.sharingPlan|{}sharingPlan[0]
+        open fun <get-sharingPlan>(): id.walt.wallet2.mobile/ProximitySharingPlan? // id.walt.wallet2.mobile/ProximitySession.sharingPlan.<get-sharingPlan>|<get-sharingPlan>(){}[0]
 
     abstract suspend fun close() // id.walt.wallet2.mobile/ProximitySession.close|close(){}[0]
     abstract suspend fun dispatch(id.walt.wallet2.mobile/ProximityAction): id.walt.wallet2.mobile/ProximityActionResult // id.walt.wallet2.mobile/ProximitySession.dispatch|dispatch(id.walt.wallet2.mobile.ProximityAction){}[0]
@@ -1100,6 +1124,33 @@ sealed interface id.walt.wallet2.mobile/ProximityApplicationProfileResult { // i
     }
 }
 
+sealed interface id.walt.wallet2.mobile/ProximityApproval { // id.walt.wallet2.mobile/ProximityApproval|null[0]
+    final class Prepared : id.walt.wallet2.mobile/ProximityApproval { // id.walt.wallet2.mobile/ProximityApproval.Prepared|null[0]
+        constructor <init>(id.walt.wallet2.mobile/ProximityPreparedSharing) // id.walt.wallet2.mobile/ProximityApproval.Prepared.<init>|<init>(id.walt.wallet2.mobile.ProximityPreparedSharing){}[0]
+
+        final val sharing // id.walt.wallet2.mobile/ProximityApproval.Prepared.sharing|{}sharing[0]
+            final fun <get-sharing>(): id.walt.wallet2.mobile/ProximityPreparedSharing // id.walt.wallet2.mobile/ProximityApproval.Prepared.sharing.<get-sharing>|<get-sharing>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile/ProximityPreparedSharing // id.walt.wallet2.mobile/ProximityApproval.Prepared.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.mobile/ProximityPreparedSharing = ...): id.walt.wallet2.mobile/ProximityApproval.Prepared // id.walt.wallet2.mobile/ProximityApproval.Prepared.copy|copy(id.walt.wallet2.mobile.ProximityPreparedSharing){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityApproval.Prepared.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityApproval.Prepared.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityApproval.Prepared.toString|toString(){}[0]
+    }
+
+    final object AskEachTime : id.walt.wallet2.mobile/ProximityApproval { // id.walt.wallet2.mobile/ProximityApproval.AskEachTime|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityApproval.AskEachTime.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityApproval.AskEachTime.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityApproval.AskEachTime.toString|toString(){}[0]
+    }
+
+    final object PrepareBeforeSharing : id.walt.wallet2.mobile/ProximityApproval { // id.walt.wallet2.mobile/ProximityApproval.PrepareBeforeSharing|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityApproval.PrepareBeforeSharing.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityApproval.PrepareBeforeSharing.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityApproval.PrepareBeforeSharing.toString|toString(){}[0]
+    }
+}
+
 sealed interface id.walt.wallet2.mobile/ProximityCertificateRevocationResult { // id.walt.wallet2.mobile/ProximityCertificateRevocationResult|null[0]
     final class Indeterminate : id.walt.wallet2.mobile/ProximityCertificateRevocationResult { // id.walt.wallet2.mobile/ProximityCertificateRevocationResult.Indeterminate|null[0]
         constructor <init>(kotlin/String) // id.walt.wallet2.mobile/ProximityCertificateRevocationResult.Indeterminate.<init>|<init>(kotlin.String){}[0]
@@ -1173,6 +1224,34 @@ sealed interface id.walt.wallet2.mobile/ProximityEngagement { // id.walt.wallet2
         final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityEngagement.Nfc.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityEngagement.Nfc.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityEngagement.Nfc.toString|toString(){}[0]
+    }
+}
+
+sealed interface id.walt.wallet2.mobile/ProximityPreparationResult { // id.walt.wallet2.mobile/ProximityPreparationResult|null[0]
+    final class Prepared : id.walt.wallet2.mobile/ProximityPreparationResult { // id.walt.wallet2.mobile/ProximityPreparationResult.Prepared|null[0]
+        constructor <init>(id.walt.wallet2.mobile/ProximityPreparedSharing) // id.walt.wallet2.mobile/ProximityPreparationResult.Prepared.<init>|<init>(id.walt.wallet2.mobile.ProximityPreparedSharing){}[0]
+
+        final val sharing // id.walt.wallet2.mobile/ProximityPreparationResult.Prepared.sharing|{}sharing[0]
+            final fun <get-sharing>(): id.walt.wallet2.mobile/ProximityPreparedSharing // id.walt.wallet2.mobile/ProximityPreparationResult.Prepared.sharing.<get-sharing>|<get-sharing>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile/ProximityPreparedSharing // id.walt.wallet2.mobile/ProximityPreparationResult.Prepared.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.mobile/ProximityPreparedSharing = ...): id.walt.wallet2.mobile/ProximityPreparationResult.Prepared // id.walt.wallet2.mobile/ProximityPreparationResult.Prepared.copy|copy(id.walt.wallet2.mobile.ProximityPreparedSharing){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityPreparationResult.Prepared.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityPreparationResult.Prepared.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityPreparationResult.Prepared.toString|toString(){}[0]
+    }
+
+    final class Rejected : id.walt.wallet2.mobile/ProximityPreparationResult { // id.walt.wallet2.mobile/ProximityPreparationResult.Rejected|null[0]
+        constructor <init>(id.walt.wallet2.mobile/ProximityError) // id.walt.wallet2.mobile/ProximityPreparationResult.Rejected.<init>|<init>(id.walt.wallet2.mobile.ProximityError){}[0]
+
+        final val error // id.walt.wallet2.mobile/ProximityPreparationResult.Rejected.error|{}error[0]
+            final fun <get-error>(): id.walt.wallet2.mobile/ProximityError // id.walt.wallet2.mobile/ProximityPreparationResult.Rejected.error.<get-error>|<get-error>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile/ProximityError // id.walt.wallet2.mobile/ProximityPreparationResult.Rejected.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.mobile/ProximityError = ...): id.walt.wallet2.mobile/ProximityPreparationResult.Rejected // id.walt.wallet2.mobile/ProximityPreparationResult.Rejected.copy|copy(id.walt.wallet2.mobile.ProximityError){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityPreparationResult.Rejected.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityPreparationResult.Rejected.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityPreparationResult.Rejected.toString|toString(){}[0]
     }
 }
 
@@ -1464,16 +1543,19 @@ sealed interface id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobi
     }
 
     final class Completed : id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobile/ProximityState.Completed|null[0]
-        constructor <init>(kotlin/Int, kotlin/Boolean) // id.walt.wallet2.mobile/ProximityState.Completed.<init>|<init>(kotlin.Int;kotlin.Boolean){}[0]
+        constructor <init>(kotlin/Int, kotlin/Boolean, id.walt.wallet2.mobile/ProximitySharingReceipt? = ...) // id.walt.wallet2.mobile/ProximityState.Completed.<init>|<init>(kotlin.Int;kotlin.Boolean;id.walt.wallet2.mobile.ProximitySharingReceipt?){}[0]
 
         final val declined // id.walt.wallet2.mobile/ProximityState.Completed.declined|{}declined[0]
             final fun <get-declined>(): kotlin/Boolean // id.walt.wallet2.mobile/ProximityState.Completed.declined.<get-declined>|<get-declined>(){}[0]
         final val exchanges // id.walt.wallet2.mobile/ProximityState.Completed.exchanges|{}exchanges[0]
             final fun <get-exchanges>(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.Completed.exchanges.<get-exchanges>|<get-exchanges>(){}[0]
+        final val receipt // id.walt.wallet2.mobile/ProximityState.Completed.receipt|{}receipt[0]
+            final fun <get-receipt>(): id.walt.wallet2.mobile/ProximitySharingReceipt? // id.walt.wallet2.mobile/ProximityState.Completed.receipt.<get-receipt>|<get-receipt>(){}[0]
 
         final fun component1(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.Completed.component1|component1(){}[0]
         final fun component2(): kotlin/Boolean // id.walt.wallet2.mobile/ProximityState.Completed.component2|component2(){}[0]
-        final fun copy(kotlin/Int = ..., kotlin/Boolean = ...): id.walt.wallet2.mobile/ProximityState.Completed // id.walt.wallet2.mobile/ProximityState.Completed.copy|copy(kotlin.Int;kotlin.Boolean){}[0]
+        final fun component3(): id.walt.wallet2.mobile/ProximitySharingReceipt? // id.walt.wallet2.mobile/ProximityState.Completed.component3|component3(){}[0]
+        final fun copy(kotlin/Int = ..., kotlin/Boolean = ..., id.walt.wallet2.mobile/ProximitySharingReceipt? = ...): id.walt.wallet2.mobile/ProximityState.Completed // id.walt.wallet2.mobile/ProximityState.Completed.copy|copy(kotlin.Int;kotlin.Boolean;id.walt.wallet2.mobile.ProximitySharingReceipt?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityState.Completed.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.Completed.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityState.Completed.toString|toString(){}[0]
@@ -1531,6 +1613,22 @@ sealed interface id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobi
         final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityState.NoData.toString|toString(){}[0]
     }
 
+    final class PreparationRequired : id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobile/ProximityState.PreparationRequired|null[0]
+        constructor <init>(id.walt.wallet2.mobile/ProximitySharingPlan, id.walt.wallet2.mobile/ProximityReviewReason = ...) // id.walt.wallet2.mobile/ProximityState.PreparationRequired.<init>|<init>(id.walt.wallet2.mobile.ProximitySharingPlan;id.walt.wallet2.mobile.ProximityReviewReason){}[0]
+
+        final val plan // id.walt.wallet2.mobile/ProximityState.PreparationRequired.plan|{}plan[0]
+            final fun <get-plan>(): id.walt.wallet2.mobile/ProximitySharingPlan // id.walt.wallet2.mobile/ProximityState.PreparationRequired.plan.<get-plan>|<get-plan>(){}[0]
+        final val reason // id.walt.wallet2.mobile/ProximityState.PreparationRequired.reason|{}reason[0]
+            final fun <get-reason>(): id.walt.wallet2.mobile/ProximityReviewReason // id.walt.wallet2.mobile/ProximityState.PreparationRequired.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile/ProximitySharingPlan // id.walt.wallet2.mobile/ProximityState.PreparationRequired.component1|component1(){}[0]
+        final fun component2(): id.walt.wallet2.mobile/ProximityReviewReason // id.walt.wallet2.mobile/ProximityState.PreparationRequired.component2|component2(){}[0]
+        final fun copy(id.walt.wallet2.mobile/ProximitySharingPlan = ..., id.walt.wallet2.mobile/ProximityReviewReason = ...): id.walt.wallet2.mobile/ProximityState.PreparationRequired // id.walt.wallet2.mobile/ProximityState.PreparationRequired.copy|copy(id.walt.wallet2.mobile.ProximitySharingPlan;id.walt.wallet2.mobile.ProximityReviewReason){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityState.PreparationRequired.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.PreparationRequired.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityState.PreparationRequired.toString|toString(){}[0]
+    }
+
     final class Preparing : id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobile/ProximityState.Preparing|null[0]
         constructor <init>(id.walt.wallet2.mobile/ProximityProfile) // id.walt.wallet2.mobile/ProximityState.Preparing.<init>|<init>(id.walt.wallet2.mobile.ProximityProfile){}[0]
 
@@ -1545,13 +1643,16 @@ sealed interface id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobi
     }
 
     final class ReviewRequired : id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobile/ProximityState.ReviewRequired|null[0]
-        constructor <init>(id.walt.wallet2.mobile/ProximityReview) // id.walt.wallet2.mobile/ProximityState.ReviewRequired.<init>|<init>(id.walt.wallet2.mobile.ProximityReview){}[0]
+        constructor <init>(id.walt.wallet2.mobile/ProximityReview, id.walt.wallet2.mobile/ProximityReviewReason = ...) // id.walt.wallet2.mobile/ProximityState.ReviewRequired.<init>|<init>(id.walt.wallet2.mobile.ProximityReview;id.walt.wallet2.mobile.ProximityReviewReason){}[0]
 
+        final val reason // id.walt.wallet2.mobile/ProximityState.ReviewRequired.reason|{}reason[0]
+            final fun <get-reason>(): id.walt.wallet2.mobile/ProximityReviewReason // id.walt.wallet2.mobile/ProximityState.ReviewRequired.reason.<get-reason>|<get-reason>(){}[0]
         final val review // id.walt.wallet2.mobile/ProximityState.ReviewRequired.review|{}review[0]
             final fun <get-review>(): id.walt.wallet2.mobile/ProximityReview // id.walt.wallet2.mobile/ProximityState.ReviewRequired.review.<get-review>|<get-review>(){}[0]
 
         final fun component1(): id.walt.wallet2.mobile/ProximityReview // id.walt.wallet2.mobile/ProximityState.ReviewRequired.component1|component1(){}[0]
-        final fun copy(id.walt.wallet2.mobile/ProximityReview = ...): id.walt.wallet2.mobile/ProximityState.ReviewRequired // id.walt.wallet2.mobile/ProximityState.ReviewRequired.copy|copy(id.walt.wallet2.mobile.ProximityReview){}[0]
+        final fun component2(): id.walt.wallet2.mobile/ProximityReviewReason // id.walt.wallet2.mobile/ProximityState.ReviewRequired.component2|component2(){}[0]
+        final fun copy(id.walt.wallet2.mobile/ProximityReview = ..., id.walt.wallet2.mobile/ProximityReviewReason = ...): id.walt.wallet2.mobile/ProximityState.ReviewRequired // id.walt.wallet2.mobile/ProximityState.ReviewRequired.copy|copy(id.walt.wallet2.mobile.ProximityReview;id.walt.wallet2.mobile.ProximityReviewReason){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityState.ReviewRequired.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.ReviewRequired.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityState.ReviewRequired.toString|toString(){}[0]
@@ -3003,10 +3104,12 @@ final class id.walt.wallet2.mobile/ProximityCapabilities { // id.walt.wallet2.mo
 }
 
 final class id.walt.wallet2.mobile/ProximityConfiguration { // id.walt.wallet2.mobile/ProximityConfiguration|null[0]
-    constructor <init>(id.walt.wallet2.mobile/ProximityProfile = ..., id.walt.wallet2.mobile/ProximitySessionConfiguration = ..., id.walt.wallet2.mobile/ProximityReaderPolicy = ..., id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy = ..., id.walt.wallet2.mobile/ProximityReaderTrustEvaluator = ..., id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator = ..., id.walt.wallet2.mobile/ProximityApplicationProfileRegistry = ..., kotlin/Int = ...) // id.walt.wallet2.mobile/ProximityConfiguration.<init>|<init>(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximitySessionConfiguration;id.walt.wallet2.mobile.ProximityReaderPolicy;id.walt.wallet2.mobile.ProximityDeviceAuthenticationPolicy;id.walt.wallet2.mobile.ProximityReaderTrustEvaluator;id.walt.wallet2.mobile.ProximityCredentialStatusEvaluator;id.walt.wallet2.mobile.ProximityApplicationProfileRegistry;kotlin.Int){}[0]
+    constructor <init>(id.walt.wallet2.mobile/ProximityProfile = ..., id.walt.wallet2.mobile/ProximitySessionConfiguration = ..., id.walt.wallet2.mobile/ProximityReaderPolicy = ..., id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy = ..., id.walt.wallet2.mobile/ProximityReaderTrustEvaluator = ..., id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator = ..., id.walt.wallet2.mobile/ProximityApplicationProfileRegistry = ..., kotlin/Int = ..., id.walt.wallet2.mobile/ProximityApproval = ...) // id.walt.wallet2.mobile/ProximityConfiguration.<init>|<init>(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximitySessionConfiguration;id.walt.wallet2.mobile.ProximityReaderPolicy;id.walt.wallet2.mobile.ProximityDeviceAuthenticationPolicy;id.walt.wallet2.mobile.ProximityReaderTrustEvaluator;id.walt.wallet2.mobile.ProximityCredentialStatusEvaluator;id.walt.wallet2.mobile.ProximityApplicationProfileRegistry;kotlin.Int;id.walt.wallet2.mobile.ProximityApproval){}[0]
 
     final val applicationProfiles // id.walt.wallet2.mobile/ProximityConfiguration.applicationProfiles|{}applicationProfiles[0]
         final fun <get-applicationProfiles>(): id.walt.wallet2.mobile/ProximityApplicationProfileRegistry // id.walt.wallet2.mobile/ProximityConfiguration.applicationProfiles.<get-applicationProfiles>|<get-applicationProfiles>(){}[0]
+    final val approval // id.walt.wallet2.mobile/ProximityConfiguration.approval|{}approval[0]
+        final fun <get-approval>(): id.walt.wallet2.mobile/ProximityApproval // id.walt.wallet2.mobile/ProximityConfiguration.approval.<get-approval>|<get-approval>(){}[0]
     final val credentialStatusEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.credentialStatusEvaluator|{}credentialStatusEvaluator[0]
         final fun <get-credentialStatusEvaluator>(): id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.credentialStatusEvaluator.<get-credentialStatusEvaluator>|<get-credentialStatusEvaluator>(){}[0]
     final val deviceAuthenticationPolicy // id.walt.wallet2.mobile/ProximityConfiguration.deviceAuthenticationPolicy|{}deviceAuthenticationPolicy[0]
@@ -3030,7 +3133,8 @@ final class id.walt.wallet2.mobile/ProximityConfiguration { // id.walt.wallet2.m
     final fun component6(): id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.component6|component6(){}[0]
     final fun component7(): id.walt.wallet2.mobile/ProximityApplicationProfileRegistry // id.walt.wallet2.mobile/ProximityConfiguration.component7|component7(){}[0]
     final fun component8(): kotlin/Int // id.walt.wallet2.mobile/ProximityConfiguration.component8|component8(){}[0]
-    final fun copy(id.walt.wallet2.mobile/ProximityProfile = ..., id.walt.wallet2.mobile/ProximitySessionConfiguration = ..., id.walt.wallet2.mobile/ProximityReaderPolicy = ..., id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy = ..., id.walt.wallet2.mobile/ProximityReaderTrustEvaluator = ..., id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator = ..., id.walt.wallet2.mobile/ProximityApplicationProfileRegistry = ..., kotlin/Int = ...): id.walt.wallet2.mobile/ProximityConfiguration // id.walt.wallet2.mobile/ProximityConfiguration.copy|copy(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximitySessionConfiguration;id.walt.wallet2.mobile.ProximityReaderPolicy;id.walt.wallet2.mobile.ProximityDeviceAuthenticationPolicy;id.walt.wallet2.mobile.ProximityReaderTrustEvaluator;id.walt.wallet2.mobile.ProximityCredentialStatusEvaluator;id.walt.wallet2.mobile.ProximityApplicationProfileRegistry;kotlin.Int){}[0]
+    final fun component9(): id.walt.wallet2.mobile/ProximityApproval // id.walt.wallet2.mobile/ProximityConfiguration.component9|component9(){}[0]
+    final fun copy(id.walt.wallet2.mobile/ProximityProfile = ..., id.walt.wallet2.mobile/ProximitySessionConfiguration = ..., id.walt.wallet2.mobile/ProximityReaderPolicy = ..., id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy = ..., id.walt.wallet2.mobile/ProximityReaderTrustEvaluator = ..., id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator = ..., id.walt.wallet2.mobile/ProximityApplicationProfileRegistry = ..., kotlin/Int = ..., id.walt.wallet2.mobile/ProximityApproval = ...): id.walt.wallet2.mobile/ProximityConfiguration // id.walt.wallet2.mobile/ProximityConfiguration.copy|copy(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximitySessionConfiguration;id.walt.wallet2.mobile.ProximityReaderPolicy;id.walt.wallet2.mobile.ProximityDeviceAuthenticationPolicy;id.walt.wallet2.mobile.ProximityReaderTrustEvaluator;id.walt.wallet2.mobile.ProximityCredentialStatusEvaluator;id.walt.wallet2.mobile.ProximityApplicationProfileRegistry;kotlin.Int;id.walt.wallet2.mobile.ProximityApproval){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityConfiguration.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityConfiguration.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityConfiguration.toString|toString(){}[0]
@@ -3143,7 +3247,7 @@ final class id.walt.wallet2.mobile/ProximityDeviceSignedElement { // id.walt.wal
 }
 
 final class id.walt.wallet2.mobile/ProximityDocumentReview { // id.walt.wallet2.mobile/ProximityDocumentReview|null[0]
-    constructor <init>(kotlin/Int, kotlin/String, kotlin.collections/List<id.walt.wallet2.mobile/ProximityCredentialOption>) // id.walt.wallet2.mobile/ProximityDocumentReview.<init>|<init>(kotlin.Int;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.ProximityCredentialOption>){}[0]
+    constructor <init>(kotlin/Int, kotlin/String, kotlin.collections/List<id.walt.wallet2.mobile/ProximityCredentialOption>, kotlin.collections/Set<id.walt.wallet2.mobile/ProximityElementReference> = ...) // id.walt.wallet2.mobile/ProximityDocumentReview.<init>|<init>(kotlin.Int;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.ProximityCredentialOption>;kotlin.collections.Set<id.walt.wallet2.mobile.ProximityElementReference>){}[0]
 
     final val credentialOptions // id.walt.wallet2.mobile/ProximityDocumentReview.credentialOptions|{}credentialOptions[0]
         final fun <get-credentialOptions>(): kotlin.collections/List<id.walt.wallet2.mobile/ProximityCredentialOption> // id.walt.wallet2.mobile/ProximityDocumentReview.credentialOptions.<get-credentialOptions>|<get-credentialOptions>(){}[0]
@@ -3151,11 +3255,14 @@ final class id.walt.wallet2.mobile/ProximityDocumentReview { // id.walt.wallet2.
         final fun <get-docType>(): kotlin/String // id.walt.wallet2.mobile/ProximityDocumentReview.docType.<get-docType>|<get-docType>(){}[0]
     final val requestIndex // id.walt.wallet2.mobile/ProximityDocumentReview.requestIndex|{}requestIndex[0]
         final fun <get-requestIndex>(): kotlin/Int // id.walt.wallet2.mobile/ProximityDocumentReview.requestIndex.<get-requestIndex>|<get-requestIndex>(){}[0]
+    final val requiredElements // id.walt.wallet2.mobile/ProximityDocumentReview.requiredElements|{}requiredElements[0]
+        final fun <get-requiredElements>(): kotlin.collections/Set<id.walt.wallet2.mobile/ProximityElementReference> // id.walt.wallet2.mobile/ProximityDocumentReview.requiredElements.<get-requiredElements>|<get-requiredElements>(){}[0]
 
     final fun component1(): kotlin/Int // id.walt.wallet2.mobile/ProximityDocumentReview.component1|component1(){}[0]
     final fun component2(): kotlin/String // id.walt.wallet2.mobile/ProximityDocumentReview.component2|component2(){}[0]
     final fun component3(): kotlin.collections/List<id.walt.wallet2.mobile/ProximityCredentialOption> // id.walt.wallet2.mobile/ProximityDocumentReview.component3|component3(){}[0]
-    final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin.collections/List<id.walt.wallet2.mobile/ProximityCredentialOption> = ...): id.walt.wallet2.mobile/ProximityDocumentReview // id.walt.wallet2.mobile/ProximityDocumentReview.copy|copy(kotlin.Int;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.ProximityCredentialOption>){}[0]
+    final fun component4(): kotlin.collections/Set<id.walt.wallet2.mobile/ProximityElementReference> // id.walt.wallet2.mobile/ProximityDocumentReview.component4|component4(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin.collections/List<id.walt.wallet2.mobile/ProximityCredentialOption> = ..., kotlin.collections/Set<id.walt.wallet2.mobile/ProximityElementReference> = ...): id.walt.wallet2.mobile/ProximityDocumentReview // id.walt.wallet2.mobile/ProximityDocumentReview.copy|copy(kotlin.Int;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.ProximityCredentialOption>;kotlin.collections.Set<id.walt.wallet2.mobile.ProximityElementReference>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityDocumentReview.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityDocumentReview.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityDocumentReview.toString|toString(){}[0]
@@ -3272,6 +3379,19 @@ final class id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration { // id.wa
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile/ProximityPreparedSharing { // id.walt.wallet2.mobile/ProximityPreparedSharing|null[0]
+    final val expiresAt // id.walt.wallet2.mobile/ProximityPreparedSharing.expiresAt|{}expiresAt[0]
+        final fun <get-expiresAt>(): kotlin.time/Instant // id.walt.wallet2.mobile/ProximityPreparedSharing.expiresAt.<get-expiresAt>|<get-expiresAt>(){}[0]
+    final val remainingSeconds // id.walt.wallet2.mobile/ProximityPreparedSharing.remainingSeconds|{}remainingSeconds[0]
+        final fun <get-remainingSeconds>(): kotlin/Int // id.walt.wallet2.mobile/ProximityPreparedSharing.remainingSeconds.<get-remainingSeconds>|<get-remainingSeconds>(){}[0]
+    final val review // id.walt.wallet2.mobile/ProximityPreparedSharing.review|{}review[0]
+        final fun <get-review>(): id.walt.wallet2.mobile/ProximityReview // id.walt.wallet2.mobile/ProximityPreparedSharing.review.<get-review>|<get-review>(){}[0]
+    final val submission // id.walt.wallet2.mobile/ProximityPreparedSharing.submission|{}submission[0]
+        final fun <get-submission>(): id.walt.wallet2.mobile/ProximitySubmission // id.walt.wallet2.mobile/ProximityPreparedSharing.submission.<get-submission>|<get-submission>(){}[0]
+
+    final suspend fun revoke() // id.walt.wallet2.mobile/ProximityPreparedSharing.revoke|revoke(){}[0]
 }
 
 final class id.walt.wallet2.mobile/ProximityPurposeHint { // id.walt.wallet2.mobile/ProximityPurposeHint|null[0]
@@ -3672,6 +3792,30 @@ final class id.walt.wallet2.mobile/ProximityRicalTrustConstraint { // id.walt.wa
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityRicalTrustConstraint.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityRicalTrustConstraint.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityRicalTrustConstraint.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile/ProximitySharingPlan { // id.walt.wallet2.mobile/ProximitySharingPlan|null[0]
+    final val expiresAt // id.walt.wallet2.mobile/ProximitySharingPlan.expiresAt|{}expiresAt[0]
+        final fun <get-expiresAt>(): kotlin.time/Instant // id.walt.wallet2.mobile/ProximitySharingPlan.expiresAt.<get-expiresAt>|<get-expiresAt>(){}[0]
+    final val isExpired // id.walt.wallet2.mobile/ProximitySharingPlan.isExpired|{}isExpired[0]
+        final fun <get-isExpired>(): kotlin/Boolean // id.walt.wallet2.mobile/ProximitySharingPlan.isExpired.<get-isExpired>|<get-isExpired>(){}[0]
+    final val readerCertificateSha256 // id.walt.wallet2.mobile/ProximitySharingPlan.readerCertificateSha256|{}readerCertificateSha256[0]
+        final fun <get-readerCertificateSha256>(): kotlin/String // id.walt.wallet2.mobile/ProximitySharingPlan.readerCertificateSha256.<get-readerCertificateSha256>|<get-readerCertificateSha256>(){}[0]
+    final val review // id.walt.wallet2.mobile/ProximitySharingPlan.review|{}review[0]
+        final fun <get-review>(): id.walt.wallet2.mobile/ProximityReview // id.walt.wallet2.mobile/ProximitySharingPlan.review.<get-review>|<get-review>(){}[0]
+
+    final fun approve(id.walt.wallet2.mobile/ProximitySubmission): id.walt.wallet2.mobile/ProximityPreparationResult // id.walt.wallet2.mobile/ProximitySharingPlan.approve|approve(id.walt.wallet2.mobile.ProximitySubmission){}[0]
+}
+
+final class id.walt.wallet2.mobile/ProximitySharingReceipt { // id.walt.wallet2.mobile/ProximitySharingReceipt|null[0]
+    final val approvalTiming // id.walt.wallet2.mobile/ProximitySharingReceipt.approvalTiming|{}approvalTiming[0]
+        final fun <get-approvalTiming>(): id.walt.wallet2.mobile/ProximityApprovalTiming // id.walt.wallet2.mobile/ProximitySharingReceipt.approvalTiming.<get-approvalTiming>|<get-approvalTiming>(){}[0]
+    final val completedAt // id.walt.wallet2.mobile/ProximitySharingReceipt.completedAt|{}completedAt[0]
+        final fun <get-completedAt>(): kotlin.time/Instant // id.walt.wallet2.mobile/ProximitySharingReceipt.completedAt.<get-completedAt>|<get-completedAt>(){}[0]
+    final val review // id.walt.wallet2.mobile/ProximitySharingReceipt.review|{}review[0]
+        final fun <get-review>(): id.walt.wallet2.mobile/ProximityReview // id.walt.wallet2.mobile/ProximitySharingReceipt.review.<get-review>|<get-review>(){}[0]
+    final val submission // id.walt.wallet2.mobile/ProximitySharingReceipt.submission|{}submission[0]
+        final fun <get-submission>(): id.walt.wallet2.mobile/ProximitySubmission // id.walt.wallet2.mobile/ProximitySharingReceipt.submission.<get-submission>|<get-submission>(){}[0]
 }
 
 final class id.walt.wallet2.mobile/ProximityStoredReaderTrustAnchor { // id.walt.wallet2.mobile/ProximityStoredReaderTrustAnchor|null[0]

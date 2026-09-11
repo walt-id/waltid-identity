@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -21,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,6 +36,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -48,6 +55,7 @@ import id.walt.wallet2.mobile.ProximityDeviceAuthenticationMethod
 import id.walt.wallet2.mobile.ProximityDocumentReview
 import id.walt.wallet2.mobile.ProximityElementReference
 import id.walt.wallet2.mobile.ProximityEngagement
+import id.walt.wallet2.mobile.ProximityEngagementMethod
 import id.walt.wallet2.mobile.ProximityError
 import id.walt.wallet2.mobile.ProximityReaderAuthentication
 import id.walt.wallet2.mobile.ProximityReaderAuthenticationSummary
@@ -59,6 +67,11 @@ import id.walt.wallet2.mobile.ProximityReaderRevocationState
 import id.walt.wallet2.mobile.ProximityReaderTrustState
 import id.walt.wallet2.mobile.ProximityRemediationAction
 import id.walt.wallet2.mobile.ProximityReview
+import id.walt.wallet2.mobile.ProximityReviewReason
+import id.walt.wallet2.mobile.ProximityPreparedSharing
+import id.walt.wallet2.mobile.ProximitySharingReceipt
+import id.walt.wallet2.mobile.ProximitySubmission
+import id.walt.wallet2.mobile.ProximityApprovalTiming
 import id.walt.wallet2.mobile.ProximityRicalState
 import id.walt.wallet2.mobile.ProximityState
 import id.walt.wallet2.mobile.legalActions
@@ -70,6 +83,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityDocumentSelection
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
+import id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.ui.components.QrCodeCanvas
 import id.walt.walletdemo.compose.ui.components.encodeProximityQrCode
@@ -87,6 +101,10 @@ import id.walt.walletdemo.compose.ui.components.ReviewMetadataSection
 import id.walt.walletdemo.compose.ui.components.ReviewActionPresentation
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
+import id.walt.walletdemo.compose.ui.components.ProximityApprovalModeChoice
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.coroutines.delay
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -108,11 +126,12 @@ fun MobileWalletDemoApp(
         credentials.associate { credential -> credential.id to credential.toCredentialDetails() }
     }
     val qrVisible = walletState.selectedTab == WalletDemoTab.Present &&
-        proximity.sessionState.engagements().any { it is ProximityEngagement.Qr }
+        proximity.qrVisible
 
     ProximityPlatformSessionEffect(
-        active = proximity.active && !proximity.isTerminal,
+        active = proximity.active && (!proximity.isTerminal || proximity.preparingApproval),
         qrVisible = qrVisible,
+        nfcReviewVisible = proximity.review != null,
         onInterrupted = proximityController::handleLifecycleInterruption,
     )
     LaunchedEffect(walletState.auth, proximity.active) {
@@ -121,10 +140,8 @@ fun MobileWalletDemoApp(
     LaunchedEffect(walletState.selectedTab, proximity.active) {
         if (proximity.active && walletState.selectedTab != WalletDemoTab.Present) proximityController.cancel()
     }
-    LaunchedEffect(proximity.sessionState, proximity.automaticPermissionAction) {
-        proximity.automaticPermissionAction
-            ?.takeIf(hostActions::mayPerformAutomatically)
-            ?.let { proximityController.remediate(it, hostActions.executor) }
+    LaunchedEffect(walletState.proximityApprovalMode, walletState.proximityTransportProfile) {
+        proximityController.refreshPreferences()
     }
     WalletDemoAppHost(
         controller = controller,
@@ -133,7 +150,7 @@ fun MobileWalletDemoApp(
         presentationContent = if (proximity.active) {
             {
                 WalletDemoProximityScreen(
-                    state = proximity,
+                    state = proximity.copy(approvalMode = walletState.proximityApprovalMode),
                     credentialDetailsById = credentialDetailsById,
                     hostActions = hostActions.executor,
                     hostActionForDisplay = hostActions::displayedAction,
@@ -147,6 +164,10 @@ fun MobileWalletDemoApp(
                     onCancel = proximityController::cancel,
                     onDismiss = proximityController::dismiss,
                     onRestart = proximityController::restart,
+                    onShowEngagement = proximityController::showEngagement,
+                    onContinueWithAvailableConnection = proximityController::continueWithAvailableConnection,
+                    onApprovalModeChange = controller::setProximityApprovalMode,
+                    onReviewRecentRequest = { proximityController.reviewRecentRequest() },
                 )
             }
         } else null,
@@ -175,6 +196,10 @@ internal fun WalletDemoProximityScreen(
     onCancel: () -> Unit,
     onDismiss: () -> Unit,
     onRestart: () -> Unit,
+    onShowEngagement: (ProximityEngagementMethod) -> Unit = {},
+    onContinueWithAvailableConnection: () -> Unit = {},
+    onApprovalModeChange: (WalletDemoProximityApprovalMode) -> Unit = {},
+    onReviewRecentRequest: () -> Unit = {},
 ) {
     val sessionState = state.sessionState
     val terminal = state.isTerminal
@@ -183,21 +208,22 @@ internal fun WalletDemoProximityScreen(
     )
     val screenTitle = stringResource(Res.string.proximity_in_person_title)
     SystemBackHandler(
-        enabled = sessionState !is ProximityState.ReviewRequired && (terminal || canCancel),
+        enabled = state.review == null && (terminal || canCancel),
     ) {
         if (terminal) onDismiss() else onCancel()
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .testTag(WalletUiTestTags.ProximityScreen)
             .semantics { paneTitle = screenTitle },
     ) {
-        if (sessionState is ProximityState.ReviewRequired) {
+        val review = state.review
+        if (review != null) {
             WalletDemoProximityReview(
                 state = state,
-                review = sessionState.review,
+                review = review,
                 credentialDetailsById = credentialDetailsById,
                 onSelectCredential = onSelectCredential,
                 onToggleElement = onToggleElement,
@@ -205,7 +231,22 @@ internal fun WalletDemoProximityScreen(
                 onApprove = onApprove,
                 onDecline = onDecline,
                 onCancel = onCancel,
+                onRestart = onRestart,
             )
+        } else if (state.showsEngagement) {
+            Box(Modifier.weight(1f).padding(horizontal = 20.dp, vertical = 8.dp)) {
+                EngagementContent(state, onShowEngagement, onApprovalModeChange)
+            }
+            if (canCancel) {
+                HorizontalDivider()
+                Surface {
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)
+                            .testTag(WalletUiTestTags.ProximityCancel),
+                    ) { Text(stringResource(Res.string.proximity_cancel)) }
+                }
+            }
         } else {
             ReviewScaffold(
                 actions = if (canCancel) {
@@ -219,7 +260,12 @@ internal fun WalletDemoProximityScreen(
                     }
                 } else null,
             ) {
-                state.actionError?.let { ProximityErrorCard(it) }
+                state.actionError?.takeUnless { it == (sessionState as? ProximityState.Failed)?.error }?.let { ProximityErrorCard(it) }
+                state.preparedSharing?.takeIf { sessionState is ProximityState.CheckingPrerequisites ||
+                    sessionState is ProximityState.Preparing || sessionState is ProximityState.EngagementReady ||
+                    sessionState is ProximityState.Connecting || sessionState is ProximityState.AwaitingRequest }?.let {
+                    PreparedSharingSummary(it)
+                }
                 when (sessionState) {
                     null -> ProgressContent(stringResource(Res.string.proximity_checking_device))
                     is ProximityState.CheckingPrerequisites -> PrerequisiteContent(
@@ -227,21 +273,16 @@ internal fun WalletDemoProximityScreen(
                         hostActionInProgress = state.hostActionInProgress,
                         hostActionForDisplay = hostActionForDisplay,
                         onRetry = onRetry,
+                        onContinueWithAvailableConnection = onContinueWithAvailableConnection,
                         onRemediate = { onRemediate(it, hostActions) },
                     )
                     is ProximityState.Preparing ->
                         ProgressContent(stringResource(Res.string.proximity_preparing))
-                    is ProximityState.EngagementReady -> EngagementContent(
-                        engagements = sessionState.engagements,
-                        connecting = false,
-                    )
-                    is ProximityState.Connecting -> EngagementContent(
-                        engagements = sessionState.engagements,
-                        connecting = true,
-                    )
+                    is ProximityState.EngagementReady -> Unit // Uses the bounded engagement layout above.
+                    is ProximityState.Connecting -> ProgressContent(stringResource(Res.string.proximity_reader_detected))
                     is ProximityState.AwaitingRequest ->
                         ProgressContent(stringResource(Res.string.proximity_awaiting_request))
-                    is ProximityState.ReviewRequired -> Unit
+                    is ProximityState.ReviewRequired, is ProximityState.PreparationRequired -> Unit
                     is ProximityState.AuthorizingHolderKey ->
                         ProgressContent(stringResource(Res.string.proximity_authenticating))
                     is ProximityState.SendingResponse ->
@@ -250,7 +291,8 @@ internal fun WalletDemoProximityScreen(
                         ProgressContent(stringResource(Res.string.proximity_awaiting_next_request))
                     is ProximityState.Terminating ->
                         ProgressContent(stringResource(Res.string.proximity_terminating))
-                    is ProximityState.Completed -> TerminalContent(
+                    is ProximityState.Completed -> {
+                        TerminalContent(
                         title = if (sessionState.declined) {
                             stringResource(Res.string.proximity_declined_title)
                         } else {
@@ -261,8 +303,17 @@ internal fun WalletDemoProximityScreen(
                         } else {
                             stringResource(Res.string.proximity_presentation_complete_message)
                         },
-                        onDismiss = onDismiss,
-                    )
+                            onDismiss = onDismiss,
+                            details = {
+                                sessionState.receipt?.let { SharingReceipt(it) }
+                                if (state.recentPlan?.isExpired == false) {
+                                    OutlinedButton(onClick = onReviewRecentRequest, modifier = Modifier.fillMaxWidth().testTag("proximity-prepare-again")) {
+                                        Text(stringResource(Res.string.proximity_prepare_again))
+                                    }
+                                }
+                            },
+                        )
+                    }
                     is ProximityState.NoData -> TerminalContent(
                         title = stringResource(Res.string.proximity_no_data_title),
                         message = stringResource(Res.string.proximity_declined_message),
@@ -275,10 +326,14 @@ internal fun WalletDemoProximityScreen(
                     )
                     is ProximityState.Failed -> FailedContent(
                         error = sessionState.error,
+                        onRemediate = { onRemediate(it, hostActions) },
+                        hostActionForDisplay = hostActionForDisplay,
+                        actionInProgress = state.hostActionInProgress != null,
                         onDismiss = onDismiss,
                         onRetry = if (sessionState.error.recovery == ProximityRecovery.StartNewSession) onRestart else null,
                     )
                 }
+                state.connectedRoute?.let { ProximityConnectionDetails(it) }
             }
         }
     }
@@ -295,13 +350,25 @@ private fun WalletDemoProximityReview(
     onApprove: () -> Unit,
     onDecline: () -> Unit,
     onCancel: () -> Unit,
+    onRestart: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SystemBackHandler(enabled = true, onBack = onCancel)
     ReviewScaffold(
         modifier = modifier,
         actions = {
-            SharingActionsRow(
+            if (state.preparingApproval) {
+                val expired = (state.sessionState as ProximityState.PreparationRequired).plan.isExpired
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = if (expired) onRestart else onApprove, enabled = expired || state.canApprove,
+                        modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityApprove)) {
+                        Text(stringResource(if (expired) Res.string.proximity_refresh_request else Res.string.proximity_approve_and_prepare))
+                    }
+                    TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityCancel)) {
+                        Text(stringResource(Res.string.proximity_cancel))
+                    }
+                }
+            } else SharingActionsRow(
                 enabled = true,
                 selectionComplete = state.canApprove,
                 onSubmit = onApprove,
@@ -312,6 +379,19 @@ private fun WalletDemoProximityReview(
         },
     ) {
         state.actionError?.let { ProximityErrorCard(it) }
+        val reason = when (val current = state.sessionState) {
+            is ProximityState.ReviewRequired -> current.reason
+            is ProximityState.PreparationRequired -> current.reason
+            else -> null
+        }
+        if (reason == ProximityReviewReason.PreparedSharingChanged) {
+            Text(stringResource(Res.string.proximity_prepared_request_changed), color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive })
+        }
+        if (state.preparingApproval) {
+            Text(stringResource(Res.string.proximity_review_before_reconnect), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(Res.string.proximity_nothing_shared_prepare))
+        }
         ReviewContent(
             review = review,
             selections = state.selections,
@@ -320,7 +400,14 @@ private fun WalletDemoProximityReview(
             onSelectCredential = onSelectCredential,
             onToggleElement = onToggleElement,
             onContinueAfterResponseChange = onContinueAfterResponseChange,
+            allowContinuation = !state.preparingApproval,
         )
+        (state.sessionState as? ProximityState.PreparationRequired)?.plan?.let { plan ->
+            MetadataDisclosure(title = stringResource(Res.string.proximity_reader_certificate), initiallyExpanded = false) {
+                Text(plan.readerCertificateSha256, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        state.connectedRoute?.let { ProximityConnectionDetails(it) }
     }
 }
 
@@ -330,102 +417,187 @@ private fun PrerequisiteContent(
     hostActionInProgress: ProximityRemediationAction?,
     hostActionForDisplay: (ProximityRemediationAction) -> ProximityRemediationAction,
     onRetry: () -> Unit,
+    onContinueWithAvailableConnection: () -> Unit,
     onRemediate: (ProximityRemediationAction) -> Unit,
 ) {
-    ReviewMetadataSection(
-        title = stringResource(
-            if (capabilities.mayStart) Res.string.proximity_device_ready else Res.string.proximity_action_needed
-        )
-    ) {
-        Text(
-            if (capabilities.mayStart) {
-                stringResource(Res.string.proximity_ready_message)
-            } else {
-                capabilities.bluetoothLowEnergy.unavailable?.message
-                    ?: capabilities.qrEngagement.unavailable?.message
-                    ?: stringResource(Res.string.proximity_generic_unavailable)
-            }
-        )
-        capabilities.remediationActions.forEach { action ->
-            val displayedAction = hostActionForDisplay(action)
-            OutlinedButton(
-                onClick = { onRemediate(action) },
-                enabled = hostActionInProgress == null,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (hostActionInProgress == action) {
+    val action = capabilities.remediationActions.firstOrNull { it != ProximityRemediationAction.UseSupportedDevice }
+    val message = listOf(capabilities.nfcEngagement, capabilities.qrEngagement, capabilities.bluetoothLowEnergy,
+        capabilities.nfcRetrieval, capabilities.nfcV2Retrieval, capabilities.wifiAwareRetrieval)
+        .firstOrNull { it.selected && action in it.remediationActions }?.unavailable?.message
+        ?: capabilities.selectedUnavailableMessage ?: stringResource(Res.string.proximity_generic_unavailable)
+    ReviewMetadataSection(title = action?.let(hostActionForDisplay)?.label() ?: stringResource(Res.string.proximity_action_needed)) {
+        Text(message)
+        if (action != null) {
+            Button(onClick = { onRemediate(action) }, enabled = hostActionInProgress == null, modifier = Modifier.fillMaxWidth()) {
+                if (hostActionInProgress != null) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.size(8.dp))
                 }
-                Text(displayedAction.label())
+                Text(hostActionForDisplay(action).label())
+            }
+        } else {
+            Button(onClick = onRetry, enabled = hostActionInProgress == null,
+                modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityRetry)) {
+                Text(stringResource(Res.string.proximity_check_again))
             }
         }
-        Button(
-            onClick = onRetry,
-            enabled = hostActionInProgress == null,
-            modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityRetry),
-        ) { Text(stringResource(Res.string.proximity_check_again)) }
+        if (capabilities.mayStart) {
+            TextButton(onClick = onContinueWithAvailableConnection, enabled = hostActionInProgress == null) {
+                Text(stringResource(Res.string.proximity_continue_available))
+            }
+        }
     }
 }
 
+private val ProximityCapabilities.selectedUnavailableMessage: String?
+    get() = listOf(
+        nfcEngagement,
+        bluetoothLowEnergy,
+        nfcRetrieval,
+        nfcV2Retrieval,
+        qrEngagement,
+        wifiAwareRetrieval,
+    ).firstNotNullOfOrNull { capability -> capability.unavailable?.message.takeIf { capability.selected } }
+
 @Composable
 private fun EngagementContent(
-    engagements: List<ProximityEngagement>,
-    connecting: Boolean,
+    state: WalletDemoProximityUiState,
+    onShowEngagement: (ProximityEngagementMethod) -> Unit,
+    onApprovalModeChange: (WalletDemoProximityApprovalMode) -> Unit,
 ) {
-    val qr = engagements.filterIsInstance<ProximityEngagement.Qr>().singleOrNull()
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            if (connecting) {
-                stringResource(Res.string.proximity_reader_detected)
-            } else {
-                stringResource(Res.string.proximity_reader_scan_title)
+    val method = state.displayedEngagement
+    val choices = state.engagementChoices
+    val sharing = state.preparedSharing
+    var showApprovedData by remember(sharing) { mutableStateOf(false) }
+    if (showApprovedData && sharing != null) {
+        AlertDialog(
+            onDismissRequest = { showApprovedData = false },
+            title = { Text(stringResource(Res.string.proximity_approved_data)) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(Res.string.proximity_prepared_one_use))
+                    DisclosureSummary(sharing.review, sharing.submission, initiallyExpanded = true)
+                }
             },
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
+            confirmButton = { TextButton(onClick = { showApprovedData = false }) { Text(stringResource(Res.string.proximity_done)) } },
         )
-        Text(
-            if (connecting) {
-                stringResource(Res.string.proximity_connecting_guidance)
-            } else {
-                stringResource(Res.string.proximity_reader_scan_guidance)
-            },
-            textAlign = TextAlign.Center,
-        )
-        qr?.let { engagement ->
-            val qrCode = remember(engagement.payload) {
-                runCatching {
-                    encodeProximityQrCode(engagement.payload)
-                }.getOrNull()
+    }
+    val header: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            state.actionError?.let { ProximityErrorCard(it) }
+            Text(stringResource(when {
+                sharing != null -> Res.string.proximity_prepared_ready
+                method == ProximityEngagementMethod.Qr -> Res.string.proximity_show_qr
+                method == ProximityEngagementMethod.Nfc -> Res.string.proximity_reader_hold_title
+                else -> Res.string.proximity_share_in_person
+            }), style = MaterialTheme.typography.titleLarge)
+            if (sharing != null) {
+                Text(sharing.review.readerAuthentication.mapNotNull { it.displayName }.distinct().joinToString(),
+                    style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                PreparedSharingCountdown(sharing)
             }
-            if (qrCode != null) {
-                Surface(
-                    color = Color.White,
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    QrCodeCanvas(
-                        qrCode = qrCode,
-                        modifier = Modifier
-                            .size(280.dp)
-                            .semantics {
-                                contentDescription = "Device engagement QR code"
-                            }
-                            .testTag(WalletUiTestTags.ProximityQr),
-                    )
+            Text(stringResource(when {
+                method == null -> Res.string.proximity_choose_connection
+                sharing != null -> Res.string.proximity_prepared_connection_instructions
+                method == ProximityEngagementMethod.Qr -> Res.string.proximity_qr_instructions
+                else -> Res.string.proximity_tap_instructions
+            }), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    val footer: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (sharing == null) {
+                ProximityApprovalModeChoice(state.approvalMode, onApprovalModeChange, compact = true, enabled = !state.refreshingEngagement)
+            } else {
+                TextButton(onClick = { showApprovedData = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(Res.string.proximity_approved_data))
+                }
+            }
+            if (method != null) {
+                choices.filter { it != method }.forEach { other ->
+                    TextButton(onClick = { onShowEngagement(other) }, enabled = !state.refreshingEngagement, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(if (other == ProximityEngagementMethod.Qr)
+                            Res.string.proximity_show_qr_instead else Res.string.proximity_tap_instead))
+                    }
+                }
+            }
+            state.connectedRoute?.let { ProximityConnectionDetails(it) }
+        }
+    }
+    val qr = (state.sessionState as? ProximityState.EngagementReady)?.engagements
+        ?.filterIsInstance<ProximityEngagement.Qr>()?.singleOrNull()
+    if (method == ProximityEngagementMethod.Qr) {
+        val qrCode = remember(qr?.payload) { qr?.let { runCatching { encodeProximityQrCode(it.payload) }.getOrNull() } }
+        ProximityQrEngagementLayout(header = header, footer = footer) {
+            if (state.refreshingEngagement) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else if (qrCode != null) {
+                BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (constraints.maxWidth >= qrCode.width + 8 && constraints.maxHeight >= qrCode.height + 8) {
+                        Surface(color = Color.White, shape = RoundedCornerShape(16.dp)) {
+                            QrCodeCanvas(qrCode, Modifier.fillMaxSize()
+                                .semantics { contentDescription = "Device engagement QR code" }
+                                .testTag(WalletUiTestTags.ProximityQr))
+                        }
+                    } else {
+                        Text(stringResource(Res.string.proximity_qr_rotate), textAlign = TextAlign.Center)
+                    }
                 }
             } else {
-                Text(
-                    text = "The device engagement QR code could not be rendered.",
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
-                )
+                Text(stringResource(Res.string.proximity_qr_render_failed), color = MaterialTheme.colorScheme.error)
             }
         }
-        if (connecting) CircularProgressIndicator()
+    } else {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            header()
+            if (method == null) choices.forEach { choice -> ProximityEngagementChoice(choice, enabled = !state.refreshingEngagement) { onShowEngagement(choice) } }
+            footer()
+        }
+    }
+}
+
+/** Measures the real text/controls first; the QR uses the remaining viewport without losing its quiet zone.
+ * Portrait keeps a 200 dp minimum; short landscape viewports keep the QR visible beside scrollable controls.
+ */
+@Composable
+private fun ProximityQrEngagementLayout(
+    header: @Composable () -> Unit,
+    footer: @Composable () -> Unit,
+    qr: @Composable () -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val viewportHeight = maxHeight
+        Layout(
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+            content = { Box { header() }; Box { qr() }; Box { footer() } },
+        ) { children, constraints ->
+            val gap = 12.dp.roundToPx()
+            val viewport = viewportHeight.roundToPx()
+            val width = constraints.maxWidth
+            val landscape = width >= 600.dp.roundToPx() && width > viewport
+            val maxQr = minOf(width, 360.dp.roundToPx())
+            val minQr = minOf(maxQr, 200.dp.roundToPx())
+            val side = if (landscape) minOf(maxQr, (width - gap) / 2, viewport.coerceAtLeast(1)) else 0
+            val textWidth = if (landscape) width - side - gap else width
+            val textConstraints = Constraints(maxWidth = textWidth)
+            val top = children[0].measure(textConstraints)
+            val bottom = children[2].measure(textConstraints)
+            val qrSide = if (landscape) side else minOf(maxQr, maxOf(minQr, viewport - top.height - bottom.height - gap * 2))
+            val code = children[1].measure(Constraints.fixed(qrSide, qrSide))
+            val height = maxOf(viewport, if (landscape) maxOf(qrSide, top.height + bottom.height + gap)
+                else top.height + qrSide + bottom.height + gap * 2)
+            layout(width, height) {
+                if (landscape) {
+                    code.placeRelative(0, (viewport - qrSide) / 2)
+                    top.placeRelative(qrSide + gap, 0)
+                    bottom.placeRelative(qrSide + gap, height - bottom.height)
+                } else {
+                    top.placeRelative(0, 0)
+                    code.placeRelative((width - qrSide) / 2, top.height + (height - top.height - bottom.height - qrSide) / 2)
+                    bottom.placeRelative(0, height - bottom.height)
+                }
+            }
+        }
     }
 }
 
@@ -438,6 +610,7 @@ private fun ReviewContent(
     onSelectCredential: (Int, String) -> Unit,
     onToggleElement: (Int, ProximityElementReference) -> Unit,
     onContinueAfterResponseChange: (Boolean) -> Unit,
+    allowContinuation: Boolean = true,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityReview),
@@ -483,7 +656,7 @@ private fun ReviewContent(
                 onToggleElement = onToggleElement,
             )
         }
-        Row(
+        if (allowContinuation) Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -677,6 +850,11 @@ private fun DocumentReviewContent(
             val details = credentialDetailsById[credential.credentialId]
             HorizontalDivider()
             Text(stringResource(Res.string.proximity_data_to_share), style = MaterialTheme.typography.labelLarge)
+            if (!document.requiredElements.all { required -> credential.requestedElements.any {
+                    it.namespace == required.namespace && it.elementIdentifier == required.elementIdentifier
+                } }) {
+                Text(stringResource(Res.string.proximity_required_data_unavailable), color = MaterialTheme.colorScheme.error)
+            }
             credential.requestedElements.forEach { element ->
                 val reference = ProximityElementReference(
                     namespace = element.namespace,
@@ -689,6 +867,7 @@ private fun DocumentReviewContent(
                     Checkbox(
                         checked = reference in (selection?.disclosedElements ?: emptySet()),
                         onCheckedChange = { onToggleElement(document.requestIndex, reference) },
+                        enabled = reference !in document.requiredElements,
                         modifier = Modifier.testTag(
                             WalletUiTestTags.proximityElement(
                                 document.requestIndex,
@@ -722,6 +901,9 @@ private fun DocumentReviewContent(
                                 color = MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall,
                             )
+                        }
+                        if (reference in document.requiredElements) {
+                            Text(stringResource(Res.string.proximity_required_identity_check), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -817,6 +999,62 @@ private fun humanizedElementIdentifier(identifier: String): String =
         .replaceFirstChar { character -> character.uppercase() }
 
 @Composable
+private fun PreparedSharingSummary(sharing: ProximityPreparedSharing) {
+    ReviewMetadataSection(stringResource(Res.string.proximity_prepared_ready)) {
+        PreparedSharingCountdown(sharing)
+        Text(stringResource(Res.string.proximity_prepared_one_use))
+        DisclosureSummary(sharing.review, sharing.submission)
+    }
+}
+
+@Composable
+private fun PreparedSharingCountdown(sharing: ProximityPreparedSharing) {
+    var remaining by remember(sharing) { mutableStateOf(sharing.remainingSeconds) }
+    LaunchedEffect(sharing) {
+        while (remaining > 0) {
+            delay(250)
+            remaining = sharing.remainingSeconds
+        }
+    }
+    Text(stringResource(Res.string.proximity_prepared_countdown, remaining),
+        style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("proximity-prepared-countdown"))
+}
+
+@Composable
+private fun SharingReceipt(receipt: ProximitySharingReceipt) {
+    ReviewMetadataSection(stringResource(Res.string.proximity_shared_data)) {
+        Text(receipt.completedAt.toLocalDateTime(TimeZone.currentSystemDefault()).let {
+            "${it.date} ${it.hour.toString().padStart(2, '0')}:${it.minute.toString().padStart(2, '0')}"
+        }, style = MaterialTheme.typography.bodySmall)
+        if (receipt.approvalTiming == ProximityApprovalTiming.BeforeConnection) {
+            Text(stringResource(Res.string.proximity_used_prepared_approval))
+        }
+        DisclosureSummary(receipt.review, receipt.submission)
+    }
+}
+
+@Composable
+private fun DisclosureSummary(review: ProximityReview, submission: ProximitySubmission, initiallyExpanded: Boolean = false) {
+    val names = review.readerAuthentication.mapNotNull { it.displayName }.distinct()
+    Text(names.joinToString().ifBlank { stringResource(Res.string.proximity_reader_identity_unavailable) },
+        fontWeight = FontWeight.SemiBold)
+    MetadataDisclosure(title = stringResource(Res.string.proximity_data_to_share), initiallyExpanded = initiallyExpanded) {
+        submission.documents.forEach { selected ->
+            val document = review.documents.single { it.requestIndex == selected.requestIndex }
+            val credential = document.credentialOptions.single { it.credentialId == selected.credentialId }
+            Text(credential.label ?: stringResource(Res.string.proximity_generic_credential), fontWeight = FontWeight.SemiBold)
+            credential.requestedElements.filter {
+                ProximityElementReference(it.namespace, it.elementIdentifier) in selected.disclosedElements
+            }.forEach { element ->
+                Text(humanizedElementIdentifier(element.elementIdentifier))
+                if (element.intentToRetain) Text(stringResource(Res.string.proximity_reader_retention),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
 private fun ProgressContent(message: String) {
     Column(
         modifier = Modifier
@@ -833,9 +1071,16 @@ private fun ProgressContent(message: String) {
 }
 
 @Composable
-private fun TerminalContent(title: String, message: String, onDismiss: () -> Unit) {
-    ReviewMetadataSection(title) {
+private fun TerminalContent(
+    title: String,
+    message: String,
+    onDismiss: () -> Unit,
+    details: (@Composable () -> Unit)? = null,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(title, style = MaterialTheme.typography.headlineSmall)
         Text(message)
+        details?.invoke()
         Button(
             onClick = onDismiss,
             modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityDone),
@@ -846,12 +1091,20 @@ private fun TerminalContent(title: String, message: String, onDismiss: () -> Uni
 @Composable
 private fun FailedContent(
     error: ProximityError,
+    onRemediate: (ProximityRemediationAction) -> Unit,
+    hostActionForDisplay: (ProximityRemediationAction) -> ProximityRemediationAction,
+    actionInProgress: Boolean,
     onDismiss: () -> Unit,
     onRetry: (() -> Unit)?,
 ) {
     ReviewMetadataSection(stringResource(Res.string.proximity_failed_title)) {
         Text(error.message, modifier = Modifier.testTag(WalletUiTestTags.ProximityError))
-        if (onRetry != null) {
+        error.remediationActions.firstOrNull { it != ProximityRemediationAction.Retry && it != ProximityRemediationAction.UseSupportedDevice }?.let { action ->
+            OutlinedButton(onClick = { onRemediate(action) }, enabled = !actionInProgress, modifier = Modifier.fillMaxWidth()) {
+                Text(hostActionForDisplay(action).label())
+            }
+        }
+        if (onRetry != null && error.remediationActions.none { it != ProximityRemediationAction.Retry && it != ProximityRemediationAction.UseSupportedDevice }) {
             Button(
                 onClick = onRetry,
                 modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityRetry),
@@ -889,7 +1142,7 @@ private fun ProximityState?.engagements(): List<ProximityEngagement> = when (thi
 }
 
 @Composable
-private fun ProximityRemediationAction.label(): String = stringResource(
+internal fun ProximityRemediationAction.label(): String = stringResource(
     when (this) {
         ProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
         ProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings

@@ -125,9 +125,11 @@ for await state in session.states {
         showUnavailableMethods(current)
     case .engagementReady(let engagements):
         showEngagements(engagements)
-    case .reviewRequired(let review):
+    case .reviewRequired(let review, _):
         showReview(review)
-    case .completed(let exchanges, _):
+    case .preparationRequired(let plan, let reason):
+        showPreparationReview(plan, reason: reason)
+    case .completed(let exchanges, _, _):
         showCompletion(exchanges: exchanges)
     case .noData(let exchange):
         showNoData(exchange: exchange)
@@ -152,6 +154,44 @@ viable selected routes. Perform a suggested permission or settings effect in app
 UI and report its privacy-safe
 outcome with `.reportRemediation`. The SDK alone advances protocol state.
 
+`ProximityConfiguration.approval` selects `.askEachTime` (default) or
+`.prepareBeforeSharing`. Preparation first authenticates the reader and declines
+its request without credential disclosure. After the connection closes,
+`.preparationRequired(plan, reason)` supplies a recent request for an explicit
+review. Display `plan.review`, let the holder choose credentials/fields, and honour
+`requiredElements`. Call `try plan.approve(submission)` only from the approval action;
+on `.prepared(sharing)`, start a new session with
+`configuration.withApproval(.prepared(sharing))`. The old connection is finished.
+
+The shared SDK binds that approval to the exact authenticated reader, request,
+selected credentials, retention/purpose and application requirements. It lasts 60
+seconds, uses a monotonic deadline, and permits one connection attempt. A plan
+expires after ten minutes and is not permission to disclose. Keep both objects
+in memory within the journey; persist only the mode. `sharing.remainingSeconds`
+supports a countdown, and `await sharing.revoke()` cancels future use. Close and
+revoke on dismissal/backgrounding, preserving only actual Core NFC system presentation.
+Retries require a fresh review; changed requests never inherit a broader approval.
+
+The bundled iOS adapter cannot host interactive review during NFC-only retrieval.
+It first declines and collects an eligible reader request even in `.askEachTime`,
+then lets the holder review and reconnect. NFC-to-Bluetooth handover can still
+review while connected. Preparation needs one named authenticated trusted reader;
+other readers need an interactive route. Normal trust, credential and holder-key
+checks remain mandatory, and protected-key prompts still depend on OS availability.
+`.completed` may include a display-only receipt; this records local response
+completion, not the reader's verification result.
+
+When the user chooses a prepared NFC engagement, call `await session.presentNfc()` to open Core NFC's
+system sheet. The request preserves the current engagement and keys, waits for the NFC resource to be
+ready, and is idempotent while emulation is starting or active. The optional presentment assertion may
+expire or be unavailable during its cooldown; explicit presentation does not require it. Calls outside
+NFC engagement readiness are ignored. Failures and cancellation still arrive through `session.states`.
+
+After an NFC-only response is submitted, keep the devices together until the reader shows its result,
+then separate them. The adapter drains pending response fragments and keeps the NFC session active
+until reader deselection, cancellation, or a platform timeout. Bluetooth handover closes NFC after
+its response drains. Response submission alone does not confirm the reader's verification result.
+
 NFC card presentation requires Apple's managed HCE capability and a matching
 provisioning profile. [`HCE.entitlements.example`](HCE.entitlements.example) is
 an unreferenced host-app template containing the Type 4/NDEF, conventional mdoc
@@ -175,6 +215,11 @@ fresh session after terminal failure. Runtime capability observations distinguis
 `.notChecked`, `.available`, and `.unavailable` independently of selection.
 Reader scopes use `.document(index:)` or `.wholeRequest`; only the valid
 authentication outcome carries an evaluated trust decision.
+
+`session.connectedRoute` retains the actual engagement and bearer through review and completion,
+even if a consumer skips the brief connecting state. Terminal errors also expose `remediationActions`;
+after Settings, wait for the application to become active and close the failed session before starting
+a fresh one. Do not send prerequisite retry actions to a terminal session.
 
 `ProximitySession` is an actor over the KMP source of truth. Its
 state stream, typed actions, immutable review, trust facts, disclosure choices,

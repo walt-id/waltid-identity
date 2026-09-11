@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import WalletDemoIdentityDocumentSupport
 import WalletDemoSharingUI
 import WalletSDK
 
@@ -47,7 +48,7 @@ struct SettingsView: View {
                 .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwkCopy)
             }
             signingProtectionSection
-            Section("Credential Sharing") {
+            Section {
                 Toggle(
                     "Show Walt Wallet preview for DC API Presentation",
                     isOn: $viewModel.showDcApiPresentationPreview
@@ -56,12 +57,15 @@ struct SettingsView: View {
                 Text("When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                proximityPresentationSettings
                 NavigationLink("Reader Authentication") {
                     ReaderTrustSettingsView(controller: viewModel.readerTrustSettings)
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsReaderAuthentication)
+            } header: {
+                Text("Credential Sharing")
+                    .accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
             }
-            .accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
             Section {
                 Button("Lock") {
                     viewModel.lock()
@@ -102,6 +106,50 @@ struct SettingsView: View {
         } message: {
             Text("This creates a new key and DID, and removes all credentials. Credentials must be issued again.")
         }
+    }
+
+    private var proximityPresentationSettings: some View {
+        NavigationLink {
+            List {
+                Section("Approval") {
+                    ProximityApprovalModeToggle(mode: $viewModel.proximityApprovalMode, compact: false)
+                    Text("Only the mode is remembered. Each prepared share needs a new approval.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Section {
+                    ForEach(WalletDemoProximityTransportProfile.allCases) { profile in
+                        Button {
+                            viewModel.proximityTransportProfile = profile
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(profile.title).foregroundStyle(.primary)
+                                    Text(profile.description).font(.footnote).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if viewModel.proximityTransportProfile == profile {
+                                    Image(systemName: "checkmark").accessibilityHidden(true)
+                                }
+                            }
+                        }
+                        .accessibilityIdentifier(profile.accessibilityIdentifier)
+                        .accessibilityValue(viewModel.proximityTransportProfile == profile ? "Selected" : "Not selected")
+                    }
+                } header: {
+                    Text("Connection")
+                } footer: {
+                    Text("Use Automatic unless your reader requires a specific connection. Changes update sharing before connection or approval. Otherwise they apply to your next presentation.")
+                }
+            }
+            .navigationTitle("Nearby sharing")
+        } label: {
+            HStack {
+                Text("Nearby sharing")
+                Spacer()
+                Text(viewModel.proximityTransportProfile.title).foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
     }
 
     @ViewBuilder
@@ -471,6 +519,35 @@ private struct ReaderTrustImportReviewView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.caption).foregroundStyle(.secondary)
             Text(value, style: .date).font(.footnote)
+        }
+    }
+}
+
+private extension WalletDemoProximityTransportProfile {
+    var title: String {
+        switch self {
+        case .defaultProfile: String(localized: "Automatic")
+        case .bluetooth: String(localized: "Bluetooth transfer")
+        case .provisionalNfcV2Hybrid: String(localized: "NFCv2 + Bluetooth")
+        case .provisionalNfcV2Direct: String(localized: "NFCv2 direct")
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .defaultProfile: String(localized: "Use available connections supported by the reader.")
+        case .bluetooth: String(localized: "Start with NFC or QR; transfer over Bluetooth.")
+        case .provisionalNfcV2Hybrid: String(localized: "Provisional profile. Start with NFCv2; transfer over Bluetooth.")
+        case .provisionalNfcV2Direct: String(localized: "Provisional profile. Keep the connection on NFCv2.")
+        }
+    }
+
+    var accessibilityIdentifier: String {
+        switch self {
+        case .defaultProfile: WalletAccessibilityID.settingsProximityDefault
+        case .provisionalNfcV2Hybrid: WalletAccessibilityID.settingsProximityNfcV2Hybrid
+        case .provisionalNfcV2Direct: WalletAccessibilityID.settingsProximityNfcV2Direct
+        default: "wallet.settingsProximity.\(rawValue)"
         }
     }
 }

@@ -25,9 +25,11 @@ for await state in session.states {
         showUnavailableMethods(current)
     case .engagementReady(let engagements):
         showEngagements(engagements)
-    case .reviewRequired(let review):
+    case .reviewRequired(let review, _):
         showReview(review)
-    case .completed(let exchanges, _):
+    case .preparationRequired(let plan, let reason):
+        showPreparationReview(plan, reason: reason)
+    case .completed(let exchanges, _, _):
         showCompletion(exchanges: exchanges)
     case .noData(let exchange):
         showNoData(exchange: exchange)
@@ -62,6 +64,14 @@ let nfcConfiguration = ProximityConfiguration(
 )
 ```
 
+When the user selects a prepared NFC engagement, call
+``ProximitySession/presentNfc()`` to open the iOS system sheet. The
+request waits for NFC resources without replacing the engagement or session
+keys. Repeated requests during emulation have no effect. Calls outside NFC
+engagement readiness are ignored, and failures arrive through the state stream.
+This explicit action also works when the optional presentment assertion has
+expired or cannot be acquired during its cooldown.
+
 On iOS, the SDK installs its `CardSession` adapter automatically, but the host
 app must also be approved and provisioned by Apple for HCE. The package includes
 `HCE.entitlements.example` as a ready-to-copy template for the three ISO
@@ -85,6 +95,15 @@ default contactless app while it remains valid, but its documented 15-second
 lifetime is not treated as CardSession availability. The SDK holds a successful
 assertion without renewing it automatically and continues the explicitly started
 CardSession if assertion acquisition fails or the assertion later expires.
+
+For background handling, read ``ProximitySession/systemPresentationActive``
+at the transition. It becomes true when the adapter enters `startEmulation()` and
+clears when emulation ends, fails, is invalidated, or loses to another engagement.
+NFC configuration, an armed card session, and the optional presentment assertion
+alone do not grant an exemption. The native and Compose hosts preserve the session
+only during that actual system-presentment interval; ordinary backgrounding during
+QR display, review, or post-handover BLE still interrupts it. This follows Apple's
+[CardSession lifecycle](https://developer.apple.com/documentation/corenfc/cardsession).
 
 Device signature is the default holder-authentication policy. Configure
 ``ProximityDeviceAuthenticationPolicy/macOnly``,
@@ -137,6 +156,37 @@ statement index. During protected-key work,
 ``ProximityState/authorizingHolderKey(_:)`` carries one
 ``ProximityHolderAuthorizationRequest`` per approved document so a mixed
 signature/MAC response cannot be collapsed into a global authorization method.
+
+### Approve before reconnecting
+
+``ProximityApproval`` keeps approval timing separate from transport selection.
+The default is `.askEachTime`. `.prepareBeforeSharing` authenticates the reader,
+collects its request without credential disclosure, and ends that connection with
+`.preparationRequired(plan, reason)` after transport cleanup. Show the plan's
+reader, credential choices, selected fields, declared purpose/retention, and
+application requirements before calling `try plan.approve(submission)` from the
+holder's deliberate approval action. Honour `requiredElements`, including a
+requested mDL portrait. A `.prepared(sharing)` result is used only in a new session
+with `configuration.withApproval(.prepared(sharing))`.
+
+Plans expire after ten minutes. Prepared approvals are opaque, wallet-bound,
+one-use objects with a 60-second monotonic deadline; they are never persisted.
+The SDK compares the exact authenticated reader certificate, request, selected
+credential contents and application conditions, and repeats normal reader, key
+and credential checks. Changed requests require a new holder decision, and
+retries cannot reuse the approval. Use `remainingSeconds` for the ready countdown;
+revoke and close on cancellation or backgrounding, except during the actively
+owned Core NFC sheet. Permission setup must not retain an armed approval when the
+holder leaves the app.
+
+The bundled iOS NFC adapter cannot show an app review during NFC-only retrieval.
+It collects an eligible request and closes before review, including in
+`.askEachTime`, then requires a second connection. NFC-to-Bluetooth handover
+retains connected review. Preparation needs one named, authenticated trusted
+reader covering all requested documents; other readers require an interactive
+route. Protected-key authorization remains mandatory and subject to OS prompt
+availability. A completion receipt describes the locally sent selection and
+approval timing; it does not confirm reader-side verification.
 
 ### Configure reader trust
 

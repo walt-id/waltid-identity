@@ -32,14 +32,61 @@ The Android and iOS apps expose a dedicated **Present in person** journey for ho
 proximity presentation. The Wallet SDK remains the source of session, request, reader-authentication,
 trust, disclosure, and terminal-state meaning; the shared Compose UI renders those facts and performs
 only platform-owned permission, settings, lifecycle, screen-awake, and brightness actions.
-Before creating a session, the demo queries the SDK capabilities and automatically requests any
+Before creating a session, the demo queries the SDK capabilities and offers an explicit action for any
 runtime permission required by the selected proximity configuration. A permission that Android no
 longer allows the app to request is shown as an explicit **Open app settings** action; returning from
 Settings rechecks the selected configuration before session creation. Radio, power, and settings
 remediation otherwise remains an explicit user action.
 
+The sharing screen offers **Hold near the reader** and **Show QR code** only for engagements actually prepared
+by the SDK. A single ready QR method opens directly. On iOS, choosing NFC explicitly opens the system
+presentation sheet, including when NFC is the only available method.
+It does not depend on the optional short-lived presentment assertion. Choosing an already prepared
+engagement preserves the session and payload. Once connecting starts, method controls disappear;
+reader consent remains the focus, and the actual route is available under **Connection details**.
+Completion shows the result and **Done**, without radio controls.
+
+Permission setup explains the required action before opening an OS prompt. Users can skip optional
+setup only when the SDK reports another complete route that can start. Returning from Settings rechecks
+availability; declined permissions are not requested again automatically. QR visibility alone controls
+temporary screen brightness, and the QR is hidden once connecting begins.
+
+**Settings → Credential Sharing → Nearby sharing** stores the connection profile. Changing it
+before connection or approval replaces the open engagement and rechecks availability. The previous
+QR and choices remain hidden until the new profile is ready. Connected exchanges and approved shares
+keep their configuration. New presentations use the latest preference.
+
+Automatic uses the available reader-compatible routes. Compatibility profiles narrow transfer to
+Bluetooth, or select provisional NFCv2 direct/handover modes. These choices stay in Settings.
+Device support and permissions are checked at startup; NFCv2 retains its mandatory NFC channel.
+
+**Approval** in Nearby sharing settings stores **Ask each time** (default) or
+**Prepare sharing**, independently of the connection profile. The same choice is
+available before connecting. Both switches update one saved preference, retained
+for subsequent shares. Changing it before connection refreshes the engagement in
+place; the previous QR is hidden until its replacement is ready. Changes made
+during an exchange apply to the next presentation. Preparation first identifies a
+named authenticated trusted reader and collects its request without sharing credentials. After the
+connection closes, review the reader, purpose, retention and selected data, then
+choose **Approve and get ready**. Several matching credentials require an explicit
+choice; requested mDL portrait data is marked required. Missing required data
+prevents approval and explains why another credential is needed.
+
+The ready screen shows a cancellable 60-second, one-use approval and its scope.
+Approval automatically reopens the previous engagement method when available.
+The reader must start a fresh request; additional data, another reader or changed
+purpose/retention requires another decision. iOS NFC-only uses this review/reconnect
+flow because Core NFC owns the screen during transfer; Bluetooth retains ordinary
+connected review. Only an actively owned NFC sheet exempts background cancellation.
+
+Completion shows the locally shared selection and **Prepare another share** while
+the recent request remains valid. Preparing again requires a new review and approval;
+retry never reuses an armed approval. **Done** forgets the plan. Plans expire after
+ten minutes, approvals after 60 seconds, and neither is persisted. Reader/key checks
+remain in the SDK. A local receipt does not confirm the reader's verification result.
+
 The current journey displays Device Engagement as an accessible QR code and retrieves over the
-available Bluetooth Low Energy method. It supports per-document credential and element selection,
+available Bluetooth Low Energy or NFC method. It supports per-document credential and element selection,
 shows reader-stated purpose and retention intent, and presents authentication scope, signature
 validity, certificate-path, revocation, optional RICAL, and product-trust evidence as separate facts.
 It requests fresh consent for repeated exchanges and restores temporary display changes on every exit
@@ -60,6 +107,13 @@ Reader CAs/RICAL providers, and imports DER, certificate-only PEM, or versioned 
 bundles through the platform document picker. Every import is validated and previewed before an atomic
 save to app-private storage; private keys and PKCS#12/PFX reader identities are deliberately rejected.
 Each new proximity session freezes the current settings, so an active exchange cannot be reconfigured.
+
+The ready screen prioritizes the full QR within the available space. **Prepare sharing** is a single
+switch: off means review each request; on means review, approve, then reconnect. Selecting the mode
+does not authorize disclosure. The same switch is available in Nearby sharing settings. Once armed,
+the reader and expiry countdown stay visible, and **Approved data** opens the already reviewed
+selection. Cancel stays separate from scrolling content. Short screens and larger text retain
+scrolling for secondary controls; landscape places the QR beside the controls.
 
 ## Local wallet data
 

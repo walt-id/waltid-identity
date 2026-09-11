@@ -1,0 +1,995 @@
+#if canImport(CoreNFC) && canImport(WalletCore) && os(iOS)
+import Foundation
+import WalletCore
+@testable @_spi(KmpHostBridge) import WalletSDK
+import XCTest
+
+final class IOSNfcHostPlatformAdapterTests: XCTestCase {
+    func testExplicitPresentmentWaitsForSessionAndWorksWithoutAssertionOrReader() async throws {
+        let card = FakeNfcCardSession()
+        let environment = FakeNfcEnvironment(session: card, presentmentIntentFailure: TestFailure.failed)
+        let events = PresentmentEvents()
+        let bridge = IOSNfcHostBridge(environment: environment, onPresentment: { events.append($0) })
+        guard case let .ready(session) = await bridge.prepare(
+            process: { _ in Data() }, deactivate: { _ in }
+        ) else { return XCTFail("Preparation failed") }
+        await bridge.present()
+        XCTAssertEqual(card.startCount, 0)
+        XCTAssertFalse(bridge.isPresenting)
+        card.emit(.sessionStarted)
+        await assertEventually { card.startCount == 1 && bridge.isPresenting }
+        await bridge.present()
+        card.emit(.readerDetected)
+        await session.close(reason: .cancelled)
+        await bridge.present()
+        XCTAssertEqual(card.startCount, 1)
+        XCTAssertFalse(bridge.isPresenting)
+        XCTAssertEqual(events.values, [.began, .ended(.cancelled)])
+        XCTAssertEqual(environment.sessionCount, 1)
+        XCTAssertEqual(environment.presentmentIntentCount, 1)
+    }
+
+    func testExplicitPresentmentProtectsBackgroundWhileStartingAndCannotReviveClosedSession() async throws {
+        let gate = BlockingNfcRouter(response: Data())
+        let card = FakeNfcCardSession(startOperation: { _ = try await gate.process(Data()) })
+        let events = PresentmentEvents()
+        let bridge = IOSNfcHostBridge(
+            environment: FakeNfcEnvironment(session: card), onPresentment: { events.append($0) }
+        )
+        guard case let .ready(session) = await bridge.prepare(
+            process: { _ in Data() }, deactivate: { _ in }
+        ) else { return XCTFail("Preparation failed") }
+        card.emit(.sessionStarted)
+        let presentation = Task { await bridge.present() }
+        await gate.waitUntilEntered()
+        XCTAssertTrue(bridge.isPresenting)
+        await bridge.present()
+        card.emit(.readerDetected)
+        await session.close(reason: .lostRace)
+        XCTAssertFalse(bridge.isPresenting)
+        await gate.release()
+        await presentation.value
+        await assertEventually { card.stopStatuses == [.failure] }
+        XCTAssertEqual(card.startCount, 1)
+        XCTAssertEqual(events.values, [.began, .ended(.lostRace)])
+    }
+
+    func testExplicitPresentmentFailureClosesRouterAndClearsBackgroundExemption() async throws {
+        let card = FakeNfcCardSession(startOperation: { throw IOSNfcCardSessionFailure.radioDisabled })
+        let router = FakeNfcRouter(response: Data())
+        let events = PresentmentEvents()
+        let core = IOSCardSessionCore(
+            generation: 1, environment: FakeNfcEnvironment(session: card), router: router,
+            onPresentment: { events.append($0) }
+        )
+        try await core.prepare()
+        await core.present()
+        card.emit(.sessionStarted)
+        await assertEventually { await router.deactivations == [.platformUnavailable] }
+        XCTAssertEqual(events.values, [.began, .ended(.platformUnavailable)])
+        XCTAssertEqual(card.invalidateCount, 1)
+        await core.present()
+        XCTAssertEqual(card.startCount, 1)
+    }
+
+    func testCapabilityReportsReadingAndCardSessionPrerequisitesWithoutSideEffects() async throws {
+        let scenarios: [(FakeNfcEnvironment, String)] = [
+            (FakeNfcEnvironment(reading: false), "nfc_reading_unavailable"),
+            (FakeNfcEnvironment(supported: false), "nfc_card_session_unsupported"),
+        ]
+
+        for (environment, expectedCode) in scenarios {
+            let capability = try await IOSNfcHostPlatformAdapter(environment: environment).__capability()
+            let unavailable = try XCTUnwrap(
+                capability as? Waltid_mdoc_proximity_mobileNfcHostAvailabilityUnavailable
+            )
+            XCTAssertEqual(unavailable.code, expectedCode)
+            XCTAssertEqual(environment.presentmentIntentCount, 0)
+            XCTAssertEqual(environment.sessionCount, 0)
+        }
+    }
+
+    func testCapabilityDoesNotCreateSessionAndReportsSystemIneligibility() async throws {
+        let environment = FakeNfcEnvironment(eligible: false)
+        let adapter = IOSNfcHostPlatformAdapter(environment: environment)
+
+        let capability = try await adapter.__capability()
+
+        let unavailable = try XCTUnwrap(
+            capability as? Waltid_mdoc_proximity_mobileNfcHostAvailabilityUnavailable
+        )
+        XCTAssertEqual(unavailable.code, "nfc_system_ineligible")
+        XCTAssertEqual(environment.presentmentIntentCount, 0)
+        XCTAssertEqual(environment.sessionCount, 0)
+    }
+
+    func testFrameworkNeutralBridgeRoutesOneSessionWithoutGeneratedKmpTypes() async throws {
+        let cardSession = FakeNfcCardSession()
+        let callbacks = BridgeNfcCallbacks(response: Data([0x90, 0x00]))
+        let bridge = IOSNfcHostBridge(environment: FakeNfcEnvironment(session: cardSession))
+
+        let preparation = await bridge.prepare(
+            process: { command in await callbacks.process(command) },
+            deactivate: { reason in await callbacks.deactivate(reason) }
+        )
+        guard case let .ready(preparedSession) = preparation else {
+            return XCTFail("The framework-neutral CardSession bridge was unavailable")
+        }
+
+        let apdu = FakeNfcAPDU(payload: Data([0x00, 0xa4, 0x04, 0x00]))
+        cardSession.emit(.readerDetected)
+        cardSession.emit(.received(apdu))
+        await assertEventually { await apdu.responseCount == 1 }
+        let closing = Task { await preparedSession.close(reason: .completed) }
+        await finishPresentation(session: cardSession)
+        await closing.value
+
+        let commands = await callbacks.commands
+        let deactivations = await callbacks.deactivations
+        let responses = await apdu.responses
+        XCTAssertEqual(commands, [Data([0x00, 0xa4, 0x04, 0x00])])
+        XCTAssertEqual(deactivations, [.completed])
+        XCTAssertEqual(responses, [Data([0x90, 0x00])])
+    }
+
+    func testRoutesOneAPDUAndClosesCompletedSessionExactlyOnce() async throws {
+        let session = FakeNfcCardSession()
+        let environment = FakeNfcEnvironment(session: session)
+        let router = FakeNfcRouter(response: Data([0x90, 0x00]))
+        let core = IOSCardSessionCore(generation: 1, environment: environment, router: router)
+        let apdu = FakeNfcAPDU(payload: Data([0x00, 0xa4, 0x04, 0x00]))
+
+        try await core.prepare()
+        session.emit(.sessionStarted)
+        session.emit(.readerDetected)
+        session.emit(.received(apdu))
+
+        await assertEventually { await apdu.responseCount == 1 }
+        let closing = Task { await core.close(reason: .completed) }
+        await finishPresentation(session: session)
+        await closing.value
+        await core.close(reason: .cancelled)
+
+        let commands = await router.commands
+        let deactivations = await router.deactivations
+        let responses = await apdu.responses
+        XCTAssertEqual(commands, [Data([0x00, 0xa4, 0x04, 0x00])])
+        XCTAssertEqual(deactivations, [.completed])
+        XCTAssertEqual(responses, [Data([0x90, 0x00])])
+        XCTAssertEqual(session.startCount, 1)
+        XCTAssertEqual(session.stopStatuses, [.success])
+        XCTAssertEqual(session.invalidateCount, 1)
+    }
+
+    func testCompletedCloseKeepsNfcActiveAfterFinalResponseUntilReaderDeselects() async throws {
+        let session = FakeNfcCardSession()
+        let router = SequenceNfcRouter(responses: [Data([0x01, 0x61, 0x01]), Data([0x02, 0x90, 0x00])])
+        let core = IOSCardSessionCore(generation: 1, environment: FakeNfcEnvironment(session: session),
+                                      router: router)
+        let first = FakeNfcAPDU(payload: Data([0x00, 0xc3, 0x00, 0x00]))
+        let last = FakeNfcAPDU(payload: Data([0x00, 0xc0, 0x00, 0x00, 0x01]))
+        try await core.prepare()
+        session.emit(.readerDetected)
+        session.emit(.received(first))
+        await assertEventually { await first.responseCount == 1 }
+        let closing = Task { await core.close(reason: .completed) }
+        try await Task.sleep(nanoseconds: 30_000_000)
+        session.emit(.received(last))
+        await assertEventually { await last.responseCount == 1 }
+        try await Task.sleep(nanoseconds: 30_000_000)
+        XCTAssertEqual(session.invalidateCount, 0)
+        XCTAssertEqual(session.stopStatuses, [])
+        // No second request is processed while the completed response remains on the RF interface.
+        let extra = FakeNfcAPDU(payload: Data([0x00, 0xc3, 0x00, 0x00]))
+        session.emit(.received(extra))
+        await assertEventually { await extra.responseCount == 1 }
+        let rejected = await extra.responses
+        XCTAssertEqual(rejected, [Data([0x69, 0x85])])
+        session.emit(.readerDeselected)
+        await closing.value
+        XCTAssertEqual(session.stopStatuses, [.success])
+        XCTAssertEqual(session.invalidateCount, 1)
+        let deactivations = await router.deactivations
+        XCTAssertEqual(deactivations, [.completed])
+    }
+
+    func testCompletedCloseRemainsInterruptibleByCancellationAndPlatformTimeout() async throws {
+        for cancellation in [true, false] {
+            let session = FakeNfcCardSession()
+            let router = FakeNfcRouter(response: Data([0x01, 0x90, 0x00]))
+            let core = IOSCardSessionCore(generation: 1, environment: FakeNfcEnvironment(session: session),
+                                          router: router)
+            let apdu = FakeNfcAPDU(payload: Data([0x00, 0xc3, 0x00, 0x00]))
+            try await core.prepare()
+            session.emit(.readerDetected)
+            session.emit(.received(apdu))
+            await assertEventually { await apdu.responseCount == 1 }
+            let closing = Task { await core.close(reason: .completed) }
+            try await Task.sleep(nanoseconds: 30_000_000)
+            XCTAssertEqual(session.invalidateCount, 0)
+            if cancellation { closing.cancel() }
+            else { session.emit(.sessionInvalidated(reason: .maximumDurationReached)) }
+            await closing.value
+            let deactivations = await router.deactivations
+            XCTAssertEqual(deactivations, [cancellation ? .cancelled : .timeout])
+        }
+    }
+
+    func testSuccessfulCloseDeliversPendingRouterResponseBeforeStoppingNfc() async throws {
+        for reason in [IOSNfcHostBridgeCloseReason.completed, .handoverCompleted] {
+            let session = FakeNfcCardSession()
+            let router = BlockingNfcRouter(response: Data([0x01, 0x90, 0x00]))
+            let core = IOSCardSessionCore(generation: 1, environment: FakeNfcEnvironment(session: session), router: router)
+            let apdu = FakeNfcAPDU(payload: Data([0x00, 0xc3, 0x00, 0x00]))
+            try await core.prepare()
+            session.emit(.readerDetected)
+            session.emit(.received(apdu))
+            await router.waitUntilEntered()
+            let closing = Task { await core.close(reason: reason) }
+            try await Task.sleep(nanoseconds: 30_000_000)
+            XCTAssertEqual(session.invalidateCount, 0)
+            await router.release()
+            await assertEventually { await apdu.responseCount == 1 }
+            if reason == .completed { await finishPresentation(session: session) }
+            await closing.value
+            let responses = await apdu.responses
+            XCTAssertEqual(responses, [Data([0x01, 0x90, 0x00])])
+            XCTAssertEqual(session.stopStatuses, [.success])
+        }
+    }
+
+    func testSuccessfulCloseWaitsForPlatformResponseSendAndAllGetResponseFragments() async throws {
+        let session = FakeNfcCardSession()
+        let router = SequenceNfcRouter(responses: [Data([0x01, 0x61, 0x01]), Data([0x02, 0x90, 0x00])])
+        let core = IOSCardSessionCore(generation: 1, environment: FakeNfcEnvironment(session: session), router: router)
+        let gate = BlockingNfcRouter(response: Data())
+        let first = FakeNfcAPDU(payload: Data([0x00, 0xc3, 0x00, 0x00]), responseOperation: {
+            _ = try await gate.process(Data())
+        })
+        let last = FakeNfcAPDU(payload: Data([0x00, 0xc0, 0x00, 0x00, 0x01]))
+        try await core.prepare()
+        session.emit(.readerDetected)
+        session.emit(.received(first))
+        await gate.waitUntilEntered()
+        let closing = Task { await core.close(reason: .completed) }
+        try await Task.sleep(nanoseconds: 30_000_000)
+        XCTAssertEqual(session.invalidateCount, 0)
+        await gate.release()
+        // The response asks the reader to issue GET RESPONSE. The gap between APDUs is not completion.
+        try await Task.sleep(nanoseconds: 30_000_000)
+        XCTAssertEqual(session.invalidateCount, 0)
+        session.emit(.received(last))
+        await assertEventually { await last.responseCount == 1 }
+        await finishPresentation(session: session)
+        await closing.value
+        let firstResponses = await first.responses
+        let lastResponses = await last.responses
+        XCTAssertEqual(firstResponses, [Data([0x01, 0x61, 0x01])])
+        XCTAssertEqual(lastResponses, [Data([0x02, 0x90, 0x00])])
+        XCTAssertEqual(session.stopStatuses, [.success])
+    }
+
+    func testReaderLossInterruptsSuccessfulCloseWaitingForResponseFragments() async throws {
+        let session = FakeNfcCardSession()
+        let router = FakeNfcRouter(response: Data([0x01, 0x61, 0x01]))
+        let core = IOSCardSessionCore(generation: 1, environment: FakeNfcEnvironment(session: session), router: router)
+        let first = FakeNfcAPDU(payload: Data([0x00, 0xc3, 0x00, 0x00]))
+        try await core.prepare()
+        session.emit(.readerDetected)
+        session.emit(.received(first))
+        await assertEventually { await first.responseCount == 1 }
+        let closing = Task { await core.close(reason: .completed) }
+        try await Task.sleep(nanoseconds: 30_000_000)
+        session.emit(.readerDeselected)
+        await closing.value
+        await assertEventually { await router.deactivations == [.peerDisconnected] }
+        XCTAssertEqual(session.stopStatuses, [.failure])
+    }
+
+    func testCompletedHandoverStopsNfcEmulationAsSuccess() async throws {
+        let session = FakeNfcCardSession()
+        let router = FakeNfcRouter(response: Data([0x90, 0x00]))
+        let core = IOSCardSessionCore(
+            generation: 1,
+            environment: FakeNfcEnvironment(session: session),
+            router: router
+        )
+
+        try await core.prepare()
+        session.emit(.readerDetected)
+        await assertEventually { session.startCount == 1 }
+        await core.close(reason: .handoverCompleted)
+
+        let deactivations = await router.deactivations
+        XCTAssertEqual(deactivations, [.handoverCompleted])
+        XCTAssertEqual(session.stopStatuses, [.success])
+        XCTAssertEqual(session.invalidateCount, 1)
+    }
+
+    func testSecondAPDUWhileFirstIsPendingIsRejectedWithoutReordering() async throws {
+        let session = FakeNfcCardSession()
+        let router = BlockingNfcRouter(response: Data([0x90, 0x00]))
+        let core = IOSCardSessionCore(
+            generation: 1,
+            environment: FakeNfcEnvironment(session: session),
+            router: router
+        )
+        let first = FakeNfcAPDU(payload: Data([0x00, 0xc3, 0x00, 0x00]))
+        let second = FakeNfcAPDU(payload: Data([0x00, 0xc3, 0x00, 0x00]))
+
+        try await core.prepare()
+        session.emit(.readerDetected)
+        session.emit(.received(first))
+        await router.waitUntilEntered()
+        session.emit(.received(second))
+
+        await assertEventually { await second.responseCount == 1 }
+        let rejectedResponses = await second.responses
+        let pendingResponses = await first.responses
+        XCTAssertEqual(rejectedResponses, [Data([0x69, 0x85])])
+        XCTAssertEqual(pendingResponses, [])
+
+        await router.release()
+        await assertEventually { await first.responseCount == 1 }
+        let completedResponses = await first.responses
+        XCTAssertEqual(completedResponses, [Data([0x90, 0x00])])
+        let closing = Task { await core.close(reason: .completed) }
+        await finishPresentation(session: session)
+        await closing.value
+    }
+
+    func testRetriesSameLogicalResponseOnceAfterTransmissionError() async throws {
+        let session = FakeNfcCardSession()
+        let router = FakeNfcRouter(response: Data([0x90, 0x00]))
+        let core = IOSCardSessionCore(
+            generation: 1,
+            environment: FakeNfcEnvironment(session: session),
+            router: router
+        )
+        let apdu = FakeNfcAPDU(
+            payload: Data([0x00, 0xc0, 0x00, 0x00]),
+            failures: [.transmissionError]
+        )
+
+        try await core.prepare()
+        session.emit(.readerDetected)
+        session.emit(.received(apdu))
+
+        await assertEventually { await apdu.responseCount == 2 }
+        let closing = Task { await core.close(reason: .completed) }
+        await finishPresentation(session: session)
+        await closing.value
+
+        let responses = await apdu.responses
+        let deactivations = await router.deactivations
+        XCTAssertEqual(responses, [Data([0x90, 0x00]), Data([0x90, 0x00])])
+        XCTAssertEqual(deactivations, [.completed])
+    }
+
+    func testSecondTransmissionFailureTerminatesTheField() async throws {
+        let session = FakeNfcCardSession()
+        let router = FakeNfcRouter(response: Data([0x61, 0x20]))
+        let core = IOSCardSessionCore(
+            generation: 1,
+            environment: FakeNfcEnvironment(session: session),
+            router: router
+        )
+        let apdu = FakeNfcAPDU(
+            payload: Data([0x00, 0xc0, 0x00, 0x00]),
+            failures: [.transmissionError, .transmissionError]
+        )
+
+        try await core.prepare()
+        session.emit(.readerDetected)
+        session.emit(.received(apdu))
+
+        await assertEventually { await router.deactivations == [.peerDisconnected] }
+        let responses = await apdu.responses
+        XCTAssertEqual(responses.count, 2)
+        XCTAssertEqual(session.stopStatuses, [.failure])
+        XCTAssertEqual(session.invalidateCount, 1)
+    }
+
+    func testReaderDeselectionCancelsPendingAPDUAndInvalidatesFieldAndRouter() async throws {
+        let session = FakeNfcCardSession()
+        let router = CancellationAwareNfcRouter()
+        let core = IOSCardSessionCore(
+            generation: 1,
+            environment: FakeNfcEnvironment(session: session),
+            router: router
+        )
+        let apdu = FakeNfcAPDU(payload: Data([0x00, 0xc3, 0x00, 0x00]))
+
+        try await core.prepare()
+        session.emit(.readerDetected)
+        session.emit(.received(apdu))
+        await router.waitUntilEntered()
+        session.emit(.readerDeselected)
+
+        await assertEventually { await router.deactivations == [.peerDisconnected] }
+        let responses = await apdu.responses
+        XCTAssertEqual(responses, [])
+        XCTAssertEqual(session.stopStatuses, [.failure])
+        XCTAssertEqual(session.invalidateCount, 1)
+    }
+
+    func testRouterFailureRespondsWithStatusAndTerminatesProtocol() async throws {
+        let session = FakeNfcCardSession()
+        let router = FakeNfcRouter(response: Data(), failure: TestFailure.failed)
+        let core = IOSCardSessionCore(
+            generation: 1,
+            environment: FakeNfcEnvironment(session: session),
+            router: router
+        )
+        let apdu = FakeNfcAPDU(payload: Data([0xff]))
+
+        try await core.prepare()
+        session.emit(.readerDetected)
+        session.emit(.received(apdu))
+
+        await assertEventually { await router.deactivations == [.protocolError] }
+        let responses = await apdu.responses
+        XCTAssertEqual(responses, [Data([0x6f, 0x00])])
+        XCTAssertEqual(session.stopStatuses, [.failure])
+        XCTAssertEqual(session.invalidateCount, 1)
+    }
+
+    func testCloseDropsStaleResponseAndWaitsForInFlightRouterCommand() async throws {
+        let session = FakeNfcCardSession()
+        let router = BlockingNfcRouter(response: Data([0x90, 0x00]))
+        let core = IOSCardSessionCore(
+            generation: 1,
+            environment: FakeNfcEnvironment(session: session),
+            router: router
+        )
+        let apdu = FakeNfcAPDU(payload: Data([0x00, 0xa4, 0x04, 0x00]))
+
+        try await core.prepare()
+        session.emit(.readerDetected)
+        session.emit(.received(apdu))
+        await router.waitUntilEntered()
+
+        let close = Task { await core.close(reason: .cancelled) }
+        await assertEventually { session.invalidateCount == 1 }
+        let deactivationsBeforeRelease = await router.deactivations
+        XCTAssertEqual(deactivationsBeforeRelease, [])
+
+        await router.release()
+        await close.value
+
+        let responses = await apdu.responses
+        let deactivations = await router.deactivations
+        XCTAssertEqual(responses, [])
+        XCTAssertEqual(deactivations, [.cancelled])
+        XCTAssertEqual(session.stopStatuses, [.failure])
+        XCTAssertEqual(session.invalidateCount, 1)
+    }
+
+    func testMaximumDurationInvalidationMapsToTimeoutWithoutReinvalidating() async throws {
+        let session = FakeNfcCardSession()
+        let router = FakeNfcRouter(response: Data([0x90, 0x00]))
+        let core = IOSCardSessionCore(
+            generation: 1,
+            environment: FakeNfcEnvironment(session: session),
+            router: router
+        )
+
+        try await core.prepare()
+        session.emit(.sessionInvalidated(reason: .maximumDurationReached))
+
+        await assertEventually { await router.deactivations == [.timeout] }
+        XCTAssertEqual(session.invalidateCount, 0)
+    }
+
+    func testCoordinatorPreservesKnownPreparationFailureCodes() async throws {
+        let scenarios: [(FakeNfcEnvironment, CardSessionNfcHostError)] = [
+            (
+                FakeNfcEnvironment(sessionFailure: IOSNfcCardSessionFailure.accessNotAccepted),
+                .accessNotAccepted
+            ),
+            (
+                FakeNfcEnvironment(sessionFailure: IOSNfcCardSessionFailure.radioDisabled),
+                .radioDisabled
+            ),
+        ]
+
+        for (environment, expected) in scenarios {
+            let coordinator = CardSessionNfcHostCoordinator(environment: environment)
+            do {
+                _ = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
+                XCTFail("Preparation unexpectedly succeeded")
+            } catch let failure as CardSessionNfcHostError {
+                XCTAssertEqual(failure, expected)
+                XCTAssertFalse(failure.code.isEmpty)
+                XCTAssertFalse(failure.message.isEmpty)
+            }
+        }
+    }
+
+    func testPresentmentIntentFailureDoesNotBlockCardSessionCreation() async throws {
+        let environment = FakeNfcEnvironment(presentmentIntentFailure: TestFailure.failed)
+        let coordinator = CardSessionNfcHostCoordinator(environment: environment)
+
+        let session = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
+
+        XCTAssertEqual(environment.presentmentIntentCount, 1)
+        XCTAssertEqual(environment.sessionCount, 1)
+        await session.close(reason: .cancelled)
+    }
+
+    func testMissingPresentmentIntentDoesNotBlockCardSessionCreation() async throws {
+        let environment = FakeNfcEnvironment(presentmentIntentAvailable: false)
+        let coordinator = CardSessionNfcHostCoordinator(environment: environment)
+
+        let session = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
+
+        XCTAssertEqual(environment.presentmentIntentCount, 1)
+        XCTAssertEqual(environment.sessionCount, 1)
+        await session.close(reason: .cancelled)
+    }
+
+    func testExpiredPresentmentIntentDoesNotBlockReaderDetection() async throws {
+        let session = FakeNfcCardSession()
+        let environment = FakeNfcEnvironment(session: session)
+        let router = FakeNfcRouter(response: Data([0x90, 0x00]))
+        let core = IOSCardSessionCore(generation: 1, environment: environment, router: router)
+
+        try await core.prepare()
+        environment.invalidatePresentmentIntent()
+        session.emit(.readerDetected)
+
+        await assertEventually { session.startCount == 1 }
+        let deactivations = await router.deactivations
+        XCTAssertEqual(deactivations, [])
+        XCTAssertEqual(session.invalidateCount, 0)
+        await core.close(reason: .cancelled)
+    }
+
+    func testCoordinatorRejectsConcurrentSessionAndReleasesClosedGeneration() async throws {
+        let environment = FakeNfcEnvironment()
+        let coordinator = CardSessionNfcHostCoordinator(environment: environment)
+        let first = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
+
+        do {
+            _ = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
+            XCTFail("Concurrent preparation unexpectedly succeeded")
+        } catch let failure as CardSessionNfcHostError {
+            XCTAssertEqual(failure, .sessionAlreadyActive)
+            XCTAssertEqual(failure.code, "nfc_session_already_active")
+        }
+
+        await first.close(reason: .completed)
+        _ = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
+        XCTAssertEqual(environment.presentmentIntentCount, 2)
+        XCTAssertEqual(environment.sessionCount, 2)
+    }
+
+    func testPresentmentTracksEmulationAndEveryExplicitCloseReason() async throws {
+        for reason in [IOSNfcHostBridgeCloseReason.completed, .handoverCompleted, .cancelled,
+                       .lostRace, .timeout, .peerDisconnected, .protocolError, .platformUnavailable] {
+            let card = FakeNfcCardSession()
+            let events = PresentmentEvents()
+            let bridge = IOSNfcHostBridge(
+                environment: FakeNfcEnvironment(session: card),
+                onPresentment: { events.append($0) }
+            )
+            guard case let .ready(session) = await bridge.prepare(
+                process: { _ in Data([0x90, 0x00]) }, deactivate: { _ in }
+            ) else { return XCTFail("Preparation failed") }
+            XCTAssertFalse(bridge.isPresenting)
+            card.emit(.sessionStarted)
+            XCTAssertFalse(bridge.isPresenting)
+            card.emit(.readerDetected)
+            await assertEventually { bridge.isPresenting && card.startCount == 1 }
+            let closing = Task { await session.close(reason: reason) }
+            if reason == .completed { await finishPresentation(session: card) }
+            await closing.value
+            XCTAssertFalse(bridge.isPresenting)
+            XCTAssertEqual(events.values, [.began, .ended(reason)])
+            await session.close(reason: .cancelled)
+            XCTAssertEqual(events.values.count, 2)
+        }
+    }
+
+    func testPresentmentInvalidationAndFailedEmulationClearTheHostExemption() async throws {
+        for failure in [IOSNfcCardSessionFailure.userInvalidated, .maximumDurationReached, .systemUnavailable] {
+            let card = FakeNfcCardSession()
+            let events = PresentmentEvents()
+            let bridge = IOSNfcHostBridge(
+                environment: FakeNfcEnvironment(session: card),
+                onPresentment: { events.append($0) }
+            )
+            guard case let .ready(session) = await bridge.prepare(
+                process: { _ in Data() }, deactivate: { _ in }
+            ) else { return XCTFail("Preparation failed") }
+            card.emit(.readerDetected)
+            await assertEventually { bridge.isPresenting }
+            card.emit(.sessionInvalidated(reason: failure))
+            await assertEventually { !bridge.isPresenting }
+            let reason: IOSNfcHostBridgeCloseReason = failure == .userInvalidated ? .cancelled :
+                failure == .maximumDurationReached ? .timeout : .platformUnavailable
+            XCTAssertEqual(events.values, [.began, .invalidated(reason)])
+            await session.close(reason: .cancelled)
+        }
+        let events = PresentmentEvents()
+        let card = FakeNfcCardSession(startOperation: { throw IOSNfcCardSessionFailure.systemUnavailable })
+        let bridge = IOSNfcHostBridge(
+            environment: FakeNfcEnvironment(session: card), onPresentment: { events.append($0) }
+        )
+        guard case let .ready(session) = await bridge.prepare(
+            process: { _ in Data() }, deactivate: { _ in }
+        ) else { return XCTFail("Preparation failed") }
+        card.emit(.readerDetected)
+        await assertEventually { events.values.count == 2 }
+        XCTAssertFalse(bridge.isPresenting)
+        XCTAssertEqual(events.values, [.began, .ended(.platformUnavailable)])
+        await session.close(reason: .cancelled)
+    }
+
+    func testExemptionBeginsBeforeEmulationReturnsAndLateSuccessCannotReviveIt() async throws {
+        let gate = BlockingNfcRouter(response: Data())
+        let card = FakeNfcCardSession(startOperation: { _ = try await gate.process(Data()) })
+        let events = PresentmentEvents()
+        let bridge = IOSNfcHostBridge(
+            environment: FakeNfcEnvironment(session: card), onPresentment: { events.append($0) }
+        )
+        guard case let .ready(session) = await bridge.prepare(
+            process: { _ in Data() }, deactivate: { _ in }
+        ) else { return XCTFail("Preparation failed") }
+        card.emit(.readerDetected)
+        await gate.waitUntilEntered()
+        XCTAssertTrue(bridge.isPresenting)
+        await session.close(reason: .lostRace)
+        XCTAssertFalse(bridge.isPresenting)
+        await gate.release()
+        await assertEventually { card.stopStatuses == [.failure] }
+        XCTAssertFalse(bridge.isPresenting)
+        XCTAssertEqual(events.values, [.began, .ended(.lostRace)])
+    }
+
+    func testCancelledPreparationDisposesLateCardWithoutReleasingANewerGeneration() async throws {
+        let gate = BlockingNfcRouter(response: Data())
+        let environment = SuspendedFirstNfcEnvironment(gate: gate)
+        let router = FakeNfcRouter(response: Data())
+        let coordinator = CardSessionNfcHostCoordinator(environment: environment)
+        let first = Task { try await coordinator.prepare(router: router) }
+        await gate.waitUntilEntered()
+        first.cancel()
+        await assertEventually { await router.deactivations == [.cancelled] }
+        let second = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
+        await gate.release()
+        do {
+            _ = try await first.value
+            XCTFail("Cancelled preparation unexpectedly returned a live card")
+        } catch {}
+        XCTAssertEqual(environment.first.invalidateCount, 1)
+        do {
+            _ = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
+            XCTFail("Late completion released the newer live generation")
+        } catch let failure as CardSessionNfcHostError {
+            XCTAssertEqual(failure, .sessionAlreadyActive)
+        }
+        environment.second.emit(.readerDetected)
+        await assertEventually { environment.second.startCount == 1 }
+        let closing = Task { await second.close(reason: .completed) }
+        await finishPresentation(session: environment.second)
+        await closing.value
+        XCTAssertEqual(environment.second.invalidateCount, 1)
+    }
+
+    private func finishPresentation(session: FakeNfcCardSession) async {
+        await assertEventually { session.messages.contains(String(localized: "Response submitted. Keep near reader until its result, then separate devices.")) }
+        // Allow the fake platform's immediate response call to return before reader deselection.
+        try? await Task.sleep(nanoseconds: 30_000_000)
+        session.emit(.readerDeselected)
+    }
+
+    private func assertEventually(
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        _ condition: @escaping @Sendable () async -> Bool
+    ) async {
+        for _ in 0..<100 {
+            if await condition() { return }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTFail("Condition was not satisfied before timeout", file: file, line: line)
+    }
+}
+
+private final class PresentmentEvents: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [IOSNfcPresentmentEvent] = []
+    var values: [IOSNfcPresentmentEvent] { lock.withLock { stored } }
+    func append(_ event: IOSNfcPresentmentEvent) { lock.withLock { stored.append(event) } }
+}
+
+private enum TestFailure: Error {
+    case failed
+}
+
+private final class FakeNfcPresentmentIntent: IOSNfcPresentmentIntent, @unchecked Sendable {
+    private let lock = NSLock()
+    private var valid: Bool
+
+    init(valid: Bool = true) {
+        self.valid = valid
+    }
+
+    var isValid: Bool { lock.withLock { valid } }
+
+    func invalidate() {
+        lock.withLock { valid = false }
+    }
+}
+
+private final class FakeNfcEnvironment: IOSNfcCardSessionEnvironment, @unchecked Sendable {
+    private let lock = NSLock()
+    private let reading: Bool
+    private let supported: Bool
+    private let eligible: Bool
+    private let session: any IOSNfcCardSession
+    private let presentmentIntent: FakeNfcPresentmentIntent?
+    private let presentmentIntentFailure: Error?
+    private let sessionFailure: Error?
+    private var storedPresentmentIntentCount = 0
+    private var storedSessionCount = 0
+
+    init(
+        reading: Bool = true,
+        supported: Bool = true,
+        eligible: Bool = true,
+        session: any IOSNfcCardSession = FakeNfcCardSession(),
+        presentmentIntentAvailable: Bool = true,
+        presentmentIntentFailure: Error? = nil,
+        sessionFailure: Error? = nil
+    ) {
+        self.reading = reading
+        self.supported = supported
+        self.eligible = eligible
+        self.session = session
+        presentmentIntent = presentmentIntentAvailable ? FakeNfcPresentmentIntent() : nil
+        self.presentmentIntentFailure = presentmentIntentFailure
+        self.sessionFailure = sessionFailure
+    }
+
+    var presentmentIntentCount: Int { lock.withLock { storedPresentmentIntentCount } }
+    var sessionCount: Int { lock.withLock { storedSessionCount } }
+
+    func invalidatePresentmentIntent() {
+        presentmentIntent?.invalidate()
+    }
+
+    func readingAvailable() -> Bool { reading }
+    func cardSessionSupported() -> Bool { supported }
+    func cardSessionEligible() async -> Bool { eligible }
+
+    func acquirePresentmentIntent() async throws -> (any IOSNfcPresentmentIntent)? {
+        lock.withLock { storedPresentmentIntentCount += 1 }
+        if let presentmentIntentFailure { throw presentmentIntentFailure }
+        return presentmentIntent
+    }
+
+    func makeCardSession() async throws -> any IOSNfcCardSession {
+        lock.withLock { storedSessionCount += 1 }
+        if let sessionFailure { throw sessionFailure }
+        return session
+    }
+}
+
+private final class SuspendedFirstNfcEnvironment: IOSNfcCardSessionEnvironment, @unchecked Sendable {
+    private let lock = NSLock()
+    private let gate: BlockingNfcRouter
+    private var calls = 0
+    let first = FakeNfcCardSession()
+    let second = FakeNfcCardSession()
+
+    init(gate: BlockingNfcRouter) { self.gate = gate }
+    func readingAvailable() -> Bool { true }
+    func cardSessionSupported() -> Bool { true }
+    func cardSessionEligible() async -> Bool { true }
+    func acquirePresentmentIntent() async throws -> (any IOSNfcPresentmentIntent)? { nil }
+    func makeCardSession() async throws -> any IOSNfcCardSession {
+        let call = lock.withLock { calls += 1; return calls }
+        if call == 1 {
+            _ = try await gate.process(Data())
+            return first
+        }
+        return second
+    }
+}
+
+private final class FakeNfcCardSession: IOSNfcCardSession, @unchecked Sendable {
+    private let lock = NSLock()
+    private let continuation: AsyncThrowingStream<IOSNfcCardSessionEvent, Error>.Continuation
+    let events: AsyncThrowingStream<IOSNfcCardSessionEvent, Error>
+    private var emulating = false
+    private var storedStartCount = 0
+    private var storedStopStatuses: [IOSNfcEmulationStatus] = []
+    private var storedInvalidateCount = 0
+    private var storedMessages: [String] = []
+    private let startOperation: @Sendable () async throws -> Void
+
+    init(startOperation: @escaping @Sendable () async throws -> Void = {}) {
+        self.startOperation = startOperation
+        var captured: AsyncThrowingStream<IOSNfcCardSessionEvent, Error>.Continuation?
+        events = AsyncThrowingStream { captured = $0 }
+        continuation = captured!
+    }
+
+    var messages: [String] { lock.withLock { storedMessages } }
+    var startCount: Int { lock.withLock { storedStartCount } }
+    var stopStatuses: [IOSNfcEmulationStatus] { lock.withLock { storedStopStatuses } }
+    var invalidateCount: Int { lock.withLock { storedInvalidateCount } }
+
+    func emit(_ event: IOSNfcCardSessionEvent) {
+        continuation.yield(event)
+    }
+
+    func setAlertMessage(_ message: String) {
+        lock.withLock { storedMessages.append(message) }
+    }
+
+    func isEmulationInProgress() async -> Bool {
+        lock.withLock { emulating }
+    }
+
+    func startEmulation() async throws {
+        lock.withLock { storedStartCount += 1 }
+        try await startOperation()
+        lock.withLock { emulating = true }
+    }
+
+    func stopEmulation(status: IOSNfcEmulationStatus) async {
+        lock.withLock {
+            storedStopStatuses.append(status)
+            emulating = false
+        }
+    }
+
+    func invalidate() {
+        lock.withLock { storedInvalidateCount += 1 }
+    }
+}
+
+private actor FakeNfcAPDU: IOSNfcCardSessionAPDU {
+    nonisolated let payload: Data
+    private var failures: [IOSNfcCardSessionFailure]
+    private let responseOperation: @Sendable () async throws -> Void
+    private(set) var responses: [Data] = []
+
+    init(payload: Data, failures: [IOSNfcCardSessionFailure] = [], responseOperation: @escaping @Sendable () async throws -> Void = {}) {
+        self.payload = payload
+        self.failures = failures
+        self.responseOperation = responseOperation
+    }
+
+    var responseCount: Int { responses.count }
+
+    func respond(response: Data) async throws {
+        responses.append(response)
+        try await responseOperation()
+        if !failures.isEmpty {
+            throw failures.removeFirst()
+        }
+    }
+}
+
+private actor SequenceNfcRouter: IOSNfcHostApduRouting {
+    private(set) var deactivations: [IOSNfcHostBridgeCloseReason] = []
+    private var responses: [Data]
+    init(responses: [Data]) { self.responses = responses }
+    func process(_ command: Data) async throws -> Data { responses.removeFirst() }
+    func deactivate(reason: IOSNfcHostBridgeCloseReason) async { deactivations.append(reason) }
+}
+
+private actor FakeNfcRouter: IOSNfcHostApduRouting {
+    private let response: Data
+    private let failure: Error?
+    private(set) var commands: [Data] = []
+    private(set) var deactivations: [IOSNfcHostBridgeCloseReason] = []
+
+    init(response: Data, failure: Error? = nil) {
+        self.response = response
+        self.failure = failure
+    }
+
+    func process(_ command: Data) async throws -> Data {
+        commands.append(command)
+        if let failure { throw failure }
+        return response
+    }
+
+    func deactivate(reason: IOSNfcHostBridgeCloseReason) async {
+        deactivations.append(reason)
+    }
+}
+
+private actor BridgeNfcCallbacks {
+    private let response: Data
+    private(set) var commands: [Data] = []
+    private(set) var deactivations: [IOSNfcHostBridgeCloseReason] = []
+
+    init(response: Data) {
+        self.response = response
+    }
+
+    func process(_ command: Data) -> Data {
+        commands.append(command)
+        return response
+    }
+
+    func deactivate(_ reason: IOSNfcHostBridgeCloseReason) {
+        deactivations.append(reason)
+    }
+}
+
+private actor BlockingNfcRouter: IOSNfcHostApduRouting {
+    private let response: Data
+    private var enteredContinuation: CheckedContinuation<Void, Never>?
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+    private var entered = false
+    private var released = false
+    private(set) var deactivations: [IOSNfcHostBridgeCloseReason] = []
+
+    init(response: Data) {
+        self.response = response
+    }
+
+    func process(_ command: Data) async throws -> Data {
+        entered = true
+        enteredContinuation?.resume()
+        enteredContinuation = nil
+        if !released {
+            await withCheckedContinuation { releaseContinuation = $0 }
+        }
+        return response
+    }
+
+    func waitUntilEntered() async {
+        if entered { return }
+        await withCheckedContinuation { enteredContinuation = $0 }
+    }
+
+    func release() {
+        released = true
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
+
+    func deactivate(reason: IOSNfcHostBridgeCloseReason) async {
+        deactivations.append(reason)
+    }
+}
+
+private actor CancellationAwareNfcRouter: IOSNfcHostApduRouting {
+    private var enteredContinuation: CheckedContinuation<Void, Never>?
+    private var entered = false
+    private(set) var deactivations: [IOSNfcHostBridgeCloseReason] = []
+
+    func process(_ command: Data) async throws -> Data {
+        entered = true
+        enteredContinuation?.resume()
+        enteredContinuation = nil
+        try await Task.sleep(nanoseconds: 60_000_000_000)
+        return Data([0x90, 0x00])
+    }
+
+    func waitUntilEntered() async {
+        if entered { return }
+        await withCheckedContinuation { enteredContinuation = $0 }
+    }
+
+    func deactivate(reason: IOSNfcHostBridgeCloseReason) async {
+        deactivations.append(reason)
+    }
+}
+
+private extension NSLock {
+    func withLock<Result>(_ body: () -> Result) -> Result {
+        lock()
+        defer { unlock() }
+        return body()
+    }
+}
+#endif

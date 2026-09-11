@@ -98,6 +98,10 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
+import kotlin.time.TestTimeSource
+import kotlin.time.Instant
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.io.encoding.Base64
@@ -105,6 +109,7 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -1300,6 +1305,263 @@ class ProximityRequestProcessorTest {
         }
     }
 
+    @Test
+    fun `prepared sharing authenticates first then signs only the exact approved credential on reconnect`() = runTest {
+        withFixture { fixture ->
+            val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
+            val configuration = preparationConfiguration()
+            suspend fun context(nonce: Byte): MdocHolderRequestContext {
+                val transcript = SessionTranscript.forQr(ByteArray(32) { nonce }, ByteArray(32) { 2 })
+                return requestContext(authenticateDocument(requestWithNames("given_name", "family_name"), transcript,
+                    certificates.readerKey, listOf(certificates.leaf.encodedDer.toByteArray())), transcript, fixture.readerEphemeralKey)
+            }
+            val firstProcessor = processor(fixture, configuration)
+            val firstContext = context(10)
+            val firstPrompt = prompt(firstProcessor.preview(firstContext), 1)
+            val firstOwner = owner(fixture, firstProcessor, ProximityApproval.PrepareBeforeSharing)
+            assertIs<MdocConsentDecision.Deny>(firstOwner.decide(firstPrompt))
+            firstOwner.publish(ProximityState.Completed(1, declined = true))
+            val plan = assertIs<ProximityState.PreparationRequired>(firstOwner.state.value).plan
+            val review = plan.review
+            val selected = review.documents.single().credentialOptions.single { it.credentialId == "mdl-2" }
+            val selection = submissionFor(review, selected).let { it.copy(documents = it.documents.map { document ->
+                document.copy(disclosedElements = document.disclosedElements.filter { field -> field.elementIdentifier == "given_name" }.toSet())
+            }) }
+            val sharing = assertIs<ProximityPreparationResult.Prepared>(plan.approve(selection)).sharing
+            assertEquals(null, sharing.claim(fixture.wallet))
+            val nextProcessor = processor(fixture, configuration)
+            val nextContext = context(11)
+            val nextPreview = nextProcessor.preview(nextContext)
+            val nextOwner = owner(fixture, nextProcessor, ProximityApproval.Prepared(sharing), canReview = false)
+            assertIs<MdocConsentDecision.Approve>(nextOwner.decide(prompt(nextPreview, 1)))
+            assertIs<ProximityState.AuthorizingHolderKey>(nextOwner.state.value)
+            val response = decodeResponse(assertIs<MdocResponseResolution.Send>(nextProcessor.resolve(nextContext, nextPreview)))
+            val data = response.documents!!.single().issuerSigned.namespaces!!.getValue("org.iso.18013.5.1").entries
+            assertEquals(listOf("given_name"), data.map { it.value.elementIdentifier })
+            assertEquals("Grace", assertIs<CborString>(data.single().value.elementValue).value)
+            nextOwner.publish(ProximityState.Completed(1, declined = false))
+            val receipt = assertNotNull(assertIs<ProximityState.Completed>(nextOwner.state.value).receipt)
+            assertEquals(ProximityApprovalTiming.BeforeConnection, receipt.approvalTiming)
+            assertEquals("mdl-2", receipt.submission.documents.single().credentialId)
+            assertEquals("prepared_sharing_used", sharing.claim(fixture.wallet)?.code)
+            firstOwner.cancel()
+            nextOwner.cancel()
+        }
+    }
+
+    @Test
+    fun `prepared sharing rejects expanded fields retention purpose extensions and another trusted reader`() = runTest {
+        withFixture { fixture ->
+            val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
+            val otherCertificate = X509CertificateUtil.createSelfSignedCertificate(certificates.readerKey,
+                SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)) { subjectDn = "CN=Another trusted reader" }
+            val configuration = preparationConfiguration()
+            suspend fun context(request: DeviceRequest, otherReader: Boolean = false): MdocHolderRequestContext {
+                val certificate = if (otherReader) otherCertificate else certificates.leaf
+                val transcript = transcript()
+                return requestContext(authenticateDocument(request, transcript, certificates.readerKey,
+                    listOf(certificate.encodedDer.toByteArray())), transcript, fixture.readerEphemeralKey)
+            }
+            val firstProcessor = processor(fixture, configuration)
+            val preview = firstProcessor.preview(context(requestWithNames("given_name")))
+            val plan = assertNotNull(firstProcessor.sharingPlan(prompt(preview, 1)))
+            val selection = submissionFor(plan.review, plan.review.documents.single().credentialOptions.first())
+            val retained = DeviceRequest(DeviceRequest.VERSION, listOf(DocRequest.fromValues("org.iso.18013.5.1.mDL",
+                mapOf("org.iso.18013.5.1" to listOf("given_name")), true)))
+            val purpose = requestWithNames("given_name").copy(version = DeviceRequest.VERSION_WITH_SIGNING,
+                deviceRequestInfo = ByteStringWrapper(DeviceRequestInfo(useCases = listOf(
+                    UseCase(mandatory = true, purposeHints = mapOf("org.iso.18013.5.1" to 2), documentSets = listOf(listOf(0u))),
+                ))))
+            val requests = listOf(
+                "extra field" to requestWithNames("given_name", "family_name"),
+                "retention" to retained,
+                "purpose" to purpose,
+                "extension" to requestWithNames("given_name").copy(extensions = mapOf("customPurpose" to CborString("different"))),
+                "other reader" to requestWithNames("given_name"),
+            )
+            for ((label, request) in requests) {
+                val sharing = assertIs<ProximityPreparationResult.Prepared>(plan.approve(selection)).sharing
+                assertEquals(null, sharing.claim(fixture.wallet))
+                val nextProcessor = processor(fixture, configuration)
+                val nextPreview = nextProcessor.preview(context(request, label == "other reader"))
+                val nextOwner = owner(fixture, nextProcessor, ProximityApproval.Prepared(sharing), canReview = false)
+                assertIs<MdocConsentDecision.Deny>(nextOwner.decide(prompt(nextPreview, 1)), label)
+                nextOwner.publish(ProximityState.Completed(1, declined = true))
+                assertEquals(ProximityReviewReason.PreparedSharingChanged,
+                    assertIs<ProximityState.PreparationRequired>(nextOwner.state.value, label).reason)
+                assertEquals("prepared_sharing_used", sharing.claim(fixture.wallet)?.code, label)
+                nextOwner.cancel()
+            }
+            firstProcessor.cancel()
+        }
+    }
+
+    @Test
+    fun `iOS NFC interaction boundary discovers a trusted reader while other routes retain manual consent`() = runTest {
+        withFixture { fixture ->
+            val configuration = preparationConfiguration()
+            val context = signedWholeRequestContext(fixture)
+            for (canReview in listOf(false, true)) {
+                val processor = processor(fixture, configuration)
+                val prompt = prompt(processor.preview(context), 1)
+                val owner = owner(fixture, processor, canReview = canReview)
+                if (!canReview) {
+                    assertIs<MdocConsentDecision.Deny>(owner.decide(prompt))
+                    owner.publish(ProximityState.Completed(1, true))
+                    assertIs<ProximityState.PreparationRequired>(owner.state.value)
+                } else {
+                    val decision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt) }
+                    val review = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
+                    assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Decline(review.reviewId)))
+                    assertIs<MdocConsentDecision.Deny>(decision.await())
+                }
+                owner.cancel()
+            }
+            val anonymous = processor(fixture)
+            val anonymousPreview = anonymous.preview(requestContext(fixture.readerEphemeralKey))
+            assertEquals(null, anonymous.sharingPlan(prompt(anonymousPreview, 1)))
+            val owner = owner(fixture, anonymous, canReview = false)
+            assertIs<MdocConsentDecision.Deny>(owner.decide(prompt(anonymousPreview, 1)))
+            owner.publish(ProximityState.Completed(1, true))
+            assertEquals("reader_not_eligible_for_preparation", assertIs<ProximityState.Failed>(owner.state.value).error.code)
+            owner.cancel()
+        }
+    }
+
+    @Test
+    fun `prepared approval expiration uses monotonic time and expired plans cannot be renewed`() = runTest {
+        withFixture { fixture ->
+            val processor = processor(fixture, preparationConfiguration())
+            val preview = processor.preview(signedWholeRequestContext(fixture))
+            val verified = assertNotNull(processor.sharingPlan(prompt(preview, 1)))
+            val monotonic = TestTimeSource()
+            var wallTime = Instant.parse("2026-09-10T12:00:00Z")
+            val plan = ProximitySharingPlan(fixture.wallet, verified.review, verified.scope,
+                timeSource = monotonic, now = { wallTime })
+            val selection = submissionFor(plan.review, plan.review.documents.single().credentialOptions.first())
+            val sharing = assertIs<ProximityPreparationResult.Prepared>(plan.approve(selection)).sharing
+            wallTime -= 24.hours
+            monotonic += 59.seconds
+            assertEquals(1, sharing.remainingSeconds)
+            assertEquals(null, sharing.claim(fixture.wallet))
+            monotonic += 1.seconds
+            assertEquals(0, sharing.remainingSeconds)
+            assertEquals(null, sharing.accept(verified.scope, verified.review))
+            val expiredBeforeConnection = assertIs<ProximityPreparationResult.Prepared>(plan.approve(selection)).sharing
+            monotonic += 60.seconds
+            assertEquals("prepared_sharing_expired", expiredBeforeConnection.claim(fixture.wallet)?.code)
+            monotonic += 8.minutes
+            assertTrue(plan.isExpired)
+            assertEquals("sharing_plan_expired", assertIs<ProximityPreparationResult.Rejected>(plan.approve(selection)).error.code)
+            processor.cancel()
+        }
+    }
+
+    @Test
+    fun `prepared approvals own submitted collections and cannot cross wallets or be claimed twice`() = runTest {
+        withFixture { fixture ->
+            val processor = processor(fixture, preparationConfiguration())
+            val preview = processor.preview(signedWholeRequestContext(fixture))
+            val plan = assertNotNull(processor.sharingPlan(prompt(preview, 1)))
+            val reference = ProximityElementReference("org.iso.18013.5.1", "given_name")
+            val fields = mutableSetOf(reference)
+            val documents = mutableListOf(ProximityDocumentSubmission(0, "mdl-1", fields))
+            val sharing = assertIs<ProximityPreparationResult.Prepared>(plan.approve(ProximitySubmission(documents))).sharing
+            fields.clear()
+            documents.clear()
+            (sharing.submission.documents as MutableList).clear()
+            assertEquals(setOf(reference), sharing.submission.documents.single().disclosedElements)
+            assertEquals("prepared_sharing_wrong_wallet", sharing.claim(Wallet("another-wallet"))?.code)
+            val claims = listOf(async { sharing.claim(fixture.wallet) }, async { sharing.claim(fixture.wallet) }).map { it.await() }
+            assertEquals(1, claims.count { it == null })
+            assertEquals(listOf("prepared_sharing_used"), claims.mapNotNull { it?.code })
+            val choices = listOf(async { sharing.accept(plan.scope, plan.review) }, async { sharing.accept(plan.scope, plan.review) }).map { it.await() }
+            assertEquals(1, choices.count { it != null })
+            processor.cancel()
+        }
+    }
+
+    @Test
+    fun `cancelled prepared sharing and changed credentials cannot authorize a response`() = runTest {
+        withFixture { fixture ->
+            val processor = processor(fixture, preparationConfiguration())
+            val preview = processor.preview(signedWholeRequestContext(fixture))
+            val plan = assertNotNull(processor.sharingPlan(prompt(preview, 1)))
+            val selection = submissionFor(plan.review, plan.review.documents.single().credentialOptions.first())
+            val beforeClaim = assertIs<ProximityPreparationResult.Prepared>(plan.approve(selection)).sharing
+            beforeClaim.revoke()
+            assertEquals("prepared_sharing_cancelled", beforeClaim.claim(fixture.wallet)?.code)
+            val claimed = assertIs<ProximityPreparationResult.Prepared>(plan.approve(selection)).sharing
+            assertEquals(null, claimed.claim(fixture.wallet))
+            claimed.revoke()
+            assertEquals(null, claimed.accept(plan.scope, plan.review))
+            val changed = assertIs<ProximityPreparationResult.Prepared>(plan.approve(selection)).sharing
+            assertEquals(null, changed.claim(fixture.wallet))
+            val credentialID = selection.documents.single().credentialId
+            assertEquals(null, changed.accept(plan.scope.copy(credentials = plan.scope.credentials - credentialID), plan.review))
+            assertEquals(null, changed.accept(plan.scope.copy(credentials = plan.scope.credentials +
+                (credentialID to ImmutableBytes.of(ByteArray(32) { 9 }))), plan.review))
+            assertEquals("prepared_sharing_single_use", assertIs<ProximityPreparationResult.Rejected>(
+                plan.approve(selection.copy(continueAfterResponse = true))).error.code)
+            processor.cancel()
+        }
+    }
+
+    @Test
+    fun `requested portrait is required before preparation and cannot be hidden by an incomplete credential`() = runTest {
+        withFixture { fixture ->
+            val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
+            val transcript = transcript()
+            val context = requestContext(authenticateDocument(requestWithNames("given_name", "portrait"), transcript,
+                certificates.readerKey, listOf(certificates.leaf.encodedDer.toByteArray())), transcript, fixture.readerEphemeralKey)
+            val processor = processor(fixture, preparationConfiguration())
+            val plan = assertNotNull(processor.sharingPlan(prompt(processor.preview(context), 1)))
+            val portrait = ProximityElementReference("org.iso.18013.5.1", "portrait")
+            assertEquals(setOf(portrait), plan.review.documents.single().requiredElements)
+            val complete = submissionFor(plan.review, plan.review.documents.single().credentialOptions.first())
+            val denied = complete.copy(documents = complete.documents.map { it.copy(disclosedElements = it.disclosedElements - portrait) })
+            assertEquals("portrait_required", assertIs<ProximityPreparationResult.Rejected>(plan.approve(denied)).error.code)
+            assertIs<ProximityPreparationResult.Prepared>(plan.approve(complete))
+            processor.cancel()
+        }
+    }
+
+    @Test
+    fun `changed prepared request on an interactive route needs a fresh decision and does not expire that review`() = runTest {
+        withFixture { fixture ->
+            val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
+            suspend fun context(vararg names: String): MdocHolderRequestContext {
+                val transcript = transcript()
+                return requestContext(authenticateDocument(requestWithNames(*names), transcript, certificates.readerKey,
+                    listOf(certificates.leaf.encodedDer.toByteArray())), transcript, fixture.readerEphemeralKey)
+            }
+            val processor = processor(fixture, preparationConfiguration())
+            val plan = assertNotNull(processor.sharingPlan(prompt(processor.preview(context("given_name")), 1)))
+            val sharing = assertIs<ProximityPreparationResult.Prepared>(plan.approve(
+                submissionFor(plan.review, plan.review.documents.single().credentialOptions.first()))).sharing
+            assertNull(sharing.claim(fixture.wallet))
+            val nextProcessor = processor(fixture, preparationConfiguration())
+            val prompt = prompt(nextProcessor.preview(context("given_name", "family_name")), 1)
+            val owner = owner(fixture, nextProcessor, ProximityApproval.Prepared(sharing), canReview = true)
+            val decision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt) }
+            val state = assertIs<ProximityState.ReviewRequired>(owner.state.value)
+            assertEquals(ProximityReviewReason.PreparedSharingChanged, state.reason)
+            assertFalse(decision.isCompleted)
+            assertFalse(owner.invalidatePrepared(approvalError("prepared_sharing_expired", "Expired")))
+            assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Decline(state.review.reviewId)))
+            assertIs<MdocConsentDecision.Deny>(decision.await())
+            owner.cancel()
+            processor.cancel()
+        }
+    }
+
+    private fun preparationConfiguration() = ProximityConfiguration(
+        readerTrustEvaluator = ProximityReaderTrustEvaluator {
+            ProximityReaderTrustDecision(state = ProximityReaderTrustState.Trusted,
+                certificatePath = ProximityReaderCertificatePathState.Valid, displayName = "Verified reader")
+        },
+    )
+
     private enum class CrlScenario { Good, AuthorityRevoked, Unavailable, Stale, InvalidSignature, LeafUnavailableAuthorityRevoked }
 
     private suspend fun authenticateDocument(
@@ -1376,10 +1638,15 @@ class ProximityRequestProcessorTest {
     private fun processor(fixture: Fixture, configuration: ProximityConfiguration = ProximityConfiguration()) =
         ProximityRequestProcessor(fixture.wallet, configuration, setOf(Cose.Algorithm.ES256))
 
-    private suspend fun owner(fixture: Fixture, processor: ProximityRequestProcessor): ProximitySessionOwner =
+    private suspend fun owner(
+        fixture: Fixture,
+        processor: ProximityRequestProcessor,
+        approval: ProximityApproval = ProximityApproval.AskEachTime,
+        canReview: Boolean = true,
+    ): ProximitySessionOwner =
         ProximitySessionOwner(
             ProximityState.CheckingPrerequisites(ProximityCoordinator(fixture.wallet, null).capabilities(ProximityConfiguration())),
-            Channel(Channel.CONFLATED),
+            Channel(Channel.CONFLATED), approval, { canReview },
         ).also { it.attach(processor) }
 
     private fun prompt(preview: MdocRequestPreview, exchange: Int) =
