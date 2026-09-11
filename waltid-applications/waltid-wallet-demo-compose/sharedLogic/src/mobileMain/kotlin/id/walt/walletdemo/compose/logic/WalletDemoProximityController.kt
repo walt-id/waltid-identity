@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** One holder choice derived only from the current immutable SDK review. */
 data class WalletDemoProximityDocumentSelection(
@@ -125,7 +126,7 @@ class WalletDemoProximityController(
 
                 val started = wallet.startProximityPresentation(configuration)
                 if (!isCurrent(startGeneration)) {
-                    kotlinx.coroutines.withContext(NonCancellable) { started.close() }
+                    withContext(NonCancellable) { started.close() }
                     return@launch
                 }
                 pendingConfiguration = null

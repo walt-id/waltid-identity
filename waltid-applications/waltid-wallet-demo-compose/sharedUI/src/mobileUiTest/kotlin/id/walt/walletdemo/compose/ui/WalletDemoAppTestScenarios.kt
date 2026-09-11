@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+@file:OptIn(ExperimentalEncodingApi::class)
 
 package id.walt.walletdemo.compose.ui
 
@@ -79,6 +79,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 

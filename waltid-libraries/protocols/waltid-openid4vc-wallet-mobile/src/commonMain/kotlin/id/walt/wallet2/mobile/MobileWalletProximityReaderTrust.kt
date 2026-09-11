@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.wallet2.mobile
 
@@ -6,6 +6,7 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ReaderAuthenticationEvidence
+import id.walt.mdoc.proximity.ReaderAuthenticationScope
 import id.walt.mdoc.proximity.ReaderTrustState
 import id.walt.mdoc.proximity.RicalConstraintEvaluator
 import id.walt.mdoc.proximity.RicalEvaluationState
@@ -23,6 +24,7 @@ import id.walt.x509.mdocReaderAuthenticationCommonName
 import id.walt.x509.validateMdocReaderAuthenticationCertificateChain
 import id.walt.x509.validateMdocReaderAuthenticationCertificateProfile
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.encodeToByteArray
 import kotlin.io.encoding.Base64
@@ -547,9 +549,9 @@ private fun ProximityReaderEvidence.toRicalEvidence(): ReaderAuthenticationEvide
     ReaderAuthenticationEvidence(
         scope = when (val scope = scope) {
             is ProximityReaderAuthenticationScope.Document ->
-                id.walt.mdoc.proximity.ReaderAuthenticationScope.Document(scope.index)
+                ReaderAuthenticationScope.Document(scope.index)
             ProximityReaderAuthenticationScope.WholeRequest ->
-                id.walt.mdoc.proximity.ReaderAuthenticationScope.WholeRequest
+                ReaderAuthenticationScope.WholeRequest
         },
         authenticationIndex = authenticationIndex,
         certificateChainDer = certificateChainDerBase64Url.map {
