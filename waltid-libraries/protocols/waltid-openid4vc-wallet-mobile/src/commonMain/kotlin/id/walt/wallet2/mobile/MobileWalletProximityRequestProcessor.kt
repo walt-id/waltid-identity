@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.wallet2.mobile
 
@@ -10,6 +10,7 @@ import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ElementReference
+import id.walt.mdoc.objects.deviceretrieval.EncryptedDocuments
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.DeviceSignedItem
@@ -62,6 +63,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborBoolean
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.decodeFromByteArray
@@ -734,7 +736,7 @@ internal class ProximityRequestProcessor(
             )
         }
         val ordinary = mutableListOf<MdocDocumentPresentation>()
-        val encrypted = mutableListOf<id.walt.mdoc.objects.deviceretrieval.EncryptedDocuments>()
+        val encrypted = mutableListOf<EncryptedDocuments>()
         presentations.forEach { (requestIndex, presentation) ->
             val encryption = context.request.value.docRequests[requestIndex].itemsRequest.value
                 .requestInfo?.docResponseEncryption
