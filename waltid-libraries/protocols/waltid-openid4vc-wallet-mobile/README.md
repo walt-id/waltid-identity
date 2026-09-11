@@ -32,6 +32,7 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 - Start and continue OpenID4VCI issuance sessions.
 - List credentials stored in mobile persistence.
 - Present credentials using OpenID4VP.
+- Present mdocs in person through a stateful ISO/IEC 18013-5 proximity session.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
 
 ## Key-use authorization
@@ -122,6 +123,98 @@ when (val encryption = preview.request.responseEncryption) {
 
 Response-encryption metadata describes protection of the authorization response. It
 does not establish verifier trust and does not expose verifier key material.
+
+## In-person proximity presentation
+
+Proximity presentation is a distinct session API rather than an OpenID4VP URL
+flow. Query capabilities without creating ephemeral keys or radio resources,
+then create one single-use session and render its authoritative state:
+
+```kotlin
+val configuration = ProximityConfiguration()
+val capabilities = wallet.proximityPresentationCapabilities(configuration)
+val session = wallet.startProximityPresentation(configuration)
+
+try {
+    session.state.collect { state ->
+        when (state) {
+            is ProximityState.CheckingPrerequisites -> showUnavailableMethods(state.capabilities)
+            is ProximityState.EngagementReady -> showEngagements(state.engagements)
+            is ProximityState.ReviewRequired -> showProximityReview(state.review)
+            is ProximityState.AuthorizingHolderKey -> showHolderAuthorization(state.authorization)
+            is ProximityState.Completed -> showCompletion(state.exchanges, state.declined)
+            is ProximityState.NoData -> showNoData(state.exchange)
+            is ProximityState.Failed -> showProximityError(state.error)
+            ProximityState.Cancelled -> showCancelled()
+            is ProximityState.Preparing,
+            is ProximityState.Connecting,
+            is ProximityState.AwaitingRequest,
+            is ProximityState.SendingResponse,
+            is ProximityState.AwaitingNextRequest,
+            is ProximityState.Terminating -> showProximityProgress(state)
+        }
+    }
+} finally {
+    withContext(NonCancellable) { session.close() }
+}
+```
+
+The `show*` functions are application UI callbacks. Collect in a screen-owned
+coroutine and cancel it on leaving the screen; the `finally` block releases the
+session even during cancellation. Import `NonCancellable` and `withContext` from
+`kotlinx.coroutines`. Handle the capability snapshot before starting; remediations
+and protected-key authorization remain explicit host actions. A `StateFlow` does
+not complete automatically on a terminal state.
+
+Kotlin and Swift proximity types use the `Proximity` prefix.
+
+The default configuration selects QR engagement and BLE retrieval. NFC and
+Wi-Fi Aware are represented in the capability contract as unimplemented in this
+build. Runtime observations distinguish `NotChecked`, `Available`, and
+`Unavailable`; session selection is independent. A session can start when a
+selected engagement and a compatible selected retrieval route are viable.
+
+Device signature is the default holder-authentication policy. Applications may
+require MAC or choose an explicit pre-review preference with
+`deviceAuthenticationPolicy`; the selected method is shown on each credential
+option, bound into the immutable review, and never changed after consent. The
+pinned EUDI profile currently requires device signature.
+
+Host applications perform permission or settings effects named by
+`capabilities.remediationActions`, report the privacy-safe outcome with
+`ProximityAction.ReportRemediation`, and let the SDK re-check the
+platform. Approve and decline require the `reviewId` from the displayed review.
+A successful decision consumes that identity once; stale, duplicate, and
+cross-session actions are rejected. Invalid submissions leave the review open
+for correction. Acceptance records a decision; signing or transmission can still
+fail.
+
+The session owns configuration and nested review/profile/selection values.
+Changing caller collections or exported projections cannot alter accepted claims
+or continuation. The accepted choice has its own retained binding, while the
+preview digest still represents the request and fresh wallet/profile state.
+Only the ordered session owner publishes state, so delayed observations cannot
+replace a newer review or a terminal state. Error `recovery` distinguishes
+prerequisite retry in an active session from starting a new session after failure.
+
+Review approval uses only the credential and element choices in the displayed
+review. The SDK revalidates credential, holder key, reader
+trust, status, disclosure, and application-profile state before sending.
+Multiple reader-authentication statements retain their independent
+`authenticationIndex`, and holder-key authorization is reported per document
+request so mixed signature/MAC responses cannot be collapsed into one prompt.
+
+Only one proximity session may be active per wallet. Always call `close()` when
+the journey leaves the screen; closing and cancellation are idempotent and every
+new session creates fresh engagement identifiers and ephemeral key material.
+
+A request with no returnable data ends in `ProximityState.NoData` without holder
+consent or key authorization. Its `exchange` identifies the final request;
+earlier exchanges may already have shared approved data. Use
+`ProximityReview.readerAuthenticationSummary` for the collapsed reader summary.
+The shared SDK accounts for whole-request coverage while preserving malformed,
+invalid, and revoked authentication warnings. Raw authentication entries remain
+available for detailed inspection.
 
 ## Persistence and encryption
 

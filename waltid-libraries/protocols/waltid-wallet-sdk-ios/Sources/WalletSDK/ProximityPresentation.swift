@@ -1,0 +1,1037 @@
+import Foundation
+
+/// Versioned mdoc interoperability boundary selected for one proximity session.
+public enum ProximityProfile: String, Sendable, CaseIterable, Equatable {
+    /// ISO/IEC 18013-5:2021 behavior.
+    case iso1801352021
+    /// ISO/IEC 18013-5 second-edition DIS behavior.
+    case iso180135Edition2DIS2026
+    /// EUDI ARF 3.0 / Common Acceptance Framework profile behavior.
+    case eudiARF3FCAF202608
+}
+
+/// BLE roles the holder prepares for one session.
+public enum ProximityBLERoles: Sendable {
+    /// Connect to a reader that advertises the GATT service.
+    case centralClient
+    /// Advertise a GATT service for a reader to connect to.
+    case peripheralServer
+    /// Prepare both supported BLE roles and advertise both retrieval options.
+    case dual
+}
+
+/// BLE bearer selection policy. This is intended for integration and debug configuration, not normal UI.
+public enum ProximityBLEBearerPolicy: Sendable {
+    /// Use the interoperable GATT bearer only.
+    case gattOnly
+    /// Prefer L2CAP when negotiated and otherwise use GATT.
+    case preferL2CAP
+}
+
+/// Holder-to-reader engagement methods selected for a session.
+public enum ProximityEngagementMethod: Sendable, Hashable {
+    /// Display an ISO device-engagement QR code.
+    case qr
+    /// Use NFC static handover for device engagement.
+    case nfc
+}
+
+/// Device-retrieval transports selected for a session.
+public enum ProximityRetrievalMethod: Sendable, Hashable {
+    /// Retrieve the response over Bluetooth Low Energy.
+    case bluetoothLowEnergy
+    /// Retrieve the response over NFC.
+    case nfc
+    /// Retrieve the response over Wi-Fi Aware.
+    case wifiAware
+}
+
+/// Reader-authentication policy applied before disclosure review.
+public enum ProximityReaderPolicy: Sendable, Equatable {
+    /// Allow absent or untrusted reader authentication and expose its exact state for review.
+    case allowAnonymousOrUntrusted
+    /// Require a reader that the application trust policy accepts.
+    case requireTrusted
+}
+
+/// Allowed holder-authentication methods and their pre-review preference.
+public enum ProximityDeviceAuthenticationPolicy: Sendable, Equatable {
+    /// Require device signature.
+    case signatureOnly
+    /// Require device MAC.
+    case macOnly
+    /// Prefer signature and fall back to MAC only before review.
+    case preferSignature
+    /// Prefer MAC and fall back to signature only before review.
+    case preferMAC
+}
+
+/// Portion of the device request covered by reader authentication.
+public enum ProximityReaderAuthenticationScope: Sendable, Equatable {
+    /// Authentication covers one document request.
+    case document(ProximityDocumentRequestIndex)
+    /// Authentication covers the whole device request.
+    case wholeRequest
+
+    /// Creates a document scope after validating its zero-based index.
+    /// - Parameter index: Nonnegative document-request index.
+    public static func document(index: Int) -> Self { .document(ProximityDocumentRequestIndex(index)) }
+
+    /// Document index carried by this scope, if it is document-scoped.
+    public var documentRequestIndex: Int? {
+        if case let .document(index) = self { index.value } else { nil }
+    }
+}
+
+/// Validated zero-based index used by document-scoped reader authentication.
+public struct ProximityDocumentRequestIndex: Sendable, Equatable {
+    /// Nonnegative document-request index.
+    public let value: Int
+    /// Creates a validated index.
+    /// - Parameter value: Nonnegative document-request index.
+    public init(_ value: Int) { precondition(value >= 0); self.value = value }
+}
+
+/// Structural and cryptographic validity of reader authentication.
+public enum ProximityReaderAuthenticationValidity: Sendable, Equatable {
+    /// No reader authentication was supplied.
+    case absent
+    /// Reader authentication could not be decoded.
+    case malformed
+    /// Reader authentication was decoded but did not verify.
+    case invalid
+    /// Reader authentication verified cryptographically.
+    case valid
+}
+
+/// Application-owned trust result for a cryptographically valid reader.
+public enum ProximityReaderTrustState: Sendable, Equatable {
+    /// No application trust evaluator ran.
+    case notEvaluated
+    /// The reader authentication is valid but the application does not trust it.
+    case validButUntrusted
+    /// The reader certificate was revoked.
+    case revoked
+    /// The application accepts the reader as trusted.
+    case trusted
+}
+
+/// Certificate-path validation result kept separate from the trust decision.
+public enum ProximityReaderCertificatePathState: Sendable, Equatable {
+    /// Certificate-path validation was not performed.
+    case notEvaluated
+    /// The certificate path is invalid.
+    case invalid
+    /// The certificate path is valid.
+    case valid
+}
+
+/// Reader-certificate revocation result kept separate from the trust decision.
+public enum ProximityReaderRevocationState: Sendable, Equatable {
+    /// Revocation was not checked.
+    case notChecked
+    /// The certificate is known not to be revoked.
+    case good
+    /// The certificate is revoked.
+    case revoked
+    /// Revocation status could not be established.
+    case indeterminate
+}
+
+/// Optional RICAL evidence. A match is evidence and never establishes product trust by itself.
+public enum ProximityRICALState: Sendable, Equatable {
+    /// RICAL evaluation was not performed.
+    case notEvaluated
+    /// No RICAL source was available.
+    case unavailable
+    /// The available RICAL data was invalid.
+    case invalid
+    /// No authority matched the reader certificate.
+    case noMatchingAuthority
+    /// A RICAL authority matched the reader certificate.
+    case matched
+}
+
+/// Exact verified reader evidence passed to an application-owned trust policy.
+public struct ProximityReaderEvidence: Sendable, Equatable {
+    /// Portion of the request authenticated by this evidence.
+    public let scope: ProximityReaderAuthenticationScope
+    /// Zero-based statement index within the authentication scope.
+    public let authenticationIndex: Int
+    /// DER certificates in leaf-first order.
+    public let certificateChainDER: [Data]
+
+    /// Creates verified reader evidence for application trust evaluation.
+    /// - Parameters:
+    ///   - scope: Portion of the request covered by the authentication.
+    ///   - authenticationIndex: Statement index within the authentication scope.
+    ///   - certificateChainDER: Nonempty DER certificate chain in leaf-first order.
+    public init(
+        scope: ProximityReaderAuthenticationScope,
+        authenticationIndex: Int = 0,
+        certificateChainDER: [Data]
+    ) {
+        precondition(
+            !certificateChainDER.isEmpty && certificateChainDER.allSatisfy { !$0.isEmpty },
+            "Verified reader evidence requires nonempty certificates"
+        )
+        precondition(authenticationIndex >= 0)
+        self.scope = scope
+        self.authenticationIndex = authenticationIndex
+        self.certificateChainDER = certificateChainDER
+    }
+}
+
+/// Application trust decision with path, revocation, and RICAL facts kept separate.
+public struct ProximityReaderTrustDecision: Sendable, Equatable {
+    /// Final application trust state.
+    public let state: ProximityReaderTrustState
+    /// Independently reported certificate-path result.
+    public let certificatePath: ProximityReaderCertificatePathState
+    /// Independently reported revocation result.
+    public let revocation: ProximityReaderRevocationState
+    /// Independently reported RICAL evidence result.
+    public let rical: ProximityRICALState
+    /// Display-safe reader name supplied by the application.
+    public let displayName: String?
+    /// Display-safe explanation supplied by the application.
+    public let reason: String?
+
+    /// Creates a coherent application-owned reader-trust decision.
+    /// - Parameters:
+    ///   - state: Final trust state.
+    ///   - certificatePath: Certificate-path result.
+    ///   - revocation: Revocation result.
+    ///   - rical: RICAL evidence result.
+    ///   - displayName: Optional display-safe reader name.
+    ///   - reason: Optional display-safe explanation.
+    public init(
+        state: ProximityReaderTrustState,
+        certificatePath: ProximityReaderCertificatePathState = .notEvaluated,
+        revocation: ProximityReaderRevocationState = .notChecked,
+        rical: ProximityRICALState = .notEvaluated,
+        displayName: String? = nil,
+        reason: String? = nil
+    ) {
+        precondition(state != .notEvaluated, "A trust evaluator must return an evaluated state")
+        precondition(state != .revoked || revocation == .revoked)
+        precondition(revocation != .revoked || state == .revoked)
+        precondition(state != .trusted || certificatePath == .valid)
+        precondition(state != .trusted || revocation != .indeterminate)
+        precondition(displayName == nil || isProximityNonBlank(displayName!))
+        precondition(reason == nil || isProximityNonBlank(reason!))
+        self.state = state
+        self.certificatePath = certificatePath
+        self.revocation = revocation
+        self.rical = rical
+        self.displayName = displayName
+        self.reason = reason
+    }
+}
+
+/// Explicit Swift-owned trust boundary. The SDK performs no network lookup implicitly.
+public protocol ProximityReaderTrustEvaluator: Sendable {
+    /// Evaluates exact verified reader evidence without an implicit SDK lookup.
+    /// - Parameter evidence: Verified reader evidence for one authentication scope.
+    /// - Returns: The application's coherent trust decision.
+    func evaluate(_ evidence: ProximityReaderEvidence) async throws -> ProximityReaderTrustDecision
+}
+
+/// Application-owned status result for a candidate holder credential.
+public enum ProximityCredentialStatus: Sendable {
+    /// The credential is valid for disclosure.
+    case valid
+    /// The credential is revoked and must not be disclosed.
+    case revoked
+    /// The application could not establish credential status.
+    case indeterminate
+}
+
+/// Credential facts supplied to an application-owned status evaluator.
+public struct ProximityCredentialStatusInput: Sendable, Equatable {
+    /// Stable wallet credential identifier.
+    public let credentialID: String
+    /// ISO mdoc document type.
+    public let documentType: String
+    /// Optional issuer identifier retained by the wallet.
+    public let issuer: String?
+    /// Credential validity start.
+    public let validFrom: Date
+    /// Credential validity end.
+    public let validUntil: Date
+}
+
+/// Explicit status boundary. The SDK itself performs no hidden network lookup.
+public protocol ProximityCredentialStatusEvaluator: Sendable {
+    /// Evaluates credential status without an implicit SDK lookup.
+    /// - Parameter credential: Candidate credential facts.
+    /// - Returns: The application's status decision.
+    func evaluate(_ credential: ProximityCredentialStatusInput) async throws -> ProximityCredentialStatus
+}
+
+/// Minimal candidate-credential facts supplied to an application profile.
+public struct ProximityApplicationCredential: Sendable, Equatable {
+    /// Stable wallet credential identifier.
+    public let credentialID: String
+    /// ISO mdoc document type.
+    public let documentType: String
+    /// Optional display label.
+    public let label: String?
+}
+
+/// Complete dependency-free request context supplied to an application profile.
+public struct ProximityApplicationProfileInput: Sendable, Equatable {
+    /// Exact encoded DeviceRequest bytes.
+    public let deviceRequest: Data
+    /// Candidate credentials available for the request.
+    public let credentials: [ProximityApplicationCredential]
+    /// Parsed document requests and element facts.
+    public let requestedDocuments: [ProximityApplicationDocumentRequest]
+    /// Verified reader-authentication facts, including absent scopes.
+    public let readerAuthentication: [ProximityReaderAuthentication]
+}
+
+/// Dependency-free parsed request facts supplied to an application profile.
+public struct ProximityApplicationDocumentRequest: Sendable, Equatable, Identifiable {
+    /// Stable identity equal to ``requestIndex``.
+    public var id: Int { requestIndex }
+    /// Zero-based document-request index.
+    public let requestIndex: Int
+    /// Requested ISO mdoc document type.
+    public let documentType: String
+    /// Requested issuer-signed elements.
+    public let requestedElements: [ProximityRequestedElement]
+}
+
+/// Display-safe application-profile detail shown during holder review.
+public struct ProximityApplicationAuthorizationDetail: Sendable, Equatable, Identifiable {
+    /// Stable profile-defined detail identifier.
+    public let id: String
+    /// Display-safe detail label.
+    public let label: String
+    /// Display-safe detail value.
+    public let value: String
+
+    /// Creates one display-safe authorization detail.
+    /// - Parameters:
+    ///   - id: Stable profile-defined detail identifier.
+    ///   - label: Display-safe detail label.
+    ///   - value: Display-safe detail value.
+    public init(id: String, label: String, value: String) {
+        precondition(isProximityNonBlank(id) && isProximityNonBlank(label) && isProximityNonBlank(value))
+        self.id = id
+        self.label = label
+        self.value = value
+    }
+}
+
+/// Application-profile element that is bound through device authentication.
+public struct ProximityDeviceSignedElement: Sendable, Equatable {
+    /// Credential whose device key authenticates the element.
+    public let credentialID: String
+    /// Device namespace containing the element.
+    public let namespace: String
+    /// Element identifier within ``namespace``.
+    public let elementIdentifier: String
+    /// Exact encoded CBOR value.
+    public let valueCBOR: Data
+
+    /// Creates an exact device-signed element.
+    /// - Parameters:
+    ///   - credentialID: Credential whose device key authenticates the value.
+    ///   - namespace: Device namespace.
+    ///   - elementIdentifier: Element identifier.
+    ///   - valueCBOR: Exact encoded CBOR value.
+    public init(credentialID: String, namespace: String, elementIdentifier: String, valueCBOR: Data) {
+        precondition(isProximityNonBlank(credentialID))
+        precondition(
+            isProximityNonBlank(namespace) && isProximityNonBlank(elementIdentifier) && !valueCBOR.isEmpty
+        )
+        self.credentialID = credentialID
+        self.namespace = namespace
+        self.elementIdentifier = elementIdentifier
+        self.valueCBOR = valueCBOR
+    }
+}
+
+/// Recognized application-profile contribution to holder review and response binding.
+public struct ProximityApplicationAuthorization: Sendable, Equatable {
+    /// Stable identifier of the recognizing profile.
+    public let profileID: String
+    /// Display-safe title for holder review.
+    public let displayTitle: String
+    /// Display-safe profile details.
+    public let details: [ProximityApplicationAuthorizationDetail]
+    /// Credential identifiers compatible with the recognized profile.
+    public let compatibleCredentialIDs: Set<String>
+    /// Profile-defined elements authenticated by the selected holder key.
+    public let deviceSignedElements: [ProximityDeviceSignedElement]
+    /// Profile-owned SHA-256 binding contribution.
+    public let resultBindingDigest: Data
+
+    /// Creates a recognized application-profile authorization.
+    /// - Parameters:
+    ///   - profileID: Stable profile identifier.
+    ///   - displayTitle: Display-safe review title.
+    ///   - details: Display-safe review details.
+    ///   - compatibleCredentialIDs: Credentials permitted by the profile.
+    ///   - deviceSignedElements: Profile-defined device-signed elements.
+    ///   - resultBindingDigest: Profile-owned 32-byte SHA-256 binding contribution.
+    public init(
+        profileID: String,
+        displayTitle: String,
+        details: [ProximityApplicationAuthorizationDetail],
+        compatibleCredentialIDs: Set<String>,
+        deviceSignedElements: [ProximityDeviceSignedElement] = [],
+        resultBindingDigest: Data
+    ) {
+        precondition(isProximityNonBlank(profileID) && isProximityNonBlank(displayTitle))
+        precondition(!details.isEmpty && Set(details.map(\.id)).count == details.count)
+        precondition(
+            !compatibleCredentialIDs.isEmpty && compatibleCredentialIDs.allSatisfy(isProximityNonBlank)
+        )
+        precondition(deviceSignedElements.allSatisfy { compatibleCredentialIDs.contains($0.credentialID) })
+        precondition(
+            Set(deviceSignedElements.map {
+                "\($0.credentialID)\u{0}\($0.namespace)\u{0}\($0.elementIdentifier)"
+            }).count == deviceSignedElements.count
+        )
+        precondition(resultBindingDigest.count == 32, "Application-profile binding must be SHA-256")
+        self.profileID = profileID
+        self.displayTitle = displayTitle
+        self.details = details
+        self.compatibleCredentialIDs = compatibleCredentialIDs
+        self.deviceSignedElements = deviceSignedElements
+        self.resultBindingDigest = resultBindingDigest
+    }
+}
+
+/// Outcome of application-profile recognition and validation.
+public enum ProximityApplicationProfileResult: Sendable, Equatable {
+    /// The profile does not recognize the request.
+    case notRecognized
+    /// The profile recognizes and authorizes the request facts.
+    case recognized(ProximityApplicationAuthorization)
+    /// The profile recognizes but rejects the request with a display-safe reason.
+    case rejected(reason: String)
+}
+
+/// Versioned Swift-owned interpreter for application-specific request semantics.
+public protocol ProximityApplicationProfile: Sendable {
+    /// Stable versioned profile identifier.
+    var id: String { get }
+    /// Interprets request facts without an implicit SDK lookup.
+    /// - Parameter input: Exact request, credential, and reader-authentication facts.
+    /// - Returns: Recognition and authorization result.
+    func evaluate(_ input: ProximityApplicationProfileInput) async throws -> ProximityApplicationProfileResult
+}
+
+/// Swift-native immutable configuration for one single-use session.
+public struct ProximityConfiguration: Sendable {
+    /// Versioned interoperability profile.
+    public let profile: ProximityProfile
+    /// BLE roles prepared for the session.
+    public let bleRoles: ProximityBLERoles
+    /// BLE bearer-selection policy.
+    public let bearerPolicy: ProximityBLEBearerPolicy
+    /// Engagement methods the host intends to offer.
+    public let engagementMethods: Set<ProximityEngagementMethod>
+    /// Retrieval methods the host intends to offer.
+    public let retrievalMethods: Set<ProximityRetrievalMethod>
+    /// Reader-authentication policy.
+    public let readerPolicy: ProximityReaderPolicy
+    /// Holder-authentication policy frozen before review.
+    public let deviceAuthenticationPolicy: ProximityDeviceAuthenticationPolicy
+    /// Optional application-owned reader-trust evaluator.
+    public let readerTrustEvaluator: (any ProximityReaderTrustEvaluator)?
+    /// Optional application-owned credential-status evaluator.
+    public let credentialStatusEvaluator: (any ProximityCredentialStatusEvaluator)?
+    /// Ordered application-specific request interpreters.
+    public let applicationProfiles: [any ProximityApplicationProfile]
+    /// Maximum accepted protocol message size in bytes.
+    public let maximumMessageBytes: Int
+
+    /// Creates immutable configuration for one single-use session.
+    /// - Parameters:
+    ///   - profile: Versioned interoperability profile.
+    ///   - bleRoles: BLE roles to prepare.
+    ///   - bearerPolicy: BLE bearer policy.
+    ///   - engagementMethods: Nonempty selected engagement methods.
+    ///   - retrievalMethods: Nonempty selected retrieval methods.
+    ///   - readerPolicy: Reader-authentication policy.
+    ///   - deviceAuthenticationPolicy: Allowed holder-authentication methods and preference.
+    ///   - readerTrustEvaluator: Optional explicit trust boundary.
+    ///   - credentialStatusEvaluator: Optional explicit status boundary.
+    ///   - applicationProfiles: Ordered application profiles.
+    ///   - maximumMessageBytes: Positive limit of at most 16 MiB.
+    public init(
+        profile: ProximityProfile = .iso180135Edition2DIS2026,
+        bleRoles: ProximityBLERoles = .dual,
+        bearerPolicy: ProximityBLEBearerPolicy = .preferL2CAP,
+        engagementMethods: Set<ProximityEngagementMethod> = [.qr],
+        retrievalMethods: Set<ProximityRetrievalMethod> = [.bluetoothLowEnergy],
+        readerPolicy: ProximityReaderPolicy = .allowAnonymousOrUntrusted,
+        deviceAuthenticationPolicy: ProximityDeviceAuthenticationPolicy = .signatureOnly,
+        readerTrustEvaluator: (any ProximityReaderTrustEvaluator)? = nil,
+        credentialStatusEvaluator: (any ProximityCredentialStatusEvaluator)? = nil,
+        applicationProfiles: [any ProximityApplicationProfile] = [],
+        maximumMessageBytes: Int = 1_048_576
+    ) {
+        precondition(maximumMessageBytes > 0 && maximumMessageBytes <= 16_777_216)
+        precondition(!engagementMethods.isEmpty)
+        precondition(!retrievalMethods.isEmpty)
+        precondition(profile != .eudiARF3FCAF202608 || readerPolicy == .requireTrusted)
+        precondition(profile != .eudiARF3FCAF202608 || deviceAuthenticationPolicy == .signatureOnly)
+        precondition(applicationProfiles.allSatisfy { isProximityNonBlank($0.id) })
+        precondition(Set(applicationProfiles.map(\.id)).count == applicationProfiles.count)
+        self.profile = profile
+        self.bleRoles = bleRoles
+        self.bearerPolicy = bearerPolicy
+        self.engagementMethods = engagementMethods
+        self.retrievalMethods = retrievalMethods
+        self.readerPolicy = readerPolicy
+        self.deviceAuthenticationPolicy = deviceAuthenticationPolicy
+        self.readerTrustEvaluator = readerTrustEvaluator
+        self.credentialStatusEvaluator = credentialStatusEvaluator
+        self.applicationProfiles = applicationProfiles
+        self.maximumMessageBytes = maximumMessageBytes
+    }
+}
+
+/// Stable error category for host presentation and recovery policy.
+public enum ProximityErrorCategory: Sendable, Equatable {
+    /// Device or runtime capability is unavailable.
+    case capability
+    /// Device engagement failed.
+    case engagement
+    /// Retrieval transport failed.
+    case transport
+    /// ISO protocol processing failed.
+    case protocolFailure
+    /// Reader authentication was absent, malformed, or invalid.
+    case readerAuthentication
+    /// Application reader-trust policy rejected the request.
+    case trust
+    /// No acceptable credential can satisfy the request.
+    case credential
+    /// Holder-key resolution or use failed.
+    case holderKey
+    /// Application-profile processing rejected or failed.
+    case applicationProfile
+    /// The approved submission no longer matches current request state.
+    case staleSubmission
+    /// The requested action violates session policy.
+    case policy
+    /// An unexpected internal failure occurred.
+    case internalFailure
+}
+
+/// Display-safe, typed proximity failure.
+public struct ProximityError: Error, Sendable, Equatable {
+    /// Stable failure category.
+    public let category: ProximityErrorCategory
+    /// Stable machine-readable error code.
+    public let code: String
+    /// Display-safe error message.
+    public let message: String
+    /// Recovery supported by the phase that reported this failure.
+    public let recovery: ProximityRecovery
+}
+
+/// Recovery distinguishes an active prerequisite loop from a terminal session.
+public enum ProximityRecovery: Sendable, Equatable {
+    /// No retry is suggested.
+    case none
+    /// Recheck prerequisites in this still-active session after remediation.
+    case retryPrerequisites
+    /// Create a fresh session to retry after terminal failure.
+    case startNewSession
+}
+
+/// Host action that may restore a selected proximity capability.
+public enum ProximityRemediationAction: Sendable, Hashable {
+    /// Request Bluetooth permission using the platform system surface.
+    case requestBluetoothPermission
+    /// Open application settings using the platform system surface.
+    case openApplicationSettings
+    /// Ask the user to enable Bluetooth through the platform-owned surface.
+    case enableBluetooth
+    /// Explain that the selected capability requires another device.
+    case useSupportedDevice
+    /// Re-run capability checks without another system surface.
+    case retry
+}
+
+/// One engagement or retrieval dimension reported independently.
+public struct ProximityTransportCapability: Sendable, Equatable {
+    /// Whether this SDK build implements the dimension.
+    public let implemented: Bool
+    /// Whether the selected interoperability profile permits it.
+    public let profilePermitted: Bool
+    /// Independent result of probing the runtime.
+    public let runtime: ProximityRuntimeObservation
+    /// Whether session configuration selected it.
+    public let selected: Bool
+    /// Whether a runtime probe established availability.
+    public var runtimeAvailable: Bool { if case .available = runtime { true } else { false } }
+    /// Observed runtime failure, if checked and unavailable.
+    public var unavailable: ProximityError? {
+        if case let .unavailable(error, _) = runtime { error } else { nil }
+    }
+    /// Ordered actions supplied by the runtime observation.
+    public var remediationActions: [ProximityRemediationAction] {
+        if case let .unavailable(_, actions) = runtime { actions } else { [] }
+    }
+    /// Whether this selected dimension may start now.
+    public var mayStart: Bool { implemented && profilePermitted && runtimeAvailable && selected }
+}
+
+/// Runtime evidence kept independent from session selection.
+public enum ProximityRuntimeObservation: Sendable, Equatable {
+    /// No runtime probe has run.
+    case notChecked
+    /// The runtime probe succeeded.
+    case available
+    /// The runtime probe failed with these possible host actions.
+    case unavailable(ProximityError, remediationActions: [ProximityRemediationAction])
+}
+
+/// Truthful capability report for every modeled engagement and retrieval dimension.
+public struct ProximityCapabilities: Sendable, Equatable {
+    /// Profile used to evaluate capability policy.
+    public let profile: ProximityProfile
+    /// QR device-engagement capability.
+    public let qrEngagement: ProximityTransportCapability
+    /// NFC device-engagement capability.
+    public let nfcEngagement: ProximityTransportCapability
+    /// Bluetooth Low Energy retrieval capability.
+    public let bluetoothLowEnergy: ProximityTransportCapability
+    /// NFC retrieval capability.
+    public let nfcRetrieval: ProximityTransportCapability
+    /// Wi-Fi Aware retrieval capability.
+    public let wifiAwareRetrieval: ProximityTransportCapability
+    /// Whether at least one selected engagement and one selected retrieval method may start now.
+    public var mayStart: Bool {
+        [qrEngagement, nfcEngagement].contains(where: \.mayStart)
+            && [bluetoothLowEnergy, nfcRetrieval, wifiAwareRetrieval].contains(where: \.mayStart)
+    }
+    /// Stable, de-duplicated remediation actions for unavailable selected dimensions.
+    public var remediationActions: [ProximityRemediationAction] {
+        var seen = Set<ProximityRemediationAction>()
+        return [qrEngagement, nfcEngagement, bluetoothLowEnergy, nfcRetrieval, wifiAwareRetrieval]
+            .filter(\.selected)
+            .flatMap(\.remediationActions)
+            .filter { seen.insert($0).inserted }
+    }
+}
+
+/// Review-safe reader-authentication result for one request scope.
+public struct ProximityReaderAuthentication: Sendable, Equatable {
+    /// Portion of the request covered by the result.
+    public let scope: ProximityReaderAuthenticationScope
+    /// Zero-based statement index within the scope.
+    public let authenticationIndex: Int
+    /// Only verified authentication carries evaluated trust facts.
+    public let outcome: ProximityReaderAuthenticationOutcome
+    /// Structural and cryptographic validity derived from the outcome.
+    public var validity: ProximityReaderAuthenticationValidity {
+        switch outcome {
+        case .absent: .absent
+        case .malformed: .malformed
+        case .invalid: .invalid
+        case .valid: .valid
+        }
+    }
+    private var decision: ProximityReaderTrustDecision? {
+        if case let .valid(value) = outcome { value } else { nil }
+    }
+    /// Application trust state when evaluated.
+    public var trust: ProximityReaderTrustState { decision?.state ?? .notEvaluated }
+    /// Independently evaluated certificate-path fact.
+    public var certificatePath: ProximityReaderCertificatePathState { decision?.certificatePath ?? .notEvaluated }
+    /// Independently evaluated revocation fact.
+    public var revocation: ProximityReaderRevocationState { decision?.revocation ?? .notChecked }
+    /// Independently evaluated RICAL fact.
+    public var rical: ProximityRICALState { decision?.rical ?? .notEvaluated }
+    /// Reader name established by trust policy.
+    public var displayName: String? { decision?.displayName }
+    /// Display-safe authentication or trust explanation.
+    public var reason: String? {
+        switch outcome {
+        case .absent: nil
+        case let .malformed(reason), let .invalid(reason): reason
+        case let .valid(trust): trust.reason
+        }
+    }
+}
+
+/// Authentication outcome with trust facts confined to verified authentication.
+public enum ProximityReaderAuthenticationOutcome: Sendable, Equatable {
+    /// No authentication statement was provided.
+    case absent
+    /// Authentication could not be parsed.
+    case malformed(reason: String)
+    /// Cryptographic verification failed.
+    case invalid(reason: String)
+    /// Verified authentication and independently evaluated trust facts.
+    case valid(ProximityReaderTrustDecision)
+}
+
+/// Names one issuer-signed element without exposing a credential model.
+public struct ProximityElementReference: Sendable, Hashable {
+    /// Issuer namespace.
+    public let namespace: String
+    /// Element identifier within ``namespace``.
+    public let elementIdentifier: String
+
+    /// Creates an issuer-signed element reference.
+    /// - Parameters:
+    ///   - namespace: Issuer namespace.
+    ///   - elementIdentifier: Element identifier within the namespace.
+    public init(namespace: String, elementIdentifier: String) {
+        precondition(isProximityNonBlank(namespace) && isProximityNonBlank(elementIdentifier))
+        self.namespace = namespace
+        self.elementIdentifier = elementIdentifier
+    }
+}
+
+/// One requested issuer-signed element and its disclosure constraints.
+public struct ProximityRequestedElement: Sendable, Equatable {
+    /// Issuer namespace.
+    public let namespace: String
+    /// Element identifier within ``namespace``.
+    public let elementIdentifier: String
+    /// Reader assertion that it intends to retain the value.
+    public let intentToRetain: Bool
+    /// Request elements satisfied by this projected element.
+    public let satisfiesRequestedElements: [ProximityElementReference]
+}
+
+/// One holder credential that can satisfy a document request.
+public struct ProximityCredentialOption: Sendable, Equatable, Identifiable {
+    /// Stable identity equal to ``credentialID``.
+    public var id: String { credentialID }
+    /// Stable wallet credential identifier.
+    public let credentialID: String
+    /// Optional display label.
+    public let label: String?
+    /// Optional display-safe issuer label or identifier.
+    public let issuer: String?
+    /// Credential validity end.
+    public let validUntil: Date
+    /// Holder authentication the response will use.
+    public let deviceAuthentication: ProximityDeviceAuthenticationMethod
+    /// Requested elements available from the credential.
+    public let requestedElements: [ProximityRequestedElement]
+}
+
+/// Holder authentication selected for a reviewed document response.
+public enum ProximityDeviceAuthenticationMethod: Sendable, Equatable {
+    /// Authenticate the response with a device signature.
+    case signature
+    /// Authenticate the response with a session MAC.
+    case mac
+}
+
+/// One requested document and its satisfying credential choices.
+public struct ProximityDocumentReview: Sendable, Equatable, Identifiable {
+    /// Stable identity equal to ``requestIndex``.
+    public var id: Int { requestIndex }
+    /// Zero-based document-request index.
+    public let requestIndex: Int
+    /// Requested ISO mdoc document type.
+    public let documentType: String
+    /// Credentials that can satisfy the request.
+    public let credentialOptions: [ProximityCredentialOption]
+}
+
+/// Reader-asserted purpose hint preserved as untrusted request data.
+public struct ProximityPurposeHint: Sendable, Equatable {
+    /// Purpose-hint type.
+    public let type: String
+    /// Purpose-hint numeric code.
+    public let code: Int
+    /// Always indicates that the hint is a reader assertion, not a wallet fact.
+    public let readerAsserted: Bool
+}
+
+/// ISO use-case metadata associated with one or more document requests.
+public struct ProximityUseCase: Sendable, Equatable, Identifiable {
+    /// Stable identity equal to ``index``.
+    public var id: Int { index }
+    /// Zero-based use-case index.
+    public let index: Int
+    /// Whether the reader marked the use case mandatory.
+    public let mandatory: Bool
+    /// Document requests associated with the use case.
+    public let documentRequestIndices: [Int]
+    /// Untrusted reader-asserted purpose hints.
+    public let purposeHints: [ProximityPurposeHint]
+}
+
+/// Opaque identifier issued for exactly one review across session instances.
+public struct ProximityReviewID: Sendable, Equatable, Hashable {
+    internal let value: String
+}
+
+/// Request-wide coverage and trust computed by the shared wallet SDK.
+public enum ProximityReaderAuthenticationSummary: Sendable, Equatable {
+    /// No reader authentication was supplied.
+    case absent
+    /// At least one authentication is malformed.
+    case malformed
+    /// At least one authentication is invalid.
+    case invalid
+    /// At least one authenticated reader is revoked.
+    case revoked
+    /// Valid authentication does not cover every requested document.
+    case partial
+    /// Coverage is complete, but at least one document lacks trusted authentication.
+    case validButUntrusted
+    /// Every document is covered by trusted authentication.
+    case trusted
+}
+
+/// Frozen, display-safe review model for one exchange.
+public struct ProximityReview: Sendable, Equatable {
+    /// Identity required when approving or declining this review.
+    public let reviewID: ProximityReviewID
+    /// One-based exchange number.
+    public let exchange: Int
+    /// Requested documents and credential choices.
+    public let documents: [ProximityDocumentReview]
+    /// Reader-authentication results.
+    public let readerAuthentication: [ProximityReaderAuthentication]
+    /// Shared summary accounting for whole-request and document authentication coverage.
+    public let readerAuthenticationSummary: ProximityReaderAuthenticationSummary
+    /// Parsed ISO use-case metadata.
+    public let useCases: [ProximityUseCase]
+    /// Recognized application-profile contributions.
+    public let applicationAuthorizations: [ProximityApplicationAuthorization]
+}
+
+/// Holder-approved credential and element selection for one document request.
+public struct ProximityDocumentSubmission: Sendable, Equatable {
+    /// Zero-based document-request index from the frozen review.
+    public let requestIndex: Int
+    /// Selected wallet credential identifier.
+    public let credentialID: String
+    /// Nonempty set of approved issuer-signed elements.
+    public let disclosedElements: Set<ProximityElementReference>
+
+    /// Creates a document submission tied to a frozen review.
+    /// - Parameters:
+    ///   - requestIndex: Document-request index.
+    ///   - credentialID: Selected credential identifier.
+    ///   - disclosedElements: Nonempty approved element set.
+    public init(requestIndex: Int, credentialID: String, disclosedElements: Set<ProximityElementReference>) {
+        precondition(requestIndex >= 0 && isProximityNonBlank(credentialID))
+        precondition(!disclosedElements.isEmpty)
+        self.requestIndex = requestIndex
+        self.credentialID = credentialID
+        self.disclosedElements = disclosedElements
+    }
+}
+
+/// Complete holder-approved submission for the current exchange.
+public struct ProximitySubmission: Sendable, Equatable {
+    /// Nonempty document submissions.
+    public let documents: [ProximityDocumentSubmission]
+    /// Whether to keep the transport alive for another device request.
+    public let continueAfterResponse: Bool
+
+    /// Creates a complete exchange submission.
+    /// - Parameters:
+    ///   - documents: Nonempty approved document submissions.
+    ///   - continueAfterResponse: Whether another exchange may follow.
+    public init(documents: [ProximityDocumentSubmission], continueAfterResponse: Bool = false) {
+        precondition(!documents.isEmpty)
+        precondition(Set(documents.map(\.requestIndex)).count == documents.count)
+        self.documents = documents
+        self.continueAfterResponse = continueAfterResponse
+    }
+}
+
+/// Host intent accepted by a session only when legal for its current state.
+public enum ProximityAction: Sendable, Equatable {
+    /// Approve a submission derived from the current frozen review.
+    case approve(reviewID: ProximityReviewID, submission: ProximitySubmission)
+    /// Decline the current disclosure request without sharing documents.
+    case decline(reviewID: ProximityReviewID)
+    /// Cancel the session and release its resources.
+    case cancel
+    /// Re-run prerequisite checks after external conditions may have changed.
+    case retryPrerequisites
+    /// Report the privacy-safe outcome of a host remediation surface.
+    case reportRemediation(ProximityRemediationAction, ProximityHostActionResult)
+}
+
+/// Privacy-safe outcome of a system surface performed by the host application.
+public enum ProximityHostActionResult: Sendable, Equatable {
+    /// The host completed the requested platform action.
+    case completed
+    /// The user cancelled the platform action.
+    case cancelled
+    /// The platform action failed without exposing sensitive diagnostics.
+    case failed
+}
+
+/// Prepared engagement presented by the host UI.
+public enum ProximityEngagement: Sendable, Equatable {
+    /// QR engagement payload to render locally without transformation.
+    case qr(payload: String)
+    /// NFC engagement is prepared and awaits a platform interaction.
+    case nfc
+}
+
+/// One protected-key operation required by a frozen approved document response.
+public struct ProximityHolderAuthorizationRequest: Sendable, Equatable, Identifiable {
+    /// Stable identity equal to ``requestIndex``.
+    public var id: Int { requestIndex }
+    /// Zero-based document-request index.
+    public let requestIndex: Int
+    /// Credential whose protected key is required.
+    public let credentialID: String
+    /// Device-authentication method frozen during review.
+    public let deviceAuthentication: ProximityDeviceAuthenticationMethod
+}
+
+/// Exact holder-key authorization context for a frozen approved submission.
+public struct ProximityHolderAuthorization: Sendable, Equatable {
+    /// Consumed review whose accepted choices require protected-key authorization.
+    public let reviewID: ProximityReviewID
+    /// One-based exchange number being authorized.
+    public let exchange: Int
+    /// Per-document protected-key operations required by the frozen response.
+    public let requests: [ProximityHolderAuthorizationRequest]
+}
+
+/// Result of attempting a host action.
+public enum ProximityActionResult: Sendable, Equatable {
+    /// The session accepted the action.
+    case accepted
+    /// The session rejected the action without changing its approved state.
+    case rejected(ProximityError)
+}
+
+/// Coarse action identity used to drive host controls from state.
+public enum ProximityActionType: Sendable, Hashable {
+    /// Approve the current review.
+    case approve
+    /// Decline the current review.
+    case decline
+    /// Cancel the active session.
+    case cancel
+    /// Re-run prerequisite checks.
+    case retryPrerequisites
+    /// Report a host remediation result.
+    case reportRemediation
+}
+
+/// Display-safe session state projected exhaustively from the KMP source of truth.
+public enum ProximityState: Sendable, Equatable {
+    /// The session is waiting for selected capabilities to become available.
+    case checkingPrerequisites(ProximityCapabilities)
+    /// Session-owned cryptographic and transport resources are being prepared.
+    case preparing(profile: ProximityProfile)
+    /// At least one engagement is ready for the host to present.
+    case engagementReady([ProximityEngagement])
+    /// A reader is connecting through a prepared engagement.
+    case connecting([ProximityEngagement])
+    /// The holder is waiting for a device request.
+    case awaitingRequest(exchange: Int)
+    /// The host must present the frozen review and collect explicit holder intent.
+    case reviewRequired(ProximityReview)
+    /// A protected holder key is authorizing the frozen approved submission.
+    case authorizingHolderKey(ProximityHolderAuthorization)
+    /// The response for an exchange is being sent.
+    case sendingResponse(exchange: Int)
+    /// The response was sent and the session awaits another request.
+    case awaitingNextRequest(completedExchanges: Int)
+    /// The protocol is terminating the transport for an exchange.
+    case terminating(exchange: Int)
+    /// The session completed normally.
+    case completed(exchanges: Int, declined: Bool)
+    /// The final request ended without credential data; earlier exchanges may have shared data.
+    case noData(exchange: Int)
+    /// The host cancelled the session.
+    case cancelled
+    /// The session failed with a display-safe typed error.
+    case failed(ProximityError)
+
+    /// Actions legal in this exact state.
+    public var legalActions: Set<ProximityActionType> {
+        switch self {
+        case .checkingPrerequisites: [.retryPrerequisites, .reportRemediation, .cancel]
+        case .reviewRequired: [.approve, .decline, .cancel]
+        case .preparing, .engagementReady, .connecting,
+             .awaitingRequest, .authorizingHolderKey, .sendingResponse, .awaitingNextRequest:
+            [.cancel]
+        case .terminating, .completed, .noData, .cancelled, .failed:
+            []
+        }
+    }
+}
+
+@available(macOS 10.15, *)
+protocol ProximitySessionBridge: Sendable {
+    var states: AsyncStream<ProximityState> { get }
+    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult
+    func close() async
+}
+
+/// Actor-safe, single-use native facade over one KMP proximity session.
+@available(macOS 10.15, *)
+public actor ProximitySession {
+    /// Exhaustive state stream whose terminal state is emitted before completion.
+    public nonisolated let states: AsyncStream<ProximityState>
+    private let bridge: any ProximitySessionBridge
+    private var closed = false
+
+    init(bridge: any ProximitySessionBridge) {
+        self.bridge = bridge
+        self.states = AsyncStream { continuation in
+            let task = Task {
+                for await state in bridge.states {
+                    continuation.yield(state)
+                    switch state {
+                    case .completed, .noData, .cancelled, .failed:
+                        continuation.finish()
+                        return
+                    default: break
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    /// Dispatches one host intent against the current session state.
+    /// - Parameter action: Action derived from the current state's ``ProximityState/legalActions``.
+    /// - Returns: Whether the session accepted the action.
+    public func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult {
+        guard !closed else {
+            return .rejected(
+                ProximityError(
+                    category: .policy,
+                    code: "session_closed",
+                    message: "The proximity presentation session is closed",
+                    recovery: .none
+                )
+            )
+        }
+        return try await bridge.dispatch(action)
+    }
+
+    /// Idempotently cancels and releases session-owned resources.
+    public func close() async {
+        guard !closed else { return }
+        closed = true
+        await bridge.close()
+    }
+}
+
+private func isProximityNonBlank(_ value: String) -> Bool {
+    !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+}
