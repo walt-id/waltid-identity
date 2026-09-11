@@ -67,12 +67,14 @@ public data class ProximityNfcRetrievalConfiguration(
  * Nonempty conventional retrieval plan used by QR or NFC handover.
  * @property bluetoothLowEnergy Optional BLE role and bearer policy.
  * @property nfc Optional conventional NFC command/response contract.
+ * @property wifiAware Whether to offer Wi-Fi Aware with mandatory NCS-SK-128 security.
  */
 public data class ProximityRetrievalOptions(
     public val bluetoothLowEnergy: ProximityBleConfiguration? = ProximityBleConfiguration(),
     public val nfc: ProximityNfcRetrievalConfiguration? = null,
+    public val wifiAware: Boolean = false,
 ) {
-    init { require(bluetoothLowEnergy != null || nfc != null) { "A retrieval plan must contain a bearer" } }
+    init { require(bluetoothLowEnergy != null || nfc != null || wifiAware) { "A retrieval plan must contain a bearer" } }
 }
 
 /** Conventional NFC Forum handover selection; provisional NFCv2 has its own session variant. */
@@ -117,12 +119,14 @@ public sealed interface ProximitySessionConfiguration {
      * Provisional NFCv2 engagement and its mandatory same-channel retrieval.
      * @property maximumCommandDataLength Maximum data accepted by the NFCv2 application.
      * @property bluetoothLowEnergy Optional NFCv2 hybrid BLE bearer.
+     * @property wifiAware Whether to offer a hybrid Wi-Fi Aware bearer with mandatory NCS-SK-128 security.
      * @property qrFallback Nonempty conventional plan advertised by QR, when selected.
      */
     public data class ProvisionalNfcV2(
         public val maximumCommandDataLength: Int = 65_536,
         public val bluetoothLowEnergy: ProximityBleConfiguration? = null,
         public val qrFallback: ProximityRetrievalOptions? = null,
+        public val wifiAware: Boolean = false,
     ) : ProximitySessionConfiguration {
         init {
             require(maximumCommandDataLength in 1..65_536)
@@ -152,6 +156,16 @@ internal val ProximitySessionConfiguration.nfcBle: ProximityBleConfiguration?
         is ProximitySessionConfiguration.ConventionalNfc -> retrieval.bluetoothLowEnergy
         is ProximitySessionConfiguration.ProvisionalNfcV2 -> bluetoothLowEnergy
     }
+
+internal val ProximitySessionConfiguration.nfcWifiAware: Boolean
+    get() = when (this) {
+        is ProximitySessionConfiguration.Qr -> false
+        is ProximitySessionConfiguration.ConventionalNfc -> retrieval.wifiAware
+        is ProximitySessionConfiguration.ProvisionalNfcV2 -> wifiAware
+    }
+
+internal val ProximitySessionConfiguration.wifiAwareSelected: Boolean
+    get() = nfcWifiAware || qrRetrieval?.wifiAware == true
 
 internal val ProximitySessionConfiguration.bleConfiguration: ProximityBleConfiguration?
     get() = nfcBle ?: qrRetrieval?.bluetoothLowEnergy
@@ -300,8 +314,11 @@ public enum class ProximityErrorCategory {
 /** Normalized host remediation suggested by a side-effect-free prerequisite check. */
 public enum class ProximityRemediationAction {
     RequestBluetoothPermission,
+    RequestNearbyWifiPermission,
+    RequestLocalNetworkPermission,
     OpenApplicationSettings,
     EnableBluetooth,
+    EnableWifi,
     EnableNfc,
     UseSupportedDevice,
     Retry,
@@ -383,7 +400,7 @@ public data class ProximityCapabilities(
                 bluetoothLowEnergy.selected == (session.bleConfiguration != null) &&
                 nfcRetrieval.selected == (session.nfcRetrieval?.nfc != null || session.qrRetrieval?.nfc != null) &&
                 nfcV2Retrieval.selected == (session is ProximitySessionConfiguration.ProvisionalNfcV2) &&
-                !wifiAwareRetrieval.selected
+                wifiAwareRetrieval.selected == session.wifiAwareSelected
         ) { "Capability selection must match the owning session retrieval plans" }
         require(!nfcV2Retrieval.mayStart || nfcEngagement.mayStart) {
             "NFCv2 same-channel retrieval cannot start without NFC engagement"
@@ -405,7 +422,8 @@ public data class ProximityCapabilities(
 
     private fun planMayStart(plan: ProximityRetrievalOptions?): Boolean = plan != null && (
         (plan.bluetoothLowEnergy != null && bluetoothLowEnergy.mayStart) ||
-            (plan.nfc != null && nfcRetrieval.mayStart)
+            (plan.nfc != null && nfcRetrieval.mayStart) ||
+            (plan.wifiAware && wifiAwareRetrieval.mayStart)
         )
 
     /** Distinct host remediations for selected unavailable methods. */

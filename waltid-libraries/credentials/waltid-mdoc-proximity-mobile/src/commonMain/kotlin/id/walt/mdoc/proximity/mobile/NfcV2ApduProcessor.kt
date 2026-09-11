@@ -10,8 +10,8 @@ import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethodCodec
-import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
 import id.walt.mdoc.proximity.ImmutableBytes
+import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
@@ -334,6 +334,18 @@ internal class NfcV2ApduProcessor(
         selected: DeviceRetrievalMethod,
         offered: DeviceRetrievalMethod,
     ): Boolean {
+        if (selected is DeviceRetrievalMethod.WifiAware && offered is DeviceRetrievalMethod.WifiAware) {
+            // The holder supplies the secret and may narrow the reader's bands. Other offer
+            // parameters retain their identity; equality would reject this required transformation.
+            return runCatching {
+                require(offered.passphraseInfo == null)
+                WifiAwareProtocol.requireValidPassphrase(requireNotNull(selected.passphraseInfo))
+                require(selected.operatingClass == offered.operatingClass && selected.channelNumber == offered.channelNumber)
+                require(selected.extensions == offered.extensions)
+                val bands = WifiAwareSupportedBands.fromBytes(selected.supportedBands)
+                bands.intersect(WifiAwareSupportedBands.fromBytes(offered.supportedBands)) == bands
+            }.getOrDefault(false)
+        }
         if (selected == offered) return true
         if (selected !is DeviceRetrievalMethod.Ble || offered !is DeviceRetrievalMethod.Ble) return false
         if (selected.extensions != offered.extensions) return false

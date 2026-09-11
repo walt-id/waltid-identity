@@ -1145,8 +1145,11 @@ private fun ProximityState?.engagements(): List<ProximityEngagement> = when (thi
 internal fun ProximityRemediationAction.label(): String = stringResource(
     when (this) {
         ProximityRemediationAction.RequestBluetoothPermission -> Res.string.proximity_allow_bluetooth
+        ProximityRemediationAction.RequestNearbyWifiPermission -> Res.string.proximity_allow_nearby_wifi
+        ProximityRemediationAction.RequestLocalNetworkPermission -> Res.string.proximity_allow_local_network
         ProximityRemediationAction.OpenApplicationSettings -> Res.string.proximity_open_app_settings
         ProximityRemediationAction.EnableBluetooth -> Res.string.proximity_enable_bluetooth
+        ProximityRemediationAction.EnableWifi -> Res.string.proximity_enable_wifi
         ProximityRemediationAction.EnableNfc -> Res.string.proximity_enable_nfc
         ProximityRemediationAction.UseSupportedDevice -> Res.string.proximity_use_supported_device
         ProximityRemediationAction.Retry -> Res.string.proximity_try_again

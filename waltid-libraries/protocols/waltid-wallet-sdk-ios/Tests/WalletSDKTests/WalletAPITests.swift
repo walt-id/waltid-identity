@@ -368,6 +368,60 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(updated.maximumMessageBytes, configuration.maximumMessageBytes)
     }
 
+    func testProximityConfigurationRepresentsWifiAwareWithoutEnablingBLE() {
+        let wifiAware = true
+        let conventional = ProximityRetrievalOptions(
+            bluetoothLowEnergy: nil,
+            wifiAware: wifiAware
+        )
+        let provisionalNFCV2 = ProximityNFCV2SessionConfiguration(
+            wifiAware: wifiAware
+        )
+
+        XCTAssertNil(conventional.bluetoothLowEnergy)
+        XCTAssertEqual(conventional.wifiAware, wifiAware)
+        XCTAssertNil(provisionalNFCV2.bluetoothLowEnergy)
+        XCTAssertEqual(provisionalNFCV2.wifiAware, wifiAware)
+        let remediations: [ProximityRemediationAction] = [
+            .requestNearbyWifiPermission,
+            .requestLocalNetworkPermission,
+            .enableWifi,
+        ]
+        let unavailable = ProximityTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtime: .unavailable(.init(category: .capability, code: "wifi_unavailable", message: "Wi-Fi unavailable", recovery: .retryPrerequisites), remediationActions: remediations),
+            selected: true
+        )
+        XCTAssertEqual(unavailable.remediationActions, remediations)
+    }
+
+    func testWifiOnlyQRFallbackAndNFCV2DeriveIndependentViableRoutes() {
+        let wifiOnly = ProximityRetrievalOptions(bluetoothLowEnergy: nil, wifiAware: true)
+        for nfcAvailable in [false, true] {
+            for wifiAvailable in [false, true] {
+                func capability(_ available: Bool, selected: Bool) -> ProximityTransportCapability {
+                    .init(implemented: true, profilePermitted: true,
+                        runtime: available ? .available : .unavailable(.init(category: .capability,
+                            code: "unavailable", message: "Unavailable", recovery: .retryPrerequisites), remediationActions: []),
+                        selected: selected)
+                }
+                let result = ProximityCapabilities(
+                    profile: .iso180135Edition2DIS2026,
+                    session: .provisionalNFCV2(.init(qrFallback: wifiOnly, wifiAware: true)),
+                    qrEngagement: capability(true, selected: true),
+                    nfcEngagement: capability(nfcAvailable, selected: true),
+                    bluetoothLowEnergy: capability(false, selected: false),
+                    nfcRetrieval: capability(false, selected: false),
+                    nfcV2Retrieval: capability(nfcAvailable, selected: true),
+                    wifiAwareRetrieval: capability(wifiAvailable, selected: true))
+                XCTAssertEqual(result.qrMayStart, wifiAvailable)
+                XCTAssertEqual(result.nfcMayStart, nfcAvailable)
+                XCTAssertEqual(result.mayStart, nfcAvailable || wifiAvailable)
+            }
+        }
+    }
+
     func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() {
         let evidence = ProximityReaderEvidence(
             scope: .wholeRequest,

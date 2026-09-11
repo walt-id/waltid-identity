@@ -78,7 +78,7 @@ class RetrievalMethodSnapshotsTest {
         val method = DeviceRetrievalMethod.WifiAware(supportedBands = bands)
         val loopback = FakeProximityLoopback.create(kind = ProximityTransportKind.WIFI_AWARE)
         val transport = FakePreparedTransport(method, loopback.holder)
-        val prepared = PreparedTransports(listOf(transport), emptyMap())
+        val prepared = PreparedTransports.of(listOf(transport))
         bands.fill(0)
         assertIs<DeviceRetrievalMethod.WifiAware>(prepared.connectionMethods.single()).supportedBands.fill(0)
         assertContentEquals(byteArrayOf(0x04),
@@ -111,7 +111,7 @@ class RetrievalMethodSnapshotsTest {
         )
         val loopback = FakeProximityLoopback.create()
         val transport = FakePreparedTransport(method, loopback.holder)
-        val prepared = PreparedTransports(listOf(transport), emptyMap())
+        val prepared = PreparedTransports.of(listOf(transport))
         address.fill(0)
         val projection = assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethods.single())
         assertContentEquals(byteArrayOf(1, 2, 3, 4, 5, 6), projection.peripheralEndpoint!!.options.deviceAddress)

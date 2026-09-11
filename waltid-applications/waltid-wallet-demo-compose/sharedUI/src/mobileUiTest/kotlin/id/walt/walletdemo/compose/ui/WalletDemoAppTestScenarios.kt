@@ -1870,7 +1870,7 @@ private class PreferenceProximityBackend : ProximityPresentationBackend {
             qrEngagement = available.copy(selected = !nfcOnly), nfcEngagement = available,
             bluetoothLowEnergy = available.copy(selected = !nfcOnly),
             nfcRetrieval = available.copy(selected = !nfcOnly), nfcV2Retrieval = available.copy(selected = nfcOnly),
-            wifiAwareRetrieval = available.copy(selected = false))
+            wifiAwareRetrieval = available.copy(selected = !nfcOnly))
     }
 
     override suspend fun startProximityPresentation(configuration: ProximityConfiguration): ProximitySession {

@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 import id.walt.wallet2.mobile.ProximityApproval
+import id.walt.wallet2.mobile.ProximityBleConfiguration
 import id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration
 import id.walt.wallet2.mobile.ProximityRetrievalOptions
 import id.walt.wallet2.mobile.ProximitySharingPlan
@@ -138,6 +139,66 @@ class WalletDemoProximityControllerTest {
     }
 
     @Test
+    fun `selected WiFi permission is offered once even when BLE can start`() = runTest {
+        listOf(
+            ProximityRemediationAction.RequestNearbyWifiPermission,
+            ProximityRemediationAction.RequestLocalNetworkPermission,
+        ).forEach { permissionAction ->
+            val capabilities = wifiPermissionCapabilities(permissionAction)
+            assertTrue(capabilities.mayStart)
+            val backend = FakeBackend(
+                session = FakeSession(
+                    ProximityState.Preparing(
+                        ProximityProfile.Iso180135Edition2Dis2026
+                    )
+                ),
+                capabilities = { capabilities },
+            )
+            val controller = controller(backend)
+
+            controller.start()
+            advanceUntilIdle()
+
+            assertEquals(0, backend.startCalls)
+            assertEquals(permissionAction, controller.state.value.automaticPermissionAction)
+            controller.remediate(permissionAction,
+                WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Cancelled })
+            advanceUntilIdle()
+            assertEquals(1, backend.startCalls)
+            assertNull(controller.state.value.automaticPermissionAction)
+            controller.dismiss()
+            advanceUntilIdle()
+        }
+    }
+
+    @Test
+    fun `required WiFi permission is repaired before a WiFi-only session starts`() = runTest {
+        for (action in listOf(
+            ProximityRemediationAction.RequestNearbyWifiPermission,
+            ProximityRemediationAction.RequestLocalNetworkPermission,
+        )) {
+            var capabilities = wifiPermissionCapabilities(action, bleSelected = false)
+            assertFalse(capabilities.mayStart)
+            val backend = FakeBackend(session = FakeSession(
+                ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026),
+            ), capabilities = { capabilities })
+            val controller = controller(backend)
+            controller.start()
+            advanceUntilIdle()
+            assertEquals(0, backend.startCalls)
+            assertEquals(action, controller.state.value.automaticPermissionAction)
+            controller.remediate(action, WalletDemoProximityHostActionExecutor {
+                capabilities = capabilities.copy(wifiAwareRetrieval = availableSelected)
+                ProximityHostActionResult.Completed
+            })
+            advanceUntilIdle()
+            assertEquals(1, backend.startCalls)
+            controller.dismiss()
+            advanceUntilIdle()
+        }
+    }
+
+    @Test
     fun `start observes the SDK session without copying protocol state`() = runTest {
         val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
         val backend = FakeBackend(session = session)
@@ -190,14 +251,19 @@ class WalletDemoProximityControllerTest {
 
     @Test
     fun `compatibility profiles preserve engagement choice and narrow data transfer`() {
-        for (profile in listOf(WalletDemoProximityTransportProfile.Bluetooth)) {
+        for (profile in listOf(WalletDemoProximityTransportProfile.Bluetooth, WalletDemoProximityTransportProfile.WifiAware)) {
             val session = assertIs<ProximitySessionConfiguration.ConventionalNfc>(profile.configuration().session)
             assertEquals(ProximityNfcHandover.Negotiated, session.handover)
             assertEquals(session.retrieval, session.qrFallback)
             assertNull(session.retrieval.nfc)
             assertEquals(profile == WalletDemoProximityTransportProfile.Bluetooth, session.retrieval.bluetoothLowEnergy != null)
+            assertEquals(profile == WalletDemoProximityTransportProfile.WifiAware, session.retrieval.wifiAware)
         }
-
+        val nfc = assertIs<ProximitySessionConfiguration.ProvisionalNfcV2>(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware.configuration().session)
+        assertTrue(nfc.wifiAware)
+        assertNull(nfc.bluetoothLowEnergy)
+        assertNull(nfc.qrFallback)
     }
 
     @Test
@@ -1117,6 +1183,32 @@ private val fallbackCapabilities = blockedCapabilities.copy(
     ),
     nfcEngagement = availableSelected,
     nfcRetrieval = availableSelected,
+)
+
+private val wifiPermissionUnavailable = ProximityError(
+    category = ProximityErrorCategory.Capability,
+    code = "wifi_permission_required",
+    message = "WiFi permission is required",
+    recovery = ProximityRecovery.RetryPrerequisites,
+)
+
+private fun wifiPermissionCapabilities(
+    action: ProximityRemediationAction,
+    bleSelected: Boolean = true,
+): ProximityCapabilities = readyCapabilities.copy(
+    bluetoothLowEnergy = availableSelected.copy(selected = bleSelected),
+    session = ProximitySessionConfiguration.Qr(
+        ProximityRetrievalOptions(
+            bluetoothLowEnergy = if (bleSelected) ProximityBleConfiguration() else null,
+            wifiAware = true,
+        ),
+    ),
+    wifiAwareRetrieval = ProximityTransportCapability(
+        implemented = true,
+        profilePermitted = true,
+        selected = true,
+        runtime = ProximityRuntimeObservation.Unavailable(wifiPermissionUnavailable, listOf(action)),
+    )
 )
 
 /** Host-only fixture. Permission invariants are covered by real signed-request tests in the SDK module. */

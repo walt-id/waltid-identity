@@ -5,6 +5,7 @@ package id.walt.wallet2.mobile
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.utils.ShaUtils
 import id.walt.crypto2.keys.Key
@@ -228,6 +229,7 @@ public class MobileWallet internal constructor(
     private val deleteLocalPersistence: suspend () -> Unit = {},
     private val proximityTransportFactory: BleProximityTransportFactory? = null,
     private val proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+    private val proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
 ) {
@@ -265,6 +267,7 @@ public class MobileWallet internal constructor(
         wallet = wallet,
         bleTransportFactory = proximityTransportFactory,
         nfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
+        wifiAwareTransportFactory = proximityWifiAwareTransportFactory,
     )
 
     /**

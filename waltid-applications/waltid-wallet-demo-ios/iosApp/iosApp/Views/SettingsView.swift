@@ -528,8 +528,10 @@ private extension WalletDemoProximityTransportProfile {
         switch self {
         case .defaultProfile: String(localized: "Automatic")
         case .bluetooth: String(localized: "Bluetooth transfer")
+        case .wifiAware: String(localized: "Wi-Fi Aware transfer")
         case .provisionalNfcV2Hybrid: String(localized: "NFCv2 + Bluetooth")
         case .provisionalNfcV2Direct: String(localized: "NFCv2 direct")
+        case .provisionalNfcV2WifiAware: String(localized: "NFCv2 + Wi-Fi Aware")
         }
     }
 
@@ -537,8 +539,10 @@ private extension WalletDemoProximityTransportProfile {
         switch self {
         case .defaultProfile: String(localized: "Use available connections supported by the reader.")
         case .bluetooth: String(localized: "Start with NFC or QR; transfer over Bluetooth.")
+        case .wifiAware: String(localized: "Start with NFC or QR; requires Wi-Fi Aware on both devices.")
         case .provisionalNfcV2Hybrid: String(localized: "Provisional profile. Start with NFCv2; transfer over Bluetooth.")
         case .provisionalNfcV2Direct: String(localized: "Provisional profile. Keep the connection on NFCv2.")
+        case .provisionalNfcV2WifiAware: String(localized: "Provisional profile. Start with NFCv2; allow Wi-Fi Aware transfer.")
         }
     }
 

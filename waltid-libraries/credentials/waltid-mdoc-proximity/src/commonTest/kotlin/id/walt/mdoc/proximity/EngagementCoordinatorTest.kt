@@ -2,6 +2,11 @@
 
 package id.walt.mdoc.proximity
 
+import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
@@ -24,6 +29,14 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class EngagementCoordinatorTest {
+    // These ownership tests never perform crypto; any unexpected key operation must fail.
+    private val selectedKey = object : Key {
+        override val id = KeyId("selected-engagement")
+        override val spec = KeySpec.Ec(EcCurve.P256)
+        override val usages = setOf(KeyUsage.KEY_AGREEMENT)
+        override val capabilities: KeyCapabilities get() = error("Ownership test must not use crypto")
+    }
+
     @Test
     fun `readiness and engaged connection reject contradictory states`() {
         val reason = ProximityError.Capability("nfc_unavailable", "NFC is unavailable")
@@ -40,6 +53,7 @@ class EngagementCoordinatorTest {
                 deviceEngagement = ImmutableBytes.of(byteArrayOf(1)),
                 sessionHandover = MdocSessionHandover.NfcConnection(ImmutableBytes.of(byteArrayOf(2))),
                 connection = TrackingConnection(ProximityTransportKind.NFC),
+            eDeviceKey = selectedKey,
             )
         }
     }
@@ -57,6 +71,7 @@ class EngagementCoordinatorTest {
                 deviceEngagement = ImmutableBytes.of(byteArrayOf(7, 8)),
                 sessionHandover = MdocSessionHandover.NfcConnection(handoverSelect, handoverRequest),
                 connection = nfcConnection,
+            eDeviceKey = selectedKey,
             ),
         )
 
@@ -149,6 +164,7 @@ class EngagementCoordinatorTest {
                     ImmutableBytes.of(byteArrayOf(2)),
                 ),
                 connection,
+            eDeviceKey = selectedKey,
             ),
         )
         val selection = async { MdocEngagementCoordinator().awaitWinner(prepared(late)) }
@@ -170,6 +186,7 @@ class EngagementCoordinatorTest {
                 deviceEngagement = ImmutableBytes.of(byteArrayOf(1)),
                 sessionHandover = MdocSessionHandover.Qr,
                 connection = TrackingConnection(ProximityTransportKind.NFC),
+            eDeviceKey = selectedKey,
             ),
         )
 
@@ -331,6 +348,7 @@ class EngagementCoordinatorTest {
                 MdocEngagementMode.Nfc, ImmutableBytes.of(byteArrayOf(7)),
                 MdocSessionHandover.NfcConnection(ImmutableBytes.of(byteArrayOf(8))),
                 TrackingConnection(ProximityTransportKind.NFC),
+            eDeviceKey = selectedKey,
             ),
         )
         val loser = TrackingEngagement(MdocEngagementMode.Qr, waitForever = true)
@@ -440,7 +458,8 @@ class EngagementCoordinatorTest {
                 MdocEngagementMode.Qr,
                 result = MdocEngagedConnection(
                     MdocEngagementMode.Qr, ImmutableBytes.of(byteArrayOf(1)), MdocSessionHandover.Qr, connection,
-                ),
+                eDeviceKey = selectedKey,
+            ),
             )
             val selection = async {
                 MdocEngagementCoordinator().awaitWinner(if (cancel) prepared(blocked) else prepared(blocked, winner))

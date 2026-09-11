@@ -57,7 +57,7 @@ QR and choices remain hidden until the new profile is ready. Connected exchanges
 keep their configuration. New presentations use the latest preference.
 
 Automatic uses the available reader-compatible routes. Compatibility profiles narrow transfer to
-Bluetooth, or select provisional NFCv2 direct/handover modes. These choices stay in Settings.
+Bluetooth or Wi-Fi Aware, or select provisional NFCv2 direct/handover modes. These choices stay in Settings.
 Device support and permissions are checked at startup; NFCv2 retains its mandatory NFC channel.
 
 **Approval** in Nearby sharing settings stores **Ask each time** (default) or
@@ -85,8 +85,11 @@ retry never reuses an armed approval. **Done** forgets the plan. Plans expire af
 ten minutes, approvals after 60 seconds, and neither is persisted. Reader/key checks
 remain in the SDK. A local receipt does not confirm the reader's verification result.
 
-The current journey displays Device Engagement as an accessible QR code and retrieves over the
-available Bluetooth Low Energy or NFC method. It supports per-document credential and element selection,
+The current journey selects Bluetooth Low Energy, conventional NFC, and Wi-Fi Aware as alternative
+retrieval methods. Capability and permission failures are explained during setup. Eligible Android API 33+
+devices may advertise the NCS-SK-128 Wi-Fi Aware holder path after runtime permissions and radio
+resources pass; iOS shows the precise unsupported result while retaining BLE/NFC fallback. The
+journey displays Device Engagement as an accessible QR code and supports per-document credential and element selection,
 shows reader-stated purpose and retention intent, and presents authentication scope, signature
 validity, certificate-path, revocation, optional RICAL, and product-trust evidence as separate facts.
 It requests fresh consent for repeated exchanges and restores temporary display changes on every exit
@@ -98,7 +101,8 @@ uses ZXing on Android and ZXing-C++ on iOS for Device Engagement only. It accept
 oversized payload. Compose iOS pins the resulting module fingerprint to the native SwiftUI renderer,
 and both renderers add an exact four-module quiet zone.
 
-This demo proves the wallet-side SDK integration. External reader interoperability, prolonged
+This demo proves the wallet-side SDK integration. Wi-Fi Aware physical discovery/data-path/HTTP
+interoperability, external reader interoperability, prolonged
 reliability, and release qualification are tracked separately and must not be inferred from the demo.
 
 The mobile settings screen exposes **Credential Sharing → Reader Authentication** on Compose Android

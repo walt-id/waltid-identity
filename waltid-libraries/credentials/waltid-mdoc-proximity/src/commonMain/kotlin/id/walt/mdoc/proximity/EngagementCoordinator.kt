@@ -47,6 +47,8 @@ data class MdocEngagedConnection(
     val deviceEngagement: ImmutableBytes,
     val sessionHandover: MdocSessionHandover,
     val connection: ProximityConnection,
+    /** Private key corresponding to the exact selected DeviceEngagement. Owned by the session. */
+    val eDeviceKey: Key,
 ) {
     init {
         require(deviceEngagement.size > 0) { "DeviceEngagement must not be empty" }
@@ -259,6 +261,7 @@ class QrMdocEngagementSource(
             context.limits.requireEngagementOrHandover(exact)
             PreparedQrMdocEngagement(
                 transports = transports,
+                eDeviceKey = context.eDeviceKey,
                 engagement = exact,
                 qrPayload = requireNotNull(engagement.qrPayload),
                 transportCoordinator = transportCoordinator,
@@ -273,6 +276,7 @@ class QrMdocEngagementSource(
 }
 
 private class PreparedQrMdocEngagement(
+    private val eDeviceKey: Key,
     private val transports: PreparedTransports,
     private val engagement: ImmutableBytes,
     qrPayload: String,
@@ -294,6 +298,7 @@ private class PreparedQrMdocEngagement(
             deviceEngagement = engagement,
             sessionHandover = MdocSessionHandover.Qr,
             connection = winner.connection,
+            eDeviceKey = eDeviceKey,
         )
     }
 

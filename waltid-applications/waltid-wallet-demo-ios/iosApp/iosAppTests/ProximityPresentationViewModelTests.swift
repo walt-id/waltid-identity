@@ -16,6 +16,10 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             .init(bluetoothLowEnergy: ble),
             .init(bluetoothLowEnergy: nil, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256)),
             .init(bluetoothLowEnergy: ble, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256)),
+            .init(bluetoothLowEnergy: nil, wifiAware: true),
+            .init(bluetoothLowEnergy: ble, wifiAware: true),
+            .init(bluetoothLowEnergy: nil, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256), wifiAware: true),
+            .init(bluetoothLowEnergy: ble, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256), wifiAware: true),
         ]
         var sessions = plans.map(WalletSDK.ProximitySessionConfiguration.qr)
         for handover in [WalletSDK.ProximityNFCHandover.staticHandover, .negotiatedHandover] {
@@ -27,9 +31,14 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         }
         for limit in [1, 65_536] {
             for qr in [nil] + plans.map(Optional.some) {
-                sessions.append(.provisionalNFCV2(.init(
-                    maximumCommandDataLength: limit, bluetoothLowEnergy: ble, qrFallback: qr
-                )))
+                for wifiAware in [false, true] {
+                    for bluetooth in [nil, ble] {
+                        sessions.append(.provisionalNFCV2(.init(
+                            maximumCommandDataLength: limit, bluetoothLowEnergy: bluetooth,
+                            qrFallback: qr, wifiAware: wifiAware
+                        )))
+                    }
+                }
             }
         }
         for profile in WalletSDK.ProximityProfile.allCases {
@@ -631,14 +640,20 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     func testCompatibilityProfilesPreserveEngagementAndNarrowTransfer() {
-        for profile in [WalletDemoProximityTransportProfile.bluetooth] {
+        for profile in [WalletDemoProximityTransportProfile.bluetooth, .wifiAware] {
             guard case .nfc(let session) = profile.configuration.session else { return XCTFail("Expected NFC with QR fallback") }
             XCTAssertEqual(session.handover, .negotiatedHandover)
             XCTAssertEqual(session.retrieval, session.qrFallback)
             XCTAssertNil(session.retrieval.nfc)
             XCTAssertEqual(session.retrieval.bluetoothLowEnergy != nil, profile == .bluetooth)
+            XCTAssertEqual(session.retrieval.wifiAware, profile == .wifiAware)
         }
-
+        guard case .provisionalNFCV2(let nfc) = WalletDemoProximityTransportProfile.provisionalNfcV2WifiAware.configuration.session else {
+            return XCTFail("Expected NFCv2")
+        }
+        XCTAssertTrue(nfc.wifiAware)
+        XCTAssertNil(nfc.bluetoothLowEnergy)
+        XCTAssertNil(nfc.qrFallback)
     }
 
     func testNativeProfilePersistenceUsesStableComposeValuesAndFallsBackSafely() {

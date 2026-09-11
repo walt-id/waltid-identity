@@ -71,24 +71,29 @@ public struct ProximityNFCRetrievalConfiguration: Sendable, Hashable {
     }
 }
 
-/// One or both conventional retrieval methods used by QR, Static Handover, or Negotiated Handover.
+/// A nonempty retrieval plan used by QR, Static Handover, or Negotiated Handover.
 public struct ProximityRetrievalOptions: Sendable, Hashable {
     /// Optional BLE role and bearer policy.
     public let bluetoothLowEnergy: ProximityBLEConfiguration?
     /// Optional conventional NFC command/response contract.
     public let nfc: ProximityNFCRetrievalConfiguration?
+    /// Whether to offer Wi-Fi Aware with mandatory NCS-SK-128 security.
+    public let wifiAware: Bool
 
     /// Creates a nonempty conventional retrieval configuration.
     /// - Parameters:
     ///   - bluetoothLowEnergy: Optional BLE role and bearer configuration.
     ///   - nfc: Optional conventional NFC command/response configuration.
+    ///   - wifiAware: Whether to offer Wi-Fi Aware retrieval.
     public init(
         bluetoothLowEnergy: ProximityBLEConfiguration? = .init(),
-        nfc: ProximityNFCRetrievalConfiguration? = nil
+        nfc: ProximityNFCRetrievalConfiguration? = nil,
+        wifiAware: Bool = false
     ) {
-        precondition(bluetoothLowEnergy != nil || nfc != nil)
+        precondition(bluetoothLowEnergy != nil || nfc != nil || wifiAware)
         self.bluetoothLowEnergy = bluetoothLowEnergy
         self.nfc = nfc
+        self.wifiAware = wifiAware
     }
 }
 
@@ -134,6 +139,8 @@ public struct ProximityNFCV2SessionConfiguration: Sendable, Hashable {
     public let maximumCommandDataLength: Int
     /// Optional NFCv2 alternate BLE bearer.
     public let bluetoothLowEnergy: ProximityBLEConfiguration?
+    /// Whether to offer an alternate Wi-Fi Aware bearer with mandatory NCS-SK-128 security.
+    public let wifiAware: Bool
     /// Optional nonempty retrieval plan offered through QR.
     public let qrFallback: ProximityRetrievalOptions?
 
@@ -142,16 +149,19 @@ public struct ProximityNFCV2SessionConfiguration: Sendable, Hashable {
     ///   - maximumCommandDataLength: Validated NFCv2 command-data limit.
     ///   - bluetoothLowEnergy: Optional alternate BLE bearer.
     ///   - qrFallback: Bearers offered through QR, when selected.
+    ///   - wifiAware: Whether to offer an alternate Wi-Fi Aware bearer.
     public init(
         maximumCommandDataLength: Int = 65_536,
         bluetoothLowEnergy: ProximityBLEConfiguration? = nil,
-        qrFallback: ProximityRetrievalOptions? = nil
+        qrFallback: ProximityRetrievalOptions? = nil,
+        wifiAware: Bool = false
     ) {
         precondition((1...65_536).contains(maximumCommandDataLength))
         requireSharedBLEPolicy(bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
         self.maximumCommandDataLength = maximumCommandDataLength
         self.bluetoothLowEnergy = bluetoothLowEnergy
         self.qrFallback = qrFallback
+        self.wifiAware = wifiAware
     }
 }
 
@@ -1009,10 +1019,16 @@ public enum ProximityRecovery: Sendable, Equatable {
 public enum ProximityRemediationAction: Sendable, Hashable {
     /// Request Bluetooth permission using the platform system surface.
     case requestBluetoothPermission
+    /// Request Nearby Wi-Fi devices permission using the platform system surface.
+    case requestNearbyWifiPermission
+    /// Request local-network permission using the platform system surface.
+    case requestLocalNetworkPermission
     /// Open application settings using the platform system surface.
     case openApplicationSettings
     /// Ask the user to enable Bluetooth through the platform-owned surface.
     case enableBluetooth
+    /// Ask the user to enable Wi-Fi through the platform-owned surface.
+    case enableWifi
     /// Ask the user to enable NFC through the platform-owned surface.
     case enableNFC
     /// Explain that the selected capability requires another device.
@@ -1091,6 +1107,7 @@ public struct ProximityCapabilities: Sendable, Equatable {
         guard let plan else { return false }
         return (plan.bluetoothLowEnergy != nil && bluetoothLowEnergy.mayStart)
             || (plan.nfc != nil && nfcRetrieval.mayStart)
+            || (plan.wifiAware && wifiAwareRetrieval.mayStart)
     }
     /// Stable, de-duplicated remediation actions for unavailable selected dimensions.
     public var remediationActions: [ProximityRemediationAction] {

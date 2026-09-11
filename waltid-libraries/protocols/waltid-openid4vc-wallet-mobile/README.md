@@ -217,8 +217,10 @@ Kotlin and Swift proximity types use the `Proximity` prefix.
 
 The default configuration selects QR engagement and BLE retrieval. NFC supports
 conventional static/negotiated handover, conventional retrieval, and the explicit
-provisional NFCv2 session variant. Wi-Fi Aware remains unimplemented at this
-layer. Runtime observations distinguish `NotChecked`, `Available`, and
+provisional NFCv2 session variant. A retrieval plan can select Wi-Fi Aware with
+`wifiAware = true`, including a Wi-Fi-only QR plan with `bluetoothLowEnergy = null`.
+Android implements the mandatory shared-key path; iOS reports it unimplemented.
+Runtime observations distinguish `NotChecked`, `Available`, and
 `Unavailable`; selection is independent. Startability follows each selected
 route's own retrieval plan, so an unavailable optional bearer cannot block a
 usable route or lend an unrelated bearer to another route.
@@ -239,7 +241,16 @@ The session variant owns engagement and compatible retrieval together. Optional
 QR fallback requires a nonempty conventional plan. Shared BLE role/policy and
 conventional NFC length limits must match across routes. The provisional NFCv2
 variant always includes same-channel retrieval and owns its distinct command
-limit; the ISO/IEC 18013-5:2021 profile rejects that variant.
+limit; the ISO/IEC 18013-5:2021 profile rejects that variant. Its optional hybrid
+Wi-Fi bearer is selected with `wifiAware = true`; QR fallback remains a separate
+nonempty conventional plan. The mandatory NCS-SK-128 cipher is enforced by the
+transport and has no redundant public policy switch.
+
+When QR and NFC both select Wi-Fi Aware, the SDK generates independent ephemeral
+keys and publishers. Each service name follows the required EDeviceKeyBytes
+derivation, and the selected connection carries its own key, exact engagement,
+and handover into session crypto. Static NFC dual-role BLE uses the shared UUID
+that its carrier format can encode; QR retains distinct role UUIDs.
 
 Device signature is the default holder-authentication policy. Applications may
 require MAC or choose an explicit pre-review preference with
@@ -280,6 +291,13 @@ trust, status, disclosure, and application-profile state before sending.
 Multiple reader-authentication statements retain their independent
 `authenticationIndex`, and holder-key authorization is reported per document
 request so mixed signature/MAC responses cannot be collapsed into one prompt.
+
+Android Wi-Fi Aware remediation distinguishes nearby-Wi-Fi permission,
+target-37 local-network permission, Wi-Fi/radio state, exhausted resources, and
+unsupported API/feature/cipher states. This draft implements only NCS-SK-128 and
+the mandatory 2.4 GHz NAN baseline. NCS-PK-2WDH-128, optional 5 GHz advertisement,
+and physical independent-reader qualification remain explicit follow-ups; this
+transport adds no server-retrieval or internet path.
 
 Reader authentication validity does not establish reader trust. To require a
 trusted reader, provision Reader CA certificates out of band and pass the shared

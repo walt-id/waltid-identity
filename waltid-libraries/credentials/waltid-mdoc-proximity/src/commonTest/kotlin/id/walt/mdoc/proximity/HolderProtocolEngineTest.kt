@@ -633,10 +633,12 @@ class HolderProtocolEngineTest {
                 deviceEngagement = engagementBytes,
                 sessionHandover = handover,
                 connection = loopback.holder,
+                eDeviceKey = deviceKey,
             )
         )
         val engine = MdocHolderProtocolEngine(
-            eDeviceKey = deviceKey,
+            // The selected engagement key, rather than the default preparation key, must decrypt.
+            eDeviceKey = readerKey,
             engagementSources = listOf(source),
             requestProcessor = object : MdocHolderRequestProcessor {
                 override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview {

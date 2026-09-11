@@ -52,7 +52,13 @@ fallback has its own nonempty plan; it may use different bearer choices. Shared
 BLE roles/policy and conventional NFC length limits must match because the
 session uses one capability probe and one conventional NFC application. The
 provisional NFCv2 variant carries its own command limit and always includes
-same-channel retrieval:
+same-channel retrieval. Both conventional plans and NFCv2's optional hybrid
+bearer use `wifiAware: true` to select Wi-Fi Aware. A conventional plan with
+`bluetoothLowEnergy: nil, wifiAware: true` is valid. iOS reports that transport
+unimplemented; Android provides the mandatory NCS-SK-128 path. There is no public
+single-choice cipher policy. Concurrent QR and NFC Wi-Fi routes own independent
+ephemeral keys and derived service names, and the winning key stays paired with
+its exact engagement and handover:
 
 ```swift
 let nfcConfiguration = ProximityConfiguration(
