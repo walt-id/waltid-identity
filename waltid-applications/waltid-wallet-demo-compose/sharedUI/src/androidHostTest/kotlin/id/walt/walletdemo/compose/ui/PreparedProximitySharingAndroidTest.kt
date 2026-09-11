@@ -1,6 +1,8 @@
 package id.walt.walletdemo.compose.ui
 
+import android.R as AndroidR
 import android.graphics.Bitmap
+import android.view.View
 import androidx.compose.runtime.mutableStateOf
 import android.graphics.Canvas
 import androidx.compose.material3.Surface
@@ -19,6 +21,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -32,7 +35,7 @@ class PreparedProximitySharingAndroidTest {
     @Test
     fun preparationShowsExplicitActionAndReadyStateKeepsScopeAndCancellationVisible() = runComposeUiTest {
         val field = ProximityElementReference("org.iso.18013.5.1", "given_name")
-        val review = ProximityReview(ProximityReviewId(kotlin.uuid.Uuid.random().toString()), 1, listOf(
+        val review = ProximityReview(ProximityReviewId(Uuid.random().toString()), 1, listOf(
             ProximityDocumentReview(0, "org.iso.18013.5.1.mDL", listOf(ProximityCredentialOption(
                 "credential", "Mobile Driving Licence", "Example issuer", Instant.parse("2030-01-01T00:00:00Z"),
                 ProximityDeviceAuthenticationMethod.Signature,
@@ -128,7 +131,7 @@ class PreparedProximitySharingAndroidTest {
         directory.mkdirs()
         runOnIdle {
             val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).single()
-            val view = activity.findViewById<android.view.View>(android.R.id.content)
+            val view = activity.findViewById<View>(AndroidR.id.content)
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
             File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }

@@ -1,12 +1,13 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.ui.test.ExperimentalTestApi
 import kotlin.test.Test
 
 class WalletDemoAppIosTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test
-    @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+    @OptIn(ExperimentalTestApi::class)
     fun proximityQrFitsWalletChromeWithoutScrolling() = scenarios.proximityQrFitsWalletChromeWithoutScrolling()
 
     @Test

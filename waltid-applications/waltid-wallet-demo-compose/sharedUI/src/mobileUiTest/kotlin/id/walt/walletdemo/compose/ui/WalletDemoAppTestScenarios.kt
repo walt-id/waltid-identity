@@ -33,10 +33,13 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runComposeUiTest
+import androidx.compose.ui.unit.Dp
 import id.walt.wallet2.mobile.ProximityAction
 import id.walt.wallet2.mobile.ProximityActionResult
 import id.walt.wallet2.mobile.ProximityCapabilities
 import id.walt.wallet2.mobile.ProximityConfiguration
+import id.walt.wallet2.mobile.ProximityEngagementMethod
+import id.walt.wallet2.mobile.ProximityHostActionResult
 import id.walt.wallet2.mobile.ProximitySessionConfiguration
 import id.walt.wallet2.mobile.ProximityEngagement
 import id.walt.walletdemo.compose.logic.ProximityPresentationBackend
@@ -58,6 +61,8 @@ import id.walt.walletdemo.compose.logic.InMemoryDemoReaderTrustSettingsStore
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
+import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
@@ -1089,7 +1094,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         waitUntil(timeoutMillis = 5_000) {
             proximity.state.value.sessionState is ProximityState.EngagementReady &&
-                proximity.state.value.engagementChoices == listOf(id.walt.wallet2.mobile.ProximityEngagementMethod.Nfc)
+                proximity.state.value.engagementChoices == listOf(ProximityEngagementMethod.Nfc)
         }
         onAllNodesWithTag("proximity-show-Qr").assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
@@ -1417,19 +1422,19 @@ class WalletDemoAppTestScenarios {
 
     fun proximityQrFitsWalletChromeWithoutScrolling(capture: ComposeUiTest.(String) -> Unit = {}) = runComposeUiTest {
         val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore())
-        val proximity = mutableStateOf(id.walt.walletdemo.compose.logic.WalletDemoProximityUiState(
+        val proximity = mutableStateOf(WalletDemoProximityUiState(
             active = true,
-            sessionState = id.walt.wallet2.mobile.ProximityState.EngagementReady(listOf(
-                id.walt.wallet2.mobile.ProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(30)),
-                id.walt.wallet2.mobile.ProximityEngagement.Nfc,
+            sessionState = ProximityState.EngagementReady(listOf(
+                ProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(30)),
+                ProximityEngagement.Nfc,
             )),
-            preferredEngagement = id.walt.wallet2.mobile.ProximityEngagementMethod.Qr,
+            preferredEngagement = ProximityEngagementMethod.Qr,
         ))
         var cancelled = false
         setContent {
             WalletDemoAppHost(controller, presentationContent = {
                 WalletDemoProximityScreen(proximity.value, emptyMap(),
-                    id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor { id.walt.wallet2.mobile.ProximityHostActionResult.Completed },
+                    WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                     onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
                     onContinueAfterResponseChange = {}, onApprove = {}, onDecline = {}, onRetry = {},
                     onRemediate = { _, _ -> }, onCancel = { cancelled = true }, onDismiss = {}, onRestart = {},
@@ -1447,14 +1452,14 @@ class WalletDemoAppTestScenarios {
             assertTrue(qr.top >= screen.top && qr.bottom <= cancel.top, "QR must fit above Cancel: $qr in $screen, cancel $cancel")
             assertTrue(qr.left >= screen.left && qr.right <= screen.right)
             assertEquals(qr.right - qr.left, qr.bottom - qr.top)
-            val landscape = screen.right - screen.left >= androidx.compose.ui.unit.Dp(600f)
-            assertTrue(qr.right - qr.left >= androidx.compose.ui.unit.Dp(if (landscape) 100f else 200f))
+            val landscape = screen.right - screen.left >= Dp(600f)
+            assertTrue(qr.right - qr.left >= Dp(if (landscape) 100f else 200f))
         }
         assertWholeQrVisible()
         onNodeWithTag("proximity-approval-mode").assertIsOff().assertIsDisplayed()
         capture("qr-ask")
         onNodeWithTag("proximity-approval-mode").performClick().assertIsOn()
-        assertEquals(id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode.PrepareSharing, proximity.value.approvalMode)
+        assertEquals(WalletDemoProximityApprovalMode.PrepareSharing, proximity.value.approvalMode)
         assertWholeQrVisible()
         capture("qr-prepare")
         onNodeWithTag(WalletUiTestTags.ProximityCancel).assertIsDisplayed().performClick()

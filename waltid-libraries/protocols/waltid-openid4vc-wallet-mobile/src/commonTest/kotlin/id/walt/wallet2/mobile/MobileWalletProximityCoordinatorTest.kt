@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalCoroutinesApi::class)
 
 package id.walt.wallet2.mobile
 
@@ -20,8 +20,10 @@ import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.mdoc.proximity.mobile.NfcHostPreparation
 import id.walt.mdoc.proximity.mobile.PreparedNfcHostSession
 import id.walt.wallet2.data.Wallet
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -32,6 +34,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -49,7 +52,7 @@ class ProximityCoordinatorTest {
             val factory = RecordingTransportFactory(BleProximityAvailability.Unavailable("ble_powered_off", "Bluetooth is off"))
             val coordinator = ProximityCoordinator(wallet, factory, sessionDispatcher = StandardTestDispatcher(testScheduler))
             val reference = ProximityElementReference("org.iso.18013.5.1", "given_name")
-            val review = ProximityReview(ProximityReviewId(kotlin.uuid.Uuid.random().toString()), 1, listOf(
+            val review = ProximityReview(ProximityReviewId(Uuid.random().toString()), 1, listOf(
                 ProximityDocumentReview(0, "org.iso.18013.5.1.mDL", listOf(ProximityCredentialOption(
                     "credential", "Identity", null, Instant.DISTANT_FUTURE, ProximityDeviceAuthenticationMethod.Signature,
                     listOf(ProximityRequestedElement(reference.namespace, reference.elementIdentifier, false)),
