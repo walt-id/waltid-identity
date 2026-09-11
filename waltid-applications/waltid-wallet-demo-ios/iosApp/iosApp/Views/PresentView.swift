@@ -62,7 +62,7 @@ struct PresentView: View {
             }
         }
         .onAppear(perform: updateProximityScreenPolicy)
-        .onChange(of: proximityPresentation.qrPayload != nil) { _ in
+        .onChange(of: proximityPresentation.displayedEngagement == .qr) { _ in
             updateProximityScreenPolicy()
         }
         .onChange(of: proximityPresentation.active) { _ in
@@ -91,7 +91,7 @@ struct PresentView: View {
     private func updateProximityScreenPolicy() {
         let foreground = scenePhase == .active
         let qrVisible = foreground && viewModel.selectedTab == .present
-            && proximityPresentation.qrPayload != nil
+            && proximityPresentation.displayedEngagement == .qr
         proximityScreenPolicy.update(
             active: foreground && proximityPresentation.active && (!proximityPresentation.isTerminal || proximityPresentation.preparingApproval),
             qrVisible: qrVisible
@@ -213,6 +213,7 @@ struct PresentView: View {
         ) {
             ProximityPresentationView(
                 viewModel: proximityPresentation,
+                approvalMode: $viewModel.proximityApprovalMode,
                 credentialDetailsByID: credentialDetailsByID
             )
         } actions: {
@@ -250,8 +251,7 @@ struct PresentView: View {
     }
 
     private var proximityEngagementReady: Bool {
-        if case .engagementReady = proximityPresentation.sessionState { return true }
-        return false
+        proximityPresentation.showsEngagement
     }
 
     private var canCancelProximityPresentation: Bool {
