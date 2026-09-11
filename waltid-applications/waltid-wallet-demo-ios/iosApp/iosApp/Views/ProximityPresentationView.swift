@@ -5,12 +5,13 @@ import WalletDemoIdentityDocumentSupport
 
 struct ProximityPresentationView: View {
     @ObservedObject var viewModel: ProximityPresentationViewModel
+    @Binding var approvalMode: WalletDemoProximityApprovalMode
     let credentialDetailsByID: [String: CredentialDetails]
 
     var body: some View {
         Group {
-            if case .engagementReady = viewModel.sessionState {
-                ProximityEngagementContent(viewModel: viewModel)
+            if viewModel.showsEngagement {
+                ProximityEngagementContent(viewModel: viewModel, approvalMode: $approvalMode)
             } else {
                 VStack(alignment: .leading, spacing: 16) {
                     if let message = viewModel.actionErrorMessage {
@@ -54,17 +55,21 @@ struct ProximityPresentationView: View {
         } else if let state = viewModel.sessionState {
             switch state {
             case .checkingPrerequisites(let capabilities):
-                ProximityPrerequisiteContent(
-                    capabilities: capabilities,
-                    actionInProgress: viewModel.hostActionInProgress,
-                    onRetry: viewModel.retryPrerequisites,
-                    onContinueWithAvailableConnection: viewModel.continueWithAvailableConnection,
-                    onRemediate: viewModel.remediate
-                )
+                if capabilities.mayStart && !capabilities.remediationActions.contains(.requestBluetoothPermission) {
+                    ProximityProgressContent(message: String(localized: "Preparing a secure presentation…"))
+                } else {
+                    ProximityPrerequisiteContent(
+                        capabilities: capabilities,
+                        actionInProgress: viewModel.hostActionInProgress,
+                        onRetry: viewModel.retryPrerequisites,
+                        onContinueWithAvailableConnection: viewModel.continueWithAvailableConnection,
+                        onRemediate: viewModel.remediate
+                    )
+                }
             case .preparing:
                 ProximityProgressContent(message: String(localized: "Preparing a secure presentation…"))
             case .engagementReady:
-                ProximityEngagementContent(viewModel: viewModel)
+                ProximityEngagementContent(viewModel: viewModel, approvalMode: $approvalMode)
             case .connecting:
                 ProximityProgressContent(message: String(localized: "Connecting to reader…"))
             case .awaitingRequest:
@@ -254,14 +259,15 @@ struct ProximityApprovalModeToggle: View {
 
 private struct ProximityEngagementContent: View {
     @ObservedObject var viewModel: ProximityPresentationViewModel
+    @Binding var approvalMode: WalletDemoProximityApprovalMode
     @State private var showApprovedData = false
     @State private var sectionHeights: [ProximityEngagementSection: CGFloat] = [:]
 
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
-                if let payload = viewModel.qrPayload {
-                    qrContent(payload: payload, viewport: geometry.size)
+                if viewModel.displayedEngagement == .qr {
+                    qrContent(payload: viewModel.qrPayload, viewport: geometry.size)
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
                         header
@@ -291,7 +297,7 @@ private struct ProximityEngagementContent: View {
 
     /// Measure actual wrapped text, leaving a 200–360 point square for the QR.
     /// The content grows into the scroll view only when readable controls need more room.
-    private func qrContent(payload: String, viewport: CGSize) -> some View {
+    private func qrContent(payload: String?, viewport: CGSize) -> some View {
         let gap: CGFloat = 12
         let landscape = viewport.width >= 600 && viewport.width > viewport.height
         let top = sectionHeights[.header] ?? 0
@@ -302,8 +308,15 @@ private struct ProximityEngagementContent: View {
             ? min(maximum, (viewport.width - gap) / 2, max(1, viewport.height))
             : min(maximum, max(minimum, viewport.height - top - bottom - gap * 2))
         let height = max(viewport.height, landscape ? max(side, top + bottom + gap) : top + side + bottom + gap * 2)
-        let code = ProximityQRCode(payload: payload).frame(width: side, height: side)
-            .accessibilityIdentifier(WalletAccessibilityID.proximityQRCode)
+        let code = Group {
+            if let payload {
+                ProximityQRCode(payload: payload)
+                    .equatable()
+                    .accessibilityIdentifier(WalletAccessibilityID.proximityQRCode)
+            } else {
+                ProgressView()
+            }
+        }.frame(width: side, height: side)
         return Group {
             if landscape {
                 HStack(alignment: .top, spacing: gap) {
@@ -367,7 +380,8 @@ private struct ProximityEngagementContent: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: 4) {
             if viewModel.preparedSharing == nil {
-                ProximityApprovalModeToggle(mode: Binding(get: { viewModel.approvalMode }, set: viewModel.setApprovalMode))
+                ProximityApprovalModeToggle(mode: $approvalMode)
+                    .disabled(viewModel.refreshingEngagement)
             } else {
                 Button("Approved data") { showApprovedData = true }.frame(maxWidth: .infinity, minHeight: 44)
             }
@@ -375,6 +389,7 @@ private struct ProximityEngagementContent: View {
                 Button(method == .qr ? String(localized: "Hold near the reader instead") : String(localized: "Show QR code instead")) {
                     viewModel.showEngagement(method == .qr ? .nfc : .qr)
                 }.frame(maxWidth: .infinity, minHeight: 44)
+                    .disabled(viewModel.refreshingEngagement)
             }
             if let route = viewModel.connectedRoute { ProximityConnectionDetails(route: route) }
         }
@@ -402,6 +417,7 @@ private struct ProximityEngagementContent: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .disabled(viewModel.refreshingEngagement)
             .accessibilityIdentifier(method == .qr ? "proximity-show-Qr" : "proximity-show-Nfc")
             Divider()
         }
@@ -900,7 +916,7 @@ private struct ProximityFailureContent: View {
     }
 }
 
-private struct ProximityQRCode: View {
+private struct ProximityQRCode: View, Equatable {
     let payload: String
 
     var body: some View {

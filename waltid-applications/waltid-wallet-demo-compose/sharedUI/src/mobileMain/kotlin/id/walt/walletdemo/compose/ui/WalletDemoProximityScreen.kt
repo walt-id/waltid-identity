@@ -140,6 +140,9 @@ fun MobileWalletDemoApp(
     LaunchedEffect(walletState.selectedTab, proximity.active) {
         if (proximity.active && walletState.selectedTab != WalletDemoTab.Present) proximityController.cancel()
     }
+    LaunchedEffect(walletState.proximityApprovalMode, walletState.proximityTransportProfile) {
+        proximityController.refreshPreferences()
+    }
     WalletDemoAppHost(
         controller = controller,
         branding = branding,
@@ -147,7 +150,7 @@ fun MobileWalletDemoApp(
         presentationContent = if (proximity.active) {
             {
                 WalletDemoProximityScreen(
-                    state = proximity,
+                    state = proximity.copy(approvalMode = walletState.proximityApprovalMode),
                     credentialDetailsById = credentialDetailsById,
                     hostActions = hostActions.executor,
                     hostActionForDisplay = hostActions::displayedAction,
@@ -163,7 +166,7 @@ fun MobileWalletDemoApp(
                     onRestart = proximityController::restart,
                     onShowEngagement = proximityController::showEngagement,
                     onContinueWithAvailableConnection = proximityController::continueWithAvailableConnection,
-                    onApprovalModeChange = proximityController::setApprovalMode,
+                    onApprovalModeChange = controller::setProximityApprovalMode,
                     onReviewRecentRequest = { proximityController.reviewRecentRequest() },
                 )
             }
@@ -230,7 +233,7 @@ internal fun WalletDemoProximityScreen(
                 onCancel = onCancel,
                 onRestart = onRestart,
             )
-        } else if (sessionState is ProximityState.EngagementReady) {
+        } else if (state.showsEngagement) {
             Box(Modifier.weight(1f).padding(horizontal = 20.dp, vertical = 8.dp)) {
                 EngagementContent(state, onShowEngagement, onApprovalModeChange)
             }
@@ -504,7 +507,7 @@ private fun EngagementContent(
     val footer: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (sharing == null) {
-                ProximityApprovalModeChoice(state.approvalMode, onApprovalModeChange, compact = true)
+                ProximityApprovalModeChoice(state.approvalMode, onApprovalModeChange, compact = true, enabled = !state.refreshingEngagement)
             } else {
                 TextButton(onClick = { showApprovedData = true }, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(Res.string.proximity_approved_data))
@@ -512,7 +515,7 @@ private fun EngagementContent(
             }
             if (method != null) {
                 choices.filter { it != method }.forEach { other ->
-                    TextButton(onClick = { onShowEngagement(other) }, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = { onShowEngagement(other) }, enabled = !state.refreshingEngagement, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(if (other == ProximityEngagementMethod.Qr)
                             Res.string.proximity_show_qr_instead else Res.string.proximity_tap_instead))
                     }
@@ -523,10 +526,12 @@ private fun EngagementContent(
     }
     val qr = (state.sessionState as? ProximityState.EngagementReady)?.engagements
         ?.filterIsInstance<ProximityEngagement.Qr>()?.singleOrNull()
-    if (method == ProximityEngagementMethod.Qr && qr != null) {
-        val qrCode = remember(qr.payload) { runCatching { encodeProximityQrCode(qr.payload) }.getOrNull() }
+    if (method == ProximityEngagementMethod.Qr) {
+        val qrCode = remember(qr?.payload) { qr?.let { runCatching { encodeProximityQrCode(it.payload) }.getOrNull() } }
         ProximityQrEngagementLayout(header = header, footer = footer) {
-            if (qrCode != null) {
+            if (state.refreshingEngagement) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else if (qrCode != null) {
                 BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     if (constraints.maxWidth >= qrCode.width + 8 && constraints.maxHeight >= qrCode.height + 8) {
                         Surface(color = Color.White, shape = RoundedCornerShape(16.dp)) {
@@ -545,7 +550,7 @@ private fun EngagementContent(
     } else {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             header()
-            if (method == null) choices.forEach { choice -> ProximityEngagementChoice(choice) { onShowEngagement(choice) } }
+            if (method == null) choices.forEach { choice -> ProximityEngagementChoice(choice, enabled = !state.refreshingEngagement) { onShowEngagement(choice) } }
             footer()
         }
     }

@@ -33,9 +33,23 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runComposeUiTest
+import id.walt.wallet2.mobile.ProximityAction
+import id.walt.wallet2.mobile.ProximityActionResult
+import id.walt.wallet2.mobile.ProximityCapabilities
+import id.walt.wallet2.mobile.ProximityConfiguration
+import id.walt.wallet2.mobile.ProximitySessionConfiguration
+import id.walt.wallet2.mobile.ProximityEngagement
+import id.walt.walletdemo.compose.logic.ProximityPresentationBackend
+import id.walt.wallet2.mobile.ProximityRuntimeObservation
+import id.walt.wallet2.mobile.ProximitySession
+import id.walt.wallet2.mobile.ProximityState
+import id.walt.wallet2.mobile.ProximityTransportCapability
 import id.walt.wallet2.mobile.ProximityReaderPolicy
 import id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.DemoBiometricResult
+import id.walt.walletdemo.compose.logic.InMemoryDemoSharingSettingsStore
+import id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode
+import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.DemoPinStore
 import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 import id.walt.walletdemo.compose.logic.DemoWallet
@@ -79,6 +93,7 @@ import id.walt.walletdemo.compose.logic.statusText
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.assertEquals
@@ -1027,6 +1042,66 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.AppTitle).assertTextEquals("Acme Wallet")
     }
 
+    fun sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys() = runComposeUiTest {
+        val settings = InMemoryDemoSharingSettingsStore()
+        val controller = WalletDemoController(FakeDemoWallet(credentials = listOf(sampleCredential)),
+            InMemoryDemoPinStore(), sharingSettings = settings)
+        val backend = PreferenceProximityBackend()
+        val proximity = WalletDemoProximityController(backend, approvalModeProvider = settings::proximityApprovalMode,
+            profileProvider = settings::proximityTransportProfile, scope = CoroutineScope(Dispatchers.Unconfined), dispatcher = Dispatchers.Unconfined)
+        val trust = DemoReaderTrustSettingsController(InMemoryDemoReaderTrustSettingsStore())
+        setContent { MobileWalletDemoApp(controller, proximity, trust) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+        onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
+        onNodeWithTag(WalletUiTestTags.ProximityStartButton).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+        waitUntil(timeoutMillis = 5_000) { proximity.state.value.sessionState is ProximityState.EngagementReady }
+        onNodeWithTag("proximity-show-Qr").performScrollTo().assertIsDisplayed().performClick()
+        val switch = onNodeWithTag("proximity-approval-mode")
+        switch.performScrollTo().assertIsOff()
+        val before = switch.getUnclippedBoundsInRoot()
+        switch.performClick()
+        waitUntil(timeoutMillis = 5_000) { proximity.state.value.refreshingEngagement }
+        switch.assertIsOn().assertIsNotEnabled()
+        assertEquals(before, switch.getUnclippedBoundsInRoot(), "Mode refresh must retain the switch position")
+        onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
+        assertEquals(WalletDemoProximityApprovalMode.PrepareSharing, settings.proximityApprovalMode())
+        backend.firstClose.complete(Unit)
+        waitUntil(timeoutMillis = 5_000) { !proximity.state.value.refreshingEngagement }
+        switch.assertIsOn().assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.ProximityQr).performScrollTo().assertIsDisplayed()
+
+        // The journey switch writes Settings; changing Settings updates this same open journey.
+        onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performScrollTo().performClick()
+        switch.performScrollTo().assertIsOn().performClick()
+        switch.assertIsOff()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        waitUntil(timeoutMillis = 5_000) { proximity.state.value.approvalMode == WalletDemoProximityApprovalMode.AskEachTime && !proximity.state.value.refreshingEngagement }
+        switch.performScrollTo().assertIsOff().performClick()
+        waitUntil(timeoutMillis = 5_000) { proximity.state.value.approvalMode == WalletDemoProximityApprovalMode.PrepareSharing && !proximity.state.value.refreshingEngagement }
+        // A connection profile changed in Settings must replace this open journey as well.
+        onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsProximityNfcV2Direct).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        waitUntil(timeoutMillis = 5_000) {
+            proximity.state.value.sessionState is ProximityState.EngagementReady &&
+                proximity.state.value.engagementChoices == listOf(id.walt.wallet2.mobile.ProximityEngagementMethod.Nfc)
+        }
+        onAllNodesWithTag("proximity-show-Qr").assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
+        switch.assertIsOn()
+        runOnIdle { backend.latestState.value = ProximityState.Completed(1, false) }
+        onNodeWithTag(WalletUiTestTags.ProximityDone).performClick()
+        onNodeWithTag(WalletUiTestTags.ProximityStartButton).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+        waitUntil(timeoutMillis = 5_000) { proximity.state.value.sessionState is ProximityState.EngagementReady }
+        switch.performScrollTo().assertIsOn()
+        assertEquals(WalletDemoProximityApprovalMode.PrepareSharing,
+            WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore(), sharingSettings = settings).state.value.proximityApprovalMode)
+        runOnIdle { proximity.dismiss() }
+    }
+
     fun settingsReplacesHeaderLockAndShowsDidAndKey() = runComposeUiTest {
         val wallet = FakeDemoWallet()
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
@@ -1773,5 +1848,33 @@ private class FakeDemoWallet(
     override suspend fun deleteWallet() {
         deleteWalletCalls += 1
         credentials = emptyList()
+    }
+}
+
+private class PreferenceProximityBackend : ProximityPresentationBackend {
+    val firstClose = CompletableDeferred<Unit>()
+    lateinit var latestState: MutableStateFlow<ProximityState>
+    private var starts = 0
+
+    override suspend fun proximityPresentationCapabilities(configuration: ProximityConfiguration): ProximityCapabilities {
+        val available = ProximityTransportCapability(implemented = true, profilePermitted = true, selected = true, runtime = ProximityRuntimeObservation.Available)
+        val nfcOnly = configuration.session is ProximitySessionConfiguration.ProvisionalNfcV2
+        return ProximityCapabilities(profile = configuration.profile, session = configuration.session,
+            qrEngagement = available.copy(selected = !nfcOnly), nfcEngagement = available,
+            bluetoothLowEnergy = available.copy(selected = !nfcOnly),
+            nfcRetrieval = available.copy(selected = !nfcOnly), nfcV2Retrieval = available.copy(selected = nfcOnly),
+            wifiAwareRetrieval = available.copy(selected = false))
+    }
+
+    override suspend fun startProximityPresentation(configuration: ProximityConfiguration): ProximitySession {
+        val first = starts++ == 0
+        return object : ProximitySession {
+            override val state = MutableStateFlow<ProximityState>(ProximityState.EngagementReady(
+                if (configuration.session is ProximitySessionConfiguration.ProvisionalNfcV2) listOf(ProximityEngagement.Nfc)
+                else listOf(ProximityEngagement.Qr("mdoc:preference-$starts"), ProximityEngagement.Nfc)))
+                .also { latestState = it }
+            override suspend fun dispatch(action: ProximityAction): ProximityActionResult = ProximityActionResult.Accepted
+            override suspend fun close() { if (first) firstClose.await() }
+        }
     }
 }

@@ -779,6 +779,276 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testModeRefreshKeepsConnectionLayoutWithoutOldQRCode() async throws {
+        var mode = WalletDemoProximityApprovalMode.askEachTime
+        let first = FakeProximitySession(suspendClose: true)
+        let next = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: first, nextSession: next)
+        let model = ProximityPresentationViewModel(client: client,
+            configurationProvider: { WalletDemoProximityTransportProfile.defaultProfile.configuration.withApproval(mode.approval) }, hostActions: FakeProximityHostActionExecutor())
+        model.start()
+        try await waitUntil { client.startCount == 1 }
+        await first.emit(.engagementReady([.qr(payload: "mdoc:old"), .nfc]))
+        try await waitUntil { model.canChangeApprovalMode }
+        model.showEngagement(.qr)
+        model.refreshPreferences()
+        XCTAssertEqual(client.startCount, 1)
+        mode = .prepareSharing
+        model.refreshPreferences()
+        try await waitUntilAsync { await first.closeCount == 1 }
+        XCTAssertTrue(model.showsEngagement)
+        XCTAssertTrue(model.refreshingEngagement)
+        XCTAssertEqual(model.displayedEngagement, .qr)
+        XCTAssertNil(model.qrPayload)
+        XCTAssertFalse(model.canChangeApprovalMode)
+        model.showEngagement(.nfc)
+        model.refreshPreferences()
+        XCTAssertEqual(model.displayedEngagement, .qr)
+        XCTAssertEqual(model.approvalMode, .prepareSharing)
+        XCTAssertEqual(client.startCount, 1)
+        await first.resumeClose()
+        try await waitUntil { client.startCount == 2 }
+        XCTAssertTrue(model.refreshingEngagement)
+        guard case .prepareBeforeSharing = client.lastConfiguration?.approval else { return XCTFail("Expected preparation") }
+        await next.emit(.engagementReady([.qr(payload: "mdoc:new"), .nfc]))
+        try await waitUntil { model.canChangeApprovalMode }
+        XCTAssertFalse(model.refreshingEngagement)
+        XCTAssertEqual(model.qrPayload, "mdoc:new")
+        await next.emit(.connecting([.nfc]))
+        try await waitUntil { !model.showsEngagement }
+        model.refreshPreferences()
+        XCTAssertEqual(client.startCount, 2)
+        model.dismiss()
+    }
+
+    @MainActor
+    func testSavedTransportChangeReplacesOpenJourneyAndRemovesStaleChoicesImmediately() async throws {
+        let profiles: [(WalletDemoProximityTransportProfile, WalletDemoProximityTransportProfile)] = [
+            (.defaultProfile, .provisionalNfcV2Direct), (.provisionalNfcV2Direct, .defaultProfile),
+        ]
+        for (initial, target) in profiles {
+            let first = FakeProximitySession(suspendClose: true)
+            let next = FakeProximitySession()
+            let client = FakeProximityWalletClient(session: first, nextSession: next)
+            let wallet = WalletViewModel(walletID: "proximity-transport-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+            let previousProfile = wallet.proximityTransportProfile
+            let previousMode = wallet.proximityApprovalMode
+            wallet.proximityTransportProfile = initial
+            wallet.proximityApprovalMode = .askEachTime
+            let model = wallet.proximityPresentation
+            defer {
+                model.dismiss()
+                wallet.proximityTransportProfile = previousProfile
+                wallet.proximityApprovalMode = previousMode
+            }
+            model.start()
+            try await waitUntil { client.startCount == 1 }
+            await first.emit(.engagementReady(initial == .defaultProfile ? [.qr(payload: "mdoc:old"), .nfc] : [.nfc]))
+            try await waitUntil { model.canChangeApprovalMode }
+            model.showEngagement(.qr)
+            // No mounted view or event-loop turn is needed to invalidate the old QR/choices.
+            wallet.proximityTransportProfile = target
+            XCTAssertFalse(model.showsEngagement)
+            XCTAssertTrue(model.engagementChoices.isEmpty)
+            XCTAssertNil(model.qrPayload)
+            try await waitUntilAsync { await first.closeCount == 1 }
+            XCTAssertEqual(client.startCount, 1)
+            await first.resumeClose()
+            try await waitUntil { client.startCount == 2 }
+            XCTAssertEqual(client.lastConfiguration?.session, target.configuration.session)
+            await next.emit(.engagementReady(target == .defaultProfile ? [.qr(payload: "mdoc:new"), .nfc] : [.nfc]))
+            try await waitUntil { model.canChangeApprovalMode }
+            XCTAssertEqual(model.engagementChoices.contains(.qr), target == .defaultProfile)
+            model.refreshPreferences()
+            XCTAssertEqual(client.startCount, 2)
+        }
+    }
+
+    @MainActor
+    func testSavedModeChangeInvalidatesQRCodeSynchronouslyWithoutMountedView() async throws {
+        let first = FakeProximitySession(suspendClose: true)
+        let client = FakeProximityWalletClient(session: first)
+        let wallet = WalletViewModel(walletID: "proximity-mode-latency-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+        let previousMode = wallet.proximityApprovalMode
+        wallet.proximityApprovalMode = .askEachTime
+        let model = wallet.proximityPresentation
+        defer { model.dismiss(); wallet.proximityApprovalMode = previousMode }
+        model.start()
+        try await waitUntil { client.startCount == 1 }
+        await first.emit(.engagementReady([.qr(payload: "mdoc:old"), .nfc]))
+        try await waitUntil { model.canChangeApprovalMode }
+        model.showEngagement(.qr)
+        wallet.proximityApprovalMode = .prepareSharing
+        XCTAssertNil(model.qrPayload)
+        XCTAssertTrue(model.refreshingEngagement)
+        XCTAssertEqual(model.approvalMode, .prepareSharing)
+        try await waitUntilAsync { await first.closeCount == 1 }
+        model.dismiss()
+        await first.resumeClose()
+    }
+
+    @MainActor
+    func testSettingsChangedDuringStartupReplaceBlockedPreflightBeforeStartingSession() async throws {
+        var profile = WalletDemoProximityTransportProfile.defaultProfile
+        var mode = WalletDemoProximityApprovalMode.askEachTime
+        let client = FakeProximityWalletClient(session: FakeProximitySession(), capabilityResults: [
+            makeProximityCapabilities(bluetoothAvailable: false, nfcAvailable: false,
+                bluetoothRemediation: [.requestBluetoothPermission]),
+            makeProximityCapabilities(),
+        ])
+        let model = ProximityPresentationViewModel(client: client,
+            configurationProvider: { profile.configuration.withApproval(mode.approval) },
+            hostActions: FakeProximityHostActionExecutor())
+        model.start()
+        profile = .provisionalNfcV2Direct
+        mode = .prepareSharing
+        try await waitUntil { client.startCount == 1 }
+        XCTAssertEqual(client.capabilityCallCount, 2)
+        XCTAssertEqual(client.lastConfiguration?.session, profile.configuration.session)
+        guard case .prepareBeforeSharing = client.lastConfiguration?.approval else { return XCTFail("Startup lost preference") }
+        model.dismiss()
+    }
+
+    @MainActor
+    func testModeRefreshLeavesNFCAvailableForExplicitNewSheet() async throws {
+        var mode = WalletDemoProximityApprovalMode.askEachTime
+        let first = FakeProximitySession()
+        let next = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: first, nextSession: next)
+        let model = ProximityPresentationViewModel(client: client,
+            configurationProvider: { WalletDemoProximityTransportProfile.defaultProfile.configuration.withApproval(mode.approval) }, hostActions: FakeProximityHostActionExecutor())
+        model.start()
+        try await waitUntil { client.startCount == 1 }
+        await first.emit(.engagementReady([.nfc]))
+        try await waitUntil { model.canChangeApprovalMode }
+        model.showEngagement(.nfc)
+        try await waitUntilAsync { await first.presentNfcCalls == 1 }
+        mode = .prepareSharing
+        model.refreshPreferences()
+        try await waitUntil { client.startCount == 2 }
+        await next.emit(.engagementReady([.nfc]))
+        try await waitUntil { model.canChangeApprovalMode }
+        XCTAssertNil(model.displayedEngagement)
+        XCTAssertEqual(model.engagementChoices, [.nfc])
+        let presentations = await next.presentNfcCalls
+        XCTAssertEqual(presentations, 0)
+        model.showEngagement(.nfc)
+        try await waitUntilAsync { await next.presentNfcCalls == 1 }
+        model.dismiss()
+    }
+
+    @MainActor
+    func testDismissDuringModeRefreshDoesNotStartReplacement() async throws {
+        var mode = WalletDemoProximityApprovalMode.askEachTime
+        let session = FakeProximitySession(suspendClose: true)
+        let client = FakeProximityWalletClient(session: session)
+        let model = ProximityPresentationViewModel(client: client,
+            configurationProvider: { WalletDemoProximityTransportProfile.defaultProfile.configuration.withApproval(mode.approval) }, hostActions: FakeProximityHostActionExecutor())
+        model.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.engagementReady([.qr(payload: "mdoc:old")]))
+        try await waitUntil { model.canChangeApprovalMode }
+        mode = .prepareSharing
+        model.refreshPreferences()
+        try await waitUntilAsync { await session.closeCount == 1 }
+        model.cancel()
+        await session.resumeClose()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertFalse(model.showsEngagement)
+        XCTAssertFalse(model.active)
+        XCTAssertEqual(client.startCount, 1)
+    }
+
+    @MainActor
+    func testSavedPreferenceReachesMountedSharingScreenAndSurvivesCompletion() async throws {
+        let first = FakeProximitySession(suspendClose: true)
+        let next = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: first, nextSession: next)
+        let wallet = WalletViewModel(walletID: "proximity-preference-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+        let previousMode = wallet.proximityApprovalMode
+        wallet.proximityApprovalMode = .askEachTime
+        wallet.selectedTab = .present
+        wallet.dismissStatus()
+        let model = wallet.proximityPresentation
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previousWindow = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = UIHostingController(rootView: PresentView(viewModel: wallet))
+        window.makeKeyAndVisible()
+        defer {
+            model.dismiss()
+            wallet.proximityApprovalMode = previousMode
+            window.isHidden = true
+            previousWindow?.makeKeyAndVisible()
+        }
+        func capture(_ name: String) async throws {
+            try await Task.sleep(nanoseconds: 500_000_000)
+            window.layoutIfNeeded()
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true))
+            }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        model.start()
+        try await waitUntil { client.startCount == 1 }
+        try await capture("native-startup-ready-preflight")
+        await first.emit(.engagementReady([.qr(payload: "mdoc:old"), .nfc]))
+        try await waitUntil { model.canChangeApprovalMode }
+        model.showEngagement(.qr)
+        try await capture("native-before-preference-refresh")
+        wallet.proximityApprovalMode = .prepareSharing
+        XCTAssertNil(model.qrPayload)
+        XCTAssertTrue(model.refreshingEngagement)
+        try await capture("native-during-preference-refresh")
+        try await waitUntilAsync { await first.closeCount == 1 }
+        XCTAssertEqual(model.approvalMode, .prepareSharing)
+        XCTAssertEqual(DemoSharingSettings.proximityApprovalMode(
+            appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier), .prepareSharing)
+        await first.resumeClose()
+        try await waitUntil { client.startCount == 2 }
+        await next.emit(.engagementReady([.qr(payload: "mdoc:new"), .nfc]))
+        try await waitUntil { model.canChangeApprovalMode }
+        await next.emit(.completed(exchanges: 1, declined: false))
+        try await waitUntil { model.isTerminal }
+        model.dismiss()
+        model.start()
+        try await waitUntil { client.startCount == 3 }
+        XCTAssertEqual(wallet.proximityApprovalMode, .prepareSharing)
+        XCTAssertEqual(model.approvalMode, .prepareSharing)
+        guard case .prepareBeforeSharing = client.lastConfiguration?.approval else { return XCTFail("Next share lost preference") }
+    }
+
+    @MainActor
+    func testRetryUsesPreferenceChangedDuringPreviousExchange() async throws {
+        var mode = WalletDemoProximityApprovalMode.askEachTime
+        var profile = WalletDemoProximityTransportProfile.defaultProfile
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let model = ProximityPresentationViewModel(client: client,
+            configurationProvider: { profile.configuration.withApproval(mode.approval) },
+            hostActions: FakeProximityHostActionExecutor())
+        model.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.connecting([.nfc]))
+        try await waitUntil { model.sessionState == .connecting([.nfc]) }
+        mode = .prepareSharing
+        profile = .provisionalNfcV2Direct
+        model.refreshPreferences()
+        XCTAssertEqual(client.startCount, 1)
+        await session.emit(.completed(exchanges: 1, declined: false))
+        try await waitUntil { model.isTerminal }
+        model.restart()
+        try await waitUntil { client.startCount == 2 }
+        XCTAssertEqual(model.approvalMode, .prepareSharing)
+        XCTAssertEqual(client.lastConfiguration?.session, profile.configuration.session)
+        guard case .prepareBeforeSharing = client.lastConfiguration?.approval else { return XCTFail("Retry lost preference") }
+        model.dismiss()
+    }
+
+    @MainActor
     func testRetryWaitsForCleanupBeforeStartingFreshSession() async throws {
         let session = FakeProximitySession(suspendClose: true)
         let client = FakeProximityWalletClient(session: session)

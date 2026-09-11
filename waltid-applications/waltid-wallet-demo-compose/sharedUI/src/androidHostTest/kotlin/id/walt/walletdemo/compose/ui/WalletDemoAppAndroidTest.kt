@@ -127,6 +127,10 @@ class WalletDemoAppAndroidTest {
         scenarios.customBrandingTitleAppearsInTheHeader()
 
     @Test
+    fun sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys() =
+        scenarios.sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys()
+
+    @Test
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
 

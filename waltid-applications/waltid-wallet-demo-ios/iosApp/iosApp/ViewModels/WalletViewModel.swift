@@ -160,6 +160,7 @@ class WalletViewModel: ObservableObject {
                     proximityTransportProfile,
                     appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
                 )
+                proximityPresentation.refreshPreferences()
             }
         }
     @Published var proximityApprovalMode: WalletDemoProximityApprovalMode = DemoSharingSettings.proximityApprovalMode(
@@ -168,6 +169,7 @@ class WalletViewModel: ObservableObject {
         didSet {
             DemoSharingSettings.setProximityApprovalMode(proximityApprovalMode,
                 appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier)
+            proximityPresentation.refreshPreferences()
         }
     }
     @Published var pinError: String?
