@@ -147,6 +147,7 @@ class MobileWalletDigitalCredentialPresentationTest {
         val fixture = walletFixtureWithKeys(
             keys = listOf(holderKey),
             credentials = arrayOf(mdocCredential(holderKey = holderKey, imageBytes = IMAGE_BYTES)),
+            registrationProjection = MobileWalletRegistryProjection.MdocIdentity,
         )
         val preview = fixture.wallet.previewDigitalCredentialPresentation(
             dcApiRequest(
@@ -590,6 +591,7 @@ class MobileWalletDigitalCredentialPresentationTest {
         credentials: Array<out StoredCredential>,
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
         bindMdocs: Boolean = true,
+        registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
     ): Fixture {
         val registry = CapturingRegistry()
         val keyStore = InMemoryMobileWalletKeyStore().also { store ->
@@ -613,6 +615,7 @@ class MobileWalletDigitalCredentialPresentationTest {
             generateAndPersistKey = { _, _ -> error("Digital Credentials presentation must not bootstrap a key") },
             transactionDataProfiles = transactionDataProfiles,
             credentialRegistry = registry,
+            registrationProjection = registrationProjection,
         )
         return Fixture(wallet, registry, credentialStore)
     }

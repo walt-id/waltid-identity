@@ -197,6 +197,9 @@ public data class WalletAttestationConfig(
     public val hostHeader: String = "",
 )
 
+/** Registration adapters select their projection at platform factory wiring; presentation uses full records. */
+internal enum class MobileWalletRegistryProjection { Full, MdocIdentity }
+
 /**
  * Android and iOS facade for the walt.id wallet SDK.
  *
@@ -222,6 +225,7 @@ public class MobileWallet internal constructor(
     private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     private val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
+    private val registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
     private val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
@@ -257,7 +261,7 @@ public class MobileWallet internal constructor(
     private val annexCEngine = MobileWalletAnnexCEngine(
         wallet = wallet,
         readerTrustEvaluator = readerTrustEvaluator,
-        registryRecords = ::registryRecords,
+        registryRecords = { registryRecords() },
     )
 
     private val issuanceSessions = WalletIssuanceSessionService(
@@ -528,7 +532,9 @@ public class MobileWallet internal constructor(
      *
      * Raw credentials, issuer-signed payloads, and private keys are never registered, and neither
      * are the SD-JWT VC infrastructure claims listed in [SD_JWT_INFRASTRUCTURE_CLAIMS]. The adapter
-     * receives the remaining decoded claims and projects them into its platform index. Android
+     * receives the remaining decoded claims and projects them into its platform index. The native
+     * iOS adapter receives only mdoc identifiers and document types, without processing claims or
+     * artwork. Custom adapters continue to receive full records. Android
      * retains compound and embedded media fields for presence matching without registering their
      * values; those fields cannot satisfy an exact-value constraint in the platform matcher.
      *
@@ -538,7 +544,7 @@ public class MobileWallet internal constructor(
      * reading the wallet's own credentials failed.
      */
     public suspend fun refreshDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult {
-        val records = registryRecords()
+        val records = registryRecords(registrationProjection)
         val presentationResult = runCatching {
             credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
         }.getOrElse { failure ->
@@ -931,11 +937,29 @@ public class MobileWallet internal constructor(
     private fun digitalCredentialRegistryId(): String =
         "waltid-${ShaUtils.calculateSha256Base64Url(wallet.id).take(24)}"
 
-    private suspend fun registryRecords(): List<MobileWalletCredentialRegistryRecord> =
+    private suspend fun registryRecords(
+        projection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
+    ): List<MobileWalletCredentialRegistryRecord> =
         wallet.streamAllCredentials().mapNotNull { stored ->
+            val credential = stored.credential
+            if (projection == MobileWalletRegistryProjection.MdocIdentity && credential !is MdocsCredential) {
+                return@mapNotNull null
+            }
             val registryEntryId = "dc-${ShaUtils.calculateSha256Base64Url("${wallet.id}\u0000${stored.id}").take(32)}"
+            if (projection == MobileWalletRegistryProjection.MdocIdentity) {
+                // IdentityDocumentServices indexes only identity and type. Do not read metadata,
+                // serialize claims, or decode images that the native adapter would discard.
+                return@mapNotNull MobileWalletCredentialRegistryRecord(
+                    registryEntryId = registryEntryId,
+                    credentialId = stored.id,
+                    format = MobileWalletDigitalCredentialFormat.MDOC,
+                    type = (credential as MdocsCredential).docType,
+                    fields = emptyList(),
+                    displayName = "",
+                )
+            }
             val metadata = stored.toMetadata()
-            when (val credential = stored.credential) {
+            when (credential) {
                 is MdocsCredential -> {
                     val display = MobileWalletRegistryDisplay.resolve(
                         format = MobileWalletDigitalCredentialFormat.MDOC,
