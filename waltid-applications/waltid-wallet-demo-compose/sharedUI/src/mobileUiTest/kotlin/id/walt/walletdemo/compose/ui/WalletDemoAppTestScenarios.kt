@@ -1076,7 +1076,9 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performScrollTo().performClick()
         switch.performScrollTo().assertIsOn().performClick()
         switch.assertIsOff()
+        onNodeWithText("Done").assertIsDisplayed().performClick()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        onNodeWithTag(WalletUiTestTags.ProximityScreen).assertIsDisplayed()
         waitUntil(timeoutMillis = 5_000) { proximity.state.value.approvalMode == WalletDemoProximityApprovalMode.AskEachTime && !proximity.state.value.refreshingEngagement }
         switch.performScrollTo().assertIsOff().performClick()
         waitUntil(timeoutMillis = 5_000) { proximity.state.value.approvalMode == WalletDemoProximityApprovalMode.PrepareSharing && !proximity.state.value.refreshingEngagement }
