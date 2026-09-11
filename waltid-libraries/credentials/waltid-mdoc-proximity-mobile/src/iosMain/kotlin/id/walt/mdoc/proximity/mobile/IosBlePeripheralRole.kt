@@ -1,15 +1,17 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(ExperimentalForeignApi::class)
 
 package id.walt.mdoc.proximity.mobile
 
 import id.walt.mdoc.proximity.ProximityCloseReason
 import kotlinx.atomicfu.atomic
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
 import platform.CoreBluetooth.CBATTErrorInvalidOffset
@@ -250,7 +252,7 @@ internal class IosBlePeripheralRole private constructor(
         awaitEvent<IosPeripheralEvent.AdvertisingStarted>().error?.let {
             throw it.asPeripheralFailure("CoreBluetooth could not advertise the mdoc GATT service")
         }
-        completion = sessionScope.coroutineContext[kotlinx.coroutines.Job]?.invokeOnCompletion {
+        completion = sessionScope.coroutineContext[Job]?.invokeOnCompletion {
             close(ProximityCloseReason.CANCELLED)
         }
     }
