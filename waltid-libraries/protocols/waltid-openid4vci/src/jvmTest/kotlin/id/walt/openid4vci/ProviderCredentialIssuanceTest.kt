@@ -18,6 +18,8 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
@@ -28,16 +30,22 @@ import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
+import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
+import id.walt.sdjwt.SDJwt
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.test.*
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 class ProviderCredentialIssuanceTest {
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
@@ -302,6 +310,139 @@ class ProviderCredentialIssuanceTest {
         val http = provider.writeCredentialError(credentialResponseResult.error)
         assertEquals(400, http.status)
         assertEquals(CredentialErrorCodes.INVALID_PROOF, http.payload["error"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `sd-jwt single and batch issuance round generated timestamps before signing`() = runBlocking {
+        val mapping = buildJsonObject {
+            put("iat", "<timestamp-seconds>")
+            put("nbf", "<timestamp-seconds>")
+            put("exp", "<timestamp-in-seconds:365d>")
+            put("unchanged", "sample")
+        }
+        val times = listOf(
+            "2026-09-10T00:00:00Z", "2026-09-10T17:43:28Z",
+            "2026-09-10T17:59:59Z", "2026-09-10T18:00:00Z",
+            "2026-09-10T23:59:59Z", "2026-09-11T00:00:00Z",
+            "2028-02-29T17:43:28Z",
+        )
+        for (legacy in listOf(false, true)) {
+            for (time in times) {
+                for (count in 1..2) {
+                    val now = Instant.parse(time)
+                    val payloads = timeMappedPayloads(issueTimeMappedSdJwt(mapping, time, count, legacy))
+                    assertEquals(count, payloads.size)
+                    payloads.forEach { payload ->
+                        assertEquals(now.epochSeconds.floorDiv(86_400L) * 86_400L, payload["iat"]!!.jsonPrimitive.long)
+                        assertEquals(payload["iat"], payload["nbf"])
+                        val exp = payload["exp"]!!.jsonPrimitive.long
+                        assertEquals((now + 365.days).epochSeconds.floorDiv(3_600L) * 3_600L, exp)
+                        assertTrue((now + 365.days).epochSeconds - exp in 0L..3_599L)
+                        assertEquals("sample", payload["unchanged"]!!.jsonPrimitive.content)
+                    }
+                    assertEquals(count, payloads.map { it["cnf"] }.distinct().size)
+                }
+            }
+        }
+        assertEquals("<timestamp-seconds>", mapping["iat"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `sd-jwt rounding preserves explicit dates missing claims and configured lifetimes`() = runBlocking {
+        val time = "2026-09-10T17:43:28Z"
+        val explicit = buildJsonObject {
+            put("iat", Instant.parse(time).epochSeconds)
+            put("nbf", Instant.parse("2026-09-11T09:43:28Z").epochSeconds)
+            put("exp", Instant.parse("2026-09-12T09:43:28Z").epochSeconds)
+        }
+        val payload = timeMappedPayloads(issueTimeMappedSdJwt(explicit, time)).single()
+        explicit.forEach { (claim, value) -> assertEquals(value, payload[claim]) }
+        val missing = timeMappedPayloads(issueTimeMappedSdJwt(null, time)).single()
+        listOf("iat", "nbf", "exp").forEach { assertNull(missing[it]) }
+        val customLifetime = buildJsonObject { put("exp", "<timestamp-in-seconds:30d>") }
+        val custom = timeMappedPayloads(issueTimeMappedSdJwt(customLifetime, time)).single()
+        assertEquals(Instant.parse("2026-10-10T17:00:00Z").epochSeconds, custom["exp"]!!.jsonPrimitive.long)
+
+        val preciseMapping = buildJsonObject {
+            put("iat", "<timestamp-seconds>")
+            put("nbf", "<timestamp-seconds>")
+            put("exp", "<timestamp-in-seconds:365d>")
+        }
+        val before = Clock.System.now().epochSeconds
+        val unrounded = timeMappedPayloads(issueTimeMappedSdJwt(preciseMapping, time, round = false)).single()
+        val after = Clock.System.now().epochSeconds
+        assertTrue(unrounded["iat"]!!.jsonPrimitive.long in before..after)
+        assertTrue(unrounded["nbf"]!!.jsonPrimitive.long in before..after)
+        assertTrue(unrounded["exp"]!!.jsonPrimitive.long in (before + 365.days.inWholeSeconds)..(after + 365.days.inWholeSeconds))
+    }
+
+    @Test
+    fun `sd-jwt rounding rejects generated expiry that would already be expired`() = runBlocking {
+        for (lifetime in listOf("10m", "0s", "-1d", "Infinity")) {
+            val mapping = buildJsonObject { put("exp", "<timestamp-in-seconds:$lifetime>") }
+            val result = issueTimeMappedSdJwt(mapping, "2026-09-10T17:43:28Z")
+            assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, assertIs<CredentialResponseResult.Failure>(result).error.error)
+        }
+    }
+
+    private fun timeMappedPayloads(result: CredentialResponseResult): List<JsonObject> =
+        assertNotNull(assertIs<CredentialResponseResult.Success>(result).response.credentials).map {
+            SDJwt.parse(it.credential.jsonPrimitive.content).fullPayload
+        }
+
+    private suspend fun issueTimeMappedSdJwt(
+        mapping: JsonObject?,
+        time: String,
+        count: Int = 1,
+        legacy: Boolean = false,
+        round: Boolean = true,
+    ): CredentialResponseResult {
+        suspend fun key(id: String) = crypto2Runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+        )
+        val configuration = CredentialConfiguration(CredentialFormat.SD_JWT_VC, vct = "https://issuer.example/identity")
+        val request = DefaultCredentialRequest(
+            client = DefaultClient("test-client", emptyList(), emptySet(), emptySet()),
+            credentialIdentifier = null, credentialConfigurationId = "identity", proofs = null,
+            credentialResponseEncryption = null,
+        )
+        val batch = CredentialIssuanceBatch(
+            inputs = List(count) { CredentialIssuanceInput(buildJsonObject { put("given_name", "Jane") }) },
+            verifiedProofs = List(count) { index ->
+                VerifiedCredentialProof("jwt", "", "ES256", buildJsonObject {}, buildJsonObject {}, key("holder-$index"), null, null, null)
+            },
+        )
+        var clockReads = 0
+        val handler = SdJwtVcCredentialHandler(roundGeneratedTimeClaims = round, now = {
+            // Any accidental per-credential clock read would move the batch into another day.
+            Instant.parse(time) + (clockReads++).days
+        })
+        val issuer = key("issuer")
+        val legacyIssuer = if (legacy) JWKKey.generate(KeyType.secp256r1) else null
+        val result = if (legacyIssuer != null) {
+            handler.sign(
+                request, configuration, legacyIssuer, "https://issuer.example", batch,
+                dataMapping = mapping, selectiveDisclosure = null, x5Chain = null, display = null,
+                w3cVersion = null, mDocNameSpacesDataMappingConfig = null, authorizedTransactionDataTypes = null,
+                validFrom = null, validUntil = null,
+            )
+        } else {
+            handler.sign(
+                request, configuration, Crypto2CredentialSigningKey.select(issuer, configuration), "https://issuer.example", batch,
+                dataMapping = mapping, selectiveDisclosure = null, x5Chain = null, display = null,
+                w3cVersion = null, mDocNameSpacesDataMappingConfig = null, authorizedTransactionDataTypes = null,
+                validFrom = null, validUntil = null,
+            )
+        }
+        assertEquals(if (round && mapping != null) 1 else 0, clockReads)
+        if (result is CredentialResponseResult.Success) {
+            result.response.credentials!!.forEach {
+                val jwt = it.credential.jsonPrimitive.content.substringBefore("~")
+                if (legacyIssuer != null) assertTrue(legacyIssuer.verifyJws(jwt).isSuccess)
+                else assertTrue(CompactJws.verify(jwt, issuer, JwsAlgorithm.ES256).payload.isNotEmpty())
+            }
+        }
+        return result
     }
 
     private fun issuanceInputs(credentialData: JsonObject) =
