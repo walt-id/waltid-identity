@@ -237,7 +237,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
         assertIsoMdlCredentialPayload(mdocCredential)
         val completedSession = client.getSession(createdOffer.offerId)
         assertEquals(IssuanceSessionStatus.SUCCESSFUL, completedSession.status)
-        assertTrue(completedSession.isClosed)
+        assertFalse(completedSession.isClosed)
         assertEquals(2, completedSession.issuanceResults.size)
     }
 
@@ -332,8 +332,46 @@ class Issuer2PreAuthorizedWalletFlowTest {
         )
         val completedSession = client.getSession(createdOffer.offerId)
         assertEquals(IssuanceSessionStatus.SUCCESSFUL, completedSession.status)
-        assertTrue(completedSession.isClosed)
+        assertFalse(completedSession.isClosed)
         assertEquals(credentialIdentifiers.toSet(), completedSession.issuanceResults.keys)
+    }
+
+    @Test
+    fun walletCanRequestCredentialAgainAfterSuccessfulIssuance() = testApplication {
+        val scenario = Issuer2CredentialScenarios.identitySdJwt
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+        val createdOffer = client.createWalletFlowCredentialOffer(
+            scenario = scenario,
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            txCodeMode = Issuer2TxCodeMode.NONE,
+        )
+        val initialSession = client.getSession(createdOffer.offerId)
+        val credentialIdentifier = initialSession.issuanceRequests.single().credentialIdentifier
+        val resolvedOffer = walletFlow.resolve(createdOffer)
+        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+
+        // Each request gets a fresh proof; both configuration and identifier selection remain usable.
+        repeat(3) { index ->
+            val credential = walletFlow.requestCredential(
+                resolvedOffer = resolvedOffer,
+                accessToken = tokenResponse.access_token,
+                credentialIdentifier = if (index == 1) credentialIdentifier else null,
+                includeDidInProof = false,
+            )
+            assertSdJwtVcCredentialPayload(
+                credentialPayload = credential,
+                expectedVctSuffix = "/${scenario.credentialConfigurationId}",
+                expectedDisclosureKeys = setOf("birthdate"),
+                expectedClaims = mapOf("family_name" to "Doe", "given_name" to "John"),
+            )
+            val session = client.getSession(createdOffer.offerId)
+            assertEquals(IssuanceSessionStatus.SUCCESSFUL, session.status)
+            assertFalse(session.isClosed)
+            assertEquals(setOf(credentialIdentifier), session.issuanceResults.keys)
+            assertEquals(initialSession.expiresAt, session.expiresAt)
+        }
     }
 
     @Test

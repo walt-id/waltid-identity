@@ -991,19 +991,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 ),
             )
         }
-        if (authorization.credentialIdentifier in observedSession.issuanceResults) {
-            return rejectCredentialRequest(
-                requestWithSession,
-                observedSession,
-                sessionConfiguration?.format,
-                requestId,
-                CredentialError(
-                    CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
-                    "Credential has already been issued",
-                ),
-            )
-        }
-
         val configuration = sessionConfiguration ?: return rejectCredentialRequest(
             requestWithSession,
             observedSession,
@@ -1076,7 +1063,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val issuanceRequest = session.issuanceRequests.find {
             it.credentialIdentifier == authorization.credentialIdentifier
         }
-        if (issuanceRequest == null || authorization.credentialIdentifier in session.issuanceResults) {
+        if (issuanceRequest == null) {
             restoreClaimedSession(session)
             return rejectCredentialRequest(
                 requestWithSession,
@@ -1085,7 +1072,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 requestId,
                 CredentialError(
                     CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
-                    "Credential is unavailable or has already been issued",
+                    "Credential is unavailable",
                 ),
             )
         }
@@ -1335,7 +1322,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                                 IssuanceSessionStatus.ACTIVE
                             },
                             statusReason = if (issuanceComplete) "Credentials issued successfully" else null,
-                            isClosed = issuanceComplete,
+                            isClosed = false,
                         )
                     )
                 }
