@@ -8,7 +8,14 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.PublicKeyExporter
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.objects.engagement.BleCentralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
+import id.walt.mdoc.objects.engagement.BlePeripheralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
@@ -16,10 +23,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborElement
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
 
 class RetrievalMethodSnapshotsTest {
     @Test fun engagementFreezesMethodsBeforeSuspendedKeyExport() = runTest {
@@ -80,6 +83,41 @@ class RetrievalMethodSnapshotsTest {
         assertIs<DeviceRetrievalMethod.WifiAware>(prepared.connectionMethods.single()).supportedBands.fill(0)
         assertContentEquals(byteArrayOf(0x04),
             assertIs<DeviceRetrievalMethod.WifiAware>(prepared.connectionMethods.single()).supportedBands)
+        transport.close(ProximityCloseReason.COMPLETED)
+    }
+    @Test fun readerOfferOwnsNestedInputAndProjection() {
+        val bytes = byteArrayOf(7)
+        val extensions = linkedMapOf<UInt, CborElement>(9u to CborArray(listOf(CborByteString(bytes))))
+        val bands = byteArrayOf(0x04)
+        val offer = ReaderSelectedTransportOffer.Method(DeviceRetrievalMethod.WifiAware(
+            supportedBands = bands, extensions = extensions,
+        ))
+        bytes.fill(0); bands.fill(0); extensions.clear()
+        val first = assertIs<DeviceRetrievalMethod.WifiAware>(offer.value)
+        first.supportedBands.fill(0)
+        val retained = assertIs<DeviceRetrievalMethod.WifiAware>(offer.value)
+        assertContentEquals(byteArrayOf(0x04), retained.supportedBands)
+        assertContentEquals(byteArrayOf(7),
+            assertIs<CborByteString>(assertIs<CborArray>(retained.extensions[9u]).single()).toByteArray())
+    }
+    @Test
+    fun bleEndpointAddressIsOwnedByPreparedMethodFacts() = runTest {
+        val address = byteArrayOf(1, 2, 3, 4, 5, 6)
+        val method = DeviceRetrievalMethod.Ble(
+            peripheralMode = BlePeripheralMode(ByteArray(16)),
+            peripheralEndpoint = BlePeripheralEndpoint.Mdoc(
+                BlePeripheralServerOptions(address, 128u),
+            ),
+        )
+        val loopback = FakeProximityLoopback.create()
+        val transport = FakePreparedTransport(method, loopback.holder)
+        val prepared = PreparedTransports(listOf(transport), emptyMap())
+        address.fill(0)
+        val projection = assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethods.single())
+        assertContentEquals(byteArrayOf(1, 2, 3, 4, 5, 6), projection.peripheralEndpoint!!.options.deviceAddress)
+        projection.peripheralEndpoint!!.options.deviceAddress!!.fill(0)
+        val retained = assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethods.single())
+        assertContentEquals(byteArrayOf(1, 2, 3, 4, 5, 6), retained.peripheralEndpoint!!.options.deviceAddress)
         transport.close(ProximityCloseReason.COMPLETED)
     }
 

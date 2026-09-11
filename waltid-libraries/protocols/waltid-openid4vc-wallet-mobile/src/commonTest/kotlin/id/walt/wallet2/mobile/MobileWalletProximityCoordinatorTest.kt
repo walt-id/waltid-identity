@@ -3,18 +3,24 @@
 package id.walt.wallet2.mobile
 
 import id.walt.mdoc.objects.engagement.BleCentralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.FakeProximityLoopback
 import id.walt.mdoc.proximity.FakeTransportProvider
-import id.walt.mdoc.proximity.ProximityTransportProvider
+import id.walt.mdoc.proximity.ProximityCloseReason
+import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 import id.walt.mdoc.proximity.mobile.BleMdocRoles
 import id.walt.mdoc.proximity.mobile.BleMdocRoleSelection
 import id.walt.mdoc.proximity.mobile.BleProximityAvailability
 import id.walt.mdoc.proximity.mobile.BleProximityTransportConfiguration
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
+import id.walt.mdoc.proximity.mobile.NfcHostApduRouter
+import id.walt.mdoc.proximity.mobile.NfcHostAvailability
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.NfcHostPreparation
+import id.walt.mdoc.proximity.mobile.PreparedNfcHostSession
 import id.walt.wallet2.data.Wallet
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -78,16 +84,237 @@ class ProximityCoordinatorTest {
     }
 
     @Test
+    fun `NFC capability preflight is side effect free and does not invent entitlement remediation`() = runTest {
+        val nfc = RecordingNfcHostAdapter(
+            NfcHostAvailability.Unavailable(
+                code = "nfc_entitlement_missing",
+                message = "The signed application is missing the managed HCE entitlement",
+            )
+        )
+        val coordinator = ProximityCoordinator(
+            Wallet("nfc-preflight"),
+            RecordingTransportFactory(BleProximityAvailability.Available),
+            nfc,
+        )
+        val configuration = ProximityConfiguration(
+            session = ProximitySessionConfiguration.ConventionalNfc(
+                handover = ProximityNfcHandover.Negotiated,
+                retrieval = ProximityRetrievalOptions(
+                    nfc = ProximityNfcRetrievalConfiguration(),
+                ),
+                qrFallback = ProximityRetrievalOptions(
+                    nfc = ProximityNfcRetrievalConfiguration(),
+                )
+            ),
+        )
+
+        val capabilities = coordinator.capabilities(configuration)
+
+        assertTrue(capabilities.mayStart)
+        assertEquals(1, nfc.capabilityCalls)
+        assertEquals(0, nfc.prepareCalls)
+        assertFalse(capabilities.nfcEngagement.mayStart)
+        assertFalse(capabilities.nfcRetrieval.mayStart)
+        assertEquals("nfc_entitlement_missing", capabilities.nfcEngagement.unavailable?.code)
+        assertTrue(capabilities.nfcEngagement.remediationActions.isEmpty())
+        assertEquals(ProximityRecovery.None, capabilities.nfcEngagement.unavailable?.recovery)
+    }
+
+    @Test
+    fun `NFC-only configuration remains blocked when the host is unavailable`() = runTest {
+        val nfc = RecordingNfcHostAdapter(
+            NfcHostAvailability.Unavailable("nfc_powered_off", "NFC is powered off")
+        )
+        val coordinator = ProximityCoordinator(Wallet("nfc-only-blocked"), null, nfc)
+        val session = coordinator.start(
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ConventionalNfc(
+                    handover = ProximityNfcHandover.Static,
+                    retrieval = ProximityRetrievalOptions(
+                        bluetoothLowEnergy = null,
+                        nfc = ProximityNfcRetrievalConfiguration(),
+                    )
+                ),
+            )
+        )
+
+        val state = assertIs<ProximityState.CheckingPrerequisites>(session.state.value)
+        assertFalse(state.capabilities.mayStart)
+        assertEquals(
+            listOf(ProximityRemediationAction.EnableNfc),
+            state.capabilities.remediationActions,
+        )
+        assertEquals(0, nfc.prepareCalls)
+        session.close()
+    }
+
+    @Test
+    fun `NFCv2-only session reports its same-channel retrieval independently of conventional NFC`() = runTest {
+        val ble = RecordingTransportFactory(
+            BleProximityAvailability.Unavailable("ble_powered_off", "Bluetooth is powered off")
+        )
+        val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
+        val coordinator = ProximityCoordinator(Wallet("nfc-v2-capability"), ble, nfc)
+        val configuration = ProximityConfiguration(
+            session = ProximitySessionConfiguration.ProvisionalNfcV2(bluetoothLowEnergy = null),
+        )
+
+        val capabilities = coordinator.capabilities(configuration)
+
+        assertTrue(capabilities.mayStart)
+        assertTrue(capabilities.nfcEngagement.mayStart)
+        assertTrue(capabilities.nfcV2Retrieval.mayStart)
+        assertFalse(capabilities.nfcRetrieval.selected)
+        assertFalse(capabilities.nfcRetrieval.mayStart)
+        assertFalse(capabilities.bluetoothLowEnergy.selected)
+        assertFalse(capabilities.bluetoothLowEnergy.mayStart)
+        assertEquals(0, ble.capabilityCalls)
+    }
+
+    @Test
+    fun `QR engagement with NFC retrieval arms one NFC host without exposing NFC engagement`() = runTest {
+        val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
+        val coordinator = ProximityCoordinator(Wallet("qr-nfc"), null, nfc)
+        val session = coordinator.start(
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.Qr(
+                    ProximityRetrievalOptions(
+                    bluetoothLowEnergy = null,
+                    nfc = ProximityNfcRetrievalConfiguration(),
+                )
+                ),
+            )
+        )
+
+        val engagements = session.awaitEngagements()
+        assertEquals(1, nfc.prepareCalls)
+        assertEquals(1, engagements.size)
+        assertIs<ProximityEngagement.Qr>(engagements.single())
+        session.close()
+    }
+
+    @Test
+    fun `combined engagement falls back to QR and BLE when NFC is unavailable`() = runTest {
+        val ble = RecordingTransportFactory(BleProximityAvailability.Available)
+        val nfc = RecordingNfcHostAdapter(
+            NfcHostAvailability.Unavailable("nfc_system_ineligible", "NFC HCE is ineligible")
+        )
+        val coordinator = ProximityCoordinator(Wallet("combined-fallback"), ble, nfc)
+        val session = coordinator.start(
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ConventionalNfc(
+                    handover = ProximityNfcHandover.Negotiated,
+                    retrieval = ProximityRetrievalOptions(),
+                    qrFallback = ProximityRetrievalOptions()
+                ),
+            )
+        )
+
+        val engagements = session.awaitEngagements()
+        assertEquals(1, ble.configurations.size)
+        assertEquals(0, nfc.prepareCalls)
+        assertEquals(1, engagements.size)
+        assertIs<ProximityEngagement.Qr>(engagements.single())
+        session.close()
+    }
+
+    @Test
+    fun `combined QR and NFC engagement gets distinct BLE transaction configurations`() = runTest {
+        val ble = RecordingTransportFactory(BleProximityAvailability.Available)
+        val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
+        val coordinator = ProximityCoordinator(Wallet("combined-uuids"), ble, nfc)
+        val session = coordinator.start(
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(
+                    bluetoothLowEnergy = ProximityBleConfiguration(),
+                    qrFallback = ProximityRetrievalOptions(
+                        bluetoothLowEnergy = ProximityBleConfiguration(),
+                        nfc = null
+                    )
+                ),
+            )
+        )
+
+        val engagements = session.awaitEngagements()
+        assertEquals(2, ble.configurations.size)
+        assertEquals(1, nfc.prepareCalls)
+        assertEquals(2, engagements.size)
+        assertTrue(engagements.any { it is ProximityEngagement.Qr })
+        assertTrue(engagements.any { it is ProximityEngagement.Nfc })
+        assertEquals(
+            ble.configurations[0].eDeviceKeyBytes,
+            ble.configurations[1].eDeviceKeyBytes,
+        )
+        assertNotEquals(ble.configurations[0].roles, ble.configurations[1].roles)
+        session.close()
+    }
+
+    @Test
+    fun `static NFC dual-role BLE uses the shared carrier UUID while QR stays distinct`() = runTest {
+        val ble = RecordingTransportFactory(BleProximityAvailability.Available)
+        val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
+        val coordinator = ProximityCoordinator(Wallet("static-dual-role"), ble, nfc)
+        val session = coordinator.start(ProximityConfiguration(
+            session = ProximitySessionConfiguration.ConventionalNfc(
+                handover = ProximityNfcHandover.Static,
+                retrieval = ProximityRetrievalOptions(),
+                qrFallback = ProximityRetrievalOptions(),
+            ),
+        ))
+        try {
+            val engagements = session.awaitEngagements()
+            assertEquals(2, engagements.size)
+            assertEquals(1, nfc.prepareCalls)
+            val nfcRoles = assertIs<BleMdocRoles.Dual>(ble.configurations[0].roles)
+            val qrRoles = assertIs<BleMdocRoles.Dual>(ble.configurations[1].roles)
+            assertEquals(nfcRoles.readerServiceUuid, nfcRoles.mdocServiceUuid)
+            assertNotEquals(qrRoles.readerServiceUuid, qrRoles.mdocServiceUuid)
+        } finally { session.close() }
+    }
+
+    @Test
+    fun `combined NFCv2 session omits an unusable QR path instead of failing preparation`() = runTest {
+        val ble = RecordingTransportFactory(
+            BleProximityAvailability.Unavailable("ble_powered_off", "Bluetooth is powered off")
+        )
+        val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
+        val coordinator = ProximityCoordinator(Wallet("combined-nfc-v2-only"), ble, nfc)
+        val session = coordinator.start(
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(
+                    bluetoothLowEnergy = ProximityBleConfiguration(),
+                    qrFallback = ProximityRetrievalOptions(
+                        bluetoothLowEnergy = ProximityBleConfiguration(),
+                        nfc = null
+                    )
+                ),
+            )
+        )
+
+        val engagements = session.awaitEngagements()
+
+        assertEquals(1, nfc.prepareCalls)
+        assertEquals(1, engagements.size)
+        assertIs<ProximityEngagement.Nfc>(engagements.single())
+        session.close()
+    }
+
+    @Test
     fun `wallet admits one active session and rotates session key and UUIDs`() = runTest {
         val factory = RecordingTransportFactory(BleProximityAvailability.Available)
         val coordinator = ProximityCoordinator(Wallet("single-session"), factory)
 
         val first = coordinator.start(ProximityConfiguration())
         first.awaitConnection()
+        assertEquals(ProximityConnectedRoute(
+            ProximityEngagementMethod.Qr, ProximityTransport.BluetoothLowEnergy,
+        ), first.connectedRoute)
         assertFailsWith<IllegalStateException> {
             coordinator.start(ProximityConfiguration())
         }
+        val retainedRoute = first.connectedRoute
         first.close()
+        assertEquals(retainedRoute, first.connectedRoute)
 
         val second = coordinator.start(ProximityConfiguration())
         second.awaitConnection()
@@ -157,30 +384,56 @@ class ProximityCoordinatorTest {
     }
 
     @Test
-    fun `configuration is owned before the first suspended capability probe`() = runTest {
-        val entered = CompletableDeferred<Unit>()
-        val resume = CompletableDeferred<Unit>()
-        val recorded = RecordingTransportFactory(BleProximityAvailability.Available)
-        val factory = object : BleProximityTransportFactory by recorded {
-            override suspend fun capability(roles: BleMdocRoleSelection): BleProximityAvailability {
-                entered.complete(Unit)
-                resume.await()
-                return BleProximityAvailability.Available
-            }
+    fun `unavailable NFC cannot lend its BLE bearer to an NFC-only QR fallback`() = runTest {
+        val ble = RecordingTransportFactory(BleProximityAvailability.Available)
+        val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Unavailable("nfc_powered_off", "NFC is off"))
+        val coordinator = ProximityCoordinator(Wallet("crossed-routes"), ble, nfc)
+        for (handover in ProximityNfcHandover.entries) {
+            val configuration = ProximityConfiguration(
+                session = ProximitySessionConfiguration.ConventionalNfc(
+                    handover = handover,
+                    retrieval = ProximityRetrievalOptions(),
+                    qrFallback = ProximityRetrievalOptions(
+                        bluetoothLowEnergy = null,
+                        nfc = ProximityNfcRetrievalConfiguration(),
+                    ),
+                ),
+            )
+            val capabilities = coordinator.capabilities(configuration)
+            assertTrue(capabilities.bluetoothLowEnergy.mayStart)
+            assertFalse(capabilities.qrMayStart)
+            assertFalse(capabilities.nfcMayStart)
+            assertFalse(capabilities.mayStart)
+            val session = coordinator.start(configuration)
+            assertIs<ProximityState.CheckingPrerequisites>(session.state.value)
+            session.close()
         }
-        val engagements = linkedSetOf(ProximityEngagementMethod.Qr)
-        val retrieval = linkedSetOf(ProximityRetrievalMethod.BluetoothLowEnergy)
-        val configuration = ProximityConfiguration(engagementMethods = engagements, retrievalMethods = retrieval)
-        val coordinator = ProximityCoordinator(Wallet("owned-configuration"), factory)
-        val pending = async { coordinator.start(configuration) }
-        entered.await()
-        engagements.clear()
-        retrieval.clear()
-        resume.complete(Unit)
-        val session = pending.await()
-        session.awaitConnection()
-        assertEquals(1, recorded.configurations.size)
-        session.close()
+        assertTrue(ble.configurations.isEmpty())
+        assertEquals(0, nfc.prepareCalls)
+    }
+
+    @Test
+    fun `missing optional BLE factory does not block a usable direct NFC route`() = runTest {
+        val nfc = RecordingNfcHostAdapter(NfcHostAvailability.Available)
+        val coordinator = ProximityCoordinator(Wallet("nfc-without-ble"), null, nfc)
+        for (handover in ProximityNfcHandover.entries) {
+            val configuration = ProximityConfiguration(
+                session = ProximitySessionConfiguration.ConventionalNfc(
+                    handover = handover,
+                    retrieval = ProximityRetrievalOptions(
+                        nfc = ProximityNfcRetrievalConfiguration(),
+                    ),
+                    qrFallback = ProximityRetrievalOptions(),
+                ),
+            )
+            val capabilities = coordinator.capabilities(configuration)
+            assertFalse(capabilities.qrMayStart)
+            assertTrue(capabilities.nfcMayStart)
+            val session = coordinator.start(configuration)
+            assertIs<ProximityEngagement.Nfc>(session.awaitEngagements().single())
+            session.close()
+        }
+        assertEquals(2, nfc.prepareCalls)
     }
 
     private suspend fun ProximitySession.awaitConnection() {
@@ -188,6 +441,46 @@ class ProximityCoordinatorTest {
             withTimeout(5.seconds) {
                 state.first { it is ProximityState.Connecting }
             }
+        }
+    }
+
+    private suspend fun ProximitySession.awaitEngagements(): List<ProximityEngagement> =
+        withContext(Dispatchers.Default) {
+            withTimeout(5.seconds) {
+                when (val current = state.first {
+                    it is ProximityState.EngagementReady ||
+                        it is ProximityState.Connecting
+                }) {
+                    is ProximityState.EngagementReady -> current.engagements
+                    is ProximityState.Connecting -> current.engagements
+                    else -> error("Unexpected proximity state $current")
+                }
+            }
+        }
+
+    private class RecordingNfcHostAdapter(
+        var availability: NfcHostAvailability,
+    ) : NfcHostPlatformAdapter {
+        var capabilityCalls: Int = 0
+        var prepareCalls: Int = 0
+        val routers: MutableList<NfcHostApduRouter> = mutableListOf()
+
+        override suspend fun capability(): NfcHostAvailability {
+            capabilityCalls++
+            return availability
+        }
+
+        override suspend fun prepare(
+            router: NfcHostApduRouter,
+            sessionScope: CoroutineScope,
+        ): NfcHostPreparation {
+            prepareCalls++
+            routers += router
+            return NfcHostPreparation.Ready(
+                object : PreparedNfcHostSession {
+                    override suspend fun close(reason: ProximityCloseReason) = Unit
+                }
+            )
         }
     }
 
@@ -202,13 +495,22 @@ class ProximityCoordinatorTest {
             return availability
         }
 
-        override fun create(configuration: BleProximityTransportConfiguration): ProximityTransportProvider {
+        override fun create(configuration: BleProximityTransportConfiguration): ReaderSelectedTransportProvider {
             configurations += configuration
             val loopback = FakeProximityLoopback.create()
             return FakeTransportProvider(
-                method = DeviceRetrievalMethod.Ble(
-                    centralMode = BleCentralMode(ByteArray(16) { 1 }),
-                ),
+                method = when (val roles = configuration.roles) {
+                    is BleMdocRoles.CentralClient -> DeviceRetrievalMethod.Ble(
+                        centralMode = BleCentralMode(roles.readerServiceUuid.encoded().copy()),
+                    )
+                    is BleMdocRoles.PeripheralServer -> DeviceRetrievalMethod.Ble(
+                        peripheralMode = BlePeripheralMode(roles.mdocServiceUuid.encoded().copy()),
+                    )
+                    is BleMdocRoles.Dual -> DeviceRetrievalMethod.Ble(
+                        centralMode = BleCentralMode(roles.readerServiceUuid.encoded().copy()),
+                        peripheralMode = BlePeripheralMode(roles.mdocServiceUuid.encoded().copy()),
+                    )
+                },
                 connection = loopback.holder,
             )
         }

@@ -17,6 +17,7 @@ import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceEngagementSecurity
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
@@ -50,26 +51,17 @@ import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 
-fun interface SessionTranscriptFactory {
-    fun create(
-        deviceEngagementBytes: ImmutableBytes,
-        eReaderKeyBytes: ImmutableBytes,
-        connectionMethod: DeviceRetrievalMethod,
-    ): SessionTranscript
-}
-
-object QrSessionTranscriptFactory : SessionTranscriptFactory {
-    override fun create(
-        deviceEngagementBytes: ImmutableBytes,
-        eReaderKeyBytes: ImmutableBytes,
-        connectionMethod: DeviceRetrievalMethod,
-    ): SessionTranscript = SessionTranscript.forQr(deviceEngagementBytes.copy(), eReaderKeyBytes.copy())
-}
-
 data class MdocEngagement(
     val engagement: ExactCbor<DeviceEngagement>,
     val qrPayload: String?,
 )
+
+/** Exact placement rules for retrieval methods and QR encoding in one Device Engagement. */
+enum class MdocDeviceEngagementPlacement {
+    QR,
+    NFC_CONNECTION_HANDOVER,
+    PROVISIONAL_NFC_V2,
+}
 
 class MdocDeviceEngagementFactory {
     /** Encodes the complete `EDeviceKeyBytes = #6.24(bstr .cbor EDeviceKey)` value. */
@@ -86,6 +78,11 @@ class MdocDeviceEngagementFactory {
         methods: List<DeviceRetrievalMethod>,
         context: EngagementContext,
         capabilities: MdocSessionCapabilities,
+        placement: MdocDeviceEngagementPlacement = if (context.engagementMode is MdocEngagementMode.Qr) {
+            MdocDeviceEngagementPlacement.QR
+        } else {
+            MdocDeviceEngagementPlacement.NFC_CONNECTION_HANDOVER
+        },
     ): MdocEngagement {
         val methods = methods.map { it.snapshot() }
         require(methods.isNotEmpty()) { "At least one retrieval method is required" }
@@ -93,13 +90,41 @@ class MdocDeviceEngagementFactory {
         require(eDeviceKey.spec.toMdocSessionCurve() == capabilities.selectedCurve) {
             "Selected session curve does not match the ephemeral device key"
         }
+        require(
+            methods.none { it is DeviceRetrievalMethod.NfcV2 } ||
+                placement == MdocDeviceEngagementPlacement.PROVISIONAL_NFC_V2
+        ) {
+            "NFCv2 retrieval requires provisional NFCv2 placement"
+        }
+        require(
+            methods.none {
+                it is DeviceRetrievalMethod.Ble && it.peripheralEndpoint is BlePeripheralEndpoint.Reader
+            } || placement != MdocDeviceEngagementPlacement.QR
+        ) {
+            "QR Device Engagement cannot advertise a reader-owned BLE endpoint"
+        }
+        require(
+            placement != MdocDeviceEngagementPlacement.QR || methods.none { method ->
+                method is DeviceRetrievalMethod.Ble && listOfNotNull(
+                    method.peripheralMode?.uuid,
+                    method.centralMode?.uuid,
+                ).any { uuid -> (uuid[8].toInt() and 0xc0) != 0x80 }
+            }
+        ) {
+            "QR Device Engagement BLE UUIDs must use the RFC 4122 variant-1 encoding"
+        }
+        require(placement != MdocDeviceEngagementPlacement.PROVISIONAL_NFC_V2 || methods.size == 1) {
+            "Provisional NFCv2 Device Engagement must select exactly one retrieval method"
+        }
         val (publicCose, encodedCose) = encodePublicDeviceKey(eDeviceKey)
         val engagementCapabilities = capabilities.toDeviceEngagementCapabilities()
         val usesEdition2Fields = engagementCapabilities != null
         val engagement = DeviceEngagement(
             version = if (usesEdition2Fields) DeviceEngagement.VERSION_1_1 else DeviceEngagement.VERSION_1_0,
             security = DeviceEngagementSecurity(1u, ByteStringWrapper(publicCose, encodedCose)),
-            deviceRetrievalMethods = methods.toList().takeIf { context.engagementMode is MdocEngagementMode.Qr },
+            deviceRetrievalMethods = methods.toList().takeIf {
+                placement != MdocDeviceEngagementPlacement.NFC_CONNECTION_HANDOVER
+            },
             originInfos = emptyList<CborElement>().takeIf { usesEdition2Fields },
             capabilities = engagementCapabilities,
         )
@@ -107,7 +132,7 @@ class MdocDeviceEngagementFactory {
             engagement,
             coseCompliantCbor.encodeToByteArray(DeviceEngagement.serializer(), engagement),
         )
-        val qrPayload = if (context.engagementMode is MdocEngagementMode.Qr) {
+        val qrPayload = if (placement == MdocDeviceEngagementPlacement.QR) {
             "mdoc:" + Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(exact.encodedCopy())
         } else null
         return MdocEngagement(exact, qrPayload)
@@ -199,7 +224,7 @@ class MdocHolderRequestContext(
     /** Exact SessionTranscriptBytes, including the tag-24 byte-string wrapper. */
     val transcript: ExactCbor<SessionTranscript>
         get() = ExactCbor.of(
-            coseCompliantCbor.decodeFromByteArray(coseCompliantCbor.decodeFromByteArray<ByteArray>(transcriptBytes)),
+            decodeProximitySessionTranscript(transcriptBytes),
             transcriptBytes,
         )
     /** Exact reader ephemeral COSE_Key from SessionEstablishment, available for device-MAC selection. */
@@ -265,19 +290,28 @@ fun interface MdocConsentHandler {
     suspend fun decide(prompt: MdocConsentPrompt): MdocConsentDecision
 }
 
+/** Winning engagement and the bearer carrying the session, retained after connection. */
+data class MdocConnectedRoute(val engagement: MdocEngagementMode, val transport: ProximityTransportKind)
+
 sealed interface MdocHolderSessionState {
     data object Idle : MdocHolderSessionState
     data class Preparing(val profileId: String) : MdocHolderSessionState
     data class EngagementReady(
         val qrPayload: String?,
+        val engagementModes: Set<MdocEngagementMode>,
         val availableTransports: Set<ProximityTransportKind>,
         val unavailableTransports: Map<ProximityTransportKind, ProximityError>,
-    ) : MdocHolderSessionState
+    ) : MdocHolderSessionState {
+        init { require(engagementModes.isNotEmpty()) }
+    }
     data class Connecting(
         val qrPayload: String?,
+        val engagementModes: Set<MdocEngagementMode>,
         val availableTransports: Set<ProximityTransportKind>,
         val unavailableTransports: Map<ProximityTransportKind, ProximityError>,
-    ) : MdocHolderSessionState
+    ) : MdocHolderSessionState {
+        init { require(engagementModes.isNotEmpty()) }
+    }
     data class AwaitingRequest(val exchange: Int) : MdocHolderSessionState {
         init { require(exchange > 0) }
     }
@@ -337,7 +371,8 @@ sealed interface MdocHolderSessionResult {
         init { require(exchange > 0) }
     }
     data class Completed(val exchanges: Int) : MdocHolderSessionResult
-    data class Failed(val error: ProximityError) : MdocHolderSessionResult
+    /** Original failure is retained for diagnostics; never render its message as user-facing text. */
+    data class Failed(val error: ProximityError, val cause: Throwable? = null) : MdocHolderSessionResult
 }
 
 /**
@@ -345,35 +380,37 @@ sealed interface MdocHolderSessionResult {
  */
 class MdocHolderProtocolEngine(
     private val eDeviceKey: Key,
-    transportProviders: List<ProximityTransportProvider>,
+    engagementSources: List<MdocEngagementSource>,
     private val requestProcessor: MdocHolderRequestProcessor,
     private val consentHandler: MdocConsentHandler,
     private val engagementContext: EngagementContext,
     private val capabilities: MdocSessionCapabilities,
     private val limits: MdocProximityLimits = MdocProximityLimits(),
     private val timeouts: MdocProximityTimeouts = MdocProximityTimeouts(),
-    private val transportCoordinator: TransportCoordinator = TransportCoordinator(),
-    private val engagementFactory: MdocDeviceEngagementFactory = MdocDeviceEngagementFactory(),
+    private val engagementCoordinator: MdocEngagementCoordinator = MdocEngagementCoordinator(),
 ) {
-    private val transportProviders = transportProviders.toList()
+    private val engagementSources = engagementSources.toList()
     private val mutableState = MutableStateFlow<MdocHolderSessionState>(MdocHolderSessionState.Idle)
     val state: StateFlow<MdocHolderSessionState> = mutableState.asStateFlow()
+    private val mutableConnectedRoute = MutableStateFlow<MdocConnectedRoute?>(null)
+    val connectedRoute: MdocConnectedRoute? get() = mutableConnectedRoute.value
     private val startMutex = Mutex()
     private var started = false
+    private lateinit var messageSequencer: MdocSessionMessageSequencer
 
     init {
         require(capabilities.profile == engagementContext.profile) {
             "Capability profile must match the engagement profile"
         }
-        val negotiatedEstablishment = (engagementContext.engagementMode as? MdocEngagementMode.Nfc)
-            ?.negotiatedSessionEstablishment
-        require(
-            capabilities.selected(MdocProtocolFeature.NEGOTIATED_HANDOVER_SESSION_ESTABLISHMENT) ==
-                (negotiatedEstablishment != null)
-        ) {
-            "Negotiated handover capability requires exact handover SessionEstablishment bytes"
+        require(engagementSources.isNotEmpty()) { "At least one engagement source is required" }
+        require(engagementSources.all { it.modes.isNotEmpty() }) {
+            "An engagement source must own at least one mode"
         }
-        negotiatedEstablishment?.let(limits::requireEngagementOrHandover)
+        require(
+            engagementSources.flatMap { it.modes }.distinct().size == engagementSources.sumOf { it.modes.size }
+        ) {
+            "An engagement mode may be configured by only one source"
+        }
     }
 
     /**
@@ -394,12 +431,34 @@ class MdocHolderProtocolEngine(
             throw cancelled
         } catch (failure: ProximityException) {
             mutableState.value = MdocHolderSessionState.Failed(failure.error)
-            MdocHolderSessionResult.Failed(failure.error)
+            MdocHolderSessionResult.Failed(failure.error, failure)
         } catch (failure: Exception) {
-            val error = ProximityError.Protocol("session_failed", "The proximity session failed")
+            val error = unexpectedFailure(mutableState.value)
             mutableState.value = MdocHolderSessionState.Failed(error)
-            MdocHolderSessionResult.Failed(error)
+            MdocHolderSessionResult.Failed(error, failure)
         }
+    }
+
+    private fun unexpectedFailure(state: MdocHolderSessionState): ProximityError = when (state) {
+        is MdocHolderSessionState.Preparing -> ProximityError.Capability(
+            "session_preparation_failed", "The selected presentation methods could not be prepared",
+        )
+        is MdocHolderSessionState.EngagementReady,
+        is MdocHolderSessionState.Connecting -> ProximityError.Transport(
+            "session_connection_failed", "The reader connection could not be established",
+        )
+        is MdocHolderSessionState.AwaitingRequest,
+        is MdocHolderSessionState.AwaitingNextRequest -> ProximityError.Protocol(
+            "request_processing_failed", "The reader request could not be processed",
+        )
+        is MdocHolderSessionState.ReviewRequired,
+        is MdocHolderSessionState.SendingResponse -> ProximityError.Protocol(
+            "response_processing_failed", "The presentation response could not be prepared or sent",
+        )
+        is MdocHolderSessionState.Terminating -> ProximityError.Transport(
+            "session_termination_failed", "The presentation session could not be closed normally",
+        )
+        else -> ProximityError.Protocol("session_failed", "The proximity session failed")
     }
 
     private suspend fun withTotalSessionTimeout(): MdocHolderSessionResult = phase(
@@ -408,67 +467,87 @@ class MdocHolderProtocolEngine(
     ) { coroutineScope { runSession(this) } }
 
     private suspend fun runSession(scope: CoroutineScope): MdocHolderSessionResult {
-        val negotiatedEstablishment = (engagementContext.engagementMode as? MdocEngagementMode.Nfc)
-            ?.negotiatedSessionEstablishment
         mutableState.value = MdocHolderSessionState.Preparing(engagementContext.profile.id)
-        var prepared: PreparedTransports? = null
-        var winningPrepared: PreparedTransport? = null
+        var prepared: PreparedMdocEngagements? = null
+        var winningSource: PreparedMdocEngagement? = null
         var cipher: MdocSessionCipher? = null
         var closeReason = ProximityCloseReason.PROTOCOL_ERROR
         val budget = MdocSessionBudget(limits.maximumCumulativeSessionBytes)
         try {
-            prepared = transportCoordinator.prepare(transportProviders, engagementContext, scope)
-            val engagement = engagementFactory.create(
-                eDeviceKey,
-                prepared.connectionMethods,
-                engagementContext,
-                capabilities,
+            prepared = engagementCoordinator.prepare(
+                sources = engagementSources,
+                context = MdocEngagementPreparationContext(
+                    eDeviceKey = eDeviceKey,
+                    engagementContext = engagementContext,
+                    capabilities = capabilities,
+                    limits = limits,
+                ),
+                sessionScope = scope,
             )
-            val engagementBytes = ImmutableBytes.of(engagement.engagement.encodedCopy())
-            limits.requireEngagementOrHandover(engagementBytes)
-            val kinds = prepared.transports.map { it.kind }.toSet()
+            val readiness = prepared.readiness
+            val engagementModes = prepared.sources.flatMap { it.modes }.toSet()
             mutableState.value = MdocHolderSessionState.EngagementReady(
-                engagement.qrPayload,
-                kinds,
-                prepared.unavailable,
+                readiness.qrPayload,
+                engagementModes,
+                readiness.availableTransports,
+                readiness.unavailableTransports,
             )
-            val (winner, firstBytes) = if (engagementContext.engagementMode is MdocEngagementMode.Qr) {
+            val onConnected = {
+                mutableState.value = MdocHolderSessionState.Connecting(
+                    readiness.qrPayload,
+                    engagementModes,
+                    readiness.availableTransports,
+                    readiness.unavailableTransports,
+                )
+            }
+            val (winner, firstBytes) = if (readiness.qrPayload != null) {
                 phase(
                     timeouts.qrEngagementLifetime,
                     ProximityError.Protocol("engagement_timeout", "The QR engagement expired before session establishment"),
                 ) {
-                    connectAndReceiveEstablishment(prepared, budget) {
-                        mutableState.value = MdocHolderSessionState.Connecting(
-                            engagement.qrPayload,
-                            kinds,
-                            prepared.unavailable,
-                        )
-                    }
+                    connectAndReceiveEstablishment(
+                        prepared = prepared,
+                        budget = budget,
+                        onConnected = onConnected,
+                        awaitConnection = { engagementCoordinator.awaitWinner(prepared) },
+                    )
                 }
             } else {
-                connectAndReceiveEstablishment(prepared, budget) {
-                    mutableState.value = MdocHolderSessionState.Connecting(
-                        engagement.qrPayload,
-                        kinds,
-                        prepared.unavailable,
-                    )
-                }
-            }
-            winningPrepared = winner.prepared
-            val connection = winner.connection
-            if (negotiatedEstablishment != null && firstBytes != negotiatedEstablishment) {
-                throw ProximityException(
-                    ProximityError.Security(
-                        "negotiated_establishment_mismatch",
-                        "SessionEstablishment differs from the negotiated handover copy",
-                    )
+                connectAndReceiveEstablishment(
+                    prepared = prepared,
+                    budget = budget,
+                    onConnected = onConnected,
+                    awaitConnection = {
+                        phase(
+                            timeouts.transportConnection,
+                            ProximityError.Transport("connection_timeout", "No reader connected in time"),
+                        ) { engagementCoordinator.awaitWinner(prepared) }
+                    },
                 )
             }
+            winningSource = winner.source
+            val engaged = winner.engaged
+            val connection = engaged.connection
+            val engagementBytes = engaged.deviceEngagement
+            val sessionHandover = engaged.sessionHandover
+            limits.requireEngagementOrHandover(engagementBytes)
+            when (sessionHandover) {
+                MdocSessionHandover.Qr -> Unit
+                is MdocSessionHandover.NfcConnection -> {
+                    limits.requireEngagementOrHandover(sessionHandover.handoverSelect)
+                    sessionHandover.handoverRequest?.let(limits::requireEngagementOrHandover)
+                }
+                is MdocSessionHandover.ProvisionalNfcV2 -> {
+                    limits.requireEngagementOrHandover(sessionHandover.handoverSelect)
+                    limits.requireEngagementOrHandover(sessionHandover.handoverRequest)
+                }
+            }
+            messageSequencer = MdocSessionMessageSequencer(sessionHandover.sessionMessageProfile)
             val establishment = decodeEstablishmentOrReport(connection, firstBytes)
-            val transcript = winner.prepared.sessionTranscriptFactory.create(
+            messageSequencer.validateIncoming(establishment)
+            val transcript = sessionHandover.createTranscript(
                 engagementBytes,
                 ImmutableBytes.of(establishment.eReaderKey.serialized),
-                winner.prepared.connectionMethod,
             )
             val transcriptBytes = MdocCryptoHelper.buildSessionTranscriptBytes(transcript)
             val exactTranscript = ImmutableBytes.of(transcriptBytes)
@@ -546,22 +625,32 @@ class MdocHolderProtocolEngine(
                 if (resolution.submissionBindingDigest != preview.submissionBindingDigest) throw ProximityException(
                     ProximityError.Security("changed_submission", "The approved request state changed before submission")
                 )
+                val terminate = resolution is MdocResponseResolution.TerminateWithoutResponse ||
+                    resolution is MdocResponseResolution.Send &&
+                    resolution.continuation == MdocSessionContinuation.TERMINATE ||
+                    terminateAfterResponse
                 if (resolution is MdocResponseResolution.Send) {
                     limits.requireResponse(resolution.exactResponse)
                     requireWithinReaderLimit(request, resolution.exactResponse)
                     mutableState.value = MdocHolderSessionState.SendingResponse(exchange)
                     val encrypted = cipher.encrypt(resolution.exactResponse.copy())
-                    send(connection, SessionData(data = encrypted), budget)
+                    send(
+                        connection,
+                        SessionData(
+                            data = encrypted,
+                            status = SessionStatusCode.SESSION_TERMINATION.code.takeIf { terminate },
+                        ),
+                        budget,
+                    )
                 }
-                val terminate = resolution is MdocResponseResolution.TerminateWithoutResponse ||
-                    resolution is MdocResponseResolution.Send &&
-                    resolution.continuation == MdocSessionContinuation.TERMINATE
-                if (terminate || terminateAfterResponse) {
+                if (terminate) {
                     mutableState.value = MdocHolderSessionState.Terminating(exchange)
-                    phase(
-                        timeouts.gracefulTermination,
-                        ProximityError.Transport("termination_timeout", "Session termination timed out"),
-                    ) { send(connection, SessionData(status = SessionStatusCode.SESSION_TERMINATION.code), budget) }
+                    if (resolution !is MdocResponseResolution.Send) {
+                        phase(
+                            timeouts.gracefulTermination,
+                            ProximityError.Transport("termination_timeout", "Session termination timed out"),
+                        ) { send(connection, SessionData(status = SessionStatusCode.SESSION_TERMINATION.code), budget) }
+                    }
                     closeReason = ProximityCloseReason.COMPLETED
                     if (resolution is MdocResponseResolution.TerminateWithoutResponse) {
                         mutableState.value = MdocHolderSessionState.NoData(exchange)
@@ -578,6 +667,7 @@ class MdocHolderProtocolEngine(
                     ProximityError.Transport("peer_disconnected", "Reader disconnected before the next request")
                 )
                 val next = decodeOrReport<SessionData>(connection, nextBytes)
+                messageSequencer.validateIncoming(next)
                 if (next.data == null) {
                     when (next.statusCode) {
                         SessionStatusCode.SESSION_TERMINATION -> {
@@ -619,10 +709,10 @@ class MdocHolderProtocolEngine(
         } finally {
             withContext(NonCancellable) {
                 cipher?.close()
-                val toClose = winningPrepared?.let(::listOf) ?: prepared?.transports.orEmpty()
-                toClose.forEach { transport ->
+                val toClose = winningSource?.let(::listOf) ?: prepared?.sources.orEmpty()
+                toClose.forEach { source ->
                     try {
-                        transport.close(closeReason)
+                        source.close(closeReason)
                     } catch (_: Exception) {
                         // Continue deterministic cleanup of remaining resources.
                     }
@@ -632,19 +722,18 @@ class MdocHolderProtocolEngine(
     }
 
     private suspend fun connectAndReceiveEstablishment(
-        prepared: PreparedTransports,
+        prepared: PreparedMdocEngagements,
         budget: MdocSessionBudget,
         onConnected: () -> Unit,
-    ): Pair<WinningConnection, ImmutableBytes> {
-        val winner = phase(
-            timeouts.transportConnection,
-            ProximityError.Transport("connection_timeout", "No reader connected in time"),
-        ) { transportCoordinator.awaitWinner(prepared) }
+        awaitConnection: suspend () -> WinningMdocEngagement,
+    ): Pair<WinningMdocEngagement, ImmutableBytes> {
+        val winner = awaitConnection()
+        mutableConnectedRoute.value = MdocConnectedRoute(winner.engaged.engagementMode, winner.engaged.connection.kind)
         onConnected()
         val firstBytes = phase(
-            establishmentTimeout(),
+            establishmentTimeout(winner.engaged.engagementMode),
             ProximityError.Transport("establishment_timeout", "Session establishment timed out"),
-        ) { receive(winner.connection, budget) } ?: throw ProximityException(
+        ) { receive(winner.engaged.connection, budget) } ?: throw ProximityException(
             ProximityError.Transport("peer_disconnected", "Reader disconnected before session establishment")
         )
         return winner to firstBytes
@@ -774,7 +863,8 @@ class MdocHolderProtocolEngine(
     }
 
     private suspend fun send(connection: ProximityConnection, message: SessionData, budget: MdocSessionBudget) {
-        val encoded = ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(SessionData.serializer(), message))
+        val sequenced = messageSequencer.sequence(message)
+        val encoded = ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(SessionData.serializer(), sequenced))
         requireWithinTransportLimit(encoded)
         limits.requireSessionMessage(encoded)
         budget.account(encoded)
@@ -783,8 +873,9 @@ class MdocHolderProtocolEngine(
 
     private suspend fun trySendStatus(connection: ProximityConnection, status: SessionStatusCode) {
         try {
+            val message = messageSequencer.sequence(SessionData(status = status.code))
             val encoded = ImmutableBytes.of(
-                coseCompliantCbor.encodeToByteArray(SessionData.serializer(), SessionData(status = status.code))
+                coseCompliantCbor.encodeToByteArray(SessionData.serializer(), message)
             )
             requireWithinTransportLimit(encoded)
             limits.requireSessionMessage(encoded)
@@ -838,7 +929,7 @@ class MdocHolderProtocolEngine(
 
     private fun limit(code: String, message: String) = ProximityException(ProximityError.Protocol(code, message))
 
-    private fun establishmentTimeout(): Duration = when (engagementContext.engagementMode) {
+    private fun establishmentTimeout(mode: MdocEngagementMode): Duration = when (mode) {
         is MdocEngagementMode.Qr -> timeouts.qrSessionEstablishment
         is MdocEngagementMode.Nfc -> timeouts.nfcSessionEstablishment
     }

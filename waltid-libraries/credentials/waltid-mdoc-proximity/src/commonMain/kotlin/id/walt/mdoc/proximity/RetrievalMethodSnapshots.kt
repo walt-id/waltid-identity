@@ -3,7 +3,9 @@
 package id.walt.mdoc.proximity
 
 import id.walt.mdoc.objects.engagement.BleCentralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
 import id.walt.mdoc.objects.engagement.BlePeripheralMode
+import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
@@ -20,9 +22,17 @@ import kotlinx.serialization.cbor.CborUndefined
 /** Typed proximity copies of mutable shared DTOs; authoritative wire encodings remain separate. */
 internal fun DeviceRetrievalMethod.snapshot(): DeviceRetrievalMethod = when (this) {
     is DeviceRetrievalMethod.Nfc -> copy(extensions = extensions.mapValues { it.value.snapshot() })
+    DeviceRetrievalMethod.NfcV2 -> this
     is DeviceRetrievalMethod.Ble -> copy(
-        peripheralMode = peripheralMode?.let { BlePeripheralMode(it.uuid.copyOf(), it.deviceAddress?.copyOf(), it.psm) },
+        peripheralMode = peripheralMode?.let { BlePeripheralMode(it.uuid.copyOf()) },
         centralMode = centralMode?.let { BleCentralMode(it.uuid.copyOf()) },
+        peripheralEndpoint = peripheralEndpoint?.let { endpoint ->
+            val options = BlePeripheralServerOptions(endpoint.options.deviceAddress?.copyOf(), endpoint.options.psm)
+            when (endpoint) {
+                is BlePeripheralEndpoint.Mdoc -> BlePeripheralEndpoint.Mdoc(options)
+                is BlePeripheralEndpoint.Reader -> BlePeripheralEndpoint.Reader(options)
+            }
+        },
         extensions = extensions.mapValues { it.value.snapshot() },
     )
     is DeviceRetrievalMethod.WifiAware -> DeviceRetrievalMethod.WifiAware(

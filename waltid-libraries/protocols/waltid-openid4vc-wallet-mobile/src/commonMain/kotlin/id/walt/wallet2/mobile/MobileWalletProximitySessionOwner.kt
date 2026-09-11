@@ -177,6 +177,7 @@ private fun ProximityTransportCapability.snapshot() = copy(
 private fun ProximityCapabilities.snapshot() = copy(
     qrEngagement = qrEngagement.snapshot(), nfcEngagement = nfcEngagement.snapshot(),
     bluetoothLowEnergy = bluetoothLowEnergy.snapshot(), nfcRetrieval = nfcRetrieval.snapshot(),
+    nfcV2Retrieval = nfcV2Retrieval.snapshot(),
     wifiAwareRetrieval = wifiAwareRetrieval.snapshot(),
 )
 

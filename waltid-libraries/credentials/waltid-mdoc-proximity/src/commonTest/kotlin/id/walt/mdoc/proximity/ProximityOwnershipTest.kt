@@ -7,6 +7,7 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.SessionTranscript
+import id.walt.mdoc.objects.handover.NFCHandover
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.ElementReference
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -96,6 +97,44 @@ class ProximityOwnershipTest {
         assertContentEquals(requestBytes, context.request.encodedCopy())
         assertContentEquals(transcriptBytes, context.transcript.encodedCopy())
         assertEquals("doc", context.request.value.docRequests.single().itemsRequest.value.docType)
+    }
+
+    @Test
+    fun `static NFC context restores handover from exact bytes`() = assertNfcTranscriptOwnership(null)
+
+    @Test
+    fun `negotiated NFC context restores both handover messages from exact bytes`() =
+        assertNfcTranscriptOwnership(byteArrayOf(4, 5))
+
+    private fun assertNfcTranscriptOwnership(handoverRequest: ByteArray?) {
+        val request = DeviceRequest("doc", mapOf("n" to listOf("a")))
+        val transcript = SessionTranscript.forNfc(
+            byteArrayOf(1), byteArrayOf(2), NFCHandover(byteArrayOf(3), handoverRequest),
+        )
+        val exactBytes = MdocCryptoHelper.buildSessionTranscriptBytes(transcript)
+        val key = CoseKey(kty = 2, x = byteArrayOf(6), y = byteArrayOf(7))
+        val context = MdocHolderRequestContext(
+            ExactCbor.of(request, coseCompliantCbor.encodeToByteArray(request)),
+            ExactCbor.of(transcript, exactBytes),
+            ExactCbor.of(key, coseCompliantCbor.encodeToByteArray(key)), 1,
+        )
+        val expectedRequest = handoverRequest?.copyOf()
+        transcript.deviceEngagementBytes!!.fill(0)
+        transcript.eReaderKeyBytes!!.fill(0)
+        transcript.nfcHandover!!.handoverSelect.fill(0)
+        handoverRequest?.fill(0)
+        val exported = context.transcript.value
+        exported.deviceEngagementBytes!!.fill(9)
+        exported.eReaderKeyBytes!!.fill(9)
+        exported.nfcHandover!!.handoverSelect.fill(9)
+        exported.nfcHandover!!.handoverRequest?.fill(9)
+        val restored = context.transcript
+        assertContentEquals(byteArrayOf(1), restored.value.deviceEngagementBytes)
+        assertContentEquals(byteArrayOf(2), restored.value.eReaderKeyBytes)
+        assertContentEquals(byteArrayOf(3), restored.value.nfcHandover!!.handoverSelect)
+        assertContentEquals(expectedRequest, restored.value.nfcHandover!!.handoverRequest)
+        assertContentEquals(exactBytes, restored.encodedCopy())
+        assertContentEquals(exactBytes, MdocCryptoHelper.buildSessionTranscriptBytes(restored.value))
     }
 
     @Test

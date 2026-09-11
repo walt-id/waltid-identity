@@ -8,13 +8,15 @@
 
 `waltid-mdoc-proximity-mobile` connects the
 [shared proximity engine](../waltid-mdoc-proximity/README.md) to platform radios.
-It owns BLE role setup, Ident checks, GATT/L2CAP framing
+It owns BLE role setup, Ident checks, GATT/L2CAP framing, NFC handover/APDU framing
 and transport lifecycle. The shared engine owns engagement coordination,
 session encryption, request processing, consent and trust decisions.
 
 | Transport | Android | iOS |
 |---|---|---|
 | BLE central/client and peripheral/server | Native Bluetooth adapters; GATT and L2CAP | CoreBluetooth adapters; GATT and L2CAP |
+| Conventional NFC engagement and retrieval | Host-card emulation adapter | Host boundary consumed by Swift WalletSDK's entitlement-gated CardSession adapter |
+| Provisional NFCv2 | Explicit edition-2 draft path | Same host boundary; platform access and reader support required |
 
 These are implementation boundaries. Physical-device and independent-reader
 qualification remain separate from compilation, unit tests and API availability.
@@ -98,6 +100,10 @@ Active connections expose passive closure observation to the shared engine. BLE
 observes closure of its platform packet channel without consuming packets or
 starting the receive inactivity timeout.
 
+NFC host deactivation ends a direct APDU connection even while the wallet awaits
+consent. Conventional handover does not close the selected BLE connection; NFCv2
+hybrid retrieval remains viable while its alternate bearer is active or connecting.
+
 Successful L2CAP completion permits a one-second drain before native cleanup.
 This allows queued response bytes to leave the radio stack; it is not a reader
 acknowledgement. Cancellation and error cleanup remain immediate.
@@ -111,4 +117,5 @@ From the unified-build root:
 ```
 
 - [BLE building blocks and qualification boundary](docs/adr/0001-ble-building-block-selection.md)
+- [NFC, handover and provisional NFCv2](docs/adr/0002-nfc-building-block-selection.md)
 - [Wallet integration, reader trust and credential selection](../../protocols/waltid-openid4vc-wallet-mobile/README.md#in-person-proximity-presentation)

@@ -12,7 +12,7 @@ import kotlin.time.Instant
  * @property id Stable identifier suitable for configuration and diagnostics.
  */
 public enum class ProximityProfile(public val id: String) {
-    /** Provisional ISO/IEC 18013-5:2021 compatibility boundary. */
+    /** ISO/IEC 18013-5:2021 compatibility boundary. */
     Iso1801352021("iso-18013-5:2021"),
 
     /** ISO/IEC 18013-5 edition-2 DIS implementation boundary. */
@@ -35,18 +35,126 @@ public enum class ProximityBleBearerPolicy {
     PreferL2cap,
 }
 
-/** Holder-to-reader engagement methods selected for a session. */
-public enum class ProximityEngagementMethod {
-    Qr,
-    Nfc,
+/**
+ * Complete BLE bearer configuration; it cannot exist unless BLE retrieval is selected.
+ *
+ * @property roles Holder GATT roles prepared for the session.
+ * @property bearerPolicy GATT/L2CAP selection policy applied within the selected roles.
+ */
+public data class ProximityBleConfiguration(
+    public val roles: ProximityBleRoles = ProximityBleRoles.Dual,
+    public val bearerPolicy: ProximityBleBearerPolicy =
+        ProximityBleBearerPolicy.PreferL2cap,
+)
+
+/**
+ * Complete conventional NFC retrieval length contract.
+ *
+ * @property maximumCommandDataLength Maximum command-data bytes accepted by the holder.
+ * @property maximumResponseDataLength Maximum response-data bytes returned by the holder.
+ */
+public data class ProximityNfcRetrievalConfiguration(
+    public val maximumCommandDataLength: Int = 65_535,
+    public val maximumResponseDataLength: Int = 65_536,
+) {
+    init {
+        require(maximumCommandDataLength in 255..65_535)
+        require(maximumResponseDataLength in 256..65_536)
+    }
 }
 
-/** Device-retrieval transports selected for a session. */
-public enum class ProximityRetrievalMethod {
-    BluetoothLowEnergy,
-    Nfc,
-    WifiAware,
+/**
+ * Nonempty conventional retrieval plan used by QR or NFC handover.
+ * @property bluetoothLowEnergy Optional BLE role and bearer policy.
+ * @property nfc Optional conventional NFC command/response contract.
+ */
+public data class ProximityRetrievalOptions(
+    public val bluetoothLowEnergy: ProximityBleConfiguration? = ProximityBleConfiguration(),
+    public val nfc: ProximityNfcRetrievalConfiguration? = null,
+) {
+    init { require(bluetoothLowEnergy != null || nfc != null) { "A retrieval plan must contain a bearer" } }
 }
+
+/** Conventional NFC Forum handover selection; provisional NFCv2 has its own session variant. */
+public enum class ProximityNfcHandover {
+    /** Holder-selected retrieval methods. */
+    Static,
+    /** Reader-selected retrieval method. */
+    Negotiated,
+}
+
+/** Owns engagement and compatible retrieval together for one single-use session. */
+public sealed interface ProximitySessionConfiguration {
+    /**
+     * QR engagement with a nonempty conventional retrieval plan.
+     * @property retrieval Bearers advertised by the QR engagement.
+     */
+    public data class Qr(
+        public val retrieval: ProximityRetrievalOptions =
+            ProximityRetrievalOptions(),
+    ) : ProximitySessionConfiguration
+
+    /**
+     * Conventional NFC handover with an optional, separately selected QR fallback.
+     * @property handover NFC Forum handover mode.
+     * @property retrieval Bearers offered through NFC handover.
+     * @property qrFallback Nonempty QR plan. Shared bearers use the same BLE policy and conventional NFC length limits.
+     */
+    public data class ConventionalNfc(
+        public val handover: ProximityNfcHandover,
+        public val retrieval: ProximityRetrievalOptions,
+        public val qrFallback: ProximityRetrievalOptions? = null,
+    ) : ProximitySessionConfiguration {
+        init {
+            requireSharedBlePolicy(retrieval.bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
+            require(retrieval.nfc == null || qrFallback?.nfc == null || retrieval.nfc == qrFallback.nfc) {
+                "QR and NFC handover must use the same conventional NFC retrieval length limits"
+            }
+        }
+    }
+
+    /**
+     * Provisional NFCv2 engagement and its mandatory same-channel retrieval.
+     * @property maximumCommandDataLength Maximum data accepted by the NFCv2 application.
+     * @property bluetoothLowEnergy Optional NFCv2 hybrid BLE bearer.
+     * @property qrFallback Nonempty conventional plan advertised by QR, when selected.
+     */
+    public data class ProvisionalNfcV2(
+        public val maximumCommandDataLength: Int = 65_536,
+        public val bluetoothLowEnergy: ProximityBleConfiguration? = null,
+        public val qrFallback: ProximityRetrievalOptions? = null,
+    ) : ProximitySessionConfiguration {
+        init {
+            require(maximumCommandDataLength in 1..65_536)
+            requireSharedBlePolicy(bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
+        }
+    }
+}
+
+// One session probes a BLE role/bearer policy once and may prepare distinct endpoints for its routes.
+private fun requireSharedBlePolicy(
+    nfc: ProximityBleConfiguration?, qr: ProximityBleConfiguration?,
+) { require(nfc == null || qr == null || nfc == qr) { "QR and NFC must use the same BLE role and bearer policy" } }
+
+internal val ProximitySessionConfiguration.qrRetrieval: ProximityRetrievalOptions?
+    get() = when (this) {
+        is ProximitySessionConfiguration.Qr -> retrieval
+        is ProximitySessionConfiguration.ConventionalNfc -> qrFallback
+        is ProximitySessionConfiguration.ProvisionalNfcV2 -> qrFallback
+    }
+
+internal val ProximitySessionConfiguration.nfcRetrieval: ProximityRetrievalOptions?
+    get() = (this as? ProximitySessionConfiguration.ConventionalNfc)?.retrieval
+
+internal val ProximitySessionConfiguration.nfcBle: ProximityBleConfiguration?
+    get() = when (this) {
+        is ProximitySessionConfiguration.Qr -> null
+        is ProximitySessionConfiguration.ConventionalNfc -> retrieval.bluetoothLowEnergy
+        is ProximitySessionConfiguration.ProvisionalNfcV2 -> bluetoothLowEnergy
+    }
+
+internal val ProximitySessionConfiguration.bleConfiguration: ProximityBleConfiguration?
+    get() = nfcBle ?: qrRetrieval?.bluetoothLowEnergy
 
 /** Holder authentication frozen for a reviewed document response. */
 public enum class ProximityDeviceAuthenticationMethod {
@@ -94,10 +202,7 @@ public enum class ProximityReaderPolicy {
  * Immutable configuration for one single-use proximity session.
  *
  * @property profile Protocol and application-profile boundary to enforce.
- * @property bleRoles BLE holder roles the platform transport may prepare.
- * @property bearerPolicy Preference between supported BLE bearer modes.
- * @property engagementMethods Holder-to-reader engagement methods selected for the session.
- * @property retrievalMethods Device-retrieval transports selected for the session.
+ * @property session Engagement and compatible retrieval plans owned by this session.
  * @property readerPolicy Trust threshold applied before disclosure review.
  * @property deviceAuthenticationPolicy Allowed and preferred holder-authentication methods.
  * @property readerTrustEvaluator Application-owned reader trust boundary.
@@ -108,13 +213,7 @@ public enum class ProximityReaderPolicy {
 public data class ProximityConfiguration(
     public val profile: ProximityProfile =
         ProximityProfile.Iso180135Edition2Dis2026,
-    public val bleRoles: ProximityBleRoles = ProximityBleRoles.Dual,
-    public val bearerPolicy: ProximityBleBearerPolicy =
-        ProximityBleBearerPolicy.PreferL2cap,
-    public val engagementMethods: Set<ProximityEngagementMethod> =
-        setOf(ProximityEngagementMethod.Qr),
-    public val retrievalMethods: Set<ProximityRetrievalMethod> =
-        setOf(ProximityRetrievalMethod.BluetoothLowEnergy),
+    public val session: ProximitySessionConfiguration = ProximitySessionConfiguration.Qr(),
     public val readerPolicy: ProximityReaderPolicy =
         ProximityReaderPolicy.AllowAnonymousOrUntrusted,
     public val deviceAuthenticationPolicy: ProximityDeviceAuthenticationPolicy =
@@ -128,8 +227,6 @@ public data class ProximityConfiguration(
     public val maximumMessageBytes: Int = 1_048_576,
 ) {
     init {
-        require(engagementMethods.isNotEmpty()) { "At least one engagement method must be selected" }
-        require(retrievalMethods.isNotEmpty()) { "At least one retrieval method must be selected" }
         require(maximumMessageBytes in 1..16_777_216) {
             "Maximum proximity message size must be between 1 byte and 16 MiB"
         }
@@ -141,6 +238,10 @@ public data class ProximityConfiguration(
             profile != ProximityProfile.EudiArf3Fcaf202608 ||
                 deviceAuthenticationPolicy == ProximityDeviceAuthenticationPolicy.SignatureOnly
         ) { "The selected EUDI profile requires device-signature authentication" }
+        require(profile != ProximityProfile.Iso1801352021 || session !is ProximitySessionConfiguration.ProvisionalNfcV2) {
+            "NFC Engagement v2 is not part of the ISO/IEC 18013-5:2021 compatibility profile"
+        }
+
     }
 }
 
@@ -158,6 +259,10 @@ public data class ProximityError(
     public val message: String,
     public val recovery: ProximityRecovery,
 ) {
+    /** Host actions for this safe error code; terminal failures require a fresh session afterward. */
+    public val remediationActions: List<ProximityRemediationAction>
+        get() = code.toRemediationActions()
+
     init {
         require(code.isNotBlank()) { "A proximity error code must not be blank" }
         require(message.isNotBlank()) { "A proximity error message must not be blank" }
@@ -195,6 +300,7 @@ public enum class ProximityRemediationAction {
     RequestBluetoothPermission,
     OpenApplicationSettings,
     EnableBluetooth,
+    EnableNfc,
     UseSupportedDevice,
     Retry,
 }
@@ -253,30 +359,52 @@ public sealed interface ProximityRuntimeObservation {
  * @property qrEngagement QR engagement capability.
  * @property nfcEngagement NFC engagement capability.
  * @property bluetoothLowEnergy BLE device-retrieval capability.
- * @property nfcRetrieval NFC device-retrieval capability.
+ * @property nfcRetrieval Conventional NFC device-retrieval capability.
+ * @property nfcV2Retrieval Provisional NFCv2 same-channel device-retrieval capability.
  * @property wifiAwareRetrieval Wi-Fi Aware device-retrieval capability.
  */
 public data class ProximityCapabilities(
     public val profile: ProximityProfile,
+    /** Selected plans used to relate independent transport observations to viable routes. */
+    public val session: ProximitySessionConfiguration,
     public val qrEngagement: ProximityTransportCapability,
     public val nfcEngagement: ProximityTransportCapability,
     public val bluetoothLowEnergy: ProximityTransportCapability,
     public val nfcRetrieval: ProximityTransportCapability,
+    public val nfcV2Retrieval: ProximityTransportCapability,
     public val wifiAwareRetrieval: ProximityTransportCapability,
 ) {
     init {
-        require(qrEngagement.selected || nfcEngagement.selected) {
-            "At least one engagement capability must be selected"
-        }
-        require(bluetoothLowEnergy.selected || nfcRetrieval.selected || wifiAwareRetrieval.selected) {
-            "At least one retrieval capability must be selected"
+        require(
+            qrEngagement.selected == (session.qrRetrieval != null) &&
+                nfcEngagement.selected == (session !is ProximitySessionConfiguration.Qr) &&
+                bluetoothLowEnergy.selected == (session.bleConfiguration != null) &&
+                nfcRetrieval.selected == (session.nfcRetrieval?.nfc != null || session.qrRetrieval?.nfc != null) &&
+                nfcV2Retrieval.selected == (session is ProximitySessionConfiguration.ProvisionalNfcV2) &&
+                !wifiAwareRetrieval.selected
+        ) { "Capability selection must match the owning session retrieval plans" }
+        require(!nfcV2Retrieval.mayStart || nfcEngagement.mayStart) {
+            "NFCv2 same-channel retrieval cannot start without NFC engagement"
         }
     }
 
-    /** Whether at least one selected engagement and one selected retrieval method can start. */
-    public val mayStart: Boolean
-        get() = listOf(qrEngagement, nfcEngagement).any { it.mayStart } &&
-            listOf(bluetoothLowEnergy, nfcRetrieval, wifiAwareRetrieval).any { it.mayStart }
+    /** Whether the selected QR plan has an available engagement and retrieval bearer. */
+    public val qrMayStart: Boolean get() = qrEngagement.mayStart && planMayStart(session.qrRetrieval)
+
+    /** Whether the selected NFC plan has an available engagement and retrieval bearer. */
+    public val nfcMayStart: Boolean get() = nfcEngagement.mayStart && when (session) {
+        is ProximitySessionConfiguration.Qr -> false
+        is ProximitySessionConfiguration.ConventionalNfc -> planMayStart(session.retrieval)
+        is ProximitySessionConfiguration.ProvisionalNfcV2 -> nfcV2Retrieval.mayStart
+    }
+
+    /** Whether at least one complete selected route can start. */
+    public val mayStart: Boolean get() = qrMayStart || nfcMayStart
+
+    private fun planMayStart(plan: ProximityRetrievalOptions?): Boolean = plan != null && (
+        (plan.bluetoothLowEnergy != null && bluetoothLowEnergy.mayStart) ||
+            (plan.nfc != null && nfcRetrieval.mayStart)
+        )
 
     /** Distinct host remediations for selected unavailable methods. */
     public val remediationActions: List<ProximityRemediationAction>
@@ -285,6 +413,7 @@ public data class ProximityCapabilities(
             nfcEngagement,
             bluetoothLowEnergy,
             nfcRetrieval,
+            nfcV2Retrieval,
             wifiAwareRetrieval,
         ).filter { it.selected }.flatMap { it.remediationActions }.distinct()
 }
@@ -1297,8 +1426,27 @@ public enum class ProximityActionType {
     ReportRemediation,
 }
 
+/** Engagement that actually won the reader connection. */
+public enum class ProximityEngagementMethod { Qr, Nfc }
+
+/** Bearer actually carrying the connected session. */
+public enum class ProximityTransport { BluetoothLowEnergy, Nfc, WifiAware }
+
+/**
+ * Actual connected route, independent of the methods configured or advertised.
+ * @property engagement Engagement that won the reader connection.
+ * @property transport Bearer carrying the connected session.
+ */
+public data class ProximityConnectedRoute(
+    public val engagement: ProximityEngagementMethod,
+    public val transport: ProximityTransport,
+)
+
 /** Single-use, wallet-owned proximity presentation session. */
 public interface ProximitySession {
+    /** Winning route once connected; remains available through review and termination. */
+    public val connectedRoute: ProximityConnectedRoute? get() = null
+
     /** Hot state stream whose variants define the only legal phase data and actions. */
     public val state: StateFlow<ProximityState>
 

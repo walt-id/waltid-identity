@@ -117,6 +117,21 @@ class ReaderAuthenticationTest {
     }
 
     @Test
+    fun `reader authentication accepts the RFC 9864 fully specified P256 algorithm`() = runTest {
+        val unsigned = DeviceRequest("org.example.mdoc", mapOf("org.example" to listOf("given_name")))
+        val signed = signedRequest(
+            unsigned = unsigned,
+            document = true,
+            whole = false,
+            algorithm = Cose.Algorithm.ESP256,
+        )
+
+        assertIs<ReaderAuthenticationResult.Valid>(
+            verifier(ReaderTrustState.TRUSTED).verify(signed, transcript).documents.single()
+        )
+    }
+
+    @Test
     fun `COSE profile failures never reach reader trust evaluation`() = runTest {
         val unsigned = DeviceRequest("org.example.mdoc", mapOf("org.example" to listOf("given_name")))
         val key = runtime.generateMdocTestKey("reader-cose-profile", setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
@@ -172,6 +187,7 @@ class ReaderAuthenticationTest {
         unsigned: DeviceRequest,
         document: Boolean,
         whole: Boolean,
+        algorithm: Int = Cose.Algorithm.ES256,
     ): DeviceRequest {
         val key = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
@@ -187,7 +203,7 @@ class ReaderAuthenticationTest {
         val headers = CoseHeaders(x5chain = listOf(CoseCertificate(certificate.encodedDer.toByteArray())))
         val sourceDoc = unsigned.docRequests.single()
         val docAuth = if (document) CoseSign1.createAndSignDetached(
-            protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256),
+            protectedHeaders = CoseHeaders(algorithm = algorithm),
             unprotectedHeaders = headers,
             detachedPayload = ReaderAuthenticationPayloads.forDocument(transcript, sourceDoc.itemsRequest),
             key = key,
@@ -197,7 +213,7 @@ class ReaderAuthenticationTest {
             docRequests = listOf(sourceDoc.copy(readerAuth = docAuth)),
         )
         val wholeAuth = if (whole) CoseSign1.createAndSignDetached(
-            protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256),
+            protectedHeaders = CoseHeaders(algorithm = algorithm),
             unprotectedHeaders = headers,
             detachedPayload = ReaderAuthenticationPayloads.forAllDocuments(
                 transcript,
@@ -216,7 +232,7 @@ class ReaderAuthenticationTest {
         trustEvaluator = ReaderTrustEvaluator {
             ReaderTrustDecision(state, displayName = "Synthetic reader")
         },
-        allowedAlgorithms = setOf(Cose.Algorithm.ES256),
+        allowedAlgorithms = setOf(Cose.Algorithm.ES256, Cose.Algorithm.ESP256),
     )
 
     private companion object { var readerCounter = 0 }

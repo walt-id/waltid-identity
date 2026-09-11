@@ -167,18 +167,49 @@ and protected-key authorization remain explicit host actions. A `StateFlow` does
 not complete automatically on a terminal state.
 
 Kotlin and Swift proximity types use the `Proximity` prefix.
+`ProximityRetrievalOptions` selects conventional retrieval bearers and defaults to BLE.
 
-The default configuration selects QR engagement and BLE retrieval. NFC and
-Wi-Fi Aware are represented in the capability contract as unimplemented in this
-build. Runtime observations distinguish `NotChecked`, `Available`, and
-`Unavailable`; session selection is independent. A session can start when a
-selected engagement and a compatible selected retrieval route are viable.
+The default configuration selects QR engagement and BLE retrieval. NFC supports
+conventional static/negotiated handover, conventional retrieval, and the explicit
+provisional NFCv2 session variant. Wi-Fi Aware remains unimplemented at this
+layer. Runtime observations distinguish `NotChecked`, `Available`, and
+`Unavailable`; selection is independent. Startability follows each selected
+route's own retrieval plan, so an unavailable optional bearer cannot block a
+usable route or lend an unrelated bearer to another route.
+
+```kotlin
+val nfcConfiguration = ProximityConfiguration(
+    session = ProximitySessionConfiguration.ConventionalNfc(
+        handover = ProximityNfcHandover.Negotiated,
+        retrieval = ProximityRetrievalOptions(
+            nfc = ProximityNfcRetrievalConfiguration(),
+        ),
+        qrFallback = ProximityRetrievalOptions(),
+    ),
+)
+```
+
+The session variant owns engagement and compatible retrieval together. Optional
+QR fallback requires a nonempty conventional plan. Shared BLE role/policy and
+conventional NFC length limits must match across routes. The provisional NFCv2
+variant always includes same-channel retrieval and owns its distinct command
+limit; the ISO/IEC 18013-5:2021 profile rejects that variant.
 
 Device signature is the default holder-authentication policy. Applications may
 require MAC or choose an explicit pre-review preference with
 `deviceAuthenticationPolicy`; the selected method is shown on each credential
 option, bound into the immutable review, and never changed after consent. The
 pinned EUDI profile currently requires device signature.
+
+`session.connectedRoute` reports the winning engagement and actual connected bearer. It remains
+available after the brief connecting state, including during review and after completion. Configured
+or advertised methods alone do not establish which route a reader used.
+
+Terminal errors expose display-safe `code`, `message`, and `remediationActions`. For example, NFC
+access not accepted maps to application settings. Perform that host action, wait for the application
+to return, close the failed session, and create a new session. `ReportRemediation` belongs only to the
+active prerequisite loop. The radio-independent engine retains unexpected exception causes on its
+failure result for diagnostics; raw exception text must never be rendered as presentation content.
 
 Host applications perform permission or settings effects named by
 `capabilities.remediationActions`, report the privacy-safe outcome with

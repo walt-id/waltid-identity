@@ -28,9 +28,26 @@ kotlin {
             implementation(identityLibs.kotlinx.atomicfu)
             implementation(identityLibs.kotlinx.coroutines.core)
         }
+        commonTest {
+            kotlin.srcDir("../waltid-mdoc-proximity/src/commonTestFixtures/kotlin")
+        }
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
+        if (enableAndroidBuild) {
+            val androidHostTest by getting {
+                dependencies {
+                    implementation(kotlin("test"))
+                    implementation(identityLibs.kotlinx.coroutines.test)
+                    implementation(identityLibs.junit)
+                    implementation(identityLibs.robolectric)
+                }
+            }
+        }
     }
+}
+
+tasks.withType<Test>().configureEach {
+    if (name == "testAndroidHostTest") useJUnit()
 }

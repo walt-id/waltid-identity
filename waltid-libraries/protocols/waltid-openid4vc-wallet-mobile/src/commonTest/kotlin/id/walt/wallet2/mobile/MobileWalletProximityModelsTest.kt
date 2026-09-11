@@ -11,6 +11,16 @@ import kotlin.uuid.Uuid
 
 class ProximityModelsTest {
     @Test
+    fun `NFC platform failures retain actionable fresh-session recovery`() {
+        val denied = EngineProximityError.Capability("nfc_access_not_accepted", "NFC access was not accepted").toWalletError()
+        assertEquals(ProximityRecovery.StartNewSession, denied.recovery)
+        assertEquals(listOf(ProximityRemediationAction.OpenApplicationSettings), denied.remediationActions)
+        for (code in listOf("nfc_system_unavailable", "nfc_session_already_active")) {
+            assertEquals(listOf(ProximityRemediationAction.Retry), code.toRemediationActions())
+        }
+    }
+
+    @Test
     fun `EUDI profile requires trusted-reader policy`() {
         assertFailsWith<IllegalArgumentException> {
             ProximityConfiguration(
@@ -76,17 +86,158 @@ class ProximityModelsTest {
             selected = true,
         )
         val capabilities = ProximityCapabilities(
+            session = ProximitySessionConfiguration.ConventionalNfc(
+                ProximityNfcHandover.Static,
+                ProximityRetrievalOptions(nfc = ProximityNfcRetrievalConfiguration()),
+                qrFallback = ProximityRetrievalOptions(),
+            ),
             profile = ProximityProfile.Iso180135Edition2Dis2026,
             qrEngagement = available,
             nfcEngagement = unavailableAlternative,
             bluetoothLowEnergy = available,
             nfcRetrieval = unavailableAlternative,
+            nfcV2Retrieval = unavailableAlternative.copy(selected = false),
             wifiAwareRetrieval = unavailableAlternative.copy(selected = false),
         )
 
         assertTrue(capabilities.mayStart)
         assertTrue(capabilities.nfcEngagement.selected)
         assertFalse(capabilities.nfcEngagement.mayStart)
+        listOf<() -> ProximityCapabilities>(
+            { capabilities.copy(qrEngagement = available.copy(selected = false)) },
+            { capabilities.copy(nfcEngagement = unavailableAlternative.copy(selected = false)) },
+            { capabilities.copy(bluetoothLowEnergy = available.copy(selected = false)) },
+            { capabilities.copy(nfcRetrieval = unavailableAlternative.copy(selected = false)) },
+            { capabilities.copy(nfcV2Retrieval = available) },
+            { capabilities.copy(wifiAwareRetrieval = available) },
+        ).forEach { inconsistent -> assertFailsWith<IllegalArgumentException> { inconsistent() } }
+
+    }
+
+    @Test
+    fun `NFCv2 retrieval cannot be selected without its NFC engagement path`() {
+        val available = ProximityTransportCapability(
+            implemented = true,
+            profilePermitted = true,
+            runtime = ProximityRuntimeObservation.Available,
+            selected = true,
+        )
+        val unselected = available.copy(selected = false)
+
+        assertFailsWith<IllegalArgumentException> {
+            ProximityCapabilities(
+                session = ProximitySessionConfiguration.Qr(),
+                profile = ProximityProfile.Iso180135Edition2Dis2026,
+                qrEngagement = available,
+                nfcEngagement = unselected,
+                bluetoothLowEnergy = unselected,
+                nfcRetrieval = unselected,
+                nfcV2Retrieval = available,
+                wifiAwareRetrieval = unselected,
+            )
+        }
+    }
+
+    @Test
+    fun `first-edition profile rejects NFCv2 instead of claiming unsupported compatibility`() {
+        assertFailsWith<IllegalArgumentException> {
+            ProximityConfiguration(
+                profile = ProximityProfile.Iso1801352021,
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(bluetoothLowEnergy = null),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ProximityConfiguration(
+                profile = ProximityProfile.Iso1801352021,
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(
+                    bluetoothLowEnergy = ProximityBleConfiguration(),
+                    qrFallback = ProximityRetrievalOptions(
+                        bluetoothLowEnergy = ProximityBleConfiguration(),
+                        nfc = null
+                    )
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `session variants own nonempty retrieval and compatible optional QR plans`() {
+        assertFailsWith<IllegalArgumentException> {
+            ProximityRetrievalOptions(bluetoothLowEnergy = null)
+        }
+        val ble = ProximityRetrievalOptions()
+        val nfc = ProximityRetrievalOptions(
+            bluetoothLowEnergy = null, nfc = ProximityNfcRetrievalConfiguration(),
+        )
+        val plans = listOf(ble, nfc, ble.copy(nfc = nfc.nfc))
+        plans.forEach { retrieval ->
+            ProximityConfiguration(session = ProximitySessionConfiguration.Qr(retrieval))
+            ProximityNfcHandover.entries.forEach { handover ->
+                (listOf(null) + plans).forEach { qr ->
+                    ProximityConfiguration(
+                        session = ProximitySessionConfiguration.ConventionalNfc(
+                            handover,
+                            retrieval,
+                            qr,
+                        )
+                    )
+                }
+            }
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(qrFallback = retrieval,)
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ProximitySessionConfiguration.ConventionalNfc(
+                ProximityNfcHandover.Static, nfc,
+                nfc.copy(nfc = ProximityNfcRetrievalConfiguration(maximumCommandDataLength = 255)),
+            )
+        }
+        val central = ProximityBleConfiguration(roles = ProximityBleRoles.CentralClient)
+        assertFailsWith<IllegalArgumentException> {
+            ProximitySessionConfiguration.ConventionalNfc(
+                ProximityNfcHandover.Static, ble,
+                ProximityRetrievalOptions(bluetoothLowEnergy = central),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ProximitySessionConfiguration.ProvisionalNfcV2(
+                bluetoothLowEnergy = central, qrFallback = ble,
+            )
+        }
+    }
+
+    @Test
+    fun `NFC length domains reject values outside their distinct wire limits`() {
+        ProximityNfcRetrievalConfiguration(
+            maximumCommandDataLength = 255,
+            maximumResponseDataLength = 256,
+        )
+        ProximityNfcRetrievalConfiguration(
+            maximumCommandDataLength = 65_535,
+            maximumResponseDataLength = 65_536,
+        )
+        ProximitySessionConfiguration.ProvisionalNfcV2(1)
+        ProximitySessionConfiguration.ProvisionalNfcV2(65_536)
+
+        assertFailsWith<IllegalArgumentException> {
+            ProximityNfcRetrievalConfiguration(maximumCommandDataLength = 254)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ProximityNfcRetrievalConfiguration(maximumCommandDataLength = 65_536)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ProximityNfcRetrievalConfiguration(maximumResponseDataLength = 255)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ProximityNfcRetrievalConfiguration(maximumResponseDataLength = 65_537)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ProximitySessionConfiguration.ProvisionalNfcV2(0)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ProximitySessionConfiguration.ProvisionalNfcV2(65_537)
+        }
     }
 
     @Test

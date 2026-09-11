@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
@@ -54,6 +55,39 @@ class TransportCoordinatorTest {
     }
 
     @Test
+    fun `platform permission failure survives preparation and connection aggregation`() = runTest {
+        val denied = ProximityException(ProximityError.Capability("ble_permission_denied", "Bluetooth access is denied"))
+        val preparation = assertFailsWith<ProximityException> {
+            TransportCoordinator().prepare(
+                listOf(provider(ProximityTransportKind.BLE) { throw denied }),
+                EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1024, MdocEngagementMode.Qr), this,
+            )
+        }
+        assertSame(denied, preparation)
+        val connection = assertFailsWith<ProximityException> {
+            TransportCoordinator().awaitWinner(PreparedTransports(listOf(
+                TrackingPrepared(ProximityTransportKind.BLE, failure = denied),
+            ), emptyMap()))
+        }
+        assertSame(denied, connection)
+    }
+
+    @Test
+    fun `a transport-local cancellation is a failed candidate rather than a stalled race`() = runTest {
+        val cancelled = TrackingPrepared(
+            ProximityTransportKind.NFC,
+            failure = CancellationException("The transport stopped itself"),
+        )
+
+        val failure = assertFailsWith<ProximityException> {
+            TransportCoordinator().awaitWinner(PreparedTransports(listOf(cancelled), emptyMap()))
+        }
+
+        assertEquals("connection_failed", failure.error.code)
+        assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), cancelled.closeReasons)
+    }
+
+    @Test
     fun `cancelling connection selection closes every prepared transport exactly once`() = runTest {
         val first = TrackingPrepared(ProximityTransportKind.BLE, waitForever = true)
         val second = TrackingPrepared(ProximityTransportKind.NFC, waitForever = true)
@@ -88,13 +122,31 @@ class TransportCoordinatorTest {
     }
 
     @Test
+    fun `prepared transport with a mismatched identifier is closed and rejected`() = runTest {
+        val candidate = TrackingPrepared(
+            kind = ProximityTransportKind.BLE,
+            id = PreparedTransportId("unexpected"),
+            waitForever = true,
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            TransportCoordinator().prepare(
+                listOf(provider(ProximityTransportKind.BLE) { candidate }),
+                EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1024, MdocEngagementMode.Qr),
+                this,
+            )
+        }
+
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), candidate.closeReasons)
+    }
+
+    @Test
     fun `a connection delivered after cancellation is discarded and closed`() = runTest {
         val release = CompletableDeferred<Unit>()
         val lateConnection = TrackingConnection()
         val prepared = object : PreparedTransport {
             override val kind = ProximityTransportKind.BLE
             override val connectionMethod = method
-            override val sessionTranscriptFactory = QrSessionTranscriptFactory
             val closeReasons = mutableListOf<ProximityCloseReason>()
             override suspend fun awaitConnection(): ProximityConnection = withContext(NonCancellable) {
                 release.await()
@@ -147,7 +199,6 @@ class TransportCoordinatorTest {
             val blocked = object : PreparedTransport {
                 override val kind = ProximityTransportKind.NFC
                 override val connectionMethod = method
-                override val sessionTranscriptFactory = QrSessionTranscriptFactory
                 override suspend fun awaitConnection(): ProximityConnection = withContext(NonCancellable) {
                     release.await()
                     throw IllegalStateException("Native accept was closed")
@@ -211,12 +262,12 @@ class TransportCoordinatorTest {
 
     private inner class TrackingPrepared(
         override val kind: ProximityTransportKind,
+        override val id: PreparedTransportId = PreparedTransportId(kind.name),
         private val connection: ProximityConnection? = null,
         private val failure: Throwable? = null,
         private val waitForever: Boolean = false,
     ) : PreparedTransport {
         override val connectionMethod: DeviceRetrievalMethod = method
-        override val sessionTranscriptFactory: SessionTranscriptFactory = QrSessionTranscriptFactory
         val closeReasons = mutableListOf<ProximityCloseReason>()
         override suspend fun awaitConnection(): ProximityConnection = when {
             waitForever -> awaitCancellation()

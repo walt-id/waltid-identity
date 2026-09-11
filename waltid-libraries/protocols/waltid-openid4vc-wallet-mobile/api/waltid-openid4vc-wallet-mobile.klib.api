@@ -394,6 +394,17 @@ final enum class id.walt.wallet2.mobile/ProximityHostActionResult : kotlin/Enum<
     final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityHostActionResult> // id.walt.wallet2.mobile/ProximityHostActionResult.values|values#static(){}[0]
 }
 
+final enum class id.walt.wallet2.mobile/ProximityNfcHandover : kotlin/Enum<id.walt.wallet2.mobile/ProximityNfcHandover> { // id.walt.wallet2.mobile/ProximityNfcHandover|null[0]
+    enum entry Negotiated // id.walt.wallet2.mobile/ProximityNfcHandover.Negotiated|null[0]
+    enum entry Static // id.walt.wallet2.mobile/ProximityNfcHandover.Static|null[0]
+
+    final val entries // id.walt.wallet2.mobile/ProximityNfcHandover.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/ProximityNfcHandover> // id.walt.wallet2.mobile/ProximityNfcHandover.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile/ProximityNfcHandover // id.walt.wallet2.mobile/ProximityNfcHandover.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityNfcHandover> // id.walt.wallet2.mobile/ProximityNfcHandover.values|values#static(){}[0]
+}
+
 final enum class id.walt.wallet2.mobile/ProximityProfile : kotlin/Enum<id.walt.wallet2.mobile/ProximityProfile> { // id.walt.wallet2.mobile/ProximityProfile|null[0]
     enum entry EudiArf3Fcaf202608 // id.walt.wallet2.mobile/ProximityProfile.EudiArf3Fcaf202608|null[0]
     enum entry Iso1801352021 // id.walt.wallet2.mobile/ProximityProfile.Iso1801352021|null[0]
@@ -512,6 +523,7 @@ final enum class id.walt.wallet2.mobile/ProximityRecovery : kotlin/Enum<id.walt.
 
 final enum class id.walt.wallet2.mobile/ProximityRemediationAction : kotlin/Enum<id.walt.wallet2.mobile/ProximityRemediationAction> { // id.walt.wallet2.mobile/ProximityRemediationAction|null[0]
     enum entry EnableBluetooth // id.walt.wallet2.mobile/ProximityRemediationAction.EnableBluetooth|null[0]
+    enum entry EnableNfc // id.walt.wallet2.mobile/ProximityRemediationAction.EnableNfc|null[0]
     enum entry OpenApplicationSettings // id.walt.wallet2.mobile/ProximityRemediationAction.OpenApplicationSettings|null[0]
     enum entry RequestBluetoothPermission // id.walt.wallet2.mobile/ProximityRemediationAction.RequestBluetoothPermission|null[0]
     enum entry Retry // id.walt.wallet2.mobile/ProximityRemediationAction.Retry|null[0]
@@ -522,18 +534,6 @@ final enum class id.walt.wallet2.mobile/ProximityRemediationAction : kotlin/Enum
 
     final fun valueOf(kotlin/String): id.walt.wallet2.mobile/ProximityRemediationAction // id.walt.wallet2.mobile/ProximityRemediationAction.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityRemediationAction> // id.walt.wallet2.mobile/ProximityRemediationAction.values|values#static(){}[0]
-}
-
-final enum class id.walt.wallet2.mobile/ProximityRetrievalMethod : kotlin/Enum<id.walt.wallet2.mobile/ProximityRetrievalMethod> { // id.walt.wallet2.mobile/ProximityRetrievalMethod|null[0]
-    enum entry BluetoothLowEnergy // id.walt.wallet2.mobile/ProximityRetrievalMethod.BluetoothLowEnergy|null[0]
-    enum entry Nfc // id.walt.wallet2.mobile/ProximityRetrievalMethod.Nfc|null[0]
-    enum entry WifiAware // id.walt.wallet2.mobile/ProximityRetrievalMethod.WifiAware|null[0]
-
-    final val entries // id.walt.wallet2.mobile/ProximityRetrievalMethod.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/ProximityRetrievalMethod> // id.walt.wallet2.mobile/ProximityRetrievalMethod.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): id.walt.wallet2.mobile/ProximityRetrievalMethod // id.walt.wallet2.mobile/ProximityRetrievalMethod.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityRetrievalMethod> // id.walt.wallet2.mobile/ProximityRetrievalMethod.values|values#static(){}[0]
 }
 
 final enum class id.walt.wallet2.mobile/ProximityRicalState : kotlin/Enum<id.walt.wallet2.mobile/ProximityRicalState> { // id.walt.wallet2.mobile/ProximityRicalState|null[0]
@@ -548,6 +548,18 @@ final enum class id.walt.wallet2.mobile/ProximityRicalState : kotlin/Enum<id.wal
 
     final fun valueOf(kotlin/String): id.walt.wallet2.mobile/ProximityRicalState // id.walt.wallet2.mobile/ProximityRicalState.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityRicalState> // id.walt.wallet2.mobile/ProximityRicalState.values|values#static(){}[0]
+}
+
+final enum class id.walt.wallet2.mobile/ProximityTransport : kotlin/Enum<id.walt.wallet2.mobile/ProximityTransport> { // id.walt.wallet2.mobile/ProximityTransport|null[0]
+    enum entry BluetoothLowEnergy // id.walt.wallet2.mobile/ProximityTransport.BluetoothLowEnergy|null[0]
+    enum entry Nfc // id.walt.wallet2.mobile/ProximityTransport.Nfc|null[0]
+    enum entry WifiAware // id.walt.wallet2.mobile/ProximityTransport.WifiAware|null[0]
+
+    final val entries // id.walt.wallet2.mobile/ProximityTransport.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/ProximityTransport> // id.walt.wallet2.mobile/ProximityTransport.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile/ProximityTransport // id.walt.wallet2.mobile/ProximityTransport.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile/ProximityTransport> // id.walt.wallet2.mobile/ProximityTransport.values|values#static(){}[0]
 }
 
 abstract fun interface id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator { // id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator|null[0]
@@ -623,6 +635,8 @@ abstract interface id.walt.wallet2.mobile/ProximityApplicationProfile { // id.wa
 abstract interface id.walt.wallet2.mobile/ProximitySession { // id.walt.wallet2.mobile/ProximitySession|null[0]
     abstract val state // id.walt.wallet2.mobile/ProximitySession.state|{}state[0]
         abstract fun <get-state>(): kotlinx.coroutines.flow/StateFlow<id.walt.wallet2.mobile/ProximityState> // id.walt.wallet2.mobile/ProximitySession.state.<get-state>|<get-state>(){}[0]
+    open val connectedRoute // id.walt.wallet2.mobile/ProximitySession.connectedRoute|{}connectedRoute[0]
+        open fun <get-connectedRoute>(): id.walt.wallet2.mobile/ProximityConnectedRoute? // id.walt.wallet2.mobile/ProximitySession.connectedRoute.<get-connectedRoute>|<get-connectedRoute>(){}[0]
 
     abstract suspend fun close() // id.walt.wallet2.mobile/ProximitySession.close|close(){}[0]
     abstract suspend fun dispatch(id.walt.wallet2.mobile/ProximityAction): id.walt.wallet2.mobile/ProximityActionResult // id.walt.wallet2.mobile/ProximitySession.dispatch|dispatch(id.walt.wallet2.mobile.ProximityAction){}[0]
@@ -1343,6 +1357,59 @@ sealed interface id.walt.wallet2.mobile/ProximityRuntimeObservation { // id.walt
     }
 }
 
+sealed interface id.walt.wallet2.mobile/ProximitySessionConfiguration { // id.walt.wallet2.mobile/ProximitySessionConfiguration|null[0]
+    final class ConventionalNfc : id.walt.wallet2.mobile/ProximitySessionConfiguration { // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc|null[0]
+        constructor <init>(id.walt.wallet2.mobile/ProximityNfcHandover, id.walt.wallet2.mobile/ProximityRetrievalOptions, id.walt.wallet2.mobile/ProximityRetrievalOptions? = ...) // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.<init>|<init>(id.walt.wallet2.mobile.ProximityNfcHandover;id.walt.wallet2.mobile.ProximityRetrievalOptions;id.walt.wallet2.mobile.ProximityRetrievalOptions?){}[0]
+
+        final val handover // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.handover|{}handover[0]
+            final fun <get-handover>(): id.walt.wallet2.mobile/ProximityNfcHandover // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.handover.<get-handover>|<get-handover>(){}[0]
+        final val qrFallback // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.qrFallback|{}qrFallback[0]
+            final fun <get-qrFallback>(): id.walt.wallet2.mobile/ProximityRetrievalOptions? // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.qrFallback.<get-qrFallback>|<get-qrFallback>(){}[0]
+        final val retrieval // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.retrieval|{}retrieval[0]
+            final fun <get-retrieval>(): id.walt.wallet2.mobile/ProximityRetrievalOptions // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.retrieval.<get-retrieval>|<get-retrieval>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile/ProximityNfcHandover // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.component1|component1(){}[0]
+        final fun component2(): id.walt.wallet2.mobile/ProximityRetrievalOptions // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.component2|component2(){}[0]
+        final fun component3(): id.walt.wallet2.mobile/ProximityRetrievalOptions? // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.component3|component3(){}[0]
+        final fun copy(id.walt.wallet2.mobile/ProximityNfcHandover = ..., id.walt.wallet2.mobile/ProximityRetrievalOptions = ..., id.walt.wallet2.mobile/ProximityRetrievalOptions? = ...): id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.copy|copy(id.walt.wallet2.mobile.ProximityNfcHandover;id.walt.wallet2.mobile.ProximityRetrievalOptions;id.walt.wallet2.mobile.ProximityRetrievalOptions?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximitySessionConfiguration.ConventionalNfc.toString|toString(){}[0]
+    }
+
+    final class ProvisionalNfcV2 : id.walt.wallet2.mobile/ProximitySessionConfiguration { // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2|null[0]
+        constructor <init>(kotlin/Int = ..., id.walt.wallet2.mobile/ProximityBleConfiguration? = ..., id.walt.wallet2.mobile/ProximityRetrievalOptions? = ...) // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.<init>|<init>(kotlin.Int;id.walt.wallet2.mobile.ProximityBleConfiguration?;id.walt.wallet2.mobile.ProximityRetrievalOptions?){}[0]
+
+        final val bluetoothLowEnergy // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.bluetoothLowEnergy|{}bluetoothLowEnergy[0]
+            final fun <get-bluetoothLowEnergy>(): id.walt.wallet2.mobile/ProximityBleConfiguration? // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.bluetoothLowEnergy.<get-bluetoothLowEnergy>|<get-bluetoothLowEnergy>(){}[0]
+        final val maximumCommandDataLength // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.maximumCommandDataLength|{}maximumCommandDataLength[0]
+            final fun <get-maximumCommandDataLength>(): kotlin/Int // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.maximumCommandDataLength.<get-maximumCommandDataLength>|<get-maximumCommandDataLength>(){}[0]
+        final val qrFallback // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.qrFallback|{}qrFallback[0]
+            final fun <get-qrFallback>(): id.walt.wallet2.mobile/ProximityRetrievalOptions? // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.qrFallback.<get-qrFallback>|<get-qrFallback>(){}[0]
+
+        final fun component1(): kotlin/Int // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.component1|component1(){}[0]
+        final fun component2(): id.walt.wallet2.mobile/ProximityBleConfiguration? // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.component2|component2(){}[0]
+        final fun component3(): id.walt.wallet2.mobile/ProximityRetrievalOptions? // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.component3|component3(){}[0]
+        final fun copy(kotlin/Int = ..., id.walt.wallet2.mobile/ProximityBleConfiguration? = ..., id.walt.wallet2.mobile/ProximityRetrievalOptions? = ...): id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2 // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.copy|copy(kotlin.Int;id.walt.wallet2.mobile.ProximityBleConfiguration?;id.walt.wallet2.mobile.ProximityRetrievalOptions?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximitySessionConfiguration.ProvisionalNfcV2.toString|toString(){}[0]
+    }
+
+    final class Qr : id.walt.wallet2.mobile/ProximitySessionConfiguration { // id.walt.wallet2.mobile/ProximitySessionConfiguration.Qr|null[0]
+        constructor <init>(id.walt.wallet2.mobile/ProximityRetrievalOptions = ...) // id.walt.wallet2.mobile/ProximitySessionConfiguration.Qr.<init>|<init>(id.walt.wallet2.mobile.ProximityRetrievalOptions){}[0]
+
+        final val retrieval // id.walt.wallet2.mobile/ProximitySessionConfiguration.Qr.retrieval|{}retrieval[0]
+            final fun <get-retrieval>(): id.walt.wallet2.mobile/ProximityRetrievalOptions // id.walt.wallet2.mobile/ProximitySessionConfiguration.Qr.retrieval.<get-retrieval>|<get-retrieval>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile/ProximityRetrievalOptions // id.walt.wallet2.mobile/ProximitySessionConfiguration.Qr.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.mobile/ProximityRetrievalOptions = ...): id.walt.wallet2.mobile/ProximitySessionConfiguration.Qr // id.walt.wallet2.mobile/ProximitySessionConfiguration.Qr.copy|copy(id.walt.wallet2.mobile.ProximityRetrievalOptions){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximitySessionConfiguration.Qr.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximitySessionConfiguration.Qr.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximitySessionConfiguration.Qr.toString|toString(){}[0]
+    }
+}
+
 sealed interface id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobile/ProximityState|null[0]
     final class AuthorizingHolderKey : id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobile/ProximityState.AuthorizingHolderKey|null[0]
         constructor <init>(id.walt.wallet2.mobile/ProximityHolderAuthorization) // id.walt.wallet2.mobile/ProximityState.AuthorizingHolderKey.<init>|<init>(id.walt.wallet2.mobile.ProximityHolderAuthorization){}[0]
@@ -1808,7 +1875,7 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge { // id.walt.wal
 }
 
 final class id.walt.wallet2.mobile.swiftinterop/WalletSdkBridgeFactory { // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridgeFactory|null[0]
-    constructor <init>() // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridgeFactory.<init>|<init>(){}[0]
+    constructor <init>(id.walt.mdoc.proximity.mobile/NfcHostPlatformAdapter? = ...) // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridgeFactory.<init>|<init>(id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter?){}[0]
 
     final suspend fun create(id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridgeFactory.create|create(id.walt.wallet2.mobile.swiftinterop.WalletBridgeConfiguration){}[0]
 }
@@ -2382,7 +2449,7 @@ final class id.walt.wallet2.mobile/MobileWalletDigitalCredentialResponse { // id
 }
 
 final class id.walt.wallet2.mobile/MobileWalletFactory { // id.walt.wallet2.mobile/MobileWalletFactory|null[0]
-    constructor <init>() // id.walt.wallet2.mobile/MobileWalletFactory.<init>|<init>(){}[0]
+    constructor <init>(id.walt.mdoc.proximity.mobile/NfcHostPlatformAdapter? = ...) // id.walt.wallet2.mobile/MobileWalletFactory.<init>|<init>(id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter?){}[0]
 
     final suspend fun create(id.walt.wallet2.mobile/MobileWalletConfig = ...): id.walt.wallet2.mobile/MobileWallet // id.walt.wallet2.mobile/MobileWalletFactory.create|create(id.walt.wallet2.mobile.MobileWalletConfig){}[0]
     final suspend fun create(id.walt.wallet2.mobile/MobileWalletConfig, id.walt.openid4vp.clientidprefix/ClientIdTrustConfiguration): id.walt.wallet2.mobile/MobileWallet // id.walt.wallet2.mobile/MobileWalletFactory.create|create(id.walt.wallet2.mobile.MobileWalletConfig;id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration){}[0]
@@ -2877,8 +2944,24 @@ final class id.walt.wallet2.mobile/ProximityApplicationProfileRegistry { // id.w
     }
 }
 
+final class id.walt.wallet2.mobile/ProximityBleConfiguration { // id.walt.wallet2.mobile/ProximityBleConfiguration|null[0]
+    constructor <init>(id.walt.wallet2.mobile/ProximityBleRoles = ..., id.walt.wallet2.mobile/ProximityBleBearerPolicy = ...) // id.walt.wallet2.mobile/ProximityBleConfiguration.<init>|<init>(id.walt.wallet2.mobile.ProximityBleRoles;id.walt.wallet2.mobile.ProximityBleBearerPolicy){}[0]
+
+    final val bearerPolicy // id.walt.wallet2.mobile/ProximityBleConfiguration.bearerPolicy|{}bearerPolicy[0]
+        final fun <get-bearerPolicy>(): id.walt.wallet2.mobile/ProximityBleBearerPolicy // id.walt.wallet2.mobile/ProximityBleConfiguration.bearerPolicy.<get-bearerPolicy>|<get-bearerPolicy>(){}[0]
+    final val roles // id.walt.wallet2.mobile/ProximityBleConfiguration.roles|{}roles[0]
+        final fun <get-roles>(): id.walt.wallet2.mobile/ProximityBleRoles // id.walt.wallet2.mobile/ProximityBleConfiguration.roles.<get-roles>|<get-roles>(){}[0]
+
+    final fun component1(): id.walt.wallet2.mobile/ProximityBleRoles // id.walt.wallet2.mobile/ProximityBleConfiguration.component1|component1(){}[0]
+    final fun component2(): id.walt.wallet2.mobile/ProximityBleBearerPolicy // id.walt.wallet2.mobile/ProximityBleConfiguration.component2|component2(){}[0]
+    final fun copy(id.walt.wallet2.mobile/ProximityBleRoles = ..., id.walt.wallet2.mobile/ProximityBleBearerPolicy = ...): id.walt.wallet2.mobile/ProximityBleConfiguration // id.walt.wallet2.mobile/ProximityBleConfiguration.copy|copy(id.walt.wallet2.mobile.ProximityBleRoles;id.walt.wallet2.mobile.ProximityBleBearerPolicy){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityBleConfiguration.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityBleConfiguration.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityBleConfiguration.toString|toString(){}[0]
+}
+
 final class id.walt.wallet2.mobile/ProximityCapabilities { // id.walt.wallet2.mobile/ProximityCapabilities|null[0]
-    constructor <init>(id.walt.wallet2.mobile/ProximityProfile, id.walt.wallet2.mobile/ProximityTransportCapability, id.walt.wallet2.mobile/ProximityTransportCapability, id.walt.wallet2.mobile/ProximityTransportCapability, id.walt.wallet2.mobile/ProximityTransportCapability, id.walt.wallet2.mobile/ProximityTransportCapability) // id.walt.wallet2.mobile/ProximityCapabilities.<init>|<init>(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability){}[0]
+    constructor <init>(id.walt.wallet2.mobile/ProximityProfile, id.walt.wallet2.mobile/ProximitySessionConfiguration, id.walt.wallet2.mobile/ProximityTransportCapability, id.walt.wallet2.mobile/ProximityTransportCapability, id.walt.wallet2.mobile/ProximityTransportCapability, id.walt.wallet2.mobile/ProximityTransportCapability, id.walt.wallet2.mobile/ProximityTransportCapability, id.walt.wallet2.mobile/ProximityTransportCapability) // id.walt.wallet2.mobile/ProximityCapabilities.<init>|<init>(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximitySessionConfiguration;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability){}[0]
 
     final val bluetoothLowEnergy // id.walt.wallet2.mobile/ProximityCapabilities.bluetoothLowEnergy|{}bluetoothLowEnergy[0]
         final fun <get-bluetoothLowEnergy>(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.bluetoothLowEnergy.<get-bluetoothLowEnergy>|<get-bluetoothLowEnergy>(){}[0]
@@ -2886,44 +2969,48 @@ final class id.walt.wallet2.mobile/ProximityCapabilities { // id.walt.wallet2.mo
         final fun <get-mayStart>(): kotlin/Boolean // id.walt.wallet2.mobile/ProximityCapabilities.mayStart.<get-mayStart>|<get-mayStart>(){}[0]
     final val nfcEngagement // id.walt.wallet2.mobile/ProximityCapabilities.nfcEngagement|{}nfcEngagement[0]
         final fun <get-nfcEngagement>(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.nfcEngagement.<get-nfcEngagement>|<get-nfcEngagement>(){}[0]
+    final val nfcMayStart // id.walt.wallet2.mobile/ProximityCapabilities.nfcMayStart|{}nfcMayStart[0]
+        final fun <get-nfcMayStart>(): kotlin/Boolean // id.walt.wallet2.mobile/ProximityCapabilities.nfcMayStart.<get-nfcMayStart>|<get-nfcMayStart>(){}[0]
     final val nfcRetrieval // id.walt.wallet2.mobile/ProximityCapabilities.nfcRetrieval|{}nfcRetrieval[0]
         final fun <get-nfcRetrieval>(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.nfcRetrieval.<get-nfcRetrieval>|<get-nfcRetrieval>(){}[0]
+    final val nfcV2Retrieval // id.walt.wallet2.mobile/ProximityCapabilities.nfcV2Retrieval|{}nfcV2Retrieval[0]
+        final fun <get-nfcV2Retrieval>(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.nfcV2Retrieval.<get-nfcV2Retrieval>|<get-nfcV2Retrieval>(){}[0]
     final val profile // id.walt.wallet2.mobile/ProximityCapabilities.profile|{}profile[0]
         final fun <get-profile>(): id.walt.wallet2.mobile/ProximityProfile // id.walt.wallet2.mobile/ProximityCapabilities.profile.<get-profile>|<get-profile>(){}[0]
     final val qrEngagement // id.walt.wallet2.mobile/ProximityCapabilities.qrEngagement|{}qrEngagement[0]
         final fun <get-qrEngagement>(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.qrEngagement.<get-qrEngagement>|<get-qrEngagement>(){}[0]
+    final val qrMayStart // id.walt.wallet2.mobile/ProximityCapabilities.qrMayStart|{}qrMayStart[0]
+        final fun <get-qrMayStart>(): kotlin/Boolean // id.walt.wallet2.mobile/ProximityCapabilities.qrMayStart.<get-qrMayStart>|<get-qrMayStart>(){}[0]
     final val remediationActions // id.walt.wallet2.mobile/ProximityCapabilities.remediationActions|{}remediationActions[0]
         final fun <get-remediationActions>(): kotlin.collections/List<id.walt.wallet2.mobile/ProximityRemediationAction> // id.walt.wallet2.mobile/ProximityCapabilities.remediationActions.<get-remediationActions>|<get-remediationActions>(){}[0]
+    final val session // id.walt.wallet2.mobile/ProximityCapabilities.session|{}session[0]
+        final fun <get-session>(): id.walt.wallet2.mobile/ProximitySessionConfiguration // id.walt.wallet2.mobile/ProximityCapabilities.session.<get-session>|<get-session>(){}[0]
     final val wifiAwareRetrieval // id.walt.wallet2.mobile/ProximityCapabilities.wifiAwareRetrieval|{}wifiAwareRetrieval[0]
         final fun <get-wifiAwareRetrieval>(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.wifiAwareRetrieval.<get-wifiAwareRetrieval>|<get-wifiAwareRetrieval>(){}[0]
 
     final fun component1(): id.walt.wallet2.mobile/ProximityProfile // id.walt.wallet2.mobile/ProximityCapabilities.component1|component1(){}[0]
-    final fun component2(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.component2|component2(){}[0]
+    final fun component2(): id.walt.wallet2.mobile/ProximitySessionConfiguration // id.walt.wallet2.mobile/ProximityCapabilities.component2|component2(){}[0]
     final fun component3(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.component3|component3(){}[0]
     final fun component4(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.component4|component4(){}[0]
     final fun component5(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.component5|component5(){}[0]
     final fun component6(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.component6|component6(){}[0]
-    final fun copy(id.walt.wallet2.mobile/ProximityProfile = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ...): id.walt.wallet2.mobile/ProximityCapabilities // id.walt.wallet2.mobile/ProximityCapabilities.copy|copy(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability){}[0]
+    final fun component7(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.component7|component7(){}[0]
+    final fun component8(): id.walt.wallet2.mobile/ProximityTransportCapability // id.walt.wallet2.mobile/ProximityCapabilities.component8|component8(){}[0]
+    final fun copy(id.walt.wallet2.mobile/ProximityProfile = ..., id.walt.wallet2.mobile/ProximitySessionConfiguration = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ..., id.walt.wallet2.mobile/ProximityTransportCapability = ...): id.walt.wallet2.mobile/ProximityCapabilities // id.walt.wallet2.mobile/ProximityCapabilities.copy|copy(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximitySessionConfiguration;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability;id.walt.wallet2.mobile.ProximityTransportCapability){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityCapabilities.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityCapabilities.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityCapabilities.toString|toString(){}[0]
 }
 
 final class id.walt.wallet2.mobile/ProximityConfiguration { // id.walt.wallet2.mobile/ProximityConfiguration|null[0]
-    constructor <init>(id.walt.wallet2.mobile/ProximityProfile = ..., id.walt.wallet2.mobile/ProximityBleRoles = ..., id.walt.wallet2.mobile/ProximityBleBearerPolicy = ..., kotlin.collections/Set<id.walt.wallet2.mobile/ProximityEngagementMethod> = ..., kotlin.collections/Set<id.walt.wallet2.mobile/ProximityRetrievalMethod> = ..., id.walt.wallet2.mobile/ProximityReaderPolicy = ..., id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy = ..., id.walt.wallet2.mobile/ProximityReaderTrustEvaluator = ..., id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator = ..., id.walt.wallet2.mobile/ProximityApplicationProfileRegistry = ..., kotlin/Int = ...) // id.walt.wallet2.mobile/ProximityConfiguration.<init>|<init>(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximityBleRoles;id.walt.wallet2.mobile.ProximityBleBearerPolicy;kotlin.collections.Set<id.walt.wallet2.mobile.ProximityEngagementMethod>;kotlin.collections.Set<id.walt.wallet2.mobile.ProximityRetrievalMethod>;id.walt.wallet2.mobile.ProximityReaderPolicy;id.walt.wallet2.mobile.ProximityDeviceAuthenticationPolicy;id.walt.wallet2.mobile.ProximityReaderTrustEvaluator;id.walt.wallet2.mobile.ProximityCredentialStatusEvaluator;id.walt.wallet2.mobile.ProximityApplicationProfileRegistry;kotlin.Int){}[0]
+    constructor <init>(id.walt.wallet2.mobile/ProximityProfile = ..., id.walt.wallet2.mobile/ProximitySessionConfiguration = ..., id.walt.wallet2.mobile/ProximityReaderPolicy = ..., id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy = ..., id.walt.wallet2.mobile/ProximityReaderTrustEvaluator = ..., id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator = ..., id.walt.wallet2.mobile/ProximityApplicationProfileRegistry = ..., kotlin/Int = ...) // id.walt.wallet2.mobile/ProximityConfiguration.<init>|<init>(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximitySessionConfiguration;id.walt.wallet2.mobile.ProximityReaderPolicy;id.walt.wallet2.mobile.ProximityDeviceAuthenticationPolicy;id.walt.wallet2.mobile.ProximityReaderTrustEvaluator;id.walt.wallet2.mobile.ProximityCredentialStatusEvaluator;id.walt.wallet2.mobile.ProximityApplicationProfileRegistry;kotlin.Int){}[0]
 
     final val applicationProfiles // id.walt.wallet2.mobile/ProximityConfiguration.applicationProfiles|{}applicationProfiles[0]
         final fun <get-applicationProfiles>(): id.walt.wallet2.mobile/ProximityApplicationProfileRegistry // id.walt.wallet2.mobile/ProximityConfiguration.applicationProfiles.<get-applicationProfiles>|<get-applicationProfiles>(){}[0]
-    final val bearerPolicy // id.walt.wallet2.mobile/ProximityConfiguration.bearerPolicy|{}bearerPolicy[0]
-        final fun <get-bearerPolicy>(): id.walt.wallet2.mobile/ProximityBleBearerPolicy // id.walt.wallet2.mobile/ProximityConfiguration.bearerPolicy.<get-bearerPolicy>|<get-bearerPolicy>(){}[0]
-    final val bleRoles // id.walt.wallet2.mobile/ProximityConfiguration.bleRoles|{}bleRoles[0]
-        final fun <get-bleRoles>(): id.walt.wallet2.mobile/ProximityBleRoles // id.walt.wallet2.mobile/ProximityConfiguration.bleRoles.<get-bleRoles>|<get-bleRoles>(){}[0]
     final val credentialStatusEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.credentialStatusEvaluator|{}credentialStatusEvaluator[0]
         final fun <get-credentialStatusEvaluator>(): id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.credentialStatusEvaluator.<get-credentialStatusEvaluator>|<get-credentialStatusEvaluator>(){}[0]
     final val deviceAuthenticationPolicy // id.walt.wallet2.mobile/ProximityConfiguration.deviceAuthenticationPolicy|{}deviceAuthenticationPolicy[0]
         final fun <get-deviceAuthenticationPolicy>(): id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy // id.walt.wallet2.mobile/ProximityConfiguration.deviceAuthenticationPolicy.<get-deviceAuthenticationPolicy>|<get-deviceAuthenticationPolicy>(){}[0]
-    final val engagementMethods // id.walt.wallet2.mobile/ProximityConfiguration.engagementMethods|{}engagementMethods[0]
-        final fun <get-engagementMethods>(): kotlin.collections/Set<id.walt.wallet2.mobile/ProximityEngagementMethod> // id.walt.wallet2.mobile/ProximityConfiguration.engagementMethods.<get-engagementMethods>|<get-engagementMethods>(){}[0]
     final val maximumMessageBytes // id.walt.wallet2.mobile/ProximityConfiguration.maximumMessageBytes|{}maximumMessageBytes[0]
         final fun <get-maximumMessageBytes>(): kotlin/Int // id.walt.wallet2.mobile/ProximityConfiguration.maximumMessageBytes.<get-maximumMessageBytes>|<get-maximumMessageBytes>(){}[0]
     final val profile // id.walt.wallet2.mobile/ProximityConfiguration.profile|{}profile[0]
@@ -2932,21 +3019,18 @@ final class id.walt.wallet2.mobile/ProximityConfiguration { // id.walt.wallet2.m
         final fun <get-readerPolicy>(): id.walt.wallet2.mobile/ProximityReaderPolicy // id.walt.wallet2.mobile/ProximityConfiguration.readerPolicy.<get-readerPolicy>|<get-readerPolicy>(){}[0]
     final val readerTrustEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.readerTrustEvaluator|{}readerTrustEvaluator[0]
         final fun <get-readerTrustEvaluator>(): id.walt.wallet2.mobile/ProximityReaderTrustEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.readerTrustEvaluator.<get-readerTrustEvaluator>|<get-readerTrustEvaluator>(){}[0]
-    final val retrievalMethods // id.walt.wallet2.mobile/ProximityConfiguration.retrievalMethods|{}retrievalMethods[0]
-        final fun <get-retrievalMethods>(): kotlin.collections/Set<id.walt.wallet2.mobile/ProximityRetrievalMethod> // id.walt.wallet2.mobile/ProximityConfiguration.retrievalMethods.<get-retrievalMethods>|<get-retrievalMethods>(){}[0]
+    final val session // id.walt.wallet2.mobile/ProximityConfiguration.session|{}session[0]
+        final fun <get-session>(): id.walt.wallet2.mobile/ProximitySessionConfiguration // id.walt.wallet2.mobile/ProximityConfiguration.session.<get-session>|<get-session>(){}[0]
 
     final fun component1(): id.walt.wallet2.mobile/ProximityProfile // id.walt.wallet2.mobile/ProximityConfiguration.component1|component1(){}[0]
-    final fun component10(): id.walt.wallet2.mobile/ProximityApplicationProfileRegistry // id.walt.wallet2.mobile/ProximityConfiguration.component10|component10(){}[0]
-    final fun component11(): kotlin/Int // id.walt.wallet2.mobile/ProximityConfiguration.component11|component11(){}[0]
-    final fun component2(): id.walt.wallet2.mobile/ProximityBleRoles // id.walt.wallet2.mobile/ProximityConfiguration.component2|component2(){}[0]
-    final fun component3(): id.walt.wallet2.mobile/ProximityBleBearerPolicy // id.walt.wallet2.mobile/ProximityConfiguration.component3|component3(){}[0]
-    final fun component4(): kotlin.collections/Set<id.walt.wallet2.mobile/ProximityEngagementMethod> // id.walt.wallet2.mobile/ProximityConfiguration.component4|component4(){}[0]
-    final fun component5(): kotlin.collections/Set<id.walt.wallet2.mobile/ProximityRetrievalMethod> // id.walt.wallet2.mobile/ProximityConfiguration.component5|component5(){}[0]
-    final fun component6(): id.walt.wallet2.mobile/ProximityReaderPolicy // id.walt.wallet2.mobile/ProximityConfiguration.component6|component6(){}[0]
-    final fun component7(): id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy // id.walt.wallet2.mobile/ProximityConfiguration.component7|component7(){}[0]
-    final fun component8(): id.walt.wallet2.mobile/ProximityReaderTrustEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.component8|component8(){}[0]
-    final fun component9(): id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.component9|component9(){}[0]
-    final fun copy(id.walt.wallet2.mobile/ProximityProfile = ..., id.walt.wallet2.mobile/ProximityBleRoles = ..., id.walt.wallet2.mobile/ProximityBleBearerPolicy = ..., kotlin.collections/Set<id.walt.wallet2.mobile/ProximityEngagementMethod> = ..., kotlin.collections/Set<id.walt.wallet2.mobile/ProximityRetrievalMethod> = ..., id.walt.wallet2.mobile/ProximityReaderPolicy = ..., id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy = ..., id.walt.wallet2.mobile/ProximityReaderTrustEvaluator = ..., id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator = ..., id.walt.wallet2.mobile/ProximityApplicationProfileRegistry = ..., kotlin/Int = ...): id.walt.wallet2.mobile/ProximityConfiguration // id.walt.wallet2.mobile/ProximityConfiguration.copy|copy(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximityBleRoles;id.walt.wallet2.mobile.ProximityBleBearerPolicy;kotlin.collections.Set<id.walt.wallet2.mobile.ProximityEngagementMethod>;kotlin.collections.Set<id.walt.wallet2.mobile.ProximityRetrievalMethod>;id.walt.wallet2.mobile.ProximityReaderPolicy;id.walt.wallet2.mobile.ProximityDeviceAuthenticationPolicy;id.walt.wallet2.mobile.ProximityReaderTrustEvaluator;id.walt.wallet2.mobile.ProximityCredentialStatusEvaluator;id.walt.wallet2.mobile.ProximityApplicationProfileRegistry;kotlin.Int){}[0]
+    final fun component2(): id.walt.wallet2.mobile/ProximitySessionConfiguration // id.walt.wallet2.mobile/ProximityConfiguration.component2|component2(){}[0]
+    final fun component3(): id.walt.wallet2.mobile/ProximityReaderPolicy // id.walt.wallet2.mobile/ProximityConfiguration.component3|component3(){}[0]
+    final fun component4(): id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy // id.walt.wallet2.mobile/ProximityConfiguration.component4|component4(){}[0]
+    final fun component5(): id.walt.wallet2.mobile/ProximityReaderTrustEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.component5|component5(){}[0]
+    final fun component6(): id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator // id.walt.wallet2.mobile/ProximityConfiguration.component6|component6(){}[0]
+    final fun component7(): id.walt.wallet2.mobile/ProximityApplicationProfileRegistry // id.walt.wallet2.mobile/ProximityConfiguration.component7|component7(){}[0]
+    final fun component8(): kotlin/Int // id.walt.wallet2.mobile/ProximityConfiguration.component8|component8(){}[0]
+    final fun copy(id.walt.wallet2.mobile/ProximityProfile = ..., id.walt.wallet2.mobile/ProximitySessionConfiguration = ..., id.walt.wallet2.mobile/ProximityReaderPolicy = ..., id.walt.wallet2.mobile/ProximityDeviceAuthenticationPolicy = ..., id.walt.wallet2.mobile/ProximityReaderTrustEvaluator = ..., id.walt.wallet2.mobile/ProximityCredentialStatusEvaluator = ..., id.walt.wallet2.mobile/ProximityApplicationProfileRegistry = ..., kotlin/Int = ...): id.walt.wallet2.mobile/ProximityConfiguration // id.walt.wallet2.mobile/ProximityConfiguration.copy|copy(id.walt.wallet2.mobile.ProximityProfile;id.walt.wallet2.mobile.ProximitySessionConfiguration;id.walt.wallet2.mobile.ProximityReaderPolicy;id.walt.wallet2.mobile.ProximityDeviceAuthenticationPolicy;id.walt.wallet2.mobile.ProximityReaderTrustEvaluator;id.walt.wallet2.mobile.ProximityCredentialStatusEvaluator;id.walt.wallet2.mobile.ProximityApplicationProfileRegistry;kotlin.Int){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityConfiguration.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityConfiguration.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityConfiguration.toString|toString(){}[0]
@@ -2959,6 +3043,22 @@ final class id.walt.wallet2.mobile/ProximityConfiguredReaderTrustEvaluator : id.
         final fun <get-configuration>(): id.walt.wallet2.mobile/ProximityReaderTrustConfiguration // id.walt.wallet2.mobile/ProximityConfiguredReaderTrustEvaluator.configuration.<get-configuration>|<get-configuration>(){}[0]
 
     final suspend fun evaluate(id.walt.wallet2.mobile/ProximityReaderEvidence): id.walt.wallet2.mobile/ProximityReaderTrustDecision // id.walt.wallet2.mobile/ProximityConfiguredReaderTrustEvaluator.evaluate|evaluate(id.walt.wallet2.mobile.ProximityReaderEvidence){}[0]
+}
+
+final class id.walt.wallet2.mobile/ProximityConnectedRoute { // id.walt.wallet2.mobile/ProximityConnectedRoute|null[0]
+    constructor <init>(id.walt.wallet2.mobile/ProximityEngagementMethod, id.walt.wallet2.mobile/ProximityTransport) // id.walt.wallet2.mobile/ProximityConnectedRoute.<init>|<init>(id.walt.wallet2.mobile.ProximityEngagementMethod;id.walt.wallet2.mobile.ProximityTransport){}[0]
+
+    final val engagement // id.walt.wallet2.mobile/ProximityConnectedRoute.engagement|{}engagement[0]
+        final fun <get-engagement>(): id.walt.wallet2.mobile/ProximityEngagementMethod // id.walt.wallet2.mobile/ProximityConnectedRoute.engagement.<get-engagement>|<get-engagement>(){}[0]
+    final val transport // id.walt.wallet2.mobile/ProximityConnectedRoute.transport|{}transport[0]
+        final fun <get-transport>(): id.walt.wallet2.mobile/ProximityTransport // id.walt.wallet2.mobile/ProximityConnectedRoute.transport.<get-transport>|<get-transport>(){}[0]
+
+    final fun component1(): id.walt.wallet2.mobile/ProximityEngagementMethod // id.walt.wallet2.mobile/ProximityConnectedRoute.component1|component1(){}[0]
+    final fun component2(): id.walt.wallet2.mobile/ProximityTransport // id.walt.wallet2.mobile/ProximityConnectedRoute.component2|component2(){}[0]
+    final fun copy(id.walt.wallet2.mobile/ProximityEngagementMethod = ..., id.walt.wallet2.mobile/ProximityTransport = ...): id.walt.wallet2.mobile/ProximityConnectedRoute // id.walt.wallet2.mobile/ProximityConnectedRoute.copy|copy(id.walt.wallet2.mobile.ProximityEngagementMethod;id.walt.wallet2.mobile.ProximityTransport){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityConnectedRoute.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityConnectedRoute.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityConnectedRoute.toString|toString(){}[0]
 }
 
 final class id.walt.wallet2.mobile/ProximityCredentialOption { // id.walt.wallet2.mobile/ProximityCredentialOption|null[0]
@@ -3107,6 +3207,8 @@ final class id.walt.wallet2.mobile/ProximityError { // id.walt.wallet2.mobile/Pr
         final fun <get-message>(): kotlin/String // id.walt.wallet2.mobile/ProximityError.message.<get-message>|<get-message>(){}[0]
     final val recovery // id.walt.wallet2.mobile/ProximityError.recovery|{}recovery[0]
         final fun <get-recovery>(): id.walt.wallet2.mobile/ProximityRecovery // id.walt.wallet2.mobile/ProximityError.recovery.<get-recovery>|<get-recovery>(){}[0]
+    final val remediationActions // id.walt.wallet2.mobile/ProximityError.remediationActions|{}remediationActions[0]
+        final fun <get-remediationActions>(): kotlin.collections/List<id.walt.wallet2.mobile/ProximityRemediationAction> // id.walt.wallet2.mobile/ProximityError.remediationActions.<get-remediationActions>|<get-remediationActions>(){}[0]
 
     final fun component1(): id.walt.wallet2.mobile/ProximityErrorCategory // id.walt.wallet2.mobile/ProximityError.component1|component1(){}[0]
     final fun component2(): kotlin/String // id.walt.wallet2.mobile/ProximityError.component2|component2(){}[0]
@@ -3154,6 +3256,22 @@ final class id.walt.wallet2.mobile/ProximityHolderAuthorizationRequest { // id.w
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityHolderAuthorizationRequest.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityHolderAuthorizationRequest.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityHolderAuthorizationRequest.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration { // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ...) // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+    final val maximumCommandDataLength // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.maximumCommandDataLength|{}maximumCommandDataLength[0]
+        final fun <get-maximumCommandDataLength>(): kotlin/Int // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.maximumCommandDataLength.<get-maximumCommandDataLength>|<get-maximumCommandDataLength>(){}[0]
+    final val maximumResponseDataLength // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.maximumResponseDataLength|{}maximumResponseDataLength[0]
+        final fun <get-maximumResponseDataLength>(): kotlin/Int // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.maximumResponseDataLength.<get-maximumResponseDataLength>|<get-maximumResponseDataLength>(){}[0]
+
+    final fun component1(): kotlin/Int // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ...): id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.copy|copy(kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration.toString|toString(){}[0]
 }
 
 final class id.walt.wallet2.mobile/ProximityPurposeHint { // id.walt.wallet2.mobile/ProximityPurposeHint|null[0]
@@ -3388,6 +3506,22 @@ final class id.walt.wallet2.mobile/ProximityRequestedElement { // id.walt.wallet
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityRequestedElement.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityRequestedElement.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityRequestedElement.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile/ProximityRetrievalOptions { // id.walt.wallet2.mobile/ProximityRetrievalOptions|null[0]
+    constructor <init>(id.walt.wallet2.mobile/ProximityBleConfiguration? = ..., id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration? = ...) // id.walt.wallet2.mobile/ProximityRetrievalOptions.<init>|<init>(id.walt.wallet2.mobile.ProximityBleConfiguration?;id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration?){}[0]
+
+    final val bluetoothLowEnergy // id.walt.wallet2.mobile/ProximityRetrievalOptions.bluetoothLowEnergy|{}bluetoothLowEnergy[0]
+        final fun <get-bluetoothLowEnergy>(): id.walt.wallet2.mobile/ProximityBleConfiguration? // id.walt.wallet2.mobile/ProximityRetrievalOptions.bluetoothLowEnergy.<get-bluetoothLowEnergy>|<get-bluetoothLowEnergy>(){}[0]
+    final val nfc // id.walt.wallet2.mobile/ProximityRetrievalOptions.nfc|{}nfc[0]
+        final fun <get-nfc>(): id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration? // id.walt.wallet2.mobile/ProximityRetrievalOptions.nfc.<get-nfc>|<get-nfc>(){}[0]
+
+    final fun component1(): id.walt.wallet2.mobile/ProximityBleConfiguration? // id.walt.wallet2.mobile/ProximityRetrievalOptions.component1|component1(){}[0]
+    final fun component2(): id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration? // id.walt.wallet2.mobile/ProximityRetrievalOptions.component2|component2(){}[0]
+    final fun copy(id.walt.wallet2.mobile/ProximityBleConfiguration? = ..., id.walt.wallet2.mobile/ProximityNfcRetrievalConfiguration? = ...): id.walt.wallet2.mobile/ProximityRetrievalOptions // id.walt.wallet2.mobile/ProximityRetrievalOptions.copy|copy(id.walt.wallet2.mobile.ProximityBleConfiguration?;id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityRetrievalOptions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityRetrievalOptions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityRetrievalOptions.toString|toString(){}[0]
 }
 
 final class id.walt.wallet2.mobile/ProximityReview { // id.walt.wallet2.mobile/ProximityReview|null[0]

@@ -57,7 +57,6 @@ class FakeProximityConnection internal constructor(
 class FakePreparedTransport(
     override val connectionMethod: DeviceRetrievalMethod,
     private val connection: ProximityConnection,
-    override val sessionTranscriptFactory: SessionTranscriptFactory = QrSessionTranscriptFactory,
 ) : PreparedTransport {
     override val kind: ProximityTransportKind = connection.kind
     private val mutex = Mutex()
@@ -78,11 +77,23 @@ class FakeTransportProvider(
     private val method: DeviceRetrievalMethod,
     private val connection: ProximityConnection,
     private val availability: ProximityCapability = ProximityCapability(true, true, true, sessionSelected = true),
-) : ProximityTransportProvider {
+) : ReaderSelectedTransportProvider {
     override val kind: ProximityTransportKind = connection.kind
     override suspend fun capability(context: EngagementContext): ProximityCapability = availability
     override suspend fun prepare(context: EngagementContext, sessionScope: CoroutineScope): PreparedTransport {
         check(availability.mayPrepare) { "Fake transport is unavailable" }
         return FakePreparedTransport(method, connection)
+    }
+
+    override fun acceptsReaderOffer(offer: ReaderSelectedTransportOffer): Boolean =
+        offer is ReaderSelectedTransportOffer.Method && offer.value == method
+
+    override suspend fun prepareReaderSelected(
+        offer: ReaderSelectedTransportOffer,
+        context: EngagementContext,
+        sessionScope: CoroutineScope,
+    ): PreparedTransport {
+        check(acceptsReaderOffer(offer)) { "The fake provider cannot prepare the selected reader offer" }
+        return prepare(context, sessionScope)
     }
 }

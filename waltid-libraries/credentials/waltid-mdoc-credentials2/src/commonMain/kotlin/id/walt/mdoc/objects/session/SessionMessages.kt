@@ -34,6 +34,8 @@ data class SessionEstablishment(
     val eReaderKey: ByteStringWrapper<CoseKey>,
     @ByteString
     val data: ByteArray,
+    /** Provisional NFCv2 direction-local message sequence number. Absent for conventional sessions. */
+    val seq: UInt? = null,
     val extensions: Map<String, CborElement> = emptyMap(),
 ) {
     init {
@@ -44,9 +46,10 @@ data class SessionEstablishment(
     }
 
     override fun equals(other: Any?): Boolean = other is SessionEstablishment &&
-        eReaderKey == other.eReaderKey && data.contentEquals(other.data) && extensions == other.extensions
+        eReaderKey == other.eReaderKey && data.contentEquals(other.data) && seq == other.seq &&
+        extensions == other.extensions
 
-    override fun hashCode(): Int = listOf(eReaderKey, data.contentHashCode(), extensions).hashCode()
+    override fun hashCode(): Int = listOf(eReaderKey, data.contentHashCode(), seq, extensions).hashCode()
 }
 
 /** Subsequent encrypted data and/or status in either direction. */
@@ -55,6 +58,8 @@ data class SessionData(
     @ByteString
     val data: ByteArray? = null,
     val status: UInt? = null,
+    /** Provisional NFCv2 direction-local message sequence number. Absent for conventional sessions. */
+    val seq: UInt? = null,
     val extensions: Map<String, CborElement> = emptyMap(),
 ) {
     init {
@@ -69,9 +74,9 @@ data class SessionData(
     val statusCode: SessionStatusCode? get() = status?.let(SessionStatusCode::fromCode)
 
     override fun equals(other: Any?): Boolean = other is SessionData &&
-        data.contentEquals(other.data) && status == other.status && extensions == other.extensions
+        data.contentEquals(other.data) && status == other.status && seq == other.seq && extensions == other.extensions
 
-    override fun hashCode(): Int = listOf(data?.contentHashCode(), status, extensions).hashCode()
+    override fun hashCode(): Int = listOf(data?.contentHashCode(), status, seq, extensions).hashCode()
 }
 
 object SessionEstablishmentSerializer : KSerializer<SessionEstablishment> {
@@ -81,6 +86,7 @@ object SessionEstablishmentSerializer : KSerializer<SessionEstablishment> {
         val fields = linkedMapOf<String, CborElement>()
         fields["eReaderKey"] = value.eReaderKey.toTaggedByteString(CoseKey.serializer())
         fields["data"] = value.data.toCborElement(ByteArraySerializer())
+        value.seq?.let { fields["seq"] = it.toCborElement(UInt.serializer()) }
         fields.putAll(value.extensions)
         encoder.encodeTextMap(fields)
     }
@@ -92,6 +98,7 @@ object SessionEstablishmentSerializer : KSerializer<SessionEstablishment> {
                 ?: throw SerializationException("SessionEstablishment eReaderKey is required"),
             data = fields["data"]?.fromCborElement(ByteArraySerializer())
                 ?: throw SerializationException("SessionEstablishment data is required"),
+            seq = fields["seq"]?.fromCborElement(UInt.serializer()),
             extensions = fields.extensionsExcluding(SESSION_ESTABLISHMENT_FIELDS),
         )
     }
@@ -104,6 +111,7 @@ object SessionDataSerializer : KSerializer<SessionData> {
         val fields = linkedMapOf<String, CborElement>()
         value.data?.let { fields["data"] = it.toCborElement(ByteArraySerializer()) }
         value.status?.let { fields["status"] = it.toCborElement(UInt.serializer()) }
+        value.seq?.let { fields["seq"] = it.toCborElement(UInt.serializer()) }
         fields.putAll(value.extensions)
         encoder.encodeTextMap(fields)
     }
@@ -113,6 +121,7 @@ object SessionDataSerializer : KSerializer<SessionData> {
         return SessionData(
             data = fields["data"]?.fromCborElement(ByteArraySerializer()),
             status = fields["status"]?.fromCborElement(UInt.serializer()),
+            seq = fields["seq"]?.fromCborElement(UInt.serializer()),
             extensions = fields.extensionsExcluding(SESSION_DATA_FIELDS),
         )
     }
@@ -130,8 +139,8 @@ enum class SessionStatusCode(val code: UInt, val terminal: Boolean) {
 }
 
 const val AUTHENTICATION_TAG_BYTES: Int = 16
-private val SESSION_ESTABLISHMENT_FIELDS = setOf("eReaderKey", "data")
-private val SESSION_DATA_FIELDS = setOf("data", "status")
+private val SESSION_ESTABLISHMENT_FIELDS = setOf("eReaderKey", "data", "seq")
+private val SESSION_DATA_FIELDS = setOf("data", "status", "seq")
 private val TERMINAL_ERROR_STATUSES = setOf(
     SessionStatusCode.SESSION_ENCRYPTION_ERROR.code,
     SessionStatusCode.CBOR_DECODING_ERROR.code,

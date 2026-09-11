@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration
+import id.walt.wallet2.mobile.ProximityRetrievalOptions
 import id.walt.wallet2.mobile.ProximityReviewId
 import id.walt.wallet2.mobile.ProximityRecovery
 import id.walt.wallet2.mobile.ProximityRuntimeObservation
@@ -13,7 +15,9 @@ import id.walt.wallet2.mobile.ProximityDocumentReview
 import id.walt.wallet2.mobile.ProximityElementReference
 import id.walt.wallet2.mobile.ProximityError
 import id.walt.wallet2.mobile.ProximityErrorCategory
+import id.walt.wallet2.mobile.ProximitySessionConfiguration
 import id.walt.wallet2.mobile.ProximityHostActionResult
+import id.walt.wallet2.mobile.ProximityNfcHandover
 import id.walt.wallet2.mobile.ProximityProfile
 import id.walt.wallet2.mobile.ProximityReaderPolicy
 import id.walt.wallet2.mobile.ProximityRemediationAction
@@ -483,11 +487,13 @@ private val availableSelected = ProximityTransportCapability(
 private val availableUnselected = availableSelected.copy(selected = false)
 
 private val readyCapabilities = ProximityCapabilities(
+    session = ProximitySessionConfiguration.Qr(),
     profile = ProximityProfile.Iso180135Edition2Dis2026,
     qrEngagement = availableSelected,
     nfcEngagement = availableUnselected,
     bluetoothLowEnergy = availableSelected,
     nfcRetrieval = availableUnselected,
+    nfcV2Retrieval = availableUnselected,
     wifiAwareRetrieval = availableUnselected,
 )
 
@@ -508,6 +514,13 @@ private val blockedCapabilities = readyCapabilities.copy(
 )
 
 private val fallbackCapabilities = blockedCapabilities.copy(
+    session = ProximitySessionConfiguration.ConventionalNfc(
+        handover = ProximityNfcHandover.Static,
+        retrieval = ProximityRetrievalOptions(
+            nfc = ProximityNfcRetrievalConfiguration(),
+        ),
+        qrFallback = ProximityRetrievalOptions(),
+    ),
     nfcEngagement = availableSelected,
     nfcRetrieval = availableSelected,
 )

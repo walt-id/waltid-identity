@@ -204,7 +204,7 @@ class HolderWireErrorTest {
             val loopback = FakeProximityLoopback.create()
             var previewCalls = 0
             var resolveCalls = 0
-            val engine = MdocHolderProtocolEngine(deviceKey, listOf(FakeTransportProvider(method, loopback.holder)),
+            val engine = MdocHolderProtocolEngine(deviceKey, listOf(QrMdocEngagementSource(listOf(FakeTransportProvider(method, loopback.holder)))),
                 object : MdocHolderRequestProcessor {
                     override suspend fun prepare(context: MdocHolderRequestContext): MdocRequestPreparation =
                         if (rejected != null) MdocRequestPreparation.Rejected(rejected)
