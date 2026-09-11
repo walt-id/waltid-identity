@@ -204,6 +204,111 @@ Multiple reader-authentication statements retain their independent
 `authenticationIndex`, and holder-key authorization is reported per document
 request so mixed signature/MAC responses cannot be collapsed into one prompt.
 
+Reader authentication validity does not establish reader trust. To require a
+trusted reader, provision Reader CA certificates out of band and pass the shared
+evaluator explicitly:
+
+```kotlin
+val readerTrust = ProximityConfiguredReaderTrustEvaluator(
+    ProximityReaderTrustConfiguration(
+        trustAnchors = listOf(
+            ProximityReaderTrustAnchor(
+                certificateDerBase64Url = readerCaDerBase64Url,
+                displayName = "Example reader authority",
+            )
+        ),
+        revocationPolicy = ProximityReaderRevocationPolicy.Check(
+            applicationRevocationEvaluator
+        ),
+    )
+)
+val configuration = ProximityConfiguration(
+    readerPolicy = ProximityReaderPolicy.RequireTrusted,
+    readerTrustEvaluator = readerTrust,
+)
+```
+
+The SDK performs certificate profile, time, and explicit-anchor path validation,
+but performs no hidden network lookup and ships no reader trust list. A root sent
+by the reader is only path evidence; it is never trusted unless the application
+provisioned the same certificate. Optional RICAL providers use separate explicit
+provider roots, signer policy, revocation, and constraint boundaries. Demo apps
+can pass a named test anchor through the same configuration constructor, but
+test anchors must not become production defaults.
+
+For CRL checking, configure the shared verifier with public certificates from the
+reader's issuer path and application-owned transport:
+
+```kotlin
+val applicationRevocationEvaluator = ProximityCrlRevocationEvaluator(
+    issuerCertificatesDerBase64Url = listOf(readerCaDerBase64Url),
+    scope = ProximityCrlScope.ReaderCertificateAndIssuingAuthorities,
+    fetcher = ProximityCrlFetcher { url, maximumBytes ->
+        // Apply application destination, redirect, timeout, and byte-limit policy.
+        // Return Available with unpadded Base64URL DER, or Unavailable.
+        applicationCrlClient.fetch(url, maximumBytes)
+    },
+)
+```
+
+The evaluator follows signature-linked issuers and fetches applicable HTTP(S)
+distribution points from the checked certificates. Authority scope includes the
+terminal self-signed Reader CA, which must also advertise a distribution point.
+A current, authenticated complete CRL must cover every checked certificate;
+verified revocation of either the reader or an authority prevents disclosure.
+The issuer list supplies path material and does not add trust anchors.
+
+The supported CRL profile is direct X.509 v2 with authority key identifier, CRL
+number, `thisUpdate` and `nextUpdate`, and ECDSA or RSA PKCS#1 signatures using
+SHA-256/384/512. CRLs are limited to 2 MiB and 10,000 entries. Delta, indirect,
+partitioned, stale or unverifiable CRLs remain indeterminate. Missing evidence
+never becomes `Good`. The SDK performs no implicit fetch and keeps no cache
+between evaluations. The default revocation policy remains `NotChecked`; demo
+trust settings do not configure a CRL client. OCSP needs a separate request and
+signed-response verifier and is not implemented by this evaluator.
+
+Wallet applications that let holders manage this policy can persist a canonical
+`ProximityReaderTrustSettings` snapshot. Use
+`ProximityReaderTrustSettingsCodec.prepareImport` to validate and
+preview public trust material before saving the returned settings. The importer
+accepts DER or certificate-only PEM Reader CAs and versioned walt.id JSON trust
+bundles containing named Reader CAs and static signed RICAL configuration. It
+rejects private keys, PKCS#12/PFX files, unknown JSON fields or versions,
+duplicates, non-CA or expired anchors, invalid RICAL signatures and paths, and
+files larger than 1 MiB. The codec performs no persistence or network access.
+
+The version-1 bundle shape is deliberately narrow; every encoded value is
+unpadded Base64URL and unknown fields are rejected:
+
+```json
+{
+  "version": 1,
+  "type": "org.waltid.wallet.reader-trust",
+  "readerAuthorities": [
+    {
+      "name": "Example Reader CA",
+      "certificateDerBase64Url": "<public DER certificate>"
+    }
+  ],
+  "ricalProviders": [
+    {
+      "providerId": "<RICAL provider identifier>",
+      "acceptedTypes": ["<RICAL type>"],
+      "providerTrustAnchorsDerBase64Url": ["<public DER certificate>"],
+      "acceptedSignerCertificatePolicyOids": ["<certificate-policy OID>"],
+      "establishReaderTrust": false,
+      "signedRicalBase64Url": "<untagged COSE_Sign1>"
+    }
+  ]
+}
+```
+
+Read one immutable settings snapshot when a new session starts and apply it with
+`ProximityReaderTrustSettings.applyTo`. Settings changed during a
+session therefore affect only the next session. The demo wallets expose this as
+**Settings → Credential Sharing → Reader Authentication** and store only the
+canonical public configuration in app-private storage.
+
 Only one proximity session may be active per wallet. Always call `close()` when
 the journey leaves the screen; closing and cancellation are idempotent and every
 new session creates fresh engagement identifiers and ephemeral key material.

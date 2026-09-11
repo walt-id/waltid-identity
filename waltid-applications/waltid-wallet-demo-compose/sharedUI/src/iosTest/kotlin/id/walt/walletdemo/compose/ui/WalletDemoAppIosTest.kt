@@ -62,6 +62,10 @@ class WalletDemoAppIosTest {
         scenarios.receiveAndPresentTabsExposeQrScanActions()
 
     @Test
+    fun embeddedPresentationJourneyKeepsWalletChrome() =
+        scenarios.embeddedPresentationJourneyKeepsWalletChrome()
+
+    @Test
     fun presentTabAllowsPreviewAndDeclineWithoutCredentials() =
         scenarios.presentTabAllowsPreviewAndDeclineWithoutCredentials()
 
@@ -120,6 +124,10 @@ class WalletDemoAppIosTest {
     @Test
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
+
+    @Test
+    fun readerTrustSettingsReviewAndPersistPublicCa() =
+        scenarios.readerTrustSettingsReviewAndPersistPublicCa()
 
     @Test
     fun lockDoesNotAutoPromptBiometrics() =

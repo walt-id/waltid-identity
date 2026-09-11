@@ -9,6 +9,9 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationRequestInfo
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.ProximityCapabilities
+import id.walt.wallet2.mobile.ProximityConfiguration
+import id.walt.wallet2.mobile.ProximitySession
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataItem
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
@@ -22,7 +25,17 @@ import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,
     private val warning: String? = null,
-) : DemoWallet {
+) : ProximityDemoWallet {
+    override suspend fun proximityPresentationCapabilities(
+        configuration: ProximityConfiguration,
+    ): ProximityCapabilities =
+        mobileWallet.proximityPresentationCapabilities(configuration)
+
+    override suspend fun startProximityPresentation(
+        configuration: ProximityConfiguration,
+    ): ProximitySession =
+        mobileWallet.startProximityPresentation(configuration)
+
     override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult =
         mobileWallet.bootstrap(
             keyUseAuthorizationPolicy = signingProtection.toKeyUseAuthorizationPolicy(),

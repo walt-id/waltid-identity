@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import WalletDemoSharingUI
+import WalletSDK
 
 struct SettingsView: View {
     @ObservedObject var viewModel: WalletViewModel
@@ -54,6 +56,10 @@ struct SettingsView: View {
                 Text("When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                NavigationLink("Reader Authentication") {
+                    ReaderTrustSettingsView(controller: viewModel.readerTrustSettings)
+                }
+                .accessibilityIdentifier(WalletAccessibilityID.settingsReaderAuthentication)
             }
             .accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
             Section {
@@ -193,5 +199,278 @@ struct SettingsView: View {
                 }
             }
         )
+    }
+}
+
+private struct ReaderTrustSettingsView: View {
+    @ObservedObject var controller: DemoReaderTrustSettingsController
+    @State private var importing = false
+    @State private var confirmReset = false
+
+    var body: some View {
+        List {
+            Section("Reader policy") {
+                policyChoice(
+                    .allowAnonymousOrUntrusted,
+                    title: "Allow anonymous or untrusted readers",
+                    detail: "Reader Authentication remains visible during holder review."
+                )
+                .accessibilityIdentifier(WalletAccessibilityID.readerTrustAllowUntrusted)
+                policyChoice(
+                    .requireTrusted,
+                    title: "Require a trusted reader",
+                    detail: "Only readers accepted by configured Reader CAs or RICALs may reach review."
+                )
+                .accessibilityIdentifier(WalletAccessibilityID.readerTrustRequireTrusted)
+                if controller.settings.readerPolicy == .requireTrusted,
+                   controller.settings.trustAnchors.isEmpty,
+                   controller.settings.ricalProviders.isEmpty {
+                    Text("No trust material is configured, so all readers will be rejected.")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+            }
+            .accessibilityIdentifier(WalletAccessibilityID.readerTrustPolicy)
+
+            Section("Configured trust material") {
+                if controller.settings.trustAnchors.isEmpty,
+                   controller.settings.ricalProviders.isEmpty {
+                    Text("No Reader CAs or RICAL providers configured")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(controller.settings.trustAnchors) { anchor in
+                    configuredMaterialRow(
+                        title: anchor.displayName,
+                        detail: "Reader CA",
+                        remove: { controller.removeReaderAuthority(id: anchor.id) }
+                    )
+                }
+                ForEach(controller.settings.ricalProviders) { provider in
+                    configuredMaterialRow(
+                        title: provider.providerID,
+                        detail: provider.establishesReaderTrust
+                            ? "RICAL provider · establishes reader trust"
+                            : "RICAL provider · evidence only",
+                        remove: { controller.removeRICALProvider(id: provider.id) }
+                    )
+                }
+            }
+
+            Section("Import") {
+                Button("Import Reader CA or trust bundle") {
+                    importing = true
+                }
+                .disabled(controller.importInProgress)
+                .accessibilityIdentifier(WalletAccessibilityID.readerTrustImport)
+                Text("Accepted: DER or certificate-only PEM Reader CAs, and versioned walt.id JSON trust bundles. Private keys and PKCS#12 files are rejected.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                if controller.importInProgress {
+                    ProgressView("Validating trust material...")
+                        .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportProgress)
+                }
+            }
+
+            if !controller.settings.trustAnchors.isEmpty ||
+                !controller.settings.ricalProviders.isEmpty ||
+                controller.settings.readerPolicy != .allowAnonymousOrUntrusted {
+                Section {
+                    Button("Reset Reader Authentication settings", role: .destructive) {
+                        confirmReset = true
+                    }
+                    .accessibilityIdentifier(WalletAccessibilityID.readerTrustReset)
+                }
+            }
+        }
+        .navigationTitle("Reader Authentication")
+        .fileImporter(
+            isPresented: $importing,
+            allowedContentTypes: [.data],
+            allowsMultipleSelection: false,
+            onCompletion: handleImportResult
+        )
+        .sheet(isPresented: importReviewPresented) {
+            if let preview = controller.pendingImport {
+                ReaderTrustImportReviewView(
+                    preview: preview,
+                    confirm: controller.confirmImport,
+                    cancel: controller.cancelImport
+                )
+            }
+        }
+        .confirmationDialog(
+            "Reset Reader Authentication settings?",
+            isPresented: $confirmReset,
+            titleVisibility: .visible
+        ) {
+            Button("Reset", role: .destructive, action: controller.reset)
+                .accessibilityIdentifier(WalletAccessibilityID.readerTrustResetConfirm)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes all imported Reader CAs and RICAL providers and restores the permissive reader policy.")
+        }
+        .alert("Reader Authentication import failed", isPresented: errorPresented) {
+            Button("OK", action: controller.dismissError)
+        } message: {
+            Text(controller.errorMessage ?? "Unknown error")
+                .accessibilityIdentifier(WalletAccessibilityID.readerTrustError)
+        }
+    }
+
+    private func policyChoice(
+        _ policy: ProximityStoredReaderPolicy,
+        title: String,
+        detail: String
+    ) -> some View {
+        Button {
+            controller.setReaderPolicy(policy)
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: controller.settings.readerPolicy == policy
+                    ? "largecircle.fill.circle"
+                    : "circle")
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).foregroundStyle(.primary)
+                    Text(detail).font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(
+            controller.settings.readerPolicy == policy ? "Selected" : "Not selected"
+        )
+        .accessibilityAddTraits(
+            controller.settings.readerPolicy == policy ? .isSelected : []
+        )
+    }
+
+    private func configuredMaterialRow(
+        title: String,
+        detail: String,
+        remove: @escaping () -> Void
+    ) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                Text(detail).font(.footnote).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(role: .destructive, action: remove) {
+                Image(systemName: "trash")
+            }
+            .accessibilityLabel("Remove \(title)")
+        }
+    }
+
+    private func handleImportResult(_ result: Result<[URL], Error>) {
+        do {
+            switch try ReaderTrustImportFileLoader.load(result) {
+            case .cancelled:
+                return
+            case let .selected(sourceName, data):
+                Task {
+                    await controller.prepareImport(sourceName: sourceName, data: data)
+                }
+            }
+        } catch {
+            controller.reportImportError(error.localizedDescription)
+        }
+    }
+
+    private var importReviewPresented: Binding<Bool> {
+        Binding(
+            get: { controller.pendingImport != nil },
+            set: { if !$0 { controller.cancelImport() } }
+        )
+    }
+
+    private var errorPresented: Binding<Bool> {
+        Binding(
+            get: { controller.errorMessage != nil },
+            set: { if !$0 { controller.dismissError() } }
+        )
+    }
+}
+
+private struct ReaderTrustImportReviewView: View {
+    let preview: ProximityReaderTrustImportPreview
+    let confirm: () -> Void
+    let cancel: () -> Void
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section("Import") {
+                    reviewDetail("File", preview.sourceName)
+                    reviewDetail(
+                        "Kind",
+                        preview.kind == .readerCA ? "Reader CA" : "Trust bundle"
+                    )
+                    Text(preview.policyEffect)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                if !preview.readerAuthorities.isEmpty {
+                    Section("Reader authorities") {
+                        ForEach(preview.readerAuthorities) { authority in
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(authority.displayName).font(.headline)
+                                reviewDetail("Profile", authority.profile)
+                                reviewDetail("Subject", authority.subject)
+                                reviewDetail("Issuer", authority.issuer)
+                                reviewDate("Valid from", authority.validFrom)
+                                reviewDate("Valid until", authority.validUntil)
+                                Text(authority.sha256Fingerprint)
+                                    .font(.caption.monospaced())
+                                    .textSelection(.enabled)
+                            }
+                        }
+                    }
+                }
+                if !preview.ricalProviders.isEmpty {
+                    Section("RICAL providers") {
+                        ForEach(preview.ricalProviders) { provider in
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(provider.providerID).font(.headline)
+                                reviewDetail("Type", provider.type)
+                                reviewDetail(
+                                    "Trust effect",
+                                    provider.establishesReaderTrust
+                                        ? "May establish reader trust"
+                                        : "Evidence only"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Review import")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: cancel)
+                        .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportCancel)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Import", action: confirm)
+                        .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportConfirm)
+                }
+            }
+            .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportReview)
+        }
+    }
+
+    private func reviewDetail(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(.footnote)
+        }
+    }
+
+    private func reviewDate(_ label: String, _ value: Date) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(value, style: .date).font(.footnote)
+        }
     }
 }

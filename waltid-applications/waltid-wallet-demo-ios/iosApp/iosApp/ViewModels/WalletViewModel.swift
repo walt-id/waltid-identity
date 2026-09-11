@@ -91,6 +91,8 @@ private enum WalletStatusText {
 
 @MainActor
 class WalletViewModel: ObservableObject {
+    let proximityPresentation: ProximityPresentationViewModel
+    let readerTrustSettings: DemoReaderTrustSettingsController
     @Published var isReady = false
     @Published var did = ""
     @Published var keyID = ""
@@ -296,6 +298,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func resetWallet() {
+        proximityPresentation.dismiss()
         receiveTask?.cancel()
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
@@ -327,6 +330,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func lock() {
+        proximityPresentation.dismiss()
         receiveTask?.cancel()
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
@@ -577,6 +581,8 @@ class WalletViewModel: ObservableObject {
         signingProtectionMode: WalletDemoSigningProtectionMode = .disabled,
         signingProtectionStore: (any WalletDemoSigningProtectionStore)? = nil,
         walletClient: (any WalletClient)? = nil,
+        proximityWalletClient: (any ProximityWalletClient)? = nil,
+        readerTrustSettingsPersistence: (any DemoReaderTrustSettingsPersistence)? = nil,
         identityDocumentRegistrationUpdate: (@Sendable () async throws -> Void)? = nil,
         pinStore: DemoPinStore? = nil,
         biometricAuthenticator: (any DemoBiometricAuthenticator)? = nil
@@ -606,13 +612,29 @@ class WalletViewModel: ObservableObject {
                 cancelText: "Cancel"
             )
         )
+        let resolvedWalletClient = walletClient ?? SDKWalletClient(configuration: configuration)
         self.signingProtectionMode = signingProtectionMode
         selectedSigningProtection = selectedProtection
         appliedSigningProtection = nil
         pendingSigningProtectionChange = nil
         signingProtectionReprovisionTarget = nil
         self.signingProtectionStore = resolvedStore
-        self.walletClient = walletClient ?? SDKWalletClient(configuration: configuration)
+        self.walletClient = resolvedWalletClient
+        let readerTrustSettings = DemoReaderTrustSettingsController(
+            persistence: readerTrustSettingsPersistence
+                ?? UserDefaultsDemoReaderTrustSettingsPersistence(
+                    appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+                )
+        )
+        self.readerTrustSettings = readerTrustSettings
+        self.proximityPresentation = ProximityPresentationViewModel(
+            client: proximityWalletClient
+                ?? (resolvedWalletClient as? any ProximityWalletClient)
+                ?? UnavailableProximityWalletClient(),
+            configurationProvider: {
+                readerTrustSettings.sessionSnapshot().applying()
+            }
+        )
         self.identityDocumentRegistrationUpdate = identityDocumentRegistrationUpdate ?? {
             try await Self.defaultIdentityDocumentRegistrationUpdate()
         }

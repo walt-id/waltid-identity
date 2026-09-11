@@ -4,7 +4,117 @@ import XCTest
 final class MockWalletUITests: XCTestCase {
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
-    func testUrlEditorsAreTopControlsInReceiveAndPresentTabs() {
+    func testReaderTrustSettingsExposePolicyAndFileImport() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            "Wallet ready"
+        )
+        ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        ui.tapElement(identifier: "wallet.settingsReaderAuthentication")
+
+        let allowUntrusted = app.descendants(matching: .any)[
+            "wallet.readerTrustAllowUntrusted"
+        ]
+        let requireTrusted = app.descendants(matching: .any)[
+            "wallet.readerTrustRequireTrusted"
+        ]
+        XCTAssertTrue(allowUntrusted.waitForExistence(timeout: 10))
+        XCTAssertTrue(requireTrusted.waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            app.buttons["wallet.readerTrustImport"].waitForExistence(timeout: 10)
+        )
+
+        allowUntrusted.tap()
+        XCTAssertTrue(allowUntrusted.isSelected)
+        XCTAssertEqual(allowUntrusted.value as? String, "Selected")
+        requireTrusted.tap()
+        XCTAssertTrue(requireTrusted.isSelected)
+        XCTAssertEqual(requireTrusted.value as? String, "Selected")
+        XCTAssertEqual(allowUntrusted.value as? String, "Not selected")
+
+        ui.tapButton(
+            identifier: "wallet.readerTrustReset",
+            fallbackLabel: "Reset Reader Authentication settings"
+        )
+        ui.tapButton(identifier: "wallet.readerTrustResetConfirm", fallbackLabel: "Reset")
+        XCTAssertEqual(allowUntrusted.value as? String, "Selected")
+        XCTAssertFalse(app.buttons["wallet.readerTrustReset"].exists)
+    }
+
+    func testProximityPresentationCanBeDismissedAndStartedAgain() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            "Wallet ready"
+        )
+        receiveMockCredential(app: app, ui: ui)
+        ui.tapTab(label: "Present")
+
+        let proximityScreen = app.descendants(matching: .any)["wallet.proximityScreen"]
+        for _ in 0..<2 {
+            ui.tapButton(identifier: "wallet.proximityStartButton", fallbackLabel: "Present to nearby reader")
+            XCTAssertTrue(proximityScreen.waitForExistence(timeout: 10))
+            XCTAssertTrue(app.buttons["wallet.settingsButton"].exists)
+            ui.tapButton(identifier: "wallet.proximityDoneButton", fallbackLabel: "Done")
+
+            let dismissed = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"),
+                object: proximityScreen
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 10), .completed)
+        }
+    }
+
+    func testStatusBannerPrecedesContentAcrossTabs() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            "Wallet ready"
+        )
+
+        let status = app.descendants(matching: .any)["wallet.status"]
+        let emptyCredentials = app.staticTexts["No credentials yet"]
+        XCTAssertTrue(status.waitForExistence(timeout: 2))
+        XCTAssertTrue(emptyCredentials.waitForExistence(timeout: 10))
+        XCTAssertLessThan(
+            status.frame.minY,
+            emptyCredentials.frame.minY,
+            "Credentials status should precede the tab content"
+        )
+
+        ui.tapTab(label: "Receive")
+        let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
+        ui.replaceText(in: offerInput, value: "https://[")
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Receive failed"], timeout: 10), "Receive failed: invalid offer URL")
+        XCTAssertLessThan(
+            app.descendants(matching: .any)["wallet.status"].frame.minY,
+            offerInput.frame.minY,
+            "Receive status should precede the tab content"
+        )
+
+        ui.tapTab(label: "Present")
+        let presentationInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
+        ui.replaceText(in: presentationInput, value: "https://[")
+        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Preview failed"], timeout: 10), "Preview failed: invalid request URL")
+        XCTAssertLessThan(
+            app.descendants(matching: .any)["wallet.status"].frame.minY,
+            presentationInput.frame.minY,
+            "Present status should precede the tab content"
+        )
+    }
+
+    func testOnlinePresentationPrecedesInPersonPresentation() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
@@ -14,26 +124,15 @@ final class MockWalletUITests: XCTestCase {
             "Wallet ready"
         )
 
-        ui.tapTab(label: "Receive")
-        let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
-        XCTAssertTrue(offerInput.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["wallet.offerScanButton"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["wallet.status"].waitForExistence(timeout: 10))
-        XCTAssertLessThan(
-            offerInput.frame.minY,
-            app.staticTexts["wallet.status"].frame.minY,
-            "Receive URL entry should be the first control in the tab"
-        )
-
         ui.tapTab(label: "Present")
         let presentationInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
+        let proximityStart = app.buttons["wallet.proximityStartButton"]
         XCTAssertTrue(presentationInput.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["wallet.presentationScanButton"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["wallet.status"].waitForExistence(timeout: 10))
+        XCTAssertTrue(proximityStart.waitForExistence(timeout: 10))
         XCTAssertLessThan(
             presentationInput.frame.minY,
-            app.staticTexts["wallet.status"].frame.minY,
-            "Presentation URL entry should be the first control in the tab"
+            proximityStart.frame.minY,
+            "Online presentation should precede in-person presentation"
         )
     }
 

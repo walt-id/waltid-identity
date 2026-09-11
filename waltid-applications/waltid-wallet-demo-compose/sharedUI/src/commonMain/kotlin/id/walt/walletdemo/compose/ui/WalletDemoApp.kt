@@ -30,6 +30,21 @@ import id.walt.walletdemo.compose.ui.screens.WalletScreen
 fun WalletDemoApp(
     controller: WalletDemoController,
     branding: WalletDemoBranding = WalletDemoBranding(),
+    onStartProximityPresentation: (() -> Unit)? = null,
+) = WalletDemoAppHost(
+    controller = controller,
+    branding = branding,
+    onStartProximityPresentation = onStartProximityPresentation,
+)
+
+/** Wallet shell with an internal slot for transport-specific presentation journey content. */
+@Composable
+internal fun WalletDemoAppHost(
+    controller: WalletDemoController,
+    branding: WalletDemoBranding = WalletDemoBranding(),
+    onStartProximityPresentation: (() -> Unit)? = null,
+    presentationContent: (@Composable () -> Unit)? = null,
+    sharingSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
@@ -78,7 +93,13 @@ fun WalletDemoApp(
                             message = auth.message,
                         )
                     }
-                    WalletAuthState.Unlocked -> WalletScreen(controller, state)
+                    WalletAuthState.Unlocked -> WalletScreen(
+                        controller = controller,
+                        state = state,
+                        onStartProximityPresentation = onStartProximityPresentation,
+                        presentationContent = presentationContent,
+                        sharingSettingsContent = sharingSettingsContent,
+                    )
                 }
             }
         }
