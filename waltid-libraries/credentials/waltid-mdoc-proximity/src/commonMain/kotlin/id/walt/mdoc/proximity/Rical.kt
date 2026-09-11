@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.proximity
 
@@ -8,6 +8,7 @@ import id.walt.cose.Cose
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.MdocVersion
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.decodeFromByteArray

@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.objects.deviceretrieval
 
@@ -10,6 +10,7 @@ import id.walt.mdoc.encoding.requireNoExtensionCollisions
 import id.walt.mdoc.encoding.toCborElement
 import id.walt.mdoc.objects.MdocVersion
 import id.walt.mdoc.objects.document.Document
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.SerializationException

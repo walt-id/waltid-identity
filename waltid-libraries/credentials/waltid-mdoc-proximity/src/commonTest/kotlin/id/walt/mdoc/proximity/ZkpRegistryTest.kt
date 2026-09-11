@@ -1,5 +1,5 @@
 @file:OptIn(
-    kotlinx.serialization.ExperimentalSerializationApi::class,
+    ExperimentalSerializationApi::class,
     ExperimentalUnsignedTypes::class,
 )
 
@@ -21,6 +21,7 @@ import id.walt.mdoc.objects.deviceretrieval.ZkRequest
 import id.walt.mdoc.objects.deviceretrieval.ZkSystemSpec
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.cbor.CborString

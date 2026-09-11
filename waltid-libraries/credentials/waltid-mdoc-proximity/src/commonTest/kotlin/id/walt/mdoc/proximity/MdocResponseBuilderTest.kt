@@ -1,12 +1,14 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.proximity
 
 import id.walt.cose.Cose
+import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
@@ -33,6 +35,7 @@ import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.handover.NFCHandover
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.cbor.*
@@ -347,7 +350,7 @@ class MdocResponseBuilderTest {
             listOf(presentation), SessionTranscript.forQr(byteArrayOf(1), byteArrayOf(2)),
             documentErrors = listOf(MdocDocumentError("org.example.other", 0L), MdocDocumentError("org.example.third", -1L)),
         )
-        val cbor = id.walt.cose.coseCompliantCbor
+        val cbor = coseCompliantCbor
         val wire = assertIs<CborMap>(cbor.decodeFromByteArray<CborElement>(cbor.encodeToByteArray(response)))
         val documents = assertIs<CborArray>(wire[CborString("documents")])
         val document = assertIs<CborMap>(documents.single())
@@ -373,7 +376,7 @@ class MdocResponseBuilderTest {
         val readerKey = key("encrypted-reader", setOf(KeyUsage.KEY_AGREEMENT))
         val readerPublic = (readerKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey()
         val parameters = EncryptionParameters(readerPublic)
-        val exactParameters = id.walt.cose.coseCompliantCbor.encodeToByteArray(parameters)
+        val exactParameters = coseCompliantCbor.encodeToByteArray(parameters)
         val wrappedParameters = ByteStringWrapper(parameters, exactParameters)
         val transcript = SessionTranscript.forQr(byteArrayOf(1, 2), byteArrayOf(3, 4))
         val source = issue(holderKey)
@@ -398,9 +401,9 @@ class MdocResponseBuilderTest {
                 encapsulatedKey = BinaryData(encrypted.enc),
                 ciphertext = BinaryData(encrypted.cipherText),
             ),
-            info = id.walt.cose.coseCompliantCbor.encodeToByteArray(encryptionTranscript),
+            info = coseCompliantCbor.encodeToByteArray(encryptionTranscript),
         )
-        val document = id.walt.cose.coseCompliantCbor
+        val document = coseCompliantCbor
             .decodeFromByteArray<EncryptedDocumentsPlaintext>(plaintext)
             .documents!!.single()
         val authentication = assertIs<DeviceAuth.Signature>(document.deviceSigned!!.deviceAuth).signature
@@ -435,7 +438,7 @@ class MdocResponseBuilderTest {
         )
     }
 
-    private suspend fun issue(holderKey: id.walt.crypto2.keys.Key): Document =
+    private suspend fun issue(holderKey: Key): Document =
         runtime.issueMdocTestDocument(holderKey)
 
     private suspend fun key(

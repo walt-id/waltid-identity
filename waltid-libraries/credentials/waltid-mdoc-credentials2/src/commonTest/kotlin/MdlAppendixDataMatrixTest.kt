@@ -1,12 +1,13 @@
 @file:OptIn(
-    kotlinx.serialization.ExperimentalSerializationApi::class,
-    kotlin.ExperimentalUnsignedTypes::class,
+    ExperimentalSerializationApi::class,
+    ExperimentalUnsignedTypes::class,
 )
 
 import id.walt.mdoc.credsdata.Mdl
 import id.walt.mdoc.encoding.MdocCbor
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborBoolean
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborElement

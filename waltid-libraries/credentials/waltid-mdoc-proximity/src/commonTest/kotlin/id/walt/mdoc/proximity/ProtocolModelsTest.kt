@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.proximity
 
@@ -41,6 +41,9 @@ import id.walt.mdoc.objects.engagement.DeviceEngagementSecurity
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.session.SessionData
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborInteger
@@ -123,7 +126,7 @@ class ProtocolModelsTest {
         extendedKnownOptions[vector.size + 2] = 0x00
         val extended = coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(extendedKnownOptions)
         val ble = assertIs<DeviceRetrievalMethod.Ble>(extended.deviceRetrievalMethods!!.single())
-        assertEquals(kotlinx.serialization.cbor.CborInteger(0), ble.extensions[99u])
+        assertEquals(CborInteger(0), ble.extensions[99u])
         assertContentEquals(
             extendedKnownOptions,
             coseCompliantCbor.encodeToByteArray(DeviceEngagement.serializer(), extended),
@@ -172,10 +175,10 @@ class ProtocolModelsTest {
         val bothMethodsBytes = coseCompliantCbor.encodeToByteArray(CborElement.serializer(), bothMethods)
         val noMethodBytes = coseCompliantCbor.encodeToByteArray(CborElement.serializer(), CborMap(emptyMap()))
 
-        assertFailsWith<kotlinx.serialization.SerializationException> {
+        assertFailsWith<SerializationException> {
             coseCompliantCbor.decodeFromByteArray<DeviceAuth>(bothMethodsBytes)
         }
-        assertFailsWith<kotlinx.serialization.SerializationException> {
+        assertFailsWith<SerializationException> {
             coseCompliantCbor.decodeFromByteArray<DeviceAuth>(noMethodBytes)
         }
         assertFailsWith<IllegalArgumentException> { DeviceRetrievalMethod.Ble() }
@@ -258,7 +261,7 @@ class ProtocolModelsTest {
         assertFailsWith<IllegalArgumentException> {
             DeviceEngagementSecurity(1u, ByteStringWrapper(privateKey, byteArrayOf(1)))
         }
-        assertFailsWith<kotlinx.serialization.SerializationException> {
+        assertFailsWith<SerializationException> {
             coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(
                 byteArrayOf(
                     0xa3.toByte(), 0x00, 0x63, 0x31, 0x2e, 0x31,
@@ -284,7 +287,7 @@ class ProtocolModelsTest {
         assertEquals(CborString("value"), deviceMap[CborString("futureDevice")])
         assertEquals(CborString("value"), documentMap[CborString("futureDocument")])
         assertIs<CborByteString>(
-            (documentMap[CborString("issuerIdentifiers")] as kotlinx.serialization.cbor.CborArray).single(),
+            (documentMap[CborString("issuerIdentifiers")] as CborArray).single(),
         )
         assertContentEquals(
             encodedDevice,
