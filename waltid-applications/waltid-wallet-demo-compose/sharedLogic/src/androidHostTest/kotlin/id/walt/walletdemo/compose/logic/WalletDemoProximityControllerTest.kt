@@ -557,6 +557,190 @@ class WalletDemoProximityControllerTest {
     }
 
     @Test
+    fun `mode refresh preserves layout and selection but removes old QR until cleanup completes`() = runTest {
+        var mode = WalletDemoProximityApprovalMode.AskEachTime
+        val closed = CompletableDeferred<Unit>()
+        val first = FakeSession(ProximityState.EngagementReady(listOf(ProximityEngagement.Qr("mdoc:old"), ProximityEngagement.Nfc)), closeGate = closed)
+        val next = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
+        val backend = FakeBackend(first, nextSession = next)
+        val controller = controller(backend, approvalModeProvider = { mode })
+        controller.start()
+        advanceUntilIdle()
+        controller.showEngagement(ProximityEngagementMethod.Qr)
+        controller.refreshPreferences()
+        assertEquals(1, backend.startCalls)
+        mode = WalletDemoProximityApprovalMode.PrepareSharing
+        controller.refreshPreferences()
+        advanceUntilIdle()
+        assertTrue(controller.state.value.showsEngagement)
+        assertTrue(controller.state.value.refreshingEngagement)
+        assertTrue(controller.state.value.qrVisible)
+        assertNull(controller.state.value.sessionState)
+        controller.showEngagement(ProximityEngagementMethod.Nfc)
+        controller.refreshPreferences()
+        assertEquals(ProximityEngagementMethod.Qr, controller.state.value.displayedEngagement)
+        assertEquals(WalletDemoProximityApprovalMode.PrepareSharing, controller.state.value.approvalMode)
+        assertEquals(1, backend.startCalls)
+        closed.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(controller.state.value.refreshingEngagement)
+        assertIs<ProximityApproval.PrepareBeforeSharing>(backend.lastConfiguration?.approval)
+        next.mutableState.value = ProximityState.EngagementReady(listOf(ProximityEngagement.Qr("mdoc:new"), ProximityEngagement.Nfc))
+        advanceUntilIdle()
+        assertFalse(controller.state.value.refreshingEngagement)
+        assertEquals(ProximityEngagementMethod.Qr, controller.state.value.displayedEngagement)
+        assertEquals(2, backend.startCalls)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `transport changes discard stale choices and recheck the selected profile after cleanup`() = runTest {
+        for ((initial, target) in listOf(
+            WalletDemoProximityTransportProfile.Default to WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct,
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct to WalletDemoProximityTransportProfile.Default,
+        )) {
+            var profile = initial
+            var mode = WalletDemoProximityApprovalMode.AskEachTime
+            val closed = CompletableDeferred<Unit>()
+            fun engagements(profile: WalletDemoProximityTransportProfile) =
+                if (profile == WalletDemoProximityTransportProfile.Default) listOf(ProximityEngagement.Qr("mdoc:new"), ProximityEngagement.Nfc)
+                else listOf(ProximityEngagement.Nfc)
+            val first = FakeSession(ProximityState.EngagementReady(engagements(initial)), closeGate = closed)
+            val next = FakeSession(ProximityState.EngagementReady(engagements(target)))
+            val backend = FakeBackend(first, nextSession = next)
+            val controller = controller(backend, profileProvider = { profile }, approvalModeProvider = { mode })
+            controller.start()
+            advanceUntilIdle()
+            controller.showEngagement(ProximityEngagementMethod.Qr)
+            profile = target
+            mode = WalletDemoProximityApprovalMode.PrepareSharing
+            controller.refreshPreferences()
+            assertFalse(controller.state.value.showsEngagement)
+            assertTrue(controller.state.value.engagementChoices.isEmpty())
+            assertFalse(controller.state.value.qrVisible)
+            advanceUntilIdle()
+            assertEquals(1, backend.startCalls)
+            closed.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(target.configuration().session, backend.lastConfiguration?.session)
+            assertIs<ProximityApproval.PrepareBeforeSharing>(backend.lastConfiguration?.approval)
+            assertEquals(target == WalletDemoProximityTransportProfile.Default,
+                ProximityEngagementMethod.Qr in controller.state.value.engagementChoices)
+            controller.refreshPreferences()
+            assertEquals(2, backend.startCalls)
+            controller.dismiss()
+            advanceUntilIdle()
+        }
+    }
+
+    @Test
+    fun `settings changed during startup replace a blocked preflight before any session starts`() = runTest {
+        var profile = WalletDemoProximityTransportProfile.Default
+        var mode = WalletDemoProximityApprovalMode.AskEachTime
+        var checks = 0
+        val backend = FakeBackend(FakeSession(ProximityState.EngagementReady(listOf(ProximityEngagement.Nfc))),
+            capabilities = { if (checks++ == 0) blockedCapabilities else readyCapabilities })
+        val controller = controller(backend, profileProvider = { profile }, approvalModeProvider = { mode })
+        controller.start()
+        profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct
+        mode = WalletDemoProximityApprovalMode.PrepareSharing
+        advanceUntilIdle()
+        assertEquals(2, backend.capabilityCalls)
+        assertEquals(1, backend.startCalls)
+        assertEquals(profile.configuration().session, backend.lastConfiguration?.session)
+        assertIs<ProximityApproval.PrepareBeforeSharing>(backend.lastConfiguration?.approval)
+        assertEquals(listOf(ProximityEngagementMethod.Nfc), controller.state.value.engagementChoices)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `mode refresh keeps iOS NFC available for an explicit new system sheet`() = runTest {
+        var mode = WalletDemoProximityApprovalMode.AskEachTime
+        var presentations = 0
+        val ready = ProximityState.EngagementReady(listOf(ProximityEngagement.Nfc))
+        val backend = FakeBackend(FakeSession(ready), nextSession = FakeSession(ready))
+        val controller = controller(backend, requestNfcPresentment = { presentations++ }, approvalModeProvider = { mode })
+        controller.start()
+        advanceUntilIdle()
+        controller.showEngagement(ProximityEngagementMethod.Nfc)
+        mode = WalletDemoProximityApprovalMode.PrepareSharing
+        controller.refreshPreferences()
+        advanceUntilIdle()
+        assertNull(controller.state.value.displayedEngagement)
+        assertEquals(listOf(ProximityEngagementMethod.Nfc), controller.state.value.engagementChoices)
+        assertEquals(1, presentations)
+        controller.showEngagement(ProximityEngagementMethod.Nfc)
+        assertEquals(2, presentations)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `dismiss during mode refresh prevents a replacement session and clears layout`() = runTest {
+        var mode = WalletDemoProximityApprovalMode.AskEachTime
+        val closed = CompletableDeferred<Unit>()
+        val first = FakeSession(ProximityState.EngagementReady(listOf(ProximityEngagement.Qr("mdoc:old"))), closeGate = closed)
+        val backend = FakeBackend(first)
+        val controller = controller(backend, approvalModeProvider = { mode })
+        controller.start()
+        advanceUntilIdle()
+        mode = WalletDemoProximityApprovalMode.PrepareSharing
+        controller.refreshPreferences()
+        advanceUntilIdle()
+        controller.dismiss()
+        closed.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(controller.state.value.showsEngagement)
+        assertEquals(1, backend.startCalls)
+    }
+
+    @Test
+    fun `failed mode refresh leaves the engagement layout and shows the failure`() = runTest {
+        var mode = WalletDemoProximityApprovalMode.AskEachTime
+        var fail = false
+        val backend = FakeBackend(FakeSession(ProximityState.EngagementReady(listOf(ProximityEngagement.Qr("mdoc:old")))),
+            capabilities = { if (fail) error("unavailable") else readyCapabilities })
+        val controller = controller(backend, approvalModeProvider = { mode })
+        controller.start()
+        advanceUntilIdle()
+        fail = true
+        mode = WalletDemoProximityApprovalMode.PrepareSharing
+        controller.refreshPreferences()
+        advanceUntilIdle()
+        assertFalse(controller.state.value.showsEngagement)
+        assertIs<ProximityState.Failed>(controller.state.value.sessionState)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `retry uses a preference changed while the previous exchange was connected`() = runTest {
+        var mode = WalletDemoProximityApprovalMode.AskEachTime
+        var profile = WalletDemoProximityTransportProfile.Default
+        val session = FakeSession(ProximityState.Connecting(listOf(ProximityEngagement.Nfc)))
+        val backend = FakeBackend(session)
+        val controller = WalletDemoProximityController(backend, approvalModeProvider = { mode }, profileProvider = { profile },
+            scope = this, dispatcher = StandardTestDispatcher(testScheduler))
+        controller.start()
+        advanceUntilIdle()
+        mode = WalletDemoProximityApprovalMode.PrepareSharing
+        profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct
+        controller.refreshPreferences()
+        assertEquals(1, backend.startCalls)
+        session.mutableState.value = ProximityState.Completed(1, false)
+        advanceUntilIdle()
+        controller.restart()
+        advanceUntilIdle()
+        assertEquals(mode, controller.state.value.approvalMode)
+        assertEquals(profile.configuration().session, backend.lastConfiguration?.session)
+        assertIs<ProximityApproval.PrepareBeforeSharing>(backend.lastConfiguration?.approval)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun `retry waits for old session cleanup before starting`() = runTest {
         val closed = CompletableDeferred<Unit>()
         val session = FakeSession(ProximityState.Failed(
@@ -770,6 +954,7 @@ class WalletDemoProximityControllerTest {
     private fun TestScope.controller(
         backend: ProximityPresentationBackend,
         requestNfcPresentment: (() -> Unit)? = null,
+        approvalModeProvider: () -> WalletDemoProximityApprovalMode = { WalletDemoProximityApprovalMode.AskEachTime },
         profileProvider: () -> WalletDemoProximityTransportProfile = {
             WalletDemoProximityTransportProfile.Default
         },
@@ -779,6 +964,7 @@ class WalletDemoProximityControllerTest {
         scope = this,
         dispatcher = StandardTestDispatcher(testScheduler),
         requestNfcPresentment = requestNfcPresentment,
+        approvalModeProvider = approvalModeProvider,
     )
 }
 

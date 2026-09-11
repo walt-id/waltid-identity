@@ -51,16 +51,22 @@ setup only when the SDK reports another complete route that can start. Returning
 availability; declined permissions are not requested again automatically. QR visibility alone controls
 temporary screen brightness, and the QR is hidden once connecting begins.
 
-**Settings → Credential Sharing → Nearby sharing** stores the connection profile for the next
-presentation. Automatic uses the available reader-compatible routes. Compatibility profiles narrow
-transfer to Bluetooth, or select provisional NFCv2 direct/handover modes. These choices
-are kept out of the sharing journey and cannot change an active exchange. Device support and permissions
-are checked at startup; NFCv2 retains its mandatory NFC channel.
+**Settings → Credential Sharing → Nearby sharing** stores the connection profile. Changing it
+before connection or approval replaces the open engagement and rechecks availability. The previous
+QR and choices remain hidden until the new profile is ready. Connected exchanges and approved shares
+keep their configuration. New presentations use the latest preference.
+
+Automatic uses the available reader-compatible routes. Compatibility profiles narrow transfer to
+Bluetooth, or select provisional NFCv2 direct/handover modes. These choices stay in Settings.
+Device support and permissions are checked at startup; NFCv2 retains its mandatory NFC channel.
 
 **Approval** in Nearby sharing settings stores **Ask each time** (default) or
 **Prepare sharing**, independently of the connection profile. The same choice is
-available before connecting. Preparation first identifies a named authenticated
-trusted reader and collects its request without sharing credentials. After the
+available before connecting. Both switches update one saved preference, retained
+for subsequent shares. Changing it before connection refreshes the engagement in
+place; the previous QR is hidden until its replacement is ready. Changes made
+during an exchange apply to the next presentation. Preparation first identifies a
+named authenticated trusted reader and collects its request without sharing credentials. After the
 connection closes, review the reader, purpose, retention and selected data, then
 choose **Approve and get ready**. Several matching credentials require an explicit
 choice; requested mDL portrait data is marked required. Missing required data
