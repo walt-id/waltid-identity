@@ -189,7 +189,7 @@ internal class AndroidWifiAwarePlatformAdapter(
     }
 }
 
-private class AndroidWifiAwarePreparedPublisher private constructor(
+internal class AndroidWifiAwarePreparedPublisher private constructor(
     private val context: Context,
     private val connectivityManager: ConnectivityManager,
     override val supportedBands: WifiAwareSupportedBands,
