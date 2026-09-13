@@ -24,6 +24,21 @@ class TestEvidenceTests(unittest.TestCase):
         self.assertEqual(result["requiredPassed"], 1)
         self.assertEqual(result["executed"], 1)
 
+    def test_known_kmp_decorations_preserve_exact_selector_identity(self):
+        for prefix, suffix in (("", "()[jvm]"), ("iosSimulatorArm64Test.", "[iosSimulatorArm64]"),
+                               ("jsNodeTest.", "[js, node]")):
+            result = self.check(f'<testsuite><testcase classname="{prefix}KMPProximityProjectionTests" '
+                                f'name="testApprovedFields{suffix}"/></testsuite>')
+            self.assertEqual(result["requiredPassed"], 1)
+        with self.assertRaises(EvidenceError):
+            self.check('<testsuite><testcase classname="KMPProximityProjectionTests" '
+                       'name="testApprovedFields[unrelated-case]"/></testsuite>')
+        with self.assertRaisesRegex(EvidenceError, "Physical test entered"):
+            self.check('<testsuite><testcase classname="KMPProximityProjectionTests" name="testApprovedFields"/>'
+                       '<testcase classname="iosSimulatorArm64Test.ProximityPhysicalDeviceTests" '
+                       'name="testExchange[iosSimulatorArm64]"/></testsuite>',
+                       forbidden_prefixes=["ProximityPhysicalDeviceTests"])
+
     def test_empty_missing_and_non_junit_reports_fail(self):
         with self.assertRaisesRegex(EvidenceError, "No JUnit"):
             verify([], self.required)
