@@ -125,6 +125,12 @@ runs:
       shell: bash
       run: ./gradlew iosSimulatorArm64Test
 
+    - name: Require proximity Kotlin simulator test discovery
+      if: ${{ always() && inputs.run-ios-simulator-tests == 'true' }}
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: python3 .github/scripts/mobile-ci/verify_proximity_suites.py --platform ios-simulator
+
     - name: Assemble Swift wallet SDK core XCFramework
       if: ${{ inputs.run-wallet-core-xcframework == 'true' }}
       working-directory: ${{ inputs.waltid-directory }}

@@ -30,7 +30,8 @@ on:
         required: false
         default: false
 
-# Pinned to the gradle-ios revision validated by this workflow.
+# Test actions use the exact coordinated checkout so discovery requirements and bridge
+# tests run together with their selected Kotlin and WalletCore source.
 env:
   XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
@@ -52,7 +53,7 @@ jobs:
 
       - name: Compile iOS targets and run Kotlin iOS simulator tests
         timeout-minutes: 40
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
+        uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -83,7 +84,7 @@ jobs:
         # One XCFramework assemble is shared by the native demo, Compose demo, and (via artifact)
         # SDK DocC. Cold Konan cache is ~27 min; both demo suites can add ~11 min each.
         timeout-minutes: 80
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
+        uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
