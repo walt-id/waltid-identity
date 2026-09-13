@@ -27,4 +27,7 @@ class WalletDemoProximityIosTest {
     @Test
     fun completedPresentationShowsDoneAndNoConnectionControls() =
         scenarios.completedPresentationShowsDoneAndNoConnectionControls()
+    @Test
+    fun replacementReviewAndCancellationRemoveStaleConsentFromTheScreen() =
+        scenarios.replacementReviewAndCancellationRemoveStaleConsentFromTheScreen()
 }

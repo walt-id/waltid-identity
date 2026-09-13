@@ -35,11 +35,14 @@ class PreparedProximitySharingAndroidTest {
     @Test
     fun preparationShowsExplicitActionAndReadyStateKeepsScopeAndCancellationVisible() = runComposeUiTest {
         val field = ProximityElementReference("org.iso.18013.5.1", "given_name")
+        val secondField = ProximityElementReference(field.namespace, "family_name")
         val review = ProximityReview(ProximityReviewId(Uuid.random().toString()), 1, listOf(
             ProximityDocumentReview(0, "org.iso.18013.5.1.mDL", listOf(ProximityCredentialOption(
                 "credential", "Mobile Driving Licence", "Example issuer", Instant.parse("2030-01-01T00:00:00Z"),
                 ProximityDeviceAuthenticationMethod.Signature,
-                listOf(ProximityRequestedElement(field.namespace, field.elementIdentifier, false)),
+                listOf(ProximityRequestedElement(field.namespace, field.elementIdentifier, false),
+                    ProximityRequestedElement(secondField.namespace, secondField.elementIdentifier, false),
+                    ProximityRequestedElement(field.namespace, "birth_date", false)),
             ))),
         ), listOf(ProximityReaderAuthentication(ProximityReaderAuthenticationScope.WholeRequest,
             outcome = ProximityReaderAuthenticationOutcome.Valid(ProximityReaderTrustDecision(
@@ -47,10 +50,10 @@ class PreparedProximitySharingAndroidTest {
                 displayName = "City service desk",
             )))), emptyList(), emptyList())
         val plan = fixturePlan(review)
-        val submission = ProximitySubmission(listOf(ProximityDocumentSubmission(0, "credential", setOf(field))))
+        val submission = ProximitySubmission(listOf(ProximityDocumentSubmission(0, "credential", setOf(field, secondField))))
         val state = mutableStateOf(WalletDemoProximityUiState(active = true,
             sessionState = ProximityState.PreparationRequired(plan), recentPlan = plan,
-            selections = listOf(WalletDemoProximityDocumentSelection(0, "credential", setOf(field)))))
+            selections = listOf(WalletDemoProximityDocumentSelection(0, "credential", setOf(field, secondField)))))
         var approved = false
         var cancelled = false
         setContent {
@@ -94,6 +97,10 @@ class PreparedProximitySharingAndroidTest {
         onNodeWithText("Presentation complete").assertIsDisplayed()
         onNodeWithText("What was shared").assertIsDisplayed()
         onNodeWithText("Done").assertIsDisplayed()
+        onNodeWithText("Data to share").performScrollTo().performClick()
+        onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Family name").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("Birth date").assertCountEquals(0)
         onAllNodesWithTag("proximity-prepared-countdown").assertCountEquals(0)
         capture("compose-sharing-receipt")
     }
