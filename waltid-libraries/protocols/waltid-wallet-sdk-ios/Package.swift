@@ -3,7 +3,9 @@
 import PackageDescription
 import Foundation
 
+let physicalFixtures = ProcessInfo.processInfo.environment["WALLET_SDK_PHYSICAL_FIXTURES"] == "1"
 let bridgeFixtures = ProcessInfo.processInfo.environment["WALLET_SDK_BRIDGE_FIXTURES"] == "1"
+precondition(!(physicalFixtures && bridgeFixtures), "Select only one isolated test fixture framework")
 
 let package = Package(
     name: "WalletSDK",
@@ -23,7 +25,9 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "WalletCore",
-            path: bridgeFixtures
+            path: physicalFixtures
+                ? "../waltid-openid4vc-wallet-mobile/build/physical-fixtures/XCFrameworks/release/WalletCore.xcframework"
+                : bridgeFixtures
                 ? "../waltid-openid4vc-wallet-mobile/build/bridge-fixtures/XCFrameworks/release/WalletCore.xcframework"
                 : "../waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework"
         ),
