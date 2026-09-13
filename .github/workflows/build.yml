@@ -26,6 +26,8 @@ jobs:
         run: .github/scripts/ci/test-macos-lane-predicates.sh
       - name: Test mobile test-result discovery guards
         run: python3 -m unittest discover -s .github/scripts/mobile-ci -p 'test_*.py'
+      - name: Test physical controller without hardware
+        run: python3 -m unittest discover -s scripts/proximity-physical -p 'test_*.py'
   android-eligibility:
     uses: ./.github/workflows/android-eligibility.yml
     with:
