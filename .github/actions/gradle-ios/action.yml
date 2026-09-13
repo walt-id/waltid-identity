@@ -31,6 +31,11 @@ inputs:
     required: false
     type: string
     default: 'true'
+  run-wallet-sdk-tests:
+    description: 'Run real WalletCore-to-Swift package projections on iOS Simulator'
+    required: false
+    type: string
+    default: 'false'
   run-native-demo-tests:
     description: 'Run native iOS WalletSDK demo tests'
     required: false
@@ -109,7 +114,7 @@ runs:
       run: ./gradlew :waltid-libraries:crypto:waltid-crypto:compileKotlinIosSimulatorArm64
 
     - name: Cleanup simulators before tests
-      if: ${{ inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' }}
+      if: ${{ inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' }}
       shell: bash
       run: |
         echo "Shutting down running simulators..."
@@ -141,7 +146,7 @@ runs:
           ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework
 
     - name: Resolve iOS simulator destination
-      if: ${{ inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true' }}
+      if: ${{ inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true' }}
       id: resolve-simulator
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
@@ -208,6 +213,27 @@ runs:
           --appex-bundle-id id.walt.wallet.compose.identitydocumentprovider \
           --development-team 9BB78CFW7Y
 
+    - name: Execute WalletSDK package bridge tests
+      if: ${{ inputs.run-wallet-sdk-tests == 'true' }}
+      id: wallet_sdk_tests
+      continue-on-error: true
+      shell: bash
+      run: |
+        "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh" \
+          "${{ steps.resolve-simulator.outputs.destination }}"
+
+    - name: Upload WalletSDK bridge discovery evidence
+      if: ${{ always() && inputs.run-wallet-sdk-tests == 'true' && steps.wallet_sdk_tests.outcome != 'skipped' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: wallet-sdk-bridge-${{ inputs.test-result-artifact-name }}
+        path: |
+          ${{ inputs.waltid-directory }}/build/proximity-tests/swift-bridge.*/*.json
+          ${{ inputs.waltid-directory }}/build/proximity-tests/swift-bridge.*/*.xml
+          ${{ inputs.waltid-directory }}/build/proximity-tests/swift-bridge.*/*.log
+        if-no-files-found: error
+        retention-days: 7
+
     - name: Execute iOS demo app integration tests
       if: ${{ inputs.run-native-demo-tests == 'true' }}
       id: ios_demo_app_tests
@@ -248,7 +274,7 @@ runs:
           -parallel-testing-enabled NO
 
     - name: Collect iOS test reports
-      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
+      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
       id: ios_test_report
       shell: bash
       run: |
@@ -322,6 +348,15 @@ runs:
 
         echo "has_report=true" >> "$GITHUB_OUTPUT"
 
+    - name: Require native demo consent test discovery
+      if: ${{ always() && inputs.run-native-demo-tests == 'true' }}
+      shell: bash
+      run: |
+        python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
+          --manifest "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/proximity-test-suites.json" \
+          --suite native-demo-consent \
+          --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*.xml"
+
     - name: Publish iOS test report
       if: always() && steps.ios_test_report.outputs.has_report == 'true'
       uses: mikepenz/action-junit-report@v6
@@ -336,14 +371,14 @@ runs:
         require_tests: ${{ inputs.test-report-require-tests }}
 
     - name: Cleanup simulators after tests
-      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
+      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
       shell: bash
       run: |
         echo "Shutting down all simulators..."
         xcrun simctl shutdown all || true
 
     - name: Upload iOS test results
-      if: always() && (failure() || steps.ios_simulator_tests.outcome == 'failure' || steps.ios_demo_app_tests.outcome == 'failure' || steps.compose_ios_demo_app_tests.outcome == 'failure')
+      if: always() && (failure() || steps.wallet_sdk_tests.outcome == 'failure' || steps.ios_simulator_tests.outcome == 'failure' || steps.ios_demo_app_tests.outcome == 'failure' || steps.compose_ios_demo_app_tests.outcome == 'failure')
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.test-result-artifact-name }}
@@ -355,10 +390,14 @@ runs:
         retention-days: 7
 
     - name: Fail if iOS tests failed
-      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true') }}
+      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true') }}
       shell: bash
       run: |
         failed=()
+
+        if [[ "${{ inputs.run-wallet-sdk-tests }}" == "true" && "${{ steps.wallet_sdk_tests.outcome }}" != "success" ]]; then
+          failed+=("WalletSDK package bridge tests")
+        fi
 
         if [[ "${{ inputs.run-ios-simulator-tests }}" == "true" && "${{ steps.ios_simulator_tests.outcome }}" == "failure" ]]; then
           failed+=("iosSimulatorArm64Test")
