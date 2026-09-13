@@ -73,7 +73,7 @@ internal sealed interface AndroidGattOperation {
     data class ServicesDiscovered(val status: Int) : AndroidGattOperation
     data class CharacteristicRead(val uuid: UUID, val value: ByteArray, val status: Int) : AndroidGattOperation
     data class CharacteristicWrite(val uuid: UUID, val status: Int) : AndroidGattOperation
-    data class DescriptorWrite(val uuid: UUID, val status: Int) : AndroidGattOperation
+    data class DescriptorWrite(val uuid: UUID, val characteristicUuid: UUID?, val status: Int) : AndroidGattOperation
     data class NotificationSent(val status: Int) : AndroidGattOperation
     data class Disconnected(val status: Int) : AndroidGattOperation
 }
