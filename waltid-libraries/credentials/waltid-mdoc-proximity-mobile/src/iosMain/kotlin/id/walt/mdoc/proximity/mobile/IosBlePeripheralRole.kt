@@ -41,10 +41,13 @@ import platform.Foundation.NSError
 import platform.darwin.NSObject
 import kotlin.math.min
 
-internal class IosBlePeripheralRole private constructor(
+internal class IosBlePeripheralRole internal constructor(
     override val serviceUuid: BleServiceUuid,
     private val preferL2cap: Boolean,
     private val sessionScope: CoroutineScope,
+    managerFactory: (CBPeripheralManagerDelegateProtocol) -> CBPeripheralManager = {
+        CBPeripheralManager(delegate = it, queue = null, options = null)
+    },
 ) : BlePreparedPlatformRole {
     override val role: BlePlatformRole = BlePlatformRole.PERIPHERAL_SERVER
     override val l2capPsm: UInt? get() = publishedPsm.value?.toUInt()
@@ -153,8 +156,10 @@ internal class IosBlePeripheralRole private constructor(
                 serverToClientCharacteristic -> dataNotificationsEnabled.value = false
                 else -> return
             }
-            if (activeConnection.value?.bearer == BleRawBearer.GATT) incomingGatt.close()
-            else if (!stateNotificationsEnabled.value && !dataNotificationsEnabled.value) {
+            if (activeConnection.value?.bearer == BleRawBearer.GATT) {
+                incomingGatt.close()
+                readyToUpdate.close(iosTransportFailure("ble_disconnected", "The CoreBluetooth reader unsubscribed"))
+            } else if (!stateNotificationsEnabled.value && !dataNotificationsEnabled.value) {
                 activeCentral.compareAndSet(active, null)
             }
         }
@@ -194,10 +199,10 @@ internal class IosBlePeripheralRole private constructor(
     }
 
     init {
-        manager = CBPeripheralManager(delegate = delegate, queue = null, options = null)
+        manager = managerFactory(delegate)
     }
 
-    private suspend fun start() {
+    internal suspend fun start() {
         awaitPoweredOn()
         if (preferL2cap) {
             manager.publishL2CAPChannelWithEncryption(false)

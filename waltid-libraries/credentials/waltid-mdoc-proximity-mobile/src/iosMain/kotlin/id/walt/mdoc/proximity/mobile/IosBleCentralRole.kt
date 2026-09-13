@@ -102,7 +102,12 @@ private sealed interface IosCentralEvent {
     data class L2cap(val channel: CBL2CAPChannel?, val error: NSError?) : IosCentralEvent
 }
 
-private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
+internal class IosCentralGattSession(
+    private val serviceUuid: BleServiceUuid,
+    centralFactory: (CBCentralManagerDelegateProtocol) -> CBCentralManager = {
+        CBCentralManager(delegate = it, queue = null, options = null)
+    },
+) {
     val incoming = Channel<ByteArray>(Channel.BUFFERED)
     private val events = Channel<IosCentralEvent>(Channel.UNLIMITED, onUndeliveredElement = { event ->
         (event as? IosCentralEvent.L2cap)?.channel?.closeStreams()
@@ -115,6 +120,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
 
     private val peripheralDelegate = object : NSObject(), CBPeripheralDelegateProtocol {
         override fun peripheral(peripheral: CBPeripheral, didDiscoverServices: NSError?) {
+            if (closed.value || peripheral != this@IosCentralGattSession.peripheral) return
             events.trySend(IosCentralEvent.Services(didDiscoverServices))
         }
 
@@ -123,6 +129,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
             didDiscoverCharacteristicsForService: CBService,
             error: NSError?,
         ) {
+            if (closed.value || peripheral != this@IosCentralGattSession.peripheral) return
             events.trySend(IosCentralEvent.Characteristics(didDiscoverCharacteristicsForService, error))
         }
 
@@ -132,6 +139,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
             didUpdateNotificationStateForCharacteristic: CBCharacteristic,
             error: NSError?,
         ) {
+            if (closed.value || peripheral != this@IosCentralGattSession.peripheral) return
             events.trySend(IosCentralEvent.NotificationState(didUpdateNotificationStateForCharacteristic, error))
         }
 
@@ -141,6 +149,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
             didUpdateValueForCharacteristic: CBCharacteristic,
             error: NSError?,
         ) {
+            if (closed.value || peripheral != this@IosCentralGattSession.peripheral) return
             val uuid = didUpdateValueForCharacteristic.UUID.UUIDString.lowercase()
             when (uuid) {
                 BleGattUuid.READER_SERVER_TO_CLIENT -> {
@@ -164,16 +173,22 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
         }
 
         override fun peripheralIsReadyToSendWriteWithoutResponse(peripheral: CBPeripheral) {
+            if (closed.value || peripheral != this@IosCentralGattSession.peripheral) return
             events.trySend(IosCentralEvent.ReadyToWrite)
         }
 
         override fun peripheral(peripheral: CBPeripheral, didOpenL2CAPChannel: CBL2CAPChannel?, error: NSError?) {
+            if (closed.value || peripheral != this@IosCentralGattSession.peripheral) {
+                didOpenL2CAPChannel?.closeStreams()
+                return
+            }
             if (events.trySend(IosCentralEvent.L2cap(didOpenL2CAPChannel, error)).isFailure) {
                 didOpenL2CAPChannel?.closeStreams()
             }
         }
 
         override fun peripheral(peripheral: CBPeripheral, didModifyServices: List<*>) {
+            if (closed.value || peripheral != this@IosCentralGattSession.peripheral) return
             incoming.close(iosTransportFailure("ble_service_changed", "The reader BLE service changed during the session"))
         }
     }
@@ -202,11 +217,13 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
 
         @ObjCSignatureOverride
         override fun centralManager(central: CBCentralManager, didConnectPeripheral: CBPeripheral) {
+            if (closed.value || central != this@IosCentralGattSession.central || didConnectPeripheral != peripheral) return
             events.trySend(IosCentralEvent.Connected(didConnectPeripheral))
         }
 
         @ObjCSignatureOverride
         override fun centralManager(central: CBCentralManager, didFailToConnectPeripheral: CBPeripheral, error: NSError?) {
+            if (closed.value || central != this@IosCentralGattSession.central || didFailToConnectPeripheral != peripheral) return
             events.trySend(IosCentralEvent.ConnectFailed(error))
         }
 
@@ -216,6 +233,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
             didDisconnectPeripheral: CBPeripheral,
             error: NSError?,
         ) {
+            if (closed.value || central != this@IosCentralGattSession.central || didDisconnectPeripheral != peripheral) return
             handleDisconnect(error)
         }
 
@@ -227,6 +245,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
             isReconnecting: Boolean,
             error: NSError?,
         ) {
+            if (closed.value || central != this@IosCentralGattSession.central || didDisconnectPeripheral != peripheral) return
             handleDisconnect(error)
         }
 
@@ -237,7 +256,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
     }
 
     init {
-        central = CBCentralManager(delegate = centralDelegate, queue = null, options = null)
+        central = centralFactory(centralDelegate)
     }
 
     suspend fun connectAndDiscover(): BleReaderCharacteristics<CBCharacteristic> {
@@ -303,7 +322,7 @@ private class IosCentralGattSession(private val serviceUuid: BleServiceUuid) {
         while (!peer.canSendWriteWithoutResponse) awaitEvent<IosCentralEvent.ReadyToWrite>()
         peer.writeValue(bytes.toNSData(), forCharacteristic = characteristic, type = CBCharacteristicWriteWithoutResponse)
         // Keep close from racing the final State=End write while CoreBluetooth applies backpressure.
-        if (!peer.canSendWriteWithoutResponse) awaitEvent<IosCentralEvent.ReadyToWrite>()
+        while (!peer.canSendWriteWithoutResponse) awaitEvent<IosCentralEvent.ReadyToWrite>()
     }
 
     suspend fun openL2cap(psm: UShort): CBL2CAPChannel? {
