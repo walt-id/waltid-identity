@@ -169,6 +169,16 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Require proximity JVM and JS test discovery
+        if: always()
+        run: |
+          python3 waltid-identity/.github/scripts/mobile-ci/verify_proximity_suites.py --platform jvm
+          python3 waltid-identity/.github/scripts/mobile-ci/verify_proximity_suites.py --platform js-node
+
+      - name: Require proximity Android host test discovery
+        if: ${{ always() && inputs.enable-android-build }}
+        run: python3 waltid-identity/.github/scripts/mobile-ci/verify_proximity_suites.py --platform android-host
+
       - name: Publish test report
         uses: mikepenz/action-junit-report@v6
         if: always()
