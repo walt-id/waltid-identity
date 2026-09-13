@@ -3,6 +3,9 @@
 import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFrameworkTask
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import java.util.zip.ZipFile
@@ -124,6 +127,32 @@ kotlin {
                     implementation(identityLibs.ktor.client.android)
                 }
             }
+        }
+    }
+
+    // A separate simulator binary compiles the unchanged SDK sources with native bridge fixtures.
+    // It never replaces the publishable WalletCore framework or enters ordinary build/test tasks.
+    if (enableIosBuild && providers.gradleProperty("enableWalletSdkBridgeFixtures").orNull == "true") {
+        val bridgeFramework = XCFramework("WalletCoreBridgeFixtures")
+        val iosProductionSources = sourceSets.getByName("iosMain")
+        targets.named<KotlinNativeTarget>("iosSimulatorArm64") {
+            val fixtures = compilations.create("bridgeFixtures") {
+                defaultSourceSet {
+                    dependsOn(iosProductionSources)
+                    kotlin.srcDir("src/iosBridgeFixtures/kotlin")
+                }
+            }
+            binaries.framework("bridgeFixtures", listOf(NativeBuildType.RELEASE)) {
+                compilation = fixtures
+                baseName = "WalletCore"
+                isStatic = true
+                binaryOption("bundleId", "id.walt.wallet.core.bridge-fixtures")
+                bridgeFramework.add(this)
+            }
+        }
+        tasks.named<XCFrameworkTask>("assembleWalletCoreBridgeFixturesReleaseXCFramework") {
+            baseName = providers.provider { "WalletCore" }
+            outputDir = layout.buildDirectory.dir("bridge-fixtures/XCFrameworks").get().asFile
         }
     }
 }

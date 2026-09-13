@@ -52,6 +52,20 @@ Then build or test the Swift facade:
 swift test --package-path waltid-libraries/protocols/waltid-wallet-sdk-ios -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
 ```
 
+Host Swift tests do not exercise the conditional WalletCore bridge. Run its package target on an
+explicit simulator from the Identity root:
+
+```bash
+.github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh 'platform=iOS Simulator,id=<simulator-UDID>'
+```
+
+The runner builds WalletCore from the selected checkout and separately compiles the same SDK sources
+with native flow/receipt fixtures under `build/bridge-fixtures`. These fixtures never enter the default
+framework or published API. The runner selects that test binary with `WALLET_SDK_BRIDGE_FIXTURES=1`,
+checks both framework headers, and requires the named review, approval, receipt, cancellation and
+error tests in JUnit results. Missing frameworks, undiscovered tests and unexpected skips fail the run.
+Source revision, binary hashes and results are recorded under `build/proximity-tests/swift-bridge.*`.
+
 Generate and validate the Swift DocC archive:
 
 ```bash
