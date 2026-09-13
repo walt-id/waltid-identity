@@ -1,9 +1,14 @@
 package id.walt.openid4vp.conformance
 
 import com.sun.net.httpserver.HttpServer
+import com.sun.net.httpserver.HttpExchange
+import com.microsoft.playwright.TimeoutError
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
 import id.walt.openid4vp.conformance.testplans.httpdata.TestLogEntry
 import id.walt.openid4vp.conformance.testplans.runner.IssuerCredentialOfferDelivery
+import id.walt.openid4vp.conformance.testplans.runner.BrowserInteraction
+import id.walt.openid4vp.conformance.testplans.runner.IssuerBrowserAutomationConfig
+import id.walt.openid4vp.conformance.testplans.runner.IssuerConformanceBrowserAutomation
 import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMethod
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.statement.bodyAsText
@@ -12,6 +17,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import java.net.InetSocketAddress
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -20,6 +28,75 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IssuerCredentialOfferDeliveryTest {
+    @Test
+    fun issuerBrowserCompletesLoginWithoutWaitingForAnUnfinishedImage() {
+        for (method in listOf("GET", "POST")) {
+            val loginSubmitted = AtomicBoolean(false)
+            val imageRequested = CountDownLatch(1)
+            withBrowserStub { server, release ->
+                server.createContext("/authorize") { exchange ->
+                    exchange.respondHtml(
+                        """
+                        <html><body>
+                          <img src="/slow-image">
+                          <form method="post" action="http://127.0.0.1:${server.address.port}/test/callback">
+                            <input id="username" name="username">
+                            <input id="password" name="password" type="password">
+                            <input id="kc-login" type="submit" value="Sign in">
+                          </form>
+                        </body></html>
+                        """.trimIndent()
+                    )
+                }
+                server.createContext("/slow-image") { exchange ->
+                    imageRequested.countDown()
+                    try {
+                        release.await()
+                    } finally {
+                        exchange.close()
+                    }
+                }
+                server.createContext("/test/callback") { exchange ->
+                    val body = exchange.requestBody.bufferedReader().use { it.readText() }
+                    loginSubmitted.set(body.contains("username=runner-user") && body.contains("password=runner-password"))
+                    exchange.respondHtml("<html><body><div id='submission_complete'>Done</div></body></html>")
+                }
+                server.start()
+                val automation = IssuerConformanceBrowserAutomation(
+                    IssuerBrowserAutomationConfig(true, "runner-user", "runner-password", 10),
+                    "127.0.0.1", server.address.port,
+                )
+                // A different hostname distinguishes the login page from the suite callback.
+                automation.complete(BrowserInteraction("http://localhost:${server.address.port}/authorize", method))
+                assertEquals(0L, imageRequested.count)
+                assertEquals(1L, release.count, "The image must still be blocked when login completes")
+                assertTrue(loginSubmitted.get())
+            }
+        }
+    }
+
+    @Test
+    fun issuerBrowserUsesConfiguredTimeoutForInitialNavigation() {
+        withBrowserStub { server, release ->
+            server.createContext("/authorize") { exchange ->
+                try {
+                    release.await()
+                } finally {
+                    exchange.close()
+                }
+            }
+            server.start()
+            val automation = IssuerConformanceBrowserAutomation(
+                IssuerBrowserAutomationConfig(true, "runner-user", "runner-password", 1),
+                "127.0.0.1", server.address.port,
+            )
+            val error = assertFailsWith<TimeoutError> {
+                automation.complete(BrowserInteraction("http://localhost:${server.address.port}/authorize", "GET"))
+            }
+            assertTrue(error.message.orEmpty().contains("1000ms"), "Initial navigation must use the configured timeout")
+        }
+    }
+
     @Test
     fun issuerManagementOffersUseCredentialsForBothFormatsAndGrantTypes() = runTest {
         val profiles = mapOf(
@@ -131,6 +208,27 @@ class IssuerCredentialOfferDeliveryTest {
         }
         assertTrue(delivery.deliverIfRequested(log) {})
         assertFalse(delivery.deliverIfRequested(log) { error("Duplicate offer") })
+    }
+
+    private fun withBrowserStub(block: (HttpServer, CountDownLatch) -> Unit) {
+        val executor = Executors.newCachedThreadPool()
+        val release = CountDownLatch(1)
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.executor = executor
+        try {
+            block(server, release)
+        } finally {
+            release.countDown()
+            server.stop(0)
+            executor.shutdownNow()
+        }
+    }
+
+    private fun HttpExchange.respondHtml(html: String) = use {
+        val bytes = html.toByteArray(Charsets.UTF_8)
+        responseHeaders.set("Content-Type", "text/html; charset=utf-8")
+        sendResponseHeaders(200, bytes.size.toLong())
+        responseBody.write(bytes)
     }
 
     private suspend fun withIssuerManagementStub(
