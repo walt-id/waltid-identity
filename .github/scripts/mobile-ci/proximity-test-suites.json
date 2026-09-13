@@ -199,6 +199,85 @@
       "reportsByPlatform": {
         "android-host": "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/build/test-results/testAndroidHostTest/*.xml"
       }
+    },
+    "swift-bridge": {
+      "executionClass": "simulated-platform",
+      "source": "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/KMPProximityProjectionTests.swift",
+      "requiredTests": [
+        {
+          "class": "KMPProximityProjectionTests",
+          "name": "testSubmissionProjectionPreservesEveryApprovedField",
+          "oracle": "Every approved field and document survives the real WalletCore-to-Swift projection, with both continuation choices."
+        },
+        {
+          "class": "KMPProximityProjectionTests",
+          "name": "testReviewProjectionPreservesRequiredFieldsAndAllowsNone",
+          "oracle": "Empty and nonempty required-field sets survive projection without dropping credential options."
+        },
+        {
+          "class": "KMPProximityProjectionTests",
+          "name": "testRealBridgeStreamsReviewAndForwardsEverySelectedField",
+          "oracle": "Native StateFlow review and exact approval pass through the real bridge into a receipt preserving all selected fields."
+        },
+        {
+          "class": "KMPProximityProjectionTests",
+          "name": "testRealBridgeCancellationRemovesReviewAndStopsLaterStates",
+          "oracle": "Cancellation removes review and terminal stream completion prevents a later native review from resurfacing."
+        },
+        {
+          "class": "KMPProximityProjectionTests",
+          "name": "testFailedStatePreservesCodeRecoveryAndHasNoLegalActions",
+          "oracle": "Stable error identity and recovery survive projection with no remaining legal actions."
+        }
+      ]
+    },
+    "compose-consent-android-host": {
+      "executionClass": "simulated-platform",
+      "sources": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/mobileUiTest/kotlin/id/walt/walletdemo/compose/ui/WalletDemoProximityTestScenarios.kt"
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/testAndroidHostTest/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.walletdemo.compose.ui.WalletDemoProximityAndroidTest",
+          "name": "replacementReviewAndCancellationRemoveStaleConsentFromTheScreen",
+          "oracle": "Replacement review removes stale credential fields; cancellation removes approval and review controls."
+        },
+        {
+          "class": "id.walt.walletdemo.compose.ui.PreparedProximitySharingAndroidTest",
+          "name": "preparationShowsExplicitActionAndReadyStateKeepsScopeAndCancellationVisible",
+          "oracle": "Rendered approved-data detail contains both selected fields and excludes the unselected field."
+        }
+      ]
+    },
+    "compose-consent-ios-simulator": {
+      "executionClass": "simulated-platform",
+      "sources": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/mobileUiTest/kotlin/id/walt/walletdemo/compose/ui/WalletDemoProximityTestScenarios.kt"
+      ],
+      "reportsByPlatform": {
+        "ios-simulator": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/iosSimulatorArm64Test/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.walletdemo.compose.ui.WalletDemoProximityIosTest",
+          "name": "replacementReviewAndCancellationRemoveStaleConsentFromTheScreen",
+          "oracle": "Replacement review removes stale credential fields; cancellation removes approval and review controls."
+        }
+      ]
+    },
+    "native-demo-consent": {
+      "executionClass": "simulated-platform",
+      "source": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppTests/ProximityPresentationViewModelTests.swift",
+      "requiredTests": [
+        {
+          "class": "ProximityPresentationViewModelTests",
+          "name": "testCombinedReviewDefaultsAndApprovalPreserveExactHolderSelections",
+          "oracle": "Combined review submits exactly the selected elements and proof in each document."
+        }
+      ]
     }
   }
 }
