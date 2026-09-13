@@ -13,8 +13,16 @@ class EvidenceError(ValueError):
 
 
 def test_name(value):
-    # XCTest reporters append parentheses to zero-argument Swift methods.
+    # Strip only known runner decorations, never arbitrary parameterized case IDs.
+    for suffix in ("[jvm]", "[android]", "[iosSimulatorArm64]", "[js, node]"):
+        value = value.removesuffix(suffix)
     return value.removesuffix("()")
+
+
+def test_class(value):
+    for prefix in ("iosSimulatorArm64Test.", "jsNodeTest."):
+        value = value.removeprefix(prefix)
+    return value
 
 
 def verify(reports, required, forbidden_prefixes=()):
@@ -37,7 +45,7 @@ def verify(reports, required, forbidden_prefixes=()):
         if root.tag not in {"testsuite", "testsuites"}:
             raise EvidenceError(f"Not a JUnit report: {report}")
         for case in root.iter("testcase"):
-            identity = (case.get("classname", ""), test_name(case.get("name", "")))
+            identity = (test_class(case.get("classname", "")), test_name(case.get("name", "")))
             if not all(identity):
                 raise EvidenceError(f"Unnamed test case in {report}")
             if any(identity[0].startswith(prefix) for prefix in forbidden_prefixes):
