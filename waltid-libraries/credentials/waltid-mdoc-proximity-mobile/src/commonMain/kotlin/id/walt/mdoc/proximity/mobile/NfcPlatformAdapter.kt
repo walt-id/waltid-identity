@@ -26,7 +26,11 @@ public sealed interface NfcHostAvailability {
 
 /** Session-scoped platform host for APDU delivery and field-deactivation callbacks. */
 public interface PreparedNfcHostSession {
-    /** Idempotently disables routing and releases every platform resource. */
+    /**
+     * Idempotently disables routing and releases every platform resource. Successful close drains
+     * pending APDU responses with a finite deadline; cancellation and field loss release immediately.
+     * Passing bytes to the platform does not establish that the reader received or verified them.
+     */
     public suspend fun close(reason: ProximityCloseReason)
 }
 

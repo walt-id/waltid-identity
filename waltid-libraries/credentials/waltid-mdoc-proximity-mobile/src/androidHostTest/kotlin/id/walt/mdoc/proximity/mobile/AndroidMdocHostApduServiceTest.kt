@@ -6,6 +6,9 @@ import id.walt.mdoc.proximity.ProximityCloseReason
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -169,6 +172,65 @@ class AndroidMdocHostApduServiceTest {
         AndroidNfcSessionRegistry.disarm(second, ProximityCloseReason.COMPLETED)
     }
 
+    @Test
+    fun successfulCloseKeepsRoutingUntilTheLastResponseFragmentIsSent() = runBlocking {
+        val service = service()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val router = object : RecordingRouter() {
+            override suspend fun process(command: ByteArray): ImmutableBytes {
+                if (command[1] == 0xc3.toByte()) {
+                    entered.complete(Unit)
+                    release.await()
+                    return ImmutableBytes.of(byteArrayOf(0x53, 0x02, 0x61, 0x02))
+                }
+                return ImmutableBytes.of(byteArrayOf(0x11, 0x22, 0x90.toByte(), 0))
+            }
+        }
+        val generation = AndroidNfcSessionRegistry.arm(router, Job())
+        assertNull(service.processCommandApdu(byteArrayOf(0, 0xc3.toByte(), 0, 0, 1, 0x53, 2), null))
+        withTimeout(TEST_TIMEOUT_MILLIS) { entered.await() }
+        val closing = async(start = CoroutineStart.UNDISPATCHED) {
+            AndroidNfcSessionRegistry.disarm(generation, ProximityCloseReason.COMPLETED)
+        }
+        try {
+            assertTrue(AndroidNfcSessionRegistry.isCurrent(generation), "Close must not drop an in-flight ENVELOPE")
+            assertTrue(closing.isActive)
+            release.complete(Unit)
+            eventually { service.responses.size == 1 }
+            assertTrue(AndroidNfcSessionRegistry.isCurrent(generation), "61xx still requires GET RESPONSE")
+            assertTrue(closing.isActive)
+            assertNull(service.processCommandApdu(byteArrayOf(0, 0xc0.toByte(), 0, 0, 2), null))
+            withTimeout(TEST_TIMEOUT_MILLIS) { closing.await() }
+            assertEquals(2, service.responses.size)
+            assertContentEquals(byteArrayOf(0x11, 0x22, 0x90.toByte(), 0), service.responses.last())
+            assertNull(AndroidNfcSessionRegistry.current())
+            assertEquals(listOf(ProximityCloseReason.COMPLETED), router.closeReasons)
+        } finally {
+            release.complete(Unit)
+            closing.cancelAndJoin()
+        }
+    }
+
+    @Test
+    fun frameworkSendFailureReleasesRoutingAndTheWorkerServesAFreshGeneration() = runBlocking {
+        val service = service()
+        service.failNextSend = true
+        val failed = RecordingRouter()
+        AndroidNfcSessionRegistry.arm(failed, Job())
+        assertNull(service.processCommandApdu(byteArrayOf(1), null))
+        eventually { failed.closeReasons.isNotEmpty() }
+        assertEquals(listOf(ProximityCloseReason.PLATFORM_UNAVAILABLE), failed.closeReasons)
+        assertNull(AndroidNfcSessionRegistry.current())
+        assertTrue(service.responses.isEmpty())
+        service.onDeactivated(HostApduService.DEACTIVATION_LINK_LOSS)
+        val fresh = AndroidNfcSessionRegistry.arm(RecordingRouter(), Job())
+        assertNull(service.processCommandApdu(byteArrayOf(2), null))
+        eventually { service.responses.size == 1 }
+        assertContentEquals(byteArrayOf(0x90.toByte(), 0), service.responses.single())
+        AndroidNfcSessionRegistry.disarm(fresh, ProximityCloseReason.COMPLETED)
+    }
+
     private fun service(): RecordingMdocHostApduService =
         Robolectric.buildService(RecordingMdocHostApduService::class.java).create().get()
 
@@ -232,7 +294,13 @@ class RecordingMdocHostApduService : AndroidMdocHostApduService() {
     val responses = CopyOnWriteArrayList<ByteArray>()
     val responded = CompletableDeferred<Unit>()
 
+    @Volatile var failNextSend = false
+
     override fun sendResponse(response: ByteArray) {
+        if (failNextSend) {
+            failNextSend = false
+            throw IllegalStateException("Synthetic framework send failure")
+        }
         responses += response.copyOf()
         responded.complete(Unit)
     }
