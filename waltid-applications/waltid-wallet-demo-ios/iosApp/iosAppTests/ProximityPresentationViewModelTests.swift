@@ -289,6 +289,11 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             "proof-credential"
         )
 
+        XCTAssertEqual(submission.documents.first(where: { $0.requestIndex == 0 })?.disclosedElements,
+                       [familyName])
+        XCTAssertEqual(submission.documents.first(where: { $0.requestIndex == 1 })?.disclosedElements,
+                       [.init(namespace: "org.waltid.example.proof", elementIdentifier: "eligible")])
+
         await session.emit(.awaitingNextRequest(completedExchanges: 1))
         try await waitUntil { viewModel.sessionState == .awaitingNextRequest(completedExchanges: 1) }
         await session.emit(.reviewRequired(combinedProximityReview(exchange: 2)))

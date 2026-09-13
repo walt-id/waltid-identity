@@ -306,6 +306,34 @@ class WalletDemoProximityTestScenarios {
         assertTrue(continued)
     }
 
+    fun replacementReviewAndCancellationRemoveStaleConsentFromTheScreen() = runComposeUiTest {
+        val first = proximityReview()
+        val state = mutableStateOf(WalletDemoProximityUiState(active = true,
+            sessionState = ProximityState.ReviewRequired(first)))
+        var cancelled = false
+        setContent {
+            WalletDemoProximityScreen(state.value, proximityCredentialDetails(), hostActions,
+                onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
+                onContinueAfterResponseChange = {}, onApprove = {}, onDecline = {}, onRetry = {},
+                onRemediate = { _, _ -> }, onCancel = { cancelled = true }, onDismiss = {}, onRestart = {})
+        }
+        onNodeWithTag(WalletUiTestTags.ProximityReview).assertIsDisplayed()
+        onNodeWithText("Mobile Driving Licence").performScrollTo().assertIsDisplayed()
+        val replacement = first.copy(reviewId = ProximityReviewId(Uuid.random().toString()), exchange = 2,
+            documents = listOf(first.documents[1]), readerAuthentication = emptyList())
+        runOnIdle { state.value = state.value.copy(sessionState = ProximityState.ReviewRequired(replacement)) }
+        onAllNodesWithText("Mobile Driving Licence").assertCountEquals(0)
+        onAllNodesWithText("Portrait").assertCountEquals(0)
+        onNodeWithText("Proof of eligibility").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.ProximityCancel).assertIsDisplayed().performClick()
+        assertTrue(cancelled)
+        runOnIdle { state.value = state.value.copy(sessionState = ProximityState.Cancelled) }
+        onAllNodesWithTag(WalletUiTestTags.ProximityReview).assertCountEquals(0)
+        onAllNodesWithText("Proof of eligibility").assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.ProximityApprove).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.ProximityDone).assertIsDisplayed()
+    }
+
     fun reviewDoesNotInventAnIdentityForAnUnsignedReader() = runComposeUiTest {
         val review = proximityReview().copy(
             readerAuthentication = listOf(
