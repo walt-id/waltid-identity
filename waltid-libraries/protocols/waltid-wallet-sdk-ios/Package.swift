@@ -1,6 +1,9 @@
 // swift-tools-version: 5.9
 
 import PackageDescription
+import Foundation
+
+let bridgeFixtures = ProcessInfo.processInfo.environment["WALLET_SDK_BRIDGE_FIXTURES"] == "1"
 
 let package = Package(
     name: "WalletSDK",
@@ -20,7 +23,9 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "WalletCore",
-            path: "../waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework"
+            path: bridgeFixtures
+                ? "../waltid-openid4vc-wallet-mobile/build/bridge-fixtures/XCFrameworks/release/WalletCore.xcframework"
+                : "../waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework"
         ),
         .target(
             name: "WalletSDK",
@@ -38,7 +43,8 @@ let package = Package(
         ),
         .testTarget(
             name: "WalletSDKTests",
-            dependencies: ["WalletSDK"]
+            dependencies: ["WalletSDK"],
+            swiftSettings: bridgeFixtures ? [.define("WALLET_SDK_BRIDGE_FIXTURES")] : []
         ),
     ]
 )
