@@ -936,7 +936,7 @@ private final class KMPProximityApplicationProfileAdapter:
     }
 }
 
-private final class KMPProximityPresentationSessionBridge:
+final class KMPProximityPresentationSessionBridge:
     ProximitySessionBridge,
     @unchecked Sendable {
     private let session: any WalletCore.ProximitySession
@@ -2345,7 +2345,7 @@ private extension WalletCore.ProximityActionResult {
     }
 }
 
-private extension WalletCore.ProximityState {
+extension WalletCore.ProximityState {
     func toSwiftState() throws -> ProximityState {
         switch onEnum(of: self) {
         case let .checkingPrerequisites(value):
