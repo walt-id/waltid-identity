@@ -180,7 +180,7 @@ private fun BluetoothGattService.required(uuid: String): BluetoothGattCharacteri
     )
 
 @SuppressLint("MissingPermission")
-private class AndroidCentralGattSession(
+internal class AndroidCentralGattSession(
     private val context: Context,
     val device: BluetoothDevice,
 ) {
@@ -194,6 +194,7 @@ private class AndroidCentralGattSession(
 
     private val callback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            if (closed.get() || ownedGatt.get() !== gatt) return
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> operations.trySend(AndroidGattOperation.Connected(status))
                 BluetoothProfile.STATE_DISCONNECTED -> {
@@ -205,21 +206,25 @@ private class AndroidCentralGattSession(
                             "The Android BLE peer disconnected with status $status",
                         )
                     )
+                    close()
                 }
             }
         }
 
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            if (closed.get() || ownedGatt.get() !== gatt) return
             operations.trySend(AndroidGattOperation.MtuChanged(mtu, status))
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            if (closed.get() || ownedGatt.get() !== gatt) return
             operations.trySend(AndroidGattOperation.ServicesDiscovered(status))
         }
 
         @Deprecated("Deprecated in Android 13")
         override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-            operations.trySend(AndroidGattOperation.CharacteristicRead(characteristic.uuid, characteristic.value ?: ByteArray(0), status))
+            if (closed.get() || ownedGatt.get() !== gatt) return
+            operations.trySend(AndroidGattOperation.CharacteristicRead(characteristic.uuid, characteristic.value?.copyOf() ?: ByteArray(0), status))
         }
 
         override fun onCharacteristicRead(
@@ -228,19 +233,23 @@ private class AndroidCentralGattSession(
             value: ByteArray,
             status: Int,
         ) {
+            if (closed.get() || ownedGatt.get() !== gatt) return
             operations.trySend(AndroidGattOperation.CharacteristicRead(characteristic.uuid, value.copyOf(), status))
         }
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            if (closed.get() || ownedGatt.get() !== gatt) return
             operations.trySend(AndroidGattOperation.CharacteristicWrite(characteristic.uuid, status))
         }
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-            operations.trySend(AndroidGattOperation.DescriptorWrite(descriptor.uuid, status))
+            if (closed.get() || ownedGatt.get() !== gatt) return
+            operations.trySend(AndroidGattOperation.DescriptorWrite(descriptor.uuid, descriptor.characteristic?.uuid, status))
         }
 
         @Deprecated("Deprecated in Android 13")
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+            if (closed.get() || ownedGatt.get() !== gatt) return
             handleNotification(characteristic.uuid, characteristic.value?.copyOf() ?: ByteArray(0))
         }
 
@@ -249,6 +258,7 @@ private class AndroidCentralGattSession(
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray,
         ) {
+            if (closed.get() || ownedGatt.get() !== gatt) return
             handleNotification(characteristic.uuid, value.copyOf())
         }
     }
@@ -285,6 +295,7 @@ private class AndroidCentralGattSession(
     }
 
     suspend fun discover(serviceUuid: UUID): BluetoothGattService {
+        beginOperation()
         if (!gatt.discoverServices()) throw androidTransportFailure("ble_discovery_failed", "Android rejected service discovery")
         requireGattSuccess(awaitOperation<AndroidGattOperation.ServicesDiscovered>().status, "service discovery")
         return gatt.getService(serviceUuid) ?: throw androidTransportFailure(
@@ -294,6 +305,7 @@ private class AndroidCentralGattSession(
     }
 
     suspend fun read(characteristic: BluetoothGattCharacteristic): ByteArray {
+        beginOperation()
         if (!gatt.readCharacteristic(characteristic)) throw androidTransportFailure(
             "ble_read_failed",
             "Android rejected a BLE characteristic read",
@@ -304,6 +316,7 @@ private class AndroidCentralGattSession(
     }
 
     suspend fun subscribe(characteristic: BluetoothGattCharacteristic) {
+        beginOperation()
         if (!gatt.setCharacteristicNotification(characteristic, true)) throw androidTransportFailure(
             "ble_subscribe_failed",
             "Android rejected BLE notification subscription",
@@ -316,11 +329,14 @@ private class AndroidCentralGattSession(
         if (!gatt.writeDescriptorCompat(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)) {
             throw androidTransportFailure("ble_subscribe_failed", "Android rejected the BLE CCCD write")
         }
-        val result = awaitOperation<AndroidGattOperation.DescriptorWrite> { it.uuid == descriptorUuid }
+        val result = awaitOperation<AndroidGattOperation.DescriptorWrite> {
+            it.uuid == descriptorUuid && it.characteristicUuid == characteristic.uuid
+        }
         requireGattSuccess(result.status, "CCCD write")
     }
 
     suspend fun write(characteristic: BluetoothGattCharacteristic, value: ByteArray) {
+        beginOperation()
         if (!gatt.writeWithoutResponse(characteristic, value)) throw androidTransportFailure(
             "ble_write_failed",
             "Android rejected a BLE characteristic write",
@@ -341,6 +357,13 @@ private class AndroidCentralGattSession(
             runCatching { resource.disconnect() }
             runCatching { resource.close() }
         }
+    }
+
+    // The provider serializes native operations. A callback already delivered before a new
+    // request belongs to an earlier operation and cannot acknowledge this request.
+    private fun beginOperation() {
+        while (operations.tryReceive().isSuccess) Unit
+        if (closed.get()) throw CancellationException("GATT session is closed")
     }
 
     private suspend inline fun <reified T : AndroidGattOperation> awaitOperation(

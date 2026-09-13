@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 @SuppressLint("MissingPermission")
-internal class AndroidBlePeripheralRole private constructor(
+internal class AndroidBlePeripheralRole internal constructor(
     private val context: Context,
     private val manager: BluetoothManager,
     private val adapter: BluetoothAdapter,
@@ -104,6 +104,7 @@ internal class AndroidBlePeripheralRole private constructor(
                 stateNotificationsEnabled.set(false)
                 dataNotificationsEnabled.set(false)
                 if (activeConnection.get()?.bearer == BleRawBearer.GATT) {
+                    notifications.close(androidTransportFailure("ble_disconnected", "The Android BLE reader disconnected"))
                     incomingGatt.close(
                         if (status == BluetoothGatt.GATT_SUCCESS) null
                         else androidTransportFailure(
@@ -220,6 +221,7 @@ internal class AndroidBlePeripheralRole private constructor(
         }
 
         override fun onNotificationSent(device: BluetoothDevice, status: Int) {
+            if (closed.get() || activeDevice.get()?.address != device.address) return
             notifications.trySend(status)
         }
     }
@@ -356,6 +358,9 @@ internal class AndroidBlePeripheralRole private constructor(
     internal fun maximumGattPacketBytes(): Int = min(BLE_MAX_GATT_PACKET_BYTES, mtu.get() - 3).coerceAtLeast(2)
 
     internal suspend fun notify(characteristic: BluetoothGattCharacteristic, value: ByteArray) {
+        // Serial sends must not consume an already delivered completion from an earlier notification.
+        while (notifications.tryReceive().isSuccess) Unit
+        if (closed.get()) throw CancellationException("GATT session is closed")
         val device = activeDevice.get() ?: throw androidTransportFailure(
             "ble_disconnected",
             "The Android BLE reader is no longer connected",
