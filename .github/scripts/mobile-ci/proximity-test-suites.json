@@ -278,6 +278,37 @@
           "oracle": "Combined review submits exactly the selected elements and proof in each document."
         }
       ]
+    },
+    "android-aware-callbacks": {
+      "executionClass": "deterministic",
+      "sources": [
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/androidHostTest/kotlin/id/walt/mdoc/proximity/mobile/AndroidWifiAwareCallbackTest.kt"
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/build/test-results/testAndroidHostTest/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidWifiAwareCallbackTest",
+          "name": "attachFailureClosesLateSuccessAndFreshPublisherCanStart",
+          "oracle": "Attach failure cleans a late successful resource and a fresh publisher can start."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidWifiAwareCallbackTest",
+          "name": "publishFailureDisposesAttachAndLatePublishResourceOnce",
+          "oracle": "Publish failure disposes attach and late publish resources once."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidWifiAwareCallbackTest",
+          "name": "networkFailureClosesPendingAcceptAndDisposesItsCallback",
+          "oracle": "Network unavailability closes a real pending socket accept and unregisters the owned callback."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidWifiAwareCallbackTest",
+          "name": "cancellationAtAttachOrPublishDisposesLateNativeResources",
+          "oracle": "Cancellation at attach and publish cleans resources delivered by late native callbacks."
+        }
+      ]
     }
   }
 }
