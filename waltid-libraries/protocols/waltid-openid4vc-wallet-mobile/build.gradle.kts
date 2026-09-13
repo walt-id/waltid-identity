@@ -96,6 +96,8 @@ kotlin {
                     implementation(kotlin("test"))
                     implementation(identityLibs.junit)
                     implementation(identityLibs.robolectric)
+                    // Independent reader oracle; never part of the published wallet runtime.
+                    implementation("org.multipaz:multipaz-jvm:0.100.0")
                 }
             }
             named("androidHostTest") {
