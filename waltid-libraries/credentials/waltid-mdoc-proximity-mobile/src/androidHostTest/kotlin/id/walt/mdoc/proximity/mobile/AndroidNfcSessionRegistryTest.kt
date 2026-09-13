@@ -4,6 +4,11 @@ import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ProximityCloseReason
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -138,6 +143,35 @@ class AndroidNfcSessionRegistryTest {
         router.releaseFirst.complete(Unit)
         processing.await()
         Unit
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun unfinishedResponseDrainIsBoundedAndDisconnectCanInterruptIt() = runTest {
+        for (disconnect in listOf(false, true)) {
+            val router = RecordingRouter()
+            val generation = AndroidNfcSessionRegistry.arm(router, null)
+            requireNotNull(AndroidNfcSessionRegistry.current()).beginResponseDelivery()
+            val closing = async(start = CoroutineStart.UNDISPATCHED) {
+                AndroidNfcSessionRegistry.disarm(generation, ProximityCloseReason.COMPLETED)
+            }
+            assertTrue(closing.isActive)
+            if (disconnect) {
+                AndroidNfcSessionRegistry.disarm(generation, ProximityCloseReason.PEER_DISCONNECTED)
+            } else {
+                advanceTimeBy(AndroidNfcSessionRegistry.RESPONSE_DRAIN_TIMEOUT_MILLIS - 1)
+                assertTrue(AndroidNfcSessionRegistry.isCurrent(generation))
+                advanceTimeBy(1)
+            }
+            runCurrent()
+            closing.await()
+            assertNull(AndroidNfcSessionRegistry.current())
+            assertEquals(listOf(if (disconnect) ProximityCloseReason.PEER_DISCONNECTED else ProximityCloseReason.TIMEOUT),
+                router.closeReasons)
+            val fresh = AndroidNfcSessionRegistry.arm(RecordingRouter(), null)
+            assertTrue(AndroidNfcSessionRegistry.isCurrent(fresh))
+            AndroidNfcSessionRegistry.disarm(fresh, ProximityCloseReason.CANCELLED)
+        }
     }
 
     private suspend fun eventually(condition: () -> Boolean) {

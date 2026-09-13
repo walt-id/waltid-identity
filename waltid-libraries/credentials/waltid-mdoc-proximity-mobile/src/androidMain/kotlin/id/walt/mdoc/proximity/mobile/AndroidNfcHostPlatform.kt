@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.xmlpull.v1.XmlPullParser
 
 internal val ANDROID_MDOC_REQUIRED_AIDS: Set<String> = setOf(
@@ -382,6 +384,7 @@ public abstract class AndroidMdocHostApduService : HostApduService() {
     init {
         serviceScope.launch {
             for (pending in commands) {
+                pending.session.beginResponseDelivery()
                 val response = try {
                     pending.session.process(pending.command)
                 } catch (cancelled: CancellationException) {
@@ -391,7 +394,14 @@ public abstract class AndroidMdocHostApduService : HostApduService() {
                     ImmutableBytes.of(STATUS_UNKNOWN_ERROR)
                 }
                 if (AndroidNfcSessionRegistry.isCurrent(pending.session.generation)) {
-                    sendResponse(response.copy())
+                    try {
+                        sendResponse(response.copy())
+                        pending.session.responseSent(response)
+                    } catch (_: Exception) {
+                        AndroidNfcSessionRegistry.requestDisarm(
+                            pending.session.generation, ProximityCloseReason.PLATFORM_UNAVAILABLE,
+                        )
+                    }
                 }
             }
         }
@@ -481,6 +491,7 @@ internal object AndroidNfcSessionRegistry {
         private val router: Router,
         parentJob: Job?,
     ) {
+        private val responseDelivery = AtomicReference(CompletableDeferred(Unit))
         private val parentCompleted = AtomicBoolean(parentJob?.isActive == false)
         private val completion = parentJob?.invokeOnCompletion {
             parentCompleted.set(true)
@@ -489,12 +500,28 @@ internal object AndroidNfcSessionRegistry {
 
         val isParentCompleted: Boolean get() = parentCompleted.get()
 
+        fun beginResponseDelivery() {
+            responseDelivery.updateAndGet { if (it.isCompleted) CompletableDeferred() else it }
+        }
+
+        fun responseSent(response: ImmutableBytes) {
+            val bytes = response.copy()
+            // 61xx requires another GET RESPONSE; staging or sending the first fragment is not completion.
+            if (bytes.size >= 2 && bytes[bytes.size - 2] != 0x61.toByte()) {
+                responseDelivery.get().complete(Unit)
+            }
+        }
+
+        suspend fun awaitResponseDelivery(): Boolean =
+            withTimeoutOrNull(RESPONSE_DRAIN_TIMEOUT_MILLIS) { responseDelivery.get().await(); true } ?: false
+
         suspend fun process(command: ByteArray): ImmutableBytes {
             check(isCurrent(generation)) { "The Android NFC session is stale" }
             return router.process(command)
         }
 
         suspend fun close(reason: ProximityCloseReason) {
+            responseDelivery.get().complete(Unit)
             completion?.dispose()
             try {
                 router.deactivate(reason)
@@ -538,8 +565,14 @@ internal object AndroidNfcSessionRegistry {
     }
 
     suspend fun disarm(generation: Long, reason: ProximityCloseReason) {
-        take(generation)?.close(reason)
+        val session = active.get()?.takeIf { it.generation == generation } ?: return
+        val actualReason = if (reason in setOf(ProximityCloseReason.COMPLETED, ProximityCloseReason.HANDOVER_COMPLETED) &&
+            !session.awaitResponseDelivery()
+        ) ProximityCloseReason.TIMEOUT else reason
+        take(generation)?.close(actualReason)
     }
+
+    internal const val RESPONSE_DRAIN_TIMEOUT_MILLIS: Long = 5_000
 
     private fun take(generation: Long): Session? {
         val session = active.get() ?: return null
