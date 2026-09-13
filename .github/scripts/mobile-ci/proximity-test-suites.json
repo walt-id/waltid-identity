@@ -142,6 +142,65 @@
           "oracle": "Only selected-peer writes reach the incoming channel or terminate the connection."
         }
       ]
+    },
+    "independent-nfc-reader": {
+      "aut": "AUT-04",
+      "executionClass": "deterministic",
+      "source": "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/androidHostTest/kotlin/id/walt/wallet2/mobile/IndependentNfcReaderTest.kt",
+      "requiredTests": [
+        {
+          "class": "id.walt.wallet2.mobile.IndependentNfcReaderTest",
+          "name": "stockPeerRetrievalSelectIsRejectedAndCorrectedSelectCanRecover",
+          "oracle": "Reject the stock peer SELECT conflict with the selected standard and retain a valid corrected control."
+        },
+        {
+          "class": "id.walt.wallet2.mobile.IndependentNfcReaderTest",
+          "name": "staticHandoverAndFragmentedResponseAreIndependentlyAuthenticated",
+          "oracle": "Pinned reader authenticates issuer/device signatures, field digests and configured issuer trust after fragmented NFC retrieval."
+        },
+        {
+          "class": "id.walt.wallet2.mobile.IndependentNfcReaderTest",
+          "name": "requestTwoRetainsConnectionCountersAndRequiresNewSelectiveConsent",
+          "oracle": "One connection carries two encrypted exchanges with fresh selective consent and rejects stale approval."
+        },
+        {
+          "class": "id.walt.wallet2.mobile.IndependentNfcReaderTest",
+          "name": "tamperedCiphertextIsRejectedWithoutConsentAndFreshSessionRecovers",
+          "oracle": "One ciphertext mutation produces status 10 without disclosure; the same wallet completes a fresh session."
+        },
+        {
+          "class": "id.walt.wallet2.mobile.IndependentNfcReaderTest",
+          "name": "cancelledReviewCannotDiscloseAndFreshSessionRecovers",
+          "oracle": "Cancelled approval cannot disclose and the same wallet completes a fresh session."
+        }
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/test-results/testAndroidHostTest/*.xml"
+      }
+    },
+    "android-nfc-callbacks": {
+      "aut": "AUT-03",
+      "executionClass": "deterministic",
+      "requiredTests": [
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidMdocHostApduServiceTest",
+          "name": "successfulCloseKeepsRoutingUntilTheLastResponseFragmentIsSent",
+          "oracle": "Successful native close cannot discard the pending response or its GET RESPONSE fragments."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidMdocHostApduServiceTest",
+          "name": "frameworkSendFailureReleasesRoutingAndTheWorkerServesAFreshGeneration",
+          "oracle": "Framework send failure disposes the generation and preserves service-worker recovery."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidNfcSessionRegistryTest",
+          "name": "unfinishedResponseDrainIsBoundedAndDisconnectCanInterruptIt",
+          "oracle": "An unfinished successful-close drain has a finite deadline, disconnect interrupts it, and fresh routing remains available."
+        }
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/build/test-results/testAndroidHostTest/*.xml"
+      }
     }
   }
 }
