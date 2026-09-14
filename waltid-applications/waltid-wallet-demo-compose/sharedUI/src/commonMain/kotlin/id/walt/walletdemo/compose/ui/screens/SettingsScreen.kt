@@ -143,11 +143,10 @@ internal fun SettingsScreen(
             )
             state.identityDetails?.let { identity ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Signing identity", style = MaterialTheme.typography.titleMedium)
+                    Text("Wallet signing key", style = MaterialTheme.typography.titleMedium)
                     Text("${identity.storage} · ${identity.origin}")
                     Text(identity.authorization)
                     Text(identity.recovery)
-                    Text("iOS Secure Enclave keys cannot be recovered on another device. Imported Android keys may use hardware, but their recovery secret exists outside it.", style = MaterialTheme.typography.bodySmall)
                     for (choice in identity.choices) {
                         Text(choice.detail, style = MaterialTheme.typography.bodySmall)
                         OutlinedButton(enabled = !state.identityBusy, onClick = {
@@ -158,11 +157,12 @@ internal fun SettingsScreen(
                 }
             }
             if (state.pinLockEnabled) {
-                SigningProtectionSettings(
-                    state = state,
-                    ready = ready,
-                    onRequestChange = onRequestSigningProtectionChange,
-                )
+                if (state.identityDetails == null) {
+                    SigningProtectionSettings(state = state, ready = ready, onRequestChange = onRequestSigningProtectionChange)
+                } else {
+                    Text("To choose different key storage or signing approval, reset this wallet and set up a new key. Current credentials will be removed and must be issued again.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()

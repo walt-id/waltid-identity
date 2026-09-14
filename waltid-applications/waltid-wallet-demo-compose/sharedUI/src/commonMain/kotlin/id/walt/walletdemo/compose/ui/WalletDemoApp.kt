@@ -83,9 +83,6 @@ internal fun WalletDemoAppHost(
                             auth = auth,
                             isBusy = state.isBusy,
                             biometricAvailable = state.biometricUnlockAvailable,
-                            signingProtectionMode = state.signingProtectionMode,
-                            selectedSigningProtection = state.selectedSigningProtection,
-                            biometricSigningAvailability = state.biometricSigningAvailability,
                         )
                     }
                     is WalletAuthState.StorageUnavailable -> Box(

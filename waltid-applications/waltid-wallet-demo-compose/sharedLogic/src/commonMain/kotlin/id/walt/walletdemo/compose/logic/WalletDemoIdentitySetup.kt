@@ -1,11 +1,48 @@
 package id.walt.walletdemo.compose.logic
 
-/** UI descriptions refer to SDK-owned options retained by the mobile adapter. */
+/** Recovery actions retain an SDK-owned handle in the mobile adapter. */
 data class WalletDemoIdentityChoice(val id: String, val title: String, val detail: String, val recoverable: Boolean, val destructive: Boolean = false)
 
+/** A display value for one decision, not an executable SDK configuration. */
+data class WalletDemoKeyChoice(val id: String, val title: String, val detail: String)
+
+/** A complete supported configuration. Only its opaque handle is submitted to the SDK. */
+data class WalletDemoKeySetupOption(
+    val id: String,
+    val recovery: WalletDemoKeyChoice,
+    val storage: WalletDemoKeyChoice,
+    val approval: WalletDemoKeyChoice,
+    val restoring: Boolean = false,
+)
+
 sealed interface WalletDemoIdentitySetup {
-    data class Choose(val choices: List<WalletDemoIdentityChoice>, val message: String? = null) : WalletDemoIdentitySetup
+    data class Choose(val options: List<WalletDemoKeySetupOption>, val message: String? = null, val recoveryStorageNotice: String? = null) : WalletDemoIdentitySetup
     data class Pending(val identityId: String) : WalletDemoIdentitySetup
+}
+
+/** Each step filters the SDK's complete options; the UI never constructs a combination. */
+enum class WalletDemoKeySetupStep(val title: String) {
+    Recovery("Recovery"), Storage("Key storage"), Approval("Signing approval");
+
+    fun choice(option: WalletDemoKeySetupOption): WalletDemoKeyChoice = when (this) {
+        Recovery -> option.recovery
+        Storage -> option.storage
+        Approval -> option.approval
+    }
+
+    fun options(all: List<WalletDemoKeySetupOption>, selected: WalletDemoKeySetupOption): List<WalletDemoKeySetupOption> =
+        all.filter { option -> when (this) {
+            Recovery -> true
+            Storage -> option.recovery.id == selected.recovery.id
+            Approval -> option.recovery.id == selected.recovery.id && option.storage.id == selected.storage.id
+        } }
+
+    fun select(all: List<WalletDemoKeySetupOption>, selected: WalletDemoKeySetupOption, choiceId: String): WalletDemoKeySetupOption {
+        val candidates = options(all, selected).filter { choice(it).id == choiceId }
+        return candidates.firstOrNull { it.storage.id == selected.storage.id && it.approval.id == selected.approval.id }
+            ?: candidates.firstOrNull { it.approval.id == selected.approval.id }
+            ?: candidates.firstOrNull() ?: selected
+    }
 }
 
 /** Public facts and SDK-issued actions only; no recovery secret reaches UI state. */

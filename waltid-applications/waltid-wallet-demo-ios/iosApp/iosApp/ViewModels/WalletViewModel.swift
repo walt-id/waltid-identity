@@ -631,7 +631,7 @@ class WalletViewModel: ObservableObject {
             ),
             transactionDataProfiles: transactionDataProfiles.profiles,
             crossProcessAccess: Self.crossProcessAccessConfiguration(),
-            defaultKeyUseAuthorizationPolicy: selectedProtection.authorizationPolicy,
+            defaultKeyUseAuthorizationPolicy: signingProtectionMode.defaultSelection.authorizationPolicy,
             keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
                 message: "Authorize wallet signing",
                 cancelText: "Cancel"
@@ -1422,6 +1422,11 @@ class WalletViewModel: ObservableObject {
         }
     }
 
+    func retryOpeningWallet() {
+        guard !isLoading, !isReady else { return }
+        bootstrapIfNeeded()
+    }
+
     private func bootstrapIfNeeded() {
         guard !isReady else { return }
         bootstrap(signingProtection: selectedSigningProtection)
@@ -1440,10 +1445,6 @@ class WalletViewModel: ObservableObject {
         pinError = nil
         Task {
             let selection = signingProtectionMode.resolve(selectedSigningProtection)
-            guard await validateSigningProtection(selection) else {
-                isAuthenticating = false
-                return
-            }
             do {
                 signingProtectionStore.save(selection)
                 selectedSigningProtection = selection
@@ -1493,8 +1494,8 @@ class WalletViewModel: ObservableObject {
             do {
                 try await loadWallet(signingProtection: signingProtection)
                 if isReady { setSuccess(WalletStatusText.walletReady) }
-                else { isLoading = false; statusMessage = "Choose your signing identity" }
-                logE2E("Bootstrap: completed successfully, wallet is ready")
+                else { isLoading = false; statusMessage = "Set up your wallet" }
+                logE2E(isReady ? "Bootstrap: wallet ready" : "Bootstrap: awaiting key setup")
             } catch {
                 logE2E("Bootstrap: FAILED with error: \(error.localizedDescription)")
                 setError(WalletStatusText.failure(WalletStatusText.bootstrapFailed, error))

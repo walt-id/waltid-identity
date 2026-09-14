@@ -55,6 +55,7 @@ fun createIosDemoWallet(
                 )
             ),
             warning = transactionDataProfiles.warning,
+            isIos = true,
         )
     }
 }

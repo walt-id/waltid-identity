@@ -90,18 +90,20 @@ internal object WalletComposeE2EHelper {
 
     private fun awaitWalletReady(device: UiDevice) {
         val deadline = System.currentTimeMillis() + WALLET_READY_TIMEOUT
-        var identitySelected = false
+        var setupStep = 0
         while (System.currentTimeMillis() < deadline) {
             val status = latestStatus(device)
             if (status == "Wallet ready") return
             if (status.startsWith("Bootstrap failed")) break
-            if (!identitySelected) {
+            if (setupStep < 3) {
                 try {
-                    // The first offered choice is the recommended identity without recovery.
-                    device.findObject(By.res("wallet.identityChoice.0"))?.let { choice ->
-                        if (choice.isEnabled) {
-                            choice.click()
-                            identitySelected = true
+                    val heading = listOf("1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval")[setupStep]
+                    if (device.hasObject(By.text(heading))) {
+                        device.findObject(By.res("wallet.keySetupContinue"))?.let { button ->
+                            if (button.isEnabled) {
+                                button.click()
+                                setupStep++
+                            }
                         }
                     }
                 } catch (_: StaleObjectException) {

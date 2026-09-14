@@ -300,7 +300,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun requiredBiometricSetupFailsBeforePersistingPinOrCreatingWalletWhenNotEnrolled() = runTest {
+    fun pinSetupDoesNotDependOnSigningBiometricEnrollment() = runTest {
         val wallet = FakeDemoWallet().apply {
             signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
         }
@@ -317,10 +317,8 @@ class WalletDemoControllerTest {
         controller.submitPin()
         runCurrent()
 
-        val setup = controller.state.value.auth as WalletAuthState.Setup
-        assertEquals(WalletDisplayText.BiometricNotEnrolled, setup.error)
-        assertFalse(pinStore.hasPin())
-        assertEquals(0, wallet.bootstrapCalls)
+        assertEquals(WalletAuthState.Unlocked, controller.state.value.auth)
+        assertTrue(pinStore.hasPin())
         assertEquals(0, wallet.deleteWalletCalls)
     }
 
@@ -372,7 +370,7 @@ class WalletDemoControllerTest {
             WalletDemoSigningProtectionAvailability.BiometricNotEnrolled,
             controller.state.value.biometricSigningAvailability,
         )
-        assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("will fail"))
+        assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("cannot be used again"))
 
         controller.dismissSigningProtectionWarning()
         assertNull(controller.state.value.signingProtectionWarning)
@@ -411,7 +409,7 @@ class WalletDemoControllerTest {
             WalletDemoSigningProtection.Biometric,
             (controller.state.value.session as WalletSessionState.Ready).signingProtection,
         )
-        assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("choose no biometric signing"))
+        assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("reset the wallet"))
     }
 
     @Test
@@ -432,7 +430,7 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("required by app configuration"))
-        assertFalse(controller.state.value.signingProtectionWarning.orEmpty().contains("choose no biometric signing"))
+        assertFalse(controller.state.value.signingProtectionWarning.orEmpty().contains("reset the wallet"))
     }
 
     @Test
@@ -451,7 +449,7 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
-        assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("will fail"))
+        assertTrue(controller.state.value.signingProtectionWarning.orEmpty().contains("cannot be used again"))
     }
 
     @Test

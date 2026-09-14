@@ -1450,10 +1450,6 @@ class WalletDemoController(
         scope.launch(dispatcher) {
             val protection = _state.value.selectedSigningProtection
             runCatching {
-                val availability = wallet.signingProtectionAvailability(protection)
-                check(availability == WalletDemoSigningProtectionAvailability.Available) {
-                    availability.displayMessage().orEmpty()
-                }
                 signingProtectionStore.save(protection)
                 pinStore.setPin(pin)
                 pinStore.setBiometricUnlockEnabled(auth.useBiometrics)

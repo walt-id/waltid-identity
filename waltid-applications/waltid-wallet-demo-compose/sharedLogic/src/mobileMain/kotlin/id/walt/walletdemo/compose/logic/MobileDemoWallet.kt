@@ -27,6 +27,7 @@ import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,
     private val warning: String? = null,
+    private val isIos: Boolean = false,
 ) : ProximityDemoWallet {
     override suspend fun proximityPresentationCapabilities(
         configuration: ProximityConfiguration,
@@ -53,19 +54,19 @@ internal class MobileDemoWallet(
             val id = Uuid.random().toString()
             identityChoices[id] = IdentityAction.Backup(option)
             choices += WalletDemoIdentityChoice(id, "Back up with ${option.providerName}",
-                "Retains a secret capable of recreating this identity.", true)
+                "Saves a recovery secret for this signing key and DID. Credentials are not included.", true)
         }
         for (candidate in mobileWallet.identities.recoveryCandidates().filter { it.reference.recordId == identity.id }) {
             val id = Uuid.random().toString()
             identityChoices[id] = IdentityAction.Delete(candidate)
             choices += WalletDemoIdentityChoice(id, "Delete recovery record", candidate.providerName, true, destructive = true)
         }
-        return WalletDemoIdentityDetails(identity.storage.identityTitle(), identity.keyFacts.origin.name,
+        return WalletDemoIdentityDetails(storageChoice(identity.storage, false).title, identity.keyFacts.origin.name,
             identity.authorization.identityDescription(), when (val recovery = identity.recovery) {
                 IdentityRecoveryState.Disabled -> "No recovery backup submitted."
                 is IdentityRecoveryState.Submitted -> if (recovery.receipt == RecoveryReceipt.AcceptedLocally)
                     "Recovery record accepted locally; cloud delivery unknown." else "Recovery submission confirmed by provider."
-                is IdentityRecoveryState.Recovered -> "The original signing identity was recovered on this installation."
+                is IdentityRecoveryState.Recovered -> "The original signing key and DID were restored on this installation."
                 is IdentityRecoveryState.RemovalRequested -> "Deletion requested; removal from other devices is not verified."
             }, choices)
     }
@@ -75,19 +76,21 @@ internal class MobileDemoWallet(
         val state = mobileWallet.identities.state()
         if (state is WalletIdentityState.Active) return null
         if (state is WalletIdentityState.Pending) return WalletDemoIdentitySetup.Pending(state.identityId)
-        val choices = mutableListOf<WalletDemoIdentityChoice>()
+        val choices = mutableListOf<WalletDemoKeySetupOption>()
         if (state == WalletIdentityState.Absent) {
             for (intent in IdentityIntent.entries) {
                 val options = mobileWallet.identities.creationOptions(intent) as? IdentityOptions.Available ?: continue
                 for (option in listOf(options.recommended) + options.alternatives) {
                     val id = Uuid.random().toString()
                     identityChoices[id] = IdentityAction.Create(option)
-                    choices += WalletDemoIdentityChoice(id,
-                        "Create with ${option.storage.identityTitle()}",
-                        option.authorization.identityDescription() + if (option.recoverable)
-                            ". Recovery via ${option.recoveryProviderName}. The recoverable secret exists outside signing hardware."
-                        else ". No recovery backup. Losing this device may require credential reissuance.",
-                        option.recoverable)
+                    val recovery = option.recoveryProviderName?.let { provider ->
+                        WalletDemoKeyChoice("backup:$provider", "Back up with $provider",
+                            "Save a recovery secret for the same signing key and DID. Credentials are not included. " +
+                                "Cloud delivery depends on the provider and is not confirmed by a local save.")
+                    } ?: WalletDemoKeyChoice("new", "No recovery backup",
+                        "Keep this key on this device. If it is lost, you may need to have your credentials issued again.")
+                    choices += WalletDemoKeySetupOption(id, recovery,
+                        storageChoice(option.storage, option.recoverable), option.authorization.approvalChoice())
                 }
             }
         }
@@ -95,13 +98,30 @@ internal class MobileDemoWallet(
             for (option in mobileWallet.identities.restorationOptions(candidate)) {
                 val id = Uuid.random().toString()
                 identityChoices[id] = IdentityAction.Restore(option)
-                choices += WalletDemoIdentityChoice(id, "Restore with ${option.storage.identityTitle()}",
-                    "${candidate.providerName}. ${option.authorization.identityDescription()}. Restores ${option.did.take(40)}…", true)
+                choices += WalletDemoKeySetupOption(id,
+                    WalletDemoKeyChoice("restore:${candidate.reference}", "Restore from ${candidate.providerName}",
+                        "Restore the original signing key and DID. Credentials are not included.\n${option.did}"),
+                    storageChoice(option.storage, true), option.authorization.approvalChoice(), restoring = true)
             }
         }
         return WalletDemoIdentitySetup.Choose(choices, if (state is WalletIdentityState.Unavailable)
-            "The existing signing identity is unavailable. Restore its original key to use bound credentials."
-            else null)
+            "The existing signing key is unavailable. Restore its original key to use credentials bound to it."
+            else null, recoveryStorageNotice = if (isIos)
+                "The Secure Enclave cannot restore a key. Recoverable keys use Keychain or the encrypted wallet database." else null)
+    }
+
+    private fun storageChoice(storage: IdentityKeyStorage, recoverable: Boolean): WalletDemoKeyChoice = when (storage) {
+        IdentityKeyStorage.Hardware -> WalletDemoKeyChoice(storage.name,
+            if (isIos) "Secure Enclave" else "Hardware required",
+            if (isIos) "Generates and uses the key inside the Secure Enclave. This key cannot be restored on another device."
+            else if (recoverable) "Imports the recoverable key into secure hardware for signing. Its recovery secret also exists outside that hardware."
+            else "Generates and uses the key inside secure hardware. Setup fails if hardware protection is unavailable.")
+        IdentityKeyStorage.NativeStorage -> WalletDemoKeyChoice(storage.name,
+            if (isIos) "Keychain" else "Android Keystore",
+            if (isIos) "Stores the key in the iOS Keychain. Signing runs outside the Secure Enclave."
+            else "The operating system manages the key. Hardware protection is not required.")
+        IdentityKeyStorage.EncryptedDatabase -> WalletDemoKeyChoice(storage.name, "Encrypted wallet database",
+            "Stores the key in the encrypted wallet database and signs in software. No hardware protection or system signing prompt.")
     }
 
     override suspend fun chooseIdentity(choiceId: String) {
@@ -424,17 +444,24 @@ internal fun MobileWalletVerifierMetadata.toDemoMetadata(): WalletDemoVerifierMe
         termsOfServiceUri = termsOfServiceUri,
     )
 
-private fun IdentityKeyStorage.identityTitle(): String = when (this) {
-    IdentityKeyStorage.Hardware -> "hardware signing"
-    IdentityKeyStorage.NativeStorage -> "native key storage"
-    IdentityKeyStorage.EncryptedDatabase -> "encrypted software storage"
-}
+private fun KeyUseAuthorizationPolicy.approvalChoice(): WalletDemoKeyChoice = WalletDemoKeyChoice(
+    toString(), when (this) {
+        KeyUseAuthorizationPolicy.None -> "No signing prompt"
+        KeyUseAuthorizationPolicy.BiometricCurrentSet -> "Current biometrics"
+        KeyUseAuthorizationPolicy.BiometricAny -> "Biometrics"
+        is KeyUseAuthorizationPolicy.BiometricTimedReuse -> "Biometrics · ${timeoutSeconds}s reuse"
+        is KeyUseAuthorizationPolicy.DeviceCredential -> "Device passcode"
+        is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> "Biometrics or device passcode"
+    }, identityDescription(),
+)
 
 private fun KeyUseAuthorizationPolicy.identityDescription(): String = when (this) {
-    KeyUseAuthorizationPolicy.None -> "No native signing authorization; the wallet PIN protects app access"
-    KeyUseAuthorizationPolicy.BiometricCurrentSet -> "Biometric authorization for every signature; enrollment changes invalidate the key"
-    KeyUseAuthorizationPolicy.BiometricAny -> "Biometric authorization for every signature; new enrollment is allowed"
-    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> "Biometric authorization with ${timeoutSeconds}s reuse"
-    is KeyUseAuthorizationPolicy.DeviceCredential -> "Device credential authorization with ${timeoutSeconds}s reuse"
-    is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> "Biometric or device credential authorization with ${timeoutSeconds}s reuse"
+    KeyUseAuthorizationPolicy.None -> "Signing does not ask for system approval. The wallet PIN and app-unlock biometrics are separate."
+    KeyUseAuthorizationPolicy.BiometricCurrentSet -> "Approve each signature with biometrics. Changing enrolled biometrics makes this key unusable."
+    KeyUseAuthorizationPolicy.BiometricAny -> "Approve each signature with biometrics. Changing enrolled biometrics keeps this key usable."
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> "Approve signing with biometrics. The system can reuse approval for $timeoutSeconds seconds."
+    is KeyUseAuthorizationPolicy.DeviceCredential -> "Approve signing with the device passcode. " + approvalReuse(timeoutSeconds)
+    is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> "Approve signing with biometrics or the device passcode. " + approvalReuse(timeoutSeconds)
 }
+
+private fun approvalReuse(seconds: Int): String = if (seconds == 0) "Approval is required for each use." else "Approval can be reused for $seconds seconds."
