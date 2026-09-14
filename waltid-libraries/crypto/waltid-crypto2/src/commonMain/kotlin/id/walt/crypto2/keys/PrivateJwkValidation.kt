@@ -55,6 +55,24 @@ internal suspend fun EncodedKey.Jwk.validatePrivatePublicConsistency(
             validatedMaterial.keys.firstOrNull()?.let(validatedMaterial::remove)
         }
         validatedMaterial[cacheKey] = Unit
+        derivationsPerformed++
+    }
+}
+
+/**
+ * How often the public key has actually been derived to check consistency.
+ *
+ * Exists so a test can assert that repeated loads of the same key derive once, which is the property the
+ * cache provides. The first version of that test asserted a wall-clock figure measured on one machine and
+ * duly failed on a slower CI runner - a count is the same claim without the hardware in it.
+ */
+internal var derivationsPerformed: Int = 0
+    private set
+
+internal suspend fun resetValidationCacheForTesting() {
+    validationCacheMutex.withLock {
+        validatedMaterial.clear()
+        derivationsPerformed = 0
     }
 }
 
