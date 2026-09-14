@@ -13,7 +13,7 @@ Handover Select and Handover Request bytes, bounded peer input, ISO 7816 APDU st
 retrieval races, session-message sequencing, and cleanup must remain consistent across Android and
 iOS.
 
-The normative implementation baseline is the authorized `ISO/IEC DIS 18013-5:2025(E)` retained in
+The normative implementation baseline is the authorized `ISO/IEC DIS 18013-5:2026(en)` retained in
 the architecture repository, SHA-256
 `6bf2cdfbc89ed992d4822d6f4f2ee30bdc1443bd8db35c5ab1b562c3811af7f4`. Final clause-level
 reconciliation against the applicable ISO/IEC 7816-4, NFC Forum Connection Handover, NDEF, Type 4
@@ -112,13 +112,11 @@ contactless app, not an HCE capability prerequisite. The Swift adapter attempts 
 for the user-started presentation, holds it while valid, never renews it without a fresh user action,
 and keeps the eligible `CardSession` independent of assertion failure or expiry.
 
-Physical Android evidence proves conventional Negotiated Handover into a reader-selected BLE bearer,
-review and consent, response delivery, and deterministic completion. Provisional NFCv2 remains
-host-tested until a compatible physical reader run is recorded. Positive iOS card-emulation evidence
-remains gated by regenerated provisioning profiles containing Apple's newly approved HCE capability
-and AIDs, followed by an eligible signed-device run with NFC reader hardware.
+Historical physical results, exact tested builds, corrected-reader limits and remaining procedures
+belong to the [qualification ledger](https://github.com/walt-id/waltid-architecture/pull/61).
+They include bounded Android and iOS observations; no result transfers automatically to another
+source revision, signed host, reader or transport variant.
 
-This ADR does not claim final ISO or platform conformance. Final qualification requires reconciling
-the now-public ISO/IEC TS 18013-6:2025 test appendices while preserving the still-missing normative
-TS text boundary, completing the remaining interoperability matrix, and recording positive iOS
-evidence.
+This ADR records the implementation decision, not final ISO or platform conformance. Qualification
+still requires the applicable source/procedure reconciliation and the ledger's remaining independent
+reader, signed-host, lifecycle and interoperability evidence.

@@ -16,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -35,12 +36,14 @@ internal class NfcV2HybridProximityConnection(
     sessionScope: CoroutineScope,
     private val maximumMessagesPerDirection: Long,
 ) : ProximityConnection {
-    override val kind: ProximityTransportKind = alternate.kind
+    private val incomingBearer = MutableStateFlow(ProximityTransportKind.NFC)
+    override val kind: ProximityTransportKind get() = incomingBearer.value
 
     private enum class Bearer { NFC, ALTERNATE }
 
     private sealed interface IncomingEvent {
         data class Message(
+            val bearer: Bearer,
             val ordinal: Long,
             val bytes: ImmutableBytes,
         ) : IncomingEvent
@@ -112,6 +115,10 @@ internal class NfcV2HybridProximityConnection(
                                 )
                             }
                             retainedIncoming += event.bytes
+                            incomingBearer.value = when (event.bearer) {
+                                Bearer.NFC -> ProximityTransportKind.NFC
+                                Bearer.ALTERNATE -> alternate.kind
+                            }
                             return event.bytes
                         }
                     }
@@ -281,7 +288,7 @@ internal class NfcV2HybridProximityConnection(
         try {
             while (true) {
                 val message = connection.receive() ?: break
-                incomingEvents.send(IncomingEvent.Message(ordinal, ImmutableBytes.of(message.copy())))
+                incomingEvents.send(IncomingEvent.Message(bearer, ordinal, ImmutableBytes.of(message.copy())))
                 ordinal++
             }
             endBearer(bearer, null)
