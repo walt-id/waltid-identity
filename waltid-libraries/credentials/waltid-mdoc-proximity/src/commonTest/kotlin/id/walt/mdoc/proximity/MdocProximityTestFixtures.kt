@@ -18,7 +18,7 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.mdoc.issuance.MdocIssuer
-import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.edition2.document.Document
 import id.walt.mdoc.objects.mso.KeyAuthorization
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonObject
@@ -53,5 +53,9 @@ internal suspend fun CryptoRuntime.issueMdocTestDocument(
         ),
         keyAuthorizations = keyAuthorizations,
     )
-    return Document("org.example.mdoc", issuerSigned)
+    return id.walt.mdoc.parser.MdocParser.parseToEdition2Document(
+            id.walt.cose.coseCompliantCbor.encodeToByteArray(
+                id.walt.mdoc.objects.document.IssuerSigned.serializer(), issuerSigned
+            ).toHexString()
+        )
 }

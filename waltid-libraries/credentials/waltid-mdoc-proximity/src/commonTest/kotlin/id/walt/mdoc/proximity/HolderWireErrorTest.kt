@@ -12,7 +12,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.objects.SessionTranscript
-import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.session.SessionData
 import kotlinx.coroutines.CoroutineScope

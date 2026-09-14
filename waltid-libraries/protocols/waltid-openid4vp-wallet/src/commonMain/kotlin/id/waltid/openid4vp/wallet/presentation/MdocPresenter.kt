@@ -223,7 +223,7 @@ object MdocPresenter {
             detachedPayload = deviceAuthBytes,
             key = crypto2Key,
         )
-        val deviceAuth = DeviceAuth.Signature(deviceSignature)
+        val deviceAuth = DeviceAuth(deviceSignature = deviceSignature)
 
         return deviceAuth
     }
@@ -452,7 +452,7 @@ object MdocPresenter {
         // 5. Assemble the final DeviceResponse
         val deviceResponse = DeviceResponse(
             version = "1.0",
-            documents = listOf(
+            documents = arrayOf(
                 Document(
                     docType = mdocsCredential.docType,
                     issuerSigned = issuerSignedWithSelectedNamespaceItems,

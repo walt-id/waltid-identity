@@ -106,7 +106,7 @@ class TransactionDataMdocVpPolicyTest {
             .orEmpty()
         val deviceSigned = DeviceSigned.fromDeviceSignedItems(
             namespacedItems = mapOf(DEMO_TRANSACTION_DATA_TYPE to embeddedTransactionData.map { (key, value) -> DeviceSignedItem(key, value) }),
-            deviceSignature = dummyCoseSign1(),
+            deviceAuth = dummyCoseSign1(),
         )
 
         return Document(

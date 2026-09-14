@@ -8,6 +8,7 @@ import id.walt.mdoc.verification.MdocVerifier
 import id.walt.mdoc.verification.verifyDeviceAuthentication
 import id.walt.mdoc.verification.verifyIssuerSignedItemDigests
 import kotlinx.coroutines.test.runTest
+import kotlin.test.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
@@ -43,12 +44,12 @@ class VerifyConformanceMdoc {
         }
 
         val deviceSigned = requireNotNull(document.deviceSigned)
-        val signature = assertIs<DeviceAuth.Signature>(deviceSigned.deviceAuth).signature
+        val signature = assertNotNull(deviceSigned.deviceAuth.deviceSignature)
         val tamperedSignature = signature.copy(
             signature = signature.signature.copyOf().also { it[0] = (it[0].toInt() xor 1).toByte() }
         )
         val tamperedDocument = document.copy(
-            deviceSigned = deviceSigned.copy(deviceAuth = DeviceAuth.Signature(tamperedSignature))
+            deviceSigned = deviceSigned.copy(deviceAuth = DeviceAuth(deviceSignature = tamperedSignature))
         )
         assertFailsWith<IllegalArgumentException> {
             verifyDeviceAuthentication(tamperedDocument, mso, sessionTranscript)

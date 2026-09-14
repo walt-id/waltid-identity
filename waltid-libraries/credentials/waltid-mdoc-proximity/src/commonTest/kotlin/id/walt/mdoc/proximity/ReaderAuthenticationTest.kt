@@ -27,8 +27,8 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.objects.SessionTranscript
-import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
-import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.ReaderAuthenticationPayloads
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

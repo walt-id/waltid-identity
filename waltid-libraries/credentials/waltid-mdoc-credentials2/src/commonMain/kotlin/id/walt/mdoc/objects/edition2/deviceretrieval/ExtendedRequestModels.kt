@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
-package id.walt.mdoc.objects.deviceretrieval
+package id.walt.mdoc.objects.edition2.deviceretrieval
 
 import id.walt.cose.CoseKey
 import id.walt.mdoc.encoding.ByteStringWrapper
@@ -12,7 +12,7 @@ import id.walt.mdoc.encoding.fromTaggedByteString
 import id.walt.mdoc.encoding.requireNoExtensionCollisions
 import id.walt.mdoc.encoding.toCborElement
 import id.walt.mdoc.encoding.toTaggedByteString
-import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.edition2.document.Document
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer

@@ -14,8 +14,8 @@ import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.SessionTranscript
-import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
-import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceResponse
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceEngagementSecurity
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
