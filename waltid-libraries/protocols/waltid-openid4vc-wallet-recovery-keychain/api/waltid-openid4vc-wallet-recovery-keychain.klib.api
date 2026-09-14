@@ -1,0 +1,33 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <id.walt.protocols:waltid-openid4vc-wallet-recovery-keychain>
+final enum class id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility : kotlin/Enum<id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility> { // id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility|null[0]
+    enum entry AfterFirstUnlock // id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility.AfterFirstUnlock|null[0]
+    enum entry WhenUnlocked // id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility.WhenUnlocked|null[0]
+
+    final val entries // id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility> // id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility // id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility> // id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility.values|values#static(){}[0]
+}
+
+final class id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery : id.walt.wallet2.mobile.identity/IdentityRecoveryProvider { // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery|null[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., id.walt.wallet2.recovery.keychain/SynchronizableKeychainAccessibility = ...) // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery.<init>|<init>(kotlin.String;kotlin.String?;id.walt.wallet2.recovery.keychain.SynchronizableKeychainAccessibility){}[0]
+
+    final val displayName // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery.displayName|{}displayName[0]
+        final fun <get-displayName>(): kotlin/String // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery.displayName.<get-displayName>|<get-displayName>(){}[0]
+    final val id // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery.id|{}id[0]
+        final fun <get-id>(): kotlin/String // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery.id.<get-id>|<get-id>(){}[0]
+
+    final suspend fun availability(): id.walt.wallet2.mobile.identity/RecoveryAvailability // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery.availability|availability(){}[0]
+    final suspend fun delete(kotlin/String): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery.delete|delete(kotlin.String){}[0]
+    final suspend fun list(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery.list|list(){}[0]
+    final suspend fun retrieve(kotlin/String): id.walt.wallet2.mobile.identity/IdentityRecoveryData? // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery.retrieve|retrieve(kotlin.String){}[0]
+    final suspend fun store(kotlin/String, id.walt.wallet2.mobile.identity/IdentityRecoveryData): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.recovery.keychain/KeychainIdentityRecovery.store|store(kotlin.String;id.walt.wallet2.mobile.identity.IdentityRecoveryData){}[0]
+}

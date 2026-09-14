@@ -10,7 +10,7 @@ final class WalletE2EUI {
         self.app = app
     }
 
-    func launch(environment: [String: String] = [:]) {
+    func launch(environment: [String: String] = [:], initializeIdentity: Bool = true) {
         app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
             app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] ?? "disabled"
         for (key, value) in environment {
@@ -18,6 +18,8 @@ final class WalletE2EUI {
         }
         app.launch()
         unlockWallet()
+        let create = app.buttons["Use this option"].firstMatch
+        if initializeIdentity && create.waitForExistence(timeout: 5) { create.tap() }
     }
 
     func launch(attestation: [String: String]) {

@@ -11,7 +11,6 @@ import id.walt.wallet2.mobile.MobileWalletEventPhase
 import id.walt.wallet2.mobile.MobileWalletEventStatus
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
-import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletClientIdScheme
 import id.walt.wallet2.mobile.MobileWalletCredential
@@ -90,23 +89,6 @@ class WalletSdkBridgeTest {
         }
 
         assertEquals("cancelled", cancellation.message)
-    }
-
-    @Test
-    fun bridgeBootstrapMapsKeyTypeAndResultDto() = runTest {
-        val operations = FakeWalletSdkBridgeOperations()
-        val bridge = WalletSdkBridge.forOperations(operations)
-
-        val result = bridge.bootstrap(
-            keyType = MobileWalletKeyType.secp256r1,
-            didMethod = "jwk",
-        )
-
-        assertIs<WalletBridgeResult.Success<MobileWalletBootstrapResult>>(result)
-        assertEquals("key-1", result.value.keyId)
-        assertEquals("did:jwk:issuer", result.value.did)
-        assertEquals(MobileWalletKeyType.secp256r1, operations.bootstrapKeyType)
-        assertEquals("jwk", operations.bootstrapDidMethod)
     }
 
     @Test
@@ -660,10 +642,6 @@ class WalletSdkBridgeTest {
         private val requestAuthentication: MobileWalletRequestAuthentication =
             MobileWalletRequestAuthentication.Unauthenticated,
     ) : WalletSdkBridgeOperations {
-        var bootstrapKeyType: MobileWalletKeyType? = null
-            private set
-        var bootstrapDidMethod: String? = null
-            private set
         var presentationRequestUrl: String? = null
             private set
         var presentationDid: String? = null
@@ -695,21 +673,6 @@ class WalletSdkBridgeTest {
             private set
         var cancelledIssuanceSessionId: String? = null
             private set
-        override suspend fun bootstrap(
-            keyType: MobileWalletKeyType?,
-            didMethod: String,
-            keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
-        ): MobileWalletBootstrapResult {
-            bootstrapKeyType = keyType
-            bootstrapDidMethod = didMethod
-            return MobileWalletBootstrapResult(
-                keyId = "key-1",
-                did = "did:jwk:issuer",
-                publicJwk = """{"kty":"OKP","crv":"Ed25519","x":"test"}""",
-                keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10),
-            )
-        }
-
         override suspend fun keyUseAuthorizationPreflight(
             keyType: MobileWalletKeyType,
             policy: KeyUseAuthorizationPolicy,

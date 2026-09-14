@@ -21,6 +21,8 @@ enum WalletDemoSigningProtection: String, CaseIterable, Hashable, Sendable {
             throw WalletDemoSigningProtectionPolicyError.unsupportedTimeout(timeoutSeconds)
         case .biometricCurrentSet:
             throw WalletDemoSigningProtectionPolicyError.unsupportedPerOperationPolicy
+        case .biometricAny, .deviceCredential, .biometricOrDeviceCredential:
+            throw WalletDemoSigningProtectionPolicyError.unsupportedAuthorizationPolicy
         }
     }
 
@@ -40,11 +42,14 @@ enum WalletDemoSigningProtection: String, CaseIterable, Hashable, Sendable {
 }
 
 private enum WalletDemoSigningProtectionPolicyError: LocalizedError {
+    case unsupportedAuthorizationPolicy
     case unsupportedTimeout(Int)
     case unsupportedPerOperationPolicy
 
     var errorDescription: String? {
         switch self {
+        case .unsupportedAuthorizationPolicy:
+            "Wallet key uses an authorization policy outside this demo configuration"
         case .unsupportedTimeout(let seconds):
             "Wallet key uses an unsupported biometric signing timeout: \(seconds) seconds"
         case .unsupportedPerOperationPolicy:

@@ -32,8 +32,9 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
 
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
-        val signumPolicy = requirements.authorizationPolicy.toSignumPolicy()
-        if (!backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
+        val signumPolicy = requirements.nativePolicy()
+        if ((isSimulator && signumPolicy.hardware == id.walt.crypto2.signum.SignumHardwarePolicy.REQUIRED) ||
+            !backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
         if (requirements.authorizationPolicy is KeyUseAuthorizationPolicy.None) {
@@ -44,7 +45,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
                 requirements.usages != setOf(KeyUsage.SIGN, KeyUsage.VERIFY) ->
                 KeyUseAuthorizationUnsupportedReason.UnsupportedCombination
             isSimulator -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
-            else -> biometricAvailabilityFailure()
+            else -> biometricAvailabilityFailure(requirements.authorizationPolicy)
         }
         return failure?.let { KeyUseAuthorizationSupport.Unsupported(it) }
             ?: requirements.authorizationPolicy.supportedOnIos()
@@ -54,9 +55,10 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         signumProvider.generate(
             GenerateManagedKeyRequest(
                 id = request.id,
+                metadata = mapOf("wallet.nativeAlias" to request.nativeAlias),
                 spec = request.requirements.spec,
                 usages = request.requirements.usages,
-                providerOptions = SignumKeyOptions(policy = request.toSignumPolicy()).encode(),
+                providerOptions = SignumKeyOptions(alias = request.nativeAlias, policy = request.toSignumPolicy()).encode(),
             )
         ).withWalletAuthorizationMapping(request.requirements.authorizationPolicy)
     } catch (cause: Throwable) {
@@ -71,6 +73,19 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
             policyMismatchFailure = KeyUseAuthorizationFailure.UnsupportedCombination,
         ) ?: cause
     }
+
+    override fun supportsPrivateKeyImport(requirements: WalletKeyRequirements): Boolean =
+        backend.supportsImport(requirements.spec, requirements.usages, requirements.nativePolicy())
+
+    override suspend fun importManagedKey(request: WalletKeyCreationRequest,
+        material: id.walt.crypto2.keys.EncodedKey.Jwk): ManagedKey =
+        signumProvider.importPrivateKey(GenerateManagedKeyRequest(
+            id = request.id, metadata = mapOf("wallet.nativeAlias" to request.nativeAlias), spec = request.requirements.spec, usages = request.requirements.usages,
+            providerOptions = SignumKeyOptions(alias = request.nativeAlias, policy = request.toSignumPolicy()).encode(),
+        ), material).withWalletAuthorizationMapping(request.requirements.authorizationPolicy)
+
+    override suspend fun keyFacts(stored: StoredKey.Managed): PlatformKeyFacts =
+        signumProvider.restoreSignumKey(stored).let { PlatformKeyFacts(it.origin, it.securityLevel, it.protectionLevel, it.attestation) }
 
     override fun keyUseAuthorizationPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy = try {
         signumProvider.storedPolicy(stored).toWalletPolicy(stored)
@@ -92,22 +107,34 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         }
     }
 
+    override suspend fun deleteUncommittedKey(request: WalletKeyCreationRequest, imported: Boolean) {
+        if (imported) backend.deleteImportedKey(request.nativeAlias, request.toSignumPolicy())
+        else backend.delete(request.nativeAlias, request.toSignumPolicy())
+    }
+
     override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
         try {
-            signumProvider.delete(stored, expectedAlias = stored.id.value)
+            signumProvider.delete(stored, expectedAlias = stored.metadata["wallet.nativeAlias"] ?: stored.id.value)
         } catch (cause: Throwable) {
             throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
         }
     }
 
+    private fun WalletKeyRequirements.nativePolicy(prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt()): SignumKeyPolicy =
+        toSignumPolicy(prompt).let { policy ->
+            if (authorizationPolicy.requiresNativeControls && platform == id.walt.crypto2.signum.SignumPlatformPolicy.Default)
+                policy.copy(platform = id.walt.crypto2.signum.SignumPlatformPolicy.IosKeychain()) else policy
+        }
+
     private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy =
-        requirements.authorizationPolicy.toSignumPolicy(prompt)
+        requirements.nativePolicy(prompt)
 
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
-    private fun biometricAvailabilityFailure(): KeyUseAuthorizationUnsupportedReason? = memScoped {
+    private fun biometricAvailabilityFailure(policy: KeyUseAuthorizationPolicy): KeyUseAuthorizationUnsupportedReason? = memScoped {
         val error = alloc<ObjCObjectVar<platform.Foundation.NSError?>>()
         val available = LAContext().canEvaluatePolicy(
-            LAPolicyDeviceOwnerAuthenticationWithBiometrics,
+            if (policy is KeyUseAuthorizationPolicy.DeviceCredential || policy is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential)
+                platform.LocalAuthentication.LAPolicyDeviceOwnerAuthentication else LAPolicyDeviceOwnerAuthenticationWithBiometrics,
             error.ptr,
         )
         if (available) return@memScoped null
@@ -123,12 +150,12 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
 private fun KeyUseAuthorizationPolicy.supportedOnIos(): KeyUseAuthorizationSupport.Supported =
     KeyUseAuthorizationSupport.Supported(
         effectivePolicy = this,
-        reuseEnforcement = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
+        reuseEnforcement = if (this.reuseSeconds > 0) {
             KeyUseAuthorizationReuseEnforcement.ProviderProcess
         } else {
             null
         },
-        timeoutValidation = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
+        timeoutValidation = if (this.reuseSeconds > 0) {
             KeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly
         } else {
             null

@@ -3,12 +3,8 @@ import Foundation
 @available(macOS 10.15, *)
 protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
+    var identityCore: any WalletIdentityCore { get }
 
-    func bootstrap(
-        keyType: WalletKeyType,
-        didMethod: String,
-        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
-    ) async throws -> WalletBootstrapResult
     func keyUseAuthorizationPreflight(
         keyType: WalletKeyType,
         policy: WalletKeyUseAuthorizationPolicy
@@ -77,13 +73,7 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         }
     }
 
-    func bootstrap(
-        keyType: WalletKeyType,
-        didMethod: String,
-        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
-    ) async throws -> WalletBootstrapResult {
-        throw unavailableError()
-    }
+
 
     func keyUseAuthorizationPreflight(
         keyType: WalletKeyType,
@@ -199,4 +189,9 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     private func unavailableError() -> WalletError {
         .internalFailure("WalletCore is only available when the iOS XCFramework is linked.")
     }
+}
+
+@available(macOS 10.15, *)
+extension WalletCoreBridge {
+    var identityCore: any WalletIdentityCore { UnavailableWalletIdentityCore() }
 }

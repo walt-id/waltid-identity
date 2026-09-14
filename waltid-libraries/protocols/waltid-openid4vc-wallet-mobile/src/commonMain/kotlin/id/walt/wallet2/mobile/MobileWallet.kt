@@ -12,8 +12,6 @@ import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
-import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.data.Wallet
@@ -85,7 +83,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-private object MobileDidSupport {
+internal object MobileDidSupport {
     private val initializationMutex = Mutex()
     private var initialized = false
 
@@ -96,23 +94,6 @@ private object MobileDidSupport {
         }
     }
 }
-
-/**
- * Result returned after a mobile wallet has been initialized with signing material and a DID.
- *
- * @property keyId Identifier of the persisted signing key used by the wallet.
- * @property did Decentralized identifier registered for the persisted key.
- * @property keyUseAuthorizationPolicy Immutable authorization policy of the persisted signing key.
- */
-public data class MobileWalletBootstrapResult(
-    public val keyId: String,
-    public val did: String,
-    /**
-     * Public JWK of [keyId] as a JSON object string. Private material is never included.
-     */
-    public val publicJwk: String,
-    public val keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
-)
 
 /**
  * Credential entry suitable for mobile UI lists and detail display.
@@ -216,10 +197,8 @@ public class MobileWallet internal constructor(
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
-    private val generateAndPersistKey: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> Key,
     private val runKeyUseAuthorizationPreflight: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> KeyUseAuthorizationSupport =
         { _, _ -> error("This MobileWallet does not support key-use authorization preflight") },
-    private val didService: Crypto2DidService = Crypto2DidService,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
     attestationConfig: WalletAttestationConfig? = null,
@@ -238,6 +217,7 @@ public class MobileWallet internal constructor(
     private val proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
+    private val identityService: id.walt.wallet2.mobile.identity.WalletIdentities? = null,
 ) {
     private val eventStream = MobileWalletEventStream()
     /**
@@ -303,50 +283,10 @@ public class MobileWallet internal constructor(
         httpClient = issuanceHttpClient,
     )
 
-    /**
-     * Initializes the wallet by creating or reusing wallet signing key material and a DID.
-     *
-     * If the wallet already contains persisted DIDs, the first persisted DID and key are reused.
-     *
-     * @param keyType Optional key type override. When omitted, [MobileWalletConfig.defaultKeyType] is used.
-     * @param didMethod DID method used for registering a new DID. The default `key` method is handled locally.
-     * @return The key identifier and DID used by this wallet.
-     * @throws IllegalArgumentException When persisted DID state exists without a persisted key.
-     */
-    public suspend fun bootstrap(
-        keyType: MobileWalletKeyType? = null,
-        didMethod: String = "key",
-        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy? = null,
-    ): MobileWalletBootstrapResult {
-        MobileDidSupport.ensureInitialized()
-        val existingDids = didStore.listDids().toList()
-        if (existingDids.isNotEmpty()) {
-            val existingKeys = keyStore.listKeys().toList()
-            require(existingKeys.isNotEmpty()) {
-                "Wallet '${wallet.id}' has persisted DIDs but no persisted keys"
-            }
-            val existingKey = existingKeys.first()
-            // Force platform key resolution before a provider extension offers a credential.
-            val keyAvailable = keyStore.getCrypto2Key(existingKey.keyId) != null
-            require(keyAvailable) {
-                "Wallet '${wallet.id}' persisted key '${existingKey.keyId}' is unavailable"
-            }
-            syncDigitalCredentialRegistration()
-            return MobileWalletBootstrapResult(
-                keyId = existingKey.keyId,
-                did = existingDids.first().did,
-                publicJwk = publicJwkJson(existingKey.keyId),
-                keyUseAuthorizationPolicy = requireNotNull(
-                    keyStore.keyUseAuthorizationPolicy(existingKey.keyId),
-                ) { "Wallet '${wallet.id}' persisted key '${existingKey.keyId}' has no authorization policy" },
-            )
-        }
+    /** Signing identity creation, backup and restoration; recovery integrations are explicitly configured. */
+    public val identities: id.walt.wallet2.mobile.identity.WalletIdentities
+        get() = checkNotNull(identityService) { "Identity lifecycle requires the persistent mobile wallet factory" }
 
-        val effectiveKeyType = keyType ?: defaultKeyType
-        val effectivePolicy = keyUseAuthorizationPolicy ?: defaultKeyUseAuthorizationPolicy
-        return createKeyAndDid(effectiveKeyType, didMethod, effectivePolicy)
-            .also { syncDigitalCredentialRegistration() }
-    }
 
     /** Checks whether a key-use authorization request is supported without creating or persisting a key. */
     public suspend fun keyUseAuthorizationPreflight(
@@ -354,57 +294,6 @@ public class MobileWallet internal constructor(
         keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
     ): KeyUseAuthorizationSupport = runKeyUseAuthorizationPreflight(keyType, keyUseAuthorizationPolicy)
 
-    private suspend fun createKeyAndDid(
-        keyType: MobileWalletKeyType,
-        didMethod: String,
-        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
-    ): MobileWalletBootstrapResult {
-        val normalizedMethod = didMethod.lowercase()
-        val options = when (normalizedMethod) {
-            "key" -> DidKeyCreateOptions()
-            "jwk" -> DidJwkCreateOptions()
-            else -> throw IllegalArgumentException("Mobile bootstrap supports only did:key and did:jwk")
-        }
-        val key = generateAndPersistKey(keyType, keyUseAuthorizationPolicy)
-        try {
-            val didResult = didService.registerByKey(normalizedMethod, key, options)
-            didStore.addDid(
-                WalletDidEntry(
-                    did = didResult.did,
-                    document = didResult.didDocument.toJsonObject(),
-                )
-            )
-            return MobileWalletBootstrapResult(
-                keyId = key.id.value,
-                did = didResult.did,
-                publicJwk = publicJwkJson(key),
-                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
-            )
-        } catch (cause: Throwable) {
-            try {
-                withContext(NonCancellable) {
-                    check(keyStore.removeKey(key.id.value)) { "Failed to remove signing key after DID bootstrap failure" }
-                }
-            } catch (cleanupFailure: Throwable) {
-                cause.addSuppressed(cleanupFailure)
-            }
-            throw cause
-        }
-    }
-
-    private suspend fun publicJwkJson(keyId: String): String {
-        val key = requireNotNull(keyStore.getCrypto2Key(keyId)) {
-            "Wallet '${wallet.id}' persisted key '$keyId' is unavailable"
-        }
-        return publicJwkJson(key)
-    }
-
-    private suspend fun publicJwkJson(key: Key): String {
-        val encoded = requireNotNull(key.capabilities.publicKeyExporter) {
-            "Wallet key '${key.id.value}' does not export public material"
-        }.exportPublicKey().toPublicJwk(key.spec)
-        return encoded.data.toByteArray().decodeToString()
-    }
 
     /**
      * Resolves an offer and starts a bound OpenID4VCI 1.0 issuance session.
@@ -499,9 +388,12 @@ public class MobileWallet internal constructor(
         keyId: String? = null,
         did: String? = null,
     ): WalletIssuanceSessionRequest {
-        val selectedKeyId = keyId ?: keyStore.listKeys().toList().firstOrNull()?.keyId
+        val active = if (keyId == null || did == null) identityService?.state() else null
+        val identity = (active as? id.walt.wallet2.mobile.identity.WalletIdentityState.Active)?.identity
+        check(identityService == null || active == null || identity != null) { "The wallet requires an active signing identity" }
+        val selectedKeyId = keyId ?: identity?.keyId ?: keyStore.getDefaultKeyMaterial()?.keyId
             ?: error("No holder key is available for credential issuance")
-        val selectedDid = did ?: didStore.listDids().toList().firstOrNull()?.did
+        val selectedDid = did ?: identity?.did ?: didStore.getDefaultDid()
         return when (offer) {
             is MobileWalletCredentialOffer.Uri -> WalletIssuanceSessionRequest(
                 offerUrl = Url(offer.value.trim()),

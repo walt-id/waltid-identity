@@ -6,7 +6,11 @@ struct HomeView: View {
     @State private var selectedCredentialDetailsID: String?
 
     var body: some View {
-        walletTabs
+        Group {
+            if !viewModel.isReady, let model = viewModel.identityScreen {
+                WalletIdentityView(model: model)
+            } else { walletTabs }
+        }
     }
 
     private var walletTabs: some View {

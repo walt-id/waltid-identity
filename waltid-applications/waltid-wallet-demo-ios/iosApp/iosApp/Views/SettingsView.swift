@@ -17,6 +17,11 @@ struct SettingsView: View {
                     .font(.headline)
                     .accessibilityIdentifier(WalletAccessibilityID.settingsAppTitle)
             }
+            if let model = viewModel.identityScreen {
+                Section("Signing identity") {
+                    NavigationLink("Protection and recovery") { WalletIdentityView(model: model) }
+                }
+            }
             Section("Wallet DID") {
                 Text(viewModel.did.isEmpty ? "Not available" : viewModel.did)
                     .font(.footnote)

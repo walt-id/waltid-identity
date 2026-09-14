@@ -13,6 +13,7 @@ data class SignumKeyPolicy(
     val keyAgreement: Boolean = false,
     /** Requests attestation evidence in addition to any hardware backing requirement. */
     val attestationChallenge: BinaryData? = null,
+    val platform: SignumPlatformPolicy = SignumPlatformPolicy.Default,
 ) {
     init {
         require(attestationChallenge == null || hardware != SignumHardwarePolicy.DISCOURAGED) {
@@ -97,3 +98,11 @@ internal fun SignumKeyPolicy.effectiveProtection(attestation: SignumKeyAttestati
     hardware == SignumHardwarePolicy.DISCOURAGED -> SignumProtectionLevel.SOFTWARE
     else -> SignumProtectionLevel.UNKNOWN
 }
+
+/** Where the private signing material originated. */
+@Serializable
+enum class SignumKeyOrigin { GENERATED, IMPORTED, UNKNOWN }
+
+/** Native security level, not a certification or issuer assurance rating. */
+@Serializable
+enum class SignumSecurityLevel { SOFTWARE, TRUSTED_ENVIRONMENT, STRONGBOX, SECURE_ENCLAVE, UNKNOWN }

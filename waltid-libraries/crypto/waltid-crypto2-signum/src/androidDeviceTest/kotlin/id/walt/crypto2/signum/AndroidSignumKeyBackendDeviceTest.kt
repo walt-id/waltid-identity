@@ -5,6 +5,12 @@ import kotlin.test.Test
 
 class AndroidSignumKeyBackendDeviceTest {
     @Test
+    fun importedP256RetainsOriginalKeyAfterDeletionAndReimport() = runTest {
+        exerciseNativePrivateImport(AndroidSignumKeyBackend(), SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED,
+            platform = SignumPlatformPolicy.AndroidKeystore(strongBox = SignumHardwarePolicy.DISCOURAGED)))
+    }
+
+    @Test
     fun platformKeySurvivesProviderRestart() = runTest {
         exercisePlatformSignumBackend(AndroidSignumKeyBackend(), AndroidSignumKeyBackend())
     }

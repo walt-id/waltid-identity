@@ -579,7 +579,7 @@ private actor TransactionCodeWalletClient: WalletClient {
 
     private(set) var bootstrapCalls = 0
 
-    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletBootstrapResult {
+    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult {
         bootstrapCalls += 1
         bootstrappedSigningProtections.append(signingProtection)
         if shouldFailNextBootstrap {
@@ -588,7 +588,7 @@ private actor TransactionCodeWalletClient: WalletClient {
         }
         let reportedSigningProtection = nextReportedSigningProtection ?? signingProtection
         nextReportedSigningProtection = nil
-        return WalletBootstrapResult(
+        return WalletDemoBootstrapResult(
             keyID: "key-1",
             did: "did:key:test",
             publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#,

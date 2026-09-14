@@ -4,8 +4,10 @@ import Foundation
 public struct WalletConfiguration: Sendable {
     /// Stable local wallet identifier used by the underlying wallet store.
     public var walletID: String
+    /// Signing identity lifecycle and opt-in recovery integrations.
+    public var identity: WalletIdentityConfiguration
 
-    /// Default key type used when bootstrapping a new wallet DID.
+    /// Default algorithm for standalone key-authorization preflight. Identity creation uses P-256.
     public var defaultKeyType: WalletKeyType
 
     /// Default authorization policy for newly created wallet signing keys.
@@ -40,8 +42,7 @@ public struct WalletConfiguration: Sendable {
     /// - Parameters:
     ///   - walletID: Stable local wallet identifier used for database naming
     ///     and persisted wallet state.
-    ///   - defaultKeyType: Key type used by ``Wallet/bootstrap(keyType:didMethod:)``
-    ///     when no operation-specific override is supplied.
+    ///   - defaultKeyType: Default algorithm for standalone key-authorization preflight; identity creation uses P-256.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
     ///   - clientIDTrustConfiguration: Trust anchors used to authenticate verifier
@@ -59,6 +60,7 @@ public struct WalletConfiguration: Sendable {
     ///   - defaultKeyUseAuthorizationPolicy: Default authorization policy for newly
     ///     created wallet signing keys.
     ///   - keyUseAuthorizationPrompt: Prompt text used for protected signing operations.
+    ///   - identity: Signing identity constraints and optional recovery providers.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
@@ -70,9 +72,11 @@ public struct WalletConfiguration: Sendable {
         preferredLocales: [String] = Locale.preferredLanguages,
         crossProcessAccess: WalletCrossProcessAccess? = nil,
         defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .biometricCurrentSet,
-        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init()
+        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init(),
+        identity: WalletIdentityConfiguration = .init()
     ) {
         self.walletID = walletID
+        self.identity = identity
         self.defaultKeyType = defaultKeyType
         self.defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy
         self.keyUseAuthorizationPrompt = keyUseAuthorizationPrompt
@@ -113,6 +117,12 @@ public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
 
     /// Strong biometric authentication for every operation; new biometric enrollment invalidates the key.
     case biometricCurrentSet
+    /// Accepts newly enrolled strong biometrics without invalidating the key.
+    case biometricAny
+    /// Uses the device credential; zero means authorization for each use.
+    case deviceCredential(timeoutSeconds: Int)
+    /// Accepts either a strong biometric or the device credential.
+    case biometricOrDeviceCredential(timeoutSeconds: Int)
 
     ///
     /// Strong biometric authentication reusable for a fixed, non-sliding interval after authorization.
@@ -704,39 +714,7 @@ public struct Credential: Equatable, Identifiable, Sendable {
     }
 }
 
-/// Result of bootstrapping wallet key material and DID state.
-public struct WalletBootstrapResult: Equatable, Sendable {
-    /// Identifier of the created or selected wallet key.
-    public let keyID: String
 
-    /// DID created for the wallet.
-    public let did: String
-
-    /// Public JWK of ``keyID`` as a JSON object string. Private material is never included.
-    public let publicJWK: String
-
-    /// Immutable authorization policy of the persisted signing key.
-    public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
-
-    /// Creates a bootstrap result.
-    ///
-    /// - Parameters:
-    ///   - keyID: Identifier of the created or selected wallet key.
-    ///   - did: DID created for the wallet.
-    ///   - publicJWK: Public JWK of the wallet key as a JSON object string.
-    ///   - keyUseAuthorizationPolicy: Authorization required for private-key use.
-    public init(
-        keyID: String,
-        did: String,
-        publicJWK: String,
-        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
-    ) {
-        self.keyID = keyID
-        self.did = did
-        self.publicJWK = publicJWK
-        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
-    }
-}
 
 /// Input used to start either OpenID4VCI issuance grant.
 public struct IssuanceRequest: Equatable, Sendable {

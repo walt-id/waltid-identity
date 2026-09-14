@@ -58,6 +58,11 @@ suspend fun createAndroidDemoMobileWallet(
         ).create(
             MobileWalletConfig(
                 walletId = config.walletId,
+                identity = id.walt.wallet2.mobile.identity.IdentityConfiguration(
+                    recoveryProviders = listOf(id.walt.wallet2.recovery.blockstore.BlockStoreIdentityRecovery(context, "wallet-demo")),
+                    alternativeAuthorizations = if (config.signingProtectionMode.allows(WalletDemoSigningProtection.None))
+                        listOf(KeyUseAuthorizationPolicy.None) else emptyList(),
+                ),
                 attestationConfig = config.toWalletAttestationConfig(),
                 transactionDataProfiles = transactionDataProfiles.profiles,
                 preferredLocales = LocaleList.getDefault().let { locales ->

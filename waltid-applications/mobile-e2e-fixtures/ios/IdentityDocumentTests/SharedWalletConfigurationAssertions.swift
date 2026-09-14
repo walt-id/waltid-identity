@@ -100,7 +100,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
     // assertions cover shared-storage wiring; protected extension signing remains device coverage.
     hostConfiguration.defaultKeyUseAuthorizationPolicy = .none
     let hostWallet = try await Wallet(configuration: hostConfiguration)
-    let hostBootstrap = try await hostWallet.bootstrap()
+    let hostBootstrap = try await initializeIdentity(hostWallet)
     let hostCredentials = try await hostWallet.credentials()
 
     // `providerWallet(walletID:)` is the extension's own entry point, and does not bootstrap.
@@ -115,7 +115,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
     )
 
     // Asserted on the Keychain item rather than through a wallet API, because the only wallet API that
-    // forces key resolution is `bootstrap()`, which writes.
+    // forces key resolution is `identities.initialize()`, which writes.
     try assertSigningKeyIsUsableFromSharedAccessGroup(
         keyID: hostBootstrap.keyID,
         expectedAccessGroup: keychainAccessGroup,
@@ -123,11 +123,11 @@ public func assertWalletReopensSharedStateAndSigningKey(
         line: line
     )
 
-    // On a wallet that already has a DID, `bootstrap()` creates nothing and fails if the platform cannot
+    // On a wallet that already has a DID, `identities.initialize()` creates nothing and fails if the platform cannot
     // load the persisted key. Run on a throwaway instance rather than on `providerWallet`, which must
     // stay un-bootstrapped for the assertions above to mean anything.
     let bootstrapProbeWallet = try await Wallet(configuration: hostConfiguration)
-    let probedResolution = try await bootstrapProbeWallet.bootstrap()
+    let probedResolution = try await initializeIdentity(bootstrapProbeWallet)
     XCTAssertEqual(
         probedResolution.keyID,
         hostBootstrap.keyID,
@@ -171,7 +171,7 @@ public func assertProviderResolvesThePublishedWalletID(
     // This assertion covers publishing the selected wallet identifier, not biometric enforcement.
     hostConfiguration.defaultKeyUseAuthorizationPolicy = .none
     let hostWallet = try await Wallet(configuration: hostConfiguration)
-    _ = try await hostWallet.bootstrap()
+    _ = try await initializeIdentity(hostWallet)
 
     XCTAssertEqual(
         try namespace.activeWalletID(),
@@ -254,4 +254,11 @@ private func assertSigningKeyIsUsableFromSharedAccessGroup(
         file: file,
         line: line
     )
+}
+
+private func initializeIdentity(_ wallet: Wallet) async throws -> WalletIdentity {
+    guard case .active(let identity) = try await wallet.identities.initialize() else {
+        throw WalletError.invalidInput("Expected an active test identity")
+    }
+    return identity
 }

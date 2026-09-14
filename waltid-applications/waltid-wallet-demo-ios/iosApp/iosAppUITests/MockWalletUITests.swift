@@ -1047,3 +1047,29 @@ final class MockWalletUITests: XCTestCase {
         )
     }
 }
+
+@MainActor
+final class WalletIdentitySetupUITests: XCTestCase {
+    func testNativeIdentitySetupAndProtectionDetails() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(initializeIdentity: false)
+        let create = app.buttons["Create with ordinary Keychain"].firstMatch
+        XCTAssertTrue(create.waitForExistence(timeout: 20))
+        let setup = XCTAttachment(screenshot: app.screenshot())
+        setup.name = "wal749-native-ios-identity-setup"
+        setup.lifetime = .keepAlways
+        add(setup)
+        create.tap()
+        XCTAssertTrue(app.buttons["wallet.settingsButton"].waitForExistence(timeout: 20))
+        app.buttons["wallet.settingsButton"].tap()
+        let details = app.buttons["Protection and recovery"]
+        XCTAssertTrue(details.waitForExistence(timeout: 10))
+        details.tap()
+        XCTAssertTrue(app.staticTexts["No recovery backup submitted."].waitForExistence(timeout: 10))
+        let active = XCTAttachment(screenshot: app.screenshot())
+        active.name = "wal749-native-ios-identity-details"
+        active.lifetime = .keepAlways
+        add(active)
+    }
+}

@@ -25,11 +25,14 @@ import id.walt.crypto2.keys.ProviderId
  */
 public class AndroidSignumKeyBackend(
     private val interactionContextProvider: () -> FragmentActivity? = { null },
-) : SignumPlatformBackend {
+) : SignumPlatformBackend, SignumPrivateKeyImportBackend {
     override val id = ProviderId("android-keystore-signum")
 
     override fun supports(spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): Boolean =
-        spec.isSupportedSignumSpec() &&
+        policy.supportsAndroidSettings(importing = false) &&
+            (policy.platform !is SignumPlatformPolicy.AndroidKeystore ||
+                (spec == KeySpec.Ec(EcCurve.P256) && !policy.keyAgreement)) &&
+            spec.isSupportedSignumSpec() &&
             usages.all { it == KeyUsage.SIGN || it == KeyUsage.VERIFY || it == KeyUsage.KEY_AGREEMENT } &&
             (KeyUsage.KEY_AGREEMENT !in usages || spec is KeySpec.Ec) &&
             (KeyUsage.KEY_AGREEMENT in usages) == policy.keyAgreement
@@ -41,7 +44,10 @@ public class AndroidSignumKeyBackend(
         policy: SignumKeyPolicy,
     ): SignumPlatformKey {
         require(supports(spec, usages, policy)) { "Android Signum backend does not support the requested key and policy" }
-        val signer = AndroidKeyStoreProvider.createSigningKey(alias) {
+        val signer = if (policy.platform is SignumPlatformPolicy.AndroidKeystore) {
+            generateAndroidP256Key(alias, policy)
+            AndroidKeyStoreProvider.getSignerForKey(alias).getOrThrow()
+        } else AndroidKeyStoreProvider.createSigningKey(alias) {
             configureSignumKey(spec, usages, policy)
         }.getOrThrow()
         try {
@@ -56,6 +62,31 @@ public class AndroidSignumKeyBackend(
         }
         return handle(alias, spec, usages, policy, signer)
     }
+
+    override fun supportsImport(spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): Boolean =
+        spec == KeySpec.Ec(EcCurve.P256) && usages == setOf(KeyUsage.SIGN, KeyUsage.VERIFY) &&
+            !policy.keyAgreement && policy.supportsAndroidSettings(importing = true)
+
+    override suspend fun importPrivateKey(alias: String, material: id.walt.crypto2.keys.EncodedKey.Jwk,
+        spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): SignumPlatformKey {
+        require(supportsImport(spec, usages, policy)) { "Unsupported Android private-key import policy" }
+        importAndroidPrivateKey(alias, material, spec, policy)
+        try { return requireNotNull(loadImportedKey(alias, spec, usages, policy)) }
+        catch (cause: Throwable) {
+            try { deleteImportedKey(alias, policy) } catch (cleanup: Throwable) { cause.addSuppressed(cleanup) }
+            throw cause
+        }
+    }
+
+    override suspend fun loadImportedKey(alias: String, spec: KeySpec, usages: Set<KeyUsage>,
+        policy: SignumKeyPolicy): SignumPlatformKey? {
+        require(supportsImport(spec, usages, policy)) { "Unsupported Android private-key import policy" }
+        return load(alias, spec, usages, policy)?.also {
+            require(it.origin == SignumKeyOrigin.IMPORTED) { "Expected an imported Android key" }
+        }
+    }
+
+    override suspend fun deleteImportedKey(alias: String, policy: SignumKeyPolicy) = delete(alias)
 
     override suspend fun load(
         alias: String,
@@ -89,27 +120,22 @@ public class AndroidSignumKeyBackend(
         return SignumPlatformKeyHandle(
             alias = alias,
             spec = spec,
-            // REQUIRED has already been independently checked against KeyInfo above; only then may the
-            // backend report the observed hardware level. Other policies remain attestation-derived.
-            protectionLevel = if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
-                SignumProtectionLevel.HARDWARE
-            } else policy.effectiveProtection(attestation),
+            protectionLevel = signer.observedProtection(),
             attestation = attestation,
             authentication = policy.authentication,
             signerFor = { algorithm: SignatureAlgorithm ->
                 val interactionContext = when {
-                    policy.authentication.isBiometricCurrentSetEveryUse() -> requireInteractionContext(alias)
-                    policy.authentication.isBiometricTimedReuse() -> availableInteractionContext()
+                    (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.timeoutSeconds == 0 -> requireInteractionContext(alias)
+                    policy.authentication is SignumAuthenticationPolicy.UserPresence -> availableInteractionContext()
                     else -> null
                 }
                 AndroidKeyStoreProvider.getSignerForKey(alias) {
                     configureSignumOperation(algorithm, policy.authentication)
                     if (interactionContext != null) {
                         unlockPrompt {
-                            if (policy.authentication.isBiometricCurrentSetEveryUse() ||
-                                policy.authentication.isBiometricTimedReuse()
-                            ) {
-                                allowedAuthenticators = BIOMETRIC_STRONG
+                            (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
+                                allowedAuthenticators = (if (auth.biometric) BIOMETRIC_STRONG else 0) or
+                                    (if (auth.deviceCredential) androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL else 0)
                             }
                             activity = interactionContext
                         }
@@ -119,7 +145,7 @@ public class AndroidSignumKeyBackend(
                 }
             },
             operationFailureMapper = { failure ->
-                if (policy.authentication.isBiometricTimedReuse()) {
+                if ((policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.timeoutSeconds?.let { it > 0 } == true) {
                     failure.mapTimedReuseInteractionContextFailure(alias, availableInteractionContext() != null)
                 } else {
                     failure
@@ -127,7 +153,14 @@ public class AndroidSignumKeyBackend(
             },
             nativePublicKey = signer.publicKey,
             keyAgreementEnabled = KeyUsage.KEY_AGREEMENT in usages && policy.keyAgreement,
-        )
+        ).let { delegate -> object : SignumPlatformKey by delegate {
+            override val origin = when ((signer as? AndroidKeystoreSigner)?.keyInfo?.origin) {
+                KeyProperties.ORIGIN_IMPORTED -> SignumKeyOrigin.IMPORTED
+                KeyProperties.ORIGIN_GENERATED -> SignumKeyOrigin.GENERATED
+                else -> SignumKeyOrigin.UNKNOWN
+            }
+            override val securityLevel = signer.observedSecurityLevel()
+        } }
     }
 
     @Suppress("DEPRECATION") // Required as the pre-S fallback when KeyInfo.securityLevel is unavailable.
@@ -136,13 +169,37 @@ public class AndroidSignumKeyBackend(
         policy: SignumKeyPolicy,
         alias: String,
     ) {
-        if (policy.hardware != SignumHardwarePolicy.REQUIRED &&
-            !policy.authentication.isBiometricCurrentSetEveryUse() &&
-            !policy.authentication.isBiometricTimedReuse()
-        ) return
         val androidSigner = signer as? AndroidKeystoreSigner
             ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Android Keystore-backed")
         val info = androidSigner.keyInfo
+        val settings = policy.androidSettings()
+        if (policy.platform is SignumPlatformPolicy.AndroidKeystore) {
+            if (info.isUserConfirmationRequired != settings.userConfirmationRequired ||
+                info.isTrustedUserPresenceRequired != settings.userPresenceRequired ||
+                info.keyValidityStart?.time != settings.validFromEpochMillis ||
+                info.keyValidityForOriginationEnd?.time != settings.validUntilEpochMillis) {
+                throw SignumKeyPolicyMismatchException(alias, "native usage constraints differ from the policy")
+            }
+            if (Build.VERSION.SDK_INT >= 31 && settings.maxUsageCount != null &&
+                info.remainingUsageCount !in 0..settings.maxUsageCount) {
+                throw SignumKeyPolicyMismatchException(alias, "native usage limit was not observed")
+            }
+        }
+        if (policy.authentication == SignumAuthenticationPolicy.None && info.isUserAuthenticationRequired) {
+            throw SignumKeyPolicyMismatchException(alias, "native authorization was unexpectedly required")
+        }
+        if (settings.strongBox == SignumHardwarePolicy.REQUIRED &&
+            (Build.VERSION.SDK_INT < 31 || info.securityLevel != KeyProperties.SECURITY_LEVEL_STRONGBOX)) {
+            throw SignumKeyPolicyMismatchException(alias, "StrongBox could not be independently verified")
+        }
+        (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
+            val timeoutMatches = if (auth.timeoutSeconds == 0) info.userAuthenticationValidityDurationSeconds in setOf(-1, 0)
+                else info.userAuthenticationValidityDurationSeconds == auth.timeoutSeconds
+            if (!info.isUserAuthenticationRequired || info.userAuthenticationType != auth.androidAuthenticationTypes() || !timeoutMatches ||
+                (auth.biometric && !auth.deviceCredential && info.isInvalidatedByBiometricEnrollment != !auth.allowNewBiometrics)) {
+                throw SignumKeyPolicyMismatchException(alias, "native authentication factors differ from the policy")
+            }
+        }
         validateAndroidNativePolicy(
             alias = alias,
             policy = policy,
@@ -258,4 +315,22 @@ private fun KeySpec.isSupportedSignumSpec(): Boolean = when (this) {
     is KeySpec.Ec -> curve == EcCurve.P256 || curve == EcCurve.P384 || curve == EcCurve.P521
     is KeySpec.Rsa -> bits == 2048 || bits == 3072 || bits == 4096
     else -> false
+}
+
+@Suppress("DEPRECATION")
+private fun PlatformSigningProviderSigner<*, *>.observedProtection(): SignumProtectionLevel =
+    (this as? AndroidKeystoreSigner)?.keyInfo?.let {
+        if (it.isInsideSecureHardware) SignumProtectionLevel.HARDWARE else SignumProtectionLevel.SOFTWARE
+    } ?: SignumProtectionLevel.UNKNOWN
+
+@Suppress("DEPRECATION")
+private fun PlatformSigningProviderSigner<*, *>.observedSecurityLevel(): SignumSecurityLevel {
+    val info = (this as? AndroidKeystoreSigner)?.keyInfo ?: return SignumSecurityLevel.UNKNOWN
+    if (Build.VERSION.SDK_INT < 31) return if (info.isInsideSecureHardware) SignumSecurityLevel.UNKNOWN else SignumSecurityLevel.SOFTWARE
+    return when (info.securityLevel) {
+        KeyProperties.SECURITY_LEVEL_STRONGBOX -> SignumSecurityLevel.STRONGBOX
+        KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> SignumSecurityLevel.TRUSTED_ENVIRONMENT
+        KeyProperties.SECURITY_LEVEL_SOFTWARE -> SignumSecurityLevel.SOFTWARE
+        else -> SignumSecurityLevel.UNKNOWN
+    }
 }

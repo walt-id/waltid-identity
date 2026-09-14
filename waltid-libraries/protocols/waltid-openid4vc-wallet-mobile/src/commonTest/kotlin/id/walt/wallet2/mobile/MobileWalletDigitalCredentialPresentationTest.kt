@@ -612,7 +612,7 @@ class MobileWalletDigitalCredentialPresentationTest {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },
             credentialStore = credentialStore,
-            generateAndPersistKey = { _, _ -> error("Digital Credentials presentation must not bootstrap a key") },
+
             transactionDataProfiles = transactionDataProfiles,
             credentialRegistry = registry,
             registrationProjection = registrationProjection,

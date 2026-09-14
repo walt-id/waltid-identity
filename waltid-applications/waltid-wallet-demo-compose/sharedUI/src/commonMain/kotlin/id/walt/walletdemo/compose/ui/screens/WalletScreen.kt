@@ -26,6 +26,11 @@ internal fun WalletScreen(
     onResetWallet: () -> Unit = { controller.resetWallet() },
     onSignOut: (() -> Unit)? = null,
 ) {
+    val setup = state.session as? WalletSessionState.IdentitySetup
+    if (setup != null) {
+        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeIdentity, controller::cancelIdentity, controller::refreshIdentityChoices)
+        return
+    }
     val openAuthorizationRequest = rememberAuthorizationRequestOpener()
     var showingSettings by remember { mutableStateOf(false) }
     var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
@@ -45,6 +50,7 @@ internal fun WalletScreen(
                 controller::setProximityTransportProfile
             },
             onBack = { showingSettings = false },
+            onIdentityAction = controller::performIdentityAction,
             onLock = controller::lock,
             onResetWallet = onResetWallet,
             onSignOut = onSignOut,
@@ -65,7 +71,7 @@ internal fun WalletScreen(
             } else {
                 WalletHeader(
                     state = state,
-                    onSettings = { onOpenSettings(); showingSettings = true },
+                    onSettings = { onOpenSettings(); controller.refreshIdentityDetails(); showingSettings = true },
                     onDismissStatus = controller::dismissStatus,
                     onToggleStatusExpanded = controller::toggleStatusExpanded,
                 )

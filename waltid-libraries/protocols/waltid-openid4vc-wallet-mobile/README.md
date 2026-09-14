@@ -28,12 +28,21 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 ## Capabilities
 
-- Bootstrap a mobile wallet with platform-backed keys and DID material.
+- Create, select, back up and restore an explicitly bound signing key and DID.
 - Start and continue OpenID4VCI issuance sessions.
 - List credentials stored in mobile persistence.
 - Present credentials using OpenID4VP.
 - Present mdocs in person through a stateful ISO/IEC 18013-5 proximity session.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
+
+## Signing identity and recovery
+
+Use `wallet.identities.initialize()` for the default P-256 / `did:jwk` identity,
+or request SDK-issued creation and restoration options for explicit configuration.
+Recovery providers are optional dependencies and registrations. The base SDK enables no backup.
+
+See the [identity lifecycle guide](docs/identity-recovery.md) for the platform matrix, configuration,
+recovery limitations and standards boundaries, and the [versioned recovery format](docs/identity-recovery-format.md).
 
 ## Key-use authorization
 
@@ -41,8 +50,8 @@ New wallet keys default to `BiometricCurrentSet`; callers that need unprotected
 signing must explicitly select `KeyUseAuthorizationPolicy.None`. The protected
 policy is P-256 only, requires a current resumed Android `FragmentActivity` for
 each signing prompt, rejects device-credential fallback, and invalidates the key
-when the biometric enrollment set changes. iOS protected keys require a physical
-Secure Enclave device and an `NSFaceIDUsageDescription` host-app entry.
+when the biometric enrollment set changes. iOS biometric signing requires an `NSFaceIDUsageDescription` host-app entry. Hardware signing
+requires a physical Secure Enclave device; recoverable identities use ordinary Keychain signing.
 
 The policy is chosen only while creating a new key. Restored keys retain their
 persisted policy; changing the default never weakens or recreates an existing key.

@@ -35,6 +35,12 @@ fun createIosDemoWallet(
             MobileWalletFactory(nfcHostPlatformAdapter).create(
                 MobileWalletConfig(
                     walletId = config.walletId,
+                    identity = id.walt.wallet2.mobile.identity.IdentityConfiguration(
+                        recoveryProviders = listOf(id.walt.wallet2.recovery.keychain.KeychainIdentityRecovery("wallet-demo", crossProcessAccess.keychainAccessGroup)),
+                        alternativeAuthorizations = if (config.signingProtectionMode.allows(WalletDemoSigningProtection.None))
+                        listOf(KeyUseAuthorizationPolicy.None) else emptyList(),
+                        platform = id.walt.crypto2.signum.SignumPlatformPolicy.IosKeychain(accessGroup = crossProcessAccess.keychainAccessGroup),
+                    ),
                     attestationConfig = config.toWalletAttestationConfig(),
                     transactionDataProfiles = transactionDataProfiles.profiles,
                     preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },

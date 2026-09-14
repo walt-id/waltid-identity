@@ -1504,6 +1504,46 @@ class WalletDemoController(
         }
     }
 
+    fun refreshIdentityDetails() {
+        if (_state.value.identityBusy) return
+        scope.launch(dispatcher) {
+            try { val details = wallet.identityDetails(); _state.update { it.copy(identityDetails = details) } }
+            catch (cause: kotlinx.coroutines.CancellationException) { throw cause }
+            catch (cause: Exception) { _state.update { it.copy(warning = WalletDisplayText.failure("Identity details unavailable", cause)) } }
+        }
+    }
+
+    fun performIdentityAction(choiceId: String) {
+        if (_state.value.identityBusy || _state.value.session !is WalletSessionState.Ready) return
+        _state.update { it.copy(identityBusy = true) }
+        scope.launch(dispatcher) {
+            try {
+                wallet.chooseIdentity(choiceId)
+                val details = wallet.identityDetails()
+                _state.update { it.copy(identityDetails = details) }
+            } catch (cause: kotlinx.coroutines.CancellationException) { throw cause }
+            catch (cause: Exception) { _state.update { it.copy(warning = WalletDisplayText.failure("Recovery operation failed", cause)) } }
+            finally { _state.update { it.copy(identityBusy = false) } }
+        }
+    }
+
+    fun chooseIdentity(choiceId: String) = runIdentityChoice { wallet.chooseIdentity(choiceId) }
+    fun cancelIdentity(identityId: String) = runIdentityChoice { wallet.cancelIdentity(identityId) }
+    fun resumeIdentity(identityId: String) = runIdentityChoice { wallet.resumeIdentity(identityId) }
+    fun refreshIdentityChoices() { bootstrapIfNeeded() }
+
+    private fun runIdentityChoice(action: suspend () -> Unit) {
+        if (_state.value.session !is WalletSessionState.IdentitySetup) return
+        _state.update { it.copy(session = WalletSessionState.Bootstrapping) }
+        scope.launch(dispatcher) {
+            try { action() }
+            catch (cause: kotlinx.coroutines.CancellationException) { throw cause }
+            catch (cause: Exception) { _state.update { it.copy(warning = WalletDisplayText.failure("Identity setup failed", cause)) } }
+            _state.update { it.copy(session = WalletSessionState.NotBootstrapped) }
+            bootstrapIfNeeded()
+        }
+    }
+
     private fun bootstrapIfNeeded() {
         if (_state.value.session is WalletSessionState.Ready ||
             _state.value.session is WalletSessionState.Bootstrapping
@@ -1517,6 +1557,15 @@ class WalletDemoController(
                     session = WalletSessionState.Bootstrapping,
                     operation = WalletOperationState.Idle,
                 )
+            }
+            val setup = runCatching { wallet.identitySetup() }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                _state.update { it.copy(session = WalletSessionState.Failed(WalletDisplayText.failure("Identity setup failed", error))) }
+                return@launch
+            }
+            if (setup != null) {
+                _state.update { it.copy(session = WalletSessionState.IdentitySetup(setup)) }
+                return@launch
             }
             runCatching {
                 val result = wallet.bootstrap(_state.value.selectedSigningProtection)

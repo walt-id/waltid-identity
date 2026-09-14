@@ -103,6 +103,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(identityLibs.cryptography.provider.optimal)
+            implementation(identityLibs.whyoleg.cryptography.random)
             api(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.coroutines.core)
         }

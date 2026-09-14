@@ -33,36 +33,15 @@ public actor Wallet {
         self.bridge = bridge
     }
 
+    /// Signing identity creation and recovery. Options are issued and validated by the shared core.
+    public var identities: WalletIdentityService { WalletIdentityService(core: bridge.identityCore) }
+
     /// Emits wallet issuance and presentation progress events.
     ///
     /// The stream is backed by the wallet core event flow. Iteration ends when
     /// the underlying flow completes or when the consuming task is cancelled.
     public var events: AsyncStream<WalletEvent> {
         bridge.events
-    }
-
-    /// Bootstraps wallet key material and DID state.
-    ///
-    /// - Parameters:
-    ///   - keyType: Optional key type override. When omitted, the wallet uses
-    ///     ``WalletConfiguration/defaultKeyType``.
-    ///   - didMethod: DID method to create for the bootstrapped wallet DID.
-    ///   - keyUseAuthorizationPolicy: Optional per-bootstrap authorization
-    ///     policy override. When omitted, the configured default is used.
-    /// - Returns: Persisted key and DID information for subsequent wallet
-    ///   operations.
-    /// - Throws: ``WalletError`` when key creation, DID creation, persistence,
-    ///   or bridge communication fails.
-    public func bootstrap(
-        keyType: WalletKeyType? = nil,
-        didMethod: String = "key",
-        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy? = nil
-    ) async throws -> WalletBootstrapResult {
-        try await bridge.bootstrap(
-            keyType: keyType ?? configuration.defaultKeyType,
-            didMethod: didMethod,
-            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy
-        )
     }
 
     /// Checks whether a key-use authorization request is supported without creating a key.

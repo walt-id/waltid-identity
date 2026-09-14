@@ -45,11 +45,14 @@ import platform.Security.kSecClassKey
 import platform.Security.kSecReturnRef
 import kotlin.coroutines.cancellation.CancellationException
 
-class IosSignumKeyBackend : SignumPlatformBackend {
+class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend {
     override val id = ProviderId("ios-keychain-signum")
 
     override fun supports(spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): Boolean =
-        spec.isSupportedSignumSpec() &&
+        policy.platform !is SignumPlatformPolicy.AndroidKeystore &&
+            (policy.platform !is SignumPlatformPolicy.IosKeychain ||
+                (spec == KeySpec.Ec(EcCurve.P256) && IosNativeKeys.supports(policy, importing = false))) &&
+            spec.isSupportedSignumSpec() &&
             usages.all { it == KeyUsage.SIGN || it == KeyUsage.VERIFY || it == KeyUsage.KEY_AGREEMENT } &&
             (KeyUsage.KEY_AGREEMENT !in usages || spec is KeySpec.Ec) &&
             (KeyUsage.KEY_AGREEMENT in usages) == policy.keyAgreement &&
@@ -62,28 +65,10 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         policy: SignumKeyPolicy,
     ): SignumPlatformKey {
         require(supports(spec, usages, policy)) { "iOS Signum backend does not support the requested key and policy" }
-        val signer = try {
-            createSigner(alias, spec, usages, policy.withoutUnavailableSecureEnclave())
-        } catch (cause: CancellationException) {
-            throw cause
-        } catch (cause: Throwable) {
-            // Signum turns SignumHardwarePolicy.PREFERRED into kSecAttrTokenIDSecureEnclave with no fallback of its
-            // own, so SecKeyGeneratePair fails outright wherever no Secure Enclave exists or where it rejects the
-            // configuration. PREFERRED has to mean preferred, so fall back to the software keychain. REQUIRED and
-            // attested keys keep failing loudly, and the reported protection level stays UNKNOWN either way
-            // because without an attestation the backing cannot be proven (see effectiveProtection).
-            if (
-                policy.hardware != SignumHardwarePolicy.PREFERRED ||
-                policy.attestationChallenge != null
-            ) throw cause
-            // Best-effort cleanup of anything the failed attempt left behind; a failure here must not hide `cause`.
-            try {
-                delete(alias)
-            } catch (ignored: Throwable) {
-                cause.addSuppressed(ignored)
-            }
-            createSigner(alias, spec, usages, policy.copy(hardware = SignumHardwarePolicy.DISCOURAGED))
+        if (policy.platform is SignumPlatformPolicy.IosKeychain) {
+            return IosNativeKeys.create(alias, policy, null)
         }
+        val signer = createSigner(alias, spec, usages, policy.withoutUnavailableSecureEnclave())
         try {
             validateNativePolicy(signer, policy, alias)
         } catch (cause: Throwable) {
@@ -115,17 +100,42 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         configureSignumKey(spec, usages, policy)
     }.getOrThrow()
 
+    override fun supportsImport(spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): Boolean =
+        spec == KeySpec.Ec(EcCurve.P256) && usages == setOf(KeyUsage.SIGN, KeyUsage.VERIFY) &&
+            IosNativeKeys.supports(policy, importing = true)
+
+    override suspend fun importPrivateKey(alias: String, material: id.walt.crypto2.keys.EncodedKey.Jwk,
+        spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): SignumPlatformKey {
+        require(supportsImport(spec, usages, policy)) { "Unsupported iOS private-key import policy" }
+        return IosNativeKeys.create(alias, policy, material)
+    }
+
+    override suspend fun loadImportedKey(alias: String, spec: KeySpec, usages: Set<KeyUsage>,
+        policy: SignumKeyPolicy): SignumPlatformKey? {
+        require(supportsImport(spec, usages, policy)) { "Unsupported iOS private-key import policy" }
+        return IosNativeKeys.load(alias, policy, imported = true)
+    }
+
+    override suspend fun deleteImportedKey(alias: String, policy: SignumKeyPolicy) =
+        IosNativeKeys.delete(alias, policy)
+
     override suspend fun load(
         alias: String,
         spec: KeySpec,
         usages: Set<KeyUsage>,
         policy: SignumKeyPolicy,
     ): SignumPlatformKey? {
+        if (policy.platform is SignumPlatformPolicy.IosKeychain) return IosNativeKeys.load(alias, policy, imported = false)
         val signer = IosKeychainProvider.getSignerForKey(alias).getOrElse { failure ->
             throw failure.mapSignumFailure(alias)
         }
         validateNativePolicy(signer, policy, alias)
         return handle(alias, spec, usages, policy, signer)
+    }
+
+    override suspend fun delete(alias: String, policy: SignumKeyPolicy) {
+        if (policy.platform is SignumPlatformPolicy.IosKeychain) IosNativeKeys.delete(alias, policy)
+        else delete(alias)
     }
 
     override suspend fun delete(alias: String) {
