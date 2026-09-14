@@ -3,6 +3,7 @@ package id.walt.certificate.x509
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.Key
 import kotlinx.coroutines.runBlocking
@@ -104,6 +105,11 @@ class JavaX509CertificateUtil(private val delegate: X509CertificateUtil) {
 
     fun validateCsrSignature(csr: Pkcs10CertificateSigningRequest): Boolean = runBlocking {
         delegate.validateCsrSignature(csr)
+    }
+
+    /** Blocking wrapper for [X509Certificate.restoreSubjectPublicKey], callable from Java. */
+    fun restoreSubjectPublicKey(certificate: X509Certificate, cryptoRuntime: CryptoRuntime): Key = runBlocking {
+        certificate.restoreSubjectPublicKey(cryptoRuntime)
     }
 
     fun validateCertificateChain(
