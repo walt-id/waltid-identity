@@ -17,7 +17,6 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewResult
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
 import id.walt.walletdemo.compose.logic.WalletDisplayText
-import io.ktor.http.Url
 import kotlin.random.Random
 
 fun createWalletApi2DemoWallet(
@@ -128,8 +127,22 @@ private class WalletApi2DemoWallet(
         callbackUri: String,
     ): WalletDemoIssuanceOutcome {
         val session = requireIssuance(sessionId)
-        val code = Url(callbackUri).parameters["code"]
-            ?: return WalletDemoIssuanceOutcome.Failed("Authorization callback is missing code")
+        val parsed = parseWalletApi2AuthorizationCallback(
+            callbackUri = callbackUri,
+            expectedState = session.authorizationState,
+            expectedRedirectUri = session.redirectUri,
+        )
+        val code = when (parsed) {
+            WalletApi2AuthorizationCallback.Denied -> {
+                issuanceSessions.remove(sessionId)
+                WalletApi2BrowserSessionStore.clearPendingIssuance()
+                return WalletDemoIssuanceOutcome.Cancelled
+            }
+            is WalletApi2AuthorizationCallback.Invalid -> {
+                return WalletDemoIssuanceOutcome.Failed(parsed.message)
+            }
+            is WalletApi2AuthorizationCallback.Code -> parsed.code
+        }
         val configurationId = session.credentialConfigurationId
             ?: return WalletDemoIssuanceOutcome.Failed("Authorization session is missing credential configuration")
         val result = client.receiveAuthorized(
@@ -189,9 +202,7 @@ private class WalletApi2DemoWallet(
                 selectedCredentialOptions = selectedCredentialOptions.map {
                     CredentialSelectionDto(queryId = it.queryId, credentialId = it.credentialId)
                 },
-                selectedDisclosureOptions = selectedDisclosureOptions.map {
-                    DisclosureSelectionDto(queryId = it.queryId, credentialId = it.credentialId, path = it.path)
-                }.ifEmpty { null },
+                selectedDisclosureOptions = selectedDisclosureOptions.toDisclosureSelectionDtos(),
                 keyId = session?.keyId ?: keyId,
                 did = did ?: this.did,
             ),
@@ -230,8 +241,10 @@ private class WalletApi2DemoWallet(
         client.deleteCredential(walletId, credentialId)
 
     override suspend fun deleteWallet() {
-        runCatching { client.deleteWallet(walletId) }
-        val created = client.createWallet()
+        val created = replaceWalletAfterSuccessfulDelete(
+            deleteCurrent = { client.deleteWallet(walletId) },
+            createReplacement = { client.createWallet() },
+        )
         walletId = created
         keyId = null
         did = null

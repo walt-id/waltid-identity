@@ -14,10 +14,16 @@ RUN chmod +x ./gradlew \
     && ./gradlew --no-daemon \
         :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDistribution \
         -PenableWalletDemoComposeWeb=true \
-    && DIST="$(find waltid-applications/waltid-wallet-demo-compose/webApp/build -type d -name productionExecutable | head -n 1)" \
-    && test -n "$DIST" \
+    && DIST="waltid-applications/waltid-wallet-demo-compose/webApp/build/dist/wasmJs/productionExecutable" \
+    && test -d "$DIST" \
     && mkdir -p /out \
-    && cp -a "$DIST"/. /out/
+    && cp -a "$DIST"/. /out/ \
+    && if [ ! -d /out/composeResources ]; then \
+        RESOURCES="waltid-applications/waltid-wallet-demo-compose/sharedUI/build/processedResources/wasmJs/main/composeResources"; \
+        test -d "$RESOURCES"; \
+        cp -a "$RESOURCES" /out/composeResources; \
+    fi \
+    && test -d /out/composeResources
 
 # RUN
 FROM nginx:1.27-alpine

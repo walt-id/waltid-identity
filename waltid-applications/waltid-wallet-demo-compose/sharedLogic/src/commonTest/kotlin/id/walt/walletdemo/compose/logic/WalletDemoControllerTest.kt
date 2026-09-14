@@ -745,6 +745,29 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun resetWalletKeepsSessionWhenDeleteFails() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        wallet.deleteWalletError = IllegalStateException("HTTP 500")
+        val controller = unlockedControllerWith(wallet, this)
+        assertTrue(controller.state.value.session is WalletSessionState.Ready)
+
+        controller.resetWallet()
+        runCurrent()
+
+        assertEquals(1, wallet.deleteWalletCalls)
+        assertEquals(listOf(sampleCredential), wallet.credentials)
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertTrue(controller.state.value.session is WalletSessionState.Ready)
+        assertEquals(
+            WalletOperationState.Failed(
+                WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, "HTTP 500"),
+                WalletDemoTab.Credentials,
+            ),
+            controller.state.value.operation,
+        )
+    }
+
+    @Test
     fun configuredPinStartsRecreatedControllerInLoginAndUnlocksWithOriginalPin() = runTest {
         val pinStore = InMemoryDemoPinStore()
         val firstController = controllerWith(FakeDemoWallet(), this, pinStore)
@@ -2288,6 +2311,7 @@ private class FakeDemoWallet(
     val rejectedPresentationPreviewHandles = mutableListOf<WalletDemoPresentationPreviewHandle>()
     val deletedCredentialIds = mutableListOf<String>()
     var deleteWalletCalls = 0
+    var deleteWalletError: Throwable? = null
 
     override suspend fun bootstrap(
         signingProtection: WalletDemoSigningProtection,
@@ -2424,6 +2448,7 @@ private class FakeDemoWallet(
 
     override suspend fun deleteWallet() {
         deleteWalletCalls += 1
+        deleteWalletError?.let { throw it }
         credentials = emptyList()
     }
 }
