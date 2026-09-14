@@ -208,7 +208,7 @@ jobs:
       - name: Generate Docker tags
         id: tags
         run: |
-          TAGS="waltid/waltid-sdk-docs:${{ inputs.version }}, waltid/waltid-sdk-docs:latest"
+          TAGS="waltid/waltid-sdk-docs:${{ inputs.version }}"
           for tag in $(echo '${{ inputs.tags }}' | jq -r '.[]'); do
             TAGS="$TAGS, waltid/waltid-sdk-docs:$tag"
           done
