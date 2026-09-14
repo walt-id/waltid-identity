@@ -20,6 +20,10 @@ configFiles: {}
 # configure via env vars instead of mounted config files (e.g. the portals).
 env: {}
 
+# Names of pre-existing Kubernetes secrets whose keys are injected as env vars.
+# Mounted as optional, so a namespace without the secret still rolls out.
+envFromSecrets: []
+
 # Optional persistent data volume (used by wallet-api).
 persistence:
   enabled: false
