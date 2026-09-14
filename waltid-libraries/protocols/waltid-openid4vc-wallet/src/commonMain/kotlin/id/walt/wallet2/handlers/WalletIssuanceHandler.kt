@@ -142,9 +142,6 @@ data class ReceiveCredentialRequest(
     /** Inline DID to use as the credential subject / holder binding. Defaults to wallet's default DID. */
     val did: String? = null,
 
-    /** Reference to a DID in the wallet's DID store for holder binding. Ignored when [did] is provided. Defaults to wallet's default DID. */
-    val didReference: String? = null,
-
     /** Transaction code (PIN) required by some pre-authorized code flows. */
     val txCode: String? = null,
 
@@ -198,8 +195,6 @@ data class ReceiveCredentialFromPreviewRequest(
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     val did: String? = null,
-    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
-    val didReference: String? = null,
     val txCode: String? = null,
     val clientId: String = DEFAULT_CLIENT_ID,
     val redirectUri: Url = Url("openid://"),
@@ -368,8 +363,6 @@ data class SignProofRequest(
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     val did: String? = null,
-    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. */
-    val didReference: String? = null,
 ) {
     init {
         require(credentialConfigurationId.isNotBlank()) {
@@ -461,8 +454,6 @@ data class ReceiveAuthorizedCredentialRequest(
     val keyId: String? = null,
     /** Holder DID; when absent the proof is bound to the raw JWK. */
     val did: String? = null,
-    /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
-    val didReference: String? = null,
     /** Optional metadata stored alongside the received credential(s). */
     val metadata: JsonObject? = null,
     /** Optional label override; otherwise derived from the credential configuration display. */
@@ -714,7 +705,6 @@ object WalletIssuanceHandler {
                     "there is no static key, and neither an inline key nor a keyId was supplied"
             )
         val did = request.did
-            ?: request.didReference?.let { wallet.didStore?.getDid(it)?.did }
             ?: wallet.defaultDid()
         val requestMetadata = request.metadata
 
@@ -1022,7 +1012,6 @@ object WalletIssuanceHandler {
         key = key,
         keyId = keyId,
         did = did,
-        didReference = didReference,
         txCode = txCode,
         clientId = clientId,
         redirectUri = redirectUri,
@@ -1181,7 +1170,6 @@ object WalletIssuanceHandler {
             )
         val preferJwkBinding = shouldPreferJwkBinding(configuration.cryptographicBindingMethodsSupported)
         val resolvedDid = request.did
-            ?: request.didReference?.let { wallet.didStore?.getDid(it)?.did }
         val proofs = buildJwtProof(
             proofBuilder = JwtProofBuilder(),
             keyMaterial = keyMaterial,
@@ -2109,8 +2097,6 @@ object WalletIssuanceHandler {
         keyReference: String? = null,
         /** Inline DID for holder binding; defaults to the wallet's default DID. */
         did: String? = null,
-        /** Reference to a DID in the wallet's DID store. Ignored when [did] is provided. Defaults to wallet's default DID. */
-        didReference: String? = null,
         /** Optional sidecar metadata merged with resolved issuer display when storing. */
         metadata: JsonObject? = null,
         /**
@@ -2132,7 +2118,6 @@ object WalletIssuanceHandler {
             ?: wallet.resolveKeyMaterial(keyReference, setOf(KeyUsage.SIGN))
             ?: error("No key available for proof-of-possession")
         val holderDid = did
-            ?: didReference?.let { wallet.didStore?.getDid(it)?.did }
             ?: wallet.defaultDid()
 
         // Exchange code for token
@@ -2262,7 +2247,6 @@ object WalletIssuanceHandler {
             key = request.key,
             keyReference = request.keyId,
             did = request.did,
-            didReference = request.didReference,
             metadata = request.metadata,
             label = request.label,
             attestationAssembler = attestationAssembler,
