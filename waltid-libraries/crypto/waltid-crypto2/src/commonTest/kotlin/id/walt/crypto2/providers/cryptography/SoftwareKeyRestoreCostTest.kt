@@ -9,7 +9,9 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
-import kotlin.test.assertTrue
+import kotlin.test.assertEquals
+import id.walt.crypto2.keys.derivationsPerformed
+import id.walt.crypto2.keys.resetValidationCacheForTesting
 import kotlin.time.measureTime
 
 /**
@@ -29,7 +31,7 @@ class SoftwareKeyRestoreCostTest {
     private val runtime = CryptoRuntime(listOf(provider))
 
     @Test
-    fun `restoring a stored EC private key stays far cheaper than a signing operation`() = runTest {
+    fun `restoring a stored EC private key derives its public key only once`() = runTest {
         val key = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("restore-cost"),
@@ -39,24 +41,21 @@ class SoftwareKeyRestoreCostTest {
         )
         val stored = key.storedKey
 
-        // Warm the JIT and any provider initialisation, so the measurement is steady state.
-        repeat(20) { runtime.restore(stored) }
+        // Restoring the same stored key repeatedly must derive the public key once: the consistency proof
+        // is what made restore expensive, and caching it is the whole point. Asserted as a count rather than
+        // a duration - the first version of this test pinned a wall-clock figure measured on one machine and
+        // failed on a slower CI runner, which said nothing about the behaviour it meant to protect.
+        resetValidationCacheForTesting()
+        val iterations = 50
 
-        val iterations = 200
         val elapsed = measureTime { repeat(iterations) { runtime.restore(stored) } }
-        val perRestoreMicros = elapsed.inWholeMicroseconds / iterations
 
-        println("  restore of a stored P-256 private key: ${perRestoreMicros}us per call")
-
-        // Measured on this hardware: 470us per restore before the consistency check was cached, 208us
-        // after. The bound catches the scalar multiplication coming back, which is the regression worth
-        // failing a build over. What remains is not elliptic-curve work but several JSON round trips per
-        // restore - `parseJwk`, `normalizeJwk` and the requirement checks each re-parse the material -
-        // and reducing that is a separate change.
-        assertTrue(
-            perRestoreMicros < 350,
-            "restoring a stored key took ${perRestoreMicros}us, which suggests it is deriving the public " +
-                "key again rather than trusting material it has already validated",
+        println("  restore of a stored P-256 private key: ${elapsed.inWholeMicroseconds / iterations}us per call")
+        assertEquals(
+            1,
+            derivationsPerformed,
+            "restoring the same stored key $iterations times derived its public key $derivationsPerformed " +
+                "times, so the validated material is not being reused",
         )
     }
 }
