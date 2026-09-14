@@ -124,11 +124,13 @@ supported DPoP signing algorithms.
 Use the Swift-native proximity API for ISO/IEC 18013-5 device engagement and
 retrieval. It is separate from the URL-based OpenID4VP methods:
 
+<!-- doc-snippet:start swift-proximity-session -->
 ```swift
 let configuration = ProximityConfiguration()
 let capabilities = try await wallet.proximityPresentationCapabilities(
     configuration: configuration
 )
+showUnavailableMethods(capabilities)
 let session = try await wallet.startProximityPresentation(
     configuration: configuration
 )
@@ -153,7 +155,9 @@ for await state in session.states {
         showProgress(state)
     }
 }
+await session.close()
 ```
+<!-- doc-snippet:end swift-proximity-session -->
 
 The default selects QR engagement and BLE retrieval. The Swift facade installs
 the iOS BLE and NFC platform adapters automatically. NFC runtime reporting is
@@ -298,6 +302,13 @@ entries. It rejects private keys, PKCS#12/PFX, unknown bundle semantics,
 duplicates, invalid or expired trust material, and files larger than 1 MiB.
 Apply one immutable snapshot to a new session with `settings.applying(to:)`;
 changes made while a session is active apply only to the next session.
+
+A final request with no returnable data ends in `ProximityState.noData(exchange:)`. No credential
+data was sent for that request; earlier exchanges in the same session may have
+shared approved data. Render `ProximityReview.readerAuthenticationSummary` for
+the request summary: it accounts for whole-request authentication coverage while
+preserving malformed, invalid, and revoked authentication warnings. Individual
+`readerAuthentication` entries remain available for detailed inspection.
 
 ## Protected keys
 
@@ -479,10 +490,3 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
-
-A final request with no returnable data ends in `ProximityState.noData(exchange:)`. No credential
-data was sent for that request; earlier exchanges in the same session may have
-shared approved data. Render `ProximityReview.readerAuthenticationSummary` for
-the request summary: it accounts for whole-request authentication coverage while
-preserving malformed, invalid, and revoked authentication warnings. Individual
-`readerAuthentication` entries remain available for detailed inspection.

@@ -177,7 +177,7 @@ private class ProximitySessionImpl(
         ProximityState.CheckingPrerequisites(initialCapabilities), prerequisiteRetry,
         approval = configuration.approval,
         canReviewWhileConnected = {
-            connectedRoute?.transport != ProximityTransport.Nfc || nfcHostPlatformAdapter?.supportsInSessionUserInteraction != false
+            nfcHostPlatformAdapter?.isUserInteractionBlocked != true
         },
     )
     private val initialCapabilities = initialCapabilities

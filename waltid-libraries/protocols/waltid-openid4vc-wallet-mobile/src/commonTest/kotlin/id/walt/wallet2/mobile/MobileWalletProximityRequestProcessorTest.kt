@@ -1332,7 +1332,7 @@ class ProximityRequestProcessorTest {
             val nextProcessor = processor(fixture, configuration)
             val nextContext = context(11)
             val nextPreview = nextProcessor.preview(nextContext)
-            val nextOwner = owner(fixture, nextProcessor, ProximityApproval.Prepared(sharing), canReview = false)
+            val nextOwner = owner(fixture, nextProcessor, ProximityApproval.Prepared(sharing), canReview = { false })
             assertIs<MdocConsentDecision.Approve>(nextOwner.decide(prompt(nextPreview, 1)))
             assertIs<ProximityState.AuthorizingHolderKey>(nextOwner.state.value)
             val response = decodeResponse(assertIs<MdocResponseResolution.Send>(nextProcessor.resolve(nextContext, nextPreview)))
@@ -1384,7 +1384,7 @@ class ProximityRequestProcessorTest {
                 assertEquals(null, sharing.claim(fixture.wallet))
                 val nextProcessor = processor(fixture, configuration)
                 val nextPreview = nextProcessor.preview(context(request, label == "other reader"))
-                val nextOwner = owner(fixture, nextProcessor, ProximityApproval.Prepared(sharing), canReview = false)
+                val nextOwner = owner(fixture, nextProcessor, ProximityApproval.Prepared(sharing), canReview = { false })
                 assertIs<MdocConsentDecision.Deny>(nextOwner.decide(prompt(nextPreview, 1)), label)
                 nextOwner.publish(ProximityState.Completed(1, declined = true))
                 assertEquals(ProximityReviewReason.PreparedSharingChanged,
@@ -1397,14 +1397,16 @@ class ProximityRequestProcessorTest {
     }
 
     @Test
-    fun `iOS NFC interaction boundary discovers a trusted reader while other routes retain manual consent`() = runTest {
+    fun `current host interaction state controls preparation even when it changes after session creation`() = runTest {
         withFixture { fixture ->
             val configuration = preparationConfiguration()
             val context = signedWholeRequestContext(fixture)
             for (canReview in listOf(false, true)) {
                 val processor = processor(fixture, configuration)
                 val prompt = prompt(processor.preview(context), 1)
-                val owner = owner(fixture, processor, canReview = canReview)
+                var interactionAvailable = !canReview
+                val owner = owner(fixture, processor, canReview = { interactionAvailable })
+                interactionAvailable = canReview
                 if (!canReview) {
                     assertIs<MdocConsentDecision.Deny>(owner.decide(prompt))
                     owner.publish(ProximityState.Completed(1, true))
@@ -1420,7 +1422,7 @@ class ProximityRequestProcessorTest {
             val anonymous = processor(fixture)
             val anonymousPreview = anonymous.preview(requestContext(fixture.readerEphemeralKey))
             assertEquals(null, anonymous.sharingPlan(prompt(anonymousPreview, 1)))
-            val owner = owner(fixture, anonymous, canReview = false)
+            val owner = owner(fixture, anonymous, canReview = { false })
             assertIs<MdocConsentDecision.Deny>(owner.decide(prompt(anonymousPreview, 1)))
             owner.publish(ProximityState.Completed(1, true))
             assertEquals("reader_not_eligible_for_preparation", assertIs<ProximityState.Failed>(owner.state.value).error.code)
@@ -1542,7 +1544,7 @@ class ProximityRequestProcessorTest {
             assertNull(sharing.claim(fixture.wallet))
             val nextProcessor = processor(fixture, preparationConfiguration())
             val prompt = prompt(nextProcessor.preview(context("given_name", "family_name")), 1)
-            val owner = owner(fixture, nextProcessor, ProximityApproval.Prepared(sharing), canReview = true)
+            val owner = owner(fixture, nextProcessor, ProximityApproval.Prepared(sharing), canReview = { true })
             val decision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt) }
             val state = assertIs<ProximityState.ReviewRequired>(owner.state.value)
             assertEquals(ProximityReviewReason.PreparedSharingChanged, state.reason)
@@ -1642,11 +1644,11 @@ class ProximityRequestProcessorTest {
         fixture: Fixture,
         processor: ProximityRequestProcessor,
         approval: ProximityApproval = ProximityApproval.AskEachTime,
-        canReview: Boolean = true,
+        canReview: () -> Boolean = { true },
     ): ProximitySessionOwner =
         ProximitySessionOwner(
             ProximityState.CheckingPrerequisites(ProximityCoordinator(fixture.wallet, null).capabilities(ProximityConfiguration())),
-            Channel(Channel.CONFLATED), approval, { canReview },
+            Channel(Channel.CONFLATED), approval, canReview,
         ).also { it.attach(processor) }
 
     private fun prompt(preview: MdocRequestPreview, exchange: Int) =

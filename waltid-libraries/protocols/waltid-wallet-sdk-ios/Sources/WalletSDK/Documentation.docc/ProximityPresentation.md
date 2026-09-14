@@ -10,11 +10,13 @@ Proximity presentation is separate from the OpenID4VP URL flow. Query
 session material, then start one single-use
 ``ProximitySession``:
 
+<!-- doc-snippet:start swift-proximity-session -->
 ```swift
 let configuration = ProximityConfiguration()
 let capabilities = try await wallet.proximityPresentationCapabilities(
     configuration: configuration
 )
+showUnavailableMethods(capabilities)
 let session = try await wallet.startProximityPresentation(
     configuration: configuration
 )
@@ -39,7 +41,9 @@ for await state in session.states {
         showProgress(state)
     }
 }
+await session.close()
 ```
+<!-- doc-snippet:end swift-proximity-session -->
 
 The default configuration selects QR engagement and Bluetooth Low Energy
 retrieval. Capabilities keep implementation, profile permission, runtime
@@ -169,6 +173,22 @@ holder's deliberate approval action. Honour `requiredElements`, including a
 requested mDL portrait. A `.prepared(sharing)` result is used only in a new session
 with `configuration.withApproval(.prepared(sharing))`.
 
+An approval handler can return the new session (or no session after rejection):
+
+<!-- doc-snippet:start swift-proximity-preparation -->
+```swift
+switch try plan.approve(submission) {
+case .prepared(let sharing):
+    return try await wallet.startProximityPresentation(
+        configuration: configuration.withApproval(.prepared(sharing))
+    )
+case .rejected(let error):
+    showFailure(error)
+    return nil
+}
+```
+<!-- doc-snippet:end swift-proximity-preparation -->
+
 Plans expire after ten minutes. Prepared approvals are opaque, wallet-bound,
 one-use objects with a 60-second monotonic deadline; they are never persisted.
 The SDK compares the exact authenticated reader certificate, request, selected
@@ -179,10 +199,13 @@ revoke and close on cancellation or backgrounding, except during the actively
 owned Core NFC sheet. Permission setup must not retain an armed approval when the
 holder leaves the app.
 
-The bundled iOS NFC adapter cannot show an app review during NFC-only retrieval.
-It collects an eligible request and closes before review, including in
-`.askEachTime`, then requires a second connection. NFC-to-Bluetooth handover
-retains connected review. Preparation needs one named, authenticated trusted
+While the Core NFC system sheet is presenting, the bundled iOS adapter blocks app
+review. It collects an eligible request and closes before review, including in
+`.askEachTime`, then requires a second connection. Conventional NFC-to-Bluetooth
+handover permits connected review after the sheet closes. NFC v2 can retain that
+sheet while an alternate bearer connects or carries messages; the SDK checks the
+current presentation state for each request. `connectedRoute.transport` reports
+the last received message bearer, or the initial connection before any message. Preparation needs one named, authenticated trusted
 reader covering all requested documents; other readers require an interactive
 route. Protected-key authorization remains mandatory and subject to OS prompt
 availability. A completion receipt describes the locally sent selection and

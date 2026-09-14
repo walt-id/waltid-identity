@@ -146,9 +146,11 @@ Proximity presentation is a distinct session API rather than an OpenID4VP URL
 flow. Query capabilities without creating ephemeral keys or radio resources,
 then create one single-use session and render its authoritative state:
 
+<!-- doc-snippet:start kotlin-proximity-session -->
 ```kotlin
 val configuration = ProximityConfiguration()
 val capabilities = wallet.proximityPresentationCapabilities(configuration)
+showUnavailableMethods(capabilities)
 val session = wallet.startProximityPresentation(configuration)
 
 try {
@@ -175,6 +177,7 @@ try {
     withContext(NonCancellable) { session.close() }
 }
 ```
+<!-- doc-snippet:end kotlin-proximity-session -->
 
 The `show*` functions are application UI callbacks. Collect in a screen-owned
 coroutine and cancel it on leaving the screen; the `finally` block releases the
@@ -200,6 +203,22 @@ old connection. `Rejected` gives a display-safe error and requires another revie
 or reader connection. Plans are recent, in-memory requests that expire after ten
 minutes; they are not authorizations or persistent reader templates.
 
+An approval handler can return the new session (or no session after rejection):
+
+<!-- doc-snippet:start kotlin-proximity-preparation -->
+```kotlin
+return when (val result = plan.approve(submission)) {
+    is ProximityPreparationResult.Prepared -> wallet.startProximityPresentation(
+        configuration.copy(approval = ProximityApproval.Prepared(result.sharing))
+    )
+    is ProximityPreparationResult.Rejected -> {
+        showProximityError(result.error)
+        null
+    }
+}
+```
+<!-- doc-snippet:end kotlin-proximity-preparation -->
+
 A prepared approval lasts 60 seconds (monotonic time) and is claimed once, before
 prerequisites or radios start. It is bound to one wallet, the exact authenticated
 reader leaf certificate, request/profile, selected credential contents, fields,
@@ -214,11 +233,14 @@ prompt can run during NFC emulation.
 Preparation requires one named, authenticated, trusted reader covering all
 requested documents. Unnamed, unsigned, untrusted or multiple-reader requests
 cannot produce a plan; their ordinary interactive policies remain unchanged.
-`NfcHostPlatformAdapter.supportsInSessionUserInteraction` describes whether the
-host can review during actual NFC retrieval. The bundled iOS adapters report
-`false`: even `AskEachTime` first collects and declines a trusted request, allowing
-review after the system sheet closes and a second connection. NFC-to-Bluetooth
-handover retains interactive review after NFC closes.
+`NfcHostPlatformAdapter.isUserInteractionBlocked` reports the host's current modal
+presentation state. The bundled iOS adapters report `true` while the Core NFC
+system sheet is presenting. During that interval, even `AskEachTime` first
+collects and declines a trusted request so review can happen after the sheet
+closes, followed by a new connection. Conventional NFC-to-Bluetooth handover
+permits interactive review after NFC closes. NFC v2 may retain its system sheet
+while an alternate bearer connects or carries messages, so the SDK checks the
+current host presentation state for each request.
 
 Persist a mode preference only. Keep a plan/approval inside the active journey,
 call `sharing.revoke()` and `session.close()` on cancellation or genuine backgrounding,

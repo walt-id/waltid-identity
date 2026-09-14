@@ -67,9 +67,9 @@ prevents approval and explains why another credential is needed.
 The ready screen shows a cancellable 60-second, one-use approval and its scope.
 Approval automatically reopens the previous engagement method when available.
 The reader must start a fresh request; additional data, another reader or changed
-purpose/retention requires another decision. iOS NFC-only uses this review/reconnect
-flow because Core NFC owns the screen during transfer; Bluetooth retains ordinary
-connected review. Only an actively owned NFC sheet exempts background cancellation.
+purpose/retention requires another decision. While the Core NFC sheet owns the
+screen, the SDK uses this review/reconnect flow even if NFC v2 has an alternate
+bearer. Conventional handover permits connected review after the sheet closes. Only an actively owned NFC sheet exempts background cancellation.
 
 Completion shows the locally shared selection and **Prepare another share** while
 the recent request remains valid. Preparing again requires a new review and approval;
@@ -77,12 +77,19 @@ retry never reuses an armed approval. **Done** forgets the plan. Plans expire af
 ten minutes, approvals after 60 seconds, and neither is persisted. Reader/key checks
 remain in the SDK. A local receipt does not confirm the reader's verification result.
 
-The journey displays Device Engagement as an accessible QR code, retrieves over the available
-Bluetooth Low Energy method, and presents authentication scope, signature validity, certificate-path,
+The journey offers QR and NFC engagement with available retrieval methods, then presents
+authentication scope, signature validity, certificate-path,
 revocation, optional RICAL, and product-trust evidence as separate facts. It exposes reader-stated
 purpose and retention intent, supports per-document credential and element selection, and obtains
 fresh consent for repeated exchanges. Bluetooth authorization, app settings, lifecycle, screen-awake,
 and temporary brightness behavior stay in the iOS host and are restored on exit.
+
+The ready screen prioritizes the full QR within the available space. **Prepare sharing** is a single
+switch: off means review each request; on means review, approve, then reconnect. Selecting the mode
+does not authorize disclosure. The same switch is available in Nearby sharing settings. Once armed,
+the reader and expiry countdown stay visible, and **Approved data** opens the already reviewed
+selection. Cancel stays separate from scrolling content. Short screens and larger text retain
+scrolling for secondary controls; landscape places the QR beside the controls.
 
 QR rendering remains a private demo-package concern rather than a Wallet SDK API. The native app
 uses the pinned ZXing-C++ dependency for Device Engagement only. It accepts bounded ASCII `mdoc:`
@@ -100,6 +107,10 @@ Reader CA/RICAL configuration. Imports use the native document picker and accept
 certificate-only PEM, or versioned walt.id JSON trust bundles. The app previews validated public trust
 material before saving it in the wallet App Group, rejects private keys and PKCS#12/PFX reader
 identities, and applies one immutable settings snapshot to each new proximity session.
+
+Review actions carry the identity of the displayed review. Each new review resets
+holder choices and continuation. Permission prompts are needed only when no
+selected route can start; terminal recovery creates a new single-use session.
 
 ## Local wallet data
 
@@ -123,12 +134,6 @@ https://wallet.demo.walt.id/wallet-api/transaction-data-profiles
 
 Override it with the `TRANSACTION_DATA_PROFILES_URL` launch environment variable or `UserDefaults` key. Wallet attestation values remain explicit overrides through `ATTESTATION_*` environment/UserDefaults values; no bearer token is defaulted.
 
-The ready screen prioritizes the full QR within the available space. **Prepare sharing** is a single
-switch: off means review each request; on means review, approve, then reconnect. Selecting the mode
-does not authorize disclosure. The same switch is available in Nearby sharing settings. Once armed,
-the reader and expiry countdown stay visible, and **Approved data** opens the already reviewed
-selection. Cancel stays separate from scrolling content. Short screens and larger text retain
-scrolling for secondary controls; landscape places the QR beside the controls.
 
 ## Common commands
 
@@ -146,7 +151,3 @@ fixture Gradle tasks documented in the mobile guide.
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)
 - [waltid-openid4vc-wallet-persistence-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md)
 - [waltid-crypto](../../waltid-libraries/crypto/waltid-crypto/README.md)
-
-Review actions carry the identity of the displayed review. Each new review resets
-holder choices and continuation. Permission prompts are needed only when no
-selected route can start; terminal recovery creates a new single-use session.

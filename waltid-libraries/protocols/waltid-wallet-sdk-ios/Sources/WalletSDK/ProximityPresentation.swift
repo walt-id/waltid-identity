@@ -1476,7 +1476,7 @@ public enum ProximityEngagementMethod: Sendable, Equatable {
     case nfc
 }
 
-/// Bearer carrying the connected session.
+/// Bearer of the last received message, or the initial connection before any message.
 public enum ProximityTransport: Sendable, Equatable {
     /// Bluetooth Low Energy carries the session.
     case bluetoothLowEnergy
@@ -1490,13 +1490,13 @@ public enum ProximityTransport: Sendable, Equatable {
 public struct ProximityConnectedRoute: Sendable, Equatable {
     /// Engagement that won the reader connection.
     public let engagement: ProximityEngagementMethod
-    /// Bearer carrying the connected session.
+    /// Bearer of the last received message, or the initial connection before any message.
     public let transport: ProximityTransport
 
     /// Creates a snapshot of the actual connected route.
     /// - Parameters:
     ///   - engagement: Engagement that won the connection.
-    ///   - transport: Actual connected bearer.
+    ///   - transport: Bearer of the last received message, or the initial connection before any message.
     public init(engagement: ProximityEngagementMethod, transport: ProximityTransport) {
         self.engagement = engagement
         self.transport = transport
