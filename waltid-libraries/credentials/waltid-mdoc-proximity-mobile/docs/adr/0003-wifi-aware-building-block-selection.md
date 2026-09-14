@@ -44,8 +44,9 @@ thin Android public-API adapter:
 
 QR Device Engagement omits the passphrase so both peers derive it from `EDeviceKeyBytes`. NFC
 Static or Negotiated Handover carries the selected NCS-SK passphrase explicitly in the Wi-Fi Aware
-carrier. One prepared publisher is reference-counted when concurrent QR and NFC engagement paths
-need representations of the same transaction endpoint.
+carrier. Concurrent QR and NFC paths own distinct ephemeral keys and prepared publishers, producing
+different transaction-derived service names. The winning path retains its exact key and transcript;
+the losing path closes its publisher and network resources.
 
 ## Source and implementation review
 
@@ -75,7 +76,8 @@ NCS-PK behavior were not adopted.
 ## Consequences and qualification boundary
 
 The implementation has deterministic host coverage for derivation vectors, carrier validation,
-HTTP framing, provider sharing, error handling, SDK fallback, and platform capability mapping. It
+HTTP framing, independent endpoint ownership, error handling, SDK fallback, and platform capability
+mapping. It
 does not establish physical Wi-Fi Aware interoperability. Before release qualification, record
 successful QR, NFC Static, and NFC Negotiated NCS-SK exchanges with a separate Android reader and
 verify permission denial/retry, radio/resource loss, peer disconnect, timeout, cancellation, repeat
