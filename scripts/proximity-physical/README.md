@@ -1,6 +1,6 @@
 # Optional local proximity tests
 
-AUT-01/AUT-06 provide an isolated Android test APK, an iOS test host and a local
+This harness provides an isolated Android test APK, an iOS test host and a local
 controller for a pinned Multipaz Android reader. **The harness has compile and
 hardware-free guard evidence only. No physical configuration is qualified by its
 addition.** Existing physical runs remain separately authorized; adding this
