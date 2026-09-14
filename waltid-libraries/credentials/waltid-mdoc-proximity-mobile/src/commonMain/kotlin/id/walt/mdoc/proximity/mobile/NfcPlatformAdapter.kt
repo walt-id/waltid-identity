@@ -55,8 +55,12 @@ public sealed interface NfcHostPreparation {
 
 /** Narrow Android HCE / Apple CardSession boundary. */
 public interface NfcHostPlatformAdapter {
-    /** Whether the host can show an interactive holder decision while the NFC bearer is active. */
-    public val supportsInSessionUserInteraction: Boolean get() = true
+    /**
+     * Whether active platform UI currently prevents an interactive holder decision. This follows
+     * actual presentment and dismissal, independently of the selected or observed data bearer.
+     * Hosts without modal NFC UI leave it false. Reads must be safe from the session dispatcher.
+     */
+    public val isUserInteractionBlocked: Boolean get() = false
 
     /** Checks hardware, OS, service routing, and runtime prerequisites without arming a session. */
     public suspend fun capability(): NfcHostAvailability

@@ -1453,7 +1453,7 @@ public enum class ProximityTransport { BluetoothLowEnergy, Nfc, WifiAware }
 /**
  * Actual connected route, independent of the methods configured or advertised.
  * @property engagement Engagement that won the reader connection.
- * @property transport Bearer carrying the connected session.
+ * @property transport Bearer of the last received message, or the initial connection before any message.
  */
 public data class ProximityConnectedRoute(
     public val engagement: ProximityEngagementMethod,

@@ -573,18 +573,23 @@ final class IOSNfcHostPlatformAdapterTests: XCTestCase {
                 environment: FakeNfcEnvironment(session: card),
                 onPresentment: { events.append($0) }
             )
+            let adapter = IOSNfcHostPlatformAdapter(bridge: bridge)
             guard case let .ready(session) = await bridge.prepare(
                 process: { _ in Data([0x90, 0x00]) }, deactivate: { _ in }
             ) else { return XCTFail("Preparation failed") }
             XCTAssertFalse(bridge.isPresenting)
+            XCTAssertFalse(adapter.isUserInteractionBlocked)
             card.emit(.sessionStarted)
             XCTAssertFalse(bridge.isPresenting)
+            XCTAssertFalse(adapter.isUserInteractionBlocked)
             card.emit(.readerDetected)
             await assertEventually { bridge.isPresenting && card.startCount == 1 }
+            XCTAssertTrue(adapter.isUserInteractionBlocked)
             let closing = Task { await session.close(reason: reason) }
             if reason == .completed { await finishPresentation(session: card) }
             await closing.value
             XCTAssertFalse(bridge.isPresenting)
+            XCTAssertFalse(adapter.isUserInteractionBlocked)
             XCTAssertEqual(events.values, [.began, .ended(reason)])
             await session.close(reason: .cancelled)
             XCTAssertEqual(events.values.count, 2)
@@ -599,13 +604,16 @@ final class IOSNfcHostPlatformAdapterTests: XCTestCase {
                 environment: FakeNfcEnvironment(session: card),
                 onPresentment: { events.append($0) }
             )
+            let adapter = IOSNfcHostPlatformAdapter(bridge: bridge)
             guard case let .ready(session) = await bridge.prepare(
                 process: { _ in Data() }, deactivate: { _ in }
             ) else { return XCTFail("Preparation failed") }
             card.emit(.readerDetected)
             await assertEventually { bridge.isPresenting }
+            XCTAssertTrue(adapter.isUserInteractionBlocked)
             card.emit(.sessionInvalidated(reason: failure))
             await assertEventually { !bridge.isPresenting }
+            XCTAssertFalse(adapter.isUserInteractionBlocked)
             let reason: IOSNfcHostBridgeCloseReason = failure == .userInvalidated ? .cancelled :
                 failure == .maximumDurationReached ? .timeout : .platformUnavailable
             XCTAssertEqual(events.values, [.began, .invalidated(reason)])
