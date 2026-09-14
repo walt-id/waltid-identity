@@ -40,7 +40,6 @@
       ]
     },
     "android-ble-callbacks": {
-      "aut": "AUT-03",
       "executionClass": "deterministic",
       "sources": [
         "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/androidHostTest/kotlin/id/walt/mdoc/proximity/mobile/AndroidCentralGattCallbackTest.kt",
@@ -98,7 +97,6 @@
       ]
     },
     "ios-ble-callbacks": {
-      "aut": "AUT-03",
       "executionClass": "deterministic",
       "sources": [
         "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/iosSimulatorArm64Test/kotlin/id/walt/mdoc/proximity/mobile/IosCentralGattCallbackTest.kt",
