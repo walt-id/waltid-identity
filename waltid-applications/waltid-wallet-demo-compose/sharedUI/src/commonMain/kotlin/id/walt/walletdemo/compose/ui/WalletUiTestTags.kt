@@ -1,6 +1,8 @@
 package id.walt.walletdemo.compose.ui
 
 internal object WalletUiTestTags {
+    val IdentitySetup = tag("identitySetup")
+    fun identityChoice(index: Int) = tag("identityChoice", index.toString())
     val Status = tag("status")
     val StatusDismiss = tag("statusDismiss")
     val StatusExpand = tag("statusExpand")

@@ -2,12 +2,14 @@ package id.walt.walletdemo.compose.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoIdentitySetup
+import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
 internal fun IdentitySetupScreen(
@@ -18,7 +20,7 @@ internal fun IdentitySetupScreen(
     onCancel: (String) -> Unit,
     onRefresh: () -> Unit,
 ) {
-    Surface(Modifier.fillMaxSize()) {
+    Surface(Modifier.fillMaxSize().testTag(WalletUiTestTags.IdentitySetup)) {
         LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 Text("Your signing identity", style = MaterialTheme.typography.headlineMedium)
@@ -42,14 +44,14 @@ internal fun IdentitySetupScreen(
                 }
                 is WalletDemoIdentitySetup.Choose -> {
                     setup.message?.let { message -> item { Text(message) } }
-                    items(setup.choices, key = { it.id }) { choice ->
+                    itemsIndexed(setup.choices, key = { _, choice -> choice.id }) { index, choice ->
                         OutlinedCard {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(choice.title, style = MaterialTheme.typography.titleMedium)
                                 Text(choice.detail, style = MaterialTheme.typography.bodyMedium)
                                 if (choice.recoverable) Text("Cloud delivery and availability on another device depend on the recovery provider.",
                                     style = MaterialTheme.typography.bodySmall)
-                                Button(onClick = { onChoose(choice.id) }) { Text("Use this option") }
+                                Button(onClick = { onChoose(choice.id) }, modifier = Modifier.testTag(WalletUiTestTags.identityChoice(index))) { Text("Use this option") }
                             }
                         }
                     }
