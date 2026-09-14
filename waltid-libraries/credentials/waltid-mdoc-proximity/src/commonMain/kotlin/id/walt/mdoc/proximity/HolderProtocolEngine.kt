@@ -290,7 +290,7 @@ fun interface MdocConsentHandler {
     suspend fun decide(prompt: MdocConsentPrompt): MdocConsentDecision
 }
 
-/** Winning engagement and the bearer carrying the session, retained after connection. */
+/** Winning engagement and last incoming-message bearer, retained after connection and termination. */
 data class MdocConnectedRoute(val engagement: MdocEngagementMode, val transport: ProximityTransportKind)
 
 sealed interface MdocHolderSessionState {
@@ -762,6 +762,7 @@ class MdocHolderProtocolEngine(
 
     private suspend fun receive(connection: ProximityConnection, budget: MdocSessionBudget): ImmutableBytes? =
         connection.receive()?.also {
+            mutableConnectedRoute.value = mutableConnectedRoute.value?.copy(transport = connection.kind)
             requireWithinTransportLimit(it)
             limits.requireSessionMessage(it)
             budget.account(it)
