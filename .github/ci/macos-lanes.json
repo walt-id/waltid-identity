@@ -19,9 +19,7 @@
     "gradle.properties",
     "gradlew",
     "settings.gradle.kts",
-    "gradle/libs.versions.toml",
-    ".github/scripts/mobile-ci/*",
-    "scripts/proximity-physical/*"
+    "gradle/libs.versions.toml"
   ],
   "lanes": {
     "ios-simulator": {
@@ -35,7 +33,10 @@
         "waltid-libraries/*/*/build.gradle.kts",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
-        "*/src/iosSimulatorArm64Test/*"
+        "*/src/iosSimulatorArm64Test/*",
+        ".github/scripts/mobile-ci/verify_proximity_suites.py",
+        ".github/scripts/mobile-ci/verify_test_results.py",
+        ".github/scripts/mobile-ci/proximity-test-suites.json"
       ]
     },
     "native": {

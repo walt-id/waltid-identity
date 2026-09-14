@@ -6,7 +6,6 @@
   ],
   "suites": {
     "independent-session-vectors": {
-      "aut": "AUT-05",
       "executionClass": "deterministic",
       "sources": [
         "waltid-libraries/credentials/waltid-mdoc-proximity/src/commonTest/kotlin/id/walt/mdoc/proximity/IndependentSessionVectorTest.kt"
