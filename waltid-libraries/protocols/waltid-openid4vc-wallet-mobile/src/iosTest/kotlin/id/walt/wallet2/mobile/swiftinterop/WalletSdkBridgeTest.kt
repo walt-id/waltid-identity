@@ -354,7 +354,6 @@ class WalletSdkBridgeTest {
         val result = factory.create(
             WalletBridgeConfiguration(
                 walletId = "consumer-wallet",
-                defaultKeyType = MobileWalletKeyType.Ed25519,
                 persistence = WalletBridgePersistence(
                     databaseKey = WalletBridgeDatabaseKeyConfiguration.Managed,
                 ),
@@ -383,7 +382,6 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         assertEquals("consumer-wallet", capturedConfig?.walletId)
-        assertEquals(MobileWalletKeyType.Ed25519, capturedConfig?.defaultKeyType)
         assertEquals(
             MobileWalletPersistence(),
             capturedConfig?.persistence,
@@ -599,7 +597,6 @@ class WalletSdkBridgeTest {
         val config = WalletBridgeConfiguration().toMobileWalletConfig()
 
         assertEquals("default", config.walletId)
-        assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(emptyList(), config.preferredLocales)

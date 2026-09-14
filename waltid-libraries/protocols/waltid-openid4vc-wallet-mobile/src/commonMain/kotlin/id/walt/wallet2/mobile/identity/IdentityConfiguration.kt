@@ -16,7 +16,9 @@ public data class IdentityConfiguration(
     public val platform: SignumPlatformPolicy = SignumPlatformPolicy.Default,
     /** Explicit alternatives the host permits. Choosing weaker authorization always requires a different option. */
     public val alternativeAuthorizations: List<KeyUseAuthorizationPolicy> = emptyList(),
-    /** Whether a separate recovery record remains in the encrypted local database after successful submission. */
+    /** Minimum provider evidence required for activation and disposal of local recovery material. */
+    public val recoveryConfirmation: RecoveryConfirmation = RecoveryConfirmation.LocalAcceptance,
+    /** Whether the additional local recovery record is retained after the required confirmation. */
     public val localRecoveryMaterial: LocalRecoveryMaterialRetention = LocalRecoveryMaterialRetention.Retain,
 ) {
     init {
@@ -66,4 +68,13 @@ public sealed interface IdentityAttestationRequest {
     public data class Native(public val challenge: id.walt.crypto2.serialization.BinaryData) : IdentityAttestationRequest {
         init { require(challenge.size in 1..128) { "Native attestation challenge must contain 1 to 128 bytes" } }
     }
+}
+
+/** Minimum evidence required before backup-dependent activation or local-record disposal. */
+@Serializable
+public enum class RecoveryConfirmation {
+    /** Accepts an exact local readback; remote delivery may still be unknown. */
+    LocalAcceptance,
+    /** Requires the provider to confirm delivery within its documented scope. */
+    ProviderConfirmation,
 }

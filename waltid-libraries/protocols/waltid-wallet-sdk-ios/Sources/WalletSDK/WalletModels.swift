@@ -7,9 +7,6 @@ public struct WalletConfiguration: Sendable {
     /// Signing identity lifecycle and opt-in recovery integrations.
     public var identity: WalletIdentityConfiguration
 
-    /// Default algorithm for standalone key-authorization preflight. Identity creation uses P-256.
-    public var defaultKeyType: WalletKeyType
-
     /// Default authorization policy for newly created wallet signing keys.
     public var defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
 
@@ -42,7 +39,6 @@ public struct WalletConfiguration: Sendable {
     /// - Parameters:
     ///   - walletID: Stable local wallet identifier used for database naming
     ///     and persisted wallet state.
-    ///   - defaultKeyType: Default algorithm for standalone key-authorization preflight; identity creation uses P-256.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
     ///   - clientIDTrustConfiguration: Trust anchors used to authenticate verifier
@@ -63,7 +59,6 @@ public struct WalletConfiguration: Sendable {
     ///   - identity: Signing identity constraints and optional recovery providers.
     public init(
         walletID: String = "default",
-        defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
         clientIDTrustConfiguration: WalletClientIDTrustConfiguration = .init(),
         issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)? = nil,
@@ -77,7 +72,6 @@ public struct WalletConfiguration: Sendable {
     ) {
         self.walletID = walletID
         self.identity = identity
-        self.defaultKeyType = defaultKeyType
         self.defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy
         self.keyUseAuthorizationPrompt = keyUseAuthorizationPrompt
         self.attestation = attestation

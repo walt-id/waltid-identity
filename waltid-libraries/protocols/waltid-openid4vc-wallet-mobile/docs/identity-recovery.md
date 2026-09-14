@@ -86,14 +86,24 @@ not turn an explicitly chosen encrypted-database option into a native key. Hosts
 must use `HardwareGenerated` or select an offered hardware option; a software option is always labeled.
 
 `localRecoveryMaterial` defaults to retaining the additional recovery record in the encrypted local
-journal. `DiscardAfterSubmission` removes that additional record after provider acceptance. It does
+journal. `DiscardAfterSubmission` removes that additional record after the required confirmation. It does
 not erase an operational software private key and does not make an imported key hardware-generated.
 Discarding the last local recovery record of a non-exportable native key prevents later backup to
-another provider unless a recovery record can still be retrieved elsewhere.
+another provider unless a recovery record can still be retrieved elsewhere. The service retrieves
+the record from its recorded source provider, validates it, and verifies the copy at the selected
+destination. Removing the source copy remains a separate explicit operation. Ordinary-Keychain
+keys also expose an explicit native private-key export capability; Enclave and Keystore handles do not.
+
+`recoveryConfirmation` defaults to `LocalAcceptance`, which requires exact provider readback without
+claiming remote delivery. Set `ProviderConfirmation` to require the provider's delivery assertion
+before activation or disposal of the additional local record. A local-only receipt leaves creation
+pending. The retained requirement cannot be weakened by reopening with a less strict default.
+Options expose `recoveryAvailability` so hosts can display protection and delivery scope before selection.
 
 ## Platform capabilities
 
-Availability is evaluated at runtime. “Supported” below describes implemented API behavior, not a
+Availability is evaluated at runtime. Android hardware choices require a temporary native-key probe
+and inspection of actual backing; the probe is removed and never becomes a wallet identity. “Supported” below describes implemented API behavior, not a
 claim that every vendor, OS release or hardware combination has been physically verified.
 
 | Configuration | Android | iOS |
@@ -104,7 +114,7 @@ claim that every vendor, OS release or hardware combination has been physically 
 | Encrypted-database P-256 | Supported; private/public consistency checked on reopen | Supported |
 | Current enrollment / any biometric | Native authorization; enrollment invalidation is a separate policy | Keychain access control |
 | Device credential / biometric-or-credential | API 30+ native authorization and AndroidX interaction | Device passcode / Keychain user presence |
-| Timed authorization | Keystore timeout, independently read back | Process-local LAContext reuse, fixed non-sliding interval; no independent timeout readback |
+| Timed authorization | Keystore timeout, independently read back | Process-local LAContext reuse across handle reloads, fixed non-sliding interval; no independent timeout readback |
 | StrongBox required/preferred/discouraged | Configurable; required backing must be observed | Inapplicable |
 | Unlocked device, validity dates, usage limit | Configurable within native API support; activation consumes one signature | Accessibility controls instead of Android flags |
 | Keychain accessibility / access group | Inapplicable | Configurable; local signing item and recovery item are independent |

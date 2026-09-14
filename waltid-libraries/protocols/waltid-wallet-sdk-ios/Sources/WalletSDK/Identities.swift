@@ -114,10 +114,20 @@ public enum WalletIdentityAuthorization: Sendable {
     case explicit(WalletKeyUseAuthorizationPolicy)
 }
 
+/// Minimum evidence required before backup-dependent activation or disposal of local recovery material.
+public enum WalletRecoveryConfirmation: Sendable {
+    /// Accepts exact local readback, without claiming remote delivery.
+    case localAcceptance
+    /// Requires the provider to confirm delivery within its documented scope.
+    case providerConfirmation
+}
+
 /// Identity lifecycle configuration. Recovery integrations are disabled unless registered explicitly.
 public struct WalletIdentityConfiguration: Sendable {
     /// Retention of the additional local recovery record.
     public var localRecoveryMaterial: WalletLocalRecoveryMaterialRetention
+    /// Minimum backup-delivery evidence required for activation and local-record disposal.
+    public var recoveryConfirmation: WalletRecoveryConfirmation
     /// Constraints applied to identity creation and recovery.
     public var policy: WalletIdentityPolicy
     /// The wallet default is inherited unless an explicit policy is selected.
@@ -131,17 +141,20 @@ public struct WalletIdentityConfiguration: Sendable {
     /// Configures identity constraints and explicitly registered recovery integrations.
     /// - Parameters:
     ///   - policy: Creation and export constraints retained with the identity.
+    ///   - recoveryConfirmation: Minimum provider evidence for successful backup.
     ///   - localRecoveryMaterial: Retention of the additional encrypted recovery record.
     ///   - authorization: Explicit policy or inheritance from the wallet default.
     ///   - alternativeAuthorizations: Policies offered only for explicit selection.
     ///   - keychain: Optional native signing-key settings.
     ///   - recoveryProviders: Trusted providers that receive recovery secrets.
     public init(policy: WalletIdentityPolicy = .generalPurpose,
+                recoveryConfirmation: WalletRecoveryConfirmation = .localAcceptance,
                 localRecoveryMaterial: WalletLocalRecoveryMaterialRetention = .retain,
                 authorization: WalletIdentityAuthorization = .walletDefault,
                 alternativeAuthorizations: [WalletKeyUseAuthorizationPolicy] = [],
                 keychain: WalletIdentityKeychainConfiguration? = nil,
                 recoveryProviders: [any WalletIdentityRecoveryProvider] = []) {
+        self.recoveryConfirmation = recoveryConfirmation
         self.localRecoveryMaterial = localRecoveryMaterial
         self.policy = policy
         self.authorization = authorization
@@ -274,6 +287,8 @@ public struct WalletIdentityCreationOption: Sendable {
     public let authorization: WalletKeyUseAuthorizationPolicy
     /// Recovery provider display name, or nil for a device-bound option.
     public let recoveryProviderName: String?
+    /// Provider protection and delivery route, or nil when recovery is disabled.
+    public let recoveryAvailability: WalletRecoveryAvailability?
     let handle: any WalletIdentityHandle
 }
 /// Supported complete choices, or reasons no choice is available.
@@ -291,6 +306,8 @@ public enum WalletIdentityOptions: Sendable {
 public struct WalletIdentityBackupOption: Sendable {
     /// Identity to which the operation applies.
     public let identityID: String
+    /// Provider protection and delivery route, rechecked before submission.
+    public let recoveryAvailability: WalletRecoveryAvailability
     /// Display name of the selected recovery provider.
     public let providerName: String
     let handle: any WalletIdentityHandle

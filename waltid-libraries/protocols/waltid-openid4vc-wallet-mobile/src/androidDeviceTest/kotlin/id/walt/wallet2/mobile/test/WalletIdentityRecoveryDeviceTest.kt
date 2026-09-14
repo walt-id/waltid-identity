@@ -24,7 +24,12 @@ class WalletIdentityRecoveryDeviceTest {
             var destinationDeleted = false
             try {
                 val options = assertIs<IdentityOptions.Available>(original.identities.creationOptions(IdentityIntent.Recoverable))
-                val selected = (listOf(options.recommended) + options.alternatives).single { it.storage == storage }
+                val selected = (listOf(options.recommended) + options.alternatives).singleOrNull { it.storage == storage }
+                if (selected == null && storage == IdentityKeyStorage.Hardware) {
+                    println("Hardware recovery unavailable; software recovery is tested independently")
+                    continue
+                }
+                requireNotNull(selected)
                 val created = assertIs<IdentityOperationResult.Active>(original.identities.create(selected)).identity
                 println("Identity destination=$storage security=${created.keyFacts.securityLevel} origin=${created.keyFacts.origin}")
                 if (storage == IdentityKeyStorage.Hardware) assertEquals(SignumKeyOrigin.IMPORTED, created.keyFacts.origin)

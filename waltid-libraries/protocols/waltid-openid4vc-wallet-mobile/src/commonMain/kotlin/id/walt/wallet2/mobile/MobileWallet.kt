@@ -199,7 +199,6 @@ public class MobileWallet internal constructor(
     private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
     private val runKeyUseAuthorizationPreflight: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> KeyUseAuthorizationSupport =
         { _, _ -> error("This MobileWallet does not support key-use authorization preflight") },
-    private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
     attestationConfig: WalletAttestationConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
@@ -290,7 +289,7 @@ public class MobileWallet internal constructor(
 
     /** Checks whether a key-use authorization request is supported without creating or persisting a key. */
     public suspend fun keyUseAuthorizationPreflight(
-        keyType: MobileWalletKeyType = defaultKeyType,
+        keyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
         keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
     ): KeyUseAuthorizationSupport = runKeyUseAuthorizationPreflight(keyType, keyUseAuthorizationPolicy)
 

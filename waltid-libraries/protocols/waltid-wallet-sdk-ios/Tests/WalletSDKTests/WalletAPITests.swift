@@ -45,7 +45,6 @@ final class WalletAPITests: XCTestCase {
 
         acceptsSendable(configuration)
         XCTAssertEqual(configuration.walletID, "default")
-        XCTAssertEqual(configuration.defaultKeyType, .secp256r1)
         XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
         XCTAssertNil(configuration.persistence.credentialStore)
         XCTAssertNil(configuration.persistence.didStore)

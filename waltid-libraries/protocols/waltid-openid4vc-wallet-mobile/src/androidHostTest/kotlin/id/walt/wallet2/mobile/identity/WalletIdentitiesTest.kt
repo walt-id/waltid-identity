@@ -220,6 +220,53 @@ class WalletIdentitiesTest {
         }
     }
 
+    @Test fun `pending setup must not activate after its local key disappears`() = runTest {
+        Fixture().use { f ->
+            f.provider.failStore = true
+            val option = assertIs<IdentityOptions.Available>(f.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended
+            val pending = assertIs<IdentityOperationResult.Pending>(f.wallet.identities.create(option))
+            val keyId = f.queries.selectAll().executeAsList().single().key_id
+            assertTrue(SqlDelightKeyStore(NoNative, f.queries, "default").removeKey(keyId))
+            f.provider.failStore = false
+            val restarted = f.reopen()
+            val result = restarted.identities.resumePending(pending.identityId)
+            assertFalse(result is IdentityOperationResult.Active, "Activated missing key: $result; actual state=${restarted.identities.state()}")
+        }
+    }
+    @Test fun `pending setup must respect newly configured device-bound policy before upload`() = runTest {
+        Fixture().use { f ->
+            f.provider.failStore = true
+            val option = assertIs<IdentityOptions.Available>(f.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended
+            val pending = assertIs<IdentityOperationResult.Pending>(f.wallet.identities.create(option))
+            f.provider.failStore = false
+            val restarted = f.reopen(IdentityConfiguration(recoveryProviders = listOf(f.provider),
+                authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None), policy = IdentityKeyPolicy.DeviceBound))
+            restarted.identities.resumePending(pending.identityId)
+            assertTrue(f.provider.records.isEmpty(), "Uploaded a secret after the host prohibited backup")
+        }
+    }
+    @Test fun `required provider confirmation survives restart and retains recovery until confirmed`() = runTest {
+        val provider = MemoryRecovery()
+        val configuration = IdentityConfiguration(recoveryProviders = listOf(provider),
+            authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None),
+            recoveryConfirmation = RecoveryConfirmation.ProviderConfirmation,
+            localRecoveryMaterial = LocalRecoveryMaterialRetention.DiscardAfterSubmission)
+        Fixture(configuration, provider).use { fixture ->
+            val option = assertIs<IdentityOptions.Available>(fixture.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended
+            val pending = assertIs<IdentityOperationResult.Pending>(fixture.wallet.identities.create(option))
+            assertNull(fixture.queries.selectActiveIdentity("default").executeAsOneOrNull())
+            val restarted = fixture.reopen(configuration.copy(recoveryConfirmation = RecoveryConfirmation.LocalAcceptance))
+            assertIs<IdentityOperationResult.Pending>(restarted.identities.resumePending(pending.identityId))
+            provider.receipt = RecoveryReceipt.ConfirmedByProvider
+            val active = assertIs<IdentityOperationResult.Active>(restarted.identities.resumePending(pending.identityId))
+            assertEquals(pending.identityId, active.identity.id)
+            assertEquals(RecoveryReceipt.ConfirmedByProvider, assertIs<IdentityRecoveryState.Submitted>(active.identity.recovery).receipt)
+            provider.receipt = RecoveryReceipt.AcceptedLocally
+            val backup = restarted.identities.backupOptions(active.identity.id).single()
+            assertIs<IdentityOperationResult.Failed>(restarted.identities.backup(backup))
+        }
+    }
+
     private class Fixture(
         configuration: IdentityConfiguration? = null,
         val provider: MemoryRecovery = MemoryRecovery(),
@@ -231,7 +278,7 @@ class WalletIdentitiesTest {
             recoveryProviders = listOf(provider), authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
         init { WalletPersistenceDatabase.Schema.create(driver) }
         val wallet = reopen()
-        fun reopen() = createSqlDelightMobileWallet(config, ClientIdTrustConfiguration(), db, NoNative, Crypto2DidService, {})
+        fun reopen(identity: IdentityConfiguration = config.identity) = createSqlDelightMobileWallet(config.copy(identity = identity), ClientIdTrustConfiguration(), db, NoNative, Crypto2DidService, {})
         override fun close() { driver.close() }
     }
 
@@ -240,6 +287,7 @@ class WalletIdentitiesTest {
         override val displayName = "Test-only memory provider"
         val records = mutableMapOf<String, ByteArray>()
         var corruptReadback = false
+        var receipt = RecoveryReceipt.AcceptedLocally
         var failStore = false
         var available = true
         override suspend fun availability() = if (available) RecoveryAvailability.Available(RecoveryProtection.ApplicationEncrypted, RecoveryScope.Custom)
@@ -250,7 +298,7 @@ class WalletIdentitiesTest {
             val bytes = record.copyBytes()
             check(records[recordId]?.contentEquals(bytes) != false)
             records[recordId] = bytes
-            return RecoveryReceipt.AcceptedLocally
+            return receipt
         }
         override suspend fun retrieve(recordId: String) = records[recordId]?.let {
             IdentityRecoveryData(if (corruptReadback) "corrupt".encodeToByteArray() else it)
