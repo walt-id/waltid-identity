@@ -75,9 +75,9 @@ prevents approval and explains why another credential is needed.
 The ready screen shows a cancellable 60-second, one-use approval and its scope.
 Approval automatically reopens the previous engagement method when available.
 The reader must start a fresh request; additional data, another reader or changed
-purpose/retention requires another decision. iOS NFC-only uses this review/reconnect
-flow because Core NFC owns the screen during transfer; Bluetooth retains ordinary
-connected review. Only an actively owned NFC sheet exempts background cancellation.
+purpose/retention requires another decision. While the Core NFC sheet owns the
+screen, the SDK uses this review/reconnect flow even if NFC v2 has an alternate
+bearer. Conventional handover permits connected review after the sheet closes. Only an actively owned NFC sheet exempts background cancellation.
 
 Completion shows the locally shared selection and **Prepare another share** while
 the recent request remains valid. Preparing again requires a new review and approval;
@@ -114,6 +114,10 @@ does not authorize disclosure. The same switch is available in Nearby sharing se
 the reader and expiry countdown stay visible, and **Approved data** opens the already reviewed
 selection. Cancel stays separate from scrolling content. Short screens and larger text retain
 scrolling for secondary controls; landscape places the QR beside the controls.
+
+Review actions carry the identity of the displayed review. Each new review resets
+holder choices and continuation. Permission prompts are needed only when no
+selected route can start; terminal recovery creates a new single-use session.
 
 ## Local wallet data
 
@@ -207,7 +211,3 @@ iOS Identity Document providers currently cover presentation only; create/issuan
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)
 - [waltid-openid4vc-wallet-persistence-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md)
 - [waltid-mobile-test-utils](../../waltid-libraries/protocols/waltid-mobile-test-utils/README.md)
-
-Review actions carry the identity of the displayed review. Each new review resets
-holder choices and continuation. Permission prompts are needed only when no
-selected route can start; terminal recovery creates a new single-use session.
