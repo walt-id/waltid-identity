@@ -8,10 +8,10 @@ import id.walt.cose.selectCoseSignatureAlgorithm
 import id.walt.cose.toCoseSigner
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
-import id.walt.mdoc.objects.deviceretrieval.ElementReference
-import id.walt.mdoc.objects.deviceretrieval.EncryptedDocuments
-import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceResponse
+import id.walt.mdoc.objects.edition2.deviceretrieval.ElementReference
+import id.walt.mdoc.objects.edition2.deviceretrieval.EncryptedDocuments
+import id.walt.mdoc.objects.edition2.document.Document
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
@@ -454,7 +454,7 @@ internal class ProximityRequestProcessor(
         return InventoryDocument(
             stored = stored,
             credential = credential,
-            document = document,
+            document = id.walt.mdoc.parser.MdocParser.parseToEdition2Document(requireNotNull(credential.signed)),
             holderKey = authentication.holderKey,
             deviceAuthentication = authentication.method,
             issuerAuthorityKeyIdentifiers = issuerAuthentication.certificateChain.mapNotNull {
