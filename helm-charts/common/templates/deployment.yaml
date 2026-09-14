@@ -43,6 +43,14 @@ spec:
           value: {{ $value | quote }}
         {{- end }}
         {{- end }}
+        {{- with .Values.envFromSecrets }}
+        envFrom:
+        {{- range . }}
+        - secretRef:
+            name: {{ . }}
+            optional: true
+        {{- end }}
+        {{- end }}
         {{- if or .Values.configFiles .Values.persistence.enabled }}
         volumeMounts:
         {{- range $name, $content := .Values.configFiles }}

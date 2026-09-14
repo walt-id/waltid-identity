@@ -38,6 +38,10 @@ spec:
               value: "https://verifier2.portal.test.waltid.cloud"
             - name: NUXT_PUBLIC_WALLET_URL
               value: "https://wallet.test.waltid.cloud"
+          envFrom:
+            - secretRef:
+                name: portal2-pid-secret
+                optional: true
           ports:
             - containerPort: 7105
               name: http-portal2
