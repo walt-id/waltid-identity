@@ -1,4 +1,4 @@
-# Independent session vectors (AUT-05)
+# Independent session vectors
 
 The existing suite already covers generated cipher mutation/replay matrices, RFC 5869 HKDF,
 curve agreement, malformed requests, authentication policy and wire-error disclosure suppression.
