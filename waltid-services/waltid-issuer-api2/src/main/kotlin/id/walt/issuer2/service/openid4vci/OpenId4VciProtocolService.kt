@@ -875,7 +875,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         // This trusted configuration classifies the event; it does not short-circuit the protocol checks below.
         val sessionConfiguration = metadataService.getCredentialConfiguration(observedSession.credentialConfigurationId)
 
-        if (observedSession.isClosed || observedSession.status != IssuanceSessionStatus.ACTIVE) {
+        if (
+            observedSession.isClosed ||
+            observedSession.status !in setOf(IssuanceSessionStatus.ACTIVE, IssuanceSessionStatus.SUCCESSFUL)
+        ) {
             return rejectCredentialRequest(
                 requestWithSession,
                 observedSession,
@@ -1203,7 +1206,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                             status = IssuanceSessionStatus.SUCCESSFUL,
                             statusReason = "Credential issued successfully",
                             issuedCredentialFormat = configuration.format.value,
-                            isClosed = true,
+                            isClosed = false,
                         )
                     )
                 }
@@ -1417,7 +1420,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
     private fun IssuanceSession.isActiveAuthorizationCodeSession(): Boolean =
         authenticationMethod == AuthenticationMethod.AUTHORIZED &&
-            status == IssuanceSessionStatus.ACTIVE &&
+            status in setOf(IssuanceSessionStatus.ACTIVE, IssuanceSessionStatus.SUCCESSFUL) &&
             !isClosed &&
             expiresAt > Clock.System.now()
 

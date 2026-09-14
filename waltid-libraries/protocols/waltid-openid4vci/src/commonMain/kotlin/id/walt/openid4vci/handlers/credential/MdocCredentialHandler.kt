@@ -35,7 +35,10 @@ import kotlin.time.Instant
  * new mdoc issuer directly.
  */
 @OptIn(ExperimentalSerializationApi::class)
-class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
+class MdocCredentialHandler(
+    private val roundValidityToTwelveHours: Boolean = false,
+    private val now: () -> Instant = { Clock.System.now() },
+) : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
     @Deprecated("Use the Crypto2CredentialSigningKey overload")
     override suspend fun sign(
         request: CredentialRequest,
@@ -68,14 +71,15 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             computeCredentialResult(
                 request = request,
                 configuration = configuration,
-                issue = { certificateChain, docType, effectiveValidUntil, verifiedProof ->
+                issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, verifiedProof ->
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
                         credentialData = credentialData,
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
                         docType = docType,
-                        validFrom = validFrom,
+                        signedAt = signedAt,
+                        validFrom = effectiveValidFrom,
                         validUntil = effectiveValidUntil,
                         status = credentialStatus,
                         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
@@ -86,6 +90,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                 credentialData = credentialData,
                 x5Chain = x5Chain,
                 mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+                validFrom = validFrom,
                 validUntil = validUntil,
                 verifiedProofs = verifiedProofs,
             )
@@ -120,9 +125,10 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             credentialData = credentialData,
             x5Chain = x5Chain,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            validFrom = validFrom,
             validUntil = validUntil,
             verifiedProofs = verifiedProofs,
-            issue = { certificateChain, docType, effectiveValidUntil, verifiedProof ->
+            issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, verifiedProof ->
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
                     credentialData = credentialData,
@@ -130,7 +136,8 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),
                     issuerCertificate = certificateChain,
                     docType = docType,
-                    validFrom = validFrom,
+                    signedAt = signedAt,
+                    validFrom = effectiveValidFrom,
                     validUntil = effectiveValidUntil,
                     status = credentialStatus,
                     mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
@@ -152,11 +159,14 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         credentialData: JsonObject,
         x5Chain: List<X509Certificate>?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        validFrom: Instant?,
         validUntil: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
         issue: suspend (
             certificateChain: List<CoseCertificate>,
             docType: String,
+            signedAt: Instant?,
+            validFrom: Instant?,
             validUntil: Instant,
             verifiedProof: VerifiedCredentialProof?,
         ) -> String,
@@ -180,14 +190,26 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             }
         }
 
-        val issuerCertificateChain = requireNotNull(x5Chain?.takeIf { it.isNotEmpty() }) {
+        val certificates = requireNotNull(x5Chain?.takeIf { it.isNotEmpty() }) {
             "mDoc issuance requests require that the x5Chain parameter contains at least one entry"
-        }.map { CoseCertificate(it.encodedDer.toByteArray()) }
+        }
+        val issuerCertificateChain = certificates.map { CoseCertificate(it.encodedDer.toByteArray()) }
 
         // Issues one credential per verified proof, or a single credential bound to the request proof.
-        val effectiveValidUntil = resolveValidUntil(request, validUntil)
+        val requestedValidUntil = request.requestForm["validUntil"]
+            ?.firstOrNull()
+            ?.toLongOrNull()
+            ?.let(Instant::fromEpochMilliseconds)
+            ?: validUntil
+        val roundedValidity = if (roundValidityToTwelveHours) {
+            roundedMdocValidity(now(), certificates.first().data.validity, validFrom, requestedValidUntil)
+        } else null
+        val effectiveValidUntil = roundedValidity?.validUntil ?: requestedValidUntil ?: now().plus(365.days)
         val issuedCredentials = verifiedProofs.ifEmpty { listOf(null) }.map { verifiedProof ->
-            issue(issuerCertificateChain, docType, effectiveValidUntil, verifiedProof)
+            issue(
+                issuerCertificateChain, docType, roundedValidity?.signed,
+                roundedValidity?.validFrom ?: validFrom, effectiveValidUntil, verifiedProof,
+            )
         }
 
         return CredentialResponseResult.Success(
@@ -196,16 +218,5 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             ),
         )
     }
-
-    private fun resolveValidUntil(
-        request: CredentialRequest,
-        configuredValidUntil: Instant?,
-    ): Instant =
-        request.requestForm["validUntil"]
-            ?.firstOrNull()
-            ?.toLongOrNull()
-            ?.let(Instant::fromEpochMilliseconds)
-            ?: configuredValidUntil
-            ?: Clock.System.now().plus(365.days)
 
 }
