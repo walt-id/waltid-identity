@@ -39,8 +39,9 @@ import kotlin.time.TimeSource
  */
 class MdocCredentialThroughputTest {
 
-    private val durationMillis =
-        (System.getProperty("waltid.credentialBenchmarkSeconds")?.toLongOrNull() ?: 3L) * 1_000L
+    // Fixed rather than read from a system property: this is commonTest, and neither system properties nor
+    // environment variables exist on every target it compiles for. A longer reading is taken by editing this.
+    private val durationMillis = 3L * 1_000L
 
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
@@ -112,9 +113,16 @@ class MdocCredentialThroughputTest {
             }
             val millis = started.elapsedNow().inWholeMilliseconds
             val perSecond = count * 1000.0 / millis
+            // String.format is JVM-only, so the numbers are rounded by hand to keep this test multiplatform.
+            fun Double.round(decimals: Int): String {
+                val factor = generateSequence(1.0) { it * 10 }.elementAt(decimals)
+                val scaled = kotlin.math.round(this * factor) / factor
+                return scaled.toString()
+            }
             println(
-                "MDOC %-8s %,8d ops in %,6d ms = %,8.1f ops/s single thread (%.3f ms each), %,9.1f ops/s on 24 cores"
-                    .format(label, count, millis, perSecond, millis.toDouble() / count, perSecond * 24)
+                "MDOC $label $count ops in $millis ms = ${perSecond.round(1)} ops/s single thread " +
+                        "(${(millis.toDouble() / count).round(3)} ms each), " +
+                        "${(perSecond * 24).round(1)} ops/s on 24 cores"
             )
         }
 
