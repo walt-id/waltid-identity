@@ -111,13 +111,20 @@ private fun WebWalletSession(
 
     LaunchedEffect(controller) {
         val href = window.location.href
-        if (href.contains("code=")) {
+        if (isAuthorizationCallbackHref(href)) {
             controller.handleDeepLink(href)
             clearAuthorizationCallbackFromAddressBar()
         }
     }
 
     WalletDemoApp(controller, branding = branding, onSignOut = onSignOut)
+}
+
+private fun isAuthorizationCallbackHref(href: String): Boolean {
+    val query = href.substringAfter('?', "").substringBefore('#')
+    return query.split('&').any { parameter ->
+        parameter.startsWith("code=") || parameter.startsWith("error=")
+    }
 }
 
 @OptIn(ExperimentalWasmJsInterop::class)

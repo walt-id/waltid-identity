@@ -76,9 +76,7 @@ private fun matchesRedirectTarget(expectedRedirectUri: String, callback: Url): B
     ) {
         return false
     }
-    val callbackBaseNames = callback.parameters.names() - callbackParameterNames.toSet()
-    if (callbackBaseNames != expected.parameters.names()) return false
-    return callbackBaseNames.all { name ->
+    return expected.parameters.names().all { name ->
         callback.parameters.getAll(name) == expected.parameters.getAll(name)
     }
 }
