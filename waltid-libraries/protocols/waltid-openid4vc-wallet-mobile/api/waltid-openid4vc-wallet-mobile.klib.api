@@ -6,6 +6,129 @@
 // - Show declarations: true
 
 // Library unique name: <id.walt.protocols:waltid-openid4vc-wallet-mobile>
+final enum class id.walt.wallet2.mobile.identity/IdentityFailure : kotlin/Enum<id.walt.wallet2.mobile.identity/IdentityFailure> { // id.walt.wallet2.mobile.identity/IdentityFailure|null[0]
+    enum entry AuthorizationNotCompleted // id.walt.wallet2.mobile.identity/IdentityFailure.AuthorizationNotCompleted|null[0]
+    enum entry ExistingIdentity // id.walt.wallet2.mobile.identity/IdentityFailure.ExistingIdentity|null[0]
+    enum entry InvalidRecoveryRecord // id.walt.wallet2.mobile.identity/IdentityFailure.InvalidRecoveryRecord|null[0]
+    enum entry KeyUnavailable // id.walt.wallet2.mobile.identity/IdentityFailure.KeyUnavailable|null[0]
+    enum entry NativeOperationFailed // id.walt.wallet2.mobile.identity/IdentityFailure.NativeOperationFailed|null[0]
+    enum entry RecoveryUnavailable // id.walt.wallet2.mobile.identity/IdentityFailure.RecoveryUnavailable|null[0]
+    enum entry StaleOption // id.walt.wallet2.mobile.identity/IdentityFailure.StaleOption|null[0]
+    enum entry UnsupportedPolicy // id.walt.wallet2.mobile.identity/IdentityFailure.UnsupportedPolicy|null[0]
+
+    final val entries // id.walt.wallet2.mobile.identity/IdentityFailure.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile.identity/IdentityFailure> // id.walt.wallet2.mobile.identity/IdentityFailure.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile.identity/IdentityFailure // id.walt.wallet2.mobile.identity/IdentityFailure.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile.identity/IdentityFailure> // id.walt.wallet2.mobile.identity/IdentityFailure.values|values#static(){}[0]
+}
+
+final enum class id.walt.wallet2.mobile.identity/IdentityIntent : kotlin/Enum<id.walt.wallet2.mobile.identity/IdentityIntent> { // id.walt.wallet2.mobile.identity/IdentityIntent|null[0]
+    enum entry Recoverable // id.walt.wallet2.mobile.identity/IdentityIntent.Recoverable|null[0]
+    enum entry WithoutRecovery // id.walt.wallet2.mobile.identity/IdentityIntent.WithoutRecovery|null[0]
+
+    final val entries // id.walt.wallet2.mobile.identity/IdentityIntent.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile.identity/IdentityIntent> // id.walt.wallet2.mobile.identity/IdentityIntent.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile.identity/IdentityIntent // id.walt.wallet2.mobile.identity/IdentityIntent.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile.identity/IdentityIntent> // id.walt.wallet2.mobile.identity/IdentityIntent.values|values#static(){}[0]
+}
+
+final enum class id.walt.wallet2.mobile.identity/IdentityKeyPolicy : kotlin/Enum<id.walt.wallet2.mobile.identity/IdentityKeyPolicy> { // id.walt.wallet2.mobile.identity/IdentityKeyPolicy|null[0]
+    enum entry DeviceBound // id.walt.wallet2.mobile.identity/IdentityKeyPolicy.DeviceBound|null[0]
+    enum entry GeneralPurpose // id.walt.wallet2.mobile.identity/IdentityKeyPolicy.GeneralPurpose|null[0]
+    enum entry HardwareGenerated // id.walt.wallet2.mobile.identity/IdentityKeyPolicy.HardwareGenerated|null[0]
+
+    final val entries // id.walt.wallet2.mobile.identity/IdentityKeyPolicy.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile.identity/IdentityKeyPolicy> // id.walt.wallet2.mobile.identity/IdentityKeyPolicy.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile.identity/IdentityKeyPolicy // id.walt.wallet2.mobile.identity/IdentityKeyPolicy.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile.identity/IdentityKeyPolicy> // id.walt.wallet2.mobile.identity/IdentityKeyPolicy.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile.identity/IdentityKeyPolicy.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/IdentityKeyPolicy> // id.walt.wallet2.mobile.identity/IdentityKeyPolicy.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile.identity/IdentityKeyPolicy.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class id.walt.wallet2.mobile.identity/IdentityKeyStorage : kotlin/Enum<id.walt.wallet2.mobile.identity/IdentityKeyStorage> { // id.walt.wallet2.mobile.identity/IdentityKeyStorage|null[0]
+    enum entry EncryptedDatabase // id.walt.wallet2.mobile.identity/IdentityKeyStorage.EncryptedDatabase|null[0]
+    enum entry Hardware // id.walt.wallet2.mobile.identity/IdentityKeyStorage.Hardware|null[0]
+    enum entry NativeStorage // id.walt.wallet2.mobile.identity/IdentityKeyStorage.NativeStorage|null[0]
+
+    final val entries // id.walt.wallet2.mobile.identity/IdentityKeyStorage.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile.identity/IdentityKeyStorage> // id.walt.wallet2.mobile.identity/IdentityKeyStorage.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile.identity/IdentityKeyStorage // id.walt.wallet2.mobile.identity/IdentityKeyStorage.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile.identity/IdentityKeyStorage> // id.walt.wallet2.mobile.identity/IdentityKeyStorage.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile.identity/IdentityKeyStorage.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/IdentityKeyStorage> // id.walt.wallet2.mobile.identity/IdentityKeyStorage.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile.identity/IdentityKeyStorage.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention : kotlin/Enum<id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention> { // id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention|null[0]
+    enum entry DiscardAfterSubmission // id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention.DiscardAfterSubmission|null[0]
+    enum entry Retain // id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention.Retain|null[0]
+
+    final val entries // id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention> // id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention // id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention> // id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention.values|values#static(){}[0]
+}
+
+final enum class id.walt.wallet2.mobile.identity/RecoveryProtection : kotlin/Enum<id.walt.wallet2.mobile.identity/RecoveryProtection> { // id.walt.wallet2.mobile.identity/RecoveryProtection|null[0]
+    enum entry ApplicationEncrypted // id.walt.wallet2.mobile.identity/RecoveryProtection.ApplicationEncrypted|null[0]
+    enum entry OperatingSystemEndToEnd // id.walt.wallet2.mobile.identity/RecoveryProtection.OperatingSystemEndToEnd|null[0]
+    enum entry OperatingSystemProtected // id.walt.wallet2.mobile.identity/RecoveryProtection.OperatingSystemProtected|null[0]
+
+    final val entries // id.walt.wallet2.mobile.identity/RecoveryProtection.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile.identity/RecoveryProtection> // id.walt.wallet2.mobile.identity/RecoveryProtection.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile.identity/RecoveryProtection // id.walt.wallet2.mobile.identity/RecoveryProtection.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile.identity/RecoveryProtection> // id.walt.wallet2.mobile.identity/RecoveryProtection.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile.identity/RecoveryProtection.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/RecoveryProtection> // id.walt.wallet2.mobile.identity/RecoveryProtection.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile.identity/RecoveryProtection.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class id.walt.wallet2.mobile.identity/RecoveryReceipt : kotlin/Enum<id.walt.wallet2.mobile.identity/RecoveryReceipt> { // id.walt.wallet2.mobile.identity/RecoveryReceipt|null[0]
+    enum entry AcceptedLocally // id.walt.wallet2.mobile.identity/RecoveryReceipt.AcceptedLocally|null[0]
+    enum entry ConfirmedByProvider // id.walt.wallet2.mobile.identity/RecoveryReceipt.ConfirmedByProvider|null[0]
+
+    final val entries // id.walt.wallet2.mobile.identity/RecoveryReceipt.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile.identity/RecoveryReceipt> // id.walt.wallet2.mobile.identity/RecoveryReceipt.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.mobile.identity/RecoveryReceipt.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile.identity/RecoveryReceipt> // id.walt.wallet2.mobile.identity/RecoveryReceipt.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile.identity/RecoveryReceipt.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/RecoveryReceipt> // id.walt.wallet2.mobile.identity/RecoveryReceipt.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile.identity/RecoveryReceipt.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class id.walt.wallet2.mobile.identity/RecoveryScope : kotlin/Enum<id.walt.wallet2.mobile.identity/RecoveryScope> { // id.walt.wallet2.mobile.identity/RecoveryScope|null[0]
+    enum entry Cloud // id.walt.wallet2.mobile.identity/RecoveryScope.Cloud|null[0]
+    enum entry Custom // id.walt.wallet2.mobile.identity/RecoveryScope.Custom|null[0]
+    enum entry DeviceTransfer // id.walt.wallet2.mobile.identity/RecoveryScope.DeviceTransfer|null[0]
+
+    final val entries // id.walt.wallet2.mobile.identity/RecoveryScope.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile.identity/RecoveryScope> // id.walt.wallet2.mobile.identity/RecoveryScope.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile.identity/RecoveryScope // id.walt.wallet2.mobile.identity/RecoveryScope.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile.identity/RecoveryScope> // id.walt.wallet2.mobile.identity/RecoveryScope.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile.identity/RecoveryScope.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/RecoveryScope> // id.walt.wallet2.mobile.identity/RecoveryScope.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile.identity/RecoveryScope.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 final enum class id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseKeyConfiguration : kotlin/Enum<id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseKeyConfiguration> { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseKeyConfiguration|null[0]
     enum entry Managed // id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseKeyConfiguration.Managed|null[0]
     enum entry Provided // id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseKeyConfiguration.Provided|null[0]
@@ -53,8 +176,11 @@ final enum class id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataS
 }
 
 final enum class id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicyType : kotlin/Enum<id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicyType> { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicyType|null[0]
+    enum entry BiometricAny // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicyType.BiometricAny|null[0]
     enum entry BiometricCurrentSet // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet|null[0]
+    enum entry BiometricOrDeviceCredential // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicyType.BiometricOrDeviceCredential|null[0]
     enum entry BiometricTimedReuse // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse|null[0]
+    enum entry DeviceCredential // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicyType.DeviceCredential|null[0]
     enum entry None // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicyType.None|null[0]
 
     final val entries // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicyType.entries|#static{}entries[0]
@@ -270,6 +396,19 @@ abstract fun interface id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator {
     abstract suspend fun evaluate(kotlin.collections/List<kotlin/ByteArray>): id.walt.wallet2.mobile/MobileWalletReaderTrustDecision // id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator.evaluate|evaluate(kotlin.collections.List<kotlin.ByteArray>){}[0]
 }
 
+abstract interface id.walt.wallet2.mobile.identity/IdentityRecoveryProvider { // id.walt.wallet2.mobile.identity/IdentityRecoveryProvider|null[0]
+    abstract val displayName // id.walt.wallet2.mobile.identity/IdentityRecoveryProvider.displayName|{}displayName[0]
+        abstract fun <get-displayName>(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryProvider.displayName.<get-displayName>|<get-displayName>(){}[0]
+    abstract val id // id.walt.wallet2.mobile.identity/IdentityRecoveryProvider.id|{}id[0]
+        abstract fun <get-id>(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryProvider.id.<get-id>|<get-id>(){}[0]
+
+    abstract suspend fun availability(): id.walt.wallet2.mobile.identity/RecoveryAvailability // id.walt.wallet2.mobile.identity/IdentityRecoveryProvider.availability|availability(){}[0]
+    abstract suspend fun delete(kotlin/String): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.mobile.identity/IdentityRecoveryProvider.delete|delete(kotlin.String){}[0]
+    abstract suspend fun list(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile.identity/IdentityRecoveryProvider.list|list(){}[0]
+    abstract suspend fun retrieve(kotlin/String): id.walt.wallet2.mobile.identity/IdentityRecoveryData? // id.walt.wallet2.mobile.identity/IdentityRecoveryProvider.retrieve|retrieve(kotlin.String){}[0]
+    abstract suspend fun store(kotlin/String, id.walt.wallet2.mobile.identity/IdentityRecoveryData): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.mobile.identity/IdentityRecoveryProvider.store|store(kotlin.String;id.walt.wallet2.mobile.identity.IdentityRecoveryData){}[0]
+}
+
 abstract interface id.walt.wallet2.mobile.swiftinterop/WalletBridgeCredentialStore { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeCredentialStore|null[0]
     abstract suspend fun addCredential(id.walt.wallet2.mobile.swiftinterop/WalletBridgeStoredCredential) // id.walt.wallet2.mobile.swiftinterop/WalletBridgeCredentialStore.addCredential|addCredential(id.walt.wallet2.mobile.swiftinterop.WalletBridgeStoredCredential){}[0]
     abstract suspend fun getCredential(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeStoredCredential? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeCredentialStore.getCredential|getCredential(kotlin.String){}[0]
@@ -326,6 +465,328 @@ sealed interface <#A: out kotlin/Any?> id.walt.wallet2.mobile.swiftinterop/Walle
         final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult.Failure.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult.Failure.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult.Failure.toString|toString(){}[0]
+    }
+}
+
+sealed interface id.walt.wallet2.mobile.identity/IdentityAttestationRequest { // id.walt.wallet2.mobile.identity/IdentityAttestationRequest|null[0]
+    final class Native : id.walt.wallet2.mobile.identity/IdentityAttestationRequest { // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.Native|null[0]
+        constructor <init>(id.walt.crypto2.serialization/BinaryData) // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.Native.<init>|<init>(id.walt.crypto2.serialization.BinaryData){}[0]
+
+        final val challenge // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.Native.challenge|{}challenge[0]
+            final fun <get-challenge>(): id.walt.crypto2.serialization/BinaryData // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.Native.challenge.<get-challenge>|<get-challenge>(){}[0]
+
+        final fun component1(): id.walt.crypto2.serialization/BinaryData // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.Native.component1|component1(){}[0]
+        final fun copy(id.walt.crypto2.serialization/BinaryData = ...): id.walt.wallet2.mobile.identity/IdentityAttestationRequest.Native // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.Native.copy|copy(id.walt.crypto2.serialization.BinaryData){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.Native.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.Native.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.Native.toString|toString(){}[0]
+    }
+
+    final object None : id.walt.wallet2.mobile.identity/IdentityAttestationRequest { // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.None|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.None.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.None.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityAttestationRequest.None.toString|toString(){}[0]
+    }
+}
+
+sealed interface id.walt.wallet2.mobile.identity/IdentityAuthorization { // id.walt.wallet2.mobile.identity/IdentityAuthorization|null[0]
+    final class Explicit : id.walt.wallet2.mobile.identity/IdentityAuthorization { // id.walt.wallet2.mobile.identity/IdentityAuthorization.Explicit|null[0]
+        constructor <init>(id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy) // id.walt.wallet2.mobile.identity/IdentityAuthorization.Explicit.<init>|<init>(id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy){}[0]
+
+        final val policy // id.walt.wallet2.mobile.identity/IdentityAuthorization.Explicit.policy|{}policy[0]
+            final fun <get-policy>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile.identity/IdentityAuthorization.Explicit.policy.<get-policy>|<get-policy>(){}[0]
+
+        final fun component1(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile.identity/IdentityAuthorization.Explicit.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ...): id.walt.wallet2.mobile.identity/IdentityAuthorization.Explicit // id.walt.wallet2.mobile.identity/IdentityAuthorization.Explicit.copy|copy(id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityAuthorization.Explicit.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityAuthorization.Explicit.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityAuthorization.Explicit.toString|toString(){}[0]
+    }
+
+    final object WalletDefault : id.walt.wallet2.mobile.identity/IdentityAuthorization { // id.walt.wallet2.mobile.identity/IdentityAuthorization.WalletDefault|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityAuthorization.WalletDefault.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityAuthorization.WalletDefault.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityAuthorization.WalletDefault.toString|toString(){}[0]
+    }
+}
+
+sealed interface id.walt.wallet2.mobile.identity/IdentityOperationResult { // id.walt.wallet2.mobile.identity/IdentityOperationResult|null[0]
+    final class Active : id.walt.wallet2.mobile.identity/IdentityOperationResult { // id.walt.wallet2.mobile.identity/IdentityOperationResult.Active|null[0]
+        constructor <init>(id.walt.wallet2.mobile.identity/WalletIdentity) // id.walt.wallet2.mobile.identity/IdentityOperationResult.Active.<init>|<init>(id.walt.wallet2.mobile.identity.WalletIdentity){}[0]
+
+        final val identity // id.walt.wallet2.mobile.identity/IdentityOperationResult.Active.identity|{}identity[0]
+            final fun <get-identity>(): id.walt.wallet2.mobile.identity/WalletIdentity // id.walt.wallet2.mobile.identity/IdentityOperationResult.Active.identity.<get-identity>|<get-identity>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile.identity/WalletIdentity // id.walt.wallet2.mobile.identity/IdentityOperationResult.Active.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.mobile.identity/WalletIdentity = ...): id.walt.wallet2.mobile.identity/IdentityOperationResult.Active // id.walt.wallet2.mobile.identity/IdentityOperationResult.Active.copy|copy(id.walt.wallet2.mobile.identity.WalletIdentity){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityOperationResult.Active.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityOperationResult.Active.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityOperationResult.Active.toString|toString(){}[0]
+    }
+
+    final class Failed : id.walt.wallet2.mobile.identity/IdentityOperationResult { // id.walt.wallet2.mobile.identity/IdentityOperationResult.Failed|null[0]
+        constructor <init>(id.walt.wallet2.mobile.identity/IdentityFailure) // id.walt.wallet2.mobile.identity/IdentityOperationResult.Failed.<init>|<init>(id.walt.wallet2.mobile.identity.IdentityFailure){}[0]
+
+        final val reason // id.walt.wallet2.mobile.identity/IdentityOperationResult.Failed.reason|{}reason[0]
+            final fun <get-reason>(): id.walt.wallet2.mobile.identity/IdentityFailure // id.walt.wallet2.mobile.identity/IdentityOperationResult.Failed.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile.identity/IdentityFailure // id.walt.wallet2.mobile.identity/IdentityOperationResult.Failed.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.mobile.identity/IdentityFailure = ...): id.walt.wallet2.mobile.identity/IdentityOperationResult.Failed // id.walt.wallet2.mobile.identity/IdentityOperationResult.Failed.copy|copy(id.walt.wallet2.mobile.identity.IdentityFailure){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityOperationResult.Failed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityOperationResult.Failed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityOperationResult.Failed.toString|toString(){}[0]
+    }
+
+    final class Pending : id.walt.wallet2.mobile.identity/IdentityOperationResult { // id.walt.wallet2.mobile.identity/IdentityOperationResult.Pending|null[0]
+        constructor <init>(kotlin/String) // id.walt.wallet2.mobile.identity/IdentityOperationResult.Pending.<init>|<init>(kotlin.String){}[0]
+
+        final val identityId // id.walt.wallet2.mobile.identity/IdentityOperationResult.Pending.identityId|{}identityId[0]
+            final fun <get-identityId>(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityOperationResult.Pending.identityId.<get-identityId>|<get-identityId>(){}[0]
+
+        final fun component1(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityOperationResult.Pending.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): id.walt.wallet2.mobile.identity/IdentityOperationResult.Pending // id.walt.wallet2.mobile.identity/IdentityOperationResult.Pending.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityOperationResult.Pending.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityOperationResult.Pending.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityOperationResult.Pending.toString|toString(){}[0]
+    }
+}
+
+sealed interface id.walt.wallet2.mobile.identity/IdentityOptions { // id.walt.wallet2.mobile.identity/IdentityOptions|null[0]
+    final class Available : id.walt.wallet2.mobile.identity/IdentityOptions { // id.walt.wallet2.mobile.identity/IdentityOptions.Available|null[0]
+        final val alternatives // id.walt.wallet2.mobile.identity/IdentityOptions.Available.alternatives|{}alternatives[0]
+            final fun <get-alternatives>(): kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityCreationOption> // id.walt.wallet2.mobile.identity/IdentityOptions.Available.alternatives.<get-alternatives>|<get-alternatives>(){}[0]
+        final val recommended // id.walt.wallet2.mobile.identity/IdentityOptions.Available.recommended|{}recommended[0]
+            final fun <get-recommended>(): id.walt.wallet2.mobile.identity/IdentityCreationOption // id.walt.wallet2.mobile.identity/IdentityOptions.Available.recommended.<get-recommended>|<get-recommended>(){}[0]
+    }
+
+    final class Unavailable : id.walt.wallet2.mobile.identity/IdentityOptions { // id.walt.wallet2.mobile.identity/IdentityOptions.Unavailable|null[0]
+        constructor <init>(kotlin.collections/List<kotlin/String>) // id.walt.wallet2.mobile.identity/IdentityOptions.Unavailable.<init>|<init>(kotlin.collections.List<kotlin.String>){}[0]
+
+        final val reasons // id.walt.wallet2.mobile.identity/IdentityOptions.Unavailable.reasons|{}reasons[0]
+            final fun <get-reasons>(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile.identity/IdentityOptions.Unavailable.reasons.<get-reasons>|<get-reasons>(){}[0]
+
+        final fun component1(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile.identity/IdentityOptions.Unavailable.component1|component1(){}[0]
+        final fun copy(kotlin.collections/List<kotlin/String> = ...): id.walt.wallet2.mobile.identity/IdentityOptions.Unavailable // id.walt.wallet2.mobile.identity/IdentityOptions.Unavailable.copy|copy(kotlin.collections.List<kotlin.String>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityOptions.Unavailable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityOptions.Unavailable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityOptions.Unavailable.toString|toString(){}[0]
+    }
+}
+
+sealed interface id.walt.wallet2.mobile.identity/IdentityRecoveryState { // id.walt.wallet2.mobile.identity/IdentityRecoveryState|null[0]
+    final class Recovered : id.walt.wallet2.mobile.identity/IdentityRecoveryState { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered|null[0]
+        constructor <init>(id.walt.wallet2.mobile.identity/IdentityBackupReference) // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.<init>|<init>(id.walt.wallet2.mobile.identity.IdentityBackupReference){}[0]
+
+        final val reference // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.reference|{}reference[0]
+            final fun <get-reference>(): id.walt.wallet2.mobile.identity/IdentityBackupReference // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.reference.<get-reference>|<get-reference>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile.identity/IdentityBackupReference // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.mobile.identity/IdentityBackupReference = ...): id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.copy|copy(id.walt.wallet2.mobile.identity.IdentityBackupReference){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered> { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.$serializer|null[0]
+            final val descriptor // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered) // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.mobile.identity.IdentityRecoveryState.Recovered){}[0]
+        }
+
+        final object Companion { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered> // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Recovered.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class RemovalRequested : id.walt.wallet2.mobile.identity/IdentityRecoveryState { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested|null[0]
+        constructor <init>(id.walt.wallet2.mobile.identity/IdentityBackupReference, id.walt.wallet2.mobile.identity/RecoveryReceipt) // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.<init>|<init>(id.walt.wallet2.mobile.identity.IdentityBackupReference;id.walt.wallet2.mobile.identity.RecoveryReceipt){}[0]
+
+        final val receipt // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.receipt|{}receipt[0]
+            final fun <get-receipt>(): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.receipt.<get-receipt>|<get-receipt>(){}[0]
+        final val reference // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.reference|{}reference[0]
+            final fun <get-reference>(): id.walt.wallet2.mobile.identity/IdentityBackupReference // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.reference.<get-reference>|<get-reference>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile.identity/IdentityBackupReference // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.component1|component1(){}[0]
+        final fun component2(): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.component2|component2(){}[0]
+        final fun copy(id.walt.wallet2.mobile.identity/IdentityBackupReference = ..., id.walt.wallet2.mobile.identity/RecoveryReceipt = ...): id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.copy|copy(id.walt.wallet2.mobile.identity.IdentityBackupReference;id.walt.wallet2.mobile.identity.RecoveryReceipt){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested> { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.$serializer|null[0]
+            final val descriptor // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested) // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.mobile.identity.IdentityRecoveryState.RemovalRequested){}[0]
+        }
+
+        final object Companion { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.Companion|null[0]
+            final val $childSerializers // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested> // id.walt.wallet2.mobile.identity/IdentityRecoveryState.RemovalRequested.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Submitted : id.walt.wallet2.mobile.identity/IdentityRecoveryState { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted|null[0]
+        constructor <init>(id.walt.wallet2.mobile.identity/IdentityBackupReference, id.walt.wallet2.mobile.identity/RecoveryReceipt) // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.<init>|<init>(id.walt.wallet2.mobile.identity.IdentityBackupReference;id.walt.wallet2.mobile.identity.RecoveryReceipt){}[0]
+
+        final val receipt // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.receipt|{}receipt[0]
+            final fun <get-receipt>(): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.receipt.<get-receipt>|<get-receipt>(){}[0]
+        final val reference // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.reference|{}reference[0]
+            final fun <get-reference>(): id.walt.wallet2.mobile.identity/IdentityBackupReference // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.reference.<get-reference>|<get-reference>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile.identity/IdentityBackupReference // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.component1|component1(){}[0]
+        final fun component2(): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.component2|component2(){}[0]
+        final fun copy(id.walt.wallet2.mobile.identity/IdentityBackupReference = ..., id.walt.wallet2.mobile.identity/RecoveryReceipt = ...): id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.copy|copy(id.walt.wallet2.mobile.identity.IdentityBackupReference;id.walt.wallet2.mobile.identity.RecoveryReceipt){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted> { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.$serializer|null[0]
+            final val descriptor // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted) // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.mobile.identity.IdentityRecoveryState.Submitted){}[0]
+        }
+
+        final object Companion { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.Companion|null[0]
+            final val $childSerializers // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted> // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Submitted.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/IdentityRecoveryState> // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+
+    final object Disabled : id.walt.wallet2.mobile.identity/IdentityRecoveryState, kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Disabled|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Disabled.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Disabled.hashCode|hashCode(){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/IdentityRecoveryState.Disabled> // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Disabled.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Disabled.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryState.Disabled.toString|toString(){}[0]
+    }
+}
+
+sealed interface id.walt.wallet2.mobile.identity/RecoveryAvailability { // id.walt.wallet2.mobile.identity/RecoveryAvailability|null[0]
+    final class Available : id.walt.wallet2.mobile.identity/RecoveryAvailability { // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available|null[0]
+        constructor <init>(id.walt.wallet2.mobile.identity/RecoveryProtection, id.walt.wallet2.mobile.identity/RecoveryScope) // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.<init>|<init>(id.walt.wallet2.mobile.identity.RecoveryProtection;id.walt.wallet2.mobile.identity.RecoveryScope){}[0]
+
+        final val protection // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.protection|{}protection[0]
+            final fun <get-protection>(): id.walt.wallet2.mobile.identity/RecoveryProtection // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.protection.<get-protection>|<get-protection>(){}[0]
+        final val scope // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.scope|{}scope[0]
+            final fun <get-scope>(): id.walt.wallet2.mobile.identity/RecoveryScope // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.scope.<get-scope>|<get-scope>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile.identity/RecoveryProtection // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.component1|component1(){}[0]
+        final fun component2(): id.walt.wallet2.mobile.identity/RecoveryScope // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.component2|component2(){}[0]
+        final fun copy(id.walt.wallet2.mobile.identity/RecoveryProtection = ..., id.walt.wallet2.mobile.identity/RecoveryScope = ...): id.walt.wallet2.mobile.identity/RecoveryAvailability.Available // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.copy|copy(id.walt.wallet2.mobile.identity.RecoveryProtection;id.walt.wallet2.mobile.identity.RecoveryScope){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile.identity/RecoveryAvailability.Available> { // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.$serializer|null[0]
+            final val descriptor // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.mobile.identity/RecoveryAvailability.Available // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.mobile.identity/RecoveryAvailability.Available) // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.mobile.identity.RecoveryAvailability.Available){}[0]
+        }
+
+        final object Companion { // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.Companion|null[0]
+            final val $childSerializers // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/RecoveryAvailability.Available> // id.walt.wallet2.mobile.identity/RecoveryAvailability.Available.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Unavailable : id.walt.wallet2.mobile.identity/RecoveryAvailability { // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable|null[0]
+        constructor <init>(kotlin/String) // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.<init>|<init>(kotlin.String){}[0]
+
+        final val reason // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): kotlin/String // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable> { // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.$serializer|null[0]
+            final val descriptor // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable) // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.mobile.identity.RecoveryAvailability.Unavailable){}[0]
+        }
+
+        final object Companion { // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable> // id.walt.wallet2.mobile.identity/RecoveryAvailability.Unavailable.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile.identity/RecoveryAvailability.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/RecoveryAvailability> // id.walt.wallet2.mobile.identity/RecoveryAvailability.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile.identity/RecoveryAvailability.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+sealed interface id.walt.wallet2.mobile.identity/WalletIdentityState { // id.walt.wallet2.mobile.identity/WalletIdentityState|null[0]
+    final class Active : id.walt.wallet2.mobile.identity/WalletIdentityState { // id.walt.wallet2.mobile.identity/WalletIdentityState.Active|null[0]
+        constructor <init>(id.walt.wallet2.mobile.identity/WalletIdentity) // id.walt.wallet2.mobile.identity/WalletIdentityState.Active.<init>|<init>(id.walt.wallet2.mobile.identity.WalletIdentity){}[0]
+
+        final val identity // id.walt.wallet2.mobile.identity/WalletIdentityState.Active.identity|{}identity[0]
+            final fun <get-identity>(): id.walt.wallet2.mobile.identity/WalletIdentity // id.walt.wallet2.mobile.identity/WalletIdentityState.Active.identity.<get-identity>|<get-identity>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile.identity/WalletIdentity // id.walt.wallet2.mobile.identity/WalletIdentityState.Active.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.mobile.identity/WalletIdentity = ...): id.walt.wallet2.mobile.identity/WalletIdentityState.Active // id.walt.wallet2.mobile.identity/WalletIdentityState.Active.copy|copy(id.walt.wallet2.mobile.identity.WalletIdentity){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/WalletIdentityState.Active.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/WalletIdentityState.Active.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentityState.Active.toString|toString(){}[0]
+    }
+
+    final class Pending : id.walt.wallet2.mobile.identity/WalletIdentityState { // id.walt.wallet2.mobile.identity/WalletIdentityState.Pending|null[0]
+        constructor <init>(kotlin/String) // id.walt.wallet2.mobile.identity/WalletIdentityState.Pending.<init>|<init>(kotlin.String){}[0]
+
+        final val identityId // id.walt.wallet2.mobile.identity/WalletIdentityState.Pending.identityId|{}identityId[0]
+            final fun <get-identityId>(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentityState.Pending.identityId.<get-identityId>|<get-identityId>(){}[0]
+
+        final fun component1(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentityState.Pending.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): id.walt.wallet2.mobile.identity/WalletIdentityState.Pending // id.walt.wallet2.mobile.identity/WalletIdentityState.Pending.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/WalletIdentityState.Pending.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/WalletIdentityState.Pending.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentityState.Pending.toString|toString(){}[0]
+    }
+
+    final class Unavailable : id.walt.wallet2.mobile.identity/WalletIdentityState { // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable|null[0]
+        constructor <init>(kotlin/String?, id.walt.wallet2.mobile.identity/IdentityFailure) // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.<init>|<init>(kotlin.String?;id.walt.wallet2.mobile.identity.IdentityFailure){}[0]
+
+        final val identityId // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.identityId|{}identityId[0]
+            final fun <get-identityId>(): kotlin/String? // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.identityId.<get-identityId>|<get-identityId>(){}[0]
+        final val reason // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.reason|{}reason[0]
+            final fun <get-reason>(): id.walt.wallet2.mobile.identity/IdentityFailure // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): kotlin/String? // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.component1|component1(){}[0]
+        final fun component2(): id.walt.wallet2.mobile.identity/IdentityFailure // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.component2|component2(){}[0]
+        final fun copy(kotlin/String? = ..., id.walt.wallet2.mobile.identity/IdentityFailure = ...): id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.copy|copy(kotlin.String?;id.walt.wallet2.mobile.identity.IdentityFailure){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentityState.Unavailable.toString|toString(){}[0]
+    }
+
+    final object Absent : id.walt.wallet2.mobile.identity/WalletIdentityState { // id.walt.wallet2.mobile.identity/WalletIdentityState.Absent|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/WalletIdentityState.Absent.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/WalletIdentityState.Absent.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentityState.Absent.toString|toString(){}[0]
     }
 }
 
@@ -645,6 +1106,175 @@ sealed interface id.walt.wallet2.mobile/MobileWalletResponseEncryption { // id.w
     }
 }
 
+final class id.walt.wallet2.mobile.identity/IdentityBackupOption { // id.walt.wallet2.mobile.identity/IdentityBackupOption|null[0]
+    final val identityId // id.walt.wallet2.mobile.identity/IdentityBackupOption.identityId|{}identityId[0]
+        final fun <get-identityId>(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityBackupOption.identityId.<get-identityId>|<get-identityId>(){}[0]
+    final val providerName // id.walt.wallet2.mobile.identity/IdentityBackupOption.providerName|{}providerName[0]
+        final fun <get-providerName>(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityBackupOption.providerName.<get-providerName>|<get-providerName>(){}[0]
+}
+
+final class id.walt.wallet2.mobile.identity/IdentityBackupReference { // id.walt.wallet2.mobile.identity/IdentityBackupReference|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // id.walt.wallet2.mobile.identity/IdentityBackupReference.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val providerId // id.walt.wallet2.mobile.identity/IdentityBackupReference.providerId|{}providerId[0]
+        final fun <get-providerId>(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityBackupReference.providerId.<get-providerId>|<get-providerId>(){}[0]
+    final val recordId // id.walt.wallet2.mobile.identity/IdentityBackupReference.recordId|{}recordId[0]
+        final fun <get-recordId>(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityBackupReference.recordId.<get-recordId>|<get-recordId>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityBackupReference.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityBackupReference.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.mobile.identity/IdentityBackupReference // id.walt.wallet2.mobile.identity/IdentityBackupReference.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityBackupReference.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityBackupReference.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityBackupReference.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile.identity/IdentityBackupReference> { // id.walt.wallet2.mobile.identity/IdentityBackupReference.$serializer|null[0]
+        final val descriptor // id.walt.wallet2.mobile.identity/IdentityBackupReference.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.mobile.identity/IdentityBackupReference.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.mobile.identity/IdentityBackupReference.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.mobile.identity/IdentityBackupReference // id.walt.wallet2.mobile.identity/IdentityBackupReference.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.mobile.identity/IdentityBackupReference) // id.walt.wallet2.mobile.identity/IdentityBackupReference.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.mobile.identity.IdentityBackupReference){}[0]
+    }
+
+    final object Companion { // id.walt.wallet2.mobile.identity/IdentityBackupReference.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/IdentityBackupReference> // id.walt.wallet2.mobile.identity/IdentityBackupReference.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class id.walt.wallet2.mobile.identity/IdentityConfiguration { // id.walt.wallet2.mobile.identity/IdentityConfiguration|null[0]
+    constructor <init>(kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityRecoveryProvider> = ..., id.walt.wallet2.mobile.identity/IdentityAuthorization = ..., id.walt.wallet2.mobile.identity/IdentityKeyPolicy = ..., id.walt.crypto2.signum/SignumPlatformPolicy = ..., kotlin.collections/List<id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy> = ..., id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention = ...) // id.walt.wallet2.mobile.identity/IdentityConfiguration.<init>|<init>(kotlin.collections.List<id.walt.wallet2.mobile.identity.IdentityRecoveryProvider>;id.walt.wallet2.mobile.identity.IdentityAuthorization;id.walt.wallet2.mobile.identity.IdentityKeyPolicy;id.walt.crypto2.signum.SignumPlatformPolicy;kotlin.collections.List<id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy>;id.walt.wallet2.mobile.identity.LocalRecoveryMaterialRetention){}[0]
+
+    final val alternativeAuthorizations // id.walt.wallet2.mobile.identity/IdentityConfiguration.alternativeAuthorizations|{}alternativeAuthorizations[0]
+        final fun <get-alternativeAuthorizations>(): kotlin.collections/List<id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy> // id.walt.wallet2.mobile.identity/IdentityConfiguration.alternativeAuthorizations.<get-alternativeAuthorizations>|<get-alternativeAuthorizations>(){}[0]
+    final val authorization // id.walt.wallet2.mobile.identity/IdentityConfiguration.authorization|{}authorization[0]
+        final fun <get-authorization>(): id.walt.wallet2.mobile.identity/IdentityAuthorization // id.walt.wallet2.mobile.identity/IdentityConfiguration.authorization.<get-authorization>|<get-authorization>(){}[0]
+    final val localRecoveryMaterial // id.walt.wallet2.mobile.identity/IdentityConfiguration.localRecoveryMaterial|{}localRecoveryMaterial[0]
+        final fun <get-localRecoveryMaterial>(): id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention // id.walt.wallet2.mobile.identity/IdentityConfiguration.localRecoveryMaterial.<get-localRecoveryMaterial>|<get-localRecoveryMaterial>(){}[0]
+    final val platform // id.walt.wallet2.mobile.identity/IdentityConfiguration.platform|{}platform[0]
+        final fun <get-platform>(): id.walt.crypto2.signum/SignumPlatformPolicy // id.walt.wallet2.mobile.identity/IdentityConfiguration.platform.<get-platform>|<get-platform>(){}[0]
+    final val policy // id.walt.wallet2.mobile.identity/IdentityConfiguration.policy|{}policy[0]
+        final fun <get-policy>(): id.walt.wallet2.mobile.identity/IdentityKeyPolicy // id.walt.wallet2.mobile.identity/IdentityConfiguration.policy.<get-policy>|<get-policy>(){}[0]
+    final val recoveryProviders // id.walt.wallet2.mobile.identity/IdentityConfiguration.recoveryProviders|{}recoveryProviders[0]
+        final fun <get-recoveryProviders>(): kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityRecoveryProvider> // id.walt.wallet2.mobile.identity/IdentityConfiguration.recoveryProviders.<get-recoveryProviders>|<get-recoveryProviders>(){}[0]
+
+    final fun component1(): kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityRecoveryProvider> // id.walt.wallet2.mobile.identity/IdentityConfiguration.component1|component1(){}[0]
+    final fun component2(): id.walt.wallet2.mobile.identity/IdentityAuthorization // id.walt.wallet2.mobile.identity/IdentityConfiguration.component2|component2(){}[0]
+    final fun component3(): id.walt.wallet2.mobile.identity/IdentityKeyPolicy // id.walt.wallet2.mobile.identity/IdentityConfiguration.component3|component3(){}[0]
+    final fun component4(): id.walt.crypto2.signum/SignumPlatformPolicy // id.walt.wallet2.mobile.identity/IdentityConfiguration.component4|component4(){}[0]
+    final fun component5(): kotlin.collections/List<id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy> // id.walt.wallet2.mobile.identity/IdentityConfiguration.component5|component5(){}[0]
+    final fun component6(): id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention // id.walt.wallet2.mobile.identity/IdentityConfiguration.component6|component6(){}[0]
+    final fun copy(kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityRecoveryProvider> = ..., id.walt.wallet2.mobile.identity/IdentityAuthorization = ..., id.walt.wallet2.mobile.identity/IdentityKeyPolicy = ..., id.walt.crypto2.signum/SignumPlatformPolicy = ..., kotlin.collections/List<id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy> = ..., id.walt.wallet2.mobile.identity/LocalRecoveryMaterialRetention = ...): id.walt.wallet2.mobile.identity/IdentityConfiguration // id.walt.wallet2.mobile.identity/IdentityConfiguration.copy|copy(kotlin.collections.List<id.walt.wallet2.mobile.identity.IdentityRecoveryProvider>;id.walt.wallet2.mobile.identity.IdentityAuthorization;id.walt.wallet2.mobile.identity.IdentityKeyPolicy;id.walt.crypto2.signum.SignumPlatformPolicy;kotlin.collections.List<id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy>;id.walt.wallet2.mobile.identity.LocalRecoveryMaterialRetention){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityConfiguration.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityConfiguration.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityConfiguration.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile.identity/IdentityCreationOption { // id.walt.wallet2.mobile.identity/IdentityCreationOption|null[0]
+    final val attestation // id.walt.wallet2.mobile.identity/IdentityCreationOption.attestation|{}attestation[0]
+        final fun <get-attestation>(): id.walt.wallet2.mobile.identity/IdentityAttestationRequest // id.walt.wallet2.mobile.identity/IdentityCreationOption.attestation.<get-attestation>|<get-attestation>(){}[0]
+    final val authorization // id.walt.wallet2.mobile.identity/IdentityCreationOption.authorization|{}authorization[0]
+        final fun <get-authorization>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile.identity/IdentityCreationOption.authorization.<get-authorization>|<get-authorization>(){}[0]
+    final val recoverable // id.walt.wallet2.mobile.identity/IdentityCreationOption.recoverable|{}recoverable[0]
+        final fun <get-recoverable>(): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityCreationOption.recoverable.<get-recoverable>|<get-recoverable>(){}[0]
+    final val recoveryProviderName // id.walt.wallet2.mobile.identity/IdentityCreationOption.recoveryProviderName|{}recoveryProviderName[0]
+        final fun <get-recoveryProviderName>(): kotlin/String? // id.walt.wallet2.mobile.identity/IdentityCreationOption.recoveryProviderName.<get-recoveryProviderName>|<get-recoveryProviderName>(){}[0]
+    final val storage // id.walt.wallet2.mobile.identity/IdentityCreationOption.storage|{}storage[0]
+        final fun <get-storage>(): id.walt.wallet2.mobile.identity/IdentityKeyStorage // id.walt.wallet2.mobile.identity/IdentityCreationOption.storage.<get-storage>|<get-storage>(){}[0]
+}
+
+final class id.walt.wallet2.mobile.identity/IdentityRecoveryData { // id.walt.wallet2.mobile.identity/IdentityRecoveryData|null[0]
+    constructor <init>(kotlin/ByteArray) // id.walt.wallet2.mobile.identity/IdentityRecoveryData.<init>|<init>(kotlin.ByteArray){}[0]
+
+    final fun copyBytes(): kotlin/ByteArray // id.walt.wallet2.mobile.identity/IdentityRecoveryData.copyBytes|copyBytes(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryData.toString|toString(){}[0]
+
+    final object Companion { // id.walt.wallet2.mobile.identity/IdentityRecoveryData.Companion|null[0]
+        final const val MAX_BYTES // id.walt.wallet2.mobile.identity/IdentityRecoveryData.Companion.MAX_BYTES|{}MAX_BYTES[0]
+            final fun <get-MAX_BYTES>(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityRecoveryData.Companion.MAX_BYTES.<get-MAX_BYTES>|<get-MAX_BYTES>(){}[0]
+    }
+}
+
+final class id.walt.wallet2.mobile.identity/IdentityRestorationOption { // id.walt.wallet2.mobile.identity/IdentityRestorationOption|null[0]
+    final val authorization // id.walt.wallet2.mobile.identity/IdentityRestorationOption.authorization|{}authorization[0]
+        final fun <get-authorization>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile.identity/IdentityRestorationOption.authorization.<get-authorization>|<get-authorization>(){}[0]
+    final val did // id.walt.wallet2.mobile.identity/IdentityRestorationOption.did|{}did[0]
+        final fun <get-did>(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRestorationOption.did.<get-did>|<get-did>(){}[0]
+    final val storage // id.walt.wallet2.mobile.identity/IdentityRestorationOption.storage|{}storage[0]
+        final fun <get-storage>(): id.walt.wallet2.mobile.identity/IdentityKeyStorage // id.walt.wallet2.mobile.identity/IdentityRestorationOption.storage.<get-storage>|<get-storage>(){}[0]
+}
+
+final class id.walt.wallet2.mobile.identity/RecoveryCandidate { // id.walt.wallet2.mobile.identity/RecoveryCandidate|null[0]
+    final val providerName // id.walt.wallet2.mobile.identity/RecoveryCandidate.providerName|{}providerName[0]
+        final fun <get-providerName>(): kotlin/String // id.walt.wallet2.mobile.identity/RecoveryCandidate.providerName.<get-providerName>|<get-providerName>(){}[0]
+    final val reference // id.walt.wallet2.mobile.identity/RecoveryCandidate.reference|{}reference[0]
+        final fun <get-reference>(): id.walt.wallet2.mobile.identity/IdentityBackupReference // id.walt.wallet2.mobile.identity/RecoveryCandidate.reference.<get-reference>|<get-reference>(){}[0]
+}
+
+final class id.walt.wallet2.mobile.identity/WalletIdentities { // id.walt.wallet2.mobile.identity/WalletIdentities|null[0]
+    final suspend fun backup(id.walt.wallet2.mobile.identity/IdentityBackupOption): id.walt.wallet2.mobile.identity/IdentityOperationResult // id.walt.wallet2.mobile.identity/WalletIdentities.backup|backup(id.walt.wallet2.mobile.identity.IdentityBackupOption){}[0]
+    final suspend fun backupOptions(kotlin/String): kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityBackupOption> // id.walt.wallet2.mobile.identity/WalletIdentities.backupOptions|backupOptions(kotlin.String){}[0]
+    final suspend fun cancelPending(kotlin/String) // id.walt.wallet2.mobile.identity/WalletIdentities.cancelPending|cancelPending(kotlin.String){}[0]
+    final suspend fun create(id.walt.wallet2.mobile.identity/IdentityCreationOption): id.walt.wallet2.mobile.identity/IdentityOperationResult // id.walt.wallet2.mobile.identity/WalletIdentities.create|create(id.walt.wallet2.mobile.identity.IdentityCreationOption){}[0]
+    final suspend fun creationOptions(id.walt.wallet2.mobile.identity/IdentityIntent = ..., id.walt.wallet2.mobile.identity/IdentityAttestationRequest = ...): id.walt.wallet2.mobile.identity/IdentityOptions // id.walt.wallet2.mobile.identity/WalletIdentities.creationOptions|creationOptions(id.walt.wallet2.mobile.identity.IdentityIntent;id.walt.wallet2.mobile.identity.IdentityAttestationRequest){}[0]
+    final suspend fun deleteRecovery(id.walt.wallet2.mobile.identity/RecoveryCandidate): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.mobile.identity/WalletIdentities.deleteRecovery|deleteRecovery(id.walt.wallet2.mobile.identity.RecoveryCandidate){}[0]
+    final suspend fun initialize(): id.walt.wallet2.mobile.identity/IdentityOperationResult // id.walt.wallet2.mobile.identity/WalletIdentities.initialize|initialize(){}[0]
+    final suspend fun recoveryCandidates(): kotlin.collections/List<id.walt.wallet2.mobile.identity/RecoveryCandidate> // id.walt.wallet2.mobile.identity/WalletIdentities.recoveryCandidates|recoveryCandidates(){}[0]
+    final suspend fun restorationOptions(id.walt.wallet2.mobile.identity/RecoveryCandidate): kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityRestorationOption> // id.walt.wallet2.mobile.identity/WalletIdentities.restorationOptions|restorationOptions(id.walt.wallet2.mobile.identity.RecoveryCandidate){}[0]
+    final suspend fun restore(id.walt.wallet2.mobile.identity/IdentityRestorationOption): id.walt.wallet2.mobile.identity/IdentityOperationResult // id.walt.wallet2.mobile.identity/WalletIdentities.restore|restore(id.walt.wallet2.mobile.identity.IdentityRestorationOption){}[0]
+    final suspend fun resumePending(kotlin/String): id.walt.wallet2.mobile.identity/IdentityOperationResult // id.walt.wallet2.mobile.identity/WalletIdentities.resumePending|resumePending(kotlin.String){}[0]
+    final suspend fun state(): id.walt.wallet2.mobile.identity/WalletIdentityState // id.walt.wallet2.mobile.identity/WalletIdentities.state|state(){}[0]
+}
+
+final class id.walt.wallet2.mobile.identity/WalletIdentity { // id.walt.wallet2.mobile.identity/WalletIdentity|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, id.walt.wallet2.mobile.identity/IdentityKeyStorage, id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy, id.walt.wallet2.persistence.keys/PlatformKeyFacts, id.walt.wallet2.mobile.identity/IdentityRecoveryState = ...) // id.walt.wallet2.mobile.identity/WalletIdentity.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;id.walt.wallet2.mobile.identity.IdentityKeyStorage;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.PlatformKeyFacts;id.walt.wallet2.mobile.identity.IdentityRecoveryState){}[0]
+
+    final val authorization // id.walt.wallet2.mobile.identity/WalletIdentity.authorization|{}authorization[0]
+        final fun <get-authorization>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile.identity/WalletIdentity.authorization.<get-authorization>|<get-authorization>(){}[0]
+    final val did // id.walt.wallet2.mobile.identity/WalletIdentity.did|{}did[0]
+        final fun <get-did>(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentity.did.<get-did>|<get-did>(){}[0]
+    final val id // id.walt.wallet2.mobile.identity/WalletIdentity.id|{}id[0]
+        final fun <get-id>(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentity.id.<get-id>|<get-id>(){}[0]
+    final val keyFacts // id.walt.wallet2.mobile.identity/WalletIdentity.keyFacts|{}keyFacts[0]
+        final fun <get-keyFacts>(): id.walt.wallet2.persistence.keys/PlatformKeyFacts // id.walt.wallet2.mobile.identity/WalletIdentity.keyFacts.<get-keyFacts>|<get-keyFacts>(){}[0]
+    final val keyId // id.walt.wallet2.mobile.identity/WalletIdentity.keyId|{}keyId[0]
+        final fun <get-keyId>(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentity.keyId.<get-keyId>|<get-keyId>(){}[0]
+    final val publicJwk // id.walt.wallet2.mobile.identity/WalletIdentity.publicJwk|{}publicJwk[0]
+        final fun <get-publicJwk>(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentity.publicJwk.<get-publicJwk>|<get-publicJwk>(){}[0]
+    final val recovery // id.walt.wallet2.mobile.identity/WalletIdentity.recovery|{}recovery[0]
+        final fun <get-recovery>(): id.walt.wallet2.mobile.identity/IdentityRecoveryState // id.walt.wallet2.mobile.identity/WalletIdentity.recovery.<get-recovery>|<get-recovery>(){}[0]
+    final val storage // id.walt.wallet2.mobile.identity/WalletIdentity.storage|{}storage[0]
+        final fun <get-storage>(): id.walt.wallet2.mobile.identity/IdentityKeyStorage // id.walt.wallet2.mobile.identity/WalletIdentity.storage.<get-storage>|<get-storage>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentity.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentity.component2|component2(){}[0]
+    final fun component3(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentity.component3|component3(){}[0]
+    final fun component4(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentity.component4|component4(){}[0]
+    final fun component5(): id.walt.wallet2.mobile.identity/IdentityKeyStorage // id.walt.wallet2.mobile.identity/WalletIdentity.component5|component5(){}[0]
+    final fun component6(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile.identity/WalletIdentity.component6|component6(){}[0]
+    final fun component7(): id.walt.wallet2.persistence.keys/PlatformKeyFacts // id.walt.wallet2.mobile.identity/WalletIdentity.component7|component7(){}[0]
+    final fun component8(): id.walt.wallet2.mobile.identity/IdentityRecoveryState // id.walt.wallet2.mobile.identity/WalletIdentity.component8|component8(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., id.walt.wallet2.mobile.identity/IdentityKeyStorage = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/PlatformKeyFacts = ..., id.walt.wallet2.mobile.identity/IdentityRecoveryState = ...): id.walt.wallet2.mobile.identity/WalletIdentity // id.walt.wallet2.mobile.identity/WalletIdentity.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;id.walt.wallet2.mobile.identity.IdentityKeyStorage;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.PlatformKeyFacts;id.walt.wallet2.mobile.identity.IdentityRecoveryState){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/WalletIdentity.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/WalletIdentity.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/WalletIdentity.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile.identity/WalletIdentity> { // id.walt.wallet2.mobile.identity/WalletIdentity.$serializer|null[0]
+        final val descriptor // id.walt.wallet2.mobile.identity/WalletIdentity.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.mobile.identity/WalletIdentity.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.mobile.identity/WalletIdentity.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.mobile.identity/WalletIdentity // id.walt.wallet2.mobile.identity/WalletIdentity.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.mobile.identity/WalletIdentity) // id.walt.wallet2.mobile.identity/WalletIdentity.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.mobile.identity.WalletIdentity){}[0]
+    }
+
+    final object Companion { // id.walt.wallet2.mobile.identity/WalletIdentity.Companion|null[0]
+        final val $childSerializers // id.walt.wallet2.mobile.identity/WalletIdentity.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.identity/WalletIdentity> // id.walt.wallet2.mobile.identity/WalletIdentity.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration|null[0]
     constructor <init>(kotlin.collections/List<kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ...) // id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
 
@@ -662,7 +1292,7 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfigu
 }
 
 final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration|null[0]
-    constructor <init>(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseEncryptionKeyProvider? = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataTrustResolver? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration = ..., kotlin/String? = ..., kotlin/String? = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ...) // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.swiftinterop.WalletBridgePersistence;id.walt.wallet2.mobile.swiftinterop.WalletBridgeDatabaseEncryptionKeyProvider?;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.swiftinterop.WalletBridgeIssuerMetadataTrustResolver?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>;id.walt.wallet2.mobile.swiftinterop.WalletBridgeClientIdTrustConfiguration;kotlin.String?;kotlin.String?;id.walt.wallet2.mobile.swiftinterop.WalletBridgeKeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt){}[0]
+    constructor <init>(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseEncryptionKeyProvider? = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataTrustResolver? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration = ..., kotlin/String? = ..., kotlin/String? = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ..., id.walt.wallet2.mobile.identity/IdentityConfiguration = ...) // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.swiftinterop.WalletBridgePersistence;id.walt.wallet2.mobile.swiftinterop.WalletBridgeDatabaseEncryptionKeyProvider?;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.swiftinterop.WalletBridgeIssuerMetadataTrustResolver?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>;id.walt.wallet2.mobile.swiftinterop.WalletBridgeClientIdTrustConfiguration;kotlin.String?;kotlin.String?;id.walt.wallet2.mobile.swiftinterop.WalletBridgeKeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt;id.walt.wallet2.mobile.identity.IdentityConfiguration){}[0]
 
     final val appGroupIdentifier // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.appGroupIdentifier|{}appGroupIdentifier[0]
         final fun <get-appGroupIdentifier>(): kotlin/String? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.appGroupIdentifier.<get-appGroupIdentifier>|<get-appGroupIdentifier>(){}[0]
@@ -676,6 +1306,8 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration { // i
         final fun <get-defaultKeyType>(): id.walt.wallet2.mobile/MobileWalletKeyType // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.defaultKeyType.<get-defaultKeyType>|<get-defaultKeyType>(){}[0]
     final val defaultKeyUseAuthorizationPolicy // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.defaultKeyUseAuthorizationPolicy|{}defaultKeyUseAuthorizationPolicy[0]
         final fun <get-defaultKeyUseAuthorizationPolicy>(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicy // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.defaultKeyUseAuthorizationPolicy.<get-defaultKeyUseAuthorizationPolicy>|<get-defaultKeyUseAuthorizationPolicy>(){}[0]
+    final val identity // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.identity|{}identity[0]
+        final fun <get-identity>(): id.walt.wallet2.mobile.identity/IdentityConfiguration // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.identity.<get-identity>|<get-identity>(){}[0]
     final val issuerMetadataTrustResolver // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.issuerMetadataTrustResolver|{}issuerMetadataTrustResolver[0]
         final fun <get-issuerMetadataTrustResolver>(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataTrustResolver? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.issuerMetadataTrustResolver.<get-issuerMetadataTrustResolver>|<get-issuerMetadataTrustResolver>(){}[0]
     final val keyUseAuthorizationPrompt // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.keyUseAuthorizationPrompt|{}keyUseAuthorizationPrompt[0]
@@ -696,6 +1328,7 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration { // i
     final fun component11(): kotlin/String? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component11|component11(){}[0]
     final fun component12(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicy // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component12|component12(){}[0]
     final fun component13(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component13|component13(){}[0]
+    final fun component14(): id.walt.wallet2.mobile.identity/IdentityConfiguration // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component14|component14(){}[0]
     final fun component2(): id.walt.wallet2.mobile/MobileWalletKeyType // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component2|component2(){}[0]
     final fun component3(): id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component3|component3(){}[0]
     final fun component4(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseEncryptionKeyProvider? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component4|component4(){}[0]
@@ -704,7 +1337,7 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration { // i
     final fun component7(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component7|component7(){}[0]
     final fun component8(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component8|component8(){}[0]
     final fun component9(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseEncryptionKeyProvider? = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataTrustResolver? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration = ..., kotlin/String? = ..., kotlin/String? = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.copy|copy(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.swiftinterop.WalletBridgePersistence;id.walt.wallet2.mobile.swiftinterop.WalletBridgeDatabaseEncryptionKeyProvider?;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.swiftinterop.WalletBridgeIssuerMetadataTrustResolver?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>;id.walt.wallet2.mobile.swiftinterop.WalletBridgeClientIdTrustConfiguration;kotlin.String?;kotlin.String?;id.walt.wallet2.mobile.swiftinterop.WalletBridgeKeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt){}[0]
+    final fun copy(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseEncryptionKeyProvider? = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataTrustResolver? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeClientIdTrustConfiguration = ..., kotlin/String? = ..., kotlin/String? = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ..., id.walt.wallet2.mobile.identity/IdentityConfiguration = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.copy|copy(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.swiftinterop.WalletBridgePersistence;id.walt.wallet2.mobile.swiftinterop.WalletBridgeDatabaseEncryptionKeyProvider?;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.swiftinterop.WalletBridgeIssuerMetadataTrustResolver?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>;id.walt.wallet2.mobile.swiftinterop.WalletBridgeClientIdTrustConfiguration;kotlin.String?;kotlin.String?;id.walt.wallet2.mobile.swiftinterop.WalletBridgeKeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt;id.walt.wallet2.mobile.identity.IdentityConfiguration){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.toString|toString(){}[0]
@@ -907,21 +1540,32 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge { // id.walt.wal
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<id.walt.wallet2.mobile/MobileWalletEvent> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.events.<get-events>|<get-events>(){}[0]
 
     final fun digitalCredentialCapabilities(): id.walt.wallet2.mobile/MobileWalletDigitalCredentialCapabilities // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.digitalCredentialCapabilities|digitalCredentialCapabilities(){}[0]
+    final suspend fun backupIdentity(id.walt.wallet2.mobile.identity/IdentityBackupOption): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/IdentityOperationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.backupIdentity|backupIdentity(id.walt.wallet2.mobile.identity.IdentityBackupOption){}[0]
     final suspend fun beginAuthorizationIssuance(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceAuthorization> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.beginAuthorizationIssuance|beginAuthorizationIssuance(kotlin.String){}[0]
-    final suspend fun bootstrap(id.walt.wallet2.mobile/MobileWalletKeyType? = ..., kotlin/String = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicy? = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile/MobileWalletBootstrapResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.bootstrap|bootstrap(id.walt.wallet2.mobile.MobileWalletKeyType?;kotlin.String;id.walt.wallet2.mobile.swiftinterop.WalletBridgeKeyUseAuthorizationPolicy?){}[0]
     final suspend fun cancelIssuance(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceOutcome> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.cancelIssuance|cancelIssuance(kotlin.String){}[0]
+    final suspend fun cancelPendingIdentity(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin/Unit> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.cancelPendingIdentity|cancelPendingIdentity(kotlin.String){}[0]
     final suspend fun continueAuthorizationIssuance(kotlin/String, kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceOutcome> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.continueAuthorizationIssuance|continueAuthorizationIssuance(kotlin.String;kotlin.String){}[0]
     final suspend fun continuePreAuthorizedIssuance(kotlin/String, kotlin/String? = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceOutcome> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.continuePreAuthorizedIssuance|continuePreAuthorizedIssuance(kotlin.String;kotlin.String?){}[0]
+    final suspend fun createIdentity(id.walt.wallet2.mobile.identity/IdentityCreationOption): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/IdentityOperationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.createIdentity|createIdentity(id.walt.wallet2.mobile.identity.IdentityCreationOption){}[0]
     final suspend fun credentials(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletCredential>> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.credentials|credentials(){}[0]
     final suspend fun deleteCredential(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin/Boolean> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.deleteCredential|deleteCredential(kotlin.String){}[0]
+    final suspend fun deleteIdentityRecovery(id.walt.wallet2.mobile.identity/RecoveryCandidate): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/RecoveryReceipt> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.deleteIdentityRecovery|deleteIdentityRecovery(id.walt.wallet2.mobile.identity.RecoveryCandidate){}[0]
     final suspend fun deleteWallet(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin/Unit> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.deleteWallet|deleteWallet(){}[0]
     final suspend fun discardPresentationPreview(id.walt.wallet2.mobile/MobileWalletPresentationPreviewHandle): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin/Unit> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.discardPresentationPreview|discardPresentationPreview(id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle){}[0]
+    final suspend fun identityBackupOptions(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityBackupOption>> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityBackupOptions|identityBackupOptions(kotlin.String){}[0]
+    final suspend fun identityCreationOptions(id.walt.wallet2.mobile.identity/IdentityIntent = ..., id.walt.wallet2.mobile.identity/IdentityAttestationRequest = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/IdentityOptions> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityCreationOptions|identityCreationOptions(id.walt.wallet2.mobile.identity.IdentityIntent;id.walt.wallet2.mobile.identity.IdentityAttestationRequest){}[0]
+    final suspend fun identityRecoveryCandidates(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin.collections/List<id.walt.wallet2.mobile.identity/RecoveryCandidate>> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityRecoveryCandidates|identityRecoveryCandidates(){}[0]
+    final suspend fun identityRestorationOptions(id.walt.wallet2.mobile.identity/RecoveryCandidate): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityRestorationOption>> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityRestorationOptions|identityRestorationOptions(id.walt.wallet2.mobile.identity.RecoveryCandidate){}[0]
+    final suspend fun identityState(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/WalletIdentityState> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityState|identityState(){}[0]
+    final suspend fun initializeIdentity(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/IdentityOperationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.initializeIdentity|initializeIdentity(){}[0]
     final suspend fun keyUseAuthorizationPreflight(id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyUseAuthorizationPolicy = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.keyUseAuthorizationPreflight|keyUseAuthorizationPreflight(id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.swiftinterop.WalletBridgeKeyUseAuthorizationPolicy){}[0]
     final suspend fun present(kotlin/String, kotlin/String? = ..., kotlin/Boolean? = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile/MobileWalletPresentationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.present|present(kotlin.String;kotlin.String?;kotlin.Boolean?){}[0]
     final suspend fun previewAnnexCPresentation(id.walt.wallet2.mobile/MobileWalletAnnexCRequest): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile/MobileWalletAnnexCPreview> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.previewAnnexCPresentation|previewAnnexCPresentation(id.walt.wallet2.mobile.MobileWalletAnnexCRequest){}[0]
     final suspend fun previewPresentation(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile/MobileWalletPresentationPreviewResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.previewPresentation|previewPresentation(kotlin.String){}[0]
     final suspend fun rejectPresentation(id.walt.wallet2.mobile/MobileWalletPresentationPreviewHandle, id.walt.wallet2.mobile/MobileWalletPresentationErrorCode? = ..., kotlin/String? = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile/MobileWalletPresentationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.rejectPresentation|rejectPresentation(id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle;id.walt.wallet2.mobile.MobileWalletPresentationErrorCode?;kotlin.String?){}[0]
+    final suspend fun restoreIdentity(id.walt.wallet2.mobile.identity/IdentityRestorationOption): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/IdentityOperationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.restoreIdentity|restoreIdentity(id.walt.wallet2.mobile.identity.IdentityRestorationOption){}[0]
     final suspend fun resumeDeferredIssuance(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceOutcome> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.resumeDeferredIssuance|resumeDeferredIssuance(kotlin.String){}[0]
+    final suspend fun resumeIdentity(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/IdentityOperationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.resumeIdentity|resumeIdentity(kotlin.String){}[0]
     final suspend fun startIssuance(id.walt.wallet2.mobile/MobileWalletIssuanceRequest): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceSession> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.startIssuance|startIssuance(id.walt.wallet2.mobile.MobileWalletIssuanceRequest){}[0]
     final suspend fun submitAnnexCPresentation(id.walt.wallet2.mobile/MobileWalletAnnexCSubmission): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile/MobileWalletDigitalCredentialResponse> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.submitAnnexCPresentation|submitAnnexCPresentation(id.walt.wallet2.mobile.MobileWalletAnnexCSubmission){}[0]
     final suspend fun submitPresentation(id.walt.wallet2.mobile/MobileWalletPresentationPreviewHandle, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletPresentationCredentialSelection>, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletPresentationDisclosureSelection>? = ..., kotlin/String? = ..., kotlin/Boolean? = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile/MobileWalletPresentationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.submitPresentation|submitPresentation(id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection>?;kotlin.String?;kotlin.Boolean?){}[0]
@@ -1015,13 +1659,14 @@ final class id.walt.wallet2.mobile/MobileWallet { // id.walt.wallet2.mobile/Mobi
         final fun <get-digitalCredentialRegistration>(): kotlinx.coroutines.flow/StateFlow<id.walt.wallet2.mobile/MobileWalletCredentialRegistrationResult?> // id.walt.wallet2.mobile/MobileWallet.digitalCredentialRegistration.<get-digitalCredentialRegistration>|<get-digitalCredentialRegistration>(){}[0]
     final val events // id.walt.wallet2.mobile/MobileWallet.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<id.walt.wallet2.mobile/MobileWalletEvent> // id.walt.wallet2.mobile/MobileWallet.events.<get-events>|<get-events>(){}[0]
+    final val identities // id.walt.wallet2.mobile/MobileWallet.identities|{}identities[0]
+        final fun <get-identities>(): id.walt.wallet2.mobile.identity/WalletIdentities // id.walt.wallet2.mobile/MobileWallet.identities.<get-identities>|<get-identities>(){}[0]
 
     final fun annexCRequest(id.walt.wallet2.mobile/MobileWalletDigitalCredentialRequest): id.walt.wallet2.mobile/MobileWalletAnnexCRequest // id.walt.wallet2.mobile/MobileWallet.annexCRequest|annexCRequest(id.walt.wallet2.mobile.MobileWalletDigitalCredentialRequest){}[0]
     final fun digitalCredentialCapabilities(): id.walt.wallet2.mobile/MobileWalletDigitalCredentialCapabilities // id.walt.wallet2.mobile/MobileWallet.digitalCredentialCapabilities|digitalCredentialCapabilities(){}[0]
     final fun digitalCredentialErrorResponse(kotlin/String, kotlin/String): id.walt.wallet2.mobile/MobileWalletDigitalCredentialResponse // id.walt.wallet2.mobile/MobileWallet.digitalCredentialErrorResponse|digitalCredentialErrorResponse(kotlin.String;kotlin.String){}[0]
     final fun parseAnnexCDeviceRequest(kotlin/String): id.walt.wallet2.mobile/MobileWalletAnnexCParsedRequest // id.walt.wallet2.mobile/MobileWallet.parseAnnexCDeviceRequest|parseAnnexCDeviceRequest(kotlin.String){}[0]
     final suspend fun beginAuthorizationIssuance(kotlin/String): id.walt.wallet2.handlers/WalletIssuanceAuthorization // id.walt.wallet2.mobile/MobileWallet.beginAuthorizationIssuance|beginAuthorizationIssuance(kotlin.String){}[0]
-    final suspend fun bootstrap(id.walt.wallet2.mobile/MobileWalletKeyType? = ..., kotlin/String = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy? = ...): id.walt.wallet2.mobile/MobileWalletBootstrapResult // id.walt.wallet2.mobile/MobileWallet.bootstrap|bootstrap(id.walt.wallet2.mobile.MobileWalletKeyType?;kotlin.String;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy?){}[0]
     final suspend fun cancelIssuance(kotlin/String): id.walt.wallet2.handlers/WalletIssuanceOutcome // id.walt.wallet2.mobile/MobileWallet.cancelIssuance|cancelIssuance(kotlin.String){}[0]
     final suspend fun continueAuthorizationIssuance(kotlin/String, kotlin/String): id.walt.wallet2.handlers/WalletIssuanceOutcome // id.walt.wallet2.mobile/MobileWallet.continueAuthorizationIssuance|continueAuthorizationIssuance(kotlin.String;kotlin.String){}[0]
     final suspend fun continuePreAuthorizedIssuance(kotlin/String, kotlin/String? = ...): id.walt.wallet2.handlers/WalletIssuanceOutcome // id.walt.wallet2.mobile/MobileWallet.continuePreAuthorizedIssuance|continuePreAuthorizedIssuance(kotlin.String;kotlin.String?){}[0]
@@ -1147,30 +1792,8 @@ final class id.walt.wallet2.mobile/MobileWalletAnnexCSubmission { // id.walt.wal
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletAnnexCSubmission.toString|toString(){}[0]
 }
 
-final class id.walt.wallet2.mobile/MobileWalletBootstrapResult { // id.walt.wallet2.mobile/MobileWalletBootstrapResult|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/String, id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy) // id.walt.wallet2.mobile/MobileWalletBootstrapResult.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy){}[0]
-
-    final val did // id.walt.wallet2.mobile/MobileWalletBootstrapResult.did|{}did[0]
-        final fun <get-did>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletBootstrapResult.did.<get-did>|<get-did>(){}[0]
-    final val keyId // id.walt.wallet2.mobile/MobileWalletBootstrapResult.keyId|{}keyId[0]
-        final fun <get-keyId>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletBootstrapResult.keyId.<get-keyId>|<get-keyId>(){}[0]
-    final val keyUseAuthorizationPolicy // id.walt.wallet2.mobile/MobileWalletBootstrapResult.keyUseAuthorizationPolicy|{}keyUseAuthorizationPolicy[0]
-        final fun <get-keyUseAuthorizationPolicy>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile/MobileWalletBootstrapResult.keyUseAuthorizationPolicy.<get-keyUseAuthorizationPolicy>|<get-keyUseAuthorizationPolicy>(){}[0]
-    final val publicJwk // id.walt.wallet2.mobile/MobileWalletBootstrapResult.publicJwk|{}publicJwk[0]
-        final fun <get-publicJwk>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletBootstrapResult.publicJwk.<get-publicJwk>|<get-publicJwk>(){}[0]
-
-    final fun component1(): kotlin/String // id.walt.wallet2.mobile/MobileWalletBootstrapResult.component1|component1(){}[0]
-    final fun component2(): kotlin/String // id.walt.wallet2.mobile/MobileWalletBootstrapResult.component2|component2(){}[0]
-    final fun component3(): kotlin/String // id.walt.wallet2.mobile/MobileWalletBootstrapResult.component3|component3(){}[0]
-    final fun component4(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile/MobileWalletBootstrapResult.component4|component4(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ...): id.walt.wallet2.mobile/MobileWalletBootstrapResult // id.walt.wallet2.mobile/MobileWalletBootstrapResult.copy|copy(kotlin.String;kotlin.String;kotlin.String;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletBootstrapResult.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletBootstrapResult.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletBootstrapResult.toString|toString(){}[0]
-}
-
 final class id.walt.wallet2.mobile/MobileWalletConfig { // id.walt.wallet2.mobile/MobileWalletConfig|null[0]
-    constructor <init>(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile/MobileWalletPersistence = ..., kotlin.coroutines/SuspendFunction1<id.walt.wallet2.mobile/MobileWalletEvent, kotlin/Unit> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ..., id.waltid.openid4vci.wallet.metadata/CredentialIssuerMetadataTrustResolver? = ..., id.walt.wallet2.mobile/MobileWalletCredentialRegistry = ..., id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator = ..., id.walt.wallet2.mobile/MobileWalletCrossProcessAccess? = ..., kotlin.coroutines/SuspendFunction0<kotlin/Unit> = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ...) // id.walt.wallet2.mobile/MobileWalletConfig.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.MobileWalletPersistence;kotlin.coroutines.SuspendFunction1<id.walt.wallet2.mobile.MobileWalletEvent,kotlin.Unit>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>;id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver?;id.walt.wallet2.mobile.MobileWalletCredentialRegistry;id.walt.wallet2.mobile.MobileWalletReaderTrustEvaluator;id.walt.wallet2.mobile.MobileWalletCrossProcessAccess?;kotlin.coroutines.SuspendFunction0<kotlin.Unit>;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt){}[0]
+    constructor <init>(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile/MobileWalletPersistence = ..., kotlin.coroutines/SuspendFunction1<id.walt.wallet2.mobile/MobileWalletEvent, kotlin/Unit> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ..., id.waltid.openid4vci.wallet.metadata/CredentialIssuerMetadataTrustResolver? = ..., id.walt.wallet2.mobile/MobileWalletCredentialRegistry = ..., id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator = ..., id.walt.wallet2.mobile/MobileWalletCrossProcessAccess? = ..., kotlin.coroutines/SuspendFunction0<kotlin/Unit> = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ..., id.walt.wallet2.mobile.identity/IdentityConfiguration = ...) // id.walt.wallet2.mobile/MobileWalletConfig.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.MobileWalletPersistence;kotlin.coroutines.SuspendFunction1<id.walt.wallet2.mobile.MobileWalletEvent,kotlin.Unit>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>;id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver?;id.walt.wallet2.mobile.MobileWalletCredentialRegistry;id.walt.wallet2.mobile.MobileWalletReaderTrustEvaluator;id.walt.wallet2.mobile.MobileWalletCrossProcessAccess?;kotlin.coroutines.SuspendFunction0<kotlin.Unit>;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt;id.walt.wallet2.mobile.identity.IdentityConfiguration){}[0]
 
     final val attestationConfig // id.walt.wallet2.mobile/MobileWalletConfig.attestationConfig|{}attestationConfig[0]
         final fun <get-attestationConfig>(): id.walt.wallet2.mobile/WalletAttestationConfig? // id.walt.wallet2.mobile/MobileWalletConfig.attestationConfig.<get-attestationConfig>|<get-attestationConfig>(){}[0]
@@ -1184,6 +1807,8 @@ final class id.walt.wallet2.mobile/MobileWalletConfig { // id.walt.wallet2.mobil
         final fun <get-defaultKeyType>(): id.walt.wallet2.mobile/MobileWalletKeyType // id.walt.wallet2.mobile/MobileWalletConfig.defaultKeyType.<get-defaultKeyType>|<get-defaultKeyType>(){}[0]
     final val defaultKeyUseAuthorizationPolicy // id.walt.wallet2.mobile/MobileWalletConfig.defaultKeyUseAuthorizationPolicy|{}defaultKeyUseAuthorizationPolicy[0]
         final fun <get-defaultKeyUseAuthorizationPolicy>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile/MobileWalletConfig.defaultKeyUseAuthorizationPolicy.<get-defaultKeyUseAuthorizationPolicy>|<get-defaultKeyUseAuthorizationPolicy>(){}[0]
+    final val identity // id.walt.wallet2.mobile/MobileWalletConfig.identity|{}identity[0]
+        final fun <get-identity>(): id.walt.wallet2.mobile.identity/IdentityConfiguration // id.walt.wallet2.mobile/MobileWalletConfig.identity.<get-identity>|<get-identity>(){}[0]
     final val keyUseAuthorizationPrompt // id.walt.wallet2.mobile/MobileWalletConfig.keyUseAuthorizationPrompt|{}keyUseAuthorizationPrompt[0]
         final fun <get-keyUseAuthorizationPrompt>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.mobile/MobileWalletConfig.keyUseAuthorizationPrompt.<get-keyUseAuthorizationPrompt>|<get-keyUseAuthorizationPrompt>(){}[0]
     final val onDigitalCredentialRegistryChanged // id.walt.wallet2.mobile/MobileWalletConfig.onDigitalCredentialRegistryChanged|{}onDigitalCredentialRegistryChanged[0]
@@ -1207,6 +1832,7 @@ final class id.walt.wallet2.mobile/MobileWalletConfig { // id.walt.wallet2.mobil
     final fun component12(): kotlin.coroutines/SuspendFunction0<kotlin/Unit> // id.walt.wallet2.mobile/MobileWalletConfig.component12|component12(){}[0]
     final fun component13(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile/MobileWalletConfig.component13|component13(){}[0]
     final fun component14(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.mobile/MobileWalletConfig.component14|component14(){}[0]
+    final fun component15(): id.walt.wallet2.mobile.identity/IdentityConfiguration // id.walt.wallet2.mobile/MobileWalletConfig.component15|component15(){}[0]
     final fun component2(): id.walt.wallet2.mobile/MobileWalletKeyType // id.walt.wallet2.mobile/MobileWalletConfig.component2|component2(){}[0]
     final fun component3(): id.walt.wallet2.mobile/WalletAttestationConfig? // id.walt.wallet2.mobile/MobileWalletConfig.component3|component3(){}[0]
     final fun component4(): id.walt.wallet2.mobile/MobileWalletPersistence // id.walt.wallet2.mobile/MobileWalletConfig.component4|component4(){}[0]
@@ -1215,7 +1841,7 @@ final class id.walt.wallet2.mobile/MobileWalletConfig { // id.walt.wallet2.mobil
     final fun component7(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> // id.walt.wallet2.mobile/MobileWalletConfig.component7|component7(){}[0]
     final fun component8(): id.waltid.openid4vci.wallet.metadata/CredentialIssuerMetadataTrustResolver? // id.walt.wallet2.mobile/MobileWalletConfig.component8|component8(){}[0]
     final fun component9(): id.walt.wallet2.mobile/MobileWalletCredentialRegistry // id.walt.wallet2.mobile/MobileWalletConfig.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile/MobileWalletPersistence = ..., kotlin.coroutines/SuspendFunction1<id.walt.wallet2.mobile/MobileWalletEvent, kotlin/Unit> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ..., id.waltid.openid4vci.wallet.metadata/CredentialIssuerMetadataTrustResolver? = ..., id.walt.wallet2.mobile/MobileWalletCredentialRegistry = ..., id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator = ..., id.walt.wallet2.mobile/MobileWalletCrossProcessAccess? = ..., kotlin.coroutines/SuspendFunction0<kotlin/Unit> = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ...): id.walt.wallet2.mobile/MobileWalletConfig // id.walt.wallet2.mobile/MobileWalletConfig.copy|copy(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.MobileWalletPersistence;kotlin.coroutines.SuspendFunction1<id.walt.wallet2.mobile.MobileWalletEvent,kotlin.Unit>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>;id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver?;id.walt.wallet2.mobile.MobileWalletCredentialRegistry;id.walt.wallet2.mobile.MobileWalletReaderTrustEvaluator;id.walt.wallet2.mobile.MobileWalletCrossProcessAccess?;kotlin.coroutines.SuspendFunction0<kotlin.Unit>;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt){}[0]
+    final fun copy(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile/MobileWalletPersistence = ..., kotlin.coroutines/SuspendFunction1<id.walt.wallet2.mobile/MobileWalletEvent, kotlin/Unit> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ..., id.waltid.openid4vci.wallet.metadata/CredentialIssuerMetadataTrustResolver? = ..., id.walt.wallet2.mobile/MobileWalletCredentialRegistry = ..., id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator = ..., id.walt.wallet2.mobile/MobileWalletCrossProcessAccess? = ..., kotlin.coroutines/SuspendFunction0<kotlin/Unit> = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ..., id.walt.wallet2.mobile.identity/IdentityConfiguration = ...): id.walt.wallet2.mobile/MobileWalletConfig // id.walt.wallet2.mobile/MobileWalletConfig.copy|copy(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.MobileWalletPersistence;kotlin.coroutines.SuspendFunction1<id.walt.wallet2.mobile.MobileWalletEvent,kotlin.Unit>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>;id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver?;id.walt.wallet2.mobile.MobileWalletCredentialRegistry;id.walt.wallet2.mobile.MobileWalletReaderTrustEvaluator;id.walt.wallet2.mobile.MobileWalletCrossProcessAccess?;kotlin.coroutines.SuspendFunction0<kotlin.Unit>;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt;id.walt.wallet2.mobile.identity.IdentityConfiguration){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletConfig.toString|toString(){}[0]

@@ -52,6 +52,8 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(identityLibs.whyoleg.cryptography.random)
+            implementation(identityLibs.signum.indispensable)
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile"))
             api(project(":waltid-libraries:waltid-did"))

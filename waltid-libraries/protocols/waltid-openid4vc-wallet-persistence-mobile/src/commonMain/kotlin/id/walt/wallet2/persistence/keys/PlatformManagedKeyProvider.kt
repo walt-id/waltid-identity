@@ -18,6 +18,17 @@ public interface PlatformManagedKeyProvider {
     /** Generates a managed key in the platform key store. */
     public suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey
 
+    /** Whether this native backend supports importing a private key with these requirements. */
+    public fun supportsPrivateKeyImport(requirements: WalletKeyRequirements): Boolean = false
+
+    /** Imports private material into native storage. Implementations must verify the public key. */
+    public suspend fun importManagedKey(request: WalletKeyCreationRequest,
+        material: id.walt.crypto2.keys.EncodedKey.Jwk): ManagedKey =
+        throw UnsupportedOperationException("Native private-key import is unavailable")
+
+    /** Inspects actual key origin and protection without claiming certification. */
+    public suspend fun keyFacts(stored: StoredKey.Managed): PlatformKeyFacts = PlatformKeyFacts()
+
     /** Reads the immutable wallet authorization policy encoded in a managed-key descriptor. */
     public fun keyUseAuthorizationPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy
 
@@ -29,9 +40,26 @@ public interface PlatformManagedKeyProvider {
      */
     public suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration
 
+    /** Cleans up an alias reserved by an interrupted, uncommitted identity operation. */
+    public suspend fun deleteUncommittedKey(request: WalletKeyCreationRequest, imported: Boolean): Unit =
+        throw UnsupportedOperationException("Uncommitted-key cleanup is unavailable")
+
     /**
      * Deletes a platform key using its descriptor without restoring the alias first.
      */
     public suspend fun deleteManagedKey(stored: StoredKey.Managed)
 
 }
+
+/** Observed native facts. Unknown values are not evidence of hardware or certification. */
+@kotlinx.serialization.Serializable
+public data class PlatformKeyFacts(
+    /** Native generation/import origin, or unknown when unavailable. */
+    public val origin: id.walt.crypto2.signum.SignumKeyOrigin = id.walt.crypto2.signum.SignumKeyOrigin.UNKNOWN,
+    /** Observed execution tier, independent of key origin. */
+    public val securityLevel: id.walt.crypto2.signum.SignumSecurityLevel = id.walt.crypto2.signum.SignumSecurityLevel.UNKNOWN,
+    /** Native key protection classification. */
+    public val protection: id.walt.crypto2.signum.SignumProtectionLevel = id.walt.crypto2.signum.SignumProtectionLevel.UNKNOWN,
+    /** Native evidence, not a verified key-attestation JWT or certification result. */
+    public val attestation: id.walt.crypto2.signum.SignumKeyAttestation? = null,
+)

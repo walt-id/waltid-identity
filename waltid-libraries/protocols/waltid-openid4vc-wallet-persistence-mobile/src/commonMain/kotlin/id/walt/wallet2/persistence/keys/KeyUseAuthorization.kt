@@ -13,6 +13,24 @@ public sealed interface KeyUseAuthorizationPolicy {
     @Serializable
     public data object None : KeyUseAuthorizationPolicy
 
+    /** Every private-key use accepts an enrolled strong biometric; new enrollment does not invalidate it. */
+    @Serializable
+    public data object BiometricAny : KeyUseAuthorizationPolicy
+
+    /** Requires the device PIN/passcode/password, with optional bounded reuse.
+     * @property timeoutSeconds Fixed non-sliding reuse interval from 0 through 30; zero requires authorization for each use. */
+    @Serializable
+    public data class DeviceCredential(public val timeoutSeconds: Int = 0) : KeyUseAuthorizationPolicy {
+        init { require(timeoutSeconds in 0..30) { "Authorization reuse must be between 0 and 30 seconds" } }
+    }
+
+    /** Accepts either a strong biometric or the device credential; enrollment changes do not invalidate it.
+     * @property timeoutSeconds Fixed non-sliding reuse interval from 0 through 30; zero requires authorization for each use. */
+    @Serializable
+    public data class BiometricOrDeviceCredential(public val timeoutSeconds: Int = 0) : KeyUseAuthorizationPolicy {
+        init { require(timeoutSeconds in 0..30) { "Authorization reuse must be between 0 and 30 seconds" } }
+    }
+
     /** Every private-key operation requires a currently enrolled strong biometric. */
     @Serializable
     public data object BiometricCurrentSet : KeyUseAuthorizationPolicy
@@ -22,9 +40,9 @@ public sealed interface KeyUseAuthorizationPolicy {
      * interval. The interval starts with successful authentication and never slides on signing.
      *
      * New biometric enrollment does not invalidate this key. Android can independently read back
-     * this interval from native KeyStore metadata after creation or restoration. iOS configures it
-     * in Signum, but Signum's pinned public API does not expose an effective positive timeout after
-     * restoration for independent readback.
+     * this interval from native KeyStore metadata after creation or restoration. iOS enforces the interval
+     * through a fixed LocalAuthentication context lifetime; native Keychain metadata does not expose
+     * that reuse interval for independent readback.
      *
      * Timed reuse is recent platform or provider authentication. It is not authorization or
      * consent for issuance, presentation, or another wallet action, and is not guaranteed to be
@@ -86,11 +104,18 @@ public class KeyUseAuthorizationException(
  * @property spec Cryptographic key specification.
  * @property usages Operations the key must support.
  * @property authorizationPolicy Authorization required for private-key use.
+ * @property protection Required native protection, checked against observed key facts.
+ * @property platform Advanced settings for the current platform backend.
  */
+@Serializable
 public data class WalletKeyRequirements(
     public val spec: KeySpec,
     public val usages: Set<KeyUsage>,
     public val authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+    public val protection: WalletKeyProtection = WalletKeyProtection.PlatformDefault,
+    public val platform: id.walt.crypto2.signum.SignumPlatformPolicy = id.walt.crypto2.signum.SignumPlatformPolicy.Default,
+    /** Fresh native generation challenge; import cannot satisfy native key-generation attestation. */
+    public val attestationChallenge: id.walt.crypto2.serialization.BinaryData? = null,
 ) {
     init {
         require(usages.isNotEmpty()) { "Wallet key usages cannot be empty" }
@@ -108,6 +133,8 @@ public data class WalletKeyCreationRequest(
     public val id: KeyId,
     public val requirements: WalletKeyRequirements,
     public val prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
+    /** Native alias; identity recovery uses a fresh alias while preserving the logical key ID. */
+    public val nativeAlias: String = id.value,
 )
 
 /** Result of checking whether the wallet can satisfy the requested key and authorization requirements. */
@@ -122,7 +149,7 @@ public sealed interface KeyUseAuthorizationSupport {
         public val timeoutValidation: KeyUseAuthorizationReuseTimeoutValidation? = null,
     ) : KeyUseAuthorizationSupport {
         init {
-            val timed = effectivePolicy is KeyUseAuthorizationPolicy.BiometricTimedReuse
+            val timed = effectivePolicy.reuseSeconds > 0
             require((reuseEnforcement != null) == timed && (timeoutValidation != null) == timed) {
                 "Timed support must include enforcement and timeout validation only for timed policy"
             }
@@ -189,4 +216,17 @@ internal fun KeyUseAuthorizationUnsupportedReason.toAuthorizationFailure(): KeyU
     KeyUseAuthorizationUnsupportedReason.UnsupportedCombination -> KeyUseAuthorizationFailure.UnsupportedCombination
     KeyUseAuthorizationUnsupportedReason.BiometricUnavailable -> KeyUseAuthorizationFailure.BiometricUnavailable
     KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled -> KeyUseAuthorizationFailure.BiometricNotEnrolled
+}
+
+/** Signing-key protection is independent of the authorization needed to use the key. */
+@Serializable
+public enum class WalletKeyProtection {
+    /** Preserves the historical native policy, including hardware required by biometric defaults. */
+    PlatformDefault,
+    /** Creation fails unless the native backend observes secure hardware. */
+    HardwareRequired,
+    /** Hardware is preferred; actual protection is reported separately. */
+    HardwarePreferred,
+    /** Native storage without a hardware requirement; iOS uses ordinary Keychain. */
+    NativeStorage,
 }

@@ -1,6 +1,6 @@
 # Getting Started
 
-Create a ``Wallet`` actor, bootstrap wallet state, and keep the actor as the
+Create a ``Wallet`` actor, initialize a signing identity, and keep the actor as the
 native iOS entry point for wallet operations.
 
 ## Overview
@@ -58,12 +58,15 @@ let wallet = try await Wallet(
 
 ### Bootstrap DID State
 
-Call ``Wallet/bootstrap(keyType:didMethod:keyUseAuthorizationPolicy:)`` before issuance or presentation
+Call ``WalletIdentityService/initialize()`` before issuance or presentation
 flows that need wallet key material.
 
 ```swift
-let bootstrap = try await wallet.bootstrap(didMethod: "key")
-print(bootstrap.did)
+guard case .active(let identity) = try await wallet.identities.initialize() else {
+    // Show pending setup or an unavailable identity before continuing.
+    return
+}
+print(identity.did)
 ```
 
 Use ``Wallet/keyUseAuthorizationPreflight(keyType:policy:)`` to check a
@@ -84,5 +87,5 @@ independently expose the effective positive timeout after restoration. Timed
 reuse is recent provider authentication, not issuance, presentation, or other
 wallet-action consent, and is not guaranteed to be key-local.
 
-Use the returned ``WalletBootstrapResult/did`` when a verifier flow needs an
+Use the returned ``WalletIdentity/did`` when a verifier flow needs an
 explicit wallet DID.

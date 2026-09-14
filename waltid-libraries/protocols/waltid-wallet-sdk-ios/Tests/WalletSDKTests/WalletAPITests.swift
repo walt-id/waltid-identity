@@ -283,49 +283,6 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNotNil(wallet)
     }
 
-    func testBootstrapForwardsDefaultKeyTypeAndDidMethod() async throws {
-        let bridge = FakeWalletCoreBridge()
-        bridge.bootstrapResult = .init(
-            keyID: "key-1",
-            did: "did:jwk:abc",
-            publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#,
-            keyUseAuthorizationPolicy: .none
-        )
-        let wallet = Wallet(
-            configuration: .init(defaultKeyType: .ed25519),
-            bridge: bridge
-        )
-
-        let result = try await wallet.bootstrap(didMethod: "jwk")
-
-        XCTAssertEqual(result, bridge.bootstrapResult)
-        XCTAssertEqual(bridge.bootstrapCalls.count, 1)
-        XCTAssertEqual(bridge.bootstrapCalls.first?.keyType, .ed25519)
-        XCTAssertEqual(bridge.bootstrapCalls.first?.didMethod, "jwk")
-    }
-
-    func testBootstrapForwardsExplicitKeyType() async throws {
-        let bridge = FakeWalletCoreBridge()
-        let wallet = Wallet(
-            configuration: .init(defaultKeyType: .secp256r1),
-            bridge: bridge
-        )
-
-        _ = try await wallet.bootstrap(keyType: .rsa4096)
-
-        XCTAssertEqual(bridge.bootstrapCalls.first?.keyType, .rsa4096)
-    }
-
-    func testBootstrapForwardsTimedKeyUseAuthorizationPolicy() async throws {
-        let bridge = FakeWalletCoreBridge()
-        let wallet = Wallet(configuration: .init(), bridge: bridge)
-        let policy = WalletKeyUseAuthorizationPolicy.biometricTimedReuse(timeoutSeconds: 10)
-
-        _ = try await wallet.bootstrap(keyUseAuthorizationPolicy: policy)
-
-        XCTAssertEqual(bridge.bootstrapCalls.first?.keyUseAuthorizationPolicy, policy)
-    }
-
     func testIssuanceSessionOperationsForwardTypedInputs() async throws {
         let bridge = FakeWalletCoreBridge()
         bridge.issuanceOutcomeResult = .stored(
@@ -850,11 +807,6 @@ private extension Array {
 }
 
 private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
-    struct BootstrapCall {
-        let keyType: WalletKeyType
-        let didMethod: String
-        let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
-    }
 
     struct PresentCall {
         let request: URL
@@ -892,12 +844,6 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
-    var bootstrapResult = WalletBootstrapResult(
-        keyID: "key",
-        did: "did:key:wallet",
-        publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#,
-        keyUseAuthorizationPolicy: .biometricCurrentSet
-    )
     var keyUseAuthorizationPreflightResult: WalletKeyUseAuthorizationPreflight?
     var issuanceSessionResult = IssuanceSession(
         id: "issuance-session-1",
@@ -947,7 +893,6 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         readerTrust: .untrusted(reason: "not configured")
     )
     var digitalCredentialResponseResult = DigitalCredentialResponse(protocolIdentifier: "org-iso-mdoc", dataJSON: "{}")
-    private(set) var bootstrapCalls: [BootstrapCall] = []
     private(set) var issuanceRequests: [IssuanceRequest] = []
     private(set) var authorizationStartSessionIDs: [String] = []
     private(set) var preAuthorizedIssuanceCalls: [(String, String?)] = []
@@ -972,25 +917,6 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             }
             continuation.finish()
         }
-    }
-
-    func bootstrap(
-        keyType: WalletKeyType,
-        didMethod: String,
-        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
-    ) async throws -> WalletBootstrapResult {
-        if let error {
-            throw error
-        }
-
-        bootstrapCalls.append(
-            .init(
-                keyType: keyType,
-                didMethod: didMethod,
-                keyUseAuthorizationPolicy: keyUseAuthorizationPolicy
-            )
-        )
-        return bootstrapResult
     }
 
     func keyUseAuthorizationPreflight(

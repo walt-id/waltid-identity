@@ -312,3 +312,28 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ]
     }
 }
+
+@MainActor
+final class WalletIdentitySetupUITests: XCTestCase {
+    func testComposeIdentitySetupAndProtectionDetails() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["WALLET_ID": "identity-ui-\(UUID().uuidString)"], initializeIdentity: false)
+        let create = app.buttons["Use this option"].firstMatch
+        XCTAssertTrue(create.waitForExistence(timeout: 30))
+        let setup = XCTAttachment(screenshot: app.screenshot())
+        setup.name = "wal749-compose-ios-identity-setup"
+        setup.lifetime = .keepAlways
+        add(setup)
+        create.tap()
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 30), "Wallet ready")
+        ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        let recovery = app.staticTexts["No recovery backup submitted."]
+        for _ in 0..<4 where !recovery.isHittable { app.swipeUp() }
+        XCTAssertTrue(recovery.waitForExistence(timeout: 10))
+        let active = XCTAttachment(screenshot: app.screenshot())
+        active.name = "wal749-compose-ios-identity-details"
+        active.lifetime = .keepAlways
+        add(active)
+    }
+}

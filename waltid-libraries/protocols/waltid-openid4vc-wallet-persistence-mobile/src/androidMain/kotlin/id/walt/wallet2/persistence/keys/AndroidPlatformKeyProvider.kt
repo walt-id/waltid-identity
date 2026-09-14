@@ -32,8 +32,11 @@ public class AndroidPlatformKeyProvider(
     private val signumProvider = SignumManagedKeyProvider(backend)
 
     override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
-        val signumPolicy = requirements.authorizationPolicy.toSignumPolicy()
-        if (!backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
+        val signumPolicy = requirements.nativePolicy()
+        val settings = signumPolicy.platform as? id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore
+        if ((settings?.strongBox == id.walt.crypto2.signum.SignumHardwarePolicy.REQUIRED &&
+                !applicationContext.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_STRONGBOX_KEYSTORE)) ||
+            !backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
         if (requirements.authorizationPolicy is KeyUseAuthorizationPolicy.None) {
@@ -43,7 +46,11 @@ public class AndroidPlatformKeyProvider(
             requirements.spec != KeySpec.Ec(EcCurve.P256) ||
                 requirements.usages != setOf(KeyUsage.SIGN, KeyUsage.VERIFY) ->
                 KeyUseAuthorizationUnsupportedReason.UnsupportedCombination
-            else -> when (BiometricManager.from(applicationContext).canAuthenticate(BIOMETRIC_STRONG)) {
+            else -> when (BiometricManager.from(applicationContext).canAuthenticate(when (requirements.authorizationPolicy) {
+                    is KeyUseAuthorizationPolicy.DeviceCredential -> BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                    is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                    else -> BIOMETRIC_STRONG
+                })) {
                 BiometricManager.BIOMETRIC_SUCCESS -> null
                 BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled
                 else -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
@@ -57,9 +64,10 @@ public class AndroidPlatformKeyProvider(
         signumProvider.generate(
             GenerateManagedKeyRequest(
                 id = request.id,
+                metadata = mapOf("wallet.nativeAlias" to request.nativeAlias),
                 spec = request.requirements.spec,
                 usages = request.requirements.usages,
-                providerOptions = SignumKeyOptions(policy = request.toSignumPolicy()).encode(),
+                providerOptions = SignumKeyOptions(alias = request.nativeAlias, policy = request.toSignumPolicy()).encode(),
             )
         ).withWalletAuthorizationMapping(request.requirements.authorizationPolicy)
     } catch (cause: Throwable) {
@@ -74,6 +82,19 @@ public class AndroidPlatformKeyProvider(
             policyMismatchFailure = KeyUseAuthorizationFailure.UnsupportedCombination,
         ) ?: cause
     }
+
+    override fun supportsPrivateKeyImport(requirements: WalletKeyRequirements): Boolean =
+        backend.supportsImport(requirements.spec, requirements.usages, requirements.nativePolicy())
+
+    override suspend fun importManagedKey(request: WalletKeyCreationRequest,
+        material: id.walt.crypto2.keys.EncodedKey.Jwk): ManagedKey =
+        signumProvider.importPrivateKey(GenerateManagedKeyRequest(
+            id = request.id, metadata = mapOf("wallet.nativeAlias" to request.nativeAlias), spec = request.requirements.spec, usages = request.requirements.usages,
+            providerOptions = SignumKeyOptions(alias = request.nativeAlias, policy = request.toSignumPolicy()).encode(),
+        ), material).withWalletAuthorizationMapping(request.requirements.authorizationPolicy)
+
+    override suspend fun keyFacts(stored: StoredKey.Managed): PlatformKeyFacts =
+        signumProvider.restoreSignumKey(stored).let { PlatformKeyFacts(it.origin, it.securityLevel, it.protectionLevel, it.attestation) }
 
     override fun keyUseAuthorizationPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy = try {
         signumProvider.storedPolicy(stored).toWalletPolicy(stored)
@@ -95,27 +116,48 @@ public class AndroidPlatformKeyProvider(
         }
     }
 
+    override suspend fun deleteUncommittedKey(request: WalletKeyCreationRequest, imported: Boolean) {
+        if (imported) backend.deleteImportedKey(request.nativeAlias, request.toSignumPolicy())
+        else backend.delete(request.nativeAlias, request.toSignumPolicy())
+    }
+
     override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
         try {
-            signumProvider.delete(stored, expectedAlias = stored.id.value)
+            signumProvider.delete(stored, expectedAlias = stored.metadata["wallet.nativeAlias"] ?: stored.id.value)
         } catch (cause: Throwable) {
             throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
         }
     }
 
+    private fun WalletKeyRequirements.nativePolicy(prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt()): SignumKeyPolicy =
+        toSignumPolicy(prompt).let { policy ->
+            if (spec != KeySpec.Ec(EcCurve.P256)) return@let policy
+            val settings = when (val platform = policy.platform) {
+                id.walt.crypto2.signum.SignumPlatformPolicy.Default -> id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore()
+                is id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore -> platform
+                else -> return@let policy
+            }
+            // API 31 import wraps absent StrongBox in a generic KeyStoreException. Use the public
+            // capability flag before import rather than interpreting exception text or weakening hardware.
+            val effective = if (settings.strongBox == id.walt.crypto2.signum.SignumHardwarePolicy.PREFERRED &&
+                !applicationContext.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_STRONGBOX_KEYSTORE))
+                settings.copy(strongBox = id.walt.crypto2.signum.SignumHardwarePolicy.DISCOURAGED) else settings
+            policy.copy(platform = effective)
+        }
+
     private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy =
-        requirements.authorizationPolicy.toSignumPolicy(prompt)
+        requirements.nativePolicy(prompt)
 }
 
 private fun KeyUseAuthorizationPolicy.supportedOnAndroid(): KeyUseAuthorizationSupport.Supported =
     KeyUseAuthorizationSupport.Supported(
         effectivePolicy = this,
-        reuseEnforcement = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
+        reuseEnforcement = if (this.reuseSeconds > 0) {
             KeyUseAuthorizationReuseEnforcement.PlatformKeyStore
         } else {
             null
         },
-        timeoutValidation = if (this is KeyUseAuthorizationPolicy.BiometricTimedReuse) {
+        timeoutValidation = if (this.reuseSeconds > 0) {
             KeyUseAuthorizationReuseTimeoutValidation.IndependentReadback
         } else {
             null

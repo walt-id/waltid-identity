@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        A74900000000000000000001 /* WalletSDKKeychainRecovery in Frameworks */ = {isa = PBXBuildFile; productRef = A74900000000000000000002 /* WalletSDKKeychainRecovery */; };
+        A74900000000000000000003 /* WalletIdentityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A74900000000000000000004 /* WalletIdentityView.swift */; };
 		0221E8E7784E493B08CF5888 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDK */; };
 		2185E0068DD9855D00602730 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDK */; };
 		71E100012FDAE00000000001 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDK */; };
@@ -113,6 +115,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+        A74900000000000000000004 /* WalletIdentityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletIdentityView.swift; sourceTree = "<group>"; };
 		71E100052FDAE00000000005 /* iosAppEnterpriseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppEnterpriseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000001AAAA000000000001 /* WalletViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletViewModel.swift; sourceTree = "<group>"; };
 		A1000002AAAA000000000002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -185,6 +188,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0221E8E7784E493B08CF5888 /* WalletSDK in Frameworks */,
+                A74900000000000000000001 /* WalletSDKKeychainRecovery in Frameworks */,
 				A75200000000000000000024 /* WalletDemoIdentityDocumentSupport in Frameworks */,
 				A75200000000000000000043 /* WalletDemoSharingUI in Frameworks */,
 				A1000500AAAA000100000050 /* CodeScanner in Frameworks */,
@@ -244,6 +248,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000002AAAA000000000002 /* HomeView.swift */,
+                A74900000000000000000004 /* WalletIdentityView.swift */,
 				A1000422AAAA000000000022 /* CredentialsTabView.swift */,
 				A1000003AAAA000000000003 /* ReceiveView.swift */,
 				A1000004AAAA000000000004 /* PresentView.swift */,
@@ -425,6 +430,7 @@
 			name = iosApp;
 			packageProductDependencies = (
 				256D4E3F703216DC04F0C650 /* WalletSDK */,
+                A74900000000000000000002 /* WalletSDKKeychainRecovery */,
 				A75200000000000000000021 /* WalletDemoIdentityDocumentSupport */,
 				A75200000000000000000040 /* WalletDemoSharingUI */,
 				A1000501AAAA000000000051 /* CodeScanner */,
@@ -637,6 +643,7 @@
 				A1000420AAAA000100000020 /* WalletClient.swift in Sources */,
 				A1000421AAAA000100000021 /* MockWalletClient.swift in Sources */,
 				A1000002AAAA000100000002 /* HomeView.swift in Sources */,
+                A74900000000000000000003 /* WalletIdentityView.swift in Sources */,
 				A1000422AAAA000100000022 /* CredentialsTabView.swift in Sources */,
 				A1000003AAAA000100000003 /* ReceiveView.swift in Sources */,
 				A1000004AAAA000100000004 /* PresentView.swift in Sources */,
@@ -1245,6 +1252,7 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+        A74900000000000000000002 /* WalletSDKKeychainRecovery */ = {isa = XCSwiftPackageProductDependency; package = 8A81DD79791BBF3F1CFF90A1; productName = WalletSDKKeychainRecovery; };
 		256D4E3F703216DC04F0C650 /* WalletSDK */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
