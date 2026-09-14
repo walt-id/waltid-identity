@@ -60,7 +60,7 @@ jobs:
     needs: enterprise-ref
     steps:
       - name: Dispatch integration-test-aws.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: integration-test-aws.yml
           repo: walt-id/waltid-identity-enterprise
@@ -74,7 +74,7 @@ jobs:
     needs: enterprise-ref
     steps:
       - name: Dispatch integration-test-azure.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: integration-test-azure.yml
           repo: walt-id/waltid-identity-enterprise
@@ -112,7 +112,7 @@ jobs:
     needs: [ version, enterprise-ref, gradle, docker, api-docker, sdk-docs, integration-test-aws, integration-test-azure ]
     steps:
       - name: Dispatch deploy-k8s.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: deploy-k8s.yml
           repo: walt-id/waltid-identity-enterprise-license

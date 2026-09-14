@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ version, guard ]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Login to Docker Hub
         uses: docker/login-action@v4
         with:
@@ -132,7 +132,7 @@ jobs:
     needs: [ version, enterprise-ref, enterprise-image-digests ]
     steps:
       - name: Dispatch enterprise-supply-chain.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: enterprise-supply-chain.yml
           repo: walt-id/waltid-identity-enterprise
@@ -148,7 +148,7 @@ jobs:
     needs: [ version, enterprise-ref, retag ]
     steps:
       - name: Dispatch deploy-k8s.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: deploy-k8s.yml
           repo: walt-id/waltid-identity-enterprise-license

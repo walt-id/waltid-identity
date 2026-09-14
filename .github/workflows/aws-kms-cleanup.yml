@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_KMS_CLEANUP_ROLE_ARN }}
           # Home region for OIDC auth and region discovery; KMS sweep covers all regions below.
