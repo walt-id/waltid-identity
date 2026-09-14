@@ -9,6 +9,26 @@ on:
         type: string
         required: false
         default: ''
+      run-ios-simulator:
+        description: 'Run Kotlin iOS simulator compilation and tests'
+        type: boolean
+        required: false
+        default: false
+      run-native:
+        description: 'Run native WalletCore / Xcode demo tests'
+        type: boolean
+        required: false
+        default: false
+      run-compose:
+        description: 'Run Compose iOS demo tests'
+        type: boolean
+        required: false
+        default: false
+      run-enterprise:
+        description: 'Run Enterprise iOS mobile tests'
+        type: boolean
+        required: false
+        default: false
 
 # Pinned to the gradle-ios revision validated by this workflow.
 env:
@@ -18,6 +38,7 @@ env:
 
 jobs:
   ios-simulator-tests:
+    if: ${{ github.event_name == 'workflow_dispatch' || inputs.run-ios-simulator }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
@@ -45,7 +66,8 @@ jobs:
           test-report-check-name: iOS Simulator Test Report
           test-result-artifact-name: ios-simulator-test-results
 
-  wallet-core-native-ios-demo-tests:
+  wallet-core-consumer-tests:
+    if: ${{ github.event_name == 'workflow_dispatch' || inputs.run-native || inputs.run-compose }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
@@ -57,10 +79,10 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
-      - name: Build WalletCore and run native iOS demo tests
-        # Same XCFramework cost as the Compose job; this one already used 29 of its previous 35 min,
-        # so a cold cache left no margin.
-        timeout-minutes: 65
+      - name: Build WalletCore once and run selected consumer tests
+        # One XCFramework assemble is shared by the native demo, Compose demo, and (via artifact)
+        # SDK DocC. Cold Konan cache is ~27 min; both demo suites can add ~11 min each.
+        timeout-minutes: 80
         uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
         with:
           waltid-directory: 'waltid-identity'
@@ -69,48 +91,25 @@ jobs:
           run-compile-smoke: 'false'
           run-ios-simulator-tests: 'false'
           run-wallet-core-xcframework: 'true'
-          run-native-demo-tests: 'true'
-          run-native-identity-document-provider-checks: 'true'
-          run-compose-demo-tests: 'false'
-          test-report-job-name: ${{ env.JOB_NAME_PREFIX }}wallet-core-native-ios-demo-tests
-          test-report-check-name: Native iOS Demo Test Report
-          test-result-artifact-name: native-ios-demo-test-results
+          run-native-demo-tests: ${{ (github.event_name == 'workflow_dispatch' || inputs.run-native) && 'true' || 'false' }}
+          run-native-identity-document-provider-checks: ${{ (github.event_name == 'workflow_dispatch' || inputs.run-native) && 'true' || 'false' }}
+          run-compose-demo-tests: ${{ (github.event_name == 'workflow_dispatch' || inputs.run-compose) && 'true' || 'false' }}
+          run-compose-identity-document-provider-checks: ${{ (github.event_name == 'workflow_dispatch' || inputs.run-compose) && 'true' || 'false' }}
+          test-report-job-name: ${{ env.JOB_NAME_PREFIX }}wallet-core-consumer-tests
+          test-report-check-name: WalletCore Consumer Test Report
+          test-report-require-tests: ${{ (github.event_name == 'workflow_dispatch' || inputs.run-native) && 'true' || 'false' }}
+          test-result-artifact-name: wallet-core-consumer-test-results
 
-  compose-ios-demo-tests:
-    runs-on: macos-26
-    steps:
-      - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+      - name: Upload WalletCore XCFramework
+        uses: actions/upload-artifact@v4
         with:
-          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
-          ref: ${{ github.head_ref || github.ref_name }}
-
-      - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
-
-      - name: Run Compose iOS demo tests
-        # Assembling WalletCore costs ~27 min on a cold Konan cache and the demo's own tests ~11 min,
-        # so the previous 40 min was below the job's actual work now that it needs the XCFramework.
-        timeout-minutes: 65
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
-        with:
-          waltid-directory: 'waltid-identity'
-          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
-          simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
-          run-compile-smoke: 'false'
-          run-ios-simulator-tests: 'false'
-          # The Compose demo embeds a document-provider extension that links WalletSDK, so this job
-          # needs the local WalletCore binary target the same way the native demo job does.
-          run-wallet-core-xcframework: 'true'
-          run-native-demo-tests: 'false'
-          run-compose-demo-tests: 'true'
-          run-compose-identity-document-provider-checks: 'true'
-          test-report-job-name: ${{ env.JOB_NAME_PREFIX }}compose-ios-demo-tests
-          test-report-check-name: Compose iOS Demo Test Report
-          test-report-require-tests: 'false'
-          test-result-artifact-name: compose-ios-demo-test-results
+          name: wallet-core-release-xcframework
+          path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework
+          if-no-files-found: error
+          retention-days: 1
 
   enterprise-ios-mobile-tests:
+    if: ${{ github.event_name == 'workflow_dispatch' || inputs.run-enterprise }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback

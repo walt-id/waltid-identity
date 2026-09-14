@@ -7,6 +7,7 @@ import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.preauthorized.hashTxCode
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
@@ -43,45 +44,67 @@ class PreAuthorizedCodeTokenEndpoint(
         request.grantTypes.contains(GrantType.PreAuthorizedCode.value)
 
     override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessTokenResponseResult {
+        val unresolvedRequest = request.withSession(null)
+
         if (!canHandleTokenEndpointRequest(request)) {
             return AccessTokenResponseResult.Failure(
-                OAuthError(
-                    error = "unsupported_grant_type",
+                request = unresolvedRequest,
+                error = OAuthError(
+                    error = OAuthErrorCodes.UNSUPPORTED_GRANT_TYPE,
                     description = "${GrantType.PreAuthorizedCode.value} grant not requested",
                 ),
             )
         }
 
         val code = request.requestForm["pre-authorized_code"]?.firstOrNull()
-            ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "Missing pre-authorized_code"))
+            ?: return AccessTokenResponseResult.Failure(
+                unresolvedRequest,
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Missing pre-authorized_code"),
+            )
 
         val record = codeRepository.get(code)
             ?: return AccessTokenResponseResult.Failure(
-                OAuthError(
-                    error = "invalid_grant",
+                request = unresolvedRequest,
+                error = OAuthError(
+                    error = OAuthErrorCodes.INVALID_GRANT,
                     description = "Pre-authorized code is invalid or has already been used",
                 ),
-            )
+        )
+        val resolvedRequest = unresolvedRequest.withSession(record.session.copy())
 
         record.clientId?.let { boundClientId ->
             val authenticatedClient = request.authenticatedClient
                 ?: return AccessTokenResponseResult.Failure(
-                    OAuthError("invalid_client", "Client authentication is required for this pre-authorized code"),
+                    resolvedRequest,
+                    OAuthError(OAuthErrorCodes.INVALID_CLIENT, "Client authentication is required for this pre-authorized code"),
                 )
 
             if (authenticatedClient.id != boundClientId) {
                 return AccessTokenResponseResult.Failure(
-                    OAuthError("invalid_grant", "Client mismatch for pre-authorized code"),
+                    resolvedRequest,
+                    OAuthError(OAuthErrorCodes.INVALID_GRANT, "Client mismatch for pre-authorized code"),
                 )
             }
         }
 
-        val providedTxCode = request.requestForm["tx_code"]?.firstOrNull()
-        if (record.txCode != null && providedTxCode.isNullOrBlank()) {
+        // OpenID4VCI 1.0 section 6.3: missing or unexpected is invalid_request, wrong is invalid_grant.
+        val providedTxCode = request.requestForm["tx_code"]?.firstOrNull()?.takeIf { it.isNotBlank() }
+        if (record.txCode != null && providedTxCode == null) {
             return AccessTokenResponseResult.Failure(
+                resolvedRequest,
                 OAuthError(
-                    error = "invalid_grant",
+                    error = OAuthErrorCodes.INVALID_REQUEST,
                     description = "tx_code is required for this pre-authorized code",
+                ),
+            )
+        }
+
+        if (record.txCode == null && providedTxCode != null) {
+            return AccessTokenResponseResult.Failure(
+                resolvedRequest,
+                OAuthError(
+                    error = OAuthErrorCodes.INVALID_REQUEST,
+                    description = "tx_code was provided but is not expected for this pre-authorized code",
                 ),
             )
         }
@@ -91,8 +114,9 @@ class PreAuthorizedCodeTokenEndpoint(
             record.txCodeValue != hashTxCode(providedTxCode)
         ) {
             return AccessTokenResponseResult.Failure(
+                resolvedRequest,
                 OAuthError(
-                    error = "invalid_grant",
+                    error = OAuthErrorCodes.INVALID_GRANT,
                     description = "tx_code is invalid",
                 ),
             )
@@ -100,14 +124,15 @@ class PreAuthorizedCodeTokenEndpoint(
 
         val consumed = codeRepository.consume(code)
             ?: return AccessTokenResponseResult.Failure(
+                resolvedRequest,
                 OAuthError(
-                    error = "invalid_grant",
+                    error = OAuthErrorCodes.INVALID_GRANT,
                     description = "Pre-authorized code is invalid or has already been used",
                 ),
             )
 
         val session = consumed.session.copy()
-        val updatedRequest = request
+        val updatedRequest = resolvedRequest
             .withSession(session)
             .markGrantTypeHandled(GrantType.PreAuthorizedCode.value)
             .grantScopes(consumed.grantedScopes)
@@ -131,7 +156,10 @@ class PreAuthorizedCodeTokenEndpoint(
         val expiresAt = sessionExpiresAt ?: (Clock.System.now() + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds)
 
         val subject = session.subject?.takeIf { it.isNotBlank() }
-            ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
+            ?: return AccessTokenResponseResult.Failure(
+                resolvedRequest,
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "subject is required in session"),
+            )
 
         val claims = defaultAccessTokenClaims(
             subject = subject,

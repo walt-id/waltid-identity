@@ -26,6 +26,7 @@ import id.walt.verifier2.data.SessionFailure
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.handlers.vpresponse.ParsedVpToken
 import id.walt.verifier2.handlers.vpresponse.Verifier2SessionCredentialPolicyValidation
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
 import id.walt.verifier2.verification.DcqlFulfillmentChecker
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -479,12 +480,16 @@ object PresentationVerificationEngine {
                 credentialPolicyResults.vcPolicies.filter { !it.success } +
                         credentialPolicyResults.specificVcPolicies.values.flatten().filter { !it.success }
 
+            if (verificationSessionPolicyResults.overallSuccess && session.redirects?.successRedirectUri != null) {
+                session.responseCode = Verifier2VPDirectPostHandler.generateResponseCode()
+            }
             session.updateSession(SessionEvent.credential_policy_results_available) {
                 this.policyResults = verificationSessionPolicyResults
                 this.status = when {
                     verificationSessionPolicyResults.overallSuccess -> Verification2Session.VerificationSessionStatus.SUCCESSFUL
                     else -> Verification2Session.VerificationSessionStatus.FAILED
                 }
+                this.responseCode = session.responseCode
                 if (!verificationSessionPolicyResults.overallSuccess) {
                     // Invariant: overallSuccess=false implies at least one credential policy failure
                     // in the same lists used to compute the overall result.

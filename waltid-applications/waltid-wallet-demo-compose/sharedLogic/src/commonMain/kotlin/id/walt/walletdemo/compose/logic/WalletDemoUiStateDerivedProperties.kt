@@ -1,7 +1,23 @@
 package id.walt.walletdemo.compose.logic
 
+enum class WalletStatusKind {
+    Busy,
+    Info,
+    Success,
+    Error,
+}
+
+data class WalletStatusBanner(
+    val message: String,
+    val kind: WalletStatusKind,
+    val occurrenceId: Long = 0,
+) {
+    val key: String get() = "$kind:$message:$occurrenceId"
+}
+
 val WalletDemoUiState.isBusy: Boolean
     get() = isAuthenticating ||
+        isChangingSigningProtection ||
         session is WalletSessionState.Bootstrapping ||
         operation is WalletOperationState.ResolvingOffer ||
         operation is WalletOperationState.Receiving ||
@@ -17,7 +33,7 @@ val WalletDemoUiState.isStatusBusy: Boolean
         (operation.belongsTo(selectedTab) && operation.isBusyOperation)
 
 val WalletDemoUiState.receiveUrlEntryEnabled: Boolean
-    get() = !isBusy && offerPreview == null && !receiveCompleted
+    get() = !isBusy && offerPreview == null
 
 val WalletDemoUiState.receiveActionEnabled: Boolean
     get() = session is WalletSessionState.Ready &&
@@ -25,13 +41,13 @@ val WalletDemoUiState.receiveActionEnabled: Boolean
         receiveUrlEntryEnabled
 
 val WalletDemoUiState.offerReviewEnabled: Boolean
-    get() = !isBusy && offerPreview != null && !receiveCompleted
+    get() = !isBusy && offerPreview != null
 
 val WalletDemoUiState.acceptOfferEnabled: Boolean
     get() = offerReviewEnabled && (offerPreview?.transactionCode?.accepts(requestDrafts.txCode) ?: true)
 
 val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
-    get() = !isBusy && presentationReview == null && !presentationCompleted
+    get() = !isBusy && presentationReview == null
 
 val WalletDemoUiState.presentationPreviewActionEnabled: Boolean
     get() = session is WalletSessionState.Ready &&
@@ -39,15 +55,46 @@ val WalletDemoUiState.presentationPreviewActionEnabled: Boolean
         presentationUrlEntryEnabled
 
 val WalletDemoUiState.presentationReviewEnabled: Boolean
-    get() = !isBusy && presentationReview != null && !presentationCompleted
+    get() = !isBusy && presentationReview != null
 
 val WalletDemoUiState.statusText: String
     get() = statusText(selectedTab)
 
 fun WalletDemoUiState.statusText(tab: WalletDemoTab): String =
-    operation.statusTextFor(tab)
+    statusBanner(tab)?.message.orEmpty()
+
+fun WalletDemoUiState.statusBanner(tab: WalletDemoTab = selectedTab): WalletStatusBanner? {
+    val message = operation.statusTextFor(tab)
         ?: tabStatusText(tab)
         ?: session.statusText(auth)
+        ?: return null
+    val kind = when {
+        isErrorFor(tab) -> WalletStatusKind.Error
+        isStatusBusyFor(tab) -> WalletStatusKind.Busy
+        isSuccessStatus(tab, message) -> WalletStatusKind.Success
+        else -> WalletStatusKind.Info
+    }
+    return WalletStatusBanner(message = message, kind = kind, occurrenceId = statusOccurrenceId)
+}
+
+val WalletDemoUiState.isStatusVisible: Boolean
+    get() {
+        val banner = statusBanner() ?: return false
+        return statusDismissedKey != banner.key
+    }
+
+val WalletDemoUiState.isStatusExpanded: Boolean
+    get() = statusExpanded && statusBanner()?.kind == WalletStatusKind.Error && isStatusVisible
+
+private fun WalletDemoUiState.isStatusBusyFor(tab: WalletDemoTab): Boolean =
+    session is WalletSessionState.Bootstrapping ||
+        (operation.belongsTo(tab) && operation.isBusyOperation)
+
+private fun WalletDemoUiState.isSuccessStatus(tab: WalletDemoTab, message: String): Boolean =
+    (operation is WalletOperationState.Succeeded && operation.belongsTo(tab)) ||
+        message == WalletDisplayText.WalletReady ||
+        message == WalletDisplayText.PresentationSent ||
+        message.startsWith("Received ")
 
 private fun WalletDemoUiState.isErrorFor(tab: WalletDemoTab): Boolean =
     session is WalletSessionState.Failed ||
@@ -56,20 +103,15 @@ private fun WalletDemoUiState.isErrorFor(tab: WalletDemoTab): Boolean =
 private fun WalletDemoUiState.tabStatusText(tab: WalletDemoTab): String? =
     when (tab) {
         WalletDemoTab.Credentials -> null
-        WalletDemoTab.Receive -> if (receiveCompleted && lastReceivedCredentialIds.isNotEmpty()) {
-            WalletDisplayText.receivedCredentials(lastReceivedCredentialIds.size)
-        } else {
-            null
-        }
+        WalletDemoTab.Receive -> null
         WalletDemoTab.Present -> when {
-            presentationCompleted -> WalletDisplayText.PresentationSent
             presentationReview is WalletDemoPresentationPreviewResult.Invalid -> WalletDisplayText.ReviewPresentationError
             presentationReview is WalletDemoPresentationPreviewResult.Ready -> WalletDisplayText.ReviewPresentationRequest
             else -> null
         }
     }
 
-private fun WalletSessionState.statusText(auth: WalletAuthState): String =
+private fun WalletSessionState.statusText(auth: WalletAuthState): String? =
     when (this) {
         WalletSessionState.NotBootstrapped -> when (auth) {
             is WalletAuthState.Setup -> WalletDisplayText.SetupPin

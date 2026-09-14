@@ -1,6 +1,57 @@
 import SwiftUI
 import WalletSDK
 
+public struct ExpandableMetadataCard<Summary: View, Details: View>: View {
+    public let title: String
+    public let titleAccessibilityIdentifier: String?
+    public let toggleAccessibilityIdentifier: String?
+    @Binding public var isExpanded: Bool
+    public let summary: Summary
+    public let details: Details
+
+    public init(
+        title: String,
+        titleAccessibilityIdentifier: String? = nil,
+        toggleAccessibilityIdentifier: String? = nil,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder summary: () -> Summary,
+        @ViewBuilder details: () -> Details
+    ) {
+        self.title = title
+        self.titleAccessibilityIdentifier = titleAccessibilityIdentifier
+        self.toggleAccessibilityIdentifier = toggleAccessibilityIdentifier
+        _isExpanded = isExpanded
+        self.summary = summary()
+        self.details = details()
+    }
+
+    public var body: some View {
+        ReviewMetadataSection(
+            title: title,
+            titleAccessibilityIdentifier: titleAccessibilityIdentifier
+        ) {
+            Button {
+                isExpanded.toggle()
+            } label: {
+                HStack(alignment: .center, spacing: 8) {
+                    summary
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(toggleAccessibilityIdentifier ?? "")
+
+            if isExpanded {
+                Divider()
+                details
+            }
+        }
+    }
+}
+
 public struct ReviewMetadataSection<Content: View>: View {
     public let title: String
     public let titleAccessibilityIdentifier: String?
@@ -120,16 +171,16 @@ public struct MetadataIdentityView: View {
                     AsyncImage(url: logoURL) { phase in
                         switch phase {
                         case let .success(image):
-                            image.resizable().scaledToFit()
-                        case .empty:
-                            ProgressView()
-                        case .failure:
-                            MetadataLogoFallback(name: name)
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .accessibilityLabel(display?.logoAltText ?? "\(name) logo")
+                        case .empty, .failure:
+                            EmptyView()
                         @unknown default:
-                            MetadataLogoFallback(name: name)
+                            EmptyView()
                         }
                     }
-                    .accessibilityLabel(display?.logoAltText ?? "\(name) logo")
                 } else {
                     MetadataLogoFallback(name: name)
                 }

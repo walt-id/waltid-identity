@@ -176,6 +176,28 @@ class WalletModuleApplicabilityTest {
     }
 
     @Test
+    fun `alternate-happy-flow is skipped until the suite can build the request`() {
+        val reason = WalletModuleApplicability.inapplicableReason(
+            "oid4vp-1final-wallet-alternate-happy-flow",
+            moduleMetadata = null,
+            variantSelection = variant(),
+        )
+        assertNotNull(reason)
+        assertTrue(
+            "AddVP1FinalEncryptionParametersToClientMetadata" in reason,
+            "the reason must name the missing suite condition, was: $reason",
+        )
+        // Happy-flow itself must still run; this skip is module-specific.
+        assertNull(
+            WalletModuleApplicability.inapplicableReason(
+                "oid4vp-1final-wallet-happy-flow",
+                moduleMetadata = null,
+                variantSelection = variant(),
+            )
+        )
+    }
+
+    @Test
     fun `conditional exclusion only bites for the value it is declared for`() {
         // plain_vp leaves the encrypted response modes applicable...
         assertNull(

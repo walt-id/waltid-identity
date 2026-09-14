@@ -20,6 +20,7 @@ protocol WalletCoreBridge: Sendable {
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
     func credentials() async throws -> [Credential]
+    func deleteCredential(id: String) async throws -> Bool
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
@@ -113,6 +114,10 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func credentials() async throws -> [Credential] {
+        throw unavailableError()
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
         throw unavailableError()
     }
 

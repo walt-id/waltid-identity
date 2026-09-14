@@ -422,12 +422,15 @@ class Issuer2AuthorizationCodeWalletFlowTest {
     fun malformedAuthorizationRequestReturnsOAuthErrorResponse() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
+        val requestId = "malformed-authorization-request"
 
         val authorizationResponse = client.get("/openid4vci/authorize") {
+            header(HttpHeaders.XRequestId, requestId)
             parameter("client_id", "issuer2-wallet-test")
         }
 
         assertEquals(HttpStatusCode.BadRequest, authorizationResponse.status)
+        assertEquals(requestId, authorizationResponse.headers[HttpHeaders.XRequestId])
         assertTrue(authorizationResponse.bodyAsText().contains("Missing response_type"))
     }
 

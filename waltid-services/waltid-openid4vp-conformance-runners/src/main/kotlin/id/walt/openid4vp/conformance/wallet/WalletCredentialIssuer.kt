@@ -13,7 +13,13 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.mdoc.credsdata.DrivingPrivilege
 import id.walt.mdoc.credsdata.Mdl
@@ -46,6 +52,7 @@ import kotlinx.serialization.json.put
 class WalletCredentialIssuer {
 
     private val issuerJwk: ECKey = ECKey.parse(TestKeyMaterial.CREDENTIAL_ISSUER_KEY_WITH_X5C)
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     /**
      * Holder key the credential is bound to via `cnf.jwk`.
@@ -57,11 +64,16 @@ class WalletCredentialIssuer {
         .keyID("conformance-wallet-holder")
         .generate()
 
-    /** Holder key in the walt.id serialized form that `KeyManager.resolveSerializedKey` accepts. */
-    fun holderSerializedKey(): JsonObject = buildJsonObject {
-        put("type", "jwk")
-        put("jwk", Json.parseToJsonElement(holderKey.toJSONString()))
-    }
+    /** Holder key as Crypto2 signing material for the wallet key store. */
+    suspend fun holderCrypto2Key(): Crypto2Key = crypto2Runtime.restore(
+        EncodedKey.Jwk(
+            data = BinaryData(holderKey.toJSONString().encodeToByteArray()),
+            privateMaterial = true,
+        ).toStoredSoftwareKey(
+            id = KeyId(requireNotNull(holderKey.keyID)),
+            usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        )
+    )
 
     /**
      * Issue the SD-JWT VC described by [WalletCredentialFixture], bound to [holderKey].

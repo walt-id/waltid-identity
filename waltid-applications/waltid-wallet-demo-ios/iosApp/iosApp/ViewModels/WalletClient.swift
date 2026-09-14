@@ -2,7 +2,10 @@ import Foundation
 import WalletSDK
 
 protocol WalletClient {
-    func bootstrap() async throws -> WalletBootstrapResult
+    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletBootstrapResult
+    func signingProtectionAvailability(
+        _ signingProtection: WalletDemoSigningProtection
+    ) async throws -> WalletDemoSigningProtectionAvailability
     func credentials() async throws -> [Credential]
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession
     func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization
@@ -20,6 +23,8 @@ protocol WalletClient {
     ) async throws -> PresentationResult
     func rejectPresentation(previewHandle: PresentationPreviewHandle) async throws -> PresentationResult
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws
+    func deleteCredential(id: String) async throws -> Bool
+    func deleteLocalData() async throws
 }
 
 final class SDKWalletClient: WalletClient {
@@ -30,8 +35,19 @@ final class SDKWalletClient: WalletClient {
         self.configuration = configuration
     }
 
-    func bootstrap() async throws -> WalletBootstrapResult {
-        try await wallet().bootstrap()
+    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletBootstrapResult {
+        try await wallet().bootstrap(keyUseAuthorizationPolicy: signingProtection.authorizationPolicy)
+    }
+
+    func signingProtectionAvailability(
+        _ signingProtection: WalletDemoSigningProtection
+    ) async throws -> WalletDemoSigningProtectionAvailability {
+        switch try await wallet().keyUseAuthorizationPreflight(policy: signingProtection.authorizationPolicy) {
+        case .supported: .available
+        case .unsupported(.biometricNotEnrolled): .biometricNotEnrolled
+        case .unsupported(.biometricUnavailable): .biometricUnavailable
+        case .unsupported(.unsupportedCombination): .unsupported
+        }
     }
 
     func credentials() async throws -> [Credential] {
@@ -73,6 +89,15 @@ final class SDKWalletClient: WalletClient {
 
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         try await wallet().discardPresentationPreview(previewHandle)
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
+        try await wallet().deleteCredential(id: id)
+    }
+
+    func deleteLocalData() async throws {
+        try await wallet().deleteLocalData()
+        cachedWallet = nil
     }
 
     private func wallet() async throws -> Wallet {

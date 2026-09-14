@@ -5,6 +5,7 @@ package id.walt.wallet2.handlers
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
@@ -18,10 +19,12 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.data.resolveKeyMaterial
+import id.walt.wallet2.data.resolveHolderKey
 import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentials
 import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentialsFromStore
 import id.walt.webdatafetching.WebDataFetcher
@@ -261,6 +264,7 @@ data class PresentationCredentialOption(
     val label: String?,
     val credentialData: JsonObject,
     val disclosures: List<PresentationDisclosure>,
+    val metadata: JsonObject? = null,
 )
 
 data class PresentationDisclosure(
@@ -443,12 +447,13 @@ object WalletPresentationHandler {
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
         val result = presentWithKeyMaterial(
+            wallet = wallet,
             keyMaterial = keyMaterial,
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
                 log.trace { "Selecting credentials for DCQL query: ${query.credentials.map { it.id }}" }
-                selectFromStores(wallet, query)
+                selectPresentableFromStores(wallet, query)
                     .also { matched ->
                         log.trace { "DCQL matched queryIds: ${matched.keys}" }
                         onEvent(WalletSessionEvent.presentation_credentials_selected)
@@ -528,11 +533,13 @@ object WalletPresentationHandler {
 
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
-        val rawCredentials = request.credentials.mapIndexed { idx, stored ->
-            stored.credential.toRawDcqlCredential(idx.toString())
+        val isolatedCredentialsById = request.credentials.mapIndexed { idx, stored -> idx.toString() to stored }.toMap()
+        val rawCredentials = isolatedCredentialsById.map { (id, stored) ->
+            stored.credential.toRawDcqlCredential(id)
         }
 
         val result = presentWithKeyMaterial(
+            wallet = wallet,
             keyMaterial = keyMaterial,
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
@@ -544,6 +551,7 @@ object WalletPresentationHandler {
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
+            isolatedCredentialsById = isolatedCredentialsById,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -640,7 +648,12 @@ object WalletPresentationHandler {
         }
         val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
-        val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
+        val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
+            wallet = wallet,
+            query = query,
+            storedById = storedById,
+        )
+        val matched = holderKeyEligibility.matched
         val availableCredentialQueryIds = matched.filterValues { it.isNotEmpty() }.keys
         val availabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
             transactionData = valid.transactionData,
@@ -650,6 +663,11 @@ object WalletPresentationHandler {
             availableCredentialQueryIds = availableCredentialQueryIds,
         )
         if (availabilityError != null) {
+            holderKeyEligibility.bindingFailureForUnavailablePresentation(
+                transactionDataCredentialIdGroups = valid.transactionData.map { it.transactionData.credentialIds },
+                requirements = query.requiredCredentialRequirements(),
+                availableCredentialQueryIds = availableCredentialQueryIds,
+            )?.let { throw it }
             PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest)
             return StatelessPreviewPresentationResult.Invalid(
                 authorizationRequest = authorizationRequest,
@@ -673,6 +691,7 @@ object WalletPresentationHandler {
                     label = stored.label,
                     credentialData = credential.credentialData,
                     disclosures = result.toPresentationDisclosures(),
+                    metadata = stored.metadata,
                 )
             }
         }
@@ -726,7 +745,12 @@ object WalletPresentationHandler {
         }
         val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
-        val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
+        val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
+            wallet = wallet,
+            query = query,
+            storedById = storedById,
+        )
+        val matched = holderKeyEligibility.matched
         val availableCredentialQueryIds = matched.filterValues { it.isNotEmpty() }.keys
         val availabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
             transactionData = valid.transactionData,
@@ -736,6 +760,11 @@ object WalletPresentationHandler {
             availableCredentialQueryIds = availableCredentialQueryIds,
         )
         if (availabilityError != null) {
+            holderKeyEligibility.bindingFailureForUnavailablePresentation(
+                transactionDataCredentialIdGroups = valid.transactionData.map { it.transactionData.credentialIds },
+                requirements = query.requiredCredentialRequirements(),
+                availableCredentialQueryIds = availableCredentialQueryIds,
+            )?.let { throw it }
             PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest)
             val handle = rememberPreviewedAuthorizationRequest(
                 wallet = wallet,
@@ -763,6 +792,7 @@ object WalletPresentationHandler {
                     label = stored.label,
                     credentialData = credential.credentialData,
                     disclosures = result.toPresentationDisclosures(),
+                    metadata = stored.metadata,
                 )
             }
         }
@@ -820,7 +850,13 @@ object WalletPresentationHandler {
             encryption.thumbprint()
         }
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
-        val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
+        val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
+            wallet = wallet,
+            query = query,
+            storedById = storedById,
+            allowedCredentialIds = request.eligibleCredentialIds,
+        )
+        val matched = holderKeyEligibility.matched
         onEvent(WalletSessionEvent.presentation_credentials_selected)
         val credentialOptions = matched.flatMap { (queryId, results) ->
             results.map { result ->
@@ -837,6 +873,7 @@ object WalletPresentationHandler {
                     label = stored.label,
                     credentialData = stored.credential.credentialData,
                     disclosures = result.toPresentationDisclosures(),
+                    metadata = stored.metadata,
                 )
             }
         }.filter { option ->
@@ -844,6 +881,26 @@ object WalletPresentationHandler {
         }
         val credentialRequirements = query.requiredCredentialRequirements()
         val offeredQueryIds = credentialOptions.mapTo(mutableSetOf()) { it.queryId }
+        val transactionAvailabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
+            transactionData = transactionDataItems,
+            availableCredentialQueryIds = offeredQueryIds,
+        )
+        if (transactionAvailabilityError != null) {
+            holderKeyEligibility.bindingFailureForUnavailableTransactionData(
+                credentialIdGroups = transactionDataItems.map { it.transactionData.credentialIds },
+                availableCredentialQueryIds = offeredQueryIds,
+            )?.let { throw it }
+            throw IllegalArgumentException(transactionAvailabilityError.message)
+        }
+        if (!credentialRequirements.satisfiedBy(offeredQueryIds)) {
+            holderKeyEligibility.bindingFailureForUnsatisfiedRequirements(
+                requirements = credentialRequirements,
+                availableCredentialQueryIds = offeredQueryIds,
+            )?.let { throw it }
+        }
+        if (credentialOptions.isEmpty()) {
+            holderKeyEligibility.firstBindingFailure()?.let { throw it }
+        }
         require(credentialOptions.isNotEmpty() && credentialRequirements.satisfiedBy(offeredQueryIds)) {
             "The selected registry entries no longer satisfy this request"
         }
@@ -897,6 +954,7 @@ object WalletPresentationHandler {
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
         val result = presentWithKeyMaterial(
+            wallet = wallet,
             keyMaterial = keyMaterial,
             holderDid = did,
             presentationRequestUrl = preview.requestUrl,
@@ -988,6 +1046,7 @@ object WalletPresentationHandler {
     }
 
     private suspend fun presentWithKeyMaterial(
+        wallet: Wallet,
         keyMaterial: WalletKeyStoreEntry,
         holderDid: String?,
         presentationRequestUrl: Url,
@@ -997,6 +1056,7 @@ object WalletPresentationHandler {
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
+        isolatedCredentialsById: Map<String, StoredCredential> = emptyMap(),
     ): Result<WalletPresentResult> = keyMaterial.crypto2Key?.let { crypto2Key ->
         WalletPresentFunctionality2.walletPresentHandling(
             holderKey = crypto2Key,
@@ -1009,6 +1069,7 @@ object WalletPresentationHandler {
             resolvedAuthorizationRequest = resolvedAuthorizationRequest,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
+            mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
         )
     } ?: WalletPresentFunctionality2.walletPresentHandling(
         holderKey = requireNotNull(keyMaterial.legacyKey) {
@@ -1024,7 +1085,20 @@ object WalletPresentationHandler {
         holderCrypto2Key = null,
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         beforeCredentialsUsed = beforeCredentialsUsed,
+        mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
     )
+
+    private fun Wallet.mdocHolderKeyResolver(
+        isolatedCredentialsById: Map<String, StoredCredential> = emptyMap(),
+    ): suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key = { credentialId, _ ->
+        val isolated = isolatedCredentialsById[credentialId]
+        val resolved = if (isolated != null) {
+            resolveHolderKey(isolated, setOf(KeyUsage.SIGN))
+        } else {
+            resolveHolderKey(credentialId, setOf(KeyUsage.SIGN))
+        }
+        resolved.keyMaterial.requireCrypto2Key()
+    }
 
     suspend fun submitDcApiPresentation(
         wallet: Wallet,
@@ -1080,6 +1154,7 @@ object WalletPresentationHandler {
                 request = resolvedRequest,
                 selectCredentialsForQuery = selectCredentialsForQuery,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
+                mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
             ).getOrElse { error ->
                 onEvent(WalletSessionEvent.presentation_failed)
                 throw error
@@ -1162,21 +1237,24 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: MatchCredentialsFromStoreRequest
     ): MatchCredentialsResult {
-        // Build idByIndex and rawCredentials in a single streaming pass over the credential stores.
-        // selectFromStores uses integer indices as DCQL credential IDs internally; we need the
-        // idx -> wallet-assigned-id map to translate them back before returning to the caller.
-        val idByIndex = mutableMapOf<String, String>()
-        val rawCredentials = mutableListOf<RawDcqlCredential>()
-        var idx = 0
-        wallet.streamAllCredentials().collect { stored ->
-            val key = idx.toString()
-            idByIndex[key] = stored.id
-            rawCredentials += stored.credential.toRawDcqlCredential(key)
-            idx++
+        val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
+        if (storedById.isEmpty()) return MatchCredentialsResult(emptyList(), 0, emptyMap())
+
+        val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
+            wallet = wallet,
+            query = request.dcqlQuery,
+            storedById = storedById,
+        )
+        val matched = holderKeyEligibility.matched
+        val availableCredentialQueryIds = matched.filterValues { it.isNotEmpty() }.keys
+        val requirements = request.dcqlQuery.requiredCredentialRequirements()
+        if (!requirements.satisfiedBy(availableCredentialQueryIds)) {
+            holderKeyEligibility.bindingFailureForUnsatisfiedRequirements(
+                requirements = requirements,
+                availableCredentialQueryIds = availableCredentialQueryIds,
+            )?.let { throw it }
         }
-        if (rawCredentials.isEmpty()) return MatchCredentialsResult(emptyList(), 0, emptyMap())
-        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
-        return buildMatchResult(matched, idByIndex)
+        return buildMatchResult(matched, emptyMap())
     }
 
     /**
@@ -1249,6 +1327,7 @@ object WalletPresentationHandler {
                 matchedCredentials = selected,
                 holderKey = crypto2Key,
                 holderDid = did,
+                mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
             )
         } else {
             WalletPresentFunctionality2.buildVpToken(
@@ -1258,6 +1337,9 @@ object WalletPresentationHandler {
                     "Key '${keyMaterial.keyId}' has no usable signing representation"
                 },
                 holderDid = did,
+                transactionDataTypeRegistry = transactionDataTypeRegistry,
+                holderCrypto2Key = null,
+                mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
             )
         }
         val idToken = if (crypto2Key != null) {
@@ -1313,25 +1395,185 @@ object WalletPresentationHandler {
         wallet: Wallet,
         query: DcqlQuery,
         useWalletCredentialIds: Boolean = false,
+    ): Map<String, List<DcqlMatcher.DcqlMatchResult>> = selectFromSnapshot(
+        wallet = wallet,
+        query = query,
+        storedCredentials = wallet.streamAllCredentials().toList(),
+        useWalletCredentialIds = useWalletCredentialIds,
+    )
+
+    /**
+     * Selects credentials for automatic presentation after excluding stored mdocs that cannot
+     * resolve their certified holder key. Eligibility is evaluated before a query that disallows
+     * multiple credentials chooses its single result, so an unusable earlier match cannot hide a
+     * later presentable credential.
+     */
+    internal suspend fun selectPresentableFromStores(
+        wallet: Wallet,
+        query: DcqlQuery,
+    ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
+        val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
+        val eligibility = selectHolderKeyEligibleFromSnapshot(
+            wallet = wallet,
+            query = query,
+            storedById = storedById,
+        )
+        val availableQueryIds = eligibility.matched.filterValues { it.isNotEmpty() }.keys
+        val requirements = query.requiredCredentialRequirements()
+        if (!requirements.satisfiedBy(availableQueryIds)) {
+            eligibility.bindingFailureForUnsatisfiedRequirements(
+                requirements,
+                availableQueryIds,
+            )?.let { throw it }
+        }
+        return eligibility.matched
+    }
+
+    /**
+     * Matches one immutable credential-store snapshot so eligibility checks and consent options are
+     * derived from the same stored records instead of independently re-reading mutable stores.
+     */
+    private fun selectFromSnapshot(
+        wallet: Wallet,
+        query: DcqlQuery,
+        storedCredentials: List<StoredCredential>,
+        useWalletCredentialIds: Boolean,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
         if (wallet.credentialStores.isEmpty()) {
             error("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
         }
 
-        val rawCredentials = mutableListOf<RawDcqlCredential>()
-        var idx = 0
-        wallet.streamAllCredentials().collect { stored ->
+        val rawCredentials = storedCredentials.mapIndexed { idx, stored ->
             log.trace { "  credential[$idx]: id=${stored.id}, format=${stored.credential.format}, issuer=${stored.credential.issuer}" }
-            rawCredentials += stored.credential.toRawDcqlCredential(
+            stored.credential.toRawDcqlCredential(
                 id = if (useWalletCredentialIds) stored.id else idx.toString(),
             )
-            idx++
         }
 
-        log.debug { "DCQL matching against $idx stored credential(s), queries=${query.credentials.map { it.id }}" }
+        log.debug { "DCQL matching against ${storedCredentials.size} stored credential(s), queries=${query.credentials.map { it.id }}" }
         val matched = DcqlMatcher.match(query.copy(credentialSets = null), rawCredentials).getOrThrow()
         log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
         return matched
+    }
+
+    private suspend fun selectHolderKeyEligibleFromSnapshot(
+        wallet: Wallet,
+        query: DcqlQuery,
+        storedById: Map<String, StoredCredential>,
+        allowedCredentialIds: Set<String>? = null,
+    ): HolderKeyEligibleMatches {
+        val originalQueries = query.credentials.associateBy { it.id }
+        val candidateQuery = query.copy(
+            credentials = query.credentials.map { it.copy(multiple = true) },
+            credentialSets = null,
+        )
+        val structuralMatches = selectFromSnapshot(
+            wallet = wallet,
+            query = candidateQuery,
+            storedCredentials = storedById.values.toList(),
+            useWalletCredentialIds = true,
+        ).mapValues { (queryId, results) ->
+            val originalQuery = originalQueries.getValue(queryId)
+            results.map { it.copy(originalQuery = originalQuery) }
+        }
+        val eligibility = wallet.holderKeyEligibleMatches(
+            matched = structuralMatches,
+            storedById = storedById,
+            allowedCredentialIds = allowedCredentialIds,
+        )
+        return eligibility.copy(
+            matched = eligibility.matched.mapValues { (queryId, results) ->
+                if (originalQueries.getValue(queryId).multiple) results else results.take(1)
+            },
+        )
+    }
+
+    private data class HolderKeyEligibleMatches(
+        val matched: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        val bindingFailuresByQueryId: Map<String, List<HolderKeyBindingException>>,
+    ) {
+        fun bindingFailureForUnavailablePresentation(
+            transactionDataCredentialIdGroups: List<List<String>>,
+            requirements: List<PresentationCredentialRequirement>,
+            availableCredentialQueryIds: Set<String>,
+        ): HolderKeyBindingException? {
+            val hasUnavailableTransactionData = transactionDataCredentialIdGroups.any { credentialIds ->
+                credentialIds.none(availableCredentialQueryIds::contains)
+            }
+            return if (hasUnavailableTransactionData) {
+                bindingFailureForUnavailableTransactionData(
+                    credentialIdGroups = transactionDataCredentialIdGroups,
+                    availableCredentialQueryIds = availableCredentialQueryIds,
+                )
+            } else {
+                bindingFailureForUnsatisfiedRequirements(requirements, availableCredentialQueryIds)
+            }
+        }
+
+        fun bindingFailureForUnsatisfiedRequirements(
+            requirements: List<PresentationCredentialRequirement>,
+            availableCredentialQueryIds: Set<String>,
+        ): HolderKeyBindingException? = requirements.asSequence()
+            .filterNot { listOf(it).satisfiedBy(availableCredentialQueryIds) }
+            .flatMap { requirement ->
+                requirement.options.asSequence().filter { option ->
+                    option.isNotEmpty() &&
+                        option.any { it !in availableCredentialQueryIds } &&
+                        option.all { queryId ->
+                            queryId in availableCredentialQueryIds ||
+                                bindingFailuresByQueryId[queryId].orEmpty().isNotEmpty()
+                        }
+                }
+            }
+            .flatMap { option ->
+                option.asSequence().flatMap { bindingFailuresByQueryId[it].orEmpty().asSequence() }
+            }
+            .firstOrNull()
+
+        fun bindingFailureForUnavailableTransactionData(
+            credentialIdGroups: List<List<String>>,
+            availableCredentialQueryIds: Set<String>,
+        ): HolderKeyBindingException? = credentialIdGroups
+            .firstOrNull { credentialIds -> credentialIds.none(availableCredentialQueryIds::contains) }
+            ?.asSequence()
+            ?.flatMap { bindingFailuresByQueryId[it].orEmpty().asSequence() }
+            ?.firstOrNull()
+
+        fun firstBindingFailure(): HolderKeyBindingException? =
+            bindingFailuresByQueryId.values.asSequence().flatten().firstOrNull()
+    }
+
+    /**
+     * Removes structurally matching mdocs whose certified DeviceKey cannot be resolved to one current
+     * Crypto2 signing key while retaining per-query failures until DCQL requirements are evaluated.
+     */
+    private suspend fun Wallet.holderKeyEligibleMatches(
+        matched: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        storedById: Map<String, StoredCredential>,
+        allowedCredentialIds: Set<String>? = null,
+    ): HolderKeyEligibleMatches {
+        val bindingFailuresByQueryId = mutableMapOf<String, MutableList<HolderKeyBindingException>>()
+        val eligible = matched.mapValues { (queryId, results) ->
+            results.filter { result ->
+                val raw = result.credential as RawDcqlCredential
+                val stored = storedById[raw.id]
+                    ?: error("Credential '${raw.id}' disappeared while checking holder-key eligibility")
+                if (allowedCredentialIds != null && stored.id !in allowedCredentialIds) {
+                    false
+                } else if (stored.credential !is id.walt.credentials.formats.MdocsCredential) {
+                    true
+                } else {
+                    try {
+                        resolveHolderKey(stored, setOf(KeyUsage.SIGN))
+                        true
+                    } catch (failure: HolderKeyBindingException) {
+                        bindingFailuresByQueryId.getOrPut(queryId, ::mutableListOf) += failure
+                        false
+                    }
+                }
+            }
+        }
+        return HolderKeyEligibleMatches(eligible, bindingFailuresByQueryId)
     }
 
     internal fun DcqlQuery.requiredCredentialRequirements(): List<PresentationCredentialRequirement> =

@@ -18,6 +18,9 @@ public interface PlatformManagedKeyProvider {
     /** Generates a managed key in the platform key store. */
     public suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey
 
+    /** Reads the immutable wallet authorization policy encoded in a managed-key descriptor. */
+    public fun keyUseAuthorizationPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy
+
     /**
      * Restores a platform key from its persisted descriptor.
      *

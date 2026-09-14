@@ -184,15 +184,6 @@ class DefaultOAuth2Provider(
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
     ): AuthorizationRequestResult {
-        if (parameters["request_uri"].orEmpty().any { it.isNotBlank() }) {
-            return AuthorizationRequestResult.Failure(
-                OAuthError(
-                    error = OAuthErrorCodes.INVALID_REQUEST,
-                    description = "request_uri is not allowed at the pushed authorization request endpoint",
-                )
-            )
-        }
-
         val authenticatedClient = when (
             val authResult = authenticateClient(
                 endpoint = ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION,
@@ -210,6 +201,15 @@ class DefaultOAuth2Provider(
         ) {
             is ClientIdParameterResolution.Success -> resolution.parameters
             is ClientIdParameterResolution.Failure -> return AuthorizationRequestResult.Failure(resolution.error)
+        }
+
+        if (effectiveParameters["request_uri"].orEmpty().any { it.isNotBlank() }) {
+            return AuthorizationRequestResult.Failure(
+                OAuthError(
+                    error = OAuthErrorCodes.INVALID_REQUEST,
+                    description = "request_uri is not allowed at the pushed authorization request endpoint",
+                )
+            )
         }
 
         return when (val result = config.authorizationRequestValidator.validate(effectiveParameters)) {
@@ -446,7 +446,8 @@ class DefaultOAuth2Provider(
 
         val description = request.grantTypes.joinToString(" ").takeIf { it.isNotBlank() }
         return AccessTokenResponseResult.Failure(
-            OAuthError("unsupported_grant_type", description),
+            request = request.withSession(null),
+            error = OAuthError(OAuthErrorCodes.UNSUPPORTED_GRANT_TYPE, description),
         )
     }
 

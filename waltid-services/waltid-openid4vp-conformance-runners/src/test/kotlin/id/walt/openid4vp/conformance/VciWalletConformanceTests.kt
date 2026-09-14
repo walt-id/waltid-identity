@@ -5,6 +5,7 @@ import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.openid4vp.conformance.adapter.VciWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.keys.ClientAttestationTestAuthority
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
@@ -30,6 +31,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -116,6 +118,16 @@ class VciWalletConformanceTests {
 
         @JvmStatic
         val isConformanceAvailable = conformanceAvailable.isSuccess
+
+        @JvmStatic
+        @AfterAll
+        fun writeSkippedSummaryIfSuiteUnavailable() {
+            if (isConformanceAvailable) return
+            ConformanceReportWriter.writeSkippedIfEmpty(
+                role = ConformanceReportWriter.Role.VCI_WALLET,
+                reason = "Conformance suite not available at $conformanceHost:$conformancePort",
+            )
+        }
 
         init {
             println()

@@ -27,6 +27,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ProviderAuthorizationOnlyFlowTest {
@@ -188,6 +190,46 @@ class ProviderAuthorizationOnlyFlowTest {
 
         assertTrue(accessResponse is AccessTokenResponseResult.Failure)
         assertEquals("invalid_scope", accessResponse.error.error)
+        assertEquals("demo-subject", assertNotNull(accessResponse.request.session).subject)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `authorization code token response rejects a redirect_uri that does not match`() = runTest {
+        val issuerId = "test-issuer"
+        val provider = buildOAuth2Provider(
+            config = createTestConfig(),
+            includeAuthorizationCodeDefaultHandlers = true,
+            includePreAuthorizedCodeDefaultHandlers = false,
+        )
+
+        val authorizeRequest = (provider.createAuthorizationRequest(
+            mapOf(
+                "response_type" to listOf(ResponseType.CODE.value),
+                "client_id" to listOf("demo-client"),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+                "scope" to listOf("openid"),
+            ),
+        ) as AuthorizationRequestResult.Success).request.withIssuer(issuerId)
+        val authorizeResponse = provider.createAuthorizationResponse(
+            authorizeRequest,
+            DefaultSession(subject = "demo-subject"),
+        ) as AuthorizationResponseResult.Success
+
+        val accessRequest = (provider.createAccessTokenRequest(
+            mapOf(
+                "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                "client_id" to listOf("demo-client"),
+                "code" to listOf(authorizeResponse.response.code),
+                "redirect_uri" to listOf("https://attacker.example/callback"),
+            ),
+        ) as AccessTokenRequestResult.Success).request.withIssuer(issuerId)
+
+        val accessResponse = provider.createAccessTokenResponse(accessRequest)
+
+        assertTrue(accessResponse is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_grant", accessResponse.error.error)
+        assertEquals("demo-subject", assertNotNull(accessResponse.request.session).subject)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -323,6 +365,8 @@ class ProviderAuthorizationOnlyFlowTest {
         val response = provider.createAccessTokenResponse(request)
         assertTrue(response is AccessTokenResponseResult.Failure)
         assertEquals("unsupported_grant_type", response.error.error)
+        assertEquals(request, response.request)
+        assertNull(response.request.session)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

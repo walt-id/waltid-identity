@@ -73,8 +73,26 @@ role-specific guide for a runnable environment and its intended command.
 ## CI summaries and soft-fail
 
 The reusable OSS Gradle workflow
-(`.github/workflows/gradle.yml`) appends per-role Markdown summaries to the
-GitHub Actions job summary after `allTests`.
+(`.github/workflows/gradle.yml`) always publishes these role sections to the
+GitHub Actions job summary, using the same heading and table shape as the
+OpenID4VP verifier report:
+
+1. OpenID4VP Verifier
+2. OpenID4VP Wallet
+3. OpenID4VCI Wallet
+4. OpenID4VCI Issuer
+
+GitHub-hosted CI points the wallet suites at `conformance.waltid.cloud` and
+exposes the in-process adapters through Cloudflare tunnels (OpenID4VP adapter
+on port 7006, OpenID4VCI adapter on port 7007), alongside the existing verifier
+tunnel on 7003. Those wallet suites therefore run live. The OpenID4VCI issuer
+matrix still only runs when its dedicated workflow inputs and issuer URL are
+configured.
+
+When a role produced `summary.md`, that file is appended. Test names are
+compacted to the module suffix and variant values so the table stays readable.
+When a role did not write a report, the workflow still writes the same heading,
+totals, and table, with a note that no results were produced.
 
 Artifacts (when a role actually runs):
 

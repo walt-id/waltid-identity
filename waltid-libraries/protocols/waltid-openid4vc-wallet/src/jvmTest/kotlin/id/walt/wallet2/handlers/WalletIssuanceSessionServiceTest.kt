@@ -1,18 +1,40 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.handlers
 
-import id.walt.crypto.keys.KeyType
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.cose.Cose
+import id.walt.cose.CoseCertificate
+import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseKey
 import id.walt.crypto.keys.Key
-import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
-import id.walt.credentials.examples.MdocsExamples
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
+import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.credentials.examples.SdJwtExamples
-import id.walt.wallet2.data.Wallet
+import id.walt.mdoc.issuance.MdocIssuer
+import id.walt.mdoc.objects.document.Document
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
+import id.walt.wallet2.data.HolderKeyBindingOrigin
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationProvider
@@ -31,12 +53,13 @@ import io.ktor.http.Url
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -48,6 +71,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -828,12 +852,10 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun deferredCredentialCanBeResumedAndStored() = runTest {
-        val key = JWKKey.generate(KeyType.secp256r1)
-        val credential = key.signJws(
-            """{"iss":"https://issuer.example","sub":"did:key:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"did:key:holder"}}}"""
-                .encodeToByteArray()
-        )
+    fun deferredMdocCanBeResumedStoredAndBound() = runTest {
+        val holderKey = crypto2SigningKey("deferred-holder")
+        val keyStore = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
+        val credential = mdocCredential(holderKey)
         val credentialStore = RecordingCredentialStore()
         val client = client { request ->
             when (request.url.toString()) {
@@ -851,17 +873,124 @@ class WalletIssuanceSessionServiceTest {
             }
         }
         val service = WalletIssuanceSessionService(
-            Wallet("deferred", staticKey = key, credentialStores = listOf(credentialStore)),
+            Wallet(
+                "deferred",
+                keyStores = listOf(keyStore),
+                credentialStores = listOf(credentialStore),
+            ),
             httpClient = client,
         )
 
-        val session = service.start(preAuthorizedRequest())
+        val session = service.start(preAuthorizedRequest().copy(keyId = holderKey.id.value))
         val deferred = assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
         val stored = assertIs<WalletIssuanceOutcome.Stored>(
             service.resumeDeferred(deferred.credentials.single().id)
         )
 
         assertEquals(stored.credentialIds, credentialStore.credentials.map { it.id })
+        assertEquals(
+            HolderKeyBindingOrigin.ISSUANCE,
+            credentialStore.credentials.single().holderKeyBinding?.origin,
+        )
+    }
+
+    @Test
+    fun localizedIssuancePreviewAndDeferredLabelStayConsistentAfterServiceRecreation() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val credential = key.signJws(
+            """{"iss":"https://issuer.example","sub":"did:key:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"did:key:holder"}}}"""
+                .encodeToByteArray()
+        )
+        val records = RecordingSessionStore()
+        val credentialStore = RecordingCredentialStore()
+        val localizedMetadata = issuerMetadata(proofRequired = false)
+            .replace(
+                "\"credential_endpoint\":\"$CREDENTIAL_ENDPOINT\",",
+                "\"display\":[{\"name\":\"English Issuer\",\"locale\":\"en\"},{\"name\":\"Deutscher Aussteller\",\"locale\":\"de\",\"logo\":{\"uri\":\"https://issuer.example/de.png\",\"alt_text\":\"Aussteller-Logo\"}}],\"credential_endpoint\":\"$CREDENTIAL_ENDPOINT\",",
+            )
+            .replace(
+                "\"credential_definition\":{\"type\":[\"VerifiableCredential\",\"TestCredential\"]}",
+                "\"credential_metadata\":{\"display\":[{\"name\":\"English Credential\",\"locale\":\"en\",\"description\":\"English description\"},{\"name\":\"Deutscher Nachweis\",\"locale\":\"de\",\"description\":\"Deutsche Beschreibung\",\"logo\":{\"uri\":\"https://issuer.example/credential-de.png\",\"alt_text\":\"Nachweis-Logo\"}}]},\"credential_definition\":{\"type\":[\"VerifiableCredential\",\"TestCredential\"]}",
+            )
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> {
+                    assertEquals("de-AT", request.headers[HttpHeaders.AcceptLanguage])
+                    jsonResponse(localizedMetadata)
+                }
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    """{"transaction_id":"transaction-1","interval":1}""",
+                    HttpStatusCode.Accepted,
+                )
+                DEFERRED_ENDPOINT -> jsonResponse(
+                    """{"credentials":[{"credential":${Json.encodeToString(credential)}}]}""",
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val wallet = Wallet("localized", staticKey = key, credentialStores = listOf(credentialStore))
+        val startedBy = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
+
+        val session = startedBy.start(preAuthorizedRequest(), preferredLocales = listOf("de-AT"))
+        assertEquals("Deutscher Aussteller", session.offer.issuer.name)
+        assertEquals("https://issuer.example/de.png", session.offer.issuer.logoUri)
+        assertEquals("Deutscher Nachweis", session.offer.credentials.single().name)
+        assertEquals("Deutsche Beschreibung", session.offer.credentials.single().descriptionText)
+        assertEquals("Nachweis-Logo", session.offer.credentials.single().logoAltText)
+        assertFalse(records.records.values.single().payload.contains("preferredLocales"))
+
+        val resumedBy = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
+        val deferred = assertIs<WalletIssuanceOutcome.Deferred>(resumedBy.continuePreAuthorized(session.id))
+        assertIs<WalletIssuanceOutcome.Stored>(resumedBy.resumeDeferred(deferred.credentials.single().id))
+
+        assertEquals("Deutscher Nachweis", credentialStore.credentials.single().label)
+    }
+
+    @Test
+    fun mdocPreviewSelectsLocalizedNameLogoAltTextAndDescription() = runTest {
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> {
+                    assertEquals("de-AT", request.headers[HttpHeaders.AcceptLanguage])
+                    jsonResponse(
+                        """
+                        {
+                          "credential_issuer":"$ISSUER",
+                          "credential_endpoint":"$CREDENTIAL_ENDPOINT",
+                          "credential_configurations_supported":{
+                            "mdl":{
+                              "format":"mso_mdoc",
+                              "doctype":"org.iso.18013.5.1.mDL",
+                              "credential_metadata":{"display":[
+                                {"name":"Mobile Driving Licence","locale":"en","description":"English description","logo":{"uri":"https://issuer.example/mdl-en.png","alt_text":"English licence logo"}},
+                                {"name":"Mobiler Fuehrerschein","locale":"de","description":"Deutsche Beschreibung","logo":{"uri":"https://issuer.example/mdl-de.png","alt_text":"Fuehrerschein-Logo"}}
+                              ]}
+                            }
+                          }
+                        }
+                        """.trimIndent(),
+                    )
+                }
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            Wallet("localized-mdoc", staticKey = JWKKey.generate(KeyType.secp256r1)),
+            httpClient = client,
+        )
+
+        val preview = service.start(preAuthorizedRequest(configurationIds = listOf("mdl")), listOf("de-AT"))
+        val credential = preview.offer.credentials.single()
+
+        assertEquals("mso_mdoc", credential.format)
+        assertEquals("org.iso.18013.5.1.mDL", credential.doctype)
+        assertEquals("Mobiler Fuehrerschein", credential.name)
+        assertEquals("Deutsche Beschreibung", credential.descriptionText)
+        assertEquals("https://issuer.example/mdl-de.png", credential.logoUri)
+        assertEquals("Fuehrerschein-Logo", credential.logoAltText)
     }
 
     @Test
@@ -1087,16 +1216,70 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun immediateResponseStoresW3cJwtSdJwtVcAndMdocWithoutAppParsing() = runTest {
+    fun issuancePreviewAndStoredMetadataExposeCredentialCardDisplay() = runTest {
         val key = JWKKey.generate(KeyType.secp256r1)
-        val w3cJwt = key.signJws(
+        val credential = key.signJws(
+            """{"iss":"https://issuer.example","sub":"did:key:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"did:key:holder","given_name":"Ada"}}}"""
+                .encodeToByteArray()
+        )
+        val store = RecordingCredentialStore()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadataWithCredentialDisplay())
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    buildJsonObject {
+                        put(
+                            "credentials",
+                            Json.parseToJsonElement("""[{"credential":${Json.encodeToString(credential)}}]"""),
+                        )
+                    }.toString()
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            Wallet("test", staticKey = key, credentialStores = listOf(store)),
+            httpClient = client,
+        )
+
+        val session = service.start(preAuthorizedRequest())
+        val preview = session.offer.credentials.single()
+        assertEquals("Personal ID", preview.name)
+        assertEquals("#12107c", preview.backgroundColor)
+        assertEquals("https://issuer.example/pid-bg.png", preview.backgroundImageUri)
+        assertEquals("#FFFFFF", preview.textColor)
+        assertEquals("https://issuer.example/pid.png", preview.logoUri)
+
+        val result = assertIs<WalletIssuanceOutcome.Stored>(service.continuePreAuthorized(session.id))
+        val stored = store.credentials.single { it.id == result.credentialIds.single() }
+        val credentialDisplay = stored.metadata!!
+            .getValue("credentialDisplay")
+            .jsonArray
+            .single()
+            .jsonObject
+        assertEquals("Personal ID", credentialDisplay.getValue("name").jsonPrimitive.content)
+        assertEquals("#12107c", credentialDisplay.getValue("background_color").jsonPrimitive.content)
+        assertEquals(
+            "https://issuer.example/pid-bg.png",
+            credentialDisplay.getValue("background_image").jsonObject.getValue("uri").jsonPrimitive.content,
+        )
+    }
+
+    @Test
+    fun immediateResponseStoresW3cJwtSdJwtVcAndMdocWithoutAppParsing() = runTest {
+        val issuerKey = JWKKey.generate(KeyType.secp256r1)
+        val holderKey = crypto2SigningKey("batch-holder")
+        val keyStore = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
+        val w3cJwt = issuerKey.signJws(
             """{"iss":"https://issuer.example","sub":"did:key:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"did:key:holder"}}}"""
                 .encodeToByteArray()
         )
         val issuedCredentials = listOf(
             w3cJwt,
             SdJwtExamples.sdJwtVcSignedExample2,
-            MdocsExamples.mdocsExampleBase64Url,
+            mdocCredential(holderKey),
         )
         val store = RecordingCredentialStore()
         val client = client { request ->
@@ -1117,16 +1300,20 @@ class WalletIssuanceSessionServiceTest {
             }
         }
         val service = WalletIssuanceSessionService(
-            Wallet("test", staticKey = key, credentialStores = listOf(store)),
+            Wallet("test", keyStores = listOf(keyStore), credentialStores = listOf(store)),
             httpClient = client,
         )
 
-        val session = service.start(preAuthorizedRequest())
+        val session = service.start(preAuthorizedRequest().copy(keyId = holderKey.id.value))
         val result = assertIs<WalletIssuanceOutcome.Stored>(service.continuePreAuthorized(session.id))
 
         assertEquals(3, result.credentialIds.size)
         assertEquals(3, store.credentials.size)
         assertEquals(setOf("jwt_vc_json", "dc+sd-jwt", "mso_mdoc"), store.credentials.map { it.credential.format }.toSet())
+        assertEquals(
+            HolderKeyBindingOrigin.ISSUANCE,
+            store.credentials.single { it.credential.format == "mso_mdoc" }.holderKeyBinding?.origin,
+        )
     }
 
     @Test
@@ -1832,6 +2019,31 @@ class WalletIssuanceSessionServiceTest {
         """.trimIndent()
     }
 
+    private fun issuerMetadataWithCredentialDisplay(): String = """
+        {
+          "credential_issuer":"$ISSUER",
+          "credential_endpoint":"$CREDENTIAL_ENDPOINT",
+          "display":[{"name":"Example Issuer","locale":"en"}],
+          "credential_configurations_supported":{
+            "test-credential":{
+              "format":"jwt_vc_json",
+              "credential_definition":{"type":["VerifiableCredential","TestCredential"]},
+              "credential_metadata":{
+                "display":[{
+                  "name":"Personal ID",
+                  "locale":"en",
+                  "logo":{"uri":"https://issuer.example/pid.png","alt_text":"PID logo"},
+                  "description":"Government identity",
+                  "background_color":"#12107c",
+                  "background_image":{"uri":"https://issuer.example/pid-bg.png"},
+                  "text_color":"#FFFFFF"
+                }]
+              }
+            }
+          }
+        }
+    """.trimIndent()
+
     private fun attestedAuthorizationServerMetadata() = """
         {
           "issuer":"$ISSUER",
@@ -1882,6 +2094,44 @@ class WalletIssuanceSessionServiceTest {
     private fun jwtPart(jwt: String, index: Int) =
         Json.parseToJsonElement(jwt.split('.')[index].decodeFromBase64Url().decodeToString()).jsonObject
 
+    private suspend fun crypto2SigningKey(id: String) =
+        CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId(id),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+
+    private suspend fun mdocCredential(holderKey: id.walt.crypto2.keys.Key): String {
+        val issuerKey = crypto2SigningKey("issuer-${holderKey.id.value}")
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(
+            issuerKey,
+            SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
+        ) {
+            subjectDn = "CN=Wallet issuance session test issuer"
+        }
+        val holderPublicJwk = holderKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
+        val issuerSigned = MdocIssuer.issueUniversal(
+            issuerKey = issuerKey,
+            signatureAlgorithm = Cose.Algorithm.ES256,
+            issuerCertificate = listOf(CoseCertificate(certificate.encodedDer.toByteArray())),
+            holderKey = holderPublicJwk.toCoseKey(),
+            docType = MDOC_DOCTYPE,
+            data = MdocIssuer.MdocUniversalIssuanceData(
+                namespaces = mapOf(
+                    MDOC_NAMESPACE to JsonObject(
+                        mapOf("given_name" to kotlinx.serialization.json.JsonPrimitive("Ada"))
+                    )
+                )
+            ),
+        )
+        return coseCompliantCbor.encodeToByteArray(
+            Document.serializer(),
+            Document(docType = MDOC_DOCTYPE, issuerSigned = issuerSigned),
+        ).encodeToBase64Url()
+    }
+
     private companion object {
         const val ISSUER = "https://issuer.example"
         const val ISSUER_METADATA = "$ISSUER/.well-known/openid-credential-issuer"
@@ -1895,6 +2145,8 @@ class WalletIssuanceSessionServiceTest {
         const val PAR_ENDPOINT = "$ISSUER/par"
         const val CHALLENGE_ENDPOINT = "$ISSUER/challenge"
         const val REDIRECT_URI = "wallet.example:/callback"
+        const val MDOC_DOCTYPE = "org.iso.18013.5.1.mDL"
+        const val MDOC_NAMESPACE = "org.iso.18013.5.1"
     }
 
     @Suppress("DEPRECATION")

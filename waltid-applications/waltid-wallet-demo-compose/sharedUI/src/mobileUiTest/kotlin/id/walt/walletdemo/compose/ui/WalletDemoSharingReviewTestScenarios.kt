@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -48,6 +49,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun digitalCredentialReviewShowsOriginTransactionDataAndEncryption() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
                 onSubmit = {},
@@ -60,16 +62,20 @@ class WalletDemoSharingReviewTestScenarios {
         // An unsigned Digital Credentials request has no verifier metadata, so the authenticated origin
         // is the requester identity: shown once, and captioned as verified, because an uncaptioned origin
         // reads as one more self-asserted requester claim.
-        onNodeWithText("https://verifier.example").performScrollTo().assertIsDisplayed()
+        onNodeWithText("https://verifier.example").assertIsDisplayed()
         onAllNodesWithText("https://verifier.example").assertCountEquals(1)
-        onNodeWithText("Verified website").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Verified website").assertIsDisplayed()
         onAllNodesWithText("Verified website").assertCountEquals(1)
         onNodeWithText("Payment Authorization").performScrollTo().assertIsDisplayed()
         onNodeWithText("42.00").performScrollTo().assertIsDisplayed()
         onNodeWithText("EUR").performScrollTo().assertIsDisplayed()
-        onNodeWithText("ACME Corp").performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ResponseProtectionSection).performScrollTo().assertIsDisplayed()
+        onNodeWithText("ACME Corp").assertIsDisplayed()
+        onNodeWithContentDescription("Show Verifier details").performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ResponseProtectionSection, useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
         onNodeWithText("OpenID4VP dc_api.jwt").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(WalletDemoPresentationCredentialSelection("pid", "credential-1").id)).performScrollTo().performClick()
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
     }
@@ -82,6 +88,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun verifiedOriginStaysVisibleBesideSelfAssertedVerifierMetadata() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview().let { review ->
                     review.copy(
                         request = review.request.copy(
@@ -104,9 +111,10 @@ class WalletDemoSharingReviewTestScenarios {
             )
         }
 
-        onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Verified website").performScrollTo().assertIsDisplayed()
-        onNodeWithText("https://verifier.example").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Example Verifier").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle).performClick()
+        onNodeWithText("Verified website").assertIsDisplayed()
+        onNodeWithText("https://verifier.example").assertIsDisplayed()
     }
 
     /**
@@ -118,6 +126,7 @@ class WalletDemoSharingReviewTestScenarios {
         var cancelled = false
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
                 onSubmit = { submitted = it },
@@ -125,18 +134,18 @@ class WalletDemoSharingReviewTestScenarios {
             )
         }
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.PresentationRejectButton).assertCountEquals(0)
         onAllNodesWithText("Reject").assertCountEquals(0)
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(
             setOf(WalletDemoPresentationCredentialSelection("pid", "credential-1")),
             submitted?.credentials,
         )
         assertEquals(false, cancelled)
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).performClick()
         assertEquals(true, cancelled)
     }
 
@@ -144,6 +153,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun disabledReviewCannotBeSubmittedTwice() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
                 onSubmit = {},
@@ -152,8 +162,8 @@ class WalletDemoSharingReviewTestScenarios {
             )
         }
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().assertIsNotEnabled()
-        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).performScrollTo().assertIsNotEnabled()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).assertIsNotEnabled()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).assertIsNotEnabled()
     }
 
     /**
@@ -163,6 +173,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun reviewWithoutReaderAuthenticationShowsNoReaderSection() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
                 onSubmit = {},
@@ -180,6 +191,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun untrustedReaderIsDescribedAsATrustDecisionNotASignatureFailure() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = annexCReview(WalletDemoReaderTrust.Untrusted("No reader trust policy is configured")),
                 title = "Share mobile document?",
                 onSubmit = {},
@@ -187,6 +199,7 @@ class WalletDemoSharingReviewTestScenarios {
             )
         }
 
+        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle).performClick()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ReaderTrustSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Reader identity not trusted by this wallet").performScrollTo().assertIsDisplayed()
         onNodeWithText("No reader trust policy is configured").performScrollTo().assertIsDisplayed()
@@ -198,6 +211,7 @@ class WalletDemoSharingReviewTestScenarios {
     fun trustedReaderIsNamedOnTheReview() = runComposeUiTest {
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = annexCReview(WalletDemoReaderTrust.Trusted("CN=Example Reader")),
                 title = "Share mobile document?",
                 onSubmit = {},
@@ -205,6 +219,7 @@ class WalletDemoSharingReviewTestScenarios {
             )
         }
 
+        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle).performClick()
         onNodeWithText("Trusted reader").performScrollTo().assertIsDisplayed()
         onNodeWithText("CN=Example Reader").performScrollTo().assertIsDisplayed()
     }
@@ -219,6 +234,7 @@ class WalletDemoSharingReviewTestScenarios {
         val photoId = credentialOption(queryId = "org.iso.23220.photoid.1", credentialId = "credential-2")
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = annexCReview(
                     readerTrust = WalletDemoReaderTrust.NotAuthenticated,
                     credentialOptions = listOf(mdl, photoId),
@@ -232,13 +248,13 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(photoId.selection.id))
             .performScrollTo()
             .performClick()
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().assertIsNotEnabled()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).assertIsNotEnabled()
         assertNull(submitted)
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(photoId.selection.id))
             .performScrollTo()
             .performClick()
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(mdl.selection, photoId.selection), submitted?.credentials)
     }
 
@@ -262,6 +278,7 @@ class WalletDemoSharingReviewTestScenarios {
         )
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = annexCReview(
                     readerTrust = WalletDemoReaderTrust.NotAuthenticated,
                     credentialOptions = listOf(first, second),
@@ -279,6 +296,7 @@ class WalletDemoSharingReviewTestScenarios {
             .performScrollTo()
             .assertIsOff()
 
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(first.selection.id)).performScrollTo().performClick()
         // Approving the first credential's optional disclosure gives the switch something to leak;
         // without it, an implementation that never dropped disclosures would still pass.
         val firstOptionalDisclosure = disclosureSelection(first, OPTIONAL_DISCLOSURE_PATH)
@@ -288,6 +306,7 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(firstOptionalDisclosure.id))
             .performScrollTo()
             .assertIsOn()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(second.selection.id))
             .performScrollTo()
@@ -296,7 +315,7 @@ class WalletDemoSharingReviewTestScenarios {
             .performScrollTo()
             .assertIsOff()
 
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(second.selection), submitted?.credentials)
         assertEquals(emptySet<WalletDemoPresentationDisclosureSelection>(), submitted?.disclosures)
     }
@@ -311,6 +330,7 @@ class WalletDemoSharingReviewTestScenarios {
         val option = credentialOption(disclosures = listOf(requiredDisclosure(), optionalDisclosure()))
         setContent {
             WalletDemoSharingReviewScreen(
+                compact = false,
                 review = digitalCredentialReview(credentialOptions = listOf(option)),
                 title = "Share digital credential?",
                 onSubmit = { submitted = it },
@@ -320,24 +340,29 @@ class WalletDemoSharingReviewTestScenarios {
 
         val required = disclosureSelection(option, REQUIRED_DISCLOSURE_PATH)
         val optional = disclosureSelection(option, OPTIONAL_DISCLOSURE_PATH)
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosure(required.id)).performScrollTo().assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(required.id)).assertCountEquals(0)
         onNodeWithText("Required by request").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOff()
         onNodeWithText("Optional disclosure").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
 
         // A required disclosure is not carried as a selection, so an empty disclosure set is what
         // "the user approved nothing optional" looks like.
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(emptySet<WalletDemoPresentationDisclosureSelection>(), submitted?.disclosures)
 
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(optional), submitted?.disclosures)
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id))
             .performScrollTo()
             .performClick()
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id))
             .performScrollTo()
             .assertIsNotEnabled()

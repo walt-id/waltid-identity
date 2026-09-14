@@ -48,6 +48,7 @@ data class IssuanceSession(
     val notifications: IssuanceNotifications? = null,
     val isClosed: Boolean = false,
     val credentialStatus: JsonElement? = null,
+    val failure: IssuanceSessionFailure? = null,
     @Transient
     val crypto2IssuerStoredKey: String? = null,
 )

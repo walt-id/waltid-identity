@@ -147,6 +147,30 @@ fun licenseTextResourceFor(license: String): String? {
     }
 }
 
+/**
+ * walt.id's own attribution notice.
+ *
+ * Apache-2.0 section 4(d) requires the distribution to carry the producer's own NOTICE; it is
+ * not derived from dependency metadata, so it is rendered here rather than harvested from jars.
+ * Set `extra["waltidNoticeProduct"]` in a project's build script to name a different product.
+ */
+fun noticeProductFor(p: Project): String =
+    p.extensions.extraProperties
+        .takeIf { it.has("waltidNoticeProduct") }
+        ?.get("waltidNoticeProduct") as? String
+        ?: "walt.id identity"
+
+fun renderNoticeMd(product: String, year: Int): String =
+    """
+    |$product
+    |Copyright $year walt.id
+    |
+    |This product includes software developed by walt.id and third parties.
+    |Third-party license information can be found in THIRD-PARTY-NOTICE.md
+    |and in the META-INF/NOTICE.html files of the included libraries.
+    |
+    """.trimMargin()
+
 val aggregateDependencyNotices = tasks.register("aggregateDependencyNotices") {
     val aggregatedDir = layout.buildDirectory.dir("licenses/all-notices")
     outputs.dir(aggregatedDir)
@@ -469,6 +493,11 @@ val aggregateDependencyNotices = tasks.register("aggregateDependencyNotices") {
             )
         )
 
+        val noticeYear = java.time.Year.now().value
+        layout.projectDirectory.file("NOTICE.md").asFile.writeText(
+            renderNoticeMd(noticeProductFor(project), noticeYear)
+        )
+
         // Per-project notices for real subprojects.
         subprojects.forEach { sub ->
             val subDeps = parseDepsFromJson(sub.layout.buildDirectory.file("licenses/THIRD-PARTY-NOTICE.json").get().asFile)
@@ -483,10 +512,14 @@ val aggregateDependencyNotices = tasks.register("aggregateDependencyNotices") {
                     bundledLicenseTexts = emptySet(),
                 )
             )
+            sub.projectDir.resolve("NOTICE.md").writeText(
+                renderNoticeMd(noticeProductFor(sub), noticeYear)
+            )
         }
 
         logger.lifecycle(
-            "Wrote THIRD-PARTY-NOTICE.md for ${project.path}: ${uniqueDeps(rootDeps).size} components, " +
+            "Wrote THIRD-PARTY-NOTICE.md and NOTICE.md for ${project.path} and ${subprojects.size} " +
+                "subproject(s): ${uniqueDeps(rootDeps).size} components, " +
                 "${bundledLicenseTexts.size} license texts in LICENSES/."
         )
         if (unresolvedLicenses.isNotEmpty()) {

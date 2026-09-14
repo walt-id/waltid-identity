@@ -128,6 +128,14 @@ public class WalletSdkBridge private constructor(
         }
 
     /**
+     * Removes one stored credential by wallet-local identifier.
+     */
+    public suspend fun deleteCredential(credentialId: String): WalletBridgeResult<Boolean> =
+        walletBridgeCall {
+            operations.deleteCredential(credentialId)
+        }
+
+    /**
      * Deletes wallet-local state and managed persistence material.
      */
     public suspend fun deleteWallet(): WalletBridgeResult<Unit> =
@@ -269,6 +277,8 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun credentials(): List<MobileWalletCredential>
 
+    suspend fun deleteCredential(credentialId: String): Boolean
+
     suspend fun deleteWallet()
 
     suspend fun present(
@@ -353,6 +363,9 @@ internal class MobileWalletSdkBridgeOperations(
 
     override suspend fun credentials(): List<MobileWalletCredential> =
         wallet.credentials()
+
+    override suspend fun deleteCredential(credentialId: String): Boolean =
+        wallet.deleteCredential(credentialId)
 
     override suspend fun deleteWallet() =
         wallet.deleteWallet()

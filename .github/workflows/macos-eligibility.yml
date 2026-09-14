@@ -32,8 +32,23 @@ on:
         type: boolean
         default: false
     outputs:
+      run-ios-simulator:
+        description: "Whether Kotlin iOS simulator jobs should run"
+        value: ${{ jobs.decide.outputs.run-ios-simulator }}
+      run-native:
+        description: "Whether native WalletCore / Xcode demo jobs should run"
+        value: ${{ jobs.decide.outputs.run-native }}
+      run-compose:
+        description: "Whether Compose iOS demo jobs should run"
+        value: ${{ jobs.decide.outputs.run-compose }}
+      run-enterprise:
+        description: "Whether Enterprise iOS jobs should run"
+        value: ${{ jobs.decide.outputs.run-enterprise }}
+      run-sdk-docs:
+        description: "Whether mobile SDK docs / ABI / DocC jobs should run"
+        value: ${{ jobs.decide.outputs.run-sdk-docs }}
       should-run:
-        description: "Whether macOS jobs should run"
+        description: "Whether any macOS lane should run"
         value: ${{ jobs.decide.outputs.should-run }}
       reason:
         description: "Human-readable decision reason"
@@ -45,47 +60,32 @@ permissions:
 
 jobs:
   decide:
-    uses: ./.github/workflows/platform-eligibility.yml
-    with:
-      event-name: ${{ inputs.event-name }}
-      ref: ${{ inputs.ref }}
-      pr-number: ${{ inputs.pr-number }}
-      pr-head-repo: ${{ inputs.pr-head-repo }}
-      pr-labels: ${{ inputs.pr-labels }}
-      pr-draft: ${{ inputs.pr-draft }}
-      additional-labels: '["ci:mobile"]'
-      platform-name: iOS
-      platform-label: ci:macos
-      path-patterns: |
-        [
-          ".github/workflows/gradle-macos.yml",
-          ".github/workflows/mobile-sdk-docs.yml",
-          ".github/workflows/macos-eligibility.yml",
-          ".github/workflows/platform-eligibility.yml",
-          ".github/actions/checkout-repos/*",
-          ".github/actions/gradle-ios/*",
-          ".github/actions/gradle-mobile-sdk-docs/*",
-          ".github/actions/gradle-setup-action/*",
-          ".github/actions/ios-build-setup/*",
-          ".github/actions/set-properties/*",
-          "scripts/check-mobile-swift-parity-decision.sh",
-          "build-logic/*",
-          "build.gradle.kts",
-          "gradle/*",
-          "gradle.properties",
-          "gradlew",
-          "settings.gradle.kts",
-          "gradle/libs.versions.toml",
-          "*/Package.swift",
-          "*/src/commonMain/*",
-          "*/src/commonTest/*",
-          "*/src/iosMain/*",
-          "*/src/iosTest/*",
-          "waltid-applications/waltid-wallet-demo-compose/*",
-          "waltid-applications/waltid-wallet-demo-ios/*",
-          "waltid-libraries/*/build.gradle.kts",
-          "waltid-libraries/*/*/build.gradle.kts",
-          "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
-          "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
-          "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
-        ]
+    runs-on: ubuntu-22.04
+    outputs:
+      run-ios-simulator: ${{ steps.decide.outputs.run-ios-simulator }}
+      run-native: ${{ steps.decide.outputs.run-native }}
+      run-compose: ${{ steps.decide.outputs.run-compose }}
+      run-enterprise: ${{ steps.decide.outputs.run-enterprise }}
+      run-sdk-docs: ${{ steps.decide.outputs.run-sdk-docs }}
+      should-run: ${{ steps.decide.outputs.should-run }}
+      reason: ${{ steps.decide.outputs.reason }}
+    steps:
+      - name: Checkout macOS lane predicates
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/ci
+            .github/scripts/ci
+
+      - name: Decide macOS lanes
+        id: decide
+        env:
+          EVENT_NAME: ${{ inputs.event-name }}
+          GH_TOKEN: ${{ github.token }}
+          PR_DRAFT: ${{ inputs.pr-draft }}
+          PR_HEAD_REPO: ${{ inputs.pr-head-repo }}
+          PR_LABELS: ${{ inputs.pr-labels }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+          REF: ${{ inputs.ref }}
+        shell: bash
+        run: .github/scripts/ci/decide-macos-lanes.sh

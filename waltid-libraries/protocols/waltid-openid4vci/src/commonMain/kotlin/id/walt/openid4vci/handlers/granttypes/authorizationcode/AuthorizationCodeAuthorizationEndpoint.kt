@@ -7,6 +7,7 @@ import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
@@ -53,7 +54,7 @@ class AuthorizationCodeAuthorizationEndpoint(
         val redirectUri = authorizationRequest.redirectUri
             ?: authorizationRequest.client.redirectUris.firstOrNull()
             ?: return AuthorizationResponseResult.Failure(
-                OAuthError("invalid_request", "Client is missing redirect_uri"),
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Client is missing redirect_uri"),
             )
 
         var updated = authorizationRequest
@@ -67,7 +68,7 @@ class AuthorizationCodeAuthorizationEndpoint(
 
         val subject = session.subject?.takeIf { it.isNotBlank() }
             ?: return AuthorizationResponseResult.Failure(
-                OAuthError("invalid_request", "Session subject is required"),
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Session subject is required"),
             )
 
         val (code, _) = generateAndSaveUnique {

@@ -183,6 +183,8 @@ public enum class MobileWalletClientIdScheme {
  * @property label Optional display label stored with the credential.
  * @property credentialDataJson Parsed credential data encoded as JSON for app-side display.
  * @property disclosures Claim values requested by the verifier for this credential option.
+ * @property metadataJson Optional stored display metadata encoded as JSON, including issuer and
+ *   credential card art.
  */
 public data class MobileWalletPresentationCredentialOption(
     val queryId: String,
@@ -194,6 +196,7 @@ public data class MobileWalletPresentationCredentialOption(
     val label: String?,
     val credentialDataJson: String,
     val disclosures: List<MobileWalletPresentationDisclosure> = emptyList(),
+    val metadataJson: String? = null,
 ) {
     init {
         require(queryId.isNotBlank()) {

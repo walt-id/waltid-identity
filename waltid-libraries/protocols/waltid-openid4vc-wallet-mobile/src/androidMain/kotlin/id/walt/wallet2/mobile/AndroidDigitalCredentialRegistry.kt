@@ -3,6 +3,7 @@ package id.walt.wallet2.mobile
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
@@ -41,6 +42,10 @@ import kotlinx.serialization.json.putJsonObject
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Android Credential Manager metadata registry adapter.
@@ -57,8 +62,8 @@ public class AndroidDigitalCredentialRegistry(
     private val applicationContext: Context = context.applicationContext
     private val registryManager: RegistryManager = RegistryManager.create(applicationContext)
     /** Host app icon shown in the Credential Manager wallet / credential picker. */
-    private val icon: Bitmap = loadApplicationIcon(applicationContext)
-    private val iconPng: ByteArray = icon.toPngBytes()
+    private val applicationIcon: Bitmap = loadApplicationIcon(applicationContext)
+    private val applicationIconPng: ByteArray = applicationIcon.toPngBytes()
     private var registrationAvailable: Boolean = false
     private var creationRegistrationAvailable: Boolean = false
 
@@ -152,6 +157,33 @@ public class AndroidDigitalCredentialRegistry(
             creationRegistrationAvailable = false
             return MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
         }
+        val immediate = records.map { it.withLocalThumbnail() }
+        val result = registerRecords(registryId, immediate)
+        if (!result.available || records.none { it.iconPng == null && it.cardArtImageUris.isNotEmpty() }) {
+            return result
+        }
+        val refreshed = withTimeoutOrNull(RegistryIconFetchTimeoutMs) {
+            coroutineScope {
+                records.map { record -> async { record.withResolvedThumbnail() } }.awaitAll()
+            }
+        } ?: return result
+        val changed = refreshed.indices.any { index ->
+            !refreshed[index].iconPng.contentEquals(immediate[index].iconPng)
+        }
+        if (changed) {
+            val refreshResult = registerRecords(registryId, refreshed)
+            registrationAvailable = registrationAvailableAfterRefresh(
+                initialSucceeded = result.available,
+                refreshSucceeded = refreshResult.available,
+            )
+        }
+        return result
+    }
+
+    private suspend fun registerRecords(
+        registryId: String,
+        records: List<MobileWalletCredentialRegistryRecord>,
+    ): MobileWalletCredentialRegistrationResult {
         val entries = records.map { it.toAndroidEntry() }
         return runCatching {
             // Registering only the unsigned protocol makes Credential Manager ignore signed and
@@ -214,7 +246,7 @@ public class AndroidDigitalCredentialRegistry(
                         applicationName = applicationDisplayName(),
                         subtitle = "Save a credential to this wallet",
                         explainer = "Save a credential to this wallet.",
-                        icon = iconPng,
+                        icon = applicationIconPng,
                     ),
                     matcher = matcher,
                     type = DigitalCredential.TYPE_DIGITAL_CREDENTIAL,
@@ -292,11 +324,65 @@ public class AndroidDigitalCredentialRegistry(
         }
     }
 
+    private fun MobileWalletCredentialRegistryRecord.withLocalThumbnail(): MobileWalletCredentialRegistryRecord {
+        if (iconPng != null) return this
+        val png = cardArtFallbackPng?.takeIf(::isImageBytes)
+            ?: solidColorPng(parseCssRgb(cardArtBackgroundColor) ?: MobileWalletRegistryIcons.DefaultCardBlueRgb)
+        return copy(iconPng = png)
+    }
+
+    private suspend fun MobileWalletCredentialRegistryRecord.withResolvedThumbnail(): MobileWalletCredentialRegistryRecord {
+        if (cardArtImageUris.isEmpty()) return withLocalThumbnail()
+        val png = MobileWalletRegistryIcons.resolveIconPng(
+            art = MobileWalletCardArt(
+                imageUris = cardArtImageUris,
+                backgroundColor = cardArtBackgroundColor,
+                fallbackPng = cardArtFallbackPng,
+            ),
+            fetchHttps = ::fetchRegistryIconBytes,
+        )
+        return copy(iconPng = png)
+    }
+
+    private fun MobileWalletCredentialRegistryRecord.entryIconBitmap(): Bitmap =
+        this.iconPng?.decodeRegistryIcon() ?: applicationIcon
+
+    private fun MobileWalletCredentialRegistryRecord.entryIconPng(): ByteArray {
+        val recordIcon = this.iconPng
+        return recordIcon?.decodeRegistryIcon()?.toPngBytes()
+            ?: recordIcon
+            ?: applicationIconPng
+    }
+
+    private fun ByteArray.decodeRegistryIcon(): Bitmap? {
+        if (!isImageBytes(this)) return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(this, 0, size, bounds)
+        val width = bounds.outWidth.toLong()
+        val height = bounds.outHeight.toLong()
+        if (width <= 0L || height <= 0L) return null
+        if (width * height > REGISTRY_ICON_MAX_PIXELS) return null
+        val bitmap = BitmapFactory.decodeByteArray(this, 0, size) ?: return null
+        return bitmap.scaleToMaxEdge(REGISTRY_ICON_MAX_EDGE_PX)
+    }
+
     private fun Bitmap.toPngBytes(): ByteArray =
         ByteArrayOutputStream().use { out ->
             compress(CompressFormat.PNG, 100, out)
             out.toByteArray()
         }
+
+    private fun Bitmap.scaleToMaxEdge(maxEdgePx: Int): Bitmap {
+        val longestEdge = maxOf(width, height)
+        if (longestEdge <= maxEdgePx) return this
+        val scale = maxEdgePx.toFloat() / longestEdge.toFloat()
+        return Bitmap.createScaledBitmap(
+            this,
+            (width * scale).toInt().coerceAtLeast(1),
+            (height * scale).toInt().coerceAtLeast(1),
+            true,
+        )
+    }
 
     private fun loadApplicationIcon(context: Context): Bitmap {
         val drawable = context.packageManager.getApplicationIcon(context.applicationInfo)
@@ -316,23 +402,15 @@ public class AndroidDigitalCredentialRegistry(
                 }
             }
         }
-        val longestEdge = maxOf(source.width, source.height)
-        if (longestEdge <= maxEdgePx) return source
-        val scale = maxEdgePx.toFloat() / longestEdge.toFloat()
-        return Bitmap.createScaledBitmap(
-            source,
-            (source.width * scale).toInt().coerceAtLeast(1),
-            (source.height * scale).toInt().coerceAtLeast(1),
-            true,
-        )
+        return source.scaleToMaxEdge(maxEdgePx)
     }
 
     internal fun MobileWalletCredentialRegistryRecord.toAndroidEntry(): DigitalCredentialEntry {
         val display = setOf(
             VerificationEntryDisplayProperties(
                 displayName,
-                type,
-                icon,
+                subtitle,
+                entryIconBitmap(),
                 null,
                 null,
             )
@@ -384,8 +462,8 @@ public class AndroidDigitalCredentialRegistry(
                 .map { record ->
                     AndroidAnnexCCredential(
                         title = record.displayName,
-                        subtitle = record.type,
-                        bitmap = iconPng,
+                        subtitle = record.subtitle,
+                        bitmap = record.entryIconPng(),
                         mdoc = AndroidAnnexCMdoc(
                             documentId = record.registryEntryId,
                             docType = record.type,
@@ -444,6 +522,7 @@ public class AndroidDigitalCredentialRegistry(
         private const val MAX_MATCHER_VALUE_LENGTH = 128
         /** Credential Manager selector icons are small; keep registry PNG payloads modest. */
         private const val REGISTRY_ICON_MAX_EDGE_PX = 128
+        private const val REGISTRY_ICON_MAX_PIXELS = 2_048L * 2_048L
         private const val SIGNED_UNSUPPORTED_REASON =
             "The wallet accepts only the unsigned OpenID4VP Digital Credentials protocol"
         private const val MULTISIGNED_UNSUPPORTED_REASON =
@@ -451,6 +530,12 @@ public class AndroidDigitalCredentialRegistry(
                 "and does not support JWS JSON Serialization request objects"
     }
 }
+
+/** A failed best-effort art refresh must not clear a successful local registration. */
+internal fun registrationAvailableAfterRefresh(
+    initialSucceeded: Boolean,
+    refreshSucceeded: Boolean,
+): Boolean = initialSucceeded || refreshSucceeded
 
 /** Raw registry request because AndroidX does not yet ship an Annex C registry builder. */
 private class AndroidAnnexCRegistry(

@@ -14,8 +14,13 @@ internal class LazyDemoWallet(
             wallet ?: createWallet().also { wallet = it }
         }
 
-    override suspend fun bootstrap(): WalletDemoBootstrapResult =
-        wallet().bootstrap()
+    override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult =
+        wallet().bootstrap(signingProtection)
+
+    override suspend fun signingProtectionAvailability(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoSigningProtectionAvailability =
+        wallet().signingProtectionAvailability(signingProtection)
 
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()
@@ -56,4 +61,14 @@ internal class LazyDemoWallet(
 
     override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) =
         wallet().discardPresentationPreview(previewHandle)
+
+    override suspend fun deleteCredential(credentialId: String): Boolean =
+        wallet().deleteCredential(credentialId)
+
+    override suspend fun deleteWallet() {
+        mutex.withLock {
+            wallet?.deleteWallet()
+            wallet = null
+        }
+    }
 }

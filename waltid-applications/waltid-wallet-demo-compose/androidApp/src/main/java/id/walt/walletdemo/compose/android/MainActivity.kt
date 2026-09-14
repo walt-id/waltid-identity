@@ -14,10 +14,14 @@ import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
+import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
+import id.walt.walletdemo.compose.logic.createAndroidDemoBiometricAuthenticator
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.ui.WalletDemoApp
 import kotlinx.coroutines.launch
 
-const val WALLET_BIOMETRIC_ENABLED_EXTRA = "id.walt.walletdemo.compose.android.WALLET_BIOMETRIC_ENABLED"
+const val WALLET_SIGNING_PROTECTION_MODE_EXTRA =
+    "id.walt.walletdemo.compose.android.WALLET_SIGNING_PROTECTION_MODE"
 
 class MainActivity : FragmentActivity() {
     private lateinit var controller: WalletDemoController
@@ -35,12 +39,12 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
 
-        walletConfig = demoWalletConfig().copy(
-            biometricEnabled = intent.getBooleanExtra(
-                WALLET_BIOMETRIC_ENABLED_EXTRA,
-                BuildConfig.WALLET_BIOMETRIC_ENABLED,
-            ),
-        )
+        walletConfig = demoWalletConfig().let { config ->
+            val override = intent.getStringExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA)
+            if (override == null) config else config.copy(
+                signingProtectionMode = WalletDemoSigningProtectionMode.parse(override),
+            )
+        }
         controller = WalletDemoController(
             wallet = createAndroidDemoWallet(
                 context = applicationContext,
@@ -48,6 +52,10 @@ class MainActivity : FragmentActivity() {
                 interactionContextProvider = { this@MainActivity },
             ),
             pinStore = createAndroidDemoPinStore(applicationContext, walletConfig.walletId),
+            biometricAuthenticator = createAndroidDemoBiometricAuthenticator { this@MainActivity },
+            signingProtectionMode = walletConfig.signingProtectionMode,
+            signingProtectionStore = walletConfig.signingProtectionStore(applicationContext),
+            sharingSettings = createAndroidDemoSharingSettingsStore(applicationContext),
         )
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         handleIntent(intent)
@@ -68,6 +76,7 @@ class MainActivity : FragmentActivity() {
         if (!::controller.isInitialized) return
         // CreateActivity stores into the shared DB; reload so Credentials tab does not stay stale.
         controller.refreshCredentialsFromStore()
+        controller.handleApplicationForegrounded()
     }
 
     override fun onDestroy() {
@@ -99,7 +108,7 @@ class MainActivity : FragmentActivity() {
                     config = walletConfig,
                     interactionContextProvider = { this@MainActivity },
                 )
-                created.wallet.bootstrap()
+                created.bootstrap(walletConfig.selectedSigningProtection(applicationContext))
                 created.wallet.continueAuthorizationIssuance(
                     sessionId = sessionId,
                     callbackUri = callbackUri,

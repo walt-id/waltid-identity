@@ -40,8 +40,16 @@ data class TestPlanResult(
     val passed: Boolean
         get() = errorMessage == null && expected?.let {
             it.acceptsConformanceResult(conformanceResult) && it.acceptsVerifierStatus(verifierStatus)
-        } ?: (conformanceResult == "PASSED" &&
-                (verifierStatus == null || verifierStatus == Verification2Session.VerificationSessionStatus.SUCCESSFUL))
+        } ?: if (walletStatus != null) {
+            // Wallet runners map TLS-only WARNING and screenshot REVIEW to walletStatus PASSED,
+            // matching the verifier's ExpectedModuleOutcome.PASSED_OR_REVIEW so the GitHub
+            // summary Error column stays empty the same way.
+            walletStatus == "PASSED" &&
+                (conformanceResult == null || conformanceResult in ACCEPTED_SUITE_RESULTS)
+        } else {
+            conformanceResult == "PASSED" &&
+                (verifierStatus == null || verifierStatus == Verification2Session.VerificationSessionStatus.SUCCESSFUL)
+        }
 
     val message: String?
         get() = errorMessage ?: when {
@@ -58,4 +66,8 @@ data class TestPlanResult(
 
             else -> null
         }
+
+    private companion object {
+        val ACCEPTED_SUITE_RESULTS = setOf("PASSED", "WARNING", "REVIEW")
+    }
 }

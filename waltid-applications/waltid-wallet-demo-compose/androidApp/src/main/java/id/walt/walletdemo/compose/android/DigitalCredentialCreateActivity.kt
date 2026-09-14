@@ -21,6 +21,7 @@ import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.toDemoIssuanceSession
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateSheet
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateUiState
+import id.walt.walletdemo.compose.ui.prefetchOfferCardArt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -84,14 +85,15 @@ class DigitalCredentialCreateActivity : FragmentActivity() {
                 val allowlist = assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
                 val input = AndroidDigitalCredentialCreateProvider.extract(intent, allowlist)
                 requestProtocol = input.request.protocol
+                val config = demoWalletConfig()
                 val created = createAndroidDemoMobileWallet(
                     context = applicationContext,
-                    config = demoWalletConfig(),
+                    config = config,
                     interactionContextProvider = { this@DigitalCredentialCreateActivity },
                 )
                 val mobileWallet = created.wallet
                 wallet = mobileWallet
-                mobileWallet.bootstrap()
+                created.bootstrap(config.selectedSigningProtection(applicationContext))
                 val started = mobileWallet.startIssuance(
                     MobileWalletIssuanceRequest(
                         offer = MobileWalletCredentialOffer.InlineJson(input.request.offerJson),
@@ -99,6 +101,7 @@ class DigitalCredentialCreateActivity : FragmentActivity() {
                     )
                 ).toDemoIssuanceSession()
                 session = started
+                prefetchOfferCardArt(this@DigitalCredentialCreateActivity, started.preview)
                 uiState = WalletDemoOfferCreateUiState.Review(preview = started.preview)
             }.onFailure {
                 reportFailure(it)

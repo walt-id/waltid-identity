@@ -32,14 +32,14 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.fail
-import org.junit.Assume.assumeTrue
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
  * OS-mediated Digital Credentials create E2E for OpenID4VCI pre-authorized offers.
  *
- * Requires Google Play services, so only the dedicated Play Store lane should run it.
+ * Requires Google Play services, so only the dedicated Google APIs lane should run it.
  *
  * Success is asserted from the issuer session and the wallet's own storage, not from the
  * `CreateDigitalCredentialResponse`. The provider acknowledgment is a fixed `{"data":{}}` payload
@@ -63,7 +63,7 @@ class DigitalCredentialIssuanceE2ETest {
      */
     @Test
     fun acceptsPortalShapedOfferThroughCreateCredential() = runBlocking {
-        val fixture = start() ?: return@runBlocking
+        val fixture = start()
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val portalOffer = createPortalShapedOffer(scenario)
 
@@ -79,12 +79,13 @@ class DigitalCredentialIssuanceE2ETest {
         clickByTag(fixture.device, "wallet.offerAcceptButton")
 
         DemoTestBackend.waitForIssuerIssuanceSuccess(portalOffer.offerId)
+        fixture.awaitCreateProviderCompletion()
         fixture.assertStoredCredentialIs(scenario)
     }
 
     @Test
     fun acceptsPreAuthorizedOfferThroughCreateCredential() = runBlocking {
-        val fixture = start() ?: return@runBlocking
+        val fixture = start()
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val offer = DemoTestBackend.createOffer(scenario, inlineOffer = true)
         val offerJson = requireNotNull(Uri.parse(offer.offerUrl).getQueryParameter("credential_offer")) {
@@ -112,12 +113,13 @@ class DigitalCredentialIssuanceE2ETest {
         clickByTag(fixture.device, "wallet.offerAcceptButton")
 
         DemoTestBackend.waitForIssuerIssuanceSuccess(offer.offerId)
+        fixture.awaitCreateProviderCompletion()
         fixture.assertStoredCredentialIs(scenario)
     }
 
     @Test
     fun acceptsPreAuthorizedOfferWithTransactionCodeThroughCreateCredential() = runBlocking {
-        val fixture = start() ?: return@runBlocking
+        val fixture = start()
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val offer = DemoTestBackend.createOffer(
             scenario,
@@ -155,6 +157,7 @@ class DigitalCredentialIssuanceE2ETest {
         clickByTag(fixture.device, "wallet.offerAcceptButton")
 
         DemoTestBackend.waitForIssuerIssuanceSuccess(offer.offerId)
+        fixture.awaitCreateProviderCompletion()
         fixture.assertStoredCredentialIs(scenario)
     }
 
@@ -298,10 +301,26 @@ class DigitalCredentialIssuanceE2ETest {
         val preexistingCardTags: Set<String>,
     )
 
-    private fun start(): Fixture? {
+    /**
+     * Issuer success can arrive before the provider finishes parsing and storing the credential.
+     * Relaunching with FLAG_ACTIVITY_CLEAR_TASK before this sheet closes destroys the provider
+     * Activity and cancels its issuance coroutine, turning a successful issuer response into an
+     * empty local store. Wait for the provider-owned review to disappear before relaunching.
+     */
+    private fun Fixture.awaitCreateProviderCompletion() {
+        val completed = device.wait(
+            Until.gone(By.res("wallet.offerReview")),
+            UI_ELEMENT_TIMEOUT,
+        )
+        if (!completed) {
+            fail("Wallet create provider did not finish after issuer success")
+        }
+    }
+
+    private fun start(): Fixture {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        assumeTrue(
+        assertTrue(
             "Digital Credentials E2E requires an Android emulator with Google Play services",
             hasGooglePlayServices(context),
         )

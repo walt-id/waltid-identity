@@ -76,6 +76,14 @@ object WalletModuleApplicability {
     )
 
     /**
+     * Published for non-HAIP variants, but the suite dies before the wallet is involved:
+     * `CreateAuthorizationRequestSteps` requests missing condition
+     * `AddVP1FinalEncryptionParametersToClientMetadata`. Not a wallet bug until the suite
+     * actually builds the authorization request.
+     */
+    private const val ALTERNATE_HAPPY_FLOW = "oid4vp-1final-wallet-alternate-happy-flow"
+
+    /**
      * Why [testModule] does not apply to [variantSelection], or `null` if it does.
      *
      * [variantSelection] must describe every axis - see [WalletTestPlan.axisValues].
@@ -90,11 +98,15 @@ object WalletModuleApplicability {
     ): String? = suiteLimitationReason(testModule, variantSelection)
         ?: metadataReason(moduleMetadata, variantSelection)
 
-    /** See [ERROR_PAGE_GATED_MODULES]. */
+    /** See [ERROR_PAGE_GATED_MODULES] and [ALTERNATE_HAPPY_FLOW]. */
     private fun suiteLimitationReason(
         testModule: String,
         variantSelection: Map<String, String>,
     ): String? {
+        if (testModule == ALTERNATE_HAPPY_FLOW) {
+            return "suite cannot build the authorization request: CreateAuthorizationRequestSteps " +
+                "requests missing condition AddVP1FinalEncryptionParametersToClientMetadata"
+        }
         if (variantSelection["request_method"] != "url_query") return null
         if (testModule !in ERROR_PAGE_GATED_MODULES) return null
         return "cannot be completed with request_method=url_query: the module only asks for its " +

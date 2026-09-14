@@ -170,6 +170,23 @@ class OSSVerifier2Crypto2StartupTest {
     }
 
     @Test
+    fun `omitted clientId still loads when clientMetadata is present`() = runTest {
+        loadConfig(includeClientId = false, includeBundledOptionalFields = true)
+        OSSVerifier2Manager.initialize()
+
+        val loaded = ConfigManager.getConfig<OSSVerifier2ServiceConfig>()
+        assertEquals(null, loaded.clientId)
+
+        val session = OSSVerifier2Manager.createVerificationSession(
+            CrossDeviceFlowSetup(core = GeneralFlowConfig())
+        )
+        assertEquals(
+            "redirect_uri:http://localhost:7003/verification-session/${session.id}/response",
+            session.authorizationRequest.clientId,
+        )
+    }
+
+    @Test
     fun `blank per-session clientId falls back to configured service clientId`() = runTest {
         loadConfig()
         OSSVerifier2Manager.initialize()
@@ -185,12 +202,16 @@ class OSSVerifier2Crypto2StartupTest {
         storedKey: String? = null,
         legacyKey: String? = null,
         includeClientId: Boolean = true,
+        includeBundledOptionalFields: Boolean = false,
     ): Pair<Path, String> {
         val configFile = Files.createTempFile("verifier-service", ".conf")
         tempFiles.add(configFile)
         val tripleQuotes = "\"\"\""
         val content = buildString {
             if (includeClientId) appendLine("clientId = \"verifier2\"")
+            if (includeBundledOptionalFields) {
+                appendLine("clientMetadata: { client_name: \"Verifier2\" }")
+            }
             appendLine("urlPrefix = \"http://localhost:7003/verification-session\"")
             appendLine("urlHost = \"openid4vp://authorize\"")
             storedKey?.let { appendLine("requestSigningStoredKey = $tripleQuotes$it$tripleQuotes") }

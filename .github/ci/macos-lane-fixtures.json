@@ -1,0 +1,95 @@
+{
+  "fixtures": [
+    {
+      "name": "commonMain-only library change selects simulator, not WalletCore consumers",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/Foo.kt"
+      ],
+      "lanes": ["ios-simulator"]
+    },
+    {
+      "name": "iosMain change selects simulator only",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto/src/iosMain/kotlin/id/walt/crypto/IosFoo.kt"
+      ],
+      "lanes": ["ios-simulator"]
+    },
+    {
+      "name": "library build.gradle.kts selects simulator only",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto/build.gradle.kts"
+      ],
+      "lanes": ["ios-simulator"]
+    },
+    {
+      "name": "wallet-mobile change selects every iOS consumer lane",
+      "files": [
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/iosMain/kotlin/id/walt/wallet/Wallet.kt"
+      ],
+      "lanes": ["ios-simulator", "native", "compose", "enterprise", "sdk-docs"]
+    },
+    {
+      "name": "native demo change selects native only",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/ContentView.swift"
+      ],
+      "lanes": ["native"]
+    },
+    {
+      "name": "Compose iOS app change selects compose only",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-compose/iosApp/iosApp/ContentView.swift"
+      ],
+      "lanes": ["compose"]
+    },
+    {
+      "name": "Compose Kotlin iosMain also selects simulator compilation",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/iosMain/kotlin/id/walt/demo/Main.kt"
+      ],
+      "lanes": ["compose", "ios-simulator"]
+    },
+    {
+      "name": "Swift package change selects WalletCore consumers, not Kotlin simulator",
+      "files": [
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources/WalletSDK/Wallet.swift"
+      ],
+      "lanes": ["native", "compose", "enterprise", "sdk-docs"]
+    },
+    {
+      "name": "shared iOS package manifest selects native and Compose",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-shared-ios/Package.swift"
+      ],
+      "lanes": ["native", "compose"]
+    },
+    {
+      "name": "shared iOS package sources select native and Compose",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoShared/Shared.swift"
+      ],
+      "lanes": ["native", "compose"]
+    },
+    {
+      "name": "build-logic change selects every macOS lane",
+      "files": [
+        "build-logic/src/main/kotlin/id/walt/convention/KotlinConvention.kt"
+      ],
+      "lanes": ["ios-simulator", "native", "compose", "enterprise", "sdk-docs"]
+    },
+    {
+      "name": "SDK docs workflow change selects docs only",
+      "files": [
+        ".github/workflows/mobile-sdk-docs.yml"
+      ],
+      "lanes": ["sdk-docs"]
+    },
+    {
+      "name": "unrelated Linux service change selects no macOS lane",
+      "files": [
+        "waltid-services/waltid-issuer-api2/src/main/kotlin/id/walt/issuer/Issuer.kt"
+      ],
+      "lanes": []
+    }
+  ]
+}

@@ -60,7 +60,7 @@ class X509CertificateBasicConstraintsValidationTest {
     }
 
     @Test
-    fun validationShouldNotBecausePathLengthConstraintIsMeet() = runTest {
+    fun validationShouldSucceedBecausePathLengthConstraintIsMeet() = runTest {
         val sigAlg = SignatureAlgorithm.RsaPkcs1(DigestAlgorithm.SHA_256)
         val caKey = TestKeyUtil.genRsaKey("root")
         val caCert = caTool.createSelfSignedCertificate(caKey, sigAlg) {
@@ -92,6 +92,25 @@ class X509CertificateBasicConstraintsValidationTest {
             .also {
                 assertTrue(it.valid)
             }
+    }
+
+    @Test
+    fun validationShouldSucceedAlthoughBasicConstraintCriticalFlagIsDisabled() = runTest {
+        val sigAlg = SignatureAlgorithm.RsaPkcs1(DigestAlgorithm.SHA_256)
+        val caKey = TestKeyUtil.genRsaKey("root")
+        val caCert = caTool.createSelfSignedCertificate(caKey, sigAlg) {
+            subjectDn = "cn=Root CA, o=Walt.id"
+            extensionBasicConstraints {
+                critical = false
+                cA = true
+            }
+        }
+        caTool.validateCertificateChain(listOf(caCert), InMemoryTrustStore(listOf(caCert))).also {
+            assertTrue(it.valid)
+            assertTrue(it.log.any { it.severity == ValidationResult.Severity.WARNING &&
+            it.validatorId == X509CertificateBasicConstraintsValidator.ID &&
+                    it.message.contains("must have critical flag set")})
+        }
     }
 
     companion object {

@@ -54,51 +54,65 @@ class WalletTestPlanRunner(
         println("  Signed request: ${testPlan.requiresSignedRequest}")
         println()
 
-        // Create test plan (response includes modules)
-        val planResponse = createTestPlan()
-        val testPlanId = planResponse.id
-        println("Test plan created: $testPlanId")
-        println("View plan: https://$conformanceHost:$conformancePort/plan-detail.html?plan=$testPlanId")
-
-        // Get test modules from create response
-        val modules = planResponse.modules
-        println("Test modules: ${modules.size}")
-        modules.forEach { println("   - ${it.testModule}") }
-        println()
-
-        // Fetched once per plan: the suite publishes some modules for variants its own applicability
-        // rules exclude, and running those produces failures that say nothing about the wallet.
-        val moduleMetadata = conformance.getAvailableTestModules()
-
-        // Run each module
         val results = mutableListOf<TestPlanResult>()
-        modules.forEachIndexed { index, module ->
-            println("[${index + 1}/${modules.size}] Running module: ${module.testModule}")
+        var failure: Throwable? = null
+        try {
+            // Create test plan (response includes modules)
+            val planResponse = createTestPlan()
+            val testPlanId = planResponse.id
+            println("Test plan created: $testPlanId")
+            println("View plan: https://$conformanceHost:$conformancePort/plan-detail.html?plan=$testPlanId")
 
-            val inapplicable = WalletModuleApplicability.inapplicableReason(
-                testModule = module.testModule,
-                moduleMetadata = moduleMetadata[module.testModule],
-                variantSelection = testPlan.axisValues,
-            )
-            val result = if (inapplicable != null) {
-                println("   Skipped: not applicable to this variant - $inapplicable")
-                TestPlanResult(
-                    testName = "${testPlan.producerId}/${module.testModule}",
-                    conformanceTestId = module.testModule,
-                    conformanceResult = "SKIPPED",
-                    walletStatus = "SKIPPED",
-                    skipReason = "Not applicable to this variant: $inapplicable",
-                )
-            } else {
-                runModule(testPlanId, module)
-            }
-            results.add(result)
-
-            println("   Result: ${result.walletStatus}")
-            if (result.errorMessage != null) {
-                println("   Error: ${result.errorMessage}")
-            }
+            // Get test modules from create response
+            val modules = planResponse.modules
+            println("Test modules: ${modules.size}")
+            modules.forEach { println("   - ${it.testModule}") }
             println()
+
+            // Fetched once per plan: the suite publishes some modules for variants its own applicability
+            // rules exclude, and running those produces failures that say nothing about the wallet.
+            val moduleMetadata = conformance.getAvailableTestModules()
+
+            // Run each module
+            modules.forEachIndexed { index, module ->
+                println("[${index + 1}/${modules.size}] Running module: ${module.testModule}")
+
+                val inapplicable = WalletModuleApplicability.inapplicableReason(
+                    testModule = module.testModule,
+                    moduleMetadata = moduleMetadata[module.testModule],
+                    variantSelection = testPlan.axisValues,
+                )
+                val result = if (inapplicable != null) {
+                    println("   Skipped: not applicable to this variant - $inapplicable")
+                    TestPlanResult(
+                        testName = "${testPlan.producerId}/${module.testModule}",
+                        conformanceTestId = module.testModule,
+                        conformanceResult = "SKIPPED",
+                        walletStatus = "SKIPPED",
+                        skipReason = "Not applicable to this variant: $inapplicable",
+                    )
+                } else {
+                    runModule(testPlanId, module)
+                }
+                results.add(result)
+
+                println("   Result: ${result.walletStatus}")
+                if (result.errorMessage != null) {
+                    println("   Error: ${result.errorMessage}")
+                }
+                println()
+            }
+        } catch (e: Throwable) {
+            failure = e
+            if (results.isEmpty()) {
+                results += TestPlanResult(
+                    testName = testPlan.producerId,
+                    conformanceTestId = "N/A",
+                    conformanceResult = "ERROR",
+                    walletStatus = "ERROR",
+                    errorMessage = e.message ?: e.toString(),
+                )
+            }
         }
 
         val namedResults = results.mapIndexed { index, result ->
@@ -115,6 +129,7 @@ class WalletTestPlanRunner(
             producer = testPlan.producerId,
             expectRejection = testPlan.expectRejection,
         )
+        failure?.let { throw it }
         printSummary(namedResults)
 
         return namedResults

@@ -14,10 +14,12 @@ public struct SharingReviewView: View {
     private let isReadOnly: Bool
     private let onToggleCredential: (PresentationCredentialSelection) -> Void
     private let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    private let onCredentialSelected: ((String) -> Void)?
     private let onSubmit: () -> Void
     private let onReject: (() -> Void)?
     private let onCancel: () -> Void
+    private let compact: Bool
+    private let showActions: Bool
+    @State private var compactClaimsOption: PresentationCredentialOption?
 
     /// Renders one sharing review.
     ///
@@ -27,8 +29,6 @@ public struct SharingReviewView: View {
     ///   - selectionComplete: Whether the request is satisfied, which is what enables Share.
     ///   - isLoading: Whether an operation is in flight, which disables every action.
     ///   - isReadOnly: Whether the review is a record of a finished presentation rather than a prompt.
-    ///   - onCredentialSelected: Opens a credential's full details, when the host has somewhere to
-    ///     open them.
     ///   - onReject: Sends a protocol-level refusal to the requester. Pass `nil` for transports with
     ///     no such message - the platform Digital Credentials APIs return a cancellation instead, and
     ///     offering both Reject and Cancel there would promise the requester gets told two different
@@ -41,10 +41,11 @@ public struct SharingReviewView: View {
         isReadOnly: Bool = false,
         onToggleCredential: @escaping (PresentationCredentialSelection) -> Void,
         onToggleDisclosure: @escaping (PresentationDisclosureSelection) -> Void,
-        onCredentialSelected: ((String) -> Void)? = nil,
         onSubmit: @escaping () -> Void,
         onReject: (() -> Void)? = nil,
-        onCancel: @escaping () -> Void
+        onCancel: @escaping () -> Void,
+        compact: Bool = false,
+        showActions: Bool = true
     ) {
         self.review = review
         self.selection = selection
@@ -53,32 +54,69 @@ public struct SharingReviewView: View {
         self.isReadOnly = isReadOnly
         self.onToggleCredential = onToggleCredential
         self.onToggleDisclosure = onToggleDisclosure
-        self.onCredentialSelected = onCredentialSelected
         self.onSubmit = onSubmit
         self.onReject = onReject
         self.onCancel = onCancel
+        self.compact = compact
+        self.showActions = showActions
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             SharingRequestSections(request: review.request)
 
-            Text("Select credentials to share")
-                .font(.subheadline.weight(.semibold))
+            if compact {
+                CredentialCardStackView(
+                    details: review.credentialOptions.map(CredentialDisplayNormalizer.details(for:))
+                ) { id in
+                    compactClaimsOption = review.credentialOptions.first {
+                        CredentialDisplayNormalizer.details(for: $0).id == id
+                    }
+                }
+                .sheet(isPresented: Binding(
+                    get: { compactClaimsOption != nil },
+                    set: { if !$0 { compactClaimsOption = nil } }
+                )) {
+                    if let option = compactClaimsOption {
+                        let details = CredentialDisplayNormalizer.details(for: option)
+                        SharingClaimsSheet(
+                            option: option,
+                            details: details,
+                            credentialSelected: selection.credentials.contains(option.selection),
+                            selectedDisclosureOptions: selection.disclosures,
+                            requestedDisclosureItems: details.groups
+                                .first { $0.title == CredentialDisplayVocabulary.requestedDisclosuresTitle }?
+                                .items ?? [],
+                            isLoading: isLoading,
+                            isReadOnly: isReadOnly,
+                            onToggleDisclosure: onToggleDisclosure,
+                            onDismiss: { compactClaimsOption = nil }
+                        )
+                    }
+                }
+            } else {
+                Text("Select credentials to share")
+                    .font(.subheadline.weight(.semibold))
 
-            ForEach(review.credentialOptions) { option in
-                CredentialReviewCard(
-                    option: option,
-                    selection: selection,
-                    isLoading: isLoading,
-                    isReadOnly: isReadOnly,
-                    onToggleCredential: onToggleCredential,
-                    onToggleDisclosure: onToggleDisclosure,
-                    onCredentialSelected: onCredentialSelected
-                )
+                if review.credentialOptions.isEmpty {
+                    Text("No credentials available")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                ForEach(review.credentialOptions) { option in
+                    CredentialReviewCard(
+                        option: option,
+                        selection: selection,
+                        isLoading: isLoading,
+                        isReadOnly: isReadOnly,
+                        onToggleCredential: onToggleCredential,
+                        onToggleDisclosure: onToggleDisclosure
+                    )
+                }
             }
 
-            if !isReadOnly {
+            if !isReadOnly && showActions {
                 ReviewActions(
                     selectionComplete: selectionComplete,
                     isLoading: isLoading,
@@ -91,7 +129,7 @@ public struct SharingReviewView: View {
     }
 }
 
-/// One offered credential: what it is, and what would be disclosed from it.
+/// One offered credential: a selectable card that opens claim details.
 struct CredentialReviewCard: View {
     let option: PresentationCredentialOption
     let selection: SharingSelection
@@ -99,53 +137,133 @@ struct CredentialReviewCard: View {
     let isReadOnly: Bool
     let onToggleCredential: (PresentationCredentialSelection) -> Void
     let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    let onCredentialSelected: ((String) -> Void)?
+    @State private var claimsOpen = false
 
     var body: some View {
         let details = CredentialDisplayNormalizer.details(for: option)
         let requestedDisclosureItems = details.groups
             .first { $0.title == CredentialDisplayVocabulary.requestedDisclosuresTitle }?
             .items ?? []
+        let credentialSelected = selection.credentials.contains(option.selection)
 
-        VStack(alignment: .leading, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             if !isReadOnly {
                 Toggle(isOn: Binding(get: {
-                    selection.credentials.contains(option.selection)
+                    credentialSelected
                 }, set: { _ in
                     onToggleCredential(option.selection)
                 })) {
-                    Text(option.label ?? option.format)
-                        .font(.subheadline.weight(.medium))
+                    EmptyView()
                 }
+                .toggleStyle(SharingCheckboxToggleStyle())
+                .labelsHidden()
                 .disabled(isLoading)
-                .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
+                .accessibilityIdentifier(WalletAccessibilityID.presentationCredentialToggle(option.selection.id))
             }
 
-            if let onCredentialSelected {
-                CredentialCardButton(details: details) {
-                    onCredentialSelected(details.id)
-                }
-                .padding(.leading, isReadOnly ? 0 : 28)
-            } else {
-                CredentialCardView(details: details)
-                    .padding(.leading, isReadOnly ? 0 : 28)
+            CredentialCardButton(details: details, compact: true) {
+                claimsOpen = true
             }
-
-            if !option.disclosures.isEmpty {
-                DisclosureList(
-                    option: option,
-                    credentialSelected: selection.credentials.contains(option.selection),
-                    selectedDisclosureOptions: selection.disclosures,
-                    requestedDisclosureItems: requestedDisclosureItems,
-                    isLoading: isLoading,
-                    isReadOnly: isReadOnly,
-                    onToggleDisclosure: onToggleDisclosure
-                )
-                .padding(.leading, isReadOnly ? 0 : 28)
-            }
-
-            Divider()
+            .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsToggle(option.selection.id))
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
+        .sheet(isPresented: $claimsOpen) {
+            SharingClaimsSheet(
+                option: option,
+                details: details,
+                credentialSelected: credentialSelected,
+                selectedDisclosureOptions: selection.disclosures,
+                requestedDisclosureItems: requestedDisclosureItems,
+                isLoading: isLoading,
+                isReadOnly: isReadOnly,
+                onToggleDisclosure: onToggleDisclosure,
+                onDismiss: { claimsOpen = false }
+            )
+        }
+    }
+}
+
+/// Scrollable claim review the user can leave without changing the Share decision.
+private struct SharingClaimsSheet: View {
+    let option: PresentationCredentialOption
+    let details: CredentialDetails
+    let credentialSelected: Bool
+    let selectedDisclosureOptions: Set<PresentationDisclosureSelection>
+    let requestedDisclosureItems: [ClaimItem]
+    let isLoading: Bool
+    let isReadOnly: Bool
+    let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
+                Text(details.cardSummary.title)
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button("Close", action: onDismiss)
+                    .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsClose)
+            }
+            .padding(.horizontal)
+            .padding(.top)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    SharingClaimsIssuerRow(details: details)
+                    if option.disclosures.isEmpty {
+                        Text("No additional claims to review")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        DisclosureList(
+                            option: option,
+                            credentialSelected: credentialSelected,
+                            selectedDisclosureOptions: selectedDisclosureOptions,
+                            requestedDisclosureItems: requestedDisclosureItems,
+                            isLoading: isLoading,
+                            isReadOnly: isReadOnly,
+                            onToggleDisclosure: onToggleDisclosure
+                        )
+                    }
+                }
+                .padding()
+            }
+        }
+        .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsDialog)
+    }
+}
+
+private struct SharingClaimsIssuerRow: View {
+    let details: CredentialDetails
+
+    var body: some View {
+        if let issuerDisplay = details.issuerDisplay {
+            let issuer = details.issuer?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            MetadataIdentityView(
+                display: issuerDisplay,
+                fallbackName: details.cardSummary.issuer,
+                supportingText: issuer.isEmpty || issuer == issuerDisplay.name ? nil : issuer
+            )
+        } else {
+            Text("Issuer: \(details.cardSummary.issuer)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct SharingCheckboxToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
+                .font(.title2)
+                .foregroundStyle(configuration.isOn ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(configuration.isOn ? [.isSelected] : [])
     }
 }
 
@@ -237,18 +355,33 @@ private struct DisclosureTextView: View {
 }
 
 /// Share, and the ways of declining the transport actually supports.
-struct ReviewActions: View {
+public struct ReviewActions: View {
+    @Environment(\.walletDemoBranding) private var branding
     let selectionComplete: Bool
     let isLoading: Bool
     let onSubmit: () -> Void
     let onReject: (() -> Void)?
     let onCancel: () -> Void
 
-    var body: some View {
+    public init(
+        selectionComplete: Bool,
+        isLoading: Bool,
+        onSubmit: @escaping () -> Void,
+        onReject: (() -> Void)?,
+        onCancel: @escaping () -> Void
+    ) {
+        self.selectionComplete = selectionComplete
+        self.isLoading = isLoading
+        self.onSubmit = onSubmit
+        self.onReject = onReject
+        self.onCancel = onCancel
+    }
+
+    public var body: some View {
         HStack(spacing: 10) {
             Button("Share", action: onSubmit)
                 .buttonStyle(.borderedProminent)
-                .tint(.waltBlue)
+                .tint(branding.primary)
                 .disabled(isLoading || !selectionComplete)
                 .accessibilityIdentifier(WalletAccessibilityID.presentationSubmitButton)
 

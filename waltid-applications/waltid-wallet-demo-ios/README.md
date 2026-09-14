@@ -30,6 +30,12 @@ The demo uses the default managed encrypted local persistence. Wallet database f
 
 The UI stays focused on the production default. Non-default persistence options, including provided database keys and custom credential stores, are documented and covered by SDK and demo integration tests.
 
+## Whitelabel branding
+
+Edit `WalletDemoBranding.default` in `waltid-wallet-demo-shared-ios` to change the in-app wallet title and brand colours (`primary`, `secondary`, `primaryContainer`, and their on-colours). The app root can also inject a custom value with `.environment(\.walletDemoBranding, ...)`.
+
+The home-screen name stays in `CFBundleDisplayName` in the app and document-provider `Info.plist` files.
+
 ## Public demo backend defaults
 
 Clean demo installs use the public walt.id demo profile endpoint for OpenID4VP transaction-data support:

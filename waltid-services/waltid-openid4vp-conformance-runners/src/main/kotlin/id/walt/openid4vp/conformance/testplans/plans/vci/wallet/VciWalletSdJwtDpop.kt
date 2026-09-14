@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.wallet
 
+import id.walt.openid4vp.conformance.config.ConformanceConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -132,7 +133,7 @@ class VciWalletSdJwtDpop(
                 }
             },
             "vci": {
-                "credential_offer_endpoint": "http://$adapterHost:7007/credential-offer",
+                "credential_offer_endpoint": "${ConformanceConfig.vciSuiteCredentialOfferEndpoint(adapterHost)}",
                 "credential_configuration_id": "eu.europa.ec.eudi.pid.1"
             },
             "waitTimeoutSeconds": 30,

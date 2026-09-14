@@ -1,7 +1,10 @@
 package id.walt.walletdemo.compose.logic
 
 interface DemoWallet {
-    suspend fun bootstrap(): WalletDemoBootstrapResult
+    suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult
+    suspend fun signingProtectionAvailability(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoSigningProtectionAvailability
     suspend fun listCredentials(): List<WalletDemoCredential>
     suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession
     suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization
@@ -25,4 +28,6 @@ interface DemoWallet {
     ): WalletDemoOperationResult
     suspend fun rejectPresentation(previewHandle: WalletDemoPresentationPreviewHandle): WalletDemoOperationResult
     suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle)
+    suspend fun deleteCredential(credentialId: String): Boolean
+    suspend fun deleteWallet()
 }

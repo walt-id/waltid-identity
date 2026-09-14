@@ -2,6 +2,7 @@ package id.walt.wallet2.mobile
 
 import androidx.credentials.registry.digitalcredentials.mdoc.MdocEntry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
+import androidx.credentials.registry.provider.digitalcredentials.VerificationEntryDisplayProperties
 import id.walt.cose.coseCompliantCbor
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
@@ -85,9 +86,13 @@ class AndroidDigitalCredentialRegistryTest {
                     )
                 ),
                 displayName = "Driving licence",
+                subtitle = "D-123-456",
             ).toAndroidEntry()
         } as MdocEntry
 
+        val display = entry.entryDisplayPropertySet.filterIsInstance<VerificationEntryDisplayProperties>().single()
+        assertEquals("Driving licence", display.title)
+        assertEquals("D-123-456", display.subtitle)
         assertEquals("org.iso.18013.5.1.mDL", entry.docType)
         assertEquals("given_name", entry.fields.single().identifier)
         assertEquals("Ada", entry.fields.single().fieldValue)
@@ -110,9 +115,13 @@ class AndroidDigitalCredentialRegistryTest {
                     )
                 ),
                 displayName = "PID",
+                subtitle = "Personal ID",
             ).toAndroidEntry()
         } as SdJwtEntry
 
+        val display = entry.entryDisplayPropertySet.filterIsInstance<VerificationEntryDisplayProperties>().single()
+        assertEquals("PID", display.title)
+        assertEquals("Personal ID", display.subtitle)
         assertEquals(listOf("address", "locality"), entry.claims.single().path)
         assertEquals("Vienna", entry.claims.single().value)
         assertTrue(entry.claims.single().isSelectivelyDisclosable)
@@ -182,12 +191,15 @@ class AndroidDigitalCredentialRegistryTest {
                         )
                     ),
                     displayName = "Driving licence",
+                    subtitle = "D-123-456",
                 )
             )
         )
         val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
         val credential = database.credentials.single()
 
+        assertEquals("Driving licence", credential.title)
+        assertEquals("D-123-456", credential.subtitle)
         assertEquals(listOf("org-iso-mdoc"), database.protocols)
         assertEquals("opaque-id", credential.mdoc.documentId)
         assertEquals("org.iso.18013.5.1.mDL", credential.mdoc.docType)
@@ -195,5 +207,41 @@ class AndroidDigitalCredentialRegistryTest {
             listOf("given_name", "Ada", "Ada"),
             credential.mdoc.namespaces.getValue("org.iso.18013.5.1").getValue("given_name"),
         )
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Test
+    fun annexCMatcherDatabaseUsesPerRecordIconWhenPresent() {
+        val customIcon = byteArrayOf(7, 8, 9, 10)
+        val bytes = registry.encodeAnnexCCredentialDatabase(
+            listOf(
+                MobileWalletCredentialRegistryRecord(
+                    registryEntryId = "opaque-id",
+                    credentialId = "wallet-private-id",
+                    format = MobileWalletDigitalCredentialFormat.MDOC,
+                    type = "org.iso.18013.5.1.mDL",
+                    fields = listOf(
+                        MobileWalletCredentialRegistryField(
+                            path = listOf("org.iso.18013.5.1", "given_name"),
+                            valueJson = "\"Ada\"",
+                            selectivelyDisclosable = true,
+                        )
+                    ),
+                    displayName = "Driving licence",
+                    iconPng = customIcon,
+                )
+            )
+        )
+        val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
+
+        assertEquals(customIcon.toList(), database.credentials.single().bitmap.toList())
+    }
+
+    @Test
+    fun bestEffortRefreshDoesNotClearSuccessfulInitialRegistration() {
+        assertTrue(registrationAvailableAfterRefresh(initialSucceeded = true, refreshSucceeded = true))
+        assertTrue(registrationAvailableAfterRefresh(initialSucceeded = true, refreshSucceeded = false))
+        assertTrue(registrationAvailableAfterRefresh(initialSucceeded = false, refreshSucceeded = true))
+        assertFalse(registrationAvailableAfterRefresh(initialSucceeded = false, refreshSucceeded = false))
     }
 }

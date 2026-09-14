@@ -188,8 +188,6 @@ class MsoMdocsVerifier2IntegrationTest {
         )
     )
 
-    private val holderKeyFun = suspend { KeyManager.resolveSerializedKey(HOLDER_SERIALIZED_KEY) }
-
     private suspend fun selectCredentialsForQuery(
         query: DcqlQuery,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
@@ -291,7 +289,7 @@ class MsoMdocsVerifier2IntegrationTest {
             // Present with wallet
             val bootstrapUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
 
-            val holderKey = holderKeyFun()
+            val holderKey = restoreMdlHolderCrypto2Key("cross-device-mdoc-holder")
 
             val selectCallback: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>> = { query ->
                 selectCredentialsForQuery(
@@ -308,6 +306,7 @@ class MsoMdocsVerifier2IntegrationTest {
                     holderPoliciesToRun = null,
                     runPolicies = null,
                     transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                    mdocHolderKeyResolver = { _, _ -> holderKey },
                 )
             }
 

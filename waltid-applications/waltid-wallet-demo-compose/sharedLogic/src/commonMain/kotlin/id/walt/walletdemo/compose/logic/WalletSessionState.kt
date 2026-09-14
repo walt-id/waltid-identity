@@ -6,6 +6,9 @@ sealed interface WalletSessionState {
 
     data class Ready(
         val did: String,
+        val keyId: String,
+        val publicJwk: String,
+        val signingProtection: WalletDemoSigningProtection,
         val credentials: List<WalletDemoCredential>,
     ) : WalletSessionState
 

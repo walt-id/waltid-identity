@@ -15,6 +15,22 @@ class WalletDemoAppAndroidTest {
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
     @Test
+    fun pinSetupShowsDisabledBiometricToggleWhenUnavailable() =
+        scenarios.pinSetupShowsDisabledBiometricToggleWhenUnavailable()
+
+    @Test
+    fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() =
+        scenarios.pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable()
+
+    @Test
+    fun pinSetupKeepsSubmitReachableWhenScrolled() =
+        scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
+
+    @Test
+    fun unavailableBiometricSigningIsDisabledButNoneRemainsAvailable() =
+        scenarios.unavailableBiometricSigningIsDisabledButNoneRemainsAvailable()
+
+    @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
 
@@ -101,4 +117,32 @@ class WalletDemoAppAndroidTest {
     @Test
     fun credentialsPersistAcrossControllerRecreation() =
         scenarios.credentialsPersistAcrossControllerRecreation()
+
+    @Test
+    fun customBrandingTitleAppearsInTheHeader() =
+        scenarios.customBrandingTitleAppearsInTheHeader()
+
+    @Test
+    fun settingsReplacesHeaderLockAndShowsDidAndKey() =
+        scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
+
+    @Test
+    fun lockDoesNotAutoPromptBiometrics() =
+        scenarios.lockDoesNotAutoPromptBiometrics()
+
+    @Test
+    fun settingsConfirmsAndAppliesSigningProtectionChange() =
+        scenarios.settingsConfirmsAndAppliesSigningProtectionChange()
+
+    @Test
+    fun credentialDetailsCanCopyAndDelete() =
+        scenarios.credentialDetailsCanCopyAndDelete()
+
+    @Test
+    fun deleteFromCredentialsWhileAReviewIsActive() =
+        scenarios.deleteFromCredentialsWhileAReviewIsActive()
+
+    @Test
+    fun successStatusCanBeDismissedFromTheHeader() =
+        scenarios.successStatusCanBeDismissedFromTheHeader()
 }
