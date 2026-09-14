@@ -8,6 +8,8 @@ import id.walt.wallet2.mobile.identity.RecoveryAvailability
 import id.walt.wallet2.mobile.identity.RecoveryProtection
 import id.walt.wallet2.mobile.identity.RecoveryReceipt
 import id.walt.wallet2.mobile.identity.RecoveryScope
+import id.walt.wallet2.mobile.identity.IdentityProviderFailure
+import id.walt.wallet2.mobile.identity.IdentityProviderException
 import kotlinx.cinterop.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -77,7 +79,7 @@ public class KeychainIdentityRecovery(
                             }
                         } finally { CFRelease(array) }
                     }
-                    else -> error("Keychain list failed with status $status")
+                    else -> throw failure(status)
                 }
             }
         }
@@ -97,10 +99,10 @@ public class KeychainIdentityRecovery(
                         errSecSuccess -> Unit
                         errSecDuplicateItem -> {
                             val existing = requireNotNull(read(recordId)) { "Existing recovery record is unavailable" }
-                            try { check(existing.contentEquals(bytes)) { "A different recovery record already uses this ID" } }
+                            try { if (!existing.contentEquals(bytes)) throw IdentityProviderException(IdentityProviderFailure.Conflict) }
                             finally { existing.fill(0) }
                         }
-                        else -> error("Keychain store failed with status $status")
+                        else -> throw failure(status)
                     }
                 }
                 RecoveryReceipt.AcceptedLocally
@@ -118,7 +120,7 @@ public class KeychainIdentityRecovery(
     override suspend fun delete(recordId: String): RecoveryReceipt = mutex.withLock { withContext(Dispatchers.Default) {
         query(recordId).use { query ->
             val status = SecItemDelete(query.ref)
-            check(status == errSecSuccess || status == errSecItemNotFound) { "Keychain delete failed with status $status" }
+            if (status != errSecSuccess && status != errSecItemNotFound) throw failure(status)
         }
         RecoveryReceipt.AcceptedLocally
     } }
@@ -138,10 +140,17 @@ public class KeychainIdentityRecovery(
                         requireNotNull(CFDataGetBytePtr(data)).readBytes(size)
                     } finally { CFRelease(data) }
                 }
-                else -> error("Keychain read failed with status $status")
+                else -> throw failure(status)
             }
         }
     }
+
+    private fun failure(status: Int) = IdentityProviderException(when (status) {
+        errSecInteractionNotAllowed, errSecAuthFailed, errSecUserCanceled -> IdentityProviderFailure.InteractionRequired
+        errSecMissingEntitlement, errSecParam -> IdentityProviderFailure.Rejected
+        errSecDuplicateItem -> IdentityProviderFailure.Conflict
+        else -> IdentityProviderFailure.TemporarilyUnavailable
+    })
 
     private fun query(recordId: String? = null): Dictionary = Dictionary().apply {
         put(kSecClass, kSecClassGenericPassword)

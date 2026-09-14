@@ -726,6 +726,8 @@ public struct IssuanceRequest: Equatable, Sendable {
 
     /// Optional holder DID URL used when the credential requires DID binding.
     public let did: String?
+    /// Minimum host/issuer policy required of the identity's retained key policy.
+    public let keyPolicy: WalletIdentityPolicy
 
     /// Creates an issuance request.
     ///
@@ -735,18 +737,21 @@ public struct IssuanceRequest: Equatable, Sendable {
     ///   - redirectURI: Exact registered callback URI.
     ///   - keyID: Optional identifier of the selected holder key.
     ///   - did: Optional holder DID URL identifying the selected key.
+    ///   - keyPolicy: Minimum required identity policy; this does not claim ecosystem certification.
     public init(
         offer: URL,
         clientID: String = "eudiw-abca",
         redirectURI: URL,
         keyID: String? = nil,
-        did: String? = nil
+        did: String? = nil,
+        keyPolicy: WalletIdentityPolicy = .generalPurpose
     ) {
         self.offer = offer
         self.clientID = clientID
         self.redirectURI = redirectURI
         self.keyID = keyID
         self.did = did
+        self.keyPolicy = keyPolicy
     }
 
 }

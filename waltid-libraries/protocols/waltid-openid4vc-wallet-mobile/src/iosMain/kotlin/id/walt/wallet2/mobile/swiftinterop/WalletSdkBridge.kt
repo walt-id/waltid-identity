@@ -95,6 +95,14 @@ public class WalletSdkBridge private constructor(
     public suspend fun backupIdentity(option: IdentityBackupOption): WalletBridgeResult<IdentityOperationResult> =
         walletBridgeCall { operations.identities.backup(option) }
 
+    /** Lists explicitly configured private-key custodians under the current export policy. */
+    public suspend fun identityCustodyOptions(identityId: String): WalletBridgeResult<List<IdentityCustodyOption>> =
+        walletBridgeCall { operations.identities.custodyOptions(identityId) }
+
+    /** Imports a copy into an explicit custodian without claiming portable recovery. */
+    public suspend fun transferIdentityToCustody(option: IdentityCustodyOption): WalletBridgeResult<IdentityCustodyResult> =
+        walletBridgeCall { operations.identities.transferToCustody(option) }
+
     /** Discovers safe backup references from registered providers. */
     public suspend fun identityRecoveryCandidates(): WalletBridgeResult<List<RecoveryCandidate>> =
         walletBridgeCall { operations.identities.recoveryCandidates() }

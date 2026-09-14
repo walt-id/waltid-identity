@@ -138,6 +138,8 @@ public struct WalletIdentityConfiguration: Sendable {
     public var keychain: WalletIdentityKeychainConfiguration?
     /// Trusted integrations that receive secret recovery records.
     public var recoveryProviders: [any WalletIdentityRecoveryProvider]
+    /// Optional destinations that receive private-key custody, independently of recovery.
+    public var keyCustodians: [any WalletIdentityKeyCustodian]
     /// Configures identity constraints and explicitly registered recovery integrations.
     /// - Parameters:
     ///   - policy: Creation and export constraints retained with the identity.
@@ -147,13 +149,15 @@ public struct WalletIdentityConfiguration: Sendable {
     ///   - alternativeAuthorizations: Policies offered only for explicit selection.
     ///   - keychain: Optional native signing-key settings.
     ///   - recoveryProviders: Trusted providers that receive recovery secrets.
+    ///   - keyCustodians: Trusted destinations receiving additional private-key copies.
     public init(policy: WalletIdentityPolicy = .generalPurpose,
                 recoveryConfirmation: WalletRecoveryConfirmation = .localAcceptance,
                 localRecoveryMaterial: WalletLocalRecoveryMaterialRetention = .retain,
                 authorization: WalletIdentityAuthorization = .walletDefault,
                 alternativeAuthorizations: [WalletKeyUseAuthorizationPolicy] = [],
                 keychain: WalletIdentityKeychainConfiguration? = nil,
-                recoveryProviders: [any WalletIdentityRecoveryProvider] = []) {
+                recoveryProviders: [any WalletIdentityRecoveryProvider] = [],
+                keyCustodians: [any WalletIdentityKeyCustodian] = []) {
         self.recoveryConfirmation = recoveryConfirmation
         self.localRecoveryMaterial = localRecoveryMaterial
         self.policy = policy
@@ -161,6 +165,7 @@ public struct WalletIdentityConfiguration: Sendable {
         self.alternativeAuthorizations = alternativeAuthorizations
         self.keychain = keychain
         self.recoveryProviders = recoveryProviders
+        self.keyCustodians = keyCustodians
     }
 }
 
@@ -273,6 +278,8 @@ public struct WalletIdentity: Sendable {
     public let attestation: WalletIdentityKeyAttestation?
     /// Last known recovery action for this identity.
     public let recovery: WalletIdentityRecoveryState
+    /// Additional private-key custodians; these references do not establish recoverable backups.
+    public let custody: [WalletIdentityCustodyReference]
 }
 
 protocol WalletIdentityHandle: Sendable {}
@@ -346,9 +353,17 @@ public enum WalletIdentityFailure: Sendable {
     /// The native key operation failed without authorizing fallback.
     case nativeOperationFailed
     /// The recovery provider could not complete the operation.
-    case recoveryUnavailable
+    case providerUnavailable
     /// A different identity is already selected or pending.
     case existingIdentity
+    /// The provider requires user interaction before retry.
+    case providerInteractionRequired
+    /// The provider rejected the operation permanently under its current policy.
+    case providerRejected
+    /// Another record already occupies the destination identifier.
+    case providerConflict
+    /// Local acceptance has not yet met the required delivery confirmation.
+    case providerConfirmationPending
 }
 /// Persistent identity lifecycle state; unavailable identities are never silently replaced.
 public enum WalletIdentityState: Sendable {
@@ -357,8 +372,10 @@ public enum WalletIdentityState: Sendable {
     /// The selected identity is ready for use.
     case active(WalletIdentity)
     /// A journaled operation needs retry or cancellation.
-    /// - Parameter identityID: Identifier of the pending operation.
-    case pending(identityID: String)
+    /// - Parameters:
+    ///   - identityID: Identifier of the pending operation.
+    ///   - reason: Why the operation needs attention before retry.
+    case pending(identityID: String, reason: WalletIdentityFailure = .providerUnavailable)
     /// Established identity state needs attention.
     /// - Parameters:
     ///   - identityID: Selected identity, when known.
@@ -370,8 +387,10 @@ public enum WalletIdentityOperationResult: Sendable {
     /// The selected identity is ready for use.
     case active(WalletIdentity)
     /// A journaled operation needs retry or cancellation.
-    /// - Parameter identityID: Identifier of the pending operation.
-    case pending(identityID: String)
+    /// - Parameters:
+    ///   - identityID: Identifier of the pending operation.
+    ///   - reason: Why the operation needs attention before retry.
+    case pending(identityID: String, reason: WalletIdentityFailure = .providerUnavailable)
     /// The operation failed without selecting a replacement identity.
     case failed(WalletIdentityFailure)
 }
@@ -421,6 +440,16 @@ public actor WalletIdentityService {
     public func backup(_ option: WalletIdentityBackupOption) async throws -> WalletIdentityOperationResult {
         try await core.backup(option)
     }
+    /// Lists explicitly configured custody destinations compatible with this identity's export policy.
+    /// - Parameter identityID: Active identity whose original key would be copied.
+    public func custodyOptions(identityID: String) async throws -> [WalletIdentityCustodyOption] {
+        try await core.custodyOptions(identityID: identityID)
+    }
+    /// Gives the selected custodian an additional key copy; retains the local key and recovery status.
+    /// - Parameter option: Unmodified choice issued by this service.
+    public func transferToCustody(_ option: WalletIdentityCustodyOption) async throws -> WalletIdentityCustodyResult {
+        try await core.transferToCustody(option)
+    }
     /// Lists references to discoverable recovery records without exposing secrets.
     public func recoveryCandidates() async throws -> [WalletIdentityRecoveryCandidate] { try await core.recoveryCandidates() }
     /// Validates a recovery record before offering supported signing destinations.
@@ -446,6 +475,8 @@ protocol WalletIdentityCore: Sendable {
     func cancelPending(identityID: String) async throws
     func backupOptions(identityID: String) async throws -> [WalletIdentityBackupOption]
     func backup(_ option: WalletIdentityBackupOption) async throws -> WalletIdentityOperationResult
+    func custodyOptions(identityID: String) async throws -> [WalletIdentityCustodyOption]
+    func transferToCustody(_ option: WalletIdentityCustodyOption) async throws -> WalletIdentityCustodyResult
     func recoveryCandidates() async throws -> [WalletIdentityRecoveryCandidate]
     func restorationOptions(_ candidate: WalletIdentityRecoveryCandidate) async throws -> [WalletIdentityRestorationOption]
     func restore(_ option: WalletIdentityRestorationOption) async throws -> WalletIdentityOperationResult
@@ -463,7 +494,79 @@ struct UnavailableWalletIdentityCore: WalletIdentityCore {
     func cancelPending(identityID: String) async throws { throw unavailable() }
     func backupOptions(identityID: String) async throws -> [WalletIdentityBackupOption] { throw unavailable() }
     func backup(_ option: WalletIdentityBackupOption) async throws -> WalletIdentityOperationResult { throw unavailable() }
+    func custodyOptions(identityID: String) async throws -> [WalletIdentityCustodyOption] { throw unavailable() }
+    func transferToCustody(_ option: WalletIdentityCustodyOption) async throws -> WalletIdentityCustodyResult { throw unavailable() }
     func recoveryCandidates() async throws -> [WalletIdentityRecoveryCandidate] { throw unavailable() }
     func restorationOptions(_ candidate: WalletIdentityRecoveryCandidate) async throws -> [WalletIdentityRestorationOption] { throw unavailable() }
     func restore(_ option: WalletIdentityRestorationOption) async throws -> WalletIdentityOperationResult { throw unavailable() }
+}
+
+/// Structured errors thrown by trusted recovery integrations; never include secret bytes.
+public enum WalletIdentityProviderError: Error, Sendable {
+    /// Retry after the service becomes available.
+    case temporarilyUnavailable
+    /// The user must unlock, sign in, or complete another provider interaction.
+    case interactionRequired
+    /// The provider policy rejects the operation.
+    case rejected
+    /// A different record already occupies the requested identifier.
+    case conflict
+    /// Local acceptance has not yet met the required delivery confirmation.
+    case confirmationPending
+}
+
+/// Explicitly trusted destination receiving a copy of a private signing key, not a recovery record.
+public protocol WalletIdentityKeyCustodian: Sendable {
+    /// Stable integration identifier, unique within one wallet configuration.
+    var id: String { get }
+    /// Destination label shown before selection.
+    var displayName: String { get }
+    /// Imports idempotently under the identity's key ID; rejects a different existing key.
+    /// - Parameters:
+    ///   - identity: Original public identity and stable identifiers.
+    ///   - privateJWK: Secret P-256 private JWK; never log it or include it in errors.
+    func importKey(identity: WalletIdentity, privateJWK: Data) async throws -> WalletIdentityCustodyReceipt
+}
+
+/// Destination evidence checked against the original public key by the SDK.
+public struct WalletIdentityCustodyReceipt: Sendable {
+    /// Stable destination key resource reference.
+    public let keyReference: String
+    /// Public JWK returned by the destination, without private members.
+    public let publicJWK: String
+    /// Reports destination evidence for SDK validation.
+    /// - Parameters:
+    ///   - keyReference: Stable destination key resource reference.
+    ///   - publicJWK: Public JWK returned after import.
+    public init(keyReference: String, publicJWK: String) {
+        self.keyReference = keyReference
+        self.publicJWK = publicJWK
+    }
+}
+
+/// Public reference to an additional private-key custodian; it is not a recovery record.
+public struct WalletIdentityCustodyReference: Sendable {
+    /// Stable registered custodian identifier.
+    public let custodianID: String
+    /// Destination key resource reference.
+    public let keyReference: String
+}
+
+/// SDK-issued custody choice; app code cannot construct or modify executable options.
+public struct WalletIdentityCustodyOption: Sendable {
+    /// Identity whose original key will be copied.
+    public let identityID: String
+    /// Display name of the trusted destination.
+    public let custodianName: String
+    let handle: any WalletIdentityHandle
+}
+
+/// Key-custody outcome; the local signing key is retained and recovery status is unaffected.
+public enum WalletIdentityCustodyResult: Sendable {
+    /// The destination reported the original public key after import.
+    /// - Parameter reference: Verified destination key reference.
+    case imported(WalletIdentityCustodyReference)
+    /// No verified custody reference was recorded; remote keys are never deleted automatically.
+    /// - Parameter reason: Stable failure category.
+    case failed(WalletIdentityFailure)
 }

@@ -8,6 +8,7 @@ let package = Package(
     products: [
         .library(name: "WalletSDK", targets: ["WalletSDK"]),
         .library(name: "WalletSDKKeychainRecovery", targets: ["WalletSDKKeychainRecovery"]),
+        .library(name: "WalletSDKEnterpriseCustody", targets: ["WalletSDKEnterpriseCustody"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0"),
@@ -26,6 +27,7 @@ let package = Package(
             ]
         ),
         .target(name: "WalletSDKKeychainRecovery", dependencies: ["WalletSDK"]),
-        .testTarget(name: "WalletSDKTests", dependencies: ["WalletSDK"]),
+        .target(name: "WalletSDKEnterpriseCustody", dependencies: ["WalletSDK"]),
+        .testTarget(name: "WalletSDKTests", dependencies: ["WalletSDK", "WalletSDKKeychainRecovery", "WalletSDKEnterpriseCustody"]),
     ]
 )

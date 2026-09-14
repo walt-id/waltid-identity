@@ -20,7 +20,7 @@ public actor KeychainIdentityRecovery: WalletIdentityRecoveryProvider {
     public init(namespace: String, accessGroup: String? = nil,
                 accessibility: SynchronizableKeychainAccessibility = .whenUnlocked) {
         precondition(namespace.range(of: "^[A-Za-z0-9._-]{1,64}$", options: .regularExpression) != nil)
-        precondition(accessGroup == nil || accessGroup?.isEmpty == false)
+        precondition(accessGroup == nil || accessGroup?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
         self.id = "keychain:\(namespace)"
         self.service = "id.walt.wallet.identity.recovery.\(namespace)"
         self.accessGroup = accessGroup
@@ -46,21 +46,21 @@ public actor KeychainIdentityRecovery: WalletIdentityRecoveryProvider {
         let status = SecItemCopyMatching(request as CFDictionary, &result)
         if status == errSecItemNotFound { return [] }
         try check(status)
-        guard let records = result as? [[String: Any]] else { throw RecoveryError.invalidResult }
+        guard let records = result as? [[String: Any]] else { throw WalletIdentityProviderError.rejected }
         return try records.map {
-            guard let account = $0[kSecAttrAccount as String] as? String else { throw RecoveryError.invalidResult }
+            guard let account = $0[kSecAttrAccount as String] as? String else { throw WalletIdentityProviderError.rejected }
             return account
         }
     }
 
     public func store(recordID: String, data: Data) async throws -> WalletRecoveryReceipt {
-        guard (1...4096).contains(data.count) else { throw RecoveryError.invalidRecord }
+        guard (1...4096).contains(data.count) else { throw WalletIdentityProviderError.rejected }
         var request = try query(recordID: recordID)
         request[kSecAttrAccessible as String] = accessibility == .whenUnlocked ? kSecAttrAccessibleWhenUnlocked : kSecAttrAccessibleAfterFirstUnlock
         request[kSecValueData as String] = data
         let status = SecItemAdd(request as CFDictionary, nil)
         if status == errSecDuplicateItem {
-            guard try read(recordID: recordID) == data else { throw RecoveryError.recordConflict }
+            guard try read(recordID: recordID) == data else { throw WalletIdentityProviderError.conflict }
         } else { try check(status) }
         return .acceptedLocally
     }
@@ -81,7 +81,7 @@ public actor KeychainIdentityRecovery: WalletIdentityRecoveryProvider {
         let status = SecItemCopyMatching(request as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
         try check(status)
-        guard let data = result as? Data, (1...4096).contains(data.count) else { throw RecoveryError.invalidRecord }
+        guard let data = result as? Data, (1...4096).contains(data.count) else { throw WalletIdentityProviderError.rejected }
         return data
     }
 
@@ -92,14 +92,19 @@ public actor KeychainIdentityRecovery: WalletIdentityRecoveryProvider {
         return result
     }
     private func query(recordID: String) throws -> [String: Any] {
-        guard recordID.range(of: "^[A-Za-z0-9._-]{1,128}$", options: .regularExpression) != nil else { throw RecoveryError.invalidRecord }
+        guard recordID.range(of: "^[A-Za-z0-9._-]{1,128}$", options: .regularExpression) != nil else { throw WalletIdentityProviderError.rejected }
         var result = query()
         result[kSecAttrAccount as String] = recordID
         return result
     }
     private func check(_ status: OSStatus) throws {
-        if status != errSecSuccess { throw RecoveryError.keychain(status) }
+        switch status {
+        case errSecSuccess: return
+        case errSecInteractionNotAllowed, errSecAuthFailed, errSecUserCanceled: throw WalletIdentityProviderError.interactionRequired
+        case errSecMissingEntitlement, errSecParam: throw WalletIdentityProviderError.rejected
+        case errSecDuplicateItem: throw WalletIdentityProviderError.conflict
+        default: throw WalletIdentityProviderError.temporarilyUnavailable
+        }
     }
-    private enum RecoveryError: Error { case invalidRecord, invalidResult, recordConflict, keychain(OSStatus) }
 }
 #endif

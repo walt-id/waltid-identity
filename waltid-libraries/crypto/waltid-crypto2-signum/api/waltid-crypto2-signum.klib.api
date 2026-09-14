@@ -135,6 +135,8 @@ abstract interface id.walt.crypto2.signum/SignumPlatformKey { // id.walt.crypto2
         abstract fun <get-spec>(): id.walt.crypto2.keys/KeySpec // id.walt.crypto2.signum/SignumPlatformKey.spec.<get-spec>|<get-spec>(){}[0]
     open val origin // id.walt.crypto2.signum/SignumPlatformKey.origin|{}origin[0]
         open fun <get-origin>(): id.walt.crypto2.signum/SignumKeyOrigin // id.walt.crypto2.signum/SignumPlatformKey.origin.<get-origin>|<get-origin>(){}[0]
+    open val privateKeyExporter // id.walt.crypto2.signum/SignumPlatformKey.privateKeyExporter|{}privateKeyExporter[0]
+        open fun <get-privateKeyExporter>(): id.walt.crypto2.keys/PrivateKeyExporter? // id.walt.crypto2.signum/SignumPlatformKey.privateKeyExporter.<get-privateKeyExporter>|<get-privateKeyExporter>(){}[0]
     open val securityLevel // id.walt.crypto2.signum/SignumPlatformKey.securityLevel|{}securityLevel[0]
         open fun <get-securityLevel>(): id.walt.crypto2.signum/SignumSecurityLevel // id.walt.crypto2.signum/SignumPlatformKey.securityLevel.<get-securityLevel>|<get-securityLevel>(){}[0]
 

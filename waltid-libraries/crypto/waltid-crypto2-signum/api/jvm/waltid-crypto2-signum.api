@@ -277,6 +277,7 @@ public abstract interface class id/walt/crypto2/signum/SignumPlatformKey {
 	public abstract fun getAttestation ()Lid/walt/crypto2/signum/SignumKeyAttestation;
 	public abstract fun getKeyAgreementAlgorithms ()Ljava/util/Set;
 	public fun getOrigin ()Lid/walt/crypto2/signum/SignumKeyOrigin;
+	public fun getPrivateKeyExporter ()Lid/walt/crypto2/keys/PrivateKeyExporter;
 	public abstract fun getProtectionLevel ()Lid/walt/crypto2/signum/SignumProtectionLevel;
 	public abstract fun getPublicKey ()Lid/walt/crypto2/keys/EncodedKey$SpkiDer;
 	public fun getSecurityLevel ()Lid/walt/crypto2/signum/SignumSecurityLevel;
@@ -288,6 +289,7 @@ public abstract interface class id/walt/crypto2/signum/SignumPlatformKey {
 
 public final class id/walt/crypto2/signum/SignumPlatformKey$DefaultImpls {
 	public static fun getOrigin (Lid/walt/crypto2/signum/SignumPlatformKey;)Lid/walt/crypto2/signum/SignumKeyOrigin;
+	public static fun getPrivateKeyExporter (Lid/walt/crypto2/signum/SignumPlatformKey;)Lid/walt/crypto2/keys/PrivateKeyExporter;
 	public static fun getSecurityLevel (Lid/walt/crypto2/signum/SignumPlatformKey;)Lid/walt/crypto2/signum/SignumSecurityLevel;
 }
 

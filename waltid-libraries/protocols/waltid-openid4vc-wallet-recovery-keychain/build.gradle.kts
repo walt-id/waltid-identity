@@ -12,6 +12,10 @@ kotlin {
     explicitApi()
     abiValidation { binariesSource.set(org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource.MAIN_COMPILATION) }
     sourceSets {
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(identityLibs.kotlinx.coroutines.test)
+        }
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
             implementation(identityLibs.kotlinx.coroutines.core)

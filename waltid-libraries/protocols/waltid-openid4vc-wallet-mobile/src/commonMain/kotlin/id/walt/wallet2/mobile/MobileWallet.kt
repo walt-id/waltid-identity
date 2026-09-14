@@ -276,6 +276,7 @@ public class MobileWallet internal constructor(
         request = newIssuanceRequest(
             offer = request.offer,
             keyId = request.keyId,
+            keyPolicy = request.keyPolicy,
             did = request.did,
             clientId = request.clientId,
             redirectUri = request.redirectUri.trim(),
@@ -356,12 +357,17 @@ public class MobileWallet internal constructor(
         redirectUri: String,
         keyId: String? = null,
         did: String? = null,
+        keyPolicy: id.walt.wallet2.mobile.identity.IdentityKeyPolicy = id.walt.wallet2.mobile.identity.IdentityKeyPolicy.GeneralPurpose,
     ): WalletIssuanceSessionRequest {
         val active = if (keyId == null || did == null) identityService?.state() else null
         val identity = (active as? id.walt.wallet2.mobile.identity.WalletIdentityState.Active)?.identity
         check(identityService == null || active == null || identity != null) { "The wallet requires an active signing identity" }
         val selectedKeyId = keyId ?: identity?.keyId ?: keyStore.getDefaultKeyMaterial()?.keyId
             ?: error("No holder key is available for credential issuance")
+        if (keyPolicy != id.walt.wallet2.mobile.identity.IdentityKeyPolicy.GeneralPurpose) {
+            requireNotNull(identityService) { "Restricted holder-key policy requires a managed signing identity" }
+                .requireKeyPolicy(selectedKeyId, keyPolicy)
+        }
         val selectedDid = did ?: identity?.did ?: didStore.getDefaultDid()
         return when (offer) {
             is MobileWalletCredentialOffer.Uri -> WalletIssuanceSessionRequest(

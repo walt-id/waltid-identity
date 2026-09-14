@@ -8,6 +8,8 @@ import kotlinx.serialization.Serializable
 public data class IdentityConfiguration(
     /** Registered providers are trusted with recovery secrets. Empty means backup is disabled. */
     public val recoveryProviders: List<IdentityRecoveryProvider> = emptyList(),
+    /** Optional destinations receiving private-key custody; distinct from recovery providers. */
+    public val keyCustodians: List<IdentityKeyCustodian> = emptyList(),
     /** Authorization inherited from the wallet configuration unless explicitly overridden. */
     public val authorization: IdentityAuthorization = IdentityAuthorization.WalletDefault,
     /** Host/issuer constraints, not a declaration of EUDI or HAIP certification. */
@@ -22,6 +24,8 @@ public data class IdentityConfiguration(
     public val localRecoveryMaterial: LocalRecoveryMaterialRetention = LocalRecoveryMaterialRetention.Retain,
 ) {
     init {
+        require(keyCustodians.all { it.id.isNotBlank() && it.displayName.isNotBlank() })
+        require(keyCustodians.map { it.id }.distinct().size == keyCustodians.size) { "Custodian identifiers must be unique" }
         require(recoveryProviders.all { it.id.isNotBlank() && it.displayName.isNotBlank() })
         require(recoveryProviders.map { it.id }.distinct().size == recoveryProviders.size) {
             "Recovery provider identifiers must be unique"

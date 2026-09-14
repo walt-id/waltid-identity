@@ -622,7 +622,6 @@ class MobileWalletTest {
                 keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
                 didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
                 credentialStore = credentialStore,
-                generateAndPersistKey = unusedKeyGenerator(),
                 credentialRegistry = registry,
                 registrationProjection = projection,
             ).refreshDigitalCredentialRegistration()

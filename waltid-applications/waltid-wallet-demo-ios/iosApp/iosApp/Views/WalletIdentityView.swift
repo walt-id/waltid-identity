@@ -45,9 +45,15 @@ final class WalletIdentityScreenModel: ObservableObject {
                         _ = try await service.deleteRecovery(candidate)
                     })
                 }
-            case .pending(let id):
+            case .pending(let id, let reason):
                 identity = nil
-                message = "Identity setup is pending. Retry to resume the recorded operation."
+                switch reason {
+                case .providerInteractionRequired: message = "Unlock or sign in to your recovery provider, then retry setup."
+                case .providerConflict: message = "The backup destination contains a different record. Resolve the conflict before retrying."
+                case .providerRejected: message = "The recovery provider rejected this backup. Check its access and storage settings."
+                case .providerConfirmationPending: message = "The provider has not confirmed backup delivery yet. Retry after delivery completes."
+                default: message = "Identity setup is pending. Retry to resume the recorded operation."
+                }
                 choices.append(Choice(title: "Retry setup", detail: "Keeps the original identity.", destructive: false) { [service] in
                     try Self.check(await service.resumePending(identityID: id))
                 })
