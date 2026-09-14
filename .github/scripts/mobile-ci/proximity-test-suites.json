@@ -144,7 +144,6 @@
       ]
     },
     "independent-nfc-reader": {
-      "aut": "AUT-04",
       "executionClass": "deterministic",
       "source": "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/androidHostTest/kotlin/id/walt/wallet2/mobile/IndependentNfcReaderTest.kt",
       "requiredTests": [
@@ -179,7 +178,6 @@
       }
     },
     "android-nfc-callbacks": {
-      "aut": "AUT-03",
       "executionClass": "deterministic",
       "requiredTests": [
         {
