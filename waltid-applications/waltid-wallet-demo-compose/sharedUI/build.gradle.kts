@@ -116,12 +116,24 @@ compose {
     resources {
         publicResClass = true
         packageOfResClass = "id.walt.walletdemo.compose.ui.resources"
+        if (enableIosBuild) {
+            customDirectory(
+                sourceSetName = "iosTest",
+                directoryProvider = provider {
+                    layout.projectDirectory.dir("../../waltid-wallet-demo-test-fixtures/resources")
+                },
+            )
+        }
     }
 }
 
 tasks.withType<Test>().configureEach {
     if (name == "testAndroidHostTest") {
         useJUnit()
+        systemProperty(
+            "walletDemoImageFixturesDir",
+            layout.projectDirectory.dir("../../waltid-wallet-demo-test-fixtures/resources/files").asFile.absolutePath,
+        )
     }
 }
 

@@ -20,6 +20,71 @@
 
 ## Getting Started
 
+### Portrait capture timestamps and compatibility
+
+`Mdl.portraitCaptureDate` and `PhotoId.portraitCaptureDate` retain their `LocalDate?`
+API, including constructors, `copy`, getters, and date-only JSON. Existing clients and
+saved typed JSON do not need a migration. At issuance and during direct model CBOR
+serialization, a date such as `2018-08-09` becomes the tag-0 timestamp
+`2018-08-09T00:00:00Z`. Midnight UTC is an explicit compatibility assumption for
+legacy date-only inputs, not a recovered capture time or a server-local time zone.
+Null model properties remain omitted.
+
+For a known capture time, supply the full timestamp through issuer2 credential data
+or use the explicit mapping callback below with `MdocIssuer.issueUniversal`. Its default
+schemaless mapper emits timestamp strings without CBOR tag 0. The legacy `LocalDate`
+models cannot retain a time of day and reject non-midnight timestamp input instead of
+silently discarding it. Namespace readers accept both legacy dates and full timestamps.
+The portrait mapping normalizes offsets to UTC and truncates fractional seconds.
+
+For direct namespace issuance, define this callback and pass
+`valueMappingFunction = portraitValueMapping` to `MdocIssuer.issueUniversal`:
+
+```kotlin
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
+import id.walt.mdoc.encoding.PortraitCaptureDateMapping
+import id.walt.mdoc.encoding.mapPortraitCaptureDate
+import id.walt.mdoc.issuance.MdocIssuer
+import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.json.JsonElement
+
+val portraitValueMapping: (String, String, String, JsonElement) -> CborElement? =
+    { docType, namespace, elementIdentifier, value ->
+        when (val portrait = mapPortraitCaptureDate(namespace, elementIdentifier, value)) {
+            PortraitCaptureDateMapping.Omit -> null
+            is PortraitCaptureDateMapping.Mapped -> portrait.value
+            PortraitCaptureDateMapping.NotApplicable ->
+                MdocIssuer.defaultSchemalessMappingFunction(docType, namespace, elementIdentifier, value)
+        }
+    }
+```
+
+Explicit null returns `Omit` and must not reach the fallback mapper. Absent and null
+portrait fields are omitted; malformed non-null inputs are rejected. This preserves
+the default mapping for other fields. If your credential needs a custom
+or schema-aware mapper, use that as the fallback instead of `defaultSchemalessMappingFunction`.
+
+Shared issuer2 issuance matches `portrait_capture_date` by namespace and element,
+independently of document type: `org.iso.18013.5.1` and `org.iso.23220.1`, plus the
+existing `org.iso.23220.photoid.1` legacy alias. Reusing these namespaces keeps their
+field encoding; unrelated custom namespaces retain their configured mapping.
+Normalization and null omission take precedence over configured conversions and custom
+mapping callbacks, including an existing `stringToFullDate` or conflicting conversion. Stored profiles and pending issuance sessions remain
+readable and do not require a bulk database or profile rewrite. New profiles should
+use `stringToTDate` and timestamps, as the bundled examples do. Deploy the shared
+issuance library update with each issuer2 server; the compatibility behavior requires that
+code to be present. Other full-date fields, such as `birth_date`, are unchanged.
+This correction does not change the legacy mdoc library or legacy issuer services.
+
+The shared `tdate` formatter requires a four-digit year (`0000`–`9999`) after UTC
+normalization, following RFC 3339. This also applies to MSO validity timestamps and
+schema `DATETIME` values; full-date/tag-1004 encoding is unchanged.
+
+Already signed credentials are not rewritten. Their authoritative issuer-signed
+bytes remain the basis for verification and presentation; an issuer must reissue a
+credential if its existing portrait field needs correction.
+
 ## What is the mdoc library
 This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://www.iso.org/standard/69084.html), Personal identification -- ISO-compliant driving licence -- Part 5: Mobile driving licence (mDL) application.
 

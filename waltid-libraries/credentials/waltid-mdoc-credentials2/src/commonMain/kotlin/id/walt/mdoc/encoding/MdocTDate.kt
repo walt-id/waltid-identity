@@ -5,12 +5,16 @@ import kotlinx.serialization.builtins.serializer
 import kotlin.time.Instant
 
 /**
- * RFC 3339 date-time formatting for CBOR tag 0 (tdate) per ISO/IEC 18013-5 and RFC 8943.
+ * RFC 3339 date-time formatting for CBOR tag 0 (tdate) per ISO/IEC 18013-5 and RFC 8949.
  *
  * Fractional seconds are not permitted in mdoc date-time strings; values are truncated to whole seconds.
+ * Enforces the RFC 3339 four-digit year range for all callers, including MSO validity timestamps
+ * and schema DATETIME fields. Date-only (full-date/tag-1004) encoding uses a separate path.
  */
 fun Instant.toMdocTDateString(): String =
-    Instant.fromEpochSeconds(epochSeconds).toString()
+    Instant.fromEpochSeconds(epochSeconds).toString().also {
+        require(it.length == 20) { "mdoc timestamps require a four-digit year" }
+    }
 
 /**
  * Normalizes an RFC 3339 date-time string to second-level precision without fractional seconds.

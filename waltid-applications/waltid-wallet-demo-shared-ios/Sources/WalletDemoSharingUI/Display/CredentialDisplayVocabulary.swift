@@ -264,6 +264,10 @@ public enum CredentialDisplayVocabulary {
         roles(for: ClaimPath(components: components))
     }
 
+    static func hasLeafDescriptor(for components: [String]) -> Bool {
+        components.last.map { descriptor(for: $0) != nil } ?? false
+    }
+
     public static func claimPathCompare(_ lhs: [String], _ rhs: [String], format: String? = nil) -> ComparisonResult {
         let lhsSemanticOrder = MdocClaimDisplaySemantics.sortOrder(format: format, path: lhs)
         let rhsSemanticOrder = MdocClaimDisplaySemantics.sortOrder(format: format, path: rhs)

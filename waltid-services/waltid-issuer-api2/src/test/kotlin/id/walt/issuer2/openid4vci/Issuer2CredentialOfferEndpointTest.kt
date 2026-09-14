@@ -66,6 +66,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.reflect.KClass
 import kotlin.test.assertEquals
+import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -89,6 +90,33 @@ class Issuer2CredentialOfferEndpointTest {
         configFiles.forEach { (id, _) -> System.clearProperty("config.file.$id") }
         ConfigManager.preclear()
         FeatureManager.preclear()
+    }
+
+    @Test
+    fun bundledPortraitProfilesProduceTaggedCaptureTimestamps() {
+        val serviceConfig = issuer2ConfigDir()
+        val dockerConfig = serviceConfig.parent.parent.parent.resolve("docker-compose/issuer-api2/config/issuer2-profiles.conf")
+        for ((profileFile, expectedCount) in listOf(serviceConfig.resolve("issuer2-profiles.conf") to 4, dockerConfig to 3)) {
+            loadIssuer2ConfigFiles(profileFile)
+            var checked = 0
+            for ((profileId, profile) in ConfigManager.getConfig<Issuer2ProfilesConfig>().profiles) {
+                for ((namespace, mapping) in profile.mDocNameSpacesDataMappingConfig.orEmpty()) {
+                    val captureMapping = mapping.entriesConfigMap["portrait_capture_date"] ?: continue
+                    val value = assertNotNull(profile.credentialData[namespace]?.jsonObject?.get("portrait_capture_date"), profileId)
+                    assertStringConversion(mapping.entriesConfigMap, "portrait_capture_date", StringToCborTypeConversion.STRING_TO_T_DATE)
+                    val timestamp = value.jsonPrimitive.content
+                    assertEquals(20, timestamp.length, profileId)
+                    assertEquals(timestamp, Instant.parse(timestamp).toString(), profileId)
+                    assertContentEquals(
+                        byteArrayOf(0xc0.toByte(), 0x74) + timestamp.encodeToByteArray(),
+                        captureMapping.executeMapping(value).toCBOR(),
+                        "$profileId / $namespace",
+                    )
+                    checked++
+                }
+            }
+            assertEquals(expectedCount, checked, profileFile.toString())
+        }
     }
 
     @Test
@@ -770,7 +798,7 @@ class Issuer2CredentialOfferEndpointTest {
         }
     }
 
-    private fun loadIssuer2ConfigFiles() {
+    private fun loadIssuer2ConfigFiles(profilesFile: Path? = null) {
         ConfigManager.preclear()
         FeatureManager.preclear()
         registerIssuer2ConfigDecoders()
@@ -778,7 +806,8 @@ class Issuer2CredentialOfferEndpointTest {
 
         val configDir = issuer2ConfigDir()
         configFiles.forEach { (id, type) ->
-            System.setProperty("config.file.$id", configDir.resolve("$id.conf").toString())
+            val file = if (id == "issuer2-profiles" && profilesFile != null) profilesFile else configDir.resolve("$id.conf")
+            System.setProperty("config.file.$id", file.toString())
             ConfigManager.registerConfig(id, type)
         }
         ConfigManager.loadConfigs()
