@@ -234,6 +234,7 @@ public class MobileWallet internal constructor(
     issuanceHttpClient: HttpClient? = null,
 ) {
     private val eventStream = MobileWalletEventStream()
+
     /**
      * Buffered stream of recent issuance and presentation events emitted by this wallet.
      */
@@ -470,7 +471,7 @@ public class MobileWallet internal constructor(
         did: String? = null,
     ): WalletIssuanceSessionRequest {
         val selectedKeyId = keyId ?: keyStore.listKeys().toList().firstOrNull()?.keyId
-            ?: error("No holder key is available for credential issuance")
+        ?: error("No holder key is available for credential issuance")
         val selectedDid = did ?: didStore.listDids().toList().firstOrNull()?.did
         return when (offer) {
             is MobileWalletCredentialOffer.Uri -> WalletIssuanceSessionRequest(
@@ -481,6 +482,7 @@ public class MobileWallet internal constructor(
                 clientId = clientId,
                 redirectUri = Url(redirectUri),
             )
+
             is MobileWalletCredentialOffer.InlineJson -> WalletIssuanceSessionRequest(
                 offerUrl = null,
                 offerJson = Json.parseToJsonElement(offer.value).jsonObject,
@@ -669,7 +671,6 @@ public class MobileWallet internal constructor(
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
         did: String? = null,
-        didReference: String? = null,
     ): MobileWalletDigitalCredentialResponse {
         require(selectedCredentialOptions.isNotEmpty()) { "At least one credential must be selected after consent" }
         val response = WalletPresentationHandler.submitDcApiPresentation(
@@ -682,8 +683,7 @@ public class MobileWallet internal constructor(
                 selectedDisclosureOptions = selectedDisclosureOptions?.map {
                     PresentationDisclosureSelection(it.queryId, it.credentialId, it.path)
                 },
-                did = did,
-                didReference = didReference,
+                did = did
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
@@ -740,7 +740,6 @@ public class MobileWallet internal constructor(
     public suspend fun present(
         requestUrl: String,
         did: String? = null,
-        didReference: String? = null,
         runPolicies: Boolean? = null,
     ): MobileWalletPresentationResult {
         val result = WalletPresentationHandler.presentCredentialWithTrust(
@@ -748,7 +747,6 @@ public class MobileWallet internal constructor(
             request = PresentCredentialRequest(
                 requestUrl = Url(requestUrl.trim()),
                 did = did,
-                didReference = didReference,
                 runPolicies = runPolicies,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
@@ -825,7 +823,6 @@ public class MobileWallet internal constructor(
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
         did: String? = null,
-        didReference: String? = null,
         runPolicies: Boolean? = null,
     ): MobileWalletPresentationResult =
         WalletPresentationHandler.submitPresentation(
@@ -846,7 +843,6 @@ public class MobileWallet internal constructor(
                     )
                 },
                 did = did,
-                didReference = didReference,
                 runPolicies = runPolicies,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
@@ -1000,6 +996,7 @@ public class MobileWallet internal constructor(
                         cardArtFallbackPng = cardArt.fallbackPng,
                     )
                 }
+
                 else -> if (metadata.format in setOf("vc+sd-jwt", "dc+sd-jwt", "sd-jwt-vc")) {
                     val data = credential.credentialData
                     val type = data["vct"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
@@ -1059,6 +1056,7 @@ public class MobileWallet internal constructor(
         is JsonObject -> entries.flatMap { (name, value) ->
             value.flattenRegistryFields(path + name, selectivelyDisclosablePaths)
         }
+
         else -> listOf(
             MobileWalletCredentialRegistryField(
                 path = path,
@@ -1099,9 +1097,9 @@ internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPrese
             responseUrl != null -> {
                 require(
                     transmissionSuccess == null &&
-                        formHtml == null &&
-                        responseJson == null &&
-                        redirectTo == null
+                            formHtml == null &&
+                            responseJson == null &&
+                            redirectTo == null
                 ) {
                     "Prepared URL result contains incompatible protocol fields"
                 }
@@ -1139,8 +1137,8 @@ internal fun AuthorizationRequest.toMobileRequestInfo(
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 ): MobileWalletPresentationRequestInfo {
     val verifiedClientId = requireNotNull(clientId) {
-            "A validated presentation request must contain client_id."
-        }
+        "A validated presentation request must contain client_id."
+    }
     return MobileWalletPresentationRequestInfo(
         clientId = verifiedClientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
@@ -1176,8 +1174,8 @@ internal fun AuthorizationRequest.toMobileRequestContext(
     resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
 ): MobileWalletPresentationRequestContext {
     val verifiedClientId = requireNotNull(clientId) {
-            "A reportable invalid presentation request must contain client_id."
-        }
+        "A reportable invalid presentation request must contain client_id."
+    }
     return MobileWalletPresentationRequestContext(
         clientId = verifiedClientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
@@ -1212,17 +1210,18 @@ private fun ClientId.toMobileClientIdScheme(): MobileWalletClientIdScheme = when
     is Unsupported -> error("Unsupported client identifier cannot be authenticated: $prefix")
 }
 
-private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
-    WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied
-    WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST -> MobileWalletPresentationErrorCode.invalidRequest
-    WalletPresentFunctionality2.OID4VPErrorCode.INVALID_CLIENT -> MobileWalletPresentationErrorCode.invalidClient
-    WalletPresentFunctionality2.OID4VPErrorCode.INVALID_SCOPE -> MobileWalletPresentationErrorCode.invalidScope
-    WalletPresentFunctionality2.OID4VPErrorCode.UNAUTHORIZED_CLIENT -> MobileWalletPresentationErrorCode.unauthorizedClient
-    WalletPresentFunctionality2.OID4VPErrorCode.UNSUPPORTED_RESPONSE_TYPE -> MobileWalletPresentationErrorCode.unsupportedResponseType
-    WalletPresentFunctionality2.OID4VPErrorCode.SERVER_ERROR -> MobileWalletPresentationErrorCode.serverError
-    WalletPresentFunctionality2.OID4VPErrorCode.TEMPORARILY_UNAVAILABLE -> MobileWalletPresentationErrorCode.temporarilyUnavailable
-    WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED -> MobileWalletPresentationErrorCode.vpFormatsNotSupported
-    WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST_URI_METHOD -> MobileWalletPresentationErrorCode.invalidRequestUriMethod
-    WalletPresentFunctionality2.OID4VPErrorCode.INVALID_TRANSACTION_DATA -> MobileWalletPresentationErrorCode.invalidTransactionData
-    WalletPresentFunctionality2.OID4VPErrorCode.WALLET_UNAVAILABLE -> MobileWalletPresentationErrorCode.walletUnavailable
-}
+private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode =
+    when (this) {
+        WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied
+        WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST -> MobileWalletPresentationErrorCode.invalidRequest
+        WalletPresentFunctionality2.OID4VPErrorCode.INVALID_CLIENT -> MobileWalletPresentationErrorCode.invalidClient
+        WalletPresentFunctionality2.OID4VPErrorCode.INVALID_SCOPE -> MobileWalletPresentationErrorCode.invalidScope
+        WalletPresentFunctionality2.OID4VPErrorCode.UNAUTHORIZED_CLIENT -> MobileWalletPresentationErrorCode.unauthorizedClient
+        WalletPresentFunctionality2.OID4VPErrorCode.UNSUPPORTED_RESPONSE_TYPE -> MobileWalletPresentationErrorCode.unsupportedResponseType
+        WalletPresentFunctionality2.OID4VPErrorCode.SERVER_ERROR -> MobileWalletPresentationErrorCode.serverError
+        WalletPresentFunctionality2.OID4VPErrorCode.TEMPORARILY_UNAVAILABLE -> MobileWalletPresentationErrorCode.temporarilyUnavailable
+        WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED -> MobileWalletPresentationErrorCode.vpFormatsNotSupported
+        WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST_URI_METHOD -> MobileWalletPresentationErrorCode.invalidRequestUriMethod
+        WalletPresentFunctionality2.OID4VPErrorCode.INVALID_TRANSACTION_DATA -> MobileWalletPresentationErrorCode.invalidTransactionData
+        WalletPresentFunctionality2.OID4VPErrorCode.WALLET_UNAVAILABLE -> MobileWalletPresentationErrorCode.walletUnavailable
+    }
