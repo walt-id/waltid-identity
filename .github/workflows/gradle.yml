@@ -73,7 +73,7 @@ jobs:
         with:
           # Restricted to pushes to main because Dependabot only consumes the default-branch
           # snapshot; submitting per PR just adds annotations and dependency-graph_*.json artifacts.
-          dependency-graph: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'generate-and-submit' || 'off' }}
+          dependency-graph: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'generate-and-submit' || 'disabled' }}
 
       - name: Install SoftHSM for PKCS11 tests
         run: |

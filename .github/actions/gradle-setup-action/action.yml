@@ -6,9 +6,9 @@ inputs:
     required: false
     default: "~"
   dependency-graph:
-    description: "'generate-and-submit' needs contents: write access to the dependency graph. 'off' disables the dependency graph."
+    description: "'generate-and-submit' needs contents: write access to the dependency graph. 'disabled' disables the dependency graph."
     required: false
-    default: "off"
+    default: "disabled"
 
 runs:
   using: "composite"
