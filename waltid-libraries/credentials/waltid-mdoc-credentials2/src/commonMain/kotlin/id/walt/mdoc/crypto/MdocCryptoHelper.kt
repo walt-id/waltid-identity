@@ -26,6 +26,14 @@ object MdocCryptoHelper {
 
     private val log = KotlinLogging.logger { }
 
+    /** Retained for released OpenID handover callers; NFC needs engagement and reader key bytes. */
+    fun reconstructSessionTranscript(handoverInfo: BaseHandoverInfo, handoverInfoBytes: ByteArray): SessionTranscript =
+        when (handoverInfo) {
+            is OpenID4VPHandoverInfo -> reconstructOpenIdSessionTranscript("OpenID4VPHandover", handoverInfoBytes)
+            is OpenID4VPDCAPIHandoverInfo -> reconstructOpenIdSessionTranscript("OpenID4VPDCAPIHandover", handoverInfoBytes)
+            is NFCHandover -> throw NotImplementedError("Use SessionTranscript.forNfc with engagement and reader key bytes")
+        }
+
     private fun reconstructOpenIdSessionTranscript(
         identifier: String,
         handoverInfoBytes: ByteArray,
