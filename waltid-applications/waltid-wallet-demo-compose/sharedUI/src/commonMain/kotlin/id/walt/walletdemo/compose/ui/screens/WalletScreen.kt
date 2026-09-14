@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
 
 @Composable

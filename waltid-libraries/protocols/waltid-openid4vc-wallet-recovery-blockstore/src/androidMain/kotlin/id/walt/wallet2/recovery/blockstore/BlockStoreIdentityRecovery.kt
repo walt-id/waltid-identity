@@ -13,6 +13,8 @@ import id.walt.wallet2.mobile.identity.RecoveryAvailability
 import id.walt.wallet2.mobile.identity.RecoveryProtection
 import id.walt.wallet2.mobile.identity.RecoveryReceipt
 import id.walt.wallet2.mobile.identity.RecoveryScope
+import id.walt.wallet2.mobile.identity.IdentityProviderFailure
+import id.walt.wallet2.mobile.identity.IdentityProviderException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -70,14 +72,14 @@ public class BlockStoreIdentityRecovery(
     }
 
     override suspend fun store(recordId: String, record: IdentityRecoveryData): RecoveryReceipt = mutex.withLock {
-        check(availability() is RecoveryAvailability.Available) { "Block Store prerequisites are no longer met" }
+        if (availability() !is RecoveryAvailability.Available) throw IdentityProviderException(IdentityProviderFailure.TemporarilyUnavailable)
         val key = key(recordId)
         val bytes = record.copyBytes()
         try {
             require(bytes.size <= BlockstoreClient.MAX_SIZE) { "Recovery record exceeds the Block Store entry limit" }
             val existing = retrieveUnlocked(recordId)
             try {
-                check(existing == null || existing.contentEquals(bytes)) { "A different recovery record already uses this ID" }
+                if (existing != null && !existing.contentEquals(bytes)) throw IdentityProviderException(IdentityProviderFailure.Conflict)
             } finally { existing?.fill(0) }
             val accepted = client.storeBytes(StoreBytesData.Builder().setKey(key).setBytes(bytes)
                 .setShouldBackupToCloud(mode == BlockStoreRecoveryMode.EncryptedCloud).build()).awaitResult()
@@ -110,6 +112,6 @@ public class BlockStoreIdentityRecovery(
 
 private suspend fun <T> Task<T>.awaitResult(): T = suspendCancellableCoroutine { continuation ->
     addOnSuccessListener { if (continuation.isActive) continuation.resume(it) }
-    addOnFailureListener { if (continuation.isActive) continuation.resumeWithException(it) }
+    addOnFailureListener { if (continuation.isActive) continuation.resumeWithException(IdentityProviderException(IdentityProviderFailure.TemporarilyUnavailable)) }
     addOnCanceledListener { continuation.cancel() }
 }

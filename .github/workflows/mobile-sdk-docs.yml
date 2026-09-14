@@ -115,6 +115,10 @@ jobs:
           ./gradlew \
             :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi \
             :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:checkKotlinAbi \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-blockstore:checkKotlinAbi \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-keychain:checkKotlinAbi \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-custody-enterprise:checkKotlinAbi \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-custody-enterprise:testAndroidHostTest \
             -PenableAndroidBuild=true \
             -PenableIosBuild=true \
             --no-daemon \

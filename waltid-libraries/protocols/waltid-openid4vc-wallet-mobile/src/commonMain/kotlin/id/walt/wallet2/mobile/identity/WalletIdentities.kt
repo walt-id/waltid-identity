@@ -64,6 +64,7 @@ public class WalletIdentities internal constructor(
     private val mutex = Mutex()
     private val software = CryptoRuntime(defaultSoftwareKeyProviders())
     private val providers = configuration.recoveryProviders.associateBy { it.id }
+    private val custodians = configuration.keyCustodians.associateBy { it.id }
     private val authorization: KeyUseAuthorizationPolicy get() = when (val value = configuration.authorization) {
         IdentityAuthorization.WalletDefault -> defaultAuthorization
         is IdentityAuthorization.Explicit -> value.policy
@@ -120,6 +121,7 @@ public class WalletIdentities internal constructor(
                 val recovery = seed?.let { RecoveryRecord(
                     identityId = id, keyId = keyId, did = registered.did, publicJwk = publicJwk,
                     secret = RecoverySecret.Derived(recoveryBase64.encode(it), id),
+                    constraints = recoveryConstraints(preparing),
                 ) }
                 val identity = describe(preparing, registered.did, publicJwk, key)
                 proveOriginalKey(key, publicJwk)
@@ -171,7 +173,7 @@ public class WalletIdentities internal constructor(
     /** Offers backup for an existing retained recovery secret or an explicitly exportable software key. */
     public suspend fun backupOptions(identityId: String): List<IdentityBackupOption> = mutex.withLock {
         val record = read()?.takeIf { it.id == identityId && it.phase == IdentityPhase.Active } ?: return@withLock emptyList()
-        if (!permitsRecovery(record)) return@withLock emptyList()
+        if (!permitsRecovery(record) || liveKey(record) == null) return@withLock emptyList()
         val recoverable = record.recovery != null || record.backup?.providerId in providers ||
             keys.getCrypto2Key(record.keyId)?.capabilities?.privateKeyExporter != null
         if (!recoverable) return@withLock emptyList()
@@ -187,39 +189,95 @@ public class WalletIdentities internal constructor(
             ?: return@withLock failed(IdentityFailure.StaleOption)
         if (record.policy != IdentityKeyPolicy.GeneralPurpose || configuration.policy != IdentityKeyPolicy.GeneralPurpose)
             return@withLock failed(IdentityFailure.UnsupportedPolicy)
-        val provider = providers[option.providerId] ?: return@withLock failed(IdentityFailure.RecoveryUnavailable)
+        if (liveKey(record) == null) return@withLock failed(IdentityFailure.KeyUnavailable)
+        val provider = providers[option.providerId] ?: return@withLock failed(IdentityFailure.ProviderUnavailable)
         if (provider.availability() != option.recoveryAvailability) return@withLock failed(IdentityFailure.StaleOption)
         val identity = requireNotNull(record.identity)
         val reference = IdentityBackupReference(provider.id, identity.id)
         try {
-            val source = record.backup?.let { providers[it.providerId] }
-            val existing = if (record.recovery == null) source?.retrieve(record.backup.recordId)?.copyBytes() else null
-            val recovery = record.recovery ?: existing?.let { bytes ->
-                try {
-                    decodeRecovery(bytes, identity.id).also {
-                        require(it.keyId == identity.keyId && it.did == identity.did && it.publicJwk == identity.publicJwk) {
-                            "Recovery record belongs to another identity"
-                        }
-                    }
-                } finally { bytes.fill(0) }
-            } ?: run {
-                val key = keys.getCrypto2Key(identity.keyId) ?: return@withLock failed(IdentityFailure.KeyUnavailable)
-                val exported = key.capabilities.privateKeyExporter?.exportPrivateKey() as? EncodedKey.Jwk
-                    ?: return@withLock failed(IdentityFailure.UnsupportedPolicy)
-                RecoveryRecord(identityId = identity.id, keyId = identity.keyId, did = identity.did,
-                    publicJwk = identity.publicJwk, secret = RecoverySecret.Exported(exported.data.toByteArray().decodeToString()))
-                    .also {
-                        val bytes = it.encode()
-                        try { decodeRecovery(bytes, identity.id) } finally { bytes.fill(0) }
-                    }
-            }
+            val recovery = recoveryRecord(record) ?: return@withLock failed(IdentityFailure.UnsupportedPolicy)
             val receipt = submit(provider, reference.recordId, recovery, record)
             val updated = identity.copy(recovery = IdentityRecoveryState.Submitted(reference, receipt))
             write(record.copy(identity = updated, recovery = retained(recovery), backup = reference,
                 recoveryAvailability = option.recoveryAvailability, recoveryConfirmation = requiredConfirmation(record)))
             IdentityOperationResult.Active(updated)
         } catch (cause: CancellationException) { throw cause }
-        catch (_: Exception) { failed(IdentityFailure.RecoveryUnavailable) }
+        catch (cause: Exception) { failed(providerFailure(cause)) }
+    }
+
+    /** Credential bindings inherit the identity's retained restriction. A recoverable identity cannot
+     * become device-bound merely because a later issuance request asks for that property. */
+    internal suspend fun requireKeyPolicy(keyId: String, policy: IdentityKeyPolicy): Unit = mutex.withLock {
+        if (policy == IdentityKeyPolicy.GeneralPurpose) return@withLock
+        val record = read()
+        require(record != null && record.keyId == keyId && record.phase == IdentityPhase.Active && liveKey(record) != null) {
+            "The selected holder key is not an active managed identity"
+        }
+        require(record.policy == policy || record.policy == IdentityKeyPolicy.HardwareGenerated) {
+            "The selected identity does not satisfy the required holder-key policy"
+        }
+        require(record.backup == null && record.recovery == null && record.identity?.custody.orEmpty().isEmpty()) {
+            "The required holder-key policy prohibits external private-key copies"
+        }
+    }
+
+    private suspend fun recoveryRecord(record: IdentityRecord): RecoveryRecord? {
+        val identity = requireNotNull(record.identity)
+        val source = record.backup?.let { providers[it.providerId] }
+        val existing = if (record.recovery == null) source?.retrieve(record.backup.recordId)?.copyBytes() else null
+        return record.recovery ?: existing?.let { bytes ->
+            try {
+                decodeRecovery(bytes, identity.id).also {
+                    require(it.keyId == identity.keyId && it.did == identity.did && it.publicJwk == identity.publicJwk) {
+                        "Recovery record belongs to another identity"
+                    }
+                }
+            } finally { bytes.fill(0) }
+        } ?: run {
+            val key = keys.getCrypto2Key(identity.keyId) ?: return null
+            val exported = key.capabilities.privateKeyExporter?.exportPrivateKey() as? EncodedKey.Jwk
+                ?: return null
+            RecoveryRecord(identityId = identity.id, keyId = identity.keyId, did = identity.did,
+                publicJwk = identity.publicJwk, secret = RecoverySecret.Exported(exported.data.toByteArray().decodeToString()),
+                constraints = recoveryConstraints(record))
+                .also {
+                    val bytes = it.encode()
+                    try { decodeRecovery(bytes, identity.id) } finally { bytes.fill(0) }
+                }
+        }
+    }
+
+    /** Offers registered custody destinations only when the current policy permits private-key export. */
+    public suspend fun custodyOptions(identityId: String): List<IdentityCustodyOption> = mutex.withLock {
+        val record = read()?.takeIf { it.id == identityId && it.phase == IdentityPhase.Active }
+            ?: return@withLock emptyList()
+        if (!permitsRecovery(record) || liveKey(record) == null) return@withLock emptyList()
+        if (record.recovery == null && record.backup?.providerId !in providers &&
+            keys.getCrypto2Key(record.keyId)?.capabilities?.privateKeyExporter == null) return@withLock emptyList()
+        custodians.values.map { IdentityCustodyOption(owner, record.id, it.displayName, it.id) }
+    }
+
+    /** Gives an explicit custodian an additional copy of the key. The local key is retained;
+     * this does not create a recovery record or enable remote signing. */
+    public suspend fun transferToCustody(option: IdentityCustodyOption): IdentityCustodyResult = mutex.withLock {
+        val record = read()?.takeIf { it.id == option.identityId && it.phase == IdentityPhase.Active }
+        if (option.owner !== owner || record == null) return@withLock IdentityCustodyResult.Failed(IdentityFailure.StaleOption)
+        if (!permitsRecovery(record)) return@withLock IdentityCustodyResult.Failed(IdentityFailure.UnsupportedPolicy)
+        val key = liveKey(record) ?: return@withLock IdentityCustodyResult.Failed(IdentityFailure.KeyUnavailable)
+        val custodian = custodians[option.custodianId]
+            ?: return@withLock IdentityCustodyResult.Failed(IdentityFailure.StaleOption)
+        try {
+            val recovery = recoveryRecord(record) ?: return@withLock IdentityCustodyResult.Failed(IdentityFailure.UnsupportedPolicy)
+            val receipt = custodian.importKey(requireNotNull(record.identity), recovery.privateKey())
+            requirePublicJwk(receipt.publicJwk)
+            val observed = EncodedKey.Jwk(BinaryData(receipt.publicJwk.encodeToByteArray()), false).toSpkiDer(identitySpec)
+            if (observed != key.capabilities.publicKeyExporter?.exportPublicKey()?.toSpkiDer(key.spec))
+                return@withLock IdentityCustodyResult.Failed(IdentityFailure.ProviderConflict)
+            val reference = IdentityCustodyReference(custodian.id, receipt.keyReference)
+            write(record.copy(identity = record.identity.copy(custody = (record.identity.custody + reference).distinct())))
+            IdentityCustodyResult.Imported(reference)
+        } catch (cause: CancellationException) { throw cause }
+        catch (cause: Exception) { IdentityCustodyResult.Failed(providerFailure(cause)) }
     }
 
     /** Lists safe references only. A reference is not proof that its record is valid or restorable. */
@@ -252,7 +310,8 @@ public class WalletIdentities internal constructor(
         val bytes = provider.retrieve(candidate.reference.recordId)?.copyBytes() ?: return@withLock emptyList()
         try {
             val record = decodeRecovery(bytes, candidate.reference.recordId)
-            authorizations.flatMap { authorization -> supportedStorage(importing = true, authorization).map { storage ->
+            authorizations.flatMap { authorization -> supportedStorage(importing = true, authorization)
+                .filter { record.constraints.permits(it, authorization) }.map { storage ->
                 IdentityRestorationOption(owner, record.did, storage, authorization, candidate.reference, fingerprint(bytes))
             } }
         } catch (cause: CancellationException) { throw cause }
@@ -264,13 +323,14 @@ public class WalletIdentities internal constructor(
     public suspend fun restore(option: IdentityRestorationOption): IdentityOperationResult = mutex.withLock {
         if (option.owner !== owner || configuration.policy != IdentityKeyPolicy.GeneralPurpose ||
             option.authorization !in authorizations || option.storage !in supportedStorage(importing = true, option.authorization)) return@withLock failed(IdentityFailure.StaleOption)
-        val provider = providers[option.reference.providerId] ?: return@withLock failed(IdentityFailure.RecoveryUnavailable)
-        if (provider.availability() !is RecoveryAvailability.Available) return@withLock failed(IdentityFailure.RecoveryUnavailable)
+        val provider = providers[option.reference.providerId] ?: return@withLock failed(IdentityFailure.ProviderUnavailable)
+        if (provider.availability() !is RecoveryAvailability.Available) return@withLock failed(IdentityFailure.ProviderUnavailable)
         val bytes = provider.retrieve(option.reference.recordId)?.copyBytes()
-            ?: return@withLock failed(IdentityFailure.RecoveryUnavailable)
+            ?: return@withLock failed(IdentityFailure.ProviderUnavailable)
         try {
             if (!fingerprint(bytes).contentEquals(option.fingerprint)) return@withLock failed(IdentityFailure.StaleOption)
             val recovery = decodeRecovery(bytes, option.reference.recordId)
+            if (!recovery.constraints.permits(option.storage, option.authorization)) return@withLock failed(IdentityFailure.UnsupportedPolicy)
             val previous = read()
             val previousKey = previous?.let { repairableKey(it, recovery) }
             if (previous != null && previousKey == null) return@withLock failed(IdentityFailure.ExistingIdentity)
@@ -279,6 +339,7 @@ public class WalletIdentities internal constructor(
                 nativeAlias = "${recovery.keyId}.identity.${Uuid.random()}",
                 phase = IdentityPhase.Preparing, storage = option.storage, requirements = requirements(option.storage, option.authorization),
                 policy = configuration.policy, recovery = recovery, backup = option.reference,
+                recoveryConfirmation = recovery.constraints.confirmation,
                 previous = previous, previousKey = previousKey)
             reserve(preparing)
             try {
@@ -390,7 +451,11 @@ public class WalletIdentities internal constructor(
         configuration.policy == IdentityKeyPolicy.GeneralPurpose && record.policy == IdentityKeyPolicy.GeneralPurpose
 
     private suspend fun liveKey(record: IdentityRecord): Key? = try {
-        keys.getCrypto2Key(record.keyId)?.takeIf { publicJwk(it) == record.identity?.publicJwk }
+        keys.getCrypto2Key(record.keyId)?.takeIf { key ->
+            val expected = record.identity?.publicJwk ?: return@takeIf false
+            val publicKey = key.capabilities.publicKeyExporter?.exportPublicKey() ?: return@takeIf false
+            publicKey.toSpkiDer(key.spec) == EncodedKey.Jwk(BinaryData(expected.encodeToByteArray()), false).toSpkiDer(identitySpec)
+        }
     } catch (cause: CancellationException) { throw cause }
     catch (_: Exception) { null }
 
@@ -407,7 +472,11 @@ public class WalletIdentities internal constructor(
             activate(record.copy(identity = requireNotNull(record.identity).copy(
                 recovery = IdentityRecoveryState.Submitted(record.backup, receipt))))
         } catch (cause: CancellationException) { throw cause }
-        catch (_: Exception) { IdentityOperationResult.Pending(record.id) }
+        catch (cause: Exception) {
+            val reason = providerFailure(cause)
+            write(pending.copy(pendingReason = reason))
+            IdentityOperationResult.Pending(record.id, reason)
+        }
     }
 
     private suspend fun submit(provider: IdentityRecoveryProvider, id: String, recovery: RecoveryRecord, record: IdentityRecord): RecoveryReceipt {
@@ -418,11 +487,14 @@ public class WalletIdentities internal constructor(
             try { check(returned != null && returned.contentEquals(expected)) { "Provider did not preserve the recovery record" } }
             finally { returned?.fill(0) }
             if (requiredConfirmation(record) == RecoveryConfirmation.ProviderConfirmation) {
-                check(receipt == RecoveryReceipt.ConfirmedByProvider) { "Recovery delivery has not been confirmed by the provider" }
+                if (receipt != RecoveryReceipt.ConfirmedByProvider) throw IdentityProviderException(IdentityProviderFailure.ConfirmationPending)
             }
             return receipt
         } finally { expected.fill(0) }
     }
+
+    private fun recoveryConstraints(record: IdentityRecord) = RecoveryConstraints(
+        record.storage, record.requirements.authorizationPolicy, requiredConfirmation(record))
 
     private fun requiredConfirmation(record: IdentityRecord): RecoveryConfirmation =
         if (configuration.recoveryConfirmation == RecoveryConfirmation.ProviderConfirmation ||
@@ -447,7 +519,7 @@ public class WalletIdentities internal constructor(
             if (didEntries.isEmpty() && keyEntries.isEmpty()) return WalletIdentityState.Absent
             return WalletIdentityState.Unavailable(null, IdentityFailure.KeyUnavailable)
         }
-        if (record.phase != IdentityPhase.Active) return WalletIdentityState.Pending(record.id)
+        if (record.phase != IdentityPhase.Active) return WalletIdentityState.Pending(record.id, record.pendingReason)
         return try {
             if (liveKey(record) == null) WalletIdentityState.Unavailable(record.id, IdentityFailure.KeyUnavailable)
             else WalletIdentityState.Active(requireNotNull(record.identity))
@@ -547,6 +619,13 @@ public class WalletIdentities internal constructor(
         .exportPublicKey().toPublicJwk(key.spec).data.toByteArray().decodeToString()
     private suspend fun fingerprint(bytes: ByteArray): ByteArray = CryptographyProvider.Default.get(SHA256).hasher().hash(bytes)
     private fun failed(reason: IdentityFailure) = IdentityOperationResult.Failed(reason)
+    private fun providerFailure(cause: Exception): IdentityFailure = when ((cause as? IdentityProviderException)?.failure) {
+        IdentityProviderFailure.InteractionRequired -> IdentityFailure.ProviderInteractionRequired
+        IdentityProviderFailure.Rejected -> IdentityFailure.ProviderRejected
+        IdentityProviderFailure.Conflict -> IdentityFailure.ProviderConflict
+        IdentityProviderFailure.ConfirmationPending -> IdentityFailure.ProviderConfirmationPending
+        IdentityProviderFailure.TemporarilyUnavailable, null -> IdentityFailure.ProviderUnavailable
+    }
     private fun classify(cause: Throwable): IdentityFailure = when ((cause as? KeyUseAuthorizationException)?.failure) {
         KeyUseAuthorizationFailure.UnsupportedCombination -> IdentityFailure.UnsupportedPolicy
         KeyUseAuthorizationFailure.ProtectedKeyUnavailable -> IdentityFailure.KeyUnavailable

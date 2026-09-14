@@ -78,3 +78,12 @@ public enum class RecoveryReceipt { AcceptedLocally, ConfirmedByProvider }
  * @property recordId Record identifier within the provider namespace. */
 @kotlinx.serialization.Serializable
 public data class IdentityBackupReference(public val providerId: String, public val recordId: String)
+
+/** Actionable provider failures. Unknown integration errors remain retryable without exposing their messages. */
+public enum class IdentityProviderFailure {
+    TemporarilyUnavailable, InteractionRequired, Rejected, Conflict, ConfirmationPending,
+}
+
+/** A trusted integration's structured failure; never includes record bytes or provider credentials.
+ * @property failure Action required before retrying the operation. */
+public class IdentityProviderException(public val failure: IdentityProviderFailure) : Exception("Identity provider: $failure")

@@ -10,7 +10,7 @@ It never replaces a missing key or rebinds existing credentials automatically.
 
 `try await wallet.identities.initialize()` reopens the selected identity or creates a
 P-256 / `did:jwk` identity without recovery with the configured authorization. Handle
-``WalletIdentityOperationResult/pending(identityID:)`` and failure before continuing.
+``WalletIdentityOperationResult/pending(identityID:reason:)`` and failure before continuing.
 Recovery integrations are absent by default. Alternatives require explicit selection.
 
 ### Explicit choices
@@ -52,10 +52,21 @@ The SDK verifies local readback before accepting submission. OS acknowledgment d
 prove cloud delivery, restoration on another device, or deletion of other device copies.
 Deleting wallet data and deleting provider recovery records are separate actions.
 
+### Optional Enterprise custody
+
+Add the `WalletSDKEnterpriseCustody` product and register its `EnterpriseIdentityKeyCustodian`
+in ``WalletIdentityConfiguration/keyCustodians``. Hosts supply the HTTPS KMS resource and an
+authorizer for a body-free request. Select an option from ``WalletIdentityService/custodyOptions(identityID:)``
+and pass it to ``WalletIdentityService/transferToCustody(_:)`` to import the original signing key.
+The SDK verifies the destination public key and records a public reference. The local key remains
+available and recovery status stays unchanged. This integration does not store an identity recovery
+record or configure remote signing. Device-bound and hardware-generated policies prohibit custody.
+
 ### Scope and assurance
 
 ``WalletIdentityPolicy`` expresses application constraints, not EUDI, HAIP or eIDAS
-certification. Imported keys retain imported origin even when a platform supports
+certification. ``IssuanceRequest/keyPolicy`` requires the selected identity to already retain
+the requested restriction before issuance starts; apps interpret issuer/profile requirements. Imported keys retain imported origin even when a platform supports
 hardware execution. Native key evidence is not an OpenID4VCI key-attestation JWT.
 Credential synchronization and reissuance remain separate from signing-key recovery.
 

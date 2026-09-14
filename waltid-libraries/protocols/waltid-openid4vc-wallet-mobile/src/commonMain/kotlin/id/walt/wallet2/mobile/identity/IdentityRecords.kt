@@ -32,6 +32,7 @@ internal data class IdentityRecord(
     val backup: IdentityBackupReference? = null,
     val recoveryAvailability: RecoveryAvailability.Available? = null,
     val recoveryConfirmation: RecoveryConfirmation = RecoveryConfirmation.LocalAcceptance,
+    val pendingReason: IdentityFailure = IdentityFailure.ProviderUnavailable,
     val previous: IdentityRecord? = null,
     val previousKey: id.walt.crypto2.keys.StoredKey.Managed? = null,
 )
@@ -49,6 +50,7 @@ internal data class RecoveryRecord(
     val did: String,
     val publicJwk: String,
     val secret: RecoverySecret,
+    val constraints: RecoveryConstraints,
 ) {
     override fun toString(): String = "RecoveryRecord(redacted)"
 
@@ -87,4 +89,19 @@ internal sealed interface RecoverySecret {
     data class Exported(val jwk: String) : RecoverySecret {
         override fun toString(): String = "Exported(redacted)"
     }
+}
+
+/** Portable minimums, independent of the original device's alias, access group or attestation. */
+@Serializable
+internal data class RecoveryConstraints(
+    val storage: IdentityKeyStorage,
+    val authorization: id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy,
+    val confirmation: RecoveryConfirmation,
+) {
+    fun permits(storage: IdentityKeyStorage, authorization: id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy): Boolean =
+        authorization == this.authorization && when (this.storage) {
+            IdentityKeyStorage.Hardware -> storage == IdentityKeyStorage.Hardware
+            IdentityKeyStorage.NativeStorage -> storage != IdentityKeyStorage.EncryptedDatabase
+            IdentityKeyStorage.EncryptedDatabase -> true
+        }
 }

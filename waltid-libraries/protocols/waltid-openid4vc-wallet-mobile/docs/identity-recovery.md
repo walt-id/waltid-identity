@@ -42,12 +42,13 @@ silent change in authorization, hardware requirements or recovery intent.
 | Operation | Purpose |
 | --- | --- |
 | `state()` | Read absent, active, pending or unavailable identity state. |
-| `initialize()` | Convenient device-bound initialization through the same lifecycle. |
+| `initialize()` | Initialize without recovery using the configured key policy. |
 | `creationOptions()` / `create()` | Select and execute a supported new identity configuration. |
 | `resumePending()` / `cancelPending()` | Retry or cancel pending local setup. Already submitted provider records are deleted only explicitly. |
 | `backupOptions()` / `backup()` | Back up a retained recovery secret or an existing exportable software key. |
 | `recoveryCandidates()` / `restorationOptions()` / `restore()` | Discover, validate and recover the original identity. |
 | `deleteRecovery()` | Request deletion of one selected provider record. |
+| `custodyOptions()` / `transferToCustody()` | Copy an exportable key to an explicitly selected custodian. |
 
 `WalletIdentity` contains only public information. Storage destination, origin, observed security
 level, authorization, native attestation and recovery status are separate facts. Unknown security
@@ -80,6 +81,9 @@ protection and app authentication remain separate from native signing authorizat
 service. `HardwareGenerated` additionally requires observed hardware and generated origin. These are
 host constraints, not certification labels. Stored constraints also apply when backup is enabled
 later or a missing key is repaired. An active key's immutable native policy is not changed in place.
+Portable records retain minimum storage and authorization requirements; a restore option must satisfy
+both those minimums and current host configuration. Device-specific aliases, access groups and old
+attestations are never replayed. This is not automatic interpretation of arbitrary ecosystem policy.
 
 `SignumPlatformPolicy.AndroidKeystore` and `.IosKeychain` configure the native destination. They do
 not turn an explicitly chosen encrypted-database option into a native key. Hosts requiring hardware
@@ -158,6 +162,11 @@ not independent certification. `Recovered` means this installation actually reco
 the original key. `RemovalRequested` never proves that all cloud, offline or previously restored
 copies disappeared. Deleting a wallet locally does not silently delete its remote recovery record.
 
+Providers can throw `IdentityProviderException` with `TemporarilyUnavailable`, `InteractionRequired`,
+`Rejected`, `Conflict`, or `ConfirmationPending`. Swift integrations use `WalletIdentityProviderError`.
+Pending results and persisted pending state expose the reason; retry never changes the original key.
+Unknown provider errors remain unavailable and their messages are not exposed by the lifecycle.
+
 A custom `IdentityRecoveryProvider` is trusted code that receives secret record bytes. It must:
 
 - Protect confidentiality and integrity in transit and at rest and scope access to the intended user/app.
@@ -177,9 +186,14 @@ identity association. Native aliases are fresh per installation/attempt; the log
 DID and public key remain unchanged during recovery. Deleting one installation cannot delete the
 other installation's native alias. Cleanup only targets the operation's owned key material.
 
-This unreleased SDK has no compatibility migration or legacy key/DID adoption. Existing development
-installations require a fresh wallet database. The SDK never clears an old database automatically.
+This unreleased SDK requires a fresh wallet database for existing development installations. The SDK never clears an old database automatically.
 New-format identities retain their exact key/DID association across restart and recovery.
+
+Set `MobileWalletIssuanceRequest.keyPolicy` (Swift: `IssuanceRequest.keyPolicy`) when a host or issuer
+profile requires `DeviceBound` or `HardwareGenerated`. Before starting issuance, the SDK checks that
+the selected key is the active identity and already retains the required restriction. A later request
+cannot relabel a general-purpose or recoverable identity as device-bound. The default is
+`GeneralPurpose`; apps remain responsible for interpreting issuer/profile requirements.
 
 Credential synchronization and reissuance are separate. Restoring an identity does not change a
 credential's signed binding or authorize migration forbidden by its issuer. Use separate wallet
@@ -217,13 +231,22 @@ The design follows the separation of common operations and native settings used 
 These source comparisons do not establish tested interoperability or certification. Native operations
 extend the existing A-SIT Signum integration (Indispensable 3.24.0, Supreme 0.15.0).
 
-Enterprise KMS import transfers custody. The inspected `import/jwk` and permission-gated `view`
-endpoints return the stored key projection: **local JWK-backed keys can include private material**.
-Remote KMS handles do not thereby become exportable. This is a key-custody API, not the versioned
-opaque-record store/retrieve contract used here; it does not preserve recovery identity metadata by
-itself. No Enterprise recovery adapter is registered. A host integration would need to define the
-protected record schema, permissions, metadata retention and retrieval behavior explicitly. Remote
-signing and credential synchronization retain their existing ownership.
+## Optional Enterprise key custody
+
+Add `waltid-openid4vc-wallet-custody-enterprise` or the Swift `WalletSDKEnterpriseCustody` product,
+then register `EnterpriseIdentityKeyCustodian` in `keyCustodians`. Neither integration is a base-SDK
+dependency or default registration. Hosts supply the authenticated HTTPS KMS resource and client settings.
+
+The service offers only policy-compatible custody options. `transferToCustody()` imports the original
+private JWK under its stable key ID, compares the returned public key, and records a public destination
+reference. It retains the local signing key and does not change recovery status. Retries are idempotent;
+a different key at the destination is a conflict and is never overwritten automatically.
+
+The Enterprise `import/jwk` response can contain private material for local JWK-backed keys. The
+adapters bound responses, refuse redirects, return only public receipt fields and expose categorized
+errors. Host HTTP clients must not log bodies. The endpoint requires `ES_KMS_IMPORT_KEY_JWK` and
+appropriate destination access. It does not retain the portable identity recovery record. Remote
+signing, credential synchronization and later recovery from custody are separate integrations.
 
 ## Evidence limits
 

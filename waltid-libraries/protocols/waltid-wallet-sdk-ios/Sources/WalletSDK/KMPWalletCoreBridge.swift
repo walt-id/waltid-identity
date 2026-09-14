@@ -93,7 +93,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
                 clientId: request.clientID,
                 redirectUri: request.redirectURI.absoluteString,
                 keyId: request.keyID,
-                did: request.did
+                did: request.did,
+                keyPolicy: request.keyPolicy.toKMPIdentityPolicy()
             )
         )
         let value = try Self.successValue(
