@@ -8,9 +8,12 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 class X509CertificateChainValidationTest {
 
@@ -145,8 +148,14 @@ class X509CertificateChainValidationTest {
                     // store - otherwise a chain that is only trusted via the base store would incorrectly
                     // validate here too, silently reintroducing whatever trust the base store carries (e.g.
                     // the platform's system CA store) into a call meant to be scoped to the given anchors.
-                    val result = utilWithBaseTrust.validateCertificateChain(listOf(leafCert), InMemoryTrustStore(listOf(unrelatedRootCert)))
-                    assertFalse(result.valid, "trustOverride must replace the base trust store, not merge with it: ${result.log}")
+                    val result = utilWithBaseTrust.validateCertificateChain(
+                        listOf(leafCert),
+                        InMemoryTrustStore(listOf(unrelatedRootCert))
+                    )
+                    assertFalse(
+                        result.valid,
+                        "trustOverride must replace the base trust store, not merge with it: ${result.log}"
+                    )
                 }
             }
         }
@@ -164,6 +173,11 @@ class X509CertificateChainValidationTest {
              * and without a system trust store to ensure the same behavior in JS and JVM
              */
             setTrust(trustStore)
+            addValidators(X509CertificateValidityValidator(
+                allowValidityInFuture = true,
+                timeProvider = {
+                getTestTime()
+            }))
         }
 
         val caCertUtil = X509CertificateUtil {
@@ -172,7 +186,18 @@ class X509CertificateChainValidationTest {
              * and without a system trust store to ensure the same behavior in JS and JVM
              */
             setTrust(trustStore)
-            addValidators(X509CertificateBasicConstraintsValidator(leafCanBeCa = true))
+            addValidators(
+                X509CertificateBasicConstraintsValidator(leafCanBeCa = true),
+                X509CertificateValidityValidator(timeProvider = {
+                    getTestTime()
+                })
+            )
         }
+
+        // Google certificates are valid till 24.09.2026
+        private val timeOffset = Clock.System.now() - Instant.parse("2026-09-01T00:00:00Z")
+
+        private fun getTestTime() =
+            Clock.System.now() - timeOffset
     }
 }

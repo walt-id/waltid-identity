@@ -49,6 +49,17 @@ class JavaX509CertificateUtil(private val delegate: X509CertificateUtil) {
 
     @JvmOverloads
     fun createCsr(
+        holderKey: Key,
+        signatureAlgorithm: SignatureAlgorithm,
+        block: Consumer<Pkcs10CertificateSigningRequestBuilder> = Consumer {}
+    ): Pkcs10CertificateSigningRequest = runBlocking {
+        delegate.createCsr(holderKey, signatureAlgorithm) { block.accept(this) }
+    }
+
+
+    @Deprecated("Use crypto2 methods")
+    @JvmOverloads
+    fun createCsr(
         holderKey: Crypto1Key,
         block: Consumer<Pkcs10CertificateSigningRequestBuilder> = Consumer {}
     ): Pkcs10CertificateSigningRequest = runBlocking {
@@ -64,6 +75,7 @@ class JavaX509CertificateUtil(private val delegate: X509CertificateUtil) {
         delegate.createSelfSignedCertificate(issuerKey, signatureAlgorithm) { block.accept(this) }
     }
 
+    @Deprecated("Use crypto2 methods")
     @JvmOverloads
     fun createSelfSignedCertificate(
         issuerKey: Crypto1Key,
@@ -82,6 +94,7 @@ class JavaX509CertificateUtil(private val delegate: X509CertificateUtil) {
         delegate.createCertificate(issuerKey, issuerCert, signatureAlgorithm) { block.accept(this) }
     }
 
+    @Deprecated("Use crypto2 methods")
     @JvmOverloads
     fun createCertificate(
         issuerKey: Crypto1Key,
