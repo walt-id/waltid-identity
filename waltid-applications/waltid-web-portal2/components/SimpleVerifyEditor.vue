@@ -121,8 +121,10 @@ function buildAnnexCRequestedElements() {
 
 async function submitCrossDevice() {
   if (isPidOption.value) {
-    await props.session.createSession(
-      JSON.parse(JSON.stringify(selectedPidRequestOption.value.requestBody)),
+    const option = selectedPidRequestOption.value;
+    await props.session.createPidSession(
+      option.materialId,
+      JSON.parse(JSON.stringify(option.requestBody)),
     );
     return;
   }
