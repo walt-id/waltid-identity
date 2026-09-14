@@ -314,7 +314,7 @@ def main():
     private.mkdir(parents=True, mode=0o700)
     events, workers, logs, endpoints = [], [], [], []
     ios = None
-    report = dict(aut="AUT-06", executionClass="physical-local", runId=run_id, source=source,
+    report = dict(executionClass="physical-local", runId=run_id, source=source,
                   peerRevision=PEER_REVISION, fixture=FIXTURE, configuration=args.configuration,
                   holderPlatform=args.holder_platform, holderOS=holder_device.os_major, readerAndroidAPI=reader_device.os_major,
                   status="failed", events=events, timingBasis="Controller observation time; device monotonic clocks are not compared")
