@@ -520,7 +520,6 @@ private extension WalletConfiguration {
     func toKMPConfiguration() -> WalletBridgeConfiguration {
         WalletBridgeConfiguration(
             walletId: walletID,
-            defaultKeyType: defaultKeyType.toKMPKeyType(),
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),

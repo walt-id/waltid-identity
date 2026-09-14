@@ -910,8 +910,19 @@ private func initializeIdentity(_ wallet: Wallet) async throws -> WalletIdentity
 final class WalletIdentityRecoveryIntegrationTests: XCTestCase {
     enum TestFailure: Error { case failed(String) }
     func testOrdinaryKeychainRecoveryPreservesOriginalIdentityAndIsolatesAliases() async throws {
+        try await ordinaryKeychainRecovery(authorization: .none)
+    }
+
+    func testAuthenticatedOrdinaryKeychainRecoveryPreservesOriginalIdentity() async throws {
+        guard ProcessInfo.processInfo.environment["WALLET_INTERACTIVE_KEY_TESTS"] == "1" else {
+            throw XCTSkip("Requires an operator to approve temporary-key authentication prompts")
+        }
+        try await ordinaryKeychainRecovery(authorization: .deviceCredential(timeoutSeconds: 30))
+    }
+
+    private func ordinaryKeychainRecovery(authorization: WalletKeyUseAuthorizationPolicy) async throws {
         let provider = MemoryRecoveryFixture()
-        let identityConfiguration = WalletIdentityConfiguration(authorization: .explicit(.none),
+        let identityConfiguration = WalletIdentityConfiguration(authorization: .explicit(authorization),
             keychain: .init(accessibility: .whenUnlockedDeviceOnly), recoveryProviders: [provider])
         let original = try await Wallet(configuration: .init(walletID: "wal749-sdk-original-\(UUID())", identity: identityConfiguration))
         let originalService = await original.identities
@@ -989,4 +1000,86 @@ private actor MemoryRecoveryFixture: WalletIdentityRecoveryProvider {
     func retrieve(recordID: String) async throws -> Data? { records[recordID] }
     func delete(recordID: String) async throws -> WalletRecoveryReceipt { records[recordID] = nil; return .confirmedByProvider }
     enum FixtureError: Error { case conflict }
+}
+
+import XCTest
+import WalletSDK
+
+final class WalletIdentityBackupIntegrationTests: XCTestCase {
+    enum TestFailure: Error { case unexpectedState }
+    func testNativeRecoveryCanMoveProviderAfterLocalRecordIsDiscarded() async throws {
+        let first = IdentityBackupMemoryProvider(id: "first")
+        let second = IdentityBackupMemoryProvider(id: "second")
+        let wallet = try await Wallet(configuration: .init(walletID: "wal749-review-\(UUID())",
+            identity: .init(localRecoveryMaterial: .discardAfterSubmission, authorization: .explicit(.none),
+                            keychain: .init(), recoveryProviders: [first, second])))
+        do {
+            let service = await wallet.identities
+            guard case .available(let recommended, let alternatives) = try await service.creationOptions(intent: .recoverable) else { throw TestFailure.unexpectedState }
+            let option = try XCTUnwrap(([recommended] + alternatives).first { $0.storage == .nativeStorage && $0.recoveryProviderName == "first" })
+            guard case .active(let identity) = try await service.create(option) else { throw TestFailure.unexpectedState }
+            let record = try await first.retrieve(recordID: identity.id)
+            XCTAssertNotNil(record, "The original provider still has the valid record")
+            let options = try await service.backupOptions(identityID: identity.id)
+            let destination = try XCTUnwrap(options.first { $0.providerName == "second" })
+            guard case .active(let backedUp) = try await service.backup(destination) else { throw TestFailure.unexpectedState }
+            XCTAssertEqual(backedUp.publicJWK, identity.publicJWK)
+            let copied = try await second.retrieve(recordID: identity.id)
+            let retained = try await first.retrieve(recordID: identity.id)
+            XCTAssertEqual(copied, record)
+            XCTAssertEqual(retained, record, "Changing providers must not delete the original backup")
+            try await assertRestores(identity, provider: second)
+            try await wallet.deleteLocalData()
+        } catch { try? await wallet.deleteLocalData(); throw error }
+    }
+    func testGeneratedOrdinaryKeychainKeyCanEnableBackupLater() async throws {
+        let provider = IdentityBackupMemoryProvider(id: "export")
+        let wallet = try await Wallet(configuration: .init(walletID: "wal749-review-\(UUID())",
+            identity: .init(authorization: .explicit(.none), keychain: .init(), recoveryProviders: [provider])))
+        do {
+            let service = await wallet.identities
+            guard case .available(let recommended, let alternatives) = try await service.creationOptions() else { throw TestFailure.unexpectedState }
+            let option = try XCTUnwrap(([recommended] + alternatives).first { $0.storage == .nativeStorage })
+            guard case .active(let identity) = try await service.create(option) else { throw TestFailure.unexpectedState }
+            let options = try await service.backupOptions(identityID: identity.id)
+            let backup = try XCTUnwrap(options.first)
+            guard case .active(let backedUp) = try await service.backup(backup) else { throw TestFailure.unexpectedState }
+            XCTAssertEqual(backedUp.publicJWK, identity.publicJWK)
+            try await assertRestores(identity, provider: provider)
+            try await wallet.deleteLocalData()
+        } catch { try? await wallet.deleteLocalData(); throw error }
+    }
+    private func assertRestores(_ expected: WalletIdentity, provider: IdentityBackupMemoryProvider) async throws {
+        let wallet = try await Wallet(configuration: .init(walletID: "wal749-backup-destination-\(UUID())",
+            identity: .init(authorization: .explicit(.none), keychain: .init(), recoveryProviders: [provider])))
+        do {
+            let service = await wallet.identities
+            let candidates = try await service.recoveryCandidates()
+            let candidate = try XCTUnwrap(candidates.first)
+            let options = try await service.restorationOptions(candidate)
+            let option = try XCTUnwrap(options.first { $0.storage == .nativeStorage })
+            guard case .active(let restored) = try await service.restore(option) else { throw TestFailure.unexpectedState }
+            XCTAssertEqual(restored.id, expected.id)
+            XCTAssertEqual(restored.keyID, expected.keyID)
+            XCTAssertEqual(restored.did, expected.did)
+            XCTAssertEqual(restored.publicJWK, expected.publicJWK)
+            try await wallet.deleteLocalData()
+        } catch { try? await wallet.deleteLocalData(); throw error }
+    }
+}
+private actor IdentityBackupMemoryProvider: WalletIdentityRecoveryProvider {
+    nonisolated let id: String
+    nonisolated var displayName: String { id }
+    init(id: String) { self.id = id }
+    private var records: [String: Data] = [:]
+    func availability() async throws -> WalletRecoveryAvailability { .available(protection: .applicationEncrypted, scope: .custom) }
+    func list() async throws -> [String] { Array(records.keys) }
+    func store(recordID: String, data: Data) async throws -> WalletRecoveryReceipt {
+        if let old = records[recordID], old != data { throw Error.conflict }
+        records[recordID] = data
+        return .acceptedLocally
+    }
+    func retrieve(recordID: String) async throws -> Data? { records[recordID] }
+    func delete(recordID: String) async throws -> WalletRecoveryReceipt { records[recordID] = nil; return .confirmedByProvider }
+    enum Error: Swift.Error { case conflict }
 }

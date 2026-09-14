@@ -27,7 +27,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * Configuration for creating a [MobileWallet].
  *
  * @property walletId Stable wallet identifier used for database naming and persisted wallet state.
- * @property defaultKeyType Default algorithm for standalone key-authorization preflight; identity creation uses P-256.
  * @property defaultKeyUseAuthorizationPolicy Authorization policy used for newly created keys.
  * The policy never changes an existing persisted key.
  * @property keyUseAuthorizationPrompt Prompt text used for protected signing operations.
@@ -47,7 +46,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
  */
 public data class MobileWalletConfig(
     public val walletId: String = "default",
-    public val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     public val attestationConfig: WalletAttestationConfig? = null,
     public val persistence: MobileWalletPersistence = MobileWalletPersistence(),
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
@@ -227,7 +225,6 @@ internal fun createSqlDelightMobileWallet(
                 )
             )
         },
-        defaultKeyType = config.defaultKeyType,
         defaultKeyUseAuthorizationPolicy = config.defaultKeyUseAuthorizationPolicy,
         attestationConfig = config.attestationConfig,
         preferredLocales = config.preferredLocales,

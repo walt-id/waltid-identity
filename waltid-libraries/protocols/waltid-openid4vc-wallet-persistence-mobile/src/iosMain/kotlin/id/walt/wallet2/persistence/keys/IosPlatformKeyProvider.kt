@@ -122,7 +122,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
 
     private fun WalletKeyRequirements.nativePolicy(prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt()): SignumKeyPolicy =
         toSignumPolicy(prompt).let { policy ->
-            if (authorizationPolicy.requiresNativeControls && platform == id.walt.crypto2.signum.SignumPlatformPolicy.Default)
+            if (spec == KeySpec.Ec(EcCurve.P256) && platform == id.walt.crypto2.signum.SignumPlatformPolicy.Default)
                 policy.copy(platform = id.walt.crypto2.signum.SignumPlatformPolicy.IosKeychain()) else policy
         }
 

@@ -12,8 +12,6 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.serialization.BinaryData
 import kotlinx.cinterop.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -35,16 +33,17 @@ internal object IosNativeKeys {
         withContext(Dispatchers.Default) {
             require(supports(policy, importing = material != null)) { "Unsupported iOS native key policy" }
             require(!exists(alias, policy)) { "Keychain alias already exists" }
+            val enclave = material == null && policy.hardware != SignumHardwarePolicy.DISCOURAGED
             val raw = material?.let(::rawPrivateKey)
             val privateKey = try {
                 attributes().use { attributes ->
                     if (material != null) attributes.put(kSecAttrKeyClass, kSecAttrKeyClassPrivate)
                     if (material == null) Dictionary().use { privateAttributes ->
-                        addAccessControl(privateAttributes, policy)
+                        addAccessControl(privateAttributes, policy, enclave)
                         privateAttributes.put(kSecAttrIsPermanent, kCFBooleanFalse)
                         attributes.put(kSecPrivateKeyAttrs, privateAttributes.ref)
                     }
-                    if (material == null && policy.hardware != SignumHardwarePolicy.DISCOURAGED) {
+                    if (enclave) {
                         attributes.put(kSecAttrTokenID, kSecAttrTokenIDSecureEnclave)
                     }
                     memScoped {
@@ -59,7 +58,7 @@ internal object IosNativeKeys {
                 // Explicit add keeps generation/import and persistence under the same ownership rules.
                 query(alias, policy).use { query ->
                     query.put(kSecValueRef, privateKey)
-                    addAccessControl(query, policy)
+                    addAccessControl(query, policy, enclave)
                     checkStatus(SecItemAdd(query.ref, null), alias)
                 }
             } finally { CFRelease(privateKey) }
@@ -72,10 +71,12 @@ internal object IosNativeKeys {
 
     suspend fun load(alias: String, policy: SignumKeyPolicy, imported: Boolean): SignumPlatformKey? {
         if (!exists(alias, policy)) return null
-        return NativeKey(alias, policy, imported)
+        return NativeKey(alias, policy, imported, session(alias, policy))
     }
 
     fun delete(alias: String, policy: SignumKeyPolicy) {
+        sessionsLock.lock()
+        try { sessions.remove(alias to policy)?.invalidate() } finally { sessionsLock.unlock() }
         query(alias, policy).use { checkStatus(SecItemDelete(it.ref), alias, missingAllowed = true) }
     }
 
@@ -92,10 +93,11 @@ internal object IosNativeKeys {
         override val alias: String,
         private val policy: SignumKeyPolicy,
         imported: Boolean,
+        private val authorization: AuthorizationSession,
     ) : SignumPlatformKey {
         override val spec: KeySpec = KeySpec.Ec(EcCurve.P256)
         override val origin = if (imported) SignumKeyOrigin.IMPORTED else SignumKeyOrigin.GENERATED
-        override val securityLevel: SignumSecurityLevel = withKey(alias, policy, null) { key ->
+        override val securityLevel: SignumSecurityLevel = authorization.use { context -> withKey(alias, policy, context) { key ->
             val attributes = SecKeyCopyAttributes(key) ?: error("Keychain attributes unavailable")
             try {
                 val token = CFDictionaryGetValue(attributes, kSecAttrTokenID)
@@ -107,19 +109,40 @@ internal object IosNativeKeys {
                     SignumSecurityLevel.SOFTWARE
                 }
             } finally { CFRelease(attributes) }
-        }
+        } }
         override val protectionLevel = if (securityLevel == SignumSecurityLevel.SECURE_ENCLAVE) {
             SignumProtectionLevel.HARDWARE
         } else SignumProtectionLevel.SOFTWARE
         override val attestation: SignumKeyAttestation? = null
+        override val privateKeyExporter: PrivateKeyExporter? = if (protectionLevel == SignumProtectionLevel.SOFTWARE) {
+            PrivateKeyExporter {
+                authorization.use { context -> withKey(alias, policy, context) { key -> memScoped {
+                    val error = alloc<CFErrorRefVar>(); error.value = null
+                    val data = SecKeyCopyExternalRepresentation(key, error.ptr) ?: throw failure(alias, error.value)
+                    val raw = try { data.toBytes() } finally { CFRelease(data) }
+                    try {
+                        require(raw.size == 97 && raw[0] == 4.toByte()) { "Invalid P-256 private representation" }
+                        val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+                        val jwk = kotlinx.serialization.json.buildJsonObject {
+                            put("kty", kotlinx.serialization.json.JsonPrimitive("EC"))
+                            put("crv", kotlinx.serialization.json.JsonPrimitive("P-256"))
+                            for ((name, offset) in listOf("x" to 1, "y" to 33, "d" to 65)) {
+                                val component = raw.copyOfRange(offset, offset + 32)
+                                try { put(name, kotlinx.serialization.json.JsonPrimitive(base64.encode(component))) }
+                                finally { component.fill(0) }
+                            }
+                        }
+                        EncodedKey.Jwk(BinaryData(jwk.toString().encodeToByteArray()), true)
+                    } finally { raw.fill(0) }
+                } } }
+            }
+        } else null
+
         override val signatureAlgorithms = setOf(SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256))
         override val keyAgreementAlgorithms: Set<KeyAgreementAlgorithm> = emptySet()
-        private val signingMutex = Mutex()
-        private var context: LAContext? = null
-        private var authenticatedAt: TimeSource.Monotonic.ValueTimeMark? = null
 
         override val publicKey: EncodedKey.SpkiDer by lazy {
-            withKey(alias, policy, null) { key ->
+            authorization.use { context -> withKey(alias, policy, context) { key ->
                 val public = SecKeyCopyPublicKey(key) ?: error("Keychain public key unavailable")
                 try {
                     memScoped {
@@ -134,20 +157,13 @@ internal object IosNativeKeys {
                         } finally { CFRelease(data) }
                     }
                 } finally { CFRelease(public) }
-            }
+            } }
         }
 
-        override suspend fun sign(data: ByteArray, algorithm: SignatureAlgorithm): ByteArray = signingMutex.withLock { withContext(Dispatchers.Default) {
+        override suspend fun sign(data: ByteArray, algorithm: SignatureAlgorithm): ByteArray = withContext(Dispatchers.Default) {
             require(algorithm == SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)) { "Unsupported signature algorithm" }
-            val auth = policy.authentication as? SignumAuthenticationPolicy.UserPresence
-            val reusable = auth != null && auth.timeoutSeconds > 0 &&
-                authenticatedAt?.elapsedNow()?.inWholeMilliseconds?.let { it < auth.timeoutSeconds * 1000L } == true
-            val activeContext = if (reusable) requireNotNull(context) else LAContext().apply {
-                localizedReason = auth?.prompt ?: "Authorize signing"
-                localizedCancelTitle = auth?.cancelText ?: "Cancel"
-            }
-            try {
-                val signature = withKey(alias, policy, activeContext) { key ->
+            authorization.use { context ->
+                val signature = withKey(alias, policy, context) { key ->
                     retained(data.toNSData()) { input -> memScoped {
                         val error = alloc<CFErrorRefVar>(); error.value = null
                         val result = SecKeyCreateSignature(key, kSecKeyAlgorithmECDSASignatureMessageX962SHA256,
@@ -155,15 +171,8 @@ internal object IosNativeKeys {
                         try { result.toBytes() } finally { CFRelease(result) }
                     } }
                 }
-                if (!reusable && auth != null && auth.timeoutSeconds > 0) {
-                    context?.invalidate(); context = activeContext; authenticatedAt = TimeSource.Monotonic.markNow()
-                } else if (auth == null || auth.timeoutSeconds == 0) activeContext.invalidate()
                 EcdsaSignatureCodec.derToP1363(signature, 32)
-            } catch (cause: Throwable) {
-                activeContext.invalidate(); context = null; authenticatedAt = null; throw cause
             }
-        }
-
         }
 
         override suspend fun verify(data: ByteArray, signature: ByteArray, algorithm: SignatureAlgorithm): Boolean {
@@ -176,6 +185,61 @@ internal object IosNativeKeys {
 
         override suspend fun generateSharedSecret(peerPublicKey: EncodedKey, algorithm: KeyAgreementAlgorithm): BinaryData =
             throw UnsupportedOperationException("Identity signing keys do not permit key agreement")
+    }
+
+    // Handles are reconstructed from storage. Keep only authorization state across those lookups,
+    // never a cached key or public key that could conceal native deletion or replacement.
+    private val sessionsLock = NSLock()
+    private val sessions = linkedMapOf<Pair<String, SignumKeyPolicy>, AuthorizationSession>()
+
+    private fun session(alias: String, policy: SignumKeyPolicy): AuthorizationSession {
+        sessionsLock.lock()
+        try {
+            return sessions.getOrPut(alias to policy) {
+                if (sessions.size >= 64) sessions.remove(sessions.keys.first())?.invalidate()
+                AuthorizationSession(policy.authentication as? SignumAuthenticationPolicy.UserPresence)
+            }
+        } finally { sessionsLock.unlock() }
+    }
+
+    private class AuthorizationSession(private val policy: SignumAuthenticationPolicy.UserPresence?) {
+        private val lock = NSRecursiveLock()
+        private var context: LAContext? = null
+        private var authenticatedAt: TimeSource.Monotonic.ValueTimeMark? = null
+
+        fun <T> use(operation: (LAContext) -> T): T {
+            lock.lock()
+            try {
+                val reusable = policy != null && policy.timeoutSeconds > 0 &&
+                    authenticatedAt?.elapsedNow()?.inWholeMilliseconds?.let { it < policy.timeoutSeconds * 1000L } == true
+                val active = if (reusable) requireNotNull(context) else LAContext().apply {
+                    localizedReason = policy?.prompt ?: "Authorize signing"
+                    localizedCancelTitle = policy?.cancelText ?: "Cancel"
+                }
+                try {
+                    val result = operation(active)
+                    if (!reusable && policy != null && policy.timeoutSeconds > 0) {
+                        context?.invalidate()
+                        context = active
+                        authenticatedAt = TimeSource.Monotonic.markNow()
+                    } else if (policy == null || policy.timeoutSeconds == 0) active.invalidate()
+                    return result
+                } catch (cause: Throwable) {
+                    active.invalidate()
+                    invalidate()
+                    throw cause
+                }
+            } finally { lock.unlock() }
+        }
+
+        fun invalidate() {
+            lock.lock()
+            try {
+                context?.invalidate()
+                context = null
+                authenticatedAt = null
+            } finally { lock.unlock() }
+        }
     }
 
     private fun attributes(): Dictionary = Dictionary().apply {
@@ -193,7 +257,7 @@ internal object IosNativeKeys {
         put(kSecUseDataProtectionKeychain, kCFBooleanTrue)
     }
 
-    private fun addAccessControl(dictionary: Dictionary, policy: SignumKeyPolicy) {
+    private fun addAccessControl(dictionary: Dictionary, policy: SignumKeyPolicy, enclave: Boolean) {
         val settings = policy.platform as? SignumPlatformPolicy.IosKeychain ?: SignumPlatformPolicy.IosKeychain()
         val accessibility = when (settings.accessibility) {
             SignumKeychainAccessibility.WHEN_UNLOCKED -> kSecAttrAccessibleWhenUnlocked
@@ -203,13 +267,14 @@ internal object IosNativeKeys {
             SignumKeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY -> kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
         }
         val auth = policy.authentication as? SignumAuthenticationPolicy.UserPresence
-        if (auth == null) { dictionary.put(kSecAttrAccessible, accessibility); return }
+        if (auth == null && !enclave) { dictionary.put(kSecAttrAccessible, accessibility); return }
         val flags = when {
+            auth == null -> 0uL
             auth.biometric && auth.deviceCredential -> kSecAccessControlUserPresence
             auth.biometric && !auth.allowNewBiometrics -> kSecAccessControlBiometryCurrentSet
             auth.biometric -> kSecAccessControlBiometryAny
             else -> kSecAccessControlDevicePasscode
-        } or kSecAccessControlPrivateKeyUsage
+        } or (if (enclave) kSecAccessControlPrivateKeyUsage else 0uL)
         memScoped {
             val error = alloc<CFErrorRefVar>(); error.value = null
             val control = SecAccessControlCreateWithFlags(kCFAllocatorDefault, accessibility, flags, error.ptr)
