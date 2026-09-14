@@ -7,8 +7,8 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.SessionTranscript
-import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
-import id.walt.mdoc.objects.deviceretrieval.ElementReference
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.ElementReference
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 import kotlin.test.Test

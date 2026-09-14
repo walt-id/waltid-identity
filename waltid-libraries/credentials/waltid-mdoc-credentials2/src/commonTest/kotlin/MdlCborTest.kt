@@ -374,7 +374,7 @@ class MdlCborTest {
             "4D80E1E2E4FB246D97895427CE7000BB59BB24C8CD003ECF94BF35BBD2917E34"
         )
 
-        assertIs<DeviceAuth.Mac>(document.deviceSigned?.deviceAuth)
+        assertNotNull(document.deviceSigned?.deviceAuth?.deviceMac)
 
         assertEquals(coseCompliantCbor.encodeToByteArray(deviceResponse).toHexString().uppercase(), input)
     }

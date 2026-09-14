@@ -11,10 +11,12 @@ engagement, session encryption, request matching, reader authentication, consent
 binding and response construction. It uses the existing mdoc, COSE and crypto
 libraries and has no wallet database, UI, Android or Apple radio dependency.
 
-The baseline is [ISO/IEC 18013-5:2021](https://www.iso.org/standard/69084.html).
-Edition-2 draft features use an explicit versioned profile. Implemented protocol
-paths and deterministic tests do not establish certification or interoperability
-with every reader.
+The selected implementation profile is the authorized ISO/IEC DIS 18013-5:2026(en)
+edition-2 draft. Its exact source identity and the provisional NFCv2 adjunct are
+recorded in the [architecture source registry](https://github.com/walt-id/waltid-architecture/pull/60).
+Conventional exchange retains the published 2021 protocol lineage; that is not a
+separate blanket compatibility or conformance claim. Implemented paths and
+deterministic tests do not establish certification or interoperability with every reader.
 
 ## Getting started
 
@@ -103,7 +105,7 @@ decisions out of radio code.
 
 Deterministic loopback fixtures in `src/commonTestFixtures/kotlin` are included
 only by consumer test source sets. They do not add a production transport kind.
-From the unified-build root, run the focused engine suite with:
+From the Identity repository root, run the focused engine suite with:
 
 ```bash
 ./gradlew :waltid-libraries:credentials:waltid-mdoc-proximity:jvmTest

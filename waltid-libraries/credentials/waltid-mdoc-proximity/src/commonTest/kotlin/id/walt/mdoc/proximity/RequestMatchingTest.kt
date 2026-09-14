@@ -3,16 +3,16 @@
 package id.walt.mdoc.proximity
 
 import id.walt.mdoc.encoding.ByteStringWrapper
-import id.walt.mdoc.objects.deviceretrieval.AlternativeDataElementsSet
-import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
-import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
-import id.walt.mdoc.objects.deviceretrieval.DocRequest
-import id.walt.mdoc.objects.deviceretrieval.DocRequestInfo
-import id.walt.mdoc.objects.deviceretrieval.ElementReference
-import id.walt.mdoc.objects.deviceretrieval.ItemRequest
-import id.walt.mdoc.objects.deviceretrieval.ItemsRequest
-import id.walt.mdoc.objects.deviceretrieval.ItemsRequestList
-import id.walt.mdoc.objects.deviceretrieval.UseCase
+import id.walt.mdoc.objects.edition2.deviceretrieval.AlternativeDataElementsSet
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceRequestInfo
+import id.walt.mdoc.objects.edition2.deviceretrieval.DocRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.DocRequestInfo
+import id.walt.mdoc.objects.edition2.deviceretrieval.ElementReference
+import id.walt.mdoc.objects.edition2.deviceretrieval.ItemRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.ItemsRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.ItemsRequestList
+import id.walt.mdoc.objects.edition2.deviceretrieval.UseCase
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test

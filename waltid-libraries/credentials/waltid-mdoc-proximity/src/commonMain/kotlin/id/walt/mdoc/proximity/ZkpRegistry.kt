@@ -1,8 +1,8 @@
 package id.walt.mdoc.proximity
 
-import id.walt.mdoc.objects.deviceretrieval.ZkRequest
-import id.walt.mdoc.objects.deviceretrieval.ZkSystemSpec
-import id.walt.mdoc.objects.deviceretrieval.ZkDocument
+import id.walt.mdoc.objects.edition2.deviceretrieval.ZkRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.ZkSystemSpec
+import id.walt.mdoc.objects.edition2.deviceretrieval.ZkDocument
 import id.walt.mdoc.objects.SessionTranscript
 
 data class SelectedZkpSystem(

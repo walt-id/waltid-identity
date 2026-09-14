@@ -67,6 +67,32 @@ object MdocCrypto {
         allowedAlgorithms = allowedAlgorithms,
     )
 
+    /** Retained for callers of the released crypto API. */
+    @Deprecated("Use the crypto2 Key overload with an explicit algorithm allowlist")
+    suspend fun verifyDeviceSignature(
+        payloadToVerify: ByteArray,
+        deviceSignature: CoseSign1,
+        sDevicePublicKey: id.walt.crypto.keys.Key,
+    ): Boolean = deviceSignature.verifyDetached(
+        verifier = sDevicePublicKey.toCoseVerifier(),
+        detachedPayload = payloadToVerify,
+    )
+
+    /** The legacy key backend has never supported ECDH; use the crypto2 overload. */
+    @Deprecated("Use the crypto2 Key.getSharedSecret overload; legacy keys do not support ECDH")
+    fun id.walt.crypto.keys.Key.getSharedSecret(other: id.walt.crypto.keys.Key): ByteArray =
+        throw NotImplementedError("Legacy keys do not support ECDH; use a crypto2 key")
+
+    /** Retains the released signature and unsupported-operation behavior of legacy ECDH. */
+    @Deprecated("Use the crypto2 Key overload; legacy keys do not support ECDH")
+    suspend fun verifyDeviceMac(
+        deviceAuthBytes: ByteArray,
+        deviceMac: CoseMac0,
+        sessionTranscript: ByteArray,
+        eReaderPrivateKey: id.walt.crypto.keys.Key,
+        sDevicePublicKey: id.walt.crypto.keys.Key,
+    ): Boolean = throw NotImplementedError("Legacy keys do not support ECDH; use a crypto2 key")
+
     suspend fun Crypto2Key.getSharedSecret(other: EncodedKey): ByteArray {
         val algorithm = when (spec) {
             is KeySpec.Ec -> KeyAgreementAlgorithm.Ecdh

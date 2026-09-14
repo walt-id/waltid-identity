@@ -63,10 +63,9 @@ open class TransformingSerializerTemplate<ValueT, EncodedT>
 /**
  * Serializes [ByteArray] values as base64url strings in text formats and as native byte strings in CBOR.
  */
-object ByteArrayBase64UrlSerializer : KSerializer<ByteArray> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("ByteArrayBase64Url", PrimitiveKind.STRING)
-
+object ByteArrayBase64UrlSerializer : TransformingSerializerTemplate<ByteArray, String>(
+    String.serializer(), { it.encodeToBase64Url() }, { it.base64UrlDecode() }
+) {
     override fun serialize(encoder: Encoder, value: ByteArray) {
         if (encoder is CborEncoder) {
             encoder.encodeSerializableValue(ByteArraySerializer(), value)

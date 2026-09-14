@@ -19,8 +19,8 @@ import id.walt.mdoc.credsdata.DrivingPrivilegeCode
 import id.walt.mdoc.credsdata.Mdl
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.SessionTranscript
-import id.walt.mdoc.objects.deviceretrieval.ElementReference
-import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.edition2.deviceretrieval.ElementReference
+import id.walt.mdoc.objects.edition2.document.Document
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -134,7 +134,11 @@ class MdlProfileResponseTest {
             holderKey = (holderKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey(),
             docType = mdl.docType,
         )
-        val source = Document(mdl.docType, issuerSigned)
+        val source = id.walt.mdoc.parser.MdocParser.parseToEdition2Document(
+            id.walt.cose.coseCompliantCbor.encodeToByteArray(
+                id.walt.mdoc.objects.document.IssuerSigned.serializer(), issuerSigned
+            ).toHexString()
+        )
         val sourceItems = issuerSigned.namespaces!!.getValue(NAMESPACE).entries
         val selected = sourceItems.mapTo(linkedSetOf()) { ElementReference(NAMESPACE, it.value.elementIdentifier) }
         val response = MdocResponseBuilder().buildResponse(

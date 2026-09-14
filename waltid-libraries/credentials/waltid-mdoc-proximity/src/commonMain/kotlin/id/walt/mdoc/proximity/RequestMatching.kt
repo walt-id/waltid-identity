@@ -1,9 +1,9 @@
 package id.walt.mdoc.proximity
 
-import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
-import id.walt.mdoc.objects.deviceretrieval.ElementReference
-import id.walt.mdoc.objects.deviceretrieval.ItemsRequest
-import id.walt.mdoc.objects.deviceretrieval.UseCase
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.ElementReference
+import id.walt.mdoc.objects.edition2.deviceretrieval.ItemsRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.UseCase
 
 /** Inventory projection needed by the protocol matcher; storage and key handles remain outside this module. */
 class MdocCredentialCandidate(
