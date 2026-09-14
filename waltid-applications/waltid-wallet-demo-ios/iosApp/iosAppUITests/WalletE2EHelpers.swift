@@ -11,6 +11,15 @@ final class WalletE2EUI {
         self.app = app
     }
 
+    func completeKeySetupIfNeeded() {
+        let button = app.buttons["wallet.keySetupContinue"]
+        guard button.waitForExistence(timeout: 10) else { return }
+        for heading in ["1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval"] {
+            XCTAssertTrue(app.staticTexts[heading].waitForExistence(timeout: 10), "Missing setup step: \(heading)")
+            button.tap()
+        }
+    }
+
     func launch(attestation: [String: String] = [:], environment: [String: String] = [:], initializeIdentity: Bool = true) {
         app.launchEnvironment["E2E_WALLET_ID"] = app.launchEnvironment["E2E_WALLET_ID"] ?? "e2e-\(UUID().uuidString)"
         app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
@@ -27,8 +36,7 @@ final class WalletE2EUI {
         app.launch()
         unlockWallet()
         if initializeIdentity && app.launchEnvironment["E2E_MOCK_WALLET"] != "1" {
-            let create = app.buttons["Create with ordinary Keychain"].firstMatch
-            if create.waitForExistence(timeout: 10) { makeHittable(create); create.tap() }
+            completeKeySetupIfNeeded()
         }
     }
 

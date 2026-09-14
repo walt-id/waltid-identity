@@ -119,7 +119,7 @@ private fun WalletSessionState.statusText(auth: WalletAuthState): String? =
             is WalletAuthState.StorageUnavailable -> auth.message
             WalletAuthState.Unlocked -> WalletDisplayText.WalletNotReady
         }
-        is WalletSessionState.IdentitySetup -> "Choose a signing identity"
+        is WalletSessionState.IdentitySetup -> "Set up your wallet"
         WalletSessionState.Bootstrapping -> WalletDisplayText.BootstrappingWallet
         is WalletSessionState.Ready -> WalletDisplayText.WalletReady
         is WalletSessionState.Failed -> message

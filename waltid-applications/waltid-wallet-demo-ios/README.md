@@ -24,6 +24,15 @@ Native iOS demo app for the mobile wallet SDK. It uses SwiftUI with the `WalletS
 
 For setup, IDE guidance, and mobile integration test commands, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
+## Signing key setup
+
+PIN setup controls access to the app, with optional biometric unlock. Key setup then asks three separate questions: whether to back up or restore a signing key, where to store it, and when to request system approval for signing. Each screen groups the SDK's supported options into selectable cards; Continue keeps the selection local until Create signing key or Restore signing key is pressed. The SDK revalidates the selected option before executing it.
+
+Key recovery restores the original key and DID, not credentials. The demos offer their configured platform recovery provider; a local save does not prove cloud delivery. iOS recovery uses Keychain or the encrypted wallet database because an existing key cannot be imported into the Secure Enclave. Android hardware-required storage must pass the hardware check; choosing Android Keystore without that requirement leaves the protection level to the platform.
+
+Settings show the current key and recovery status. To replace a key or its signing policy, use Reset wallet and repeat setup; this removes local credentials, which must be issued again.
+
+
 ## Local wallet data
 
 The demo uses the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in iOS Keychain. During local development, reset wallet state by calling `Wallet.deleteLocalData()` from the SDK facade, deleting the app from the simulator/device, or removing the app's local data.

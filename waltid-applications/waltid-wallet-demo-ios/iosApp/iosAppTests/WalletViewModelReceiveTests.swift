@@ -282,7 +282,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(protections, [.none])
     }
 
-    func testRequiredBiometricSetupStopsBeforeBootstrapWhenNotEnrolled() async throws {
+    func testPinSetupDoesNotDependOnSigningBiometricEnrollment() async throws {
         let client = TransactionCodeWalletClient()
         await client.setSigningProtectionAvailability(.biometricNotEnrolled)
         let viewModel = WalletViewModel(
@@ -293,12 +293,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
         try await waitUntil { viewModel.biometricSigningAvailability == .biometricNotEnrolled }
         viewModel.unlockForTests()
-        try await waitUntil { viewModel.signingProtectionError != nil }
-
-        XCTAssertEqual(viewModel.auth, .setup)
-        XCTAssertFalse(viewModel.isReady)
-        let protections = await client.bootstrappedSigningProtections
-        XCTAssertTrue(protections.isEmpty)
+        try await waitUntil { viewModel.auth == .unlocked }
+        XCTAssertNil(viewModel.pinError)
     }
 
     func testUnavailableBiometricSigningCannotBeSelectedButNoneRemainsSelectable() async throws {
@@ -332,7 +328,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await waitUntil { viewModel.signingProtectionWarning != nil }
 
         XCTAssertEqual(viewModel.biometricSigningAvailability, .biometricNotEnrolled)
-        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("will fail") == true)
+        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("cannot be used again") == true)
 
         viewModel.dismissSigningProtectionWarning()
         XCTAssertNil(viewModel.signingProtectionWarning)
@@ -361,7 +357,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await waitUntil { viewModel.signingProtectionWarning != nil }
 
         XCTAssertEqual(viewModel.appliedSigningProtection, .biometric)
-        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("choose no biometric signing") == true)
+        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("reset the wallet") == true)
     }
 
     func testRequiredModeWarningDoesNotOfferAProhibitedSigningChoice() async throws {
@@ -379,7 +375,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await waitUntil { viewModel.signingProtectionWarning != nil }
 
         XCTAssertTrue(viewModel.signingProtectionWarning?.contains("required by app configuration") == true)
-        XCTAssertFalse(viewModel.signingProtectionWarning?.contains("choose no biometric signing") == true)
+        XCTAssertFalse(viewModel.signingProtectionWarning?.contains("reset the wallet") == true)
     }
 
     func testForegroundWarningWaitsUntilPinUnlock() async throws {
@@ -402,7 +398,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.submitPin()
         try await waitUntil { viewModel.auth == .unlocked }
 
-        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("will fail") == true)
+        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("cannot be used again") == true)
     }
 
     func testUnavailableSigningProtectionDoesNotReplaceWallet() async throws {

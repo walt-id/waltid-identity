@@ -44,13 +44,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
-import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
-import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
-import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
-import id.walt.walletdemo.compose.logic.displayMessage
 import id.walt.walletdemo.compose.ui.LocalWalletDemoBranding
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
-import id.walt.walletdemo.compose.ui.components.SigningProtectionChoice
 
 @Composable
 internal fun PinScreen(
@@ -58,9 +53,6 @@ internal fun PinScreen(
     auth: WalletAuthState.PinEntry,
     isBusy: Boolean,
     biometricAvailable: Boolean,
-    signingProtectionMode: WalletDemoSigningProtectionMode,
-    selectedSigningProtection: WalletDemoSigningProtection,
-    biometricSigningAvailability: WalletDemoSigningProtectionAvailability?,
 ) {
     val setup = auth as? WalletAuthState.Setup
     val login = auth as? WalletAuthState.Login
@@ -73,8 +65,6 @@ internal fun PinScreen(
         is WalletAuthState.Login -> auth.error
     }
     val biometricUnlockEnabled = controller.isBiometricUnlockEnabled()
-    val biometricSigningAvailable =
-        biometricSigningAvailability == WalletDemoSigningProtectionAvailability.Available
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -181,7 +171,7 @@ internal fun PinScreen(
                     Text("Unlock with biometrics", style = MaterialTheme.typography.bodyLarge)
                     Text(
                         if (biometricAvailable) {
-                            "Use Face ID or fingerprint instead of typing the PIN. The PIN remains a fallback."
+                            "Use biometrics to open the app instead of typing the PIN. Signing approval is set up next."
                         } else {
                             "Biometrics are not available on this device."
                         },
@@ -196,65 +186,6 @@ internal fun PinScreen(
                 )
             }
 
-            Text(
-                "Signing protection",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                "Choose how wallet signing is protected. Changing it later creates a new wallet key and DID.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (signingProtectionMode == WalletDemoSigningProtectionMode.Optional) {
-                SigningProtectionChoice(
-                    protection = WalletDemoSigningProtection.Biometric,
-                    selected = selectedSigningProtection == WalletDemoSigningProtection.Biometric,
-                    enabled = biometricSigningAvailable && !isBusy,
-                    testTag = WalletUiTestTags.SigningProtectionBiometric,
-                    onSelect = { controller.selectSigningProtection(WalletDemoSigningProtection.Biometric) },
-                )
-                SigningProtectionChoice(
-                    protection = WalletDemoSigningProtection.None,
-                    selected = selectedSigningProtection == WalletDemoSigningProtection.None,
-                    enabled = !isBusy,
-                    testTag = WalletUiTestTags.SigningProtectionNone,
-                    onSelect = { controller.selectSigningProtection(WalletDemoSigningProtection.None) },
-                )
-            } else {
-                val managedProtection = signingProtectionMode.defaultSelection
-                SigningProtectionChoice(
-                    protection = managedProtection,
-                    selected = true,
-                    enabled = false,
-                    testTag = if (managedProtection == WalletDemoSigningProtection.Biometric) {
-                        WalletUiTestTags.SigningProtectionBiometric
-                    } else {
-                        WalletUiTestTags.SigningProtectionNone
-                    },
-                    onSelect = {},
-                )
-                Text(
-                    "Managed by app configuration.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (selectedSigningProtection == WalletDemoSigningProtection.Biometric &&
-                !biometricSigningAvailable
-            ) {
-                Text(
-                    biometricSigningAvailability?.displayMessage()
-                        ?: "Checking strong biometric availability...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (biometricSigningAvailability == null) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
-                    modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionAvailability),
-                )
-            }
         }
 
         error?.let { error ->
@@ -263,11 +194,7 @@ internal fun PinScreen(
 
         Button(
             onClick = controller::submitPin,
-            enabled = !isBusy && (
-                setup == null ||
-                    selectedSigningProtection != WalletDemoSigningProtection.Biometric ||
-                    biometricSigningAvailable
-                ),
+            enabled = !isBusy,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(WalletUiTestTags.PinSubmitButton),

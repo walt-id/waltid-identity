@@ -14,6 +14,9 @@ class WalletDemoAppIosTest {
     }
 
     @Test
+    fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = scenarios.keySetupGroupsChoicesAndConfirmsSelectedConfiguration()
+
+    @Test
     fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
@@ -30,8 +33,8 @@ class WalletDemoAppIosTest {
         scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
 
     @Test
-    fun unavailableBiometricSigningIsDisabledButNoneRemainsAvailable() =
-        scenarios.unavailableBiometricSigningIsDisabledButNoneRemainsAvailable()
+    fun pinSetupDoesNotAskForSigningApproval() =
+        scenarios.pinSetupDoesNotAskForSigningApproval()
 
     @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =

@@ -919,13 +919,20 @@ final class WalletIdentitySetupUITests: XCTestCase {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(initializeIdentity: false)
-        let create = app.buttons["Create with ordinary Keychain"].firstMatch
+        let create = app.buttons["wallet.keySetupContinue"]
         XCTAssertTrue(create.waitForExistence(timeout: 20))
         let setup = XCTAttachment(screenshot: app.screenshot())
         setup.name = "wal749-native-ios-identity-setup"
         setup.lifetime = .keepAlways
         add(setup)
-        create.tap()
+        for (index, heading) in ["1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval"].enumerated() {
+            XCTAssertTrue(app.staticTexts[heading].waitForExistence(timeout: 10))
+            let screen = XCTAttachment(screenshot: app.screenshot())
+            screen.name = "wal749-key-setup-step-\(index + 1)"
+            screen.lifetime = .keepAlways
+            add(screen)
+            create.tap()
+        }
         XCTAssertTrue(app.buttons["wallet.settingsButton"].waitForExistence(timeout: 20))
         app.buttons["wallet.settingsButton"].tap()
         let details = app.buttons["Protection and recovery"]

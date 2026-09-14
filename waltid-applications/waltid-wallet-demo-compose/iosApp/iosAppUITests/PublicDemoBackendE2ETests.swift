@@ -319,13 +319,20 @@ final class WalletIdentitySetupUITests: XCTestCase {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["WALLET_ID": "identity-ui-\(UUID().uuidString)"], initializeIdentity: false)
-        let create = app.buttons["Use this option"].firstMatch
+        let create = app.buttons["wallet.keySetupContinue"]
         XCTAssertTrue(create.waitForExistence(timeout: 30))
         let setup = XCTAttachment(screenshot: app.screenshot())
         setup.name = "wal749-compose-ios-identity-setup"
         setup.lifetime = .keepAlways
         add(setup)
-        create.tap()
+        for (index, heading) in ["1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval"].enumerated() {
+            XCTAssertTrue(app.staticTexts[heading].waitForExistence(timeout: 10))
+            let screen = XCTAttachment(screenshot: app.screenshot())
+            screen.name = "wal749-key-setup-step-\(index + 1)"
+            screen.lifetime = .keepAlways
+            add(screen)
+            create.tap()
+        }
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 30), "Wallet ready")
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
         let recovery = app.staticTexts["No recovery backup submitted."]
