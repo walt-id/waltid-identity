@@ -132,7 +132,10 @@ kotlin {
             testTask {
                 enabled = chromeExecutable != null
                 chromeExecutable?.let { environment("CHROME_BIN", it) }
-                useKarma { useChromeHeadless() }
+                useKarma {
+                    useChromeHeadless()
+                    useConfigDirectory(project.file("karma.config.d"))
+                }
             }
         }
         binaries.executable()
@@ -143,7 +146,10 @@ kotlin {
             testTask {
                 enabled = chromeExecutable != null
                 chromeExecutable?.let { environment("CHROME_BIN", it) }
-                useKarma { useChromeHeadless() }
+                useKarma {
+                    useChromeHeadless()
+                    useConfigDirectory(project.file("karma.config.d"))
+                }
             }
         }
         nodejs()
