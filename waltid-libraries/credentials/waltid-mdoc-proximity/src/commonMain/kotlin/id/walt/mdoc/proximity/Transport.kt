@@ -111,6 +111,11 @@ interface PreparedTransport {
 }
 
 interface ProximityConnection {
+    /**
+     * Bearer of the most recently delivered incoming message, or the initial connection bearer
+     * before the first message. A hybrid updates this only when [receive] conveys a new message;
+     * selecting or connecting an alternate bearer does not establish that it carried any data.
+     */
     val kind: ProximityTransportKind
 
     /**

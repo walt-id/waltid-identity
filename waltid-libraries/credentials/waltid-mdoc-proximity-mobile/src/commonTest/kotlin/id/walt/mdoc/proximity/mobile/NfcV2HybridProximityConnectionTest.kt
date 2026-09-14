@@ -38,19 +38,23 @@ class NfcV2HybridProximityConnectionTest {
         val prepared = DeferredPreparedTransport().also { it.connect(alternate.holder) }
         val connection = hybrid(nfc, prepared)
         runCurrent()
+        assertEquals(ProximityTransportKind.NFC, connection.kind, "A connected alternate has not carried a message")
 
         val first = byteArrayOf(1, 2, 3)
         val nfcExchange = async { exchange(nfc, 0u, first) }
         assertContentEquals(first, connection.receive()!!.copy())
+        assertEquals(ProximityTransportKind.NFC, connection.kind)
 
         alternate.reader.send(ImmutableBytes.of(first))
         val next = async { connection.receive() }
         runCurrent()
         assertTrue(next.isActive)
+        assertEquals(ProximityTransportKind.NFC, connection.kind, "A suppressed duplicate does not change the route")
 
         val second = byteArrayOf(4, 5, 6)
         alternate.reader.send(ImmutableBytes.of(second))
         assertContentEquals(second, next.await()!!.copy())
+        assertEquals(ProximityTransportKind.BLE, connection.kind)
 
         val response = ImmutableBytes.of(byteArrayOf(7, 8))
         connection.send(response)
@@ -94,9 +98,11 @@ class NfcV2HybridProximityConnectionTest {
 
         prepared.connect(alternate.holder)
         runCurrent()
+        assertEquals(ProximityTransportKind.NFC, connection.kind, "Connection alone is not message evidence")
         val request = ImmutableBytes.of(byteArrayOf(3, 4))
         alternate.reader.send(request)
         assertEquals(request, incoming.await())
+        assertEquals(ProximityTransportKind.BLE, connection.kind)
 
         val response = ImmutableBytes.of(byteArrayOf(5, 6))
         connection.send(response)
@@ -165,6 +171,7 @@ class NfcV2HybridProximityConnectionTest {
         val request = byteArrayOf(1, 3, 5)
         val exchange = async { exchange(nfc, 0u, request) }
         assertContentEquals(request, connection.receive()!!.copy())
+        assertEquals(ProximityTransportKind.NFC, connection.kind, "A failed alternate cannot carry the request")
         val response = ImmutableBytes.of(byteArrayOf(2, 4, 6))
         connection.send(response)
 

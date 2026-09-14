@@ -179,7 +179,16 @@ class HolderProtocolEngineTest {
         val macSourceDocument = runtime.issueMdocTestDocument(macHolderKey)
         val method = DeviceRetrievalMethod.Nfc(1_024u, 1_024u)
         val loopback = FakeProximityLoopback.create(capacity = 0)
-        val transport = GatedFakeTransportProvider(method, loopback.holder)
+        val holder = object : ProximityConnection by loopback.holder {
+            override var kind = ProximityTransportKind.NFC
+                private set
+            private var received = 0
+            override suspend fun receive(): ImmutableBytes? = loopback.holder.receive()?.also {
+                // A hybrid may convey successive messages over different bearers.
+                kind = if (received++ == 0) ProximityTransportKind.BLE else ProximityTransportKind.NFC
+            }
+        }
+        val transport = GatedFakeTransportProvider(method, holder)
         val engagementContext = EngagementContext(
             MdocProximityProfile.ISO_18013_5_ED2_DIS_2026,
             1_048_576,
@@ -283,6 +292,7 @@ class HolderProtocolEngineTest {
             engine.state.filterIsInstance<MdocHolderSessionState.Connecting>().first()
             loopback.reader.send(firstEstablishment)
             val signatureResponse = assertResponse(loopback.reader, readerSession.cipher, engine)
+            assertEquals(MdocConnectedRoute(MdocEngagementMode.Qr, ProximityTransportKind.BLE), engine.connectedRoute)
             assertEquals(
                 1,
                 engine.state.filterIsInstance<MdocHolderSessionState.AwaitingNextRequest>()
@@ -311,6 +321,7 @@ class HolderProtocolEngineTest {
 
         val result = engine.run()
         reader.await()
+        assertEquals(MdocConnectedRoute(MdocEngagementMode.Qr, ProximityTransportKind.NFC), engine.connectedRoute)
 
         if (noDataOnSecondRequest) {
             assertEquals(2, assertIs<MdocHolderSessionResult.NoData>(result).exchange)

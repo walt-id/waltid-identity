@@ -514,7 +514,7 @@ class NfcMdocEngagementSourceTest {
             val response = platform.router.process(envelope(NfcDo53.encode(exactRequest)))
             val engaged = prepared.awaitConnection()
 
-            assertEquals(ProximityTransportKind.BLE, engaged.connection.kind)
+            assertEquals(ProximityTransportKind.NFC, engaged.connection.kind, "Selected BLE has not conveyed a message")
             assertEquals(emptyList(), platform.closeReasons)
             val handover = assertIs<MdocSessionHandover.ProvisionalNfcV2>(engaged.sessionHandover)
             assertContentEquals(exactRequest, handover.handoverRequest.copy())
@@ -537,6 +537,7 @@ class NfcMdocEngagementSourceTest {
                 platform.router.process(envelope(NfcDo53.encode(firstRequest)))
             }
             assertContentEquals(firstRequest, engaged.connection.receive()!!.copy())
+            assertEquals(ProximityTransportKind.NFC, engaged.connection.kind)
             val firstResponse = ImmutableBytes.of(byteArrayOf(4, 5, 6))
             engaged.connection.send(firstResponse)
             assertContentEquals(
