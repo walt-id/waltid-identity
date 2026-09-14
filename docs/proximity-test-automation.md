@@ -9,23 +9,22 @@ Counts are evidence for a particular run, not a coverage percentage or qualifica
 
 ## Risk inventory
 
-The starting inventory was reviewed at Identity `e61aabde1a9537f04027f09af9b1dd14c20198fc`.
-The following maps the accepted AUT risks to preserved assertions and distinct additions.
+The following maps proximity risks to existing assertions, additional coverage and remaining limits.
 Similar names and declared test counts alone do not establish that a test executes.
 
 | Risk | Preserved production assertions | Added boundary / remaining limitation |
 | --- | --- | --- |
-| AUT-01: missing discovery, stale framework, physical leakage | Existing Gradle/JUnit/XCTest runners | Exact passing IDs, nonzero execution, owned-suite skip rejection and forbidden physical prefixes; fixture/release header checks and separate physical sources/target |
-| AUT-02: field projection and receipt | `KMPProximityProjectionTests` submission/review collection regressions | Real native `StateFlow` through the Swift bridge, exact selected fields in forwarded approval and receipt, cancellation and error projection |
-| AUT-02: rendered stale consent | Shared Compose review/terminal scenarios; native view-model cancellation, settings replacement and preparation tests | Android/iOS replacement review and cancellation remove stale controls; Android prepared receipt details exclude unselected fields; native combined selection preserves exact elements and proof |
-| AUT-03: NFC fragmentation and lifecycle | `NfcRetrievalApduProcessorTest` APDU order, malformed DO53, request two and deactivation; native CardSession adapter tests | Android successful close retains routing through the final response fragment; bounded drain, send failure, disconnect and fresh-generation recovery |
-| AUT-03: native BLE callback identity | Common framing, handshake, incoming packet and provider tests | Real Android/CoreBluetooth callback adapters reject wrong peers/attributes, dispose on disconnect/cancellation, preserve ordered bytes under backpressure and permit fresh recovery |
-| AUT-03: Wi-Fi Aware ownership | Android publisher/native resource and raw-socket tests | Real attach/publish/network callback failures and cancellation clean late resources and close pending socket accept; no independent hardware peer claim |
-| AUT-04: independent full exchange | SDK request processing and holder session tests | Pinned reader checks static NFC handover, fragmented response, issuer/device authentication, field digests, configured-root trust and a wrong-root control |
-| AUT-04: retained connection and rejection | Holder wire-error and coordinator cancellation tests | Independent reader request two on one connection uses fresh selective consent; ciphertext mutation and cancellation suppress disclosure and allow fresh recovery |
-| AUT-05: crypto known answers | `MdocSessionCipherTest` directional keys, IV layout, counter exhaustion, replay and RFC 5869 HKDF | Public external transcript/key/ciphertext vectors through production cipher and platform ECDH, on JVM, Android host, iOS Simulator and JS |
-| AUT-05: malformed requests and authentication | `HolderWireErrorTest` encrypted status, empty response, consent suppression and CBOR budgets; SDK reader trust/request matrices | External-vector mutations change one condition and retain valid controls; existing holder/SDK tests remain the oracle for wire status and absence of consent |
-| AUT-06: real radios and OS behavior | Deterministic counterparts above | Optional selected-device hosts/controller for BLE roles/bearers, Android direct NFC and eligible NFC-to-BLE; hardware passes require separate physical execution |
+| Missing discovery, stale framework, physical leakage | Existing Gradle/JUnit/XCTest runners | Exact passing IDs, nonzero execution, owned-suite skip rejection and forbidden physical prefixes; fixture/release header checks and separate physical sources/target |
+| Field projection and receipt | `KMPProximityProjectionTests` submission/review collection regressions | Real native `StateFlow` through the Swift bridge, exact selected fields in forwarded approval and receipt, cancellation and error projection |
+| Rendered stale consent | Shared Compose review/terminal scenarios; native view-model cancellation, settings replacement and preparation tests | Android/iOS replacement review and cancellation remove stale controls; Android prepared receipt details exclude unselected fields; native combined selection preserves exact elements and proof |
+| NFC fragmentation and lifecycle | `NfcRetrievalApduProcessorTest` APDU order, malformed DO53, request two and deactivation; native CardSession adapter tests | Android successful close retains routing through the final response fragment; bounded drain, send failure, disconnect and fresh-generation recovery |
+| Native BLE callback identity | Common framing, handshake, incoming packet and provider tests | Real Android/CoreBluetooth callback adapters reject wrong peers/attributes, dispose on disconnect/cancellation, preserve ordered bytes under backpressure and permit fresh recovery |
+| Wi-Fi Aware ownership | Android publisher/native resource and raw-socket tests | Real attach/publish/network callback failures and cancellation clean late resources and close pending socket accept; no independent hardware peer claim |
+| Independent full exchange | SDK request processing and holder session tests | Pinned reader checks static NFC handover, fragmented response, issuer/device authentication, field digests, configured-root trust and a wrong-root control |
+| Retained connection and rejection | Holder wire-error and coordinator cancellation tests | Independent reader request two on one connection uses fresh selective consent; ciphertext mutation and cancellation suppress disclosure and allow fresh recovery |
+| Crypto known answers | `MdocSessionCipherTest` directional keys, IV layout, counter exhaustion, replay and RFC 5869 HKDF | Public external transcript/key/ciphertext vectors through production cipher and platform ECDH, on JVM, Android host, iOS Simulator and JS |
+| Malformed requests and authentication | `HolderWireErrorTest` encrypted status, empty response, consent suppression and CBOR budgets; SDK reader trust/request matrices | External-vector mutations change one condition and retain valid controls; existing holder/SDK tests remain the oracle for wire status and absence of consent |
+| Real radios and OS behavior | Deterministic counterparts above | Optional selected-device hosts/controller for BLE roles/bearers, Android direct NFC and eligible NFC-to-BLE; hardware passes require separate physical execution |
 
 ## CI and local deterministic execution
 
@@ -58,13 +57,6 @@ Apply each Gradle `--tests` selector to its own task. A selector following the l
 task in a multi-task invocation does not select all preceding tasks. Preserve failed
 attempts and zero-test/setup failures; do not retry until green and report only the
 last result. Unit-test deadlines and coroutine deadlines remain finite.
-
-The Enterprise iOS lane separately times prerequisite fixture compilation, simulator
-startup, framework assembly, Xcode build, fixture health and test execution. Its
-bounded step budget is 70 minutes; its five native tests and per-phase limits remain
-unchanged. This is setup headroom and diagnostics, not evidence of runner reliability.
-The coordinated Enterprise companion supplies the split build/test task and retains
-per-run phase logs on failure or cancellation.
 
 ## Independent source authority
 
