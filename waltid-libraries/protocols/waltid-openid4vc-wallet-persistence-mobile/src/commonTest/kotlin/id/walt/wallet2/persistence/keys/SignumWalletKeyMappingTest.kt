@@ -158,12 +158,14 @@ class SignumWalletKeyMappingTest {
 
         assertEquals(expected, timed.toSignumPolicy())
         assertEquals(timed, expected.toWalletPolicy(valid))
+        assertEquals(KeyUseAuthorizationPolicy.BiometricAny,
+            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(timeoutSeconds = 0)).toWalletPolicy(valid))
+        assertEquals(KeyUseAuthorizationPolicy.BiometricOrDeviceCredential(10),
+            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(deviceCredential = true)).toWalletPolicy(valid))
 
         listOf(
-            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(timeoutSeconds = 0)),
             expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(timeoutSeconds = 31)),
             expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(allowNewBiometrics = false)),
-            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(deviceCredential = true)),
         ).forEach { malformed ->
             val failure = assertFailsWith<KeyUseAuthorizationException> {
                 malformed.toWalletPolicy(valid)

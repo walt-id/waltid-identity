@@ -51,6 +51,7 @@ internal fun SettingsScreen(
     state: WalletDemoUiState,
     onShowDcApiPresentationPreviewChange: (Boolean) -> Unit,
     onBack: () -> Unit,
+    onIdentityAction: (String) -> Unit,
     onLock: () -> Unit,
     onResetWallet: () -> Unit,
     onRequestSigningProtectionChange: (WalletDemoSigningProtection) -> Unit,
@@ -59,7 +60,15 @@ internal fun SettingsScreen(
 ) {
     val ready = state.session as? WalletSessionState.Ready
     val clipboard = LocalClipboardManager.current
+    var deleteRecovery by remember { mutableStateOf<String?>(null) }
     var confirmReset by remember { mutableStateOf(false) }
+
+    deleteRecovery?.let { id ->
+        AlertDialog(onDismissRequest = { deleteRecovery = null }, title = { Text("Delete recovery record?") },
+            text = { Text("This requests deletion from the provider. It does not erase identities already restored on other devices.") },
+            confirmButton = { TextButton(onClick = { deleteRecovery = null; onIdentityAction(id) }) { Text("Delete recovery record") } },
+            dismissButton = { TextButton(onClick = { deleteRecovery = null }) { Text("Cancel") } })
+    }
 
     SystemBackHandler(enabled = true, onBack = onBack)
 
@@ -121,6 +130,22 @@ internal fun SettingsScreen(
                 copyTag = WalletUiTestTags.SettingsPublicJwkCopy,
                 onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
             )
+            state.identityDetails?.let { identity ->
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Signing identity", style = MaterialTheme.typography.titleMedium)
+                    Text("${identity.storage} · ${identity.origin}")
+                    Text(identity.authorization)
+                    Text(identity.recovery)
+                    Text("iOS Secure Enclave keys cannot be recovered on another device. Imported Android keys may use hardware, but their recovery secret exists outside it.", style = MaterialTheme.typography.bodySmall)
+                    for (choice in identity.choices) {
+                        Text(choice.detail, style = MaterialTheme.typography.bodySmall)
+                        OutlinedButton(enabled = !state.identityBusy, onClick = {
+                            if (choice.destructive) deleteRecovery = choice.id else onIdentityAction(choice.id)
+                        }) { Text(choice.title) }
+                    }
+                    if (state.identityBusy) CircularProgressIndicator()
+                }
+            }
             SigningProtectionSettings(
                 state = state,
                 ready = ready,

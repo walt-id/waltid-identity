@@ -154,7 +154,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     func testBootstrapCreatesKeyAndDid() async throws {
         let wallet = try await makeWallet()
 
-        let result = try await wallet.bootstrap()
+        let result = try await initializeIdentity(wallet)
 
         XCTAssertTrue(result.did.starts(with: "did:"), "DID should start with 'did:', got: \(result.did)")
     }
@@ -162,11 +162,11 @@ final class MobileWalletIntegrationTests: XCTestCase {
     func testManagedEncryptedWalletBootstrapsAcrossRecreation() async throws {
         let wallet1 = try await makeWallet()
 
-        let first = try await wallet1.bootstrap()
+        let first = try await initializeIdentity(wallet1)
         XCTAssertTrue(first.did.starts(with: "did:"), "DID should start with 'did:', got: \(first.did)")
 
         let wallet2 = try await makeWallet()
-        let second = try await wallet2.bootstrap()
+        let second = try await initializeIdentity(wallet2)
 
         XCTAssertEqual(second.did, first.did, "Encrypted wallet state should survive wallet facade recreation")
         XCTAssertEqual(second.keyID, first.keyID, "Encrypted wallet key reference should survive wallet facade recreation")
@@ -178,12 +178,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     func testDeleteLocalDataRemovesManagedEncryptedWalletState() async throws {
         let wallet1 = try await makeWallet()
-        let first = try await wallet1.bootstrap()
+        let first = try await initializeIdentity(wallet1)
 
         try await wallet1.deleteLocalData()
 
         let wallet2 = try await makeWallet()
-        let second = try await wallet2.bootstrap()
+        let second = try await initializeIdentity(wallet2)
 
         XCTAssertNotEqual(second.did, first.did, "Deleting local data should remove the persisted DID state")
         XCTAssertNotEqual(second.keyID, first.keyID, "Deleting local data should remove the persisted platform key reference")
@@ -250,10 +250,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
         let wallet = try await makeWallet(persistence: persistence)
 
-        let bootstrap = try await wallet.bootstrap()
+        let bootstrap = try await initializeIdentity(wallet)
         let credentials = try await wallet.credentials()
         let reopenedWallet = try await makeWallet(persistence: persistence)
-        let reopenedBootstrap = try await reopenedWallet.bootstrap()
+        let reopenedBootstrap = try await initializeIdentity(reopenedWallet)
         let reopenedCredentials = try await reopenedWallet.credentials()
         let listCredentialsCalls = await store.listCredentialsCalls
 
@@ -274,10 +274,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let persistence = WalletPersistence(databaseKey: .provided(provider))
         let wallet1 = try await makeWallet(persistence: persistence)
 
-        let first = try await wallet1.bootstrap()
+        let first = try await initializeIdentity(wallet1)
 
         let wallet2 = try await makeWallet(persistence: persistence)
-        let second = try await wallet2.bootstrap()
+        let second = try await initializeIdentity(wallet2)
         let requestedKeys = await provider.requestedKeys
 
         XCTAssertEqual(second.did, first.did, "Provided database key should reopen encrypted wallet state")
@@ -298,7 +298,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     func testReceiveEudiPidSdJwtFromEudi() async throws {
         let wallet = try await makeEudiWallet()
-        _ = try await wallet.bootstrap()
+        _ = try await initializeIdentity(wallet)
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
@@ -334,7 +334,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let walletID = "ios-demo-signed-\(UUID().uuidString)"
         await clearTestData(walletId: walletID)
         let wallet = try await makeSignedMetadataWallet(walletId: walletID)
-        let bootstrap = try await wallet.bootstrap()
+        let bootstrap = try await initializeIdentity(wallet)
         let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
 
@@ -417,7 +417,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         await clearTestData(walletId: walletId)
 
         let wallet = try await makeWallet(walletId: walletId)
-        _ = try await wallet.bootstrap()
+        _ = try await initializeIdentity(wallet)
         let session = try await DemoBackend.shared.createResponseBoundVerifierSession(scenario: scenario)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
         let previewResult = try await wallet.previewPresentation(request: presentationURL)
@@ -444,7 +444,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let walletId = "ios-invalid-transaction-data-\(UUID().uuidString)"
         await clearTestData(walletId: walletId)
         let wallet = try await makeWallet(walletId: walletId)
-        _ = try await wallet.bootstrap()
+        _ = try await initializeIdentity(wallet)
         let presentationURL = try invalidTransactionDataPresentationURL()
 
         let previewResult = try await wallet.previewPresentation(request: presentationURL)
@@ -470,7 +470,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let walletId = "ios-eudi-pid-sd-jwt-persistence-\(UUID().uuidString)"
         await clearTestData(walletId: walletId)
         let wallet1 = try await makeEudiWallet(walletId: walletId)
-        _ = try await wallet1.bootstrap()
+        _ = try await initializeIdentity(wallet1)
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
@@ -484,7 +484,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         // Recreate wallet facade (simulates app restart)
         let wallet2 = try await makeEudiWallet(walletId: walletId)
 
-        _ = try await wallet2.bootstrap()
+        _ = try await initializeIdentity(wallet2)
         let credentials = try await wallet2.credentials()
         XCTAssertFalse(credentials.isEmpty, "Credentials should persist across controller recreation")
     }
@@ -495,7 +495,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         await clearTestData(walletId: walletId)
 
         let wallet1 = try await makeWallet(walletId: walletId)
-        let bootstrapResult = try await wallet1.bootstrap()
+        let bootstrapResult = try await initializeIdentity(wallet1)
         let did = bootstrapResult.did
 
         let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
@@ -507,7 +507,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
 
         let wallet2 = try await makeWallet(walletId: walletId)
-        _ = try await wallet2.bootstrap()
+        _ = try await initializeIdentity(wallet2)
         let credentials = try await wallet2.credentials()
         XCTAssertFalse(credentials.isEmpty, "public demo credential should persist across controller recreation")
         try assertStoredCredentialDisplayData(scenario: scenario, credentials: credentials)
@@ -534,7 +534,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let walletId = "ios-eudi-present-\(UUID().uuidString)"
         await clearTestData(walletId: walletId)
         let wallet = try await makeEudiWallet(walletId: walletId)
-        let bootstrapResult = try await wallet.bootstrap()
+        let bootstrapResult = try await initializeIdentity(wallet)
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
@@ -567,7 +567,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let walletId = "ios-eudi-preview-submit-\(UUID().uuidString)"
         await clearTestData(walletId: walletId)
         let wallet = try await makeEudiWallet(walletId: walletId)
-        let bootstrapResult = try await wallet.bootstrap()
+        let bootstrapResult = try await initializeIdentity(wallet)
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
@@ -617,7 +617,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         await clearTestData(walletId: walletId)
 
         let wallet = try await makeWallet(walletId: walletId)
-        let bootstrapResult = try await wallet.bootstrap()
+        let bootstrapResult = try await initializeIdentity(wallet)
         let did = bootstrapResult.did
 
         let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
@@ -712,7 +712,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         await clearTestData(walletId: walletId)
 
         let wallet = try await makeWallet(walletId: walletId)
-        _ = try await wallet.bootstrap()
+        _ = try await initializeIdentity(wallet)
 
         let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
@@ -733,7 +733,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         await clearTestData(walletId: walletId)
 
         let wallet = try await makeWallet(walletId: walletId)
-        let bootstrapResult = try await wallet.bootstrap()
+        let bootstrapResult = try await initializeIdentity(wallet)
         let did = bootstrapResult.did
 
         let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
@@ -897,4 +897,96 @@ private func assertTransmittedSuccess(
         XCTFail(message(), file: file, line: line)
         return
     }
+}
+
+private func initializeIdentity(_ wallet: Wallet) async throws -> WalletIdentity {
+    guard case .active(let identity) = try await wallet.identities.initialize() else {
+        throw WalletError.invalidInput("Expected an active test identity")
+    }
+    return identity
+}
+
+
+final class WalletIdentityRecoveryIntegrationTests: XCTestCase {
+    enum TestFailure: Error { case failed(String) }
+    func testOrdinaryKeychainRecoveryPreservesOriginalIdentityAndIsolatesAliases() async throws {
+        let provider = MemoryRecoveryFixture()
+        let identityConfiguration = WalletIdentityConfiguration(authorization: .explicit(.none),
+            keychain: .init(accessibility: .whenUnlockedDeviceOnly), recoveryProviders: [provider])
+        let original = try await Wallet(configuration: .init(walletID: "wal749-sdk-original-\(UUID())", identity: identityConfiguration))
+        let originalService = await original.identities
+        let destination = try await Wallet(configuration: .init(walletID: "wal749-sdk-destination-\(UUID())", identity: identityConfiguration))
+        do {
+            let options = try await originalService.creationOptions(intent: .recoverable)
+            guard case .available(let recommended, let alternatives) = options else { throw TestFailure.failed("No recoverable native option") }
+            let choices = [recommended] + alternatives
+            XCTAssertFalse(choices.contains { $0.storage == .hardware }, "iOS must not offer recoverable Enclave keys")
+            let option = try XCTUnwrap(choices.first { $0.storage == .nativeStorage })
+            guard case .active(let created) = try await originalService.create(option) else { throw TestFailure.failed("Creation did not activate") }
+            XCTAssertEqual(created.origin, .imported)
+            XCTAssertEqual(created.securityLevel, .software)
+            XCTAssertTrue(created.did.hasPrefix("did:jwk:"))
+            let destinationService = await destination.identities
+            let candidates = try await destinationService.recoveryCandidates()
+            let candidate = try XCTUnwrap(candidates.first)
+            let restoreOptions = try await destinationService.restorationOptions(candidate)
+            let restore = try XCTUnwrap(restoreOptions.first { $0.storage == .nativeStorage })
+            guard case .active(let restored) = try await destinationService.restore(restore) else { throw TestFailure.failed("Restore did not activate") }
+            XCTAssertEqual(created.id, restored.id)
+            XCTAssertEqual(created.keyID, restored.keyID)
+            XCTAssertEqual(created.did, restored.did)
+            XCTAssertEqual(created.publicJWK, restored.publicJWK)
+            XCTAssertEqual(restored.origin, .imported)
+            try await destination.deleteLocalData()
+            guard case .active(let stillAvailable) = try await originalService.state() else { throw TestFailure.failed("Deleting destination affected original native alias") }
+            XCTAssertEqual(stillAvailable.did, created.did)
+            try await original.deleteLocalData()
+        } catch {
+            try? await destination.deleteLocalData()
+            try? await original.deleteLocalData()
+            throw error
+        }
+    }
+
+    func testSecureEnclaveGenerationIsHardwareGeneratedAndNotRecoverable() async throws {
+        #if targetEnvironment(simulator)
+        throw XCTSkip("Secure Enclave generation requires a physical iPhone")
+        #else
+        let wallet = try await Wallet(configuration: .init(walletID: "wal749-sdk-enclave-\(UUID())",
+            identity: .init(policy: .hardwareGenerated, authorization: .explicit(.none),
+                            keychain: .init(accessibility: .whenUnlockedDeviceOnly))))
+        do {
+            let identities = await wallet.identities
+            guard case .available(let option, _) = try await identities.creationOptions() else { throw TestFailure.failed("Hardware generation unavailable on attached iPhone") }
+            XCTAssertEqual(option.storage, .hardware)
+            guard case .active(let created) = try await identities.create(option) else { throw TestFailure.failed("Enclave creation failed") }
+            XCTAssertEqual(created.origin, .generated)
+            XCTAssertEqual(created.securityLevel, .secureEnclave)
+            let backupOptions = try await identities.backupOptions(identityID: created.id)
+            XCTAssertTrue(backupOptions.isEmpty)
+            guard case .unavailable = try await identities.creationOptions(intent: .recoverable) else { throw TestFailure.failed("Enclave recovery must be unavailable") }
+            try await wallet.deleteLocalData()
+        } catch {
+            try? await wallet.deleteLocalData()
+            throw error
+        }
+        #endif
+    }
+}
+
+/// Local, test-only transport. No record is sent to a cloud service.
+private actor MemoryRecoveryFixture: WalletIdentityRecoveryProvider {
+    nonisolated let id = "local-test-fixture"
+    nonisolated let displayName = "Local test fixture"
+    private var records: [String: Data] = [:]
+    func availability() async throws -> WalletRecoveryAvailability { .available(protection: .applicationEncrypted, scope: .custom) }
+    func list() async throws -> [String] { Array(records.keys) }
+    func store(recordID: String, data: Data) async throws -> WalletRecoveryReceipt {
+        if let existing = records[recordID], existing != data { throw FixtureError.conflict }
+        records[recordID] = data
+        return .acceptedLocally
+    }
+    func retrieve(recordID: String) async throws -> Data? { records[recordID] }
+    func delete(recordID: String) async throws -> WalletRecoveryReceipt { records[recordID] = nil; return .confirmedByProvider }
+    enum FixtureError: Error { case conflict }
 }

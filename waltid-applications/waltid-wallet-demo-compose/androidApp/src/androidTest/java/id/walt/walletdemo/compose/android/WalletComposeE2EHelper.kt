@@ -84,6 +84,8 @@ internal object WalletComposeE2EHelper {
         waitForResource(device, "wallet.pinConfirmationInput", 2_000L)?.setText(PIN)
 
         clickByTag(device, "wallet.pinSubmitButton")
+        // Fresh wallets require explicit identity selection before protocol tests can proceed.
+        device.wait(Until.findObject(By.text("Use this option")), 5_000L)?.click()
 
         assertTrue(
             "Wallet did not become ready after unlock. Latest status: ${latestStatus(device)}",

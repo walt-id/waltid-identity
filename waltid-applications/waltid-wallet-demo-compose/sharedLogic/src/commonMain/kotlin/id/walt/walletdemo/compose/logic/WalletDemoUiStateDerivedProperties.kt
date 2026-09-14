@@ -16,7 +16,7 @@ data class WalletStatusBanner(
 }
 
 val WalletDemoUiState.isBusy: Boolean
-    get() = isAuthenticating ||
+    get() = isAuthenticating || identityBusy ||
         isChangingSigningProtection ||
         session is WalletSessionState.Bootstrapping ||
         operation is WalletOperationState.ResolvingOffer ||
@@ -119,6 +119,7 @@ private fun WalletSessionState.statusText(auth: WalletAuthState): String? =
             is WalletAuthState.StorageUnavailable -> auth.message
             WalletAuthState.Unlocked -> WalletDisplayText.WalletNotReady
         }
+        is WalletSessionState.IdentitySetup -> "Choose a signing identity"
         WalletSessionState.Bootstrapping -> WalletDisplayText.BootstrappingWallet
         is WalletSessionState.Ready -> WalletDisplayText.WalletReady
         is WalletSessionState.Failed -> message

@@ -17,6 +17,11 @@ import id.walt.walletdemo.compose.logic.WalletDemoUiState
 
 @Composable
 internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
+    val setup = state.session as? WalletSessionState.IdentitySetup
+    if (setup != null) {
+        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeIdentity, controller::cancelIdentity, controller::refreshIdentityChoices)
+        return
+    }
     val uriHandler = LocalUriHandler.current
     var showingSettings by remember { mutableStateOf(false) }
     var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
@@ -33,6 +38,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             state = state,
             onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
             onBack = { showingSettings = false },
+            onIdentityAction = controller::performIdentityAction,
             onLock = controller::lock,
             onResetWallet = controller::resetWallet,
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
@@ -50,7 +56,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             } else {
                 WalletHeader(
                     state = state,
-                    onSettings = { showingSettings = true },
+                    onSettings = { controller.refreshIdentityDetails(); showingSettings = true },
                     onDismissStatus = controller::dismissStatus,
                     onToggleStatusExpanded = controller::toggleStatusExpanded,
                 )

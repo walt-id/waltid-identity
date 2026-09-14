@@ -50,6 +50,7 @@ kotlin {
                 }
 
                 androidMain.dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-blockstore"))
                     implementation(identityLibs.ktor.client.android)
                     implementation(identityLibs.androidx.fragment)
                     implementation(identityLibs.androidx.biometric)
@@ -76,6 +77,7 @@ kotlin {
                 }
 
                 iosMain.dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-keychain"))
                     implementation(identityLibs.ktor.client.darwin)
                 }
             }

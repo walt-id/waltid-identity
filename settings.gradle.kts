@@ -85,6 +85,8 @@ val modules = listOfNotNull(
         "waltid-openid4vc-wallet-persistence-server",
         "waltid-openid4vc-wallet-mobile" whenEnabled enableAndroidBuild,
         "waltid-openid4vc-wallet-mobile" whenEnabled enableIosBuild,
+        "waltid-openid4vc-wallet-recovery-blockstore" whenEnabled enableAndroidBuild,
+        "waltid-openid4vc-wallet-recovery-keychain" whenEnabled enableIosBuild,
         "waltid-openid4vc-wallet-server",
         "waltid-mobile-test-utils" whenEnabled enableAndroidBuild,
     ),

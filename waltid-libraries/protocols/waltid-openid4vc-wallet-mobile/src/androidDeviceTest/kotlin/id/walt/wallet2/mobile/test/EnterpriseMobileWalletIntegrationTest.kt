@@ -1,5 +1,8 @@
 package id.walt.wallet2.mobile.test
 
+import id.walt.wallet2.mobile.identity.IdentityOperationResult
+import id.walt.wallet2.mobile.identity.WalletIdentity
+
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.mobile.test.backend.EnterpriseMobileAttestationConfig
@@ -58,7 +61,7 @@ class EnterpriseMobileWalletIntegrationTest {
         val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
 
         val wallet1 = createWallet(walletId, offer.attestation)
-        val bootstrapResult = wallet1.bootstrap()
+        val bootstrapResult = wallet1.identities.initialize().activeIdentity()
         wallet1.receiveCredential(offer.offerUrl, offer.txCode)
 
         val wallet2 = createWallet(walletId, offer.attestation)
@@ -82,7 +85,7 @@ class EnterpriseMobileWalletIntegrationTest {
             walletId = "android-enterprise-receive-${scenario.id}-${UUID.randomUUID()}",
             attestation = offer.attestation,
         )
-        wallet.bootstrap()
+        wallet.identities.initialize().activeIdentity()
 
         val credentialIds = wallet.receiveCredential(offer.offerUrl, offer.txCode)
 
@@ -102,7 +105,7 @@ class EnterpriseMobileWalletIntegrationTest {
             walletId = "android-enterprise-present-${scenario.id}-${UUID.randomUUID()}",
             attestation = offer.attestation,
         )
-        val bootstrapResult = wallet.bootstrap()
+        val bootstrapResult = wallet.identities.initialize().activeIdentity()
 
         val credentialIds = wallet.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(credentialIds.isNotEmpty(), "Should receive ${scenario.displayName}")
@@ -172,3 +175,6 @@ class EnterpriseMobileWalletIntegrationTest {
             is WalletIssuanceOutcome.Failed -> error("Expected stored credentials, got failed outcome: ${outcome.error.message}")
         }
 }
+
+private fun IdentityOperationResult.activeIdentity(): WalletIdentity =
+    kotlin.test.assertIs<IdentityOperationResult.Active>(this).identity

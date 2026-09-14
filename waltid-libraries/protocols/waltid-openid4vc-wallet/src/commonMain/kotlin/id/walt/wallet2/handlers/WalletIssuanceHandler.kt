@@ -2292,7 +2292,11 @@ object WalletIssuanceHandler {
 
 internal fun supportedJwtProofAlgorithms(proofTypes: Map<String, ProofType>?): Set<String>? {
     if (proofTypes.isNullOrEmpty()) return null
-    return requireNotNull(proofTypes["jwt"]) {
+    val jwt = requireNotNull(proofTypes["jwt"]) {
         "Issuer requires an unsupported proof type: ${proofTypes.keys}"
-    }.proofSigningAlgValuesSupported
+    }
+    require(jwt.keyAttestationsRequired == null) {
+        "Issuer requires a key-attestation JWT; the configured proof path cannot supply one"
+    }
+    return jwt.proofSigningAlgValuesSupported
 }

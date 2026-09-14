@@ -138,6 +138,7 @@ signum = "3.24.0"
 supreme = "0.15.0"
 
 [libraries]
+google-blockstore = { module = "com.google.android.gms:play-services-auth-blockstore", version = "16.4.0" }
 
 # Plugins
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
