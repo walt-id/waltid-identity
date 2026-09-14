@@ -91,4 +91,28 @@ class WalletApi2AuthorizationCallbackTest {
         )
         assertIs<WalletApi2AuthorizationCallback.Invalid>(parsed)
     }
+
+    @Test
+    fun unrecognizedResponseParametersAreIgnored() {
+        val parsed = parseWalletApi2AuthorizationCallback(
+            callbackUri = "http://localhost:7106/?code=auth-code&state=state-1&session_state=oidc-session",
+            expectedState = "state-1",
+            expectedRedirectUri = "http://localhost:7106/",
+        )
+        assertEquals(WalletApi2AuthorizationCallback.Code("auth-code"), parsed)
+    }
+
+    @Test
+    fun configuredRedirectQueryParametersAreStillRequired() {
+        val parsed = parseWalletApi2AuthorizationCallback(
+            callbackUri = "http://localhost:7106/?code=auth-code&state=state-1",
+            expectedState = "state-1",
+            expectedRedirectUri = "http://localhost:7106/?tenant=demo",
+        )
+        val invalid = assertIs<WalletApi2AuthorizationCallback.Invalid>(parsed)
+        assertEquals(
+            "Authorization callback redirect URI does not match the issuance session",
+            invalid.message,
+        )
+    }
 }

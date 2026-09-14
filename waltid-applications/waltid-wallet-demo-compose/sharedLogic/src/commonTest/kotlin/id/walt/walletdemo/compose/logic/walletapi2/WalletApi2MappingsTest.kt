@@ -132,4 +132,12 @@ class WalletDeepLinkSchemeWebTest {
     fun httpWithoutCodeIsIgnored() {
         assertEquals(null, WalletDeepLinkScheme.parse("http://localhost:8080/"))
     }
+
+    @Test
+    fun httpsAuthorizationCallbackWithError() {
+        assertEquals(
+            WalletDeepLinkScheme.AuthorizationCallback,
+            WalletDeepLinkScheme.parse("http://localhost:8080/?error=access_denied&state=1"),
+        )
+    }
 }

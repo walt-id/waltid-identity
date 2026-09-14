@@ -1023,6 +1023,29 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun httpErrorAuthorizationCallbackIsDispatched() = runTest {
+        val wallet = FakeDemoWallet(
+            issuanceGrant = WalletDemoIssuanceGrant.AuthorizationCode,
+            authorizationOutcome = WalletDemoIssuanceOutcome.Cancelled,
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://authorization-code")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+        controller.authorizationRequestOpened()
+        controller.handleDeepLink("http://localhost:7106/?error=access_denied&state=state-1")
+        runCurrent()
+
+        assertEquals(
+            listOf("http://localhost:7106/?error=access_denied&state=state-1"),
+            wallet.authorizationCallbackUris,
+        )
+    }
+
+    @Test
     fun deferredIssuanceCanBeResumedFromTheReceiveState() = runTest {
         val deferredCredential = WalletDemoDeferredCredential(
             id = "deferred-1",
