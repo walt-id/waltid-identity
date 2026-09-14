@@ -248,6 +248,7 @@ class SignumManagedKeyProvider(
             },
             deleter = KeyDeleter { delete(storedKey) },
             publicKeyExporter = PublicKeyExporter { handle.publicKey },
+            privateKeyExporter = handle.privateKeyExporter,
             signatureAlgorithms = advertisedSignatureAlgorithms,
             keyAgreementAlgorithms = advertisedKeyAgreementAlgorithms,
             supportsSignatureAlgorithm = { it in advertisedSignatureAlgorithms },

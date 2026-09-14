@@ -49,7 +49,6 @@ import kotlin.time.Instant
  * Configuration used when creating an iOS [WalletSdkBridge].
  *
  * @property walletId Stable wallet identifier used for database naming and persisted wallet state.
- * @property defaultKeyType Default algorithm for standalone key-authorization preflight; identity creation uses P-256.
  * @property persistence Wallet-local persistence configuration.
  * @property databaseKeyProvider Swift-owned database key provider used when [persistence] uses
  * [WalletBridgeDatabaseKeyConfiguration.Provided].
@@ -65,7 +64,6 @@ import kotlin.time.Instant
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
-    public val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
@@ -246,7 +244,6 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
     }
     return MobileWalletConfig(
         walletId = walletId,
-        defaultKeyType = defaultKeyType,
         attestationConfig = attestation,
         credentialIssuerMetadataTrustResolver = issuerMetadataTrustResolver?.let { bridgeResolver ->
             CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->

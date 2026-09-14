@@ -17,7 +17,6 @@ import WalletSDK
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
-        defaultKeyType: .secp256r1,
         defaultKeyUseAuthorizationPolicy: .biometricCurrentSet,
         keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
             message: "Authorize wallet signing",

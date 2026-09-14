@@ -152,7 +152,6 @@ class MobileWalletTest {
         val config = MobileWalletConfig()
         val (
             walletId,
-            defaultKeyType,
             attestationConfig,
             persistence,
             onEvent,
@@ -162,7 +161,6 @@ class MobileWalletTest {
         ) = config
 
         assertEquals("default", walletId)
-        assertEquals(MobileWalletKeyType.secp256r1, defaultKeyType)
         assertEquals(null, attestationConfig)
         assertEquals(MobileWalletPersistence(), persistence)
         assertEquals(emptyList(), preferredLocales)

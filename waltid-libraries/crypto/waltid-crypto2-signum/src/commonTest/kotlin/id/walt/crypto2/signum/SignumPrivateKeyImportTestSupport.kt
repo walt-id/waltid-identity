@@ -29,7 +29,7 @@ internal suspend fun exerciseNativePrivateImport(backend: SignumPlatformBackend,
             val imported = provider.importPrivateKey(request, material)
             stored = imported.storedKey
             assertEquals(SignumKeyOrigin.IMPORTED, imported.origin)
-            assertNull(imported.capabilities.privateKeyExporter)
+            if (imported.protectionLevel == SignumProtectionLevel.HARDWARE) assertNull(imported.capabilities.privateKeyExporter)
             assertEquals(material.toSpkiDer(spec), imported.storedKey.publicKey)
             if (policy.hardware == SignumHardwarePolicy.REQUIRED) assertEquals(SignumProtectionLevel.HARDWARE, imported.protectionLevel)
             val reopened = SignumManagedKeyProvider(backend).restoreSignumKey(imported.storedKey)

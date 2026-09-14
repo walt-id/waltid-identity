@@ -40,6 +40,8 @@ interface SignumPlatformKey {
     /** Observed hardware tier, where the platform exposes it. */
     val securityLevel: SignumSecurityLevel get() = SignumSecurityLevel.UNKNOWN
     val spec: KeySpec
+    /** Explicit capability for exportable ordinary-Keychain keys; absent for hardware and Keystore keys. */
+    val privateKeyExporter: id.walt.crypto2.keys.PrivateKeyExporter? get() = null
     val publicKey: EncodedKey.SpkiDer
     /** Observed protection backing; policy requests must not be used as evidence. */
     val protectionLevel: SignumProtectionLevel

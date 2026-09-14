@@ -1,5 +1,10 @@
 package id.walt.wallet2.persistence.keys
 
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.uuid.Uuid
 import android.content.Context
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
@@ -30,6 +35,27 @@ public class AndroidPlatformKeyProvider(
     private val applicationContext = context.applicationContext
     private val backend = AndroidSignumKeyBackend(interactionContextProvider)
     private val signumProvider = SignumManagedKeyProvider(backend)
+    private val capabilityMutex = Mutex()
+    private val hardwareCapabilities = mutableMapOf<id.walt.crypto2.signum.SignumHardwarePolicy, Boolean>()
+
+    // Feature declarations are not reliable evidence of a P-256 key's actual execution tier.
+    // Probe an owned, unauthenticated alias once per backing preference and always remove it.
+    private suspend fun supportsHardware(policy: SignumKeyPolicy): Boolean = capabilityMutex.withLock {
+        val backing = (policy.platform as? id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore)?.strongBox
+            ?: id.walt.crypto2.signum.SignumHardwarePolicy.DISCOURAGED
+        hardwareCapabilities[backing]?.let { return@withLock it }
+        val alias = "wallet_capability_${Uuid.random()}"
+        val probe = SignumKeyPolicy(hardware = id.walt.crypto2.signum.SignumHardwarePolicy.REQUIRED,
+            platform = id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore(strongBox = backing))
+        val supported = try {
+            backend.create(alias, KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY), probe)
+            true
+        } catch (_: SignumKeyPolicyMismatchException) { false }
+        finally { withContext(NonCancellable) { backend.delete(alias, probe) } }
+        hardwareCapabilities[backing] = supported
+        supported
+    }
+
 
     override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
         val signumPolicy = requirements.nativePolicy()
@@ -37,6 +63,10 @@ public class AndroidPlatformKeyProvider(
         if ((settings?.strongBox == id.walt.crypto2.signum.SignumHardwarePolicy.REQUIRED &&
                 !applicationContext.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_STRONGBOX_KEYSTORE)) ||
             !backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
+            return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
+        }
+        if (signumPolicy.hardware == id.walt.crypto2.signum.SignumHardwarePolicy.REQUIRED &&
+            !supportsHardware(signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
         if (requirements.authorizationPolicy is KeyUseAuthorizationPolicy.None) {

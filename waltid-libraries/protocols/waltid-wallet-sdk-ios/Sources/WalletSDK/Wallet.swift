@@ -47,14 +47,14 @@ public actor Wallet {
     /// Checks whether a key-use authorization request is supported without creating a key.
     ///
     /// - Parameters:
-    ///   - keyType: Optional key type override. When omitted, the configured default is used.
+    ///   - keyType: Algorithm to check; defaults to the identity algorithm, P-256.
     ///   - policy: Optional authorization policy override. When omitted, the configured default is used.
     public func keyUseAuthorizationPreflight(
-        keyType: WalletKeyType? = nil,
+        keyType: WalletKeyType = .secp256r1,
         policy: WalletKeyUseAuthorizationPolicy? = nil
     ) async throws -> WalletKeyUseAuthorizationPreflight {
         try await bridge.keyUseAuthorizationPreflight(
-            keyType: keyType ?? configuration.defaultKeyType,
+            keyType: keyType,
             policy: policy ?? configuration.defaultKeyUseAuthorizationPolicy
         )
     }

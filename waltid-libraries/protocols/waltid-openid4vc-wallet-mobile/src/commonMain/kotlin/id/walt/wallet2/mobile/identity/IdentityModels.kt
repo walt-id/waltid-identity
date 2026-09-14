@@ -53,6 +53,7 @@ public sealed interface IdentityRecoveryState {
  * @property storage Selected signing backend.
  * @property authorization Required private-key authorization.
  * @property recoveryProviderName Selected backup provider's display name, or null for no backup.
+ * @property recoveryAvailability Provider protection and route, or null when recovery is disabled.
  * @property attestation Native evidence requested at creation. */
 public class IdentityCreationOption internal constructor(
     internal val owner: Any,
@@ -60,7 +61,7 @@ public class IdentityCreationOption internal constructor(
     public val authorization: KeyUseAuthorizationPolicy,
     public val recoveryProviderName: String?,
     internal val providerId: String?,
-    internal val availability: RecoveryAvailability.Available?,
+    public val recoveryAvailability: RecoveryAvailability.Available?,
     public val attestation: IdentityAttestationRequest,
 ) {
     /** Whether this option retains a secret from which the same key can be recovered. */
@@ -85,13 +86,14 @@ public sealed interface IdentityOptions {
 
 /** SDK-issued backup choice for an existing exportable identity.
  * @property identityId Identity whose signing secret will be backed up.
- * @property providerName Selected provider's display name. */
+ * @property providerName Selected provider's display name.
+ * @property recoveryAvailability Provider protection and route, rechecked before submission. */
 public class IdentityBackupOption internal constructor(
     internal val owner: Any,
     public val identityId: String,
     public val providerName: String,
     internal val providerId: String,
-    internal val availability: RecoveryAvailability.Available,
+    public val recoveryAvailability: RecoveryAvailability.Available,
 )
 
 /** A record discovered through a configured provider; executable recovery options require validation.

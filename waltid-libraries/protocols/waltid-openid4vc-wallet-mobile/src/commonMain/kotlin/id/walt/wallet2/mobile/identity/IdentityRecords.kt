@@ -31,6 +31,7 @@ internal data class IdentityRecord(
     val recovery: RecoveryRecord? = null,
     val backup: IdentityBackupReference? = null,
     val recoveryAvailability: RecoveryAvailability.Available? = null,
+    val recoveryConfirmation: RecoveryConfirmation = RecoveryConfirmation.LocalAcceptance,
     val previous: IdentityRecord? = null,
     val previousKey: id.walt.crypto2.keys.StoredKey.Managed? = null,
 )

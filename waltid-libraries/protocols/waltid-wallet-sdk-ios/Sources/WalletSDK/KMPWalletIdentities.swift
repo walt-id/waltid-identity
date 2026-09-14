@@ -62,7 +62,7 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
     }
     func backupOptions(identityID: String) async throws -> [WalletIdentityBackupOption] {
         try value(await bridge.identityBackupOptions(identityId: identityID), as: [WalletCore.IdentityBackupOption].self).map {
-            .init(identityID: $0.identityId, providerName: $0.providerName, handle: KMPIdentityHandle($0))
+            .init(identityID: $0.identityId, recoveryAvailability: availability($0.recoveryAvailability), providerName: $0.providerName, handle: KMPIdentityHandle($0))
         }
     }
     func backup(_ option: WalletIdentityBackupOption) async throws -> WalletIdentityOperationResult {
@@ -92,7 +92,7 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
         case .native(let request): attestation = .native(challenge: bytes(request.challenge))
         }
         return .init(attestation: attestation, storage: storage(option.storage), authorization: toSwiftAuthorizationPolicy(option.authorization),
-                     recoveryProviderName: option.recoveryProviderName, handle: KMPIdentityHandle(option))
+                     recoveryProviderName: option.recoveryProviderName, recoveryAvailability: option.recoveryAvailability.map(availability), handle: KMPIdentityHandle(option))
     }
     private func operation(_ result: any WalletCore.IdentityOperationResult) -> WalletIdentityOperationResult {
         switch onEnum(of: result) {
@@ -140,6 +140,21 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
         case .encryptedDatabase: return .encryptedDatabase
         }
     }
+    private func availability(_ value: WalletCore.RecoveryAvailabilityAvailable) -> WalletRecoveryAvailability {
+        let protection: WalletRecoveryProtection
+        switch value.protection {
+        case .operatingSystemProtected: protection = .operatingSystemProtected
+        case .operatingSystemEndToEnd: protection = .operatingSystemEndToEnd
+        case .applicationEncrypted: protection = .applicationEncrypted
+        }
+        let scope: WalletRecoveryScope
+        switch value.scope {
+        case .cloud: scope = .cloud
+        case .deviceTransfer: scope = .deviceTransfer
+        case .custom: scope = .custom
+        }
+        return .available(protection: protection, scope: scope)
+    }
     private func failure(_ value: WalletCore.IdentityFailure) -> WalletIdentityFailure {
         switch value {
         case .unsupportedPolicy: return .unsupportedPolicy
@@ -182,6 +197,7 @@ extension WalletIdentityConfiguration {
         return WalletCore.IdentityConfiguration(recoveryProviders: recoveryProviders.map(KMPRecoveryProvider.init), authorization: authorization,
                                                 policy: policy, platform: platform,
                                                 alternativeAuthorizations: alternativeAuthorizations.map { $0.toKMPNativeAuthorization() },
+                                                recoveryConfirmation: recoveryConfirmation == .localAcceptance ? .localAcceptance : .providerConfirmation,
                                                 localRecoveryMaterial: localRecoveryMaterial == .retain ? .retain : .discardAfterSubmission)
     }
 }
