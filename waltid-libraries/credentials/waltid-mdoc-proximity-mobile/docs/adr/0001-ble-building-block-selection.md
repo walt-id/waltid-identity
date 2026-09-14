@@ -13,7 +13,7 @@ characteristic definitions, framing, role selection, timeouts, errors, race owne
 must remain walt-owned common behavior. Platform code should be limited to Bluetooth discovery,
 advertising, GATT, sockets/streams, permissions, and lifecycle callbacks.
 
-The implementation baseline is the authorized `ISO/IEC DIS 18013-5:2025(E)` held in the architecture
+The implementation baseline is the authorized `ISO/IEC DIS 18013-5:2026(en)` held in the architecture
 repository, SHA-256
 `6bf2cdfbc89ed992d4822d6f4f2ee30bdc1443bd8db35c5ab1b562c3811af7f4`. Clauses 11.1.1 through
 11.1.4 govern the BLE roles, Device Engagement UUIDs, Ident, GATT state/framing, and L2CAP framing.
