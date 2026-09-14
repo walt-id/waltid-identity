@@ -20,6 +20,7 @@ public struct SharingReviewView: View {
     private let compact: Bool
     private let showActions: Bool
     @State private var compactClaimsOption: PresentationCredentialOption?
+    @State private var credentialDetails: [CredentialDetails] = []
 
     /// Renders one sharing review.
     ///
@@ -65,20 +66,24 @@ public struct SharingReviewView: View {
         VStack(alignment: .leading, spacing: 14) {
             SharingRequestSections(request: review.request)
 
+            if !review.credentialOptions.isEmpty && credentialDetails.isEmpty {
+                ProgressView("Loading credentials…")
+            }
+
             if compact {
                 CredentialCardStackView(
-                    details: review.credentialOptions.map(CredentialDisplayNormalizer.details(for:))
+                    cards: credentialDetails.map { CredentialCardItem(id: $0.id, summary: $0.cardSummary) }
                 ) { id in
                     compactClaimsOption = review.credentialOptions.first {
-                        CredentialDisplayNormalizer.details(for: $0).id == id
+                        $0.selection.id == id
                     }
                 }
                 .sheet(isPresented: Binding(
                     get: { compactClaimsOption != nil },
                     set: { if !$0 { compactClaimsOption = nil } }
                 )) {
-                    if let option = compactClaimsOption {
-                        let details = CredentialDisplayNormalizer.details(for: option)
+                    if let option = compactClaimsOption,
+                       let details = credentialDetails.first(where: { $0.id == option.selection.id }) {
                         SharingClaimsSheet(
                             option: option,
                             details: details,
@@ -105,14 +110,17 @@ public struct SharingReviewView: View {
                 }
 
                 ForEach(review.credentialOptions) { option in
-                    CredentialReviewCard(
-                        option: option,
-                        selection: selection,
-                        isLoading: isLoading,
-                        isReadOnly: isReadOnly,
-                        onToggleCredential: onToggleCredential,
-                        onToggleDisclosure: onToggleDisclosure
-                    )
+                    if let details = credentialDetails.first(where: { $0.id == option.selection.id }) {
+                        CredentialReviewCard(
+                            option: option,
+                            details: details,
+                            selection: selection,
+                            isLoading: isLoading,
+                            isReadOnly: isReadOnly,
+                            onToggleCredential: onToggleCredential,
+                            onToggleDisclosure: onToggleDisclosure
+                        )
+                    }
                 }
             }
 
@@ -126,12 +134,19 @@ public struct SharingReviewView: View {
                 )
             }
         }
+        .task(id: review.credentialOptions) {
+            credentialDetails = []
+            let snapshot = await CredentialDisplayNormalizer.details(for: review.credentialOptions)
+            guard !Task.isCancelled else { return }
+            credentialDetails = snapshot
+        }
     }
 }
 
 /// One offered credential: a selectable card that opens claim details.
 struct CredentialReviewCard: View {
     let option: PresentationCredentialOption
+    let details: CredentialDetails
     let selection: SharingSelection
     let isLoading: Bool
     let isReadOnly: Bool
@@ -140,7 +155,6 @@ struct CredentialReviewCard: View {
     @State private var claimsOpen = false
 
     var body: some View {
-        let details = CredentialDisplayNormalizer.details(for: option)
         let requestedDisclosureItems = details.groups
             .first { $0.title == CredentialDisplayVocabulary.requestedDisclosuresTitle }?
             .items ?? []
@@ -278,7 +292,7 @@ struct DisclosureList: View {
     let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        LazyVStack(alignment: .leading, spacing: 8) {
             Text(CredentialDisplayVocabulary.requestedDisclosuresTitle)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
