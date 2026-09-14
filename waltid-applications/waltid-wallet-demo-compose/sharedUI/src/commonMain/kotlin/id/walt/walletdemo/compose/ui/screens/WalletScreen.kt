@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletSessionState
 
 @Composable
 internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {

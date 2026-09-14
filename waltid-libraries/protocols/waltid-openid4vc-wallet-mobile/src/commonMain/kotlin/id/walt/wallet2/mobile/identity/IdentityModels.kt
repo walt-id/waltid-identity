@@ -11,7 +11,8 @@ import id.walt.wallet2.persistence.keys.PlatformKeyFacts
  * @property storage Configured signing backend; hardware claims are in [keyFacts].
  * @property authorization Private-key use policy, separate from app authentication.
  * @property keyFacts Observed native origin, protection and evidence.
- * @property recovery Latest known backup or restoration state. */
+ * @property recovery Latest known backup or restoration state.
+ * @property custody Additional private-key custodians, independent of recovery. */
 @kotlinx.serialization.Serializable
 public data class WalletIdentity(
     public val id: String,
@@ -22,6 +23,7 @@ public data class WalletIdentity(
     public val authorization: KeyUseAuthorizationPolicy,
     public val keyFacts: PlatformKeyFacts,
     public val recovery: IdentityRecoveryState = IdentityRecoveryState.Disabled,
+    public val custody: List<IdentityCustodyReference> = emptyList(),
 )
 
 /** Backup status says what is known, separately from native signing-key protection. */
@@ -127,9 +129,10 @@ public sealed interface WalletIdentityState {
      */
     public data class Active(public val identity: WalletIdentity) : WalletIdentityState
     /** An interrupted setup must be resumed or cancelled before activation.
+     * @property reason Why the operation needs attention before retry.
      * @property identityId Identifier of the journaled operation's identity.
      */
-    public data class Pending(public val identityId: String) : WalletIdentityState
+    public data class Pending(public val identityId: String, public val reason: IdentityFailure = IdentityFailure.ProviderUnavailable) : WalletIdentityState
     /** Existing state requires attention; a replacement is never generated automatically.
      * @property identityId Known identity identifier, or null for unassociated state.
      * @property reason Stable failure category.
@@ -140,7 +143,8 @@ public sealed interface WalletIdentityState {
 /** Stable failure categories; callers do not need native error-message parsing. */
 public enum class IdentityFailure {
     UnsupportedPolicy, StaleOption, KeyUnavailable, InvalidRecoveryRecord,
-    AuthorizationNotCompleted, NativeOperationFailed, RecoveryUnavailable, ExistingIdentity,
+    AuthorizationNotCompleted, NativeOperationFailed, ProviderUnavailable, ExistingIdentity,
+    ProviderInteractionRequired, ProviderRejected, ProviderConflict, ProviderConfirmationPending,
 }
 
 /** Creation and restore share one lifecycle result. Pending operations are resumable. */
@@ -150,9 +154,10 @@ public sealed interface IdentityOperationResult {
      */
     public data class Active(public val identity: WalletIdentity) : IdentityOperationResult
     /** An interrupted setup must be resumed or cancelled before activation.
+     * @property reason Why the operation needs attention before retry.
      * @property identityId Identifier of the journaled operation's identity.
      */
-    public data class Pending(public val identityId: String) : IdentityOperationResult
+    public data class Pending(public val identityId: String, public val reason: IdentityFailure = IdentityFailure.ProviderUnavailable) : IdentityOperationResult
     /** The operation could not complete.
      * @property reason Stable failure category.
      */

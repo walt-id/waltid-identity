@@ -24,6 +24,11 @@ The record is serialized with defaults included and unknown fields rejected on r
   "keyId": "<original logical wallet key ID>",
   "did": "<exact original did:jwk or did:key URI>",
   "publicJwk": "<original public JWK JSON string>",
+  "constraints": {
+    "storage": "NativeStorage",
+    "authorization": {"type": "id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy.None"},
+    "confirmation": "LocalAcceptance"
+  },
   "secret": {
     "type": "derived",
     "seed": "<32-byte seed, unpadded base64url>",
@@ -45,7 +50,10 @@ key ID and exact DID remain unchanged. The expected public JWK supplies the publ
 comparison uses the decoded key, not string ordering or a replacement DID serialization.
 
 Only general-purpose identities can submit or restore this format through the service. A record
-is not evidence that an issuer permits credential-key migration. Hardware-generated/device-bound
+is not evidence that an issuer permits credential-key migration. The record retains its minimum
+storage destination and explicit authorization policy. Hardware requires hardware on restoration;
+native storage cannot become database storage. Authorization must match an explicitly permitted
+current host option. Native aliases, access groups and old device attestations are not portable policy. Hardware-generated/device-bound
 host policies prohibit the operation independently of the record's cryptographic validity.
 
 ## Derivation
@@ -96,7 +104,7 @@ their own record-ID namespace rules. Unsupported fields/versions and malformed i
 
 The executable option retains a SHA-256 fingerprint of the validated bytes. The record is fetched
 again before import; a changed fingerprint invalidates the option. The destination is rechecked
-against current host policy and device capabilities. Native import must preserve the original public
+against both retained minimums and current host policy/device capabilities. Native import must preserve the original public
 key and imported origin. A fresh signature is independently verified against that public key before
 activation. Native generation attestation cannot be replayed or manufactured from a recovery record.
 

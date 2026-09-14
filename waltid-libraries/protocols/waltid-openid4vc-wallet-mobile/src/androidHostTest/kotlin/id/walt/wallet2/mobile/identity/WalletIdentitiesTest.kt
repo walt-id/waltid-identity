@@ -3,6 +3,7 @@
 package id.walt.wallet2.mobile.identity
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.did.dids.Crypto2DidService
@@ -267,6 +268,119 @@ class WalletIdentitiesTest {
         }
     }
 
+    @Test fun `restoration preserves recorded minimums instead of weakening them to destination defaults`() = runTest {
+        Fixture().use { source ->
+            val option = assertIs<IdentityOptions.Available>(source.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended
+            val original = assertIs<IdentityOperationResult.Active>(source.wallet.identities.create(option)).identity
+            val bytes = source.provider.records.getValue(original.id)
+            val record = recordJson.decodeFromString<RecoveryRecord>(bytes.decodeToString())
+            assertEquals(IdentityKeyStorage.EncryptedDatabase, record.constraints.storage)
+            assertEquals(KeyUseAuthorizationPolicy.None, record.constraints.authorization)
+            for (restricted in listOf(
+                record.constraints.copy(storage = IdentityKeyStorage.Hardware),
+                record.constraints.copy(authorization = KeyUseAuthorizationPolicy.BiometricCurrentSet),
+            )) {
+                source.provider.records[original.id] = record.copy(constraints = restricted).encode()
+                Fixture(provider = source.provider).use { destination ->
+                    val candidate = destination.wallet.identities.recoveryCandidates().single()
+                    assertTrue(destination.wallet.identities.restorationOptions(candidate).isEmpty())
+                    assertTrue(destination.queries.selectAll().executeAsList().isEmpty())
+                }
+            }
+        }
+    }
+
+    @Test fun `provider failures remain actionable after restarting pending setup`() = runTest {
+        val cases = mapOf(
+            IdentityProviderFailure.TemporarilyUnavailable to IdentityFailure.ProviderUnavailable,
+            IdentityProviderFailure.InteractionRequired to IdentityFailure.ProviderInteractionRequired,
+            IdentityProviderFailure.Rejected to IdentityFailure.ProviderRejected,
+            IdentityProviderFailure.Conflict to IdentityFailure.ProviderConflict,
+            IdentityProviderFailure.ConfirmationPending to IdentityFailure.ProviderConfirmationPending,
+        )
+        for ((cause, expected) in cases) Fixture().use { fixture ->
+            fixture.provider.failure = cause
+            val option = assertIs<IdentityOptions.Available>(fixture.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended
+            val pending = assertIs<IdentityOperationResult.Pending>(fixture.wallet.identities.create(option))
+            assertEquals(expected, pending.reason)
+            assertEquals(expected, assertIs<WalletIdentityState.Pending>(fixture.reopen().identities.state()).reason)
+            assertNull(fixture.queries.selectActiveIdentity("default").executeAsOneOrNull())
+            fixture.provider.failure = null
+            assertIs<IdentityOperationResult.Active>(fixture.wallet.identities.resumePending(pending.identityId))
+        }
+    }
+
+    @Test fun `custody preserves local identity and recovery state and persists one verified reference`() = runTest {
+        val custodian = MemoryCustodian()
+        Fixture(IdentityConfiguration(keyCustodians = listOf(custodian),
+            authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None))).use { fixture ->
+            val original = assertIs<IdentityOperationResult.Active>(fixture.wallet.identities.initialize()).identity
+            val option = fixture.wallet.identities.custodyOptions(original.id).single()
+            repeat(2) { assertIs<IdentityCustodyResult.Imported>(fixture.wallet.identities.transferToCustody(option)) }
+            val active = assertIs<WalletIdentityState.Active>(fixture.reopen().identities.state()).identity
+            assertEquals(original.did, active.did)
+            assertEquals(original.publicJwk, active.publicJwk)
+            assertEquals(original.recovery, active.recovery)
+            assertEquals(listOf(IdentityCustodyReference(custodian.id, "kms/${original.keyId}")), active.custody)
+            assertNotNull(SqlDelightKeyStore(NoNative, fixture.queries, "default").getDefaultKeyMaterial())
+            assertEquals(2, custodian.imports)
+            assertTrue(custodian.privateJwk!!.contains("\"d\""))
+            assertEquals(IdentityFailure.StaleOption,
+                assertIs<IdentityCustodyResult.Failed>(fixture.reopen().identities.transferToCustody(option)).reason)
+        }
+    }
+
+    @Test fun `custody conflicts never record verified custody and restricted identities never offer export`() = runTest {
+        val custodian = MemoryCustodian()
+        val config = IdentityConfiguration(keyCustodians = listOf(custodian),
+            authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None))
+        Fixture(config).use { fixture ->
+            val original = assertIs<IdentityOperationResult.Active>(fixture.wallet.identities.initialize()).identity
+            Fixture().use { other ->
+                custodian.returnedJwk = assertIs<IdentityOperationResult.Active>(other.wallet.identities.initialize()).identity.publicJwk
+            }
+            val option = fixture.wallet.identities.custodyOptions(original.id).single()
+            assertEquals(IdentityFailure.ProviderConflict,
+                assertIs<IdentityCustodyResult.Failed>(fixture.wallet.identities.transferToCustody(option)).reason)
+            assertTrue(assertIs<WalletIdentityState.Active>(fixture.wallet.identities.state()).identity.custody.isEmpty())
+            val restricted = fixture.reopen(config.copy(policy = IdentityKeyPolicy.DeviceBound))
+            assertTrue(restricted.identities.custodyOptions(original.id).isEmpty())
+        }
+        Fixture(config.copy(policy = IdentityKeyPolicy.DeviceBound)).use { fixture ->
+            val original = assertIs<IdentityOperationResult.Active>(fixture.wallet.identities.initialize()).identity
+            assertTrue(fixture.wallet.identities.custodyOptions(original.id).isEmpty())
+            assertTrue(fixture.reopen(config).identities.custodyOptions(original.id).isEmpty())
+        }
+    }
+
+    @Test fun `issuance restrictions require retained identity policy and reject a different key`() = runTest {
+        for (policy in listOf(IdentityKeyPolicy.GeneralPurpose, IdentityKeyPolicy.DeviceBound)) {
+            Fixture(IdentityConfiguration(policy = policy,
+                authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None))).use { fixture ->
+                val identity = assertIs<IdentityOperationResult.Active>(fixture.wallet.identities.initialize()).identity
+                val reopened = fixture.reopen().identities
+                reopened.requireKeyPolicy(identity.keyId, IdentityKeyPolicy.GeneralPurpose)
+                if (policy == IdentityKeyPolicy.DeviceBound) reopened.requireKeyPolicy(identity.keyId, policy)
+                else assertFailsWith<IllegalArgumentException> { reopened.requireKeyPolicy(identity.keyId, IdentityKeyPolicy.DeviceBound) }
+                assertFailsWith<IllegalArgumentException> { reopened.requireKeyPolicy(identity.keyId, IdentityKeyPolicy.HardwareGenerated) }
+                assertFailsWith<IllegalArgumentException> { reopened.requireKeyPolicy("different", IdentityKeyPolicy.DeviceBound) }
+            }
+        }
+    }
+
+    private class MemoryCustodian : IdentityKeyCustodian {
+        override val id = "test-custodian"
+        override val displayName = "Test custodian"
+        var imports = 0
+        var privateJwk: String? = null
+        var returnedJwk: String? = null
+        override suspend fun importKey(identity: WalletIdentity, privateKey: EncodedKey.Jwk): IdentityCustodyReceipt {
+            imports++
+            privateJwk = privateKey.data.toByteArray().decodeToString()
+            return IdentityCustodyReceipt("kms/${identity.keyId}", returnedJwk ?: identity.publicJwk)
+        }
+    }
+
     private class Fixture(
         configuration: IdentityConfiguration? = null,
         val provider: MemoryRecovery = MemoryRecovery(),
@@ -287,6 +401,7 @@ class WalletIdentitiesTest {
         override val displayName = "Test-only memory provider"
         val records = mutableMapOf<String, ByteArray>()
         var corruptReadback = false
+        var failure: IdentityProviderFailure? = null
         var receipt = RecoveryReceipt.AcceptedLocally
         var failStore = false
         var available = true
@@ -294,6 +409,7 @@ class WalletIdentitiesTest {
             else RecoveryAvailability.Unavailable("Fixture unavailable")
         override suspend fun list() = records.keys.toList()
         override suspend fun store(recordId: String, record: IdentityRecoveryData): RecoveryReceipt {
+            failure?.let { throw IdentityProviderException(it) }
             check(!failStore)
             val bytes = record.copyBytes()
             check(records[recordId]?.contentEquals(bytes) != false)

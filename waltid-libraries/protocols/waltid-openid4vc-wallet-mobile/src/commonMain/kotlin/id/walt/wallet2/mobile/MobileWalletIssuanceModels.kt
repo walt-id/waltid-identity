@@ -35,7 +35,7 @@ public sealed interface MobileWalletCredentialOffer {
  * App-facing input for starting an OpenID4VCI issuance session.
  *
  * The selected [keyId] is used for DPoP, holder binding, and credential proof creation. When it is
- * omitted, the wallet's first persisted key is selected. [did] is only required when the issuer
+ * omitted, the wallet's active signing identity is selected. [did] is only required when the issuer
  * requires DID binding rather than JWK or COSE-key binding.
  *
  * @property offer Credential offer as a URI or inline JSON object.
@@ -43,6 +43,7 @@ public sealed interface MobileWalletCredentialOffer {
  * @property redirectUri Exact callback URI registered for authorization-code issuance.
  * @property keyId Optional identifier of the holder key selected for DPoP and credential proofs.
  * @property did Optional holder DID URL used when the credential configuration requires DID binding.
+ * @property keyPolicy Minimum host/issuer profile policy; requires an identity created under that retained policy.
  */
 public data class MobileWalletIssuanceRequest(
     public val offer: MobileWalletCredentialOffer,
@@ -50,4 +51,5 @@ public data class MobileWalletIssuanceRequest(
     public val redirectUri: String = "openid://",
     public val keyId: String? = null,
     public val did: String? = null,
+    public val keyPolicy: id.walt.wallet2.mobile.identity.IdentityKeyPolicy = id.walt.wallet2.mobile.identity.IdentityKeyPolicy.GeneralPurpose,
 )
