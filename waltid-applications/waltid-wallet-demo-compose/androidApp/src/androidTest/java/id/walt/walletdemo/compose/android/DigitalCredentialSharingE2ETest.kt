@@ -36,6 +36,7 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.identity.IdentityOperationResult
 import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
@@ -1293,6 +1294,8 @@ class DigitalCredentialSharingE2ETest {
                 ),
             )
             wallet = created.wallet
+            val identity = wallet.identities.initialize()
+            assertTrue("Could not initialize the fixture signing identity: $identity", identity is IdentityOperationResult.Active)
             created.bootstrap(WalletDemoSigningProtection.None)
             demoWalletConfig().signingProtectionStore(context).save(WalletDemoSigningProtection.None)
 
