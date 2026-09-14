@@ -17,6 +17,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirem
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosure
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationError
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewHandle
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewResult
 import id.walt.walletdemo.compose.logic.WalletDemoResponseEncryption
@@ -65,6 +66,23 @@ internal fun ResolveOfferDetailedResponseDto.toDemoPreview(): WalletDemoOfferPre
         transactionCode = transactionCode?.toDemoRequirement(),
         requiresIssuerAuthentication = toDemoGrant() == WalletDemoIssuanceGrant.AuthorizationCode,
     )
+
+internal fun List<WalletDemoPresentationDisclosureSelection>.toDisclosureSelectionDtos(): List<DisclosureSelectionDto> =
+    map { selection ->
+        DisclosureSelectionDto(
+            queryId = selection.queryId,
+            credentialId = selection.credentialId,
+            path = selection.path,
+        )
+    }
+
+internal suspend fun replaceWalletAfterSuccessfulDelete(
+    deleteCurrent: suspend () -> Unit,
+    createReplacement: suspend () -> String,
+): String {
+    deleteCurrent()
+    return createReplacement()
+}
 
 internal fun ResolveOfferDetailedResponseDto.toDemoGrant(): WalletDemoIssuanceGrant {
     val grant = grantType.orEmpty()

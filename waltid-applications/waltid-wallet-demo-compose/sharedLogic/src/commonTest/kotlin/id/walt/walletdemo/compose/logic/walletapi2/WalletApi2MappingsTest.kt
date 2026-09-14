@@ -2,8 +2,11 @@ package id.walt.walletdemo.compose.logic.walletapi2
 
 import id.walt.walletdemo.compose.logic.WalletDeepLinkScheme
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WalletApi2MappingsTest {
@@ -49,6 +52,70 @@ class WalletApi2MappingsTest {
             walletApi2Json.encodeToString(original),
         )
         assertEquals(original, decoded)
+    }
+
+    @Test
+    fun emptyDisclosureSelectionStaysEmpty() {
+        assertEquals(
+            emptyList(),
+            emptyList<WalletDemoPresentationDisclosureSelection>().toDisclosureSelectionDtos(),
+        )
+    }
+
+    @Test
+    fun disclosureSelectionPathsRoundTrip() {
+        val selected = listOf(
+            WalletDemoPresentationDisclosureSelection(
+                queryId = "query-1",
+                credentialId = "cred-1",
+                path = "$.given_name",
+            ),
+        )
+        assertEquals(
+            listOf(
+                DisclosureSelectionDto(
+                    queryId = "query-1",
+                    credentialId = "cred-1",
+                    path = "$.given_name",
+                ),
+            ),
+            selected.toDisclosureSelectionDtos(),
+        )
+    }
+
+    @Test
+    fun emptyDisclosureSelectionIsEncodedAsEmptyArray() {
+        val encoded = walletApi2Json.encodeToString(
+            BuildVpTokenRequestDto(
+                requestUrl = "https://verifier.example/request",
+                selectedDisclosureOptions = emptyList(),
+            ),
+        )
+        assertTrue("\"selectedDisclosureOptions\":[]" in encoded.replace(" ", ""))
+    }
+
+    @Test
+    fun omittedDisclosureSelectionIsNotEncoded() {
+        val encoded = walletApi2Json.encodeToString(
+            BuildVpTokenRequestDto(requestUrl = "https://verifier.example/request"),
+        )
+        assertFalse("selectedDisclosureOptions" in encoded)
+    }
+
+    @Test
+    fun replaceWalletAfterSuccessfulDeleteDoesNotCreateWhenDeleteFails() = runTest {
+        var created = false
+        val result = runCatching {
+            replaceWalletAfterSuccessfulDelete(
+                deleteCurrent = { error("HTTP 500") },
+                createReplacement = {
+                    created = true
+                    "wallet-2"
+                },
+            )
+        }
+        assertTrue(result.isFailure)
+        assertFalse(created)
     }
 }
 
