@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.ui.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.toCardDisplayData
@@ -15,7 +16,7 @@ internal fun CredentialCard(
     onClick: () -> Unit,
 ) {
     CredentialCardArt(
-        art = details.toCardDisplayData().toCardArt(),
+        art = remember(details) { details.toCardDisplayData().toCardArt() },
         compact = compact,
         modifier = modifier
             .fillMaxWidth()

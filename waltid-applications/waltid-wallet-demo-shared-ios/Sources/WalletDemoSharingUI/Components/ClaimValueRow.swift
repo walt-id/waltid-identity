@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 import UIKit
 
@@ -33,11 +34,13 @@ private struct ClaimValueView: View {
         case .decodedText(let value), .text(let value), .number(let value):
             Text(value)
                 .font(.caption)
+        case .deferredImage(let source):
+            DeferredImageValue(source: source, path: path)
         case .image(_, let data, let mimeType, let byteCount):
             ImageValue(data: data, mimeType: mimeType, byteCount: byteCount, path: path)
         case .list(let values):
             let preview = DisplayListPreview(values: values)
-            VStack(alignment: .leading, spacing: 4) {
+            LazyVStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(preview.values.enumerated()), id: \.offset) { index, value in
                     HStack(alignment: .top, spacing: 4) {
                         Text("\(index + 1).")
@@ -56,7 +59,7 @@ private struct ClaimValueView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .object(let entries):
-            VStack(alignment: .leading, spacing: 6) {
+            LazyVStack(alignment: .leading, spacing: 6) {
                 ForEach(entries) { entry in
                     ClaimValueRow(item: entry)
                 }
@@ -84,15 +87,72 @@ struct DisplayListPreview {
     }
 }
 
+private struct DeferredImageValue: View {
+    let source: DeferredCredentialImage
+    let path: ClaimItemPath
+    @State private var resolved: DisplayValue?
+
+    var body: some View {
+        Group {
+            if let resolved {
+                ClaimValueView(value: resolved, path: path)
+            } else {
+                Color.clear.frame(width: 112, height: 112)
+            }
+        }
+        .task(id: ObjectIdentifier(source)) {
+            resolved = nil
+            let value = await CredentialImageDecoder.shared.resolve(source)
+            guard !Task.isCancelled else { return }
+            resolved = value
+        }
+    }
+}
+
+// Serialize expensive decodes and skip work that was cancelled while waiting for the actor.
+private actor CredentialImageDecoder {
+    static let shared = CredentialImageDecoder()
+
+    func resolve(_ source: DeferredCredentialImage) -> DisplayValue? {
+        guard !Task.isCancelled else { return nil }
+        return autoreleasepool { source.resolve() }
+    }
+
+    func thumbnail(_ data: Data, maxPixelSize: Int) -> UIImage? {
+        guard !Task.isCancelled else { return nil }
+        return autoreleasepool { credentialThumbnail(data, maxPixelSize: maxPixelSize) }
+    }
+}
+
+private func credentialThumbnail(_ data: Data, maxPixelSize: Int) -> UIImage? {
+    guard let source = CGImageSourceCreateWithData(data as CFData,
+        [kCGImageSourceShouldCache: false] as CFDictionary) else { return nil }
+    let options: [CFString: Any] = [
+        kCGImageSourceCreateThumbnailFromImageAlways: true,
+        kCGImageSourceCreateThumbnailWithTransform: true,
+        kCGImageSourceShouldCacheImmediately: true,
+        kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+    ]
+    guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+    return UIImage(cgImage: image)
+}
+
 private struct ImageValue: View {
     let data: Data
     let mimeType: String
     let byteCount: Int
     let path: ClaimItemPath
     @State private var viewerOpen = false
+    @State private var image: UIImage?
 
     var body: some View {
         content(image: image)
+            .task(id: data) {
+                image = nil
+                let thumbnail = await CredentialImageDecoder.shared.thumbnail(data, maxPixelSize: 336)
+                guard !Task.isCancelled else { return }
+                image = thumbnail
+            }
     }
 
     private func content(image: UIImage?) -> some View {
@@ -126,7 +186,8 @@ private struct ImageValue: View {
         .fullScreenCover(isPresented: $viewerOpen) {
             if let image {
                 CredentialImageViewer(
-                    image: image,
+                    data: data,
+                    preview: image,
                     path: path,
                     onDismiss: { viewerOpen = false }
                 )
@@ -135,15 +196,14 @@ private struct ImageValue: View {
         }
     }
 
-    private var image: UIImage? {
-        UIImage(data: data)
-    }
 }
 
 private struct CredentialImageViewer: View {
-    let image: UIImage
+    let data: Data
+    let preview: UIImage
     let path: ClaimItemPath
     let onDismiss: () -> Void
+    @State private var image: UIImage?
 
     var body: some View {
         ZStack {
@@ -152,7 +212,7 @@ private struct CredentialImageViewer: View {
                 .accessibilityLabel("Credential image viewer")
                 .accessibilityIdentifier(WalletAccessibilityID.claimImageViewer(path.id))
 
-            Image(uiImage: image)
+            Image(uiImage: image ?? preview)
                 .resizable()
                 .scaledToFit()
                 .padding(.horizontal, 24)
@@ -175,6 +235,11 @@ private struct CredentialImageViewer: View {
                 Spacer()
             }
             .padding(16)
+        }
+        .task(id: data) {
+            let fullScreenImage = await CredentialImageDecoder.shared.thumbnail(data, maxPixelSize: 2048)
+            guard !Task.isCancelled else { return }
+            image = fullScreenImage
         }
     }
 }

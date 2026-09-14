@@ -1,22 +1,43 @@
-name: Release on manual push
+name: Promote a release candidate to a general release
 
 on:
   workflow_dispatch:
     inputs:
-      release_version:
-        description: 'Release version'
+      version:
+        description: 'Version to promote (must already be published by release-candidate.yml)'
         required: true
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
 
 jobs:
   version:
     uses: ./.github/workflows/version.yml
     with:
-      preferred: ${{ inputs.release_version }}
+      preferred: ${{ inputs.version }}
+  guard:
+    name: Guard against promoting a pre-release
+    runs-on: ubuntu-latest
+    needs: version
+    steps:
+      - name: Reject pre-release versions
+        env:
+          VERSION: ${{ needs.version.outputs.release_version }}
+        run: |
+          case "$VERSION" in
+            *PRE-RELEASE*|*SNAPSHOT*)
+              echo "::error::Refusing to promote '$VERSION' to stable/latest and prod."
+              exit 1
+              ;;
+          esac
+          echo "Promoting $VERSION."
   enterprise-ref:
     name: Resolve enterprise branch ref
     runs-on: ubuntu-latest
     outputs:
       ref: ${{ steps.ref.outputs.ref }}
+      license-ref: ${{ steps.ref.outputs.license-ref }}
     steps:
       - name: Determine ref to dispatch on
         id: ref
@@ -31,76 +52,61 @@ jobs:
             echo "Branch '$REF' not found in waltid-identity-enterprise, using main."
             echo "ref=main" >> "$GITHUB_OUTPUT"
           fi
-  gradle:
-    uses: ./.github/workflows/gradle.yml
-    secrets: inherit
-    needs: version
-    with:
-      version: ${{ needs.version.outputs.release_version }}
-      enable-android-build: true
-      publish: true
-      cacheless: true
-      run-conformance: true
-      run-issuer-conformance: true
-      run-haip-conformance: true
-      report-check-name: 'gradle / gradle (ubuntu-22.04)'
-      conformance-report-check-name: 'gradle / conformance (ubuntu-22.04)'
-  integration-test-aws:
-    name: Integration Tests - AWS
+
+          if git ls-remote --exit-code --heads "https://${TOKEN}@github.com/walt-id/waltid-identity-enterprise-license.git" "$REF"; then
+            echo "Branch '$REF' found in waltid-identity-enterprise-license, using it."
+            echo "license-ref=$REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch '$REF' not found in waltid-identity-enterprise-license, using main."
+            echo "license-ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
+  retag:
+    name: Promote image tags
     runs-on: ubuntu-latest
-    needs: enterprise-ref
+    needs: [ version, guard ]
     steps:
-      - name: Dispatch integration-test-aws.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+      - uses: actions/checkout@v6
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
         with:
-          workflow: integration-test-aws.yml
-          repo: walt-id/waltid-identity-enterprise
-          ref: ${{ needs.enterprise-ref.outputs.ref }}
-          token: ${{ secrets.GH_ACCESS_TOKEN }}
-          wait-for-completion: true
-          sync-status: true
-  integration-test-azure:
-    name: Integration Tests - Azure
-    runs-on: ubuntu-latest
-    needs: enterprise-ref
-    steps:
-      - name: Dispatch integration-test-azure.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
-        with:
-          workflow: integration-test-azure.yml
-          repo: walt-id/waltid-identity-enterprise
-          ref: ${{ needs.enterprise-ref.outputs.ref }}
-          token: ${{ secrets.GH_ACCESS_TOKEN }}
-          wait-for-completion: true
-          sync-status: true
-  docker:
-    uses: ./.github/workflows/docker.yml
-    secrets: inherit
-    needs: version
-    with:
-      version: ${{ needs.version.outputs.release_version }}
-      tags: '["stable", "latest"]'
-      publish: true
-  api-docker:
-    uses: ./.github/workflows/api-docker.yml
-    secrets: inherit
-    needs: version
-    with:
-      version: ${{ needs.version.outputs.release_version }}
-      tags: '["stable", "latest"]'
-      publish: true
-  sdk-docs:
-    uses: ./.github/workflows/mobile-sdk-docs.yml
-    secrets: inherit
-    needs: version
-    with:
-      deploy: true
-      version: ${{ needs.version.outputs.release_version }}
-      tags: '["stable", "latest"]'
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Point stable and latest at the verified digests
+        env:
+          VERSION: ${{ needs.version.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          images="$(
+            {
+              jq -r '.[].image' \
+                .github/workflows/data/docker-matrix.json \
+                .github/workflows/data/api-docker-matrix.json
+              echo waltid-sdk-docs
+            } | sort -u
+          )"
+          for image in $images; do
+            echo "::group::waltid/${image}"
+            digest="$(docker buildx imagetools inspect "waltid/${image}:${VERSION}" \
+              --format '{{json .Manifest}}' | jq -r '.digest')"
+            if [ -z "$digest" ] || [ "$digest" = "null" ]; then
+              echo "::error::Could not resolve a digest for waltid/${image}:${VERSION}. Was this version published by release-candidate.yml?"
+              exit 1
+            fi
+            docker buildx imagetools create \
+              --tag "waltid/${image}:stable" \
+              --tag "waltid/${image}:latest" \
+              "waltid/${image}@${digest}"
+            echo "promoted waltid/${image}:${VERSION} (${digest}) -> stable, latest"
+            echo "::endgroup::"
+          done
+
   enterprise-image-digests:
     name: Resolve enterprise image digests
     runs-on: ubuntu-latest
-    needs: [ version, api-docker, docker ]
+    needs: [ version, retag ]
     outputs:
       api-index-digest: ${{ steps.digest.outputs.api }}
       ui-index-digest: ${{ steps.digest.outputs.ui }}
@@ -123,7 +129,7 @@ jobs:
   enterprise-supply-chain:
     name: Enterprise supply chain
     runs-on: ubuntu-latest
-    needs: [ enterprise-ref, enterprise-image-digests ]
+    needs: [ version, enterprise-ref, enterprise-image-digests ]
     steps:
       - name: Dispatch enterprise-supply-chain.yml and wait
         uses: benc-uk/workflow-dispatch@v1.3.2
@@ -135,43 +141,44 @@ jobs:
           wait-for-completion: true
           sync-status: true
           inputs: '{"api-index-digest": "${{ needs.enterprise-image-digests.outputs.api-index-digest }}", "ui-index-digest": "${{ needs.enterprise-image-digests.outputs.ui-index-digest }}", "version": "${{ needs.version.outputs.release_version }}"}'
+
   deploy-license:
     name: Deploy license
     runs-on: ubuntu-latest
-    needs: [ version, enterprise-ref, gradle, docker, api-docker, sdk-docs, integration-test-aws, integration-test-azure ]
-    if: ${{ !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    needs: [ version, enterprise-ref, retag ]
     steps:
-      - name: Dispatch deploy-k8s-license.yml and wait
+      - name: Dispatch deploy-k8s.yml and wait
         uses: benc-uk/workflow-dispatch@v1.3.2
         with:
-          workflow: deploy-k8s-license.yml
-          repo: walt-id/waltid-identity-enterprise
-          ref: ${{ needs.enterprise-ref.outputs.ref }}
+          workflow: deploy-k8s.yml
+          repo: walt-id/waltid-identity-enterprise-license
+          ref: ${{ needs.enterprise-ref.outputs.license-ref }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
-          inputs: '{"version": "${{ needs.version.outputs.release_version }}"}'
+          inputs: '{"version": "${{ needs.version.outputs.release_version }}", "k8s_file": "waltid-license-server/k8s/deployment-prod.yaml"}'
   deploy:
     uses: ./.github/workflows/deployment.yml
     secrets: inherit
     needs: [ version, deploy-license ]
     with:
       version: ${{ needs.version.outputs.release_version }}
-      deployment: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'dev' || 'prod' }}
-      oss: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-identity-main' || 'identity-main' }}
-      enterprise: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-enterprise-main' || 'enterprise-main' }}
+      deployment: prod
+      oss: identity-main
+      enterprise: enterprise-main
+
   branch:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
     needs: [ version, deploy ]
-    if: ${{ endsWith(needs.version.outputs.release_version, '.0') && !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    if: ${{ endsWith(needs.version.outputs.release_version, '.0') }}
     with:
       version: ${{ needs.version.outputs.release_version }}
   enterprise-branch:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
     needs: [ version, deploy ]
-    if: ${{ endsWith(needs.version.outputs.release_version, '.0') && !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    if: ${{ endsWith(needs.version.outputs.release_version, '.0') }}
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-identity-enterprise
@@ -179,7 +186,7 @@ jobs:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
     needs: [ version, deploy ]
-    if: ${{ endsWith(needs.version.outputs.release_version, '.0') && !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    if: ${{ endsWith(needs.version.outputs.release_version, '.0') }}
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-docs
@@ -187,7 +194,7 @@ jobs:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
     needs: [ version, deploy ]
-    if: ${{ endsWith(needs.version.outputs.release_version, '.0') && !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    if: ${{ endsWith(needs.version.outputs.release_version, '.0') }}
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-enterprise-quickstart
@@ -195,10 +202,11 @@ jobs:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
     needs: [ version, deploy ]
-    if: ${{ endsWith(needs.version.outputs.release_version, '.0') && !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    if: ${{ endsWith(needs.version.outputs.release_version, '.0') }}
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-unified-build
+
   tag:
     uses: ./.github/workflows/tag.yml
     secrets: inherit
@@ -233,6 +241,7 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-unified-build
+
   release:
     uses: ./.github/workflows/create-release.yml
     secrets: inherit

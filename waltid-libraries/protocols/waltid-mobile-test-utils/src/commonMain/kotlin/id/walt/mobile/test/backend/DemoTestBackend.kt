@@ -191,13 +191,16 @@ object DemoTestBackend {
      * query parameter instead of a `credential_offer_uri`. The issuer defaults to `BY_REFERENCE`,
      * which is what the QR and deep link flows consume; DC API issuance needs the offer object itself
      * because it is passed to `navigator.credentials.create` / Credential Manager verbatim.
+     * [runtimeOverrides] supplies test-specific credential data without changing the shared issuer profile.
      */
     suspend fun createOffer(
         scenario: CredentialScenario,
         withGeneratedTransactionCode: Boolean = false,
         inlineOffer: Boolean = false,
+        runtimeOverrides: JsonObject? = null,
     ): GeneratedOffer {
         val payload = buildJsonObject {
+            runtimeOverrides?.let { put("runtimeOverrides", it) }
             put("profileId", scenario.profileId)
             put("authMethod", "PRE_AUTHORIZED")
             if (inlineOffer) put("valueMode", "BY_VALUE")

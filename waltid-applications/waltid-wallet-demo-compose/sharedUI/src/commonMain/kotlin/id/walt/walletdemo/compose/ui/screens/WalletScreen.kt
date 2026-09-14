@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
-import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
 
 @Composable
@@ -22,8 +21,6 @@ internal fun WalletScreen(
     state: WalletDemoUiState,
     onSignOut: (() -> Unit)? = null,
 ) {
-    val ready = state.session as? WalletSessionState.Ready
-    val credentials = ready?.credentials.orEmpty()
     val openAuthorizationRequest = rememberAuthorizationRequestOpener()
     var showingSettings by remember { mutableStateOf(false) }
     var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
@@ -77,7 +74,7 @@ internal fun WalletScreen(
 
         when (state.selectedTab) {
             WalletDemoTab.Credentials -> CredentialsTab(
-                credentials = credentials,
+                session = state.session,
                 onDeleteCredential = controller::deleteCredential,
                 onDetailsChromeChange = { detailsChrome = it },
                 modifier = modifier,
