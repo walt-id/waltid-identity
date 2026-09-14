@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
@@ -78,24 +79,39 @@ internal object WalletComposeE2EHelper {
 
     fun unlock(device: UiDevice) {
         val pinInput = waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT)
-        assertNotNull("PIN input not found", pinInput)
-        pinInput!!.setText(PIN)
+            ?: throw AssertionError("PIN input not found. ${foregroundWindowSnapshot(device)}")
+        pinInput.setText(PIN)
 
         waitForResource(device, "wallet.pinConfirmationInput", 2_000L)?.setText(PIN)
 
         clickByTag(device, "wallet.pinSubmitButton")
-        // Fresh wallets require explicit identity selection before protocol tests can proceed.
-        device.wait(Until.findObject(By.text("Use this option")), 5_000L)?.click()
+        awaitWalletReady(device)
+    }
 
-        assertTrue(
-            "Wallet did not become ready after unlock. Latest status: ${latestStatus(device)}",
-            waitForStatus(
-                device = device,
-                timeoutMs = WALLET_READY_TIMEOUT,
-                matcher = { it == "Wallet ready" },
-                failurePrefixes = listOf("Bootstrap failed")
-            )
-        )
+    private fun awaitWalletReady(device: UiDevice) {
+        val deadline = System.currentTimeMillis() + WALLET_READY_TIMEOUT
+        var identitySelected = false
+        while (System.currentTimeMillis() < deadline) {
+            val status = latestStatus(device)
+            if (status == "Wallet ready") return
+            if (status.startsWith("Bootstrap failed")) break
+            if (!identitySelected) {
+                try {
+                    // The first offered choice is the recommended identity without recovery.
+                    device.findObject(By.res("wallet.identityChoice.0"))?.let { choice ->
+                        if (choice.isEnabled) {
+                            choice.click()
+                            identitySelected = true
+                        }
+                    }
+                } catch (_: StaleObjectException) {
+                    // Re-query when Compose replaces the accessibility tree during setup.
+                }
+            }
+            Thread.sleep(500)
+        }
+        fail("Wallet did not become ready after unlock. Latest status: ${latestStatus(device)}. " +
+            foregroundWindowSnapshot(device))
     }
 
     fun sendDeepLink(context: Context, url: String) {
@@ -363,15 +379,15 @@ internal object WalletComposeE2EHelper {
         waitForIdle()
     }
 
-    fun latestStatus(device: UiDevice): String {
-        val tagged = device.findObject(By.res("wallet.status"))
-        if (tagged?.text != null) return tagged.text
-
-        for (prefix in statusPrefixes) {
-            val obj = device.findObject(By.textStartsWith(prefix))
-            if (obj != null) return obj.text
-        }
-        return "UNKNOWN"
+    fun latestStatus(device: UiDevice): String = try {
+        device.findObject(By.res("wallet.status"))?.text
+            ?: statusPrefixes.firstNotNullOfOrNull { prefix ->
+                device.findObject(By.textStartsWith(prefix))?.text
+            }
+            ?: "UNKNOWN"
+    } catch (_: StaleObjectException) {
+        // A screen transition invalidated the node; the next poll reads the new tree.
+        "UNKNOWN"
     }
 
     fun waitForStatus(
