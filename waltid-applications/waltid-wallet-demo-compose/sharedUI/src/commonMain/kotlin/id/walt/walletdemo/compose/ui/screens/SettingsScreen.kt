@@ -53,6 +53,7 @@ internal fun SettingsScreen(
     onBack: () -> Unit,
     onLock: () -> Unit,
     onResetWallet: () -> Unit,
+    onSignOut: (() -> Unit)? = null,
     onRequestSigningProtectionChange: (WalletDemoSigningProtection) -> Unit,
     onConfirmSigningProtectionChange: () -> Unit,
     onCancelSigningProtectionChange: () -> Unit,
@@ -121,55 +122,57 @@ internal fun SettingsScreen(
                 copyTag = WalletUiTestTags.SettingsPublicJwkCopy,
                 onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
             )
-            SigningProtectionSettings(
-                state = state,
-                ready = ready,
-                onRequestChange = onRequestSigningProtectionChange,
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.SettingsCredentialSharing),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    "Credential Sharing",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+            if (state.pinLockEnabled) {
+                SigningProtectionSettings(
+                    state = state,
+                    ready = ready,
+                    onRequestChange = onRequestSigningProtectionChange,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(WalletUiTestTags.SettingsCredentialSharing),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    Text(
+                        "Credential Sharing",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            "Show Walt Wallet preview for DC API Presentation",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            "When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                "Show Walt Wallet preview for DC API Presentation",
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(
+                                "When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = state.showDcApiPresentationPreview,
+                            onCheckedChange = onShowDcApiPresentationPreviewChange,
+                            modifier = Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview),
                         )
                     }
-                    Switch(
-                        checked = state.showDcApiPresentationPreview,
-                        onCheckedChange = onShowDcApiPresentationPreviewChange,
-                        modifier = Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview),
-                    )
                 }
-            }
-            OutlinedButton(
-                onClick = onLock,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.SettingsLock),
-            ) {
-                Text("Lock")
+                OutlinedButton(
+                    onClick = onLock,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(WalletUiTestTags.SettingsLock),
+                ) {
+                    Text("Lock")
+                }
             }
             Button(
                 onClick = { confirmReset = true },
@@ -182,6 +185,16 @@ internal fun SettingsScreen(
                 ),
             ) {
                 Text("Reset wallet")
+            }
+            if (onSignOut != null) {
+                OutlinedButton(
+                    onClick = onSignOut,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(WalletUiTestTags.SettingsSignOut),
+                ) {
+                    Text("Sign out")
+                }
             }
         }
     }

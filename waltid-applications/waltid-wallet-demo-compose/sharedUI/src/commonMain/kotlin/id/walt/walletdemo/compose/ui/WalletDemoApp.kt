@@ -30,6 +30,7 @@ import id.walt.walletdemo.compose.ui.screens.WalletScreen
 fun WalletDemoApp(
     controller: WalletDemoController,
     branding: WalletDemoBranding = WalletDemoBranding(),
+    onSignOut: (() -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
@@ -78,7 +79,7 @@ fun WalletDemoApp(
                             message = auth.message,
                         )
                     }
-                    WalletAuthState.Unlocked -> WalletScreen(controller, state)
+                    WalletAuthState.Unlocked -> WalletScreen(controller, state, onSignOut = onSignOut)
                 }
             }
         }
