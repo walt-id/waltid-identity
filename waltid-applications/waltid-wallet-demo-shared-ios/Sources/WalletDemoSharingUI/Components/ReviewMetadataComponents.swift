@@ -117,7 +117,9 @@ public struct MetadataDisclosure<Content: View>: View {
 
     public var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
-            content.padding(.top, 4)
+            if isExpanded {
+                content.padding(.top, 4)
+            }
         } label: {
             disclosureLabel
         }

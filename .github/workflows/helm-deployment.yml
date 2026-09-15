@@ -67,9 +67,45 @@ jobs:
 
           # Update image name in helm-values.json
           sed -i "s|\"latest\"|\"${IMAGE_NAME}\"|g" helm-values.json
+      - uses: azure/setup-kubectl@v4
       - uses: azure/setup-helm@v5.0.0
       - name: Create kubeconfig file
         run: echo "${{ secrets[inputs.kubeconfig_secret] }}" | base64 --decode > ${{ github.workspace }}/kubeconfig
+      - name: Create portal2 PID secret
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+          PORTAL2_PID_ENV: ${{ secrets.PORTAL2_PID_ENV }}
+        run: |
+          if [ -z "$PORTAL2_PID_ENV" ]; then
+            echo "::error::PORTAL2_PID_ENV is not set. Add PORTAL2_PID_ENV in your repository secrets."
+            echo "Deploy aborted: PORTAL2_PID_ENV is not set." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          ENV_FILE="$RUNNER_TEMP/portal2-pid.env"
+          printf '%s\n' "$PORTAL2_PID_ENV" > "$ENV_FILE"
+
+          present=$(awk -F= '/^[A-Za-z_][A-Za-z0-9_]*=/ { print $1 }' "$ENV_FILE")
+          missing=()
+          for name in \
+            NUXT_PID_GERMAN_KEY_JWK NUXT_PID_GERMAN_X5C NUXT_PID_GERMAN_CLIENT_ID \
+            NUXT_PID_GERMAN_VERIFIER_INFO NUXT_PID_FRANCE_KEY_JWK NUXT_PID_FRANCE_X5C \
+            NUXT_PID_FRANCE_CLIENT_ID NUXT_PID_EUDI_REF_KEY_JWK NUXT_PID_EUDI_REF_X5C \
+            NUXT_PID_EUDI_REF_CLIENT_ID; do
+            grep -qxF "$name" <<< "$present" || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            rm -f "$ENV_FILE"
+            echo "::error::PORTAL2_PID_ENV is missing: ${missing[*]}"
+            echo "Deploy aborted: PORTAL2_PID_ENV is missing ${missing[*]}." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          kubectl create secret generic portal2-pid-secret \
+            --namespace ${{ inputs.namespace }} \
+            --from-env-file="$ENV_FILE" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          rm -f "$ENV_FILE"
       - name: Helm Dependency Build
         run: |
           helm dependency build ./helm-charts/waltid

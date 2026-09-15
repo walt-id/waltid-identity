@@ -12,6 +12,7 @@ public struct CredentialDetails: Equatable, Identifiable {
     public let issuerDisplay: MetadataDisplay?
     public let credentialDisplay: MetadataDisplay?
     public let credentialDataJSON: String?
+    let cardTitle: String
 
     public init(
         id: String,
@@ -44,6 +45,12 @@ public struct CredentialDetails: Equatable, Identifiable {
                 preferredLocales: Locale.preferredLanguages
             )
         self.credentialDataJSON = credentialDataJSON
+        self.cardTitle = CredentialTitles.displayName(
+            format: format,
+            credentialDataJSON: credentialDataJSON,
+            displayName: self.credentialDisplay?.name,
+            fallback: title
+        )
     }
 }
 
@@ -94,6 +101,7 @@ public enum DisplayValue: Equatable {
     case bool(Bool)
     case object([ClaimItem])
     case list([DisplayValue])
+    case deferredImage(DeferredCredentialImage)
     case image(encoded: String, data: Data, mimeType: String, byteCount: Int)
     case decodedText(String)
     case raw(String)
@@ -279,5 +287,22 @@ public enum DisplayTransactionDataField {
         case .details: return "details"
         case .raw: return "raw"
         }
+    }
+}
+
+/// Keeps encoded media out of list construction and view updates. The visible row owns the result.
+public final class DeferredCredentialImage: Equatable {
+    public let byteCount: Int?
+    private let decode: () -> DisplayValue
+
+    init(byteCount: Int? = nil, decode: @escaping () -> DisplayValue) {
+        self.byteCount = byteCount
+        self.decode = decode
+    }
+
+    public func resolve() -> DisplayValue { decode() }
+
+    public static func == (lhs: DeferredCredentialImage, rhs: DeferredCredentialImage) -> Bool {
+        lhs === rhs
     }
 }

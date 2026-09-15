@@ -4,6 +4,18 @@ import XCTest
 final class MockWalletUITests: XCTestCase {
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
+    func testCredentialsStayLoadingUntilTheInitialReadCompletes() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_WALLET_DELAY_MS": "8000"])
+        let loading = app.descendants(matching: .any)["wallet.credentials.loading"].firstMatch
+        XCTAssertTrue(loading.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.descendants(matching: .any)["wallet.credentials.empty"].exists)
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 20), "Wallet ready")
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.credentials.empty"].waitForExistence(timeout: 3))
+        XCTAssertFalse(loading.exists)
+    }
+
     func testUrlEditorsAreTopControlsInReceiveAndPresentTabs() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)

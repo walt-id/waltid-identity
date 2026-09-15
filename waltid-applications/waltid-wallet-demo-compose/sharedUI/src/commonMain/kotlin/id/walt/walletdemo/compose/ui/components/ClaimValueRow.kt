@@ -20,8 +20,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +44,8 @@ import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.ClaimItemPath
 import id.walt.walletdemo.compose.logic.DisplayValue
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier) {
@@ -72,6 +78,7 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
             modifier = modifier,
             style = MaterialTheme.typography.bodyMedium,
         )
+        is DisplayValue.DeferredImage -> DeferredImageValue(value, path, modifier)
         is DisplayValue.Image -> ImageValue(value, path, modifier)
         is DisplayValue.ListValue -> Column(
             modifier = modifier,
@@ -121,6 +128,31 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
             modifier = modifier,
             style = MaterialTheme.typography.bodyMedium,
         )
+    }
+}
+
+// Bound concurrent validation work, including ImageIO on Compose iOS.
+private val imageDecodeDispatcher = Dispatchers.Default.limitedParallelism(2)
+
+@Composable
+private fun DeferredImageValue(source: DisplayValue.DeferredImage, path: ClaimItemPath, modifier: Modifier) {
+    var visible by remember(source) { mutableStateOf(false) }
+    var resolved by remember(source) { mutableStateOf<DisplayValue?>(null) }
+    Box(modifier.onGloballyPositioned { coordinates ->
+        val bounds = coordinates.boundsInWindow()
+        visible = bounds.width > 0 && bounds.height > 0
+    }) {
+        val value = resolved
+        if (value == null) {
+            Box(Modifier.size(112.dp))
+        } else {
+            ClaimValue(value, path)
+        }
+    }
+    LaunchedEffect(source, visible) {
+        if (visible && resolved == null) {
+            resolved = withContext(imageDecodeDispatcher) { source.resolve() }
+        }
     }
 }
 

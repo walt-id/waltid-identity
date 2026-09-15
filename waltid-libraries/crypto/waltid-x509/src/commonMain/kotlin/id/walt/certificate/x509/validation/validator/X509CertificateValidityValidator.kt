@@ -5,18 +5,22 @@ import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Instant
 
+/**
+ * @param clock the source of "now" this validator judges validity against. Defaults to the system clock;
+ *   pass a fixed clock to decide validity as of a chosen instant, which is what tests holding a captured
+ *   real-world certificate need - otherwise they start failing on the day that certificate expires.
+ */
 class X509CertificateValidityValidator(
     private val allowValidityInFuture: Boolean = false,
-    private val timeProvider: () -> Instant
+    private val clock: Clock
 ) : X509CertificateValidator {
 
     override val id: String = ID
 
     constructor(
         allowValidityInFuture: Boolean = false
-    ) : this(allowValidityInFuture = allowValidityInFuture, timeProvider = { Clock.System.now() })
+    ) : this(allowValidityInFuture = allowValidityInFuture, clock = Clock.System)
 
     override suspend fun validate(
         context: ValidationContext,
@@ -26,7 +30,7 @@ class X509CertificateValidityValidator(
         if ((certificateValidity.notBefore - certificateValidity.notAfter).isPositive()) {
             context.addLogEntry(ValidationResult.Severity.ERROR, "Illegal certificate validity")
         } else {
-            val now = timeProvider.invoke()
+            val now = clock.now()
             if ((now - certificateValidity.notBefore).isNegative()) {
                 if (allowValidityInFuture) {
                     context.addLogEntry(ValidationResult.Severity.WARNING, "Certificate is not yet valid")

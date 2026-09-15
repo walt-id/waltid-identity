@@ -59,7 +59,7 @@ class X509CertificateChainValidationTest {
             googleComCrtPem,
             gtsWe2CrtPem,
         ).joinToString("\n")
-        val result = certUtil.validatePemCertificateChain(certificatePem)
+        val result = capturedChainCertUtil.validatePemCertificateChain(certificatePem)
         assertTrue(result.valid)
         result.log.filter { it.validatorId == X509CertificateSignatureValidator.ID }
             .also { signatureValidatorLog ->
@@ -163,9 +163,44 @@ class X509CertificateChainValidationTest {
 
     companion object {
 
+        // Google certificates are valid till 24.09.2026
+        private val timeOffset = Clock.System.now() - Instant.parse("2026-09-01T00:00:00Z")
+
+        private val testClock: Clock = object : Clock {
+            override fun now(): Instant =
+                Clock.System.now() - timeOffset
+        }
+
         val trustStore = InMemoryTrustStore(
             listOf(gtsRootR4CrtPem)
                 .map { X509CertificateUtil.parseCertificatePem(it) })
+
+        /**
+         * A captured real leaf certificate lives about 90 days, so judging it against the system clock means
+         * the test validating it starts failing on the day it expires - which is what happened on 14 September
+         * 2026. What that test covers is chain and signature validation, not whether a certificate pasted into
+         * test data is valid today.
+         *
+         * So validity is judged at the midpoint of the leaf's own window: inside it by construction, and still
+         * inside it if someone later drops in a freshly captured certificate. Replacing the default validator
+         * works because [X509CertificateUtilBuilder.addValidators] substitutes by validator id.
+         *
+         * Deliberately not applied to [certUtil] or [caCertUtil]: those are also used by tests that build
+         * their certificates at the real "now", and a clock pinned into the past makes those not yet valid.
+         */
+        private val googleLeafValidity = X509CertificateUtil.parseCertificatePem(googleComCrtPem).data.validity
+        private val whileGoogleLeafWasValid = X509CertificateValidityValidator(
+            clock = object : Clock {
+                override fun now(): Instant =
+                    googleLeafValidity.notBefore + (googleLeafValidity.notAfter - googleLeafValidity.notBefore) / 2
+            },
+        )
+
+        /** [certUtil] with validity judged while the captured leaf was valid. */
+        val capturedChainCertUtil = X509CertificateUtil {
+            setTrust(trustStore)
+            addValidators(whileGoogleLeafWasValid)
+        }
 
         val certUtil = X509CertificateUtil {
             /**
@@ -173,11 +208,12 @@ class X509CertificateChainValidationTest {
              * and without a system trust store to ensure the same behavior in JS and JVM
              */
             setTrust(trustStore)
-            addValidators(X509CertificateValidityValidator(
-                allowValidityInFuture = true,
-                timeProvider = {
-                getTestTime()
-            }))
+            addValidators(
+                X509CertificateValidityValidator(
+                    allowValidityInFuture = true,
+                    clock = testClock
+                )
+            )
         }
 
         val caCertUtil = X509CertificateUtil {
@@ -188,16 +224,8 @@ class X509CertificateChainValidationTest {
             setTrust(trustStore)
             addValidators(
                 X509CertificateBasicConstraintsValidator(leafCanBeCa = true),
-                X509CertificateValidityValidator(timeProvider = {
-                    getTestTime()
-                })
+                X509CertificateValidityValidator(clock = testClock)
             )
         }
-
-        // Google certificates are valid till 24.09.2026
-        private val timeOffset = Clock.System.now() - Instant.parse("2026-09-01T00:00:00Z")
-
-        private fun getTestTime() =
-            Clock.System.now() - timeOffset
     }
 }

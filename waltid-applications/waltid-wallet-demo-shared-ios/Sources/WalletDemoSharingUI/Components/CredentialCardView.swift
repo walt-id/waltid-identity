@@ -1,7 +1,6 @@
 import Foundation
 import SwiftUI
 import UIKit
-import WalletSDK
 
 public let id1AspectRatio: CGFloat = 1.586
 public let credentialCardPeek: CGFloat = 56
@@ -13,11 +12,6 @@ public struct CredentialCardView: View {
 
     public init(details: CredentialDetails, compact: Bool = false) {
         self.details = details
-        self.compact = compact
-    }
-
-    public init(credential: Credential, compact: Bool = false) {
-        self.details = CredentialDisplayNormalizer.details(for: credential)
         self.compact = compact
     }
 
@@ -139,20 +133,20 @@ public struct CredentialCardButton: View {
 }
 
 public struct CredentialCardStackView: View {
-    public let details: [CredentialDetails]
+    public let cards: [CredentialCardItem]
     public let onOpenDetails: (String) -> Void
     public var expandedID: String? = nil
     public var othersHidden: Bool = false
     public var selectedAtTop: Bool = false
 
     public init(
-        details: [CredentialDetails],
+        cards: [CredentialCardItem],
         expandedID: String? = nil,
         othersHidden: Bool = false,
         selectedAtTop: Bool = false,
         onOpenDetails: @escaping (String) -> Void
     ) {
-        self.details = details
+        self.cards = cards
         self.expandedID = expandedID
         self.othersHidden = othersHidden
         self.selectedAtTop = selectedAtTop
@@ -166,19 +160,22 @@ public struct CredentialCardStackView: View {
         let stackHeight = width > 0 ? displayedHeight(forWidth: width) : 0
 
         ZStack(alignment: .topLeading) {
-            ForEach(Array(details.enumerated()), id: \.element.id) { index, item in
+            ForEach(Array(cards.enumerated()), id: \.element.id) { index, item in
                 let isSelected = item.id == expandedID
-                CredentialCardButton(details: item) {
-                    onOpenDetails(item.id)
-                }
+                CredentialCardArtView(summary: item.summary)
+                .contentShape(Rectangle())
+                .onTapGesture { onOpenDetails(item.id) }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(WalletAccessibilityID.credentialCard(item.id))
+                .accessibilityAddTraits(.isButton)
                 .frame(width: width > 0 ? width : nil)
                 .offset(y: isSelected && selectedAtTop ? 0 : cardOffsets(
-                    count: details.count,
+                    count: cards.count,
                     peek: credentialCardPeek,
                     cardHeight: width > 0 ? width / id1AspectRatio : 0
                 )[index])
                 .opacity(isSelected || !othersHidden ? 1 : 0)
-                .zIndex(isSelected ? Double(details.count) : Double(index))
+                .zIndex(isSelected ? Double(cards.count) : Double(index))
                 .allowsHitTesting(isSelected || !othersHidden)
             }
         }
@@ -200,7 +197,7 @@ public struct CredentialCardStackView: View {
             return cardHeight
         }
         let offsets = cardOffsets(
-            count: details.count,
+            count: cards.count,
             peek: credentialCardPeek,
             cardHeight: cardHeight
         )
