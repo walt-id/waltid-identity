@@ -2,6 +2,34 @@ import Foundation
 import WalletSDK
 
 public enum CredentialDisplayNormalizer {
+    private static let queue = DispatchQueue(label: "id.walt.credential-display", qos: .userInitiated)
+
+    public static func cards(for credentials: [Credential]) async -> [CredentialCardItem] {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: credentials.map {
+                    CredentialCardItem(id: $0.id, summary: .stored(from: $0))
+                })
+            }
+        }
+    }
+
+    /// Build one display snapshot off the main thread. Image claims remain unresolved.
+    public static func details(for credentials: [Credential]) async -> [CredentialDetails] {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: credentials.map(details(for:)))
+            }
+        }
+    }
+
+    public static func details(for options: [PresentationCredentialOption]) async -> [CredentialDetails] {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: options.map(details(for:)))
+            }
+        }
+    }
 
     public static func details(for credential: Credential) -> CredentialDetails {
         let result = details(
@@ -289,46 +317,7 @@ public enum CredentialDisplayNormalizer {
         format: String?
     ) -> [ClaimRow] {
         let item = claimItem(path: path, label: label, value: value, format: format)
-        return flattenObjectForClaimRows(path: path, item: item, value: value, format: format)
-    }
-
-    private static func flattenObjectForClaimRows(
-        path: DisplayClaimPath,
-        item: ClaimItem,
-        value: CredentialDisplayJSONValue,
-        format: String?
-    ) -> [ClaimRow] {
-        guard case .object(let members) = value else {
-            if case .object = item.value {
-                return flattenDisplayObjectForClaimRows(item)
-            }
-            return [ClaimRow(path: path, item: item)]
-        }
-        guard case .object = item.value else {
-            return [ClaimRow(path: path, item: item)]
-        }
-
-        return members.flatMap { member in
-            let childPath = path.child(member.key)
-            let childItem = claimItem(
-                path: childPath,
-                label: CredentialDisplayVocabulary.humanizedLabel(member.key),
-                value: member.value,
-                format: format
-            )
-            let rows = flattenObjectForClaimRows(
-                path: childPath,
-                item: childItem,
-                value: member.value,
-                format: format
-            )
-            if rows.count == 1,
-               case .image = rows[0].item.value,
-               rows[0].item.label == CredentialDisplayVocabulary.humanizedLabel(imageWrapperClaimName) {
-                return [ClaimRow(path: rows[0].path, item: rows[0].item.relabelled(item.label))]
-            }
-            return rows
-        }
+        return flattenDisplayObjectForClaimRows(item)
     }
 
     private static func flattenDisplayObjectForClaimRows(_ item: ClaimItem) -> [ClaimRow] {
@@ -344,7 +333,7 @@ public enum CredentialDisplayNormalizer {
         return entries.flatMap { entry in
             let rows = flattenDisplayObjectForClaimRows(entry)
             if rows.count == 1,
-               case .image = rows[0].item.value,
+               rows[0].item.value.isImage,
                rows[0].item.label == CredentialDisplayVocabulary.humanizedLabel(imageWrapperClaimName) {
                 return [ClaimRow(path: rows[0].path, item: rows[0].item.relabelled(item.label))]
             }
@@ -388,15 +377,16 @@ public enum CredentialDisplayNormalizer {
             }
             return .object(items)
         case .array(let list):
-            if let image = CredentialDisplayValueDecoder.imageDisplayValue(
-                for: list,
-                roles: CredentialDisplayVocabulary.roles(for: path.components)
-            ) {
-                return image
+            let renderList = {
+                DisplayValue.list(list.enumerated().map { index, element in
+                    displayValue(for: element, path: path.indexed(index), format: format)
+                })
             }
-            return .list(list.enumerated().map { index, element in
-                displayValue(for: element, path: path.indexed(index), format: format)
-            })
+            return CredentialDisplayValueDecoder.imageDisplayValue(
+                for: list,
+                roles: CredentialDisplayVocabulary.roles(for: path.components),
+                renderList: renderList
+            ) ?? renderList()
         }
     }
 
@@ -545,6 +535,8 @@ private extension DisplayValue {
         switch self {
         case .image(_, _, _, let count):
             byteCount = count
+        case .deferredImage(let source):
+            byteCount = source.byteCount
         case .list(let values) where !values.isEmpty && values.allSatisfy({ value in
             if case .number = value { return true }
             return false
@@ -929,6 +921,15 @@ private extension UnicodeScalar {
         case 65...70: return Int(value - 55)
         case 97...102: return Int(value - 87)
         default: return nil
+        }
+    }
+}
+
+private extension DisplayValue {
+    var isImage: Bool {
+        switch self {
+        case .image, .deferredImage: return true
+        default: return false
         }
     }
 }
