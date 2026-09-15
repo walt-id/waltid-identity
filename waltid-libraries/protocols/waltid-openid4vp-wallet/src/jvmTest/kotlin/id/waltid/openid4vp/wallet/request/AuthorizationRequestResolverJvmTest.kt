@@ -270,7 +270,7 @@ class AuthorizationRequestResolverJvmTest {
             parameters.append("request_uri_method", "post")
         }.build()
 
-        assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+        val unsignedJsonError = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
             AuthorizationRequestResolver.resolve(
                 requestUrl = requestUrl,
                 unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
@@ -283,6 +283,8 @@ class AuthorizationRequestResolverJvmTest {
                 )
             }
         }
+        assertEquals(ClientIdError.PreRegisteredClientNotFound("verifier2"), unsignedJsonError.clientIdError)
+        assertEquals("invalid_client", unsignedJsonError.errorCode)
 
         val nonceRequestUrl = URLBuilder("openid4vp://authorize").apply {
             parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
@@ -569,6 +571,133 @@ class AuthorizationRequestResolverJvmTest {
         }
 
         assertEquals(ClientIdError.InvalidSignature, error.clientIdError)
+    }
+
+    @Test
+    fun `unsigned pre-registered JSON is accepted when redirect_uris match`() = runBlocking {
+        val destination = "https://verifier.example/callback"
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request_uri", "https://verifier.example/request")
+        }.build()
+        val trust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                "verifier2" to ClientMetadata(redirectUris = listOf(destination)),
+            ),
+        )
+        val fetchJson = { _: String, _: RequestUriHttpMethod? ->
+            AuthorizationRequestResolver.RequestUriFetchResponse(
+                status = io.ktor.http.HttpStatusCode.OK,
+                contentType = ContentType.Application.Json,
+                body = """{"client_id":"verifier2","response_type":"vp_token","response_mode":"direct_post","response_uri":"$destination","nonce":"nonce-123"}""",
+            )
+        }
+
+        assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                fetchRequestUri = fetchJson,
+                trustConfiguration = trust,
+            )
+        }
+
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            fetchRequestUri = fetchJson,
+            trustConfiguration = trust,
+        )
+        assertIs<ResolvedAuthorizationRequest.Plain>(resolved)
+        assertEquals("verifier2", resolved.authorizationRequest.clientId)
+        assertEquals(destination, resolved.authorizationRequest.responseUri)
+    }
+
+    @Test
+    fun `unsigned pre-registered JSON rejects client_metadata and mismatched redirect_uris`() = runBlocking {
+        val destination = "https://verifier.example/callback"
+        val trust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                "verifier2" to ClientMetadata(redirectUris = listOf(destination)),
+            ),
+        )
+
+        suspend fun resolveBody(body: String) = AuthorizationRequestResolver.resolve(
+            requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", "verifier2")
+                parameters.append("request_uri", "https://verifier.example/request")
+            }.build(),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            fetchRequestUri = { _, _ ->
+                AuthorizationRequestResolver.RequestUriFetchResponse(
+                    status = io.ktor.http.HttpStatusCode.OK,
+                    contentType = ContentType.Application.Json,
+                    body = body,
+                )
+            },
+            trustConfiguration = trust,
+        )
+
+        val metadataError = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            resolveBody(
+                """{"client_id":"verifier2","response_type":"vp_token","response_mode":"direct_post","response_uri":"$destination","nonce":"n","client_metadata":{"client_name":"spoof"}}""",
+            )
+        }
+        assertEquals(ClientIdError.InvalidClient, metadataError.clientIdError)
+        assertEquals("invalid_client", metadataError.errorCode)
+
+        val uriError = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            resolveBody(
+                """{"client_id":"verifier2","response_type":"vp_token","response_mode":"direct_post","response_uri":"https://attacker.example/collect","nonce":"n"}""",
+            )
+        }
+        assertIs<ClientIdError.UnregisteredRedirectUri>(uriError.clientIdError)
+
+        val urlClientId = "https://verifier.example.com"
+        val urlTrust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                urlClientId to ClientMetadata(redirectUris = listOf(destination)),
+            ),
+        )
+        val urlResolved = AuthorizationRequestResolver.resolve(
+            requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", urlClientId)
+                parameters.append("request_uri", "https://verifier.example/request")
+            }.build(),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            fetchRequestUri = { _, _ ->
+                AuthorizationRequestResolver.RequestUriFetchResponse(
+                    status = io.ktor.http.HttpStatusCode.OK,
+                    contentType = ContentType.Application.Json,
+                    body = """{"client_id":"$urlClientId","response_type":"vp_token","response_mode":"direct_post","response_uri":"$destination","nonce":"n"}""",
+                )
+            },
+            trustConfiguration = urlTrust,
+        )
+        assertEquals(urlClientId, urlResolved.authorizationRequest.clientId)
+    }
+
+    @Test
+    fun `unsigned query pre-registered is accepted when redirect_uris match`() = runBlocking {
+        val destination = "https://verifier.example/callback"
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", "verifier2")
+                parameters.append("response_type", "vp_token")
+                parameters.append("response_mode", "direct_post")
+                parameters.append("response_uri", destination)
+                parameters.append("nonce", "nonce-123")
+            }.build(),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            fetchRequestUri = { _, _ -> error("request_uri fetch should not be called") },
+            trustConfiguration = ClientIdTrustConfiguration(
+                preRegisteredClients = mapOf(
+                    "verifier2" to ClientMetadata(redirectUris = listOf(destination)),
+                ),
+            ),
+        )
+        assertIs<ResolvedAuthorizationRequest.Plain>(resolved)
+        assertEquals("verifier2", resolved.authorizationRequest.clientId)
     }
 
     @Test
