@@ -23,6 +23,7 @@ import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
@@ -79,6 +80,9 @@ class MdocCredentialValidityTest {
                     put("issue_date", "2019-10-20")
                     put("expiry_date", "2024-10-20")
                     put("issuing_authority", "request-authority")
+                    putJsonArray("administrative_number") {
+                        add("request-value")
+                    }
                 }
             },
             dataMapping = buildJsonObject {
@@ -86,6 +90,10 @@ class MdocCredentialValidityTest {
                     put("issue_date", "2026-09-15")
                     put("expiry_date", "2027-09-15")
                     put("issuing_authority", "<issuerId>")
+                    putJsonArray("administrative_number") {
+                        add("<issuerId>")
+                        add("mapped-value")
+                    }
                 }
             },
         )
@@ -95,6 +103,11 @@ class MdocCredentialValidityTest {
         assertEquals("2026-09-15", assertIs<CborString>(items.getValue("issue_date")).value)
         assertEquals("2027-09-15", assertIs<CborString>(items.getValue("expiry_date")).value)
         assertEquals("https://issuer.example", assertIs<CborString>(items.getValue("issuing_authority")).value)
+        val administrativeNumber = assertIs<CborArray>(items.getValue("administrative_number"))
+        assertEquals(
+            listOf("https://issuer.example", "mapped-value"),
+            administrativeNumber.map { assertIs<CborString>(it).value },
+        )
     }
 
     private suspend fun fixture(notBefore: String = "2026-01-01T00:00:00Z"): Fixture {

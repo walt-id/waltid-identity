@@ -20,7 +20,8 @@ import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.issuance.dataFunctions
-import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import id.walt.w3c.utils.CredentialDataMergeUtils.getTemplateData
+import id.walt.w3c.utils.CredentialDataMergeUtils.isTemplate
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -29,6 +30,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -167,9 +170,9 @@ class MdocCredentialHandler(
         dataMapping: JsonObject?,
         issuerId: String,
         display: List<CredentialDisplay>?,
-    ): JsonObject = mergeSDJwtVCPayloadWithMapping(
-        mapping = dataMapping ?: JsonObject(emptyMap()),
-        context = mapOf(
+    ): JsonObject {
+        val mapping = dataMapping ?: return this
+        val context = mapOf(
             "issuerId" to issuerId,
             "issuerDid" to issuerId,
             "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
@@ -183,9 +186,50 @@ class MdocCredentialHandler(
                 is JsonElement -> value
                 else -> JsonPrimitive(value.toString())
             }
-        },
-        data = dataFunctions,
-    )
+        }
+        return mergeMdocJsonObject(this, mapping, context, HashMap())
+    }
+
+    private suspend fun mergeMdocJsonObject(
+        credentialData: JsonObject,
+        mapping: JsonObject,
+        context: Map<String, JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonObject = buildJsonObject {
+        credentialData.forEach { (key, value) -> put(key, value) }
+        mapping.forEach { (key, value) ->
+            put(key, mergeMdocJsonElement(credentialData[key], value, context, functionHistory))
+        }
+    }
+
+    private suspend fun mergeMdocJsonArray(
+        mapping: JsonArray,
+        context: Map<String, JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonArray = buildJsonArray {
+        mapping.forEach { value ->
+            add(mergeMdocJsonElement(null, value, context, functionHistory))
+        }
+    }
+
+    private suspend fun mergeMdocJsonElement(
+        original: JsonElement?,
+        mapping: JsonElement,
+        context: Map<String, JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonElement = when (mapping) {
+        is JsonPrimitive -> when {
+            mapping.isString && mapping.isTemplate() -> getTemplateData(
+                functionCall = mapping.content,
+                dataFunctions = dataFunctions,
+                context = context,
+                functionHistory = functionHistory,
+            )
+            else -> mapping
+        }
+        is JsonObject -> mergeMdocJsonObject(original as? JsonObject ?: JsonObject(emptyMap()), mapping, context, functionHistory)
+        is JsonArray -> mergeMdocJsonArray(mapping, context, functionHistory)
+    }
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun computeCredentialResult(
