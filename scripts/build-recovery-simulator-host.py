@@ -31,12 +31,23 @@ init.write_text("""gradle.projectsEvaluated {
     module.extensions.getByName('kotlin').sourceSets.getByName('iosTest').kotlin.srcDir(
         gradle.rootProject.file('waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-keychain/src/iosTest/kotlin'))
     def target = module.extensions.getByName('kotlin').targets.getByName('iosSimulatorArm64')
-    target.binaries.getTest('DEBUG').linkerOpts('-sectcreate', '__TEXT', '__entitlements',
-        System.getenv('RECOVERY_TEST_ENTITLEMENTS'), '-L' + System.getenv('RECOVERY_TEST_SWIFT_LIBS'))
+    def binary = target.binaries.getTest('DEBUG')
+    binary.linkerOpts('-sectcreate', '__TEXT', '__entitlements',
+        System.getenv('RECOVERY_TEST_ENTITLEMENTS'), '-L' + System.getenv('RECOVERY_TEST_SWIFT_LIBS'),
+        System.getenv('RECOVERY_TEST_HOST_OBJECT'), '-e', '_waltTestMain', '-framework', 'UIKit')
+    binary.linkTaskProvider.configure {
+        inputs.files(System.getenv('RECOVERY_TEST_ENTITLEMENTS'), System.getenv('RECOVERY_TEST_HOST_OBJECT'))
+    }
 }
 """)
 developer = os.environ.get("DEVELOPER_DIR") or subprocess.check_output(["xcode-select", "-p"], text=True).strip()
+host_object = output / "recovery-simulator-host.o"
+sdk = subprocess.check_output(["xcrun", "--sdk", "iphonesimulator", "--show-sdk-path"], text=True).strip()
+subprocess.run(["xcrun", "--sdk", "iphonesimulator", "clang", "-target", "arm64-apple-ios16.0-simulator",
+                "-isysroot", sdk, "-fobjc-arc", "-c", str(root / "scripts/recovery-simulator-host.m"),
+                "-o", str(host_object)], check=True)
 env = dict(os.environ, RECOVERY_TEST_ENTITLEMENTS=str(entitlements),
+           RECOVERY_TEST_HOST_OBJECT=str(host_object),
            RECOVERY_TEST_SWIFT_LIBS=developer + "/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator")
 log = output / "build.log"
 with log.open("w") as stream:

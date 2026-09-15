@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import plistlib
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -8,6 +9,7 @@ from unittest.mock import patch
 from types import SimpleNamespace
 import xml.etree.ElementTree as ET
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 spec = importlib.util.spec_from_file_location("qualification", Path(__file__).resolve().parents[1] / "qualify-wallet-recovery.py")
 qualification = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(qualification)
@@ -78,13 +80,14 @@ class QualificationTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "ANDROID_HOME"):
                 qualification.Qualification(args)
 
-    def test_ios_uses_standard_xcode_tools_and_selected_simulator(self):
+    def test_ios_uses_completion_transport_and_selected_simulator(self):
         self.run.args = SimpleNamespace(device="simulator-id")
-        with patch.object(qualification, "execute", return_value="test output") as execute:
+        with patch.object(qualification, "run_test", return_value="test output") as run_test:
             self.assertEqual("test output", self.run.ios_phase("verify"))
-        command = execute.call_args.args[0]
-        self.assertEqual(["xcrun", "simctl", "launch", "--console", "--terminate-running-process",
-                          "simulator-id", qualification.IOS_PACKAGE], command[:7])
+        device, arguments = run_test.call_args.args
+        self.assertEqual("simulator-id", device)
+        self.assertIn("--ktest_filter=" + qualification.IOS_TEST, arguments)
+        self.assertIn("--recoveryPhase=verify", arguments)
 
     def test_invalid_public_checkpoint_is_reported_as_a_failure(self):
         self.run.state["phase"] = "new"
