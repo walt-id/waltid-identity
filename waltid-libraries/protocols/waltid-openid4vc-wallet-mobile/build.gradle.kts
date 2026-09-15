@@ -105,10 +105,21 @@ kotlin {
                 implementation(identityLibs.signum.indispensable)
                 implementation(identityLibs.signum.supreme)
             }
+            iosTest {
+                kotlin.srcDir("src/recoveryTest/kotlin")
+                if (providers.gradleProperty("enableIosRecoveryTests").orNull == "true") {
+                    kotlin.srcDir("src/iosRecoveryTest/kotlin")
+                }
+                dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-keychain"))
+                }
+            }
         }
         if (enableAndroidBuild) {
             val androidDeviceTest by getting {
+                kotlin.srcDir("src/recoveryTest/kotlin")
                 dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-blockstore"))
                     implementation(kotlin("test"))
                     implementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
                     implementation(identityLibs.kotlinx.coroutines.test)
