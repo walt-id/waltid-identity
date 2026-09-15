@@ -550,7 +550,7 @@ class WalletDemoAppTestScenarios(
             InMemoryDemoPinStore(),
         )
 
-        setContent {
+        setWalletContent {
             WalletDemoAppHost(
                 controller = controller,
                 presentationContent = { Text("Embedded in-person journey") },
@@ -1132,7 +1132,7 @@ class WalletDemoAppTestScenarios(
             dispatcher = Dispatchers.Unconfined,
         )
 
-        setContent { DemoReaderTrustSettings(controller) }
+        setWalletContent { DemoReaderTrustSettings(controller) }
 
         val allowUntrusted = onNodeWithTag(
             WalletUiTestTags.SettingsReaderPolicyAllowUntrusted
