@@ -826,7 +826,25 @@ class WalletDemoController(
                 }
                 return
             }
-            WalletDemoIssuanceOutcome.Cancelled -> emptyList()
+            WalletDemoIssuanceOutcome.Cancelled -> {
+                issuanceSession = null
+                updateIfCurrent(request, WalletOperationState.Receiving) {
+                    it.copy(
+                        offerPreview = null,
+                        authorizationRequestUrl = null,
+                        requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
+                        lastReceivedCredentialIds = emptyList(),
+                        receiveCompleted = false,
+                        selectedTab = WalletDemoTab.Receive,
+                        operation = WalletOperationState.Succeeded(
+                            message = WalletDisplayText.CredentialOfferDeclined,
+                            tab = WalletDemoTab.Receive,
+                        ),
+                        receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
+                    ).withPublishedStatus()
+                }
+                return
+            }
             is WalletDemoIssuanceOutcome.Failed -> error(outcome.message)
         }
         issuanceSession = null
