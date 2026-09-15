@@ -105,6 +105,69 @@ Issuance uses DPoP consistently for authorization binding, token exchange, and
 protected credential requests whenever the authorization server advertises
 supported DPoP signing algorithms.
 
+## In-person proximity presentation
+
+Use the Swift-native proximity API for ISO/IEC 18013-5 device engagement and
+retrieval. It is separate from the URL-based OpenID4VP methods:
+
+```swift
+let configuration = ProximityConfiguration()
+let capabilities = try await wallet.proximityPresentationCapabilities(
+    configuration: configuration
+)
+let session = try await wallet.startProximityPresentation(
+    configuration: configuration
+)
+
+for await state in session.states {
+    switch state {
+    case .checkingPrerequisites(let current):
+        showUnavailableMethods(current)
+    case .engagementReady(let engagements):
+        showEngagements(engagements)
+    case .reviewRequired(let review):
+        showReview(review)
+    case .completed(let exchanges, _):
+        showCompletion(exchanges: exchanges)
+    case .noData(let exchange):
+        showNoData(exchange: exchange)
+    case .failed(let error):
+        showFailure(error)
+    default:
+        showProgress(state)
+    }
+}
+```
+
+The default selects QR engagement and BLE retrieval. NFC and Wi-Fi Aware remain
+visible as precise unavailable capabilities until their platform adapters are
+installed; the SDK never silently substitutes an unselected method. Perform a
+suggested permission or settings effect in app UI and report its privacy-safe
+outcome with `.reportRemediation`. The SDK alone advances protocol state.
+
+Device signature is the default holder-authentication policy. Select
+`.macOnly`, `.preferSignature`, or `.preferMAC` explicitly when the integration
+profile permits it. The chosen method is frozen per credential option before
+review; `.authorizingHolderKey` reports the exact method and credential for
+each document request. The pinned EUDI profile currently requires
+`.signatureOnly`.
+
+Approval uses `.approve(reviewID: review.reviewID, submission: submission)`;
+decline uses `.decline(reviewID: review.reviewID)`. Accepted decisions consume the
+review once; delayed or duplicate UI actions cannot act on a later review.
+`ProximityError.recovery` distinguishes prerequisite retry from a
+fresh session after terminal failure. Runtime capability observations distinguish
+`.notChecked`, `.available`, and `.unavailable` independently of selection.
+Reader scopes use `.document(index:)` or `.wholeRequest`; only the valid
+authentication outcome carries an evaluated trust decision.
+
+`ProximitySession` is an actor over the KMP source of truth. Its
+state stream, typed actions, immutable review, trust facts, disclosure choices,
+application-profile result, and terminal states contain no generated Kotlin,
+Bluetooth, COSE, or platform objects. Call `close()` when the journey ends;
+closing is idempotent and every new session rotates engagement identifiers and
+ephemeral key material.
+
 ## Protected keys
 
 New signing keys default to `.biometricCurrentSet`. Select `.none` explicitly
@@ -285,3 +348,10 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+A final request with no returnable data ends in `ProximityState.noData(exchange:)`. No credential
+data was sent for that request; earlier exchanges in the same session may have
+shared approved data. Render `ProximityReview.readerAuthenticationSummary` for
+the request summary: it accounts for whole-request authentication coverage while
+preserving malformed, invalid, and revoked authentication warnings. Individual
+`readerAuthentication` entries remain available for detailed inspection.

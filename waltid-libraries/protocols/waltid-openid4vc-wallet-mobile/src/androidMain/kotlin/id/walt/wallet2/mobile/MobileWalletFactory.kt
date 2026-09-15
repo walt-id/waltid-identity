@@ -8,6 +8,7 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
+import id.walt.mdoc.proximity.mobile.AndroidBleProximityTransportFactory
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
@@ -47,6 +48,7 @@ public actual class MobileWalletFactory(
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             managedDatabaseKeyProvider = AndroidDatabaseEncryptionKeyProvider(applicationContext),
             platformKeyProvider = AndroidPlatformKeyProvider(applicationContext, interactionContextProvider),
+            proximityTransportFactory = AndroidBleProximityTransportFactory(applicationContext),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
         )
