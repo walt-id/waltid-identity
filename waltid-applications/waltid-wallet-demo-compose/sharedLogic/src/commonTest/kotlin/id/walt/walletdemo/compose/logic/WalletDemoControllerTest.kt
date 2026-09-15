@@ -1043,6 +1043,40 @@ class WalletDemoControllerTest {
             listOf("http://localhost:7106/?error=access_denied&state=state-1"),
             wallet.authorizationCallbackUris,
         )
+        assertEquals(null, controller.state.value.offerPreview)
+        assertEquals("", controller.state.value.requestDrafts.offerUrl)
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertTrue(controller.state.value.receiveUrlEntryEnabled)
+        assertEquals(
+            WalletOperationState.Succeeded(
+                WalletDisplayText.CredentialOfferDeclined,
+                WalletDemoTab.Receive,
+            ),
+            controller.state.value.operation,
+        )
+        assertEquals(WalletDisplayText.CredentialOfferDeclined, controller.state.value.statusText)
+    }
+
+    @Test
+    fun preAuthorizedCancellationDeclinesOfferInsteadOfReceiveFailed() = runTest {
+        val wallet = FakeDemoWallet(preAuthorizedOutcome = WalletDemoIssuanceOutcome.Cancelled)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertEquals(
+            WalletOperationState.Succeeded(
+                WalletDisplayText.CredentialOfferDeclined,
+                WalletDemoTab.Receive,
+            ),
+            controller.state.value.operation,
+        )
+        assertEquals(WalletDisplayText.CredentialOfferDeclined, controller.state.value.statusText)
     }
 
     @Test
