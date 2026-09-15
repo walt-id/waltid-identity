@@ -35,6 +35,9 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
   - Configurable validators with profile-compliant defaults.
 - **ETSI TS 119 412-6 X.509 certificate tooling**:
   - PID Provider and Wallet Provider end-entity certificate generation and parsing, for EUDI Wallet PID issuance (SD-JWT VC / mdoc) and Wallet Instance/Unit Attestation signing.
+- **ETSI TS 119 411-8 / TS 119 475 X.509 certificate tooling (Wallet Relying Party)**:
+  - Wallet Relying Party Access Certificate (WRPAC) generation and parsing, for authenticating a Relying Party's presentation requests.
+  - Wallet Relying Party Registration Certificate (WRPRC) generation and parsing - **draft**, doesn't yet validate the certificate's registered intended use.
 - **CSR Support**: Support for creating and fulfilling Certificate Signing Requests (CSRs) using the PKCS#10 standard.
 - **Crypto2 signing**: Generic, ISO IACA, and Document Signer certificates plus PKCS#10 CSRs use native crypto2 keys.
 - **Crypto2 parsing**: Parsed certificate and CSR public keys are available as typed `id.walt.crypto2.keys.Key` values.
@@ -391,6 +394,86 @@ val walletProviderCert = X509CertificateUtil.createCertificate(rootKey, rootCert
 > [eudi-lib-kmp-etsi-1196x2](https://github.com/eu-digital-identity-wallet/eudi-lib-kmp-etsi-1196x2)
 > reference implementation. Signature algorithm selection (EN 319 412-1 GEN-4.2.2-1) is advisory
 > ("should", not "shall") and intentionally not validated, matching that reference.
+
+---
+
+## ETSI TS 119 411-8 / TS 119 475 X.509 certificate tooling (Wallet Relying Party certificates)
+
+Two more certificate types close the loop on the EUDI trust chain: the **Wallet Relying Party
+Access Certificate (WRPAC)**, which a Relying Party uses to authenticate a presentation request so
+the wallet can confirm it's talking to a registered Relying Party before releasing any credential,
+and the **Wallet Relying Party Registration Certificate (WRPRC)**, meant to encode the Relying
+Party's registered attribute scope / purpose so the wallet can explain *why* a request is allowed.
+
+### WRPAC certificate generation and validation
+
+```kotlin
+import id.walt.certificate.x509.profile.Etsi119411Part8
+import id.walt.certificate.x509.profile.EtsiWrpacX509CertificateProfile
+import id.walt.certificate.x509.profile.EtsiWrpacX509CertificateProfile.profileWrpAccessCertificate
+
+val wrpacCertUtil = X509CertificateUtil {
+    addValidators(
+        EtsiWrpacX509CertificateProfile,
+        X509CertificateValidityValidator(allowValidityInFuture = true)
+    )
+}
+
+val relyingPartyKey = cryptoRuntime.generateSoftwareKey(keyGen)
+val wrpacCert = X509CertificateUtil.createCertificate(rootKey, rootCert, certSigningAlg) {
+    profileWrpAccessCertificate(
+        subjectKey = relyingPartyKey,
+        subjectDn = "CN=Example Relying Party,O=Walt.id,OrganizationIdentifier=VATAT-U55667788,C=AT",
+        policyOid = Etsi119411Part8.NCP_L_EUDIWRP,
+        contactEmail = "relying-party@example.com",
+        caIssuerUri = "https://ca.example.com/root.crt",
+        crlDistributionPointUri = "https://ca.example.com/crl",
+    )
+}
+
+val wrpacResult = wrpacCertUtil.validateCertificateChain(listOf(wrpacCert), rootCert)
+check(wrpacResult.valid) { "Not a valid WRPAC certificate: ${wrpacResult.log}" }
+```
+
+`profileWrpAccessCertificate` requires exactly one of the four `Etsi119411Part8` policy OIDs
+(`NCP_N_EUDIWRP`/`NCP_L_EUDIWRP`/`QCP_N_EUDIWRP`/`QCP_L_EUDIWRP` - natural/legal person crossed with
+non-qualified/qualified), at least one contact method (`contactEmail`/`contactUri`) for the
+mandatory `subjectAltName`, and a revocation mechanism (`crlDistributionPointUri` or
+`ocspResponderUri`). `EtsiWrpacX509CertificateProfile` re-validates all of that, plus the
+policy-conditional `qcStatements` (required for the QCP policies only, with `QcType` required
+additionally for QCP-l) and the policy-driven natural/legal person subject DN shape - cross-checked
+against the [eudi-lib-kmp-etsi-1196x2](https://github.com/eu-digital-identity-wallet/eudi-lib-kmp-etsi-1196x2)
+reference implementation.
+
+> Not implemented: the validity-assured short-term certificate exemption
+> (`ext-etsi-valassured-ST-certs` / `noRevocationAvail`, RFC 9608), which would let a short-lived
+> (≤7 day) WRPAC skip the revocation mechanism above, and telephone contact info in
+> `subjectAltName` (no confirmed ASN.1 encoding yet). WRPAC certificates issued through this
+> profile always need a CRL/OCSP endpoint and use URI/email contact info.
+
+### WRPRC certificate generation - draft, incomplete
+
+> **`EtsiWrprcX509CertificateProfile` is a draft.** Unlike every other profile in this library,
+> there is no reference implementation to cross-check WRPRC (ETSI TS 119 475) against, and the
+> encoding of its defining feature - the Relying Party's *registered intended use* - isn't
+> confirmed (it likely needs a new custom X.509 extension). This profile only implements the
+> baseline end-entity shape shared by every ETSI EUDI profile here; `validate()` always emits a
+> `WARNING` log entry flagging that the registered intended use itself is not checked, rather than
+> silently passing a certificate a real WRPRC issuer might reject.
+
+```kotlin
+import id.walt.certificate.x509.profile.EtsiWrprcX509CertificateProfile
+import id.walt.certificate.x509.profile.EtsiWrprcX509CertificateProfile.profileWrpRegistrationCertificate
+
+val wrprcCert = X509CertificateUtil.createCertificate(rootKey, rootCert, certSigningAlg) {
+    profileWrpRegistrationCertificate(
+        subjectKey = cryptoRuntime.generateSoftwareKey(keyGen),
+        subjectDn = "CN=Example Relying Party,O=Walt.id,OrganizationIdentifier=VATAT-U55667788,C=AT",
+        certificatePolicyOids = listOf("0.4.0.194118.1.2"),
+        caIssuerUri = "https://ca.example.com/root.crt",
+    )
+}
+```
 
 ---
 

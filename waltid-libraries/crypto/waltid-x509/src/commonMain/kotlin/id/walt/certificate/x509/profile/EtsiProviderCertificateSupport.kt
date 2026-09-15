@@ -29,6 +29,12 @@ import id.walt.crypto2.keys.Key
  * Only requirements that are normatively mandatory ("shall") are enforced here. Signature
  * algorithm selection (EN 319 412-1 GEN-4.2.2-1) is advisory ("should") and intentionally not
  * validated, matching the reference implementation.
+ *
+ * A handful of these checks (end-entity, keyUsage, subjectKeyIdentifier, certificatePolicies
+ * presence, conditional authorityInfoAccess, public key algorithm/size, person-DN field shape) are
+ * identical across every ETSI EUDI end-entity profile in this package, not just the two Provider
+ * profiles - [EtsiWrpacX509CertificateProfile] and [EtsiWrprcX509CertificateProfile] reuse them
+ * directly rather than duplicating the logic.
  */
 internal object EtsiProviderCertificateSupport {
 
@@ -122,9 +128,19 @@ internal object EtsiProviderCertificateSupport {
     }
 
     /**
+     * WRPAC (TS 119 411-8) / WRPRC (TS 119 475): both are always CA-issued, unlike PID/Wallet
+     * Provider certificates which may be self-signed.
+     */
+    fun validateNotSelfSigned(context: ValidationContext, x509Certificate: X509Certificate) {
+        if (x509Certificate.data.issuerDn == x509Certificate.data.subjectDn) {
+            context.addLogEntry(ValidationResult.Severity.ERROR, "issuerDn", "Certificate must not be self-signed")
+        }
+    }
+
+    /**
      * PID-4.1-01 / WAL-5.1-01: end-entity certificate (basicConstraints cA=FALSE, critical).
      */
-    private fun validateEndEntity(context: ValidationContext, x509Certificate: X509Certificate) {
+    fun validateEndEntity(context: ValidationContext, x509Certificate: X509Certificate) {
         val extension = x509Certificate.data.extensionBasicConstraints
         if (extension == null) {
             context.addLogEntry(ValidationResult.Severity.ERROR, "basicConstraints", "Certificate extension 'basicConstraints' is not present")
@@ -141,7 +157,7 @@ internal object EtsiProviderCertificateSupport {
     /**
      * PID-4.4.1-01 / WAL-5.1-01: keyUsage digitalSignature, critical, and no other bit set.
      */
-    private fun validateKeyUsage(context: ValidationContext, x509Certificate: X509Certificate) {
+    fun validateKeyUsage(context: ValidationContext, x509Certificate: X509Certificate) {
         val extension = x509Certificate.data.extensionKeyUsage
         if (extension == null) {
             context.addLogEntry(ValidationResult.Severity.ERROR, "keyUsage", "Certificate extension 'keyUsage' is not present")
@@ -162,7 +178,7 @@ internal object EtsiProviderCertificateSupport {
     /**
      * PID-4.4.2-01 / WAL-5.1-01: subjectKeyIdentifier required, not critical.
      */
-    private fun validateSubjectKeyIdentifier(context: ValidationContext, x509Certificate: X509Certificate) {
+    fun validateSubjectKeyIdentifier(context: ValidationContext, x509Certificate: X509Certificate) {
         val extension = x509Certificate.data.extensionSubjectKeyIdentifier
         if (extension == null) {
             context.addLogEntry(ValidationResult.Severity.ERROR, "subjectKeyIdentifier", "Certificate extension 'subjectKeyIdentifier' is not present")
@@ -174,7 +190,7 @@ internal object EtsiProviderCertificateSupport {
     /**
      * EN 319 412-2 4.3.3: certificatePolicies extension shall be present.
      */
-    private fun validateCertificatePoliciesPresent(context: ValidationContext, x509Certificate: X509Certificate) {
+    fun validateCertificatePoliciesPresent(context: ValidationContext, x509Certificate: X509Certificate) {
         val extension = x509Certificate.data.extensionCertificatePolicies
         if (extension == null || extension.policyOids.isEmpty()) {
             context.addLogEntry(ValidationResult.Severity.ERROR, "certificatePolicies", "Certificate extension 'certificatePolicies' is not present")
@@ -185,7 +201,7 @@ internal object EtsiProviderCertificateSupport {
      * PID-4.4.3-01 / EN 319 412-2 4.4.1: authorityInfoAccess required for CA-issued certificates.
      * Self-signed certificates (issuer DN == subject DN) are exempt.
      */
-    private fun validateAuthorityInfoAccessIfCaIssued(context: ValidationContext, x509Certificate: X509Certificate) {
+    fun validateAuthorityInfoAccessIfCaIssued(context: ValidationContext, x509Certificate: X509Certificate) {
         val isSelfSigned = x509Certificate.data.issuerDn == x509Certificate.data.subjectDn
         if (isSelfSigned) return
         val extension = x509Certificate.data.extensionAuthorityInfoAccess
@@ -220,7 +236,7 @@ internal object EtsiProviderCertificateSupport {
     /**
      * ETSI TS 119 312: RSA >= 2048 bits, EC >= 256 bits (FIPS 186-4 or RFC 5639 brainpool curves).
      */
-    private fun validatePublicKeyAlgorithm(context: ValidationContext, x509Certificate: X509Certificate) {
+    fun validatePublicKeyAlgorithm(context: ValidationContext, x509Certificate: X509Certificate) {
         val subjectPublicKeyInfo = x509Certificate.data.subjectPublicKeyInfo
         when (subjectPublicKeyInfo.algorithmOid) {
             RSA_ALGORITHM_OID -> {
@@ -268,6 +284,18 @@ internal object EtsiProviderCertificateSupport {
 
     private fun validatePersonDn(context: ValidationContext, attribute: String, dnString: String) {
         val dn = DistinguishedName.ofString(dnString)
+        val isLegalPerson = dn.rdnList.flatMap { it }.any { it.type.name.lowercase() == "organizationidentifier" }
+        validatePersonDnByRole(context, attribute, dnString, isLegalPerson)
+    }
+
+    /**
+     * Same field-shape checks as [validatePersonDn], but the natural-vs-legal-person distinction
+     * is given explicitly rather than detected from the DN - used by [EtsiWrpacX509CertificateProfile]
+     * / [EtsiWrprcX509CertificateProfile], whose person role is determined by the certificate's
+     * policy OID (or, for WRPRC's issuer, is always a legal person) rather than by DN inspection.
+     */
+    fun validatePersonDnByRole(context: ValidationContext, attribute: String, dnString: String, isLegalPerson: Boolean) {
+        val dn = DistinguishedName.ofString(dnString)
         val grouped = dn.rdnList.flatMap { it }.groupBy { it.type.name.lowercase() }
 
         val countryName = grouped["c"]
@@ -279,7 +307,6 @@ internal object EtsiProviderCertificateSupport {
             context.addLogEntry(ValidationResult.Severity.ERROR, "${attribute}Dn", "Missing or blank commonName in $attribute DN")
         }
 
-        val isLegalPerson = !grouped["organizationidentifier"].isNullOrEmpty()
         if (isLegalPerson) {
             if (grouped["o"].isNullOrEmpty()) {
                 context.addLogEntry(ValidationResult.Severity.ERROR, "${attribute}Dn", "Legal person $attribute DN is missing organizationName")
