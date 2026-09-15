@@ -61,7 +61,7 @@ data class AttributeType(
 
             //2.5.4
             AttributeType("2.5.4.3", Encoding.utf8String, listOf("cn", "commonName")),
-            AttributeType("2.5.4.4", Encoding.notSupported, listOf("surname")),
+            AttributeType("2.5.4.4", Encoding.utf8String, listOf("surname")),
             AttributeType("2.5.4.5", Encoding.printableString, listOf("serialNumber")),
             AttributeType("2.5.4.6", Encoding.printableString, listOf("c", "countryName")),
             AttributeType("2.5.4.7", Encoding.utf8String, listOf("l", "localityName")),
@@ -76,7 +76,7 @@ data class AttributeType(
             AttributeType("2.5.4.17", Encoding.notSupported, listOf("postalCode")),
             AttributeType("2.5.4.20", Encoding.printableString, listOf("telephoneNumber")),
             AttributeType("2.5.4.41", Encoding.notSupported, listOf("name")),
-            AttributeType("2.5.4.42", Encoding.notSupported, listOf("givenName")),
+            AttributeType("2.5.4.42", Encoding.utf8String, listOf("givenName")),
             AttributeType("2.5.4.43", Encoding.notSupported, listOf("initials")),
             AttributeType("2.5.4.44", Encoding.notSupported, listOf("generationQualifier", "generation")),
             AttributeType("2.5.4.45", Encoding.notSupported, listOf("uniqueIdentifier", "x500UniqueIdentifier")),
@@ -89,7 +89,7 @@ data class AttributeType(
             AttributeType("2.5.4.83", Encoding.notSupported, listOf("uri")),
             AttributeType("2.5.4.86", Encoding.notSupported, listOf("urn")),
             AttributeType("2.5.4.87", Encoding.notSupported, listOf("url")),
-            AttributeType("2.5.4.97", Encoding.notSupported, listOf("organizationIdentifier")),
+            AttributeType("2.5.4.97", Encoding.utf8String, listOf("organizationIdentifier", "organizationId")),
             AttributeType("2.5.4.98", Encoding.notSupported, listOf("c3", "countryCode3c")),
             AttributeType("2.5.4.99", Encoding.notSupported, listOf("n3", "countryCode3n")),
             AttributeType("2.5.4.100", Encoding.notSupported, listOf("dnsName")),
