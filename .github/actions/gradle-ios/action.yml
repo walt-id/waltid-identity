@@ -98,7 +98,7 @@ runs:
         xcodebuild -version
 
     - name: Configure iOS build environment
-      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@e7889e25f7e3f7c98db9d0c8e5bf905e6dd538ec
+      uses: ./waltid-identity/.github/actions/ios-build-setup
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
@@ -254,6 +254,9 @@ runs:
           while IFS= read -r -d '' bundle; do
             if [[ "$xcresultparser_ready" != "true" ]]; then
               if ! command -v xcresultparser >/dev/null 2>&1; then
+                # See install-and-run-kdoctor: the runner image's untrusted aws/tap makes every
+                # `brew install` emit a tap-trust warning. Drop it first.
+                brew untap aws/tap 2>/dev/null || true
                 brew install xcresultparser
               fi
               xcresultparser_ready=true
@@ -324,7 +327,7 @@ runs:
 
     - name: Upload iOS test results
       if: always() && (failure() || steps.ios_simulator_tests.outcome == 'failure' || steps.ios_demo_app_tests.outcome == 'failure' || steps.compose_ios_demo_app_tests.outcome == 'failure')
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.test-result-artifact-name }}
         path: |
