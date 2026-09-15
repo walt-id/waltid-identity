@@ -78,12 +78,11 @@ class MdocCredentialHandler(
                     )
                 )
             }
-            val mappedCredentialData = credentialData.mergeMdocPayloadWithMapping(dataMapping, issuerId, display)
-
             computeCredentialResult(
                 request = request,
                 configuration = configuration,
                 issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, verifiedProof ->
+                    val mappedCredentialData = credentialData.mergeMdocPayloadWithMapping(dataMapping, issuerId, display, verifiedProof?.holderDid)
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
                         credentialData = mappedCredentialData,
@@ -99,7 +98,7 @@ class MdocCredentialHandler(
                         authorizedTransactionDataTypes = authorizedTransactionDataTypes,
                     )
                 },
-                credentialData = mappedCredentialData,
+                credentialData = credentialData,
                 x5Chain = x5Chain,
                 mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                 validFrom = validFrom,
@@ -131,18 +130,17 @@ class MdocCredentialHandler(
         validUntil: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult = try {
-        val mappedCredentialData = credentialData.mergeMdocPayloadWithMapping(dataMapping, issuerId, display)
-
         computeCredentialResult(
             request = request,
             configuration = configuration,
-            credentialData = mappedCredentialData,
+            credentialData = credentialData,
             x5Chain = x5Chain,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             validFrom = validFrom,
             validUntil = validUntil,
             verifiedProofs = verifiedProofs,
             issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, verifiedProof ->
+                val mappedCredentialData = credentialData.mergeMdocPayloadWithMapping(dataMapping, issuerId, display, verifiedProof?.holderDid)
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
                     credentialData = mappedCredentialData,
@@ -170,16 +168,22 @@ class MdocCredentialHandler(
         dataMapping: JsonObject?,
         issuerId: String,
         display: List<CredentialDisplay>?,
+        subjectDid: String?,
     ): JsonObject {
-        val mapping = dataMapping ?: return this
+        val mapping = dataMapping
+            ?.filter { (key, value) -> this[key] is JsonObject && value is JsonObject }
+            ?.let(::JsonObject)
+            ?.takeIf { it.isNotEmpty() }
+            ?: return this
         val context = mapOf(
             "issuerId" to issuerId,
             "issuerDid" to issuerId,
+            "subjectDid" to subjectDid,
             "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
         ).filterValues {
             when (it) {
                 is JsonElement -> it !is JsonNull && (it !is JsonObject || it.isNotEmpty()) && (it !is JsonArray || it.isNotEmpty())
-                else -> it.toString().isNotEmpty()
+                else -> it?.toString()?.isNotEmpty() == true
             }
         }.mapValues { (_, value) ->
             when (value) {
