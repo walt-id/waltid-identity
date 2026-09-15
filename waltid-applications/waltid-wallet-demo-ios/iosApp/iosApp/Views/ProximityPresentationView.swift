@@ -1,23 +1,46 @@
 import SwiftUI
 import WalletDemoSharingUI
 import WalletSDK
+import WalletDemoIdentityDocumentSupport
 
 struct ProximityPresentationView: View {
     @ObservedObject var viewModel: ProximityPresentationViewModel
+    @Binding var approvalMode: WalletDemoProximityApprovalMode
     let credentialDetailsByID: [String: CredentialDetails]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if let message = viewModel.actionErrorMessage {
-                StatusBannerView(
-                    message: String(localized: "Action failed: \(message)"),
-                    isLoading: false,
-                    isError: true
-                )
+        Group {
+            if viewModel.showsEngagement {
+                ProximityEngagementContent(viewModel: viewModel, approvalMode: $approvalMode)
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let message = viewModel.actionErrorMessage {
+                        StatusBannerView(message: String(localized: "Action failed: \(message)"), isLoading: false, isError: true)
+                    }
+                    if let sharing = pendingPreparedSharing {
+                        ProximityPreparedSharingSummary(sharing: sharing)
+                    }
+                    content
+                    if let route = viewModel.connectedRoute {
+                        ProximityConnectionDetails(route: route)
+                    }
+                }
             }
-            content
         }
         .accessibilityIdentifier(WalletAccessibilityID.proximityScreen)
+    }
+
+    private var pendingPreparedSharing: ProximityPreparedSharing? {
+        switch viewModel.sessionState {
+        case .checkingPrerequisites, .preparing, .engagementReady, .connecting, .awaitingRequest:
+            return viewModel.preparedSharing
+        default: return nil
+        }
+    }
+
+    private var prepareAnotherShareAction: (() -> Void)? {
+        guard viewModel.recentPlan?.isExpired == false else { return nil }
+        return { viewModel.reviewRecentRequest() }
     }
 
     @ViewBuilder
@@ -32,23 +55,32 @@ struct ProximityPresentationView: View {
         } else if let state = viewModel.sessionState {
             switch state {
             case .checkingPrerequisites(let capabilities):
-                ProximityPrerequisiteContent(
-                    capabilities: capabilities,
-                    actionInProgress: viewModel.hostActionInProgress,
-                    onRetry: viewModel.retryPrerequisites,
-                    onRemediate: viewModel.remediate
-                )
+                if capabilities.mayStart && !capabilities.remediationActions.contains(.requestBluetoothPermission) {
+                    ProximityProgressContent(message: String(localized: "Preparing a secure presentation…"))
+                } else {
+                    ProximityPrerequisiteContent(
+                        capabilities: capabilities,
+                        actionInProgress: viewModel.hostActionInProgress,
+                        onRetry: viewModel.retryPrerequisites,
+                        onContinueWithAvailableConnection: viewModel.continueWithAvailableConnection,
+                        onRemediate: viewModel.remediate
+                    )
+                }
             case .preparing:
                 ProximityProgressContent(message: String(localized: "Preparing a secure presentation…"))
-            case .engagementReady(let engagements):
-                ProximityEngagementContent(engagements: engagements, connecting: false)
-            case .connecting(let engagements):
-                ProximityEngagementContent(engagements: engagements, connecting: true)
+            case .engagementReady:
+                ProximityEngagementContent(viewModel: viewModel, approvalMode: $approvalMode)
+            case .connecting:
+                ProximityProgressContent(message: String(localized: "Connecting to reader…"))
             case .awaitingRequest:
                 ProximityProgressContent(
                     message: String(localized: "Connected. Waiting for the reader's request…")
                 )
-            case .reviewRequired(let review):
+            case .reviewRequired(let review, let reason):
+                if reason == .preparedSharingChanged {
+                    Text("The reader or request has changed. Nothing was shared using your earlier approval. Review these new details.")
+                        .foregroundStyle(.red)
+                }
                 ProximityReviewContent(
                     review: review,
                     selections: viewModel.selections,
@@ -56,8 +88,11 @@ struct ProximityPresentationView: View {
                     onSelectCredential: viewModel.selectCredential,
                     onToggleElement: viewModel.toggleElement,
                     continueAfterResponse: viewModel.continueAfterResponse,
-                    onContinueAfterResponseChange: viewModel.setContinueAfterResponse
+                    onContinueAfterResponseChange: viewModel.setContinueAfterResponse,
+                    allowContinuation: true
                 )
+            case .preparationRequired(let plan, let reason):
+                preparationContent(plan: plan, reason: reason)
             case .authorizingHolderKey:
                 ProximityProgressContent(message: String(localized: "Confirming the selected credentials…"))
             case .sendingResponse:
@@ -68,7 +103,7 @@ struct ProximityPresentationView: View {
                 )
             case .terminating:
                 ProximityProgressContent(message: String(localized: "Closing the secure connection…"))
-            case .completed(_, let declined):
+            case .completed(_, let declined, let receipt):
                 ProximityTerminalContent(
                     title: declined
                         ? String(localized: "Request declined")
@@ -76,7 +111,9 @@ struct ProximityPresentationView: View {
                     message: declined
                         ? String(localized: "No credential data was shared for this request.")
                         : String(localized: "The approved credential data was sent to the reader."),
-                    onDismiss: viewModel.dismiss
+                    onDismiss: viewModel.dismiss,
+                    receipt: receipt,
+                    onPrepareAnotherShare: prepareAnotherShareAction
                 )
             case .noData:
                 ProximityTerminalContent(
@@ -95,29 +132,54 @@ struct ProximityPresentationView: View {
                     message: error.message,
                     recoverable: error.recovery == .startNewSession,
                     onRetry: viewModel.restart,
-                    onDismiss: viewModel.dismiss
+                    onDismiss: viewModel.dismiss,
+                    errorCode: error.code,
+                    remediationActions: error.remediationActions,
+                    onRemediate: viewModel.remediate
                 )
             }
         } else {
             ProximityProgressContent(message: String(localized: "Checking this device…"))
         }
     }
+
+    @ViewBuilder
+    private func preparationContent(plan: ProximitySharingPlan, reason: ProximityReviewReason) -> some View {
+        Text("Review before reconnecting").font(.title2.bold()).accessibilityAddTraits(.isHeader)
+        Text("No data has been shared. Choose what to share with this reader, then approve once before reconnecting.")
+        if reason == .preparedSharingChanged {
+            Text("The reader or request has changed. Your earlier approval was not used.").foregroundStyle(.red)
+        }
+        ProximityReviewContent(
+            review: plan.review,
+            selections: viewModel.selections,
+            credentialDetailsByID: credentialDetailsByID,
+            onSelectCredential: viewModel.selectCredential,
+            onToggleElement: viewModel.toggleElement,
+            continueAfterResponse: false,
+            onContinueAfterResponseChange: viewModel.setContinueAfterResponse,
+            allowContinuation: false
+        )
+        MetadataDisclosure(title: "Reader certificate identity", initiallyExpanded: false) {
+            Text(plan.readerCertificateSHA256).font(.caption).textSelection(.enabled)
+        }
+    }
+
 }
 
 private struct ProximityPrerequisiteContent: View {
     let capabilities: ProximityCapabilities
     let actionInProgress: ProximityRemediationAction?
     let onRetry: () -> Void
+    let onContinueWithAvailableConnection: () -> Void
     let onRemediate: (ProximityRemediationAction) -> Void
 
     var body: some View {
         ReviewMetadataSection(
-            title: capabilities.mayStart
-                ? String(localized: "Device ready")
-                : String(localized: "Action needed")
+            title: primaryAction?.label ?? String(localized: "Action needed")
         ) {
             Text(message)
-            ForEach(Array(capabilities.remediationActions.enumerated()), id: \.offset) { _, action in
+            if let action = primaryAction {
                 Button {
                     onRemediate(action)
                 } label: {
@@ -132,57 +194,242 @@ private struct ProximityPrerequisiteContent: View {
                 .buttonStyle(.bordered)
                 .disabled(actionInProgress != nil)
             }
-            Button("Check again", action: onRetry)
-                .buttonStyle(.borderedProminent)
-                .disabled(actionInProgress != nil)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier(WalletAccessibilityID.proximityRetryButton)
+            if capabilities.mayStart {
+                Button("Continue with available connection", action: onContinueWithAvailableConnection)
+                    .frame(minHeight: 44).disabled(actionInProgress != nil)
+            }
+            if primaryAction == nil {
+                Button("Check again", action: onRetry)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(actionInProgress != nil)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier(WalletAccessibilityID.proximityRetryButton)
+            }
         }
     }
 
+    private var primaryAction: ProximityRemediationAction? {
+        capabilities.remediationActions.first { $0 != .useSupportedDevice }
+    }
+
     private var message: String {
-        if capabilities.mayStart {
-            return String(localized: "This device can create a QR code and present over Bluetooth.")
+        let selected = [capabilities.nfcEngagement, capabilities.qrEngagement, capabilities.bluetoothLowEnergy,
+            capabilities.nfcRetrieval, capabilities.nfcV2Retrieval, capabilities.wifiAwareRetrieval]
+        if let primaryAction, let error = selected.first(where: {
+            $0.selected && $0.remediationActions.contains(primaryAction)
+        })?.unavailable { return error.message }
+        return capabilities.selectedUnavailableMessage ?? String(localized: "Nearby presentation is not available yet.")
+    }
+}
+
+private extension ProximityCapabilities {
+    var selectedUnavailableMessage: String? {
+        [
+            nfcEngagement,
+            bluetoothLowEnergy,
+            nfcRetrieval,
+            nfcV2Retrieval,
+            qrEngagement,
+            wifiAwareRetrieval,
+        ].first { $0.selected && $0.unavailable != nil }?.unavailable?.message
+    }
+}
+
+struct ProximityApprovalModeToggle: View {
+    @Binding var mode: WalletDemoProximityApprovalMode
+    var compact = true
+
+    var body: some View {
+        Toggle(isOn: Binding(get: { mode == .prepareSharing }, set: { mode = $0 ? .prepareSharing : .askEachTime })) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Prepare sharing")
+                Text(compact
+                    ? mode == .prepareSharing
+                        ? String(localized: "Review, approve, then reconnect to share.")
+                        : String(localized: "Review each request before sharing.")
+                    : mode.explanation)
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
         }
-        return capabilities.bluetoothLowEnergy.unavailable?.message
-            ?? capabilities.qrEngagement.unavailable?.message
-            ?? String(localized: "Nearby presentation is not available yet.")
+        .toggleStyle(.switch).frame(minHeight: 44)
+        .accessibilityIdentifier("proximity-approval-mode")
     }
 }
 
 private struct ProximityEngagementContent: View {
-    let engagements: [ProximityEngagement]
-    let connecting: Bool
+    @ObservedObject var viewModel: ProximityPresentationViewModel
+    @Binding var approvalMode: WalletDemoProximityApprovalMode
+    @State private var showApprovedData = false
+    @State private var sectionHeights: [ProximityEngagementSection: CGFloat] = [:]
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text(connecting ? String(localized: "Reader detected") : String(localized: "Scan with the reader"))
-                .font(.title2.bold())
-                .multilineTextAlignment(.center)
-                .accessibilityAddTraits(.isHeader)
-            Text(
-                connecting
-                    ? String(localized: "Keep this screen open while a secure Bluetooth connection is established.")
-                    : String(localized: "Open a compatible reader and scan this QR code. Keep both devices nearby.")
-            )
-            .multilineTextAlignment(.center)
-            if let payload = qrPayload {
-                ProximityQRCode(payload: payload)
-                    .frame(maxWidth: 320, maxHeight: 320)
-                    .accessibilityIdentifier(WalletAccessibilityID.proximityQRCode)
-            }
-            if connecting {
-                ProgressView()
+        GeometryReader { geometry in
+            ScrollView {
+                if viewModel.displayedEngagement == .qr {
+                    qrContent(payload: viewModel.qrPayload, viewport: geometry.size)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        header
+                        if viewModel.displayedEngagement == nil { choices }
+                        footer
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
-        .frame(maxWidth: .infinity)
+        .onPreferenceChange(ProximityEngagementHeightKey.self) { sectionHeights = $0 }
+        .sheet(isPresented: $showApprovedData) {
+            NavigationView {
+                ScrollView {
+                    if let sharing = viewModel.preparedSharing {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Only the approved reader and data can be used. Cancel to withdraw this approval.")
+                            ProximityDisclosureSummary(review: sharing.review, submission: sharing.submission, initiallyExpanded: true)
+                        }.padding()
+                    }
+                }
+                .navigationTitle("Approved data").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showApprovedData = false } } }
+            }.navigationViewStyle(.stack)
+        }
     }
 
-    private var qrPayload: String? {
-        engagements.compactMap { engagement in
-            guard case .qr(let payload) = engagement else { return nil }
-            return payload
-        }.first
+    /// Measure actual wrapped text, leaving a 200–360 point square for the QR.
+    /// The content grows into the scroll view only when readable controls need more room.
+    private func qrContent(payload: String?, viewport: CGSize) -> some View {
+        let gap: CGFloat = 12
+        let landscape = viewport.width >= 600 && viewport.width > viewport.height
+        let top = sectionHeights[.header] ?? 0
+        let bottom = sectionHeights[.footer] ?? 0
+        let maximum = min(viewport.width, 360)
+        let minimum = min(maximum, 200)
+        let side = landscape
+            ? min(maximum, (viewport.width - gap) / 2, max(1, viewport.height))
+            : min(maximum, max(minimum, viewport.height - top - bottom - gap * 2))
+        let height = max(viewport.height, landscape ? max(side, top + bottom + gap) : top + side + bottom + gap * 2)
+        let code = Group {
+            if let payload {
+                ProximityQRCode(payload: payload)
+                    .equatable()
+                    .accessibilityIdentifier(WalletAccessibilityID.proximityQRCode)
+            } else {
+                ProgressView()
+            }
+        }.frame(width: side, height: side)
+        return Group {
+            if landscape {
+                HStack(alignment: .top, spacing: gap) {
+                    code
+                    VStack(alignment: .leading, spacing: gap) {
+                        measuredHeader
+                        Spacer(minLength: 0)
+                        measuredFooter
+                    }
+                }
+            } else {
+                VStack(spacing: 0) {
+                    measuredHeader
+                    Spacer(minLength: gap)
+                    code
+                    Spacer(minLength: gap)
+                    measuredFooter
+                }
+            }
+        }
+        .frame(width: viewport.width, height: height)
+    }
+
+    private var measuredHeader: some View {
+        header.background(GeometryReader { geometry in
+            Color.clear.preference(key: ProximityEngagementHeightKey.self, value: [.header: geometry.size.height])
+        })
+    }
+
+    private var measuredFooter: some View {
+        footer.fixedSize(horizontal: false, vertical: true).background(GeometryReader { geometry in
+            Color.clear.preference(key: ProximityEngagementHeightKey.self, value: [.footer: geometry.size.height])
+        })
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let message = viewModel.actionErrorMessage {
+                StatusBannerView(message: String(localized: "Action failed: \(message)"), isLoading: false, isError: true)
+            }
+            Text(viewModel.preparedSharing != nil ? String(localized: "Ready for one share")
+                : viewModel.displayedEngagement == .qr ? String(localized: "Show QR code")
+                : viewModel.displayedEngagement == .nfc ? String(localized: "Hold near the reader")
+                : String(localized: "Share in person"))
+                .font(.title3.bold()).accessibilityAddTraits(.isHeader)
+            if let sharing = viewModel.preparedSharing {
+                Text(Array(Set(sharing.review.readerAuthentication.compactMap(\.displayName))).sorted().joined(separator: ", "))
+                    .font(.subheadline.weight(.semibold))
+                ProximityPreparedSharingCountdown(sharing: sharing)
+            }
+            Text(viewModel.displayedEngagement == nil ? String(localized: "Choose how to connect to the reader.")
+                : viewModel.preparedSharing != nil ? String(localized: "Start a new request on the reader, then reconnect.")
+                : viewModel.displayedEngagement == .qr ? String(localized: "Let the reader scan this code. Keep both devices nearby.")
+                : String(localized: "Keep your phone near the reader while it connects."))
+                .font(.subheadline).foregroundStyle(.secondary)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if viewModel.preparedSharing == nil {
+                ProximityApprovalModeToggle(mode: $approvalMode)
+                    .disabled(viewModel.refreshingEngagement)
+            } else {
+                Button("Approved data") { showApprovedData = true }.frame(maxWidth: .infinity, minHeight: 44)
+            }
+            if let method = viewModel.displayedEngagement, viewModel.engagementChoices.count > 1 {
+                Button(method == .qr ? String(localized: "Hold near the reader instead") : String(localized: "Show QR code instead")) {
+                    viewModel.showEngagement(method == .qr ? .nfc : .qr)
+                }.frame(maxWidth: .infinity, minHeight: 44)
+                    .disabled(viewModel.refreshingEngagement)
+            }
+            if let route = viewModel.connectedRoute { ProximityConnectionDetails(route: route) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var choices: some View {
+        ForEach(Array(viewModel.engagementChoices.enumerated()), id: \.offset) { _, method in
+            Button { viewModel.showEngagement(method) } label: {
+                HStack(spacing: 16) {
+                    Image(systemName: method == .qr ? "qrcode" : "wave.3.right")
+                        .font(.title2).foregroundStyle(Color.accentColor)
+                        .frame(width: 28).accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(method == .qr ? String(localized: "Show QR code") : String(localized: "Hold near the reader"))
+                            .font(.headline).foregroundStyle(.primary)
+                        Text(method == .qr ? String(localized: "Let the reader scan your screen.")
+                            : String(localized: "Bring your phone close to connect."))
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.refreshingEngagement)
+            .accessibilityIdentifier(method == .qr ? "proximity-show-Qr" : "proximity-show-Nfc")
+            Divider()
+        }
+    }
+}
+
+private enum ProximityEngagementSection { case header, footer }
+
+private struct ProximityEngagementHeightKey: PreferenceKey {
+    static let defaultValue: [ProximityEngagementSection: CGFloat] = [:]
+    static func reduce(value: inout [ProximityEngagementSection: CGFloat], nextValue: () -> [ProximityEngagementSection: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
     }
 }
 
@@ -194,6 +441,7 @@ private struct ProximityReviewContent: View {
     let onToggleElement: (Int, ProximityElementReference) -> Void
     let continueAfterResponse: Bool
     let onContinueAfterResponseChange: (Bool) -> Void
+    let allowContinuation: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -240,7 +488,7 @@ private struct ProximityReviewContent: View {
                 )
             }
 
-            Toggle(
+            if allowContinuation { Toggle(
                 isOn: Binding(
                     get: { continueAfterResponse },
                     set: onContinueAfterResponseChange
@@ -254,8 +502,59 @@ private struct ProximityReviewContent: View {
                 }
             }
             .accessibilityIdentifier(WalletAccessibilityID.proximityContinueAfterResponse)
+            }
         }
         .accessibilityIdentifier(WalletAccessibilityID.proximityReview)
+    }
+}
+
+private struct ProximityPreparedSharingSummary: View {
+    let sharing: ProximityPreparedSharing
+
+    var body: some View {
+        ReviewMetadataSection(title: "Ready for one share") {
+            ProximityPreparedSharingCountdown(sharing: sharing)
+            Text("Only the approved reader and data can be used. Cancel to withdraw this approval.")
+            ProximityDisclosureSummary(review: sharing.review, submission: sharing.submission)
+        }
+    }
+}
+
+private struct ProximityPreparedSharingCountdown: View {
+    let sharing: ProximityPreparedSharing
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            Text("Approval expires in \(sharing.remainingSeconds) seconds").font(.subheadline)
+                .accessibilityIdentifier("proximity-prepared-countdown")
+        }
+    }
+}
+
+private struct ProximityDisclosureSummary: View {
+    let review: ProximityReview
+    let submission: ProximitySubmission
+    var initiallyExpanded = false
+
+    var body: some View {
+        let names = Array(Set(review.readerAuthentication.compactMap(\.displayName))).sorted()
+        Text(names.isEmpty ? String(localized: "Reader identity unavailable") : names.joined(separator: ", ")).font(.headline)
+        MetadataDisclosure(title: "Selected data", initiallyExpanded: initiallyExpanded) {
+            ForEach(submission.documents, id: \.requestIndex) { selected in
+                if let document = review.documents.first(where: { $0.requestIndex == selected.requestIndex }),
+                   let credential = document.credentialOptions.first(where: { $0.credentialID == selected.credentialID }) {
+                    Text(credential.label ?? String(localized: "Credential")).font(.headline)
+                    ForEach(Array(credential.requestedElements.filter {
+                        selected.disclosedElements.contains(.init(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier))
+                    }.enumerated()), id: \.offset) { _, element in
+                        Text(element.elementIdentifier.replacingOccurrences(of: "_", with: " ").capitalized)
+                        if element.intentToRetain {
+                            Text("The reader intends to retain this information.").font(.footnote).foregroundStyle(.red)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -445,6 +744,12 @@ private struct ProximityDocumentContent: View {
                 let details = credentialDetailsByID[credential.credentialID]
                 Divider()
                 Text("Data to share").font(.headline)
+                if !document.requiredElements.isSubset(of: Set(credential.requestedElements.map {
+                    ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+                })) {
+                    Text("This credential cannot provide all the required data. Choose another credential or decline sharing.")
+                        .font(.footnote).foregroundStyle(.red)
+                }
                 ForEach(Array(credential.requestedElements.enumerated()), id: \.offset) { _, element in
                     let reference = ProximityElementReference(
                         namespace: element.namespace,
@@ -472,9 +777,13 @@ private struct ProximityDocumentContent: View {
                                     .font(.caption)
                                     .foregroundStyle(.red)
                             }
+                            if document.requiredElements.contains(reference) {
+                                Text("Required for this identity check").font(.caption).foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .toggleStyle(ReviewCheckboxToggleStyle())
+                    .disabled(document.requiredElements.contains(reference))
                     .accessibilityIdentifier(
                         WalletAccessibilityID.proximityElement(
                             requestIndex: document.requestIndex,
@@ -548,10 +857,27 @@ private struct ProximityTerminalContent: View {
     let title: String
     let message: String
     let onDismiss: () -> Void
+    var receipt: ProximitySharingReceipt? = nil
+    var onPrepareAnotherShare: (() -> Void)? = nil
 
     var body: some View {
-        ReviewMetadataSection(title: title) {
-            Text(message)
+        VStack(alignment: .leading, spacing: 16) {
+            Text(title).font(.title2.bold()).accessibilityAddTraits(.isHeader)
+            Text(message).foregroundStyle(.secondary)
+            if let receipt {
+                ReviewMetadataSection(title: "What was shared") {
+                    Text(receipt.completedAt.formatted(date: .abbreviated, time: .shortened)).font(.footnote)
+                    if receipt.approvalTiming == .beforeConnection {
+                        Text("Shared using your one-use prepared approval.")
+                    }
+                    ProximityDisclosureSummary(review: receipt.review, submission: receipt.submission)
+                }
+            }
+            if let onPrepareAnotherShare {
+                Button("Prepare another share", action: onPrepareAnotherShare)
+                    .buttonStyle(.bordered).frame(minHeight: 44)
+                    .accessibilityIdentifier("proximity-prepare-again")
+            }
             Button("Done", action: onDismiss)
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity)
@@ -565,12 +891,18 @@ private struct ProximityFailureContent: View {
     let recoverable: Bool
     let onRetry: () -> Void
     let onDismiss: () -> Void
+    var errorCode: String? = nil
+    var remediationActions: [ProximityRemediationAction] = []
+    var onRemediate: (ProximityRemediationAction) -> Void = { _ in }
 
     var body: some View {
         ReviewMetadataSection(title: String(localized: "Presentation failed")) {
             Text(message)
                 .accessibilityIdentifier(WalletAccessibilityID.proximityError)
-            if recoverable {
+            if let action = remediationActions.first(where: { $0 != .retry && $0 != .useSupportedDevice }) {
+                Button(action.label) { onRemediate(action) }.buttonStyle(.bordered)
+            }
+            if recoverable && remediationActions.allSatisfy({ $0 == .retry || $0 == .useSupportedDevice }) {
                 Button("Try again", action: onRetry)
                     .buttonStyle(.borderedProminent)
                     .frame(maxWidth: .infinity)
@@ -584,7 +916,7 @@ private struct ProximityFailureContent: View {
     }
 }
 
-private struct ProximityQRCode: View {
+private struct ProximityQRCode: View, Equatable {
     let payload: String
 
     var body: some View {
@@ -596,7 +928,6 @@ private struct ProximityQRCode: View {
                     .foregroundStyle(.red)
             }
         }
-        .padding(20)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
         .accessibilityLabel("Device engagement QR code")
     }
@@ -718,6 +1049,31 @@ private extension ProximityDeviceAuthenticationMethod {
         switch self {
         case .signature: String(localized: "Device signature")
         case .mac: String(localized: "Device MAC")
+        }
+    }
+}
+
+
+private struct ProximityConnectionDetails: View {
+    let route: ProximityConnectedRoute
+
+    var body: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Started with: \(route.engagement == .qr ? String(localized: "Show QR code") : String(localized: "Hold near the reader"))")
+                Text("Data connection: \(transport)")
+            }
+            .font(.subheadline).frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text("Connection details").font(.subheadline).frame(minHeight: 44)
+        }
+    }
+
+    private var transport: String {
+        switch route.transport {
+        case .bluetoothLowEnergy: String(localized: "Bluetooth")
+        case .nfc: String(localized: "NFC")
+        case .wifiAware: String(localized: "Wi-Fi Aware")
         }
     }
 }

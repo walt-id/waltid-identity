@@ -4,6 +4,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.LocalSystemTheme
 import androidx.compose.ui.SystemTheme
+import androidx.compose.ui.test.ExperimentalTestApi
 import kotlin.test.Test
 
 @OptIn(InternalComposeUiApi::class)
@@ -12,6 +13,10 @@ class WalletDemoAppIosTest {
         // Headless Skiko tests have no UIKit window; reading its fallback display theme can block.
         CompositionLocalProvider(LocalSystemTheme provides SystemTheme.Light, content = content)
     }
+
+    @Test
+    @OptIn(ExperimentalTestApi::class)
+    fun proximityQrFitsWalletChromeWithoutScrolling() = scenarios.proximityQrFitsWalletChromeWithoutScrolling()
 
     @Test
     fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
@@ -134,6 +139,10 @@ class WalletDemoAppIosTest {
     @Test
     fun customBrandingTitleAppearsInTheHeader() =
         scenarios.customBrandingTitleAppearsInTheHeader()
+
+    @Test
+    fun sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys() =
+        scenarios.sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys()
 
     @Test
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =

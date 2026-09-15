@@ -3,7 +3,16 @@ import XCTest
 
 final class WalletAPITests: XCTestCase {
     func testProximityStreamCompletesAtEveryTerminalStateWithoutForwardingLaterStates() async {
+        let review = ProximityReview(reviewID: .init(value: UUID().uuidString), exchange: 1,
+            documents: [.init(requestIndex: 0, documentType: "org.iso.18013.5.1.mDL", credentialOptions: [
+                .init(credentialID: "fixture", label: "Identity", issuer: nil, validUntil: .distantFuture,
+                    deviceAuthentication: .signature, requestedElements: [.init(namespace: "org.iso.18013.5.1",
+                        elementIdentifier: "given_name", intentToRetain: false, satisfiesRequestedElements: [])])])],
+            readerAuthentication: [], readerAuthenticationSummary: .absent, useCases: [], applicationAuthorizations: [])
+        let plan = ProximitySharingPlan(review: review, expiresAt: .distantFuture,
+            readerCertificateSHA256: "display-fixture", bridge: DisplayOnlySharingPlanBridge())
         let terminals: [ProximityState] = [
+            .preparationRequired(plan),
             .completed(exchanges: 1, declined: false), .noData(exchange: 2), .cancelled,
             .failed(.init(category: .transport, code: "closed", message: "Closed", recovery: .startNewSession)),
         ]
@@ -436,6 +445,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertTrue(capabilities.mayStart)
 
         let session = try await wallet.startProximityPresentation()
+        await session.presentNfc()
         var states = session.states.makeAsyncIterator()
         let firstState = await states.next()
         XCTAssertEqual(firstState, .checkingPrerequisites(capabilities))
@@ -443,11 +453,13 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(actionResult, .accepted)
         await session.close()
         await session.close()
+        await session.presentNfc()
 
         XCTAssertEqual(bridge.proximityCapabilityCalls, 1)
         XCTAssertEqual(bridge.proximitySessionStarts, 1)
         XCTAssertEqual(bridge.proximitySession.dispatches, [.cancel])
         XCTAssertEqual(bridge.proximitySession.closeCalls, 1)
+        XCTAssertEqual(bridge.proximitySession.presentNfcCalls, 1)
     }
 
     func testProximityCapabilitiesAllowUnavailableSelectedAlternatives() {
@@ -1498,6 +1510,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 }
 
 private final class FakeProximityPresentationSessionBridge: ProximitySessionBridge, @unchecked Sendable {
+    let systemPresentationActive = false
     lazy var states = AsyncStream<ProximityState> { [unowned self] continuation in
         continuation.yield(.checkingPrerequisites(capabilities))
         continuation.finish()
@@ -1505,6 +1518,9 @@ private final class FakeProximityPresentationSessionBridge: ProximitySessionBrid
     var capabilities = makeTestProximityCapabilities()
     private(set) var dispatches: [ProximityAction] = []
     private(set) var closeCalls = 0
+    private(set) var presentNfcCalls = 0
+
+    func presentNfc() async { presentNfcCalls += 1 }
 
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult {
         dispatches.append(action)
@@ -1539,4 +1555,12 @@ private struct TerminalProximityStreamBridge: ProximitySessionBridge {
     }
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult { .accepted }
     func close() async { continuation.finish() }
+    func presentNfc() async {}
+}
+
+private struct DisplayOnlySharingPlanBridge: ProximitySharingPlanBridge {
+    var isExpired: Bool { false }
+    func approve(_ submission: ProximitySubmission) throws -> ProximityPreparationResult {
+        .rejected(.init(category: .policy, code: "display_fixture", message: "Display fixture only", recovery: .none))
+    }
 }

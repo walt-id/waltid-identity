@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalCoroutinesApi::class)
 
 package id.walt.wallet2.mobile
 
@@ -20,13 +20,21 @@ import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.mdoc.proximity.mobile.NfcHostPreparation
 import id.walt.mdoc.proximity.mobile.PreparedNfcHostSession
 import id.walt.wallet2.data.Wallet
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import id.walt.mdoc.proximity.ImmutableBytes
+import kotlin.time.TestTimeSource
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -37,6 +45,42 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class ProximityCoordinatorTest {
+    @Test
+    fun `prepared deadline and revocation close a permission-blocked session and release admission`() = runTest {
+        for (cancel in listOf(false, true)) {
+            val wallet = Wallet("prepared-blocked-$cancel")
+            val factory = RecordingTransportFactory(BleProximityAvailability.Unavailable("ble_powered_off", "Bluetooth is off"))
+            val coordinator = ProximityCoordinator(wallet, factory, sessionDispatcher = StandardTestDispatcher(testScheduler))
+            val reference = ProximityElementReference("org.iso.18013.5.1", "given_name")
+            val review = ProximityReview(ProximityReviewId(Uuid.random().toString()), 1, listOf(
+                ProximityDocumentReview(0, "org.iso.18013.5.1.mDL", listOf(ProximityCredentialOption(
+                    "credential", "Identity", null, Instant.DISTANT_FUTURE, ProximityDeviceAuthenticationMethod.Signature,
+                    listOf(ProximityRequestedElement(reference.namespace, reference.elementIdentifier, false)),
+                ))),
+            ), emptyList(), emptyList(), emptyList())
+            val digest = ImmutableBytes.of(ByteArray(32))
+            val time = TestTimeSource()
+            val plan = ProximitySharingPlan(wallet, review, ProximityApprovalScope(ProximityProfile.Iso180135Edition2Dis2026,
+                "reader", digest, mapOf("credential" to digest), emptyList()), timeSource = time)
+            val sharing = assertIs<ProximityPreparationResult.Prepared>(plan.approve(ProximitySubmission(listOf(
+                ProximityDocumentSubmission(0, "credential", setOf(reference)),
+            )))).sharing
+            val session = coordinator.start(ProximityConfiguration(approval = ProximityApproval.Prepared(sharing)))
+            runCurrent()
+            assertIs<ProximityState.CheckingPrerequisites>(session.state.value)
+            if (cancel) sharing.revoke() else {
+                time += 60.seconds
+                advanceTimeBy(60_000)
+            }
+            runCurrent()
+            assertEquals(if (cancel) "prepared_sharing_cancelled" else "prepared_sharing_expired",
+                assertIs<ProximityState.Failed>(session.state.value).error.code)
+            assertTrue(factory.configurations.isEmpty())
+            val fresh = coordinator.start(ProximityConfiguration())
+            fresh.close()
+        }
+    }
+
     @Test
     fun `closing or cancelling before the worker starts releases the wallet for a fresh session`() = runTest {
         for (dispatchCancel in listOf(false, true)) {

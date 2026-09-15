@@ -52,6 +52,20 @@ Then build or test the Swift facade:
 swift test --package-path waltid-libraries/protocols/waltid-wallet-sdk-ios -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
 ```
 
+Host Swift tests do not exercise the conditional WalletCore bridge. Run its package target on an
+explicit simulator from the Identity root:
+
+```bash
+.github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh 'platform=iOS Simulator,id=<simulator-UDID>'
+```
+
+The runner builds WalletCore from the selected checkout and separately compiles the same SDK sources
+with native flow/receipt fixtures under `build/bridge-fixtures`. These fixtures never enter the default
+framework or published API. The runner selects that test binary with `WALLET_SDK_BRIDGE_FIXTURES=1`,
+checks both framework headers, and requires the named review, approval, receipt, cancellation and
+error tests in JUnit results. Missing frameworks, undiscovered tests and unexpected skips fail the run.
+Source revision, binary hashes and results are recorded under `build/proximity-tests/swift-bridge.*`.
+
 Generate and validate the Swift DocC archive:
 
 ```bash
@@ -110,11 +124,13 @@ supported DPoP signing algorithms.
 Use the Swift-native proximity API for ISO/IEC 18013-5 device engagement and
 retrieval. It is separate from the URL-based OpenID4VP methods:
 
+<!-- doc-snippet:start swift-proximity-session -->
 ```swift
 let configuration = ProximityConfiguration()
 let capabilities = try await wallet.proximityPresentationCapabilities(
     configuration: configuration
 )
+showUnavailableMethods(capabilities)
 let session = try await wallet.startProximityPresentation(
     configuration: configuration
 )
@@ -125,9 +141,11 @@ for await state in session.states {
         showUnavailableMethods(current)
     case .engagementReady(let engagements):
         showEngagements(engagements)
-    case .reviewRequired(let review):
+    case .reviewRequired(let review, _):
         showReview(review)
-    case .completed(let exchanges, _):
+    case .preparationRequired(let plan, let reason):
+        showPreparationReview(plan, reason: reason)
+    case .completed(let exchanges, _, _):
         showCompletion(exchanges: exchanges)
     case .noData(let exchange):
         showNoData(exchange: exchange)
@@ -137,7 +155,9 @@ for await state in session.states {
         showProgress(state)
     }
 }
+await session.close()
 ```
+<!-- doc-snippet:end swift-proximity-session -->
 
 The default selects QR engagement and BLE retrieval. The Swift facade installs
 the iOS BLE and NFC platform adapters automatically. NFC runtime reporting is
@@ -151,6 +171,44 @@ conventional NFC length limits must match across routes. The SDK prepares only
 viable selected routes. Perform a suggested permission or settings effect in app
 UI and report its privacy-safe
 outcome with `.reportRemediation`. The SDK alone advances protocol state.
+
+`ProximityConfiguration.approval` selects `.askEachTime` (default) or
+`.prepareBeforeSharing`. Preparation first authenticates the reader and declines
+its request without credential disclosure. After the connection closes,
+`.preparationRequired(plan, reason)` supplies a recent request for an explicit
+review. Display `plan.review`, let the holder choose credentials/fields, and honour
+`requiredElements`. Call `try plan.approve(submission)` only from the approval action;
+on `.prepared(sharing)`, start a new session with
+`configuration.withApproval(.prepared(sharing))`. The old connection is finished.
+
+The shared SDK binds that approval to the exact authenticated reader, request,
+selected credentials, retention/purpose and application requirements. It lasts 60
+seconds, uses a monotonic deadline, and permits one connection attempt. A plan
+expires after ten minutes and is not permission to disclose. Keep both objects
+in memory within the journey; persist only the mode. `sharing.remainingSeconds`
+supports a countdown, and `await sharing.revoke()` cancels future use. Close and
+revoke on dismissal/backgrounding, preserving only actual Core NFC system presentation.
+Retries require a fresh review; changed requests never inherit a broader approval.
+
+The bundled iOS adapter cannot host interactive review during NFC-only retrieval.
+It first declines and collects an eligible reader request even in `.askEachTime`,
+then lets the holder review and reconnect. NFC-to-Bluetooth handover can still
+review while connected. Preparation needs one named authenticated trusted reader;
+other readers need an interactive route. Normal trust, credential and holder-key
+checks remain mandatory, and protected-key prompts still depend on OS availability.
+`.completed` may include a display-only receipt; this records local response
+completion, not the reader's verification result.
+
+When the user chooses a prepared NFC engagement, call `await session.presentNfc()` to open Core NFC's
+system sheet. The request preserves the current engagement and keys, waits for the NFC resource to be
+ready, and is idempotent while emulation is starting or active. The optional presentment assertion may
+expire or be unavailable during its cooldown; explicit presentation does not require it. Calls outside
+NFC engagement readiness are ignored. Failures and cancellation still arrive through `session.states`.
+
+After an NFC-only response is submitted, keep the devices together until the reader shows its result,
+then separate them. The adapter drains pending response fragments and keeps the NFC session active
+until reader deselection, cancellation, or a platform timeout. Bluetooth handover closes NFC after
+its response drains. Response submission alone does not confirm the reader's verification result.
 
 NFC card presentation requires Apple's managed HCE capability and a matching
 provisioning profile. [`HCE.entitlements.example`](HCE.entitlements.example) is
@@ -175,6 +233,11 @@ fresh session after terminal failure. Runtime capability observations distinguis
 `.notChecked`, `.available`, and `.unavailable` independently of selection.
 Reader scopes use `.document(index:)` or `.wholeRequest`; only the valid
 authentication outcome carries an evaluated trust decision.
+
+`session.connectedRoute` retains the actual engagement and bearer through review and completion,
+even if a consumer skips the brief connecting state. Terminal errors also expose `remediationActions`;
+after Settings, wait for the application to become active and close the failed session before starting
+a fresh one. Do not send prerequisite retry actions to a terminal session.
 
 `ProximitySession` is an actor over the KMP source of truth. Its
 state stream, typed actions, immutable review, trust facts, disclosure choices,
@@ -239,6 +302,13 @@ entries. It rejects private keys, PKCS#12/PFX, unknown bundle semantics,
 duplicates, invalid or expired trust material, and files larger than 1 MiB.
 Apply one immutable snapshot to a new session with `settings.applying(to:)`;
 changes made while a session is active apply only to the next session.
+
+A final request with no returnable data ends in `ProximityState.noData(exchange:)`. No credential
+data was sent for that request; earlier exchanges in the same session may have
+shared approved data. Render `ProximityReview.readerAuthenticationSummary` for
+the request summary: it accounts for whole-request authentication coverage while
+preserving malformed, invalid, and revoked authentication warnings. Individual
+`readerAuthentication` entries remain available for detailed inspection.
 
 ## Protected keys
 
@@ -420,10 +490,3 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
-
-A final request with no returnable data ends in `ProximityState.noData(exchange:)`. No credential
-data was sent for that request; earlier exchanges in the same session may have
-shared approved data. Render `ProximityReview.readerAuthenticationSummary` for
-the request summary: it accounts for whole-request authentication coverage while
-preserving malformed, invalid, and revoked authentication warnings. Individual
-`readerAuthentication` entries remain available for detailed inspection.

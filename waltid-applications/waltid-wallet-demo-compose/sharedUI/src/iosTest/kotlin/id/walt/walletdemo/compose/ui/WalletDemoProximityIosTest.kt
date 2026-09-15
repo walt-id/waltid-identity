@@ -6,8 +6,12 @@ class WalletDemoProximityIosTest {
     private val scenarios = WalletDemoProximityTestScenarios()
 
     @Test
-    fun engagementKeepsTheExactDeviceQRCodeVisibleWhileConnecting() =
-        scenarios.engagementKeepsTheExactDeviceQRCodeVisibleWhileConnecting()
+    fun connectingHidesEngagementChoicesAndQrCode() =
+        scenarios.connectingHidesEngagementChoicesAndQrCode()
+
+    @Test
+    fun nfcOnlyEngagementShowsHoldGuidanceWithoutInventingAQrCode() =
+        scenarios.nfcOnlyEngagementShowsHoldGuidanceWithoutInventingAQrCode(requiresUserAction = true)
 
     @Test
     fun reviewSeparatesReaderTrustAndSendsOnlyExplicitHolderActions() =
@@ -17,7 +21,13 @@ class WalletDemoProximityIosTest {
     fun reviewDoesNotInventAnIdentityForAnUnsignedReader() =
         scenarios.reviewDoesNotInventAnIdentityForAnUnsignedReader()
     @Test
+    fun guidedChoicesRemainUsableWithLargeTextAndDoNotShowRadios() =
+        scenarios.guidedChoicesRemainUsableWithLargeTextAndDoNotShowRadios()
+
+    @Test
     fun completedPresentationShowsDoneAndNoConnectionControls() =
         scenarios.completedPresentationShowsDoneAndNoConnectionControls()
-
+    @Test
+    fun replacementReviewAndCancellationRemoveStaleConsentFromTheScreen() =
+        scenarios.replacementReviewAndCancellationRemoveStaleConsentFromTheScreen()
 }

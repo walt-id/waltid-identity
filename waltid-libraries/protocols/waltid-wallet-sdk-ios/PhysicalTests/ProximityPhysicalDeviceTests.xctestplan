@@ -1,0 +1,79 @@
+{
+  "configurations": [
+    {
+      "id": "F1ECD60B-68D3-4384-9744-F4F3F2528E5A",
+      "name": "physical-local",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "environmentVariableEntries": [
+      {
+        "key": "PROXIMITY_OPT_IN",
+        "value": "$(PROXIMITY_OPT_IN)"
+      },
+      {
+        "key": "PROXIMITY_DEVICE_ID",
+        "value": "$(PROXIMITY_DEVICE_ID)"
+      },
+      {
+        "key": "PROXIMITY_READER_ID",
+        "value": "$(PROXIMITY_READER_ID)"
+      },
+      {
+        "key": "PROXIMITY_FIXTURE",
+        "value": "$(PROXIMITY_FIXTURE)"
+      },
+      {
+        "key": "PROXIMITY_PEER_REVISION",
+        "value": "$(PROXIMITY_PEER_REVISION)"
+      },
+      {
+        "key": "PROXIMITY_HOST_BUNDLE_ID",
+        "value": "$(PROXIMITY_HOST_BUNDLE_ID)"
+      },
+      {
+        "key": "PROXIMITY_TEAM_ID",
+        "value": "$(PROXIMITY_TEAM_ID)"
+      },
+      {
+        "key": "PROXIMITY_RUN_ID",
+        "value": "$(PROXIMITY_RUN_ID)"
+      },
+      {
+        "key": "PROXIMITY_CONFIGURATION",
+        "value": "$(PROXIMITY_CONFIGURATION)"
+      },
+      {
+        "key": "PROXIMITY_CONTROL_URL",
+        "value": "$(PROXIMITY_CONTROL_URL)"
+      },
+      {
+        "key": "PROXIMITY_CONTROL_TOKEN",
+        "value": "$(PROXIMITY_CONTROL_TOKEN)"
+      }
+    ],
+    "targetForVariableExpansion": {
+      "containerPath": "container:PhysicalTests.xcodeproj",
+      "identifier": "4740AE6347B0172C01254FF5",
+      "name": "PhysicalHost"
+    },
+    "testTimeoutsEnabled": true,
+    "defaultTestExecutionTimeAllowance": 240,
+    "maximumTestExecutionTimeAllowance": 240
+  },
+  "testTargets": [
+    {
+      "parallelizable": false,
+      "target": {
+        "containerPath": "container:PhysicalTests.xcodeproj",
+        "identifier": "3A0C9CEF9D8F3BC090274361",
+        "name": "ProximityPhysicalDeviceTests"
+      },
+      "selectedTests": [
+        "ProximityPhysicalDeviceTests"
+      ]
+    }
+  ],
+  "version": 1
+}

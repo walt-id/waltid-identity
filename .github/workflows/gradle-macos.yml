@@ -92,6 +92,7 @@ jobs:
           run-compile-smoke: 'false'
           run-ios-simulator-tests: 'false'
           run-wallet-core-xcframework: 'true'
+          run-wallet-sdk-tests: 'true'
           run-native-demo-tests: ${{ (github.event_name == 'workflow_dispatch' || inputs.run-native) && 'true' || 'false' }}
           run-native-identity-document-provider-checks: ${{ (github.event_name == 'workflow_dispatch' || inputs.run-native) && 'true' || 'false' }}
           run-compose-demo-tests: ${{ (github.event_name == 'workflow_dispatch' || inputs.run-compose) && 'true' || 'false' }}
