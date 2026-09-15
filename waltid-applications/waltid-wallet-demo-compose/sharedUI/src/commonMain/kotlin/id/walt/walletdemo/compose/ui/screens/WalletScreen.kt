@@ -16,7 +16,13 @@ import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 
 @Composable
-internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
+internal fun WalletScreen(
+    controller: WalletDemoController,
+    state: WalletDemoUiState,
+    onStartProximityPresentation: (() -> Unit)? = null,
+    presentationContent: (@Composable () -> Unit)? = null,
+    sharingSettingsContent: (@Composable () -> Unit)? = null,
+) {
     val uriHandler = LocalUriHandler.current
     var showingSettings by remember { mutableStateOf(false) }
     var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
@@ -38,6 +44,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
+            sharingSettingsContent = sharingSettingsContent,
         )
         return
     }
@@ -98,6 +105,8 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                     onSubmit = controller::submitPresentation,
                     onReject = controller::rejectPresentation,
                     onCancel = controller::cancelPresentationReview,
+                    onStartProximityPresentation = onStartProximityPresentation,
+                    presentationContent = presentationContent,
                     modifier = modifier,
                 )
             }

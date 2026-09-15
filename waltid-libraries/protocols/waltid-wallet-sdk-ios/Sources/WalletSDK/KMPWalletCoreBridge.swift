@@ -406,6 +406,10 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     }
 }
 
+private protocol KMPBackedProximityReaderTrustEvaluator {
+    var kmpReaderTrustEvaluator: any WalletCore.ProximityReaderTrustEvaluator { get }
+}
+
 private extension ProximityConfiguration {
     func toKMPConfiguration() -> WalletCore.ProximityConfiguration {
         WalletCore.ProximityConfiguration(
@@ -416,8 +420,9 @@ private extension ProximityConfiguration {
             retrievalMethods: Set(retrievalMethods.map { $0.toKMPMethod() }),
             readerPolicy: readerPolicy.toKMPPolicy(),
             deviceAuthenticationPolicy: deviceAuthenticationPolicy.toKMPPolicy(),
-            readerTrustEvaluator: readerTrustEvaluator.map {
-                KMPProximityReaderTrustEvaluatorAdapter(evaluator: $0)
+            readerTrustEvaluator: readerTrustEvaluator.map { evaluator in
+                (evaluator as? any KMPBackedProximityReaderTrustEvaluator)?.kmpReaderTrustEvaluator ??
+                    KMPProximityReaderTrustEvaluatorAdapter(evaluator: evaluator)
             } ?? WalletCore.UnconfiguredProximityReaderTrustEvaluator.shared,
             credentialStatusEvaluator: credentialStatusEvaluator.map {
                 KMPProximityCredentialStatusEvaluatorAdapter(evaluator: $0)
@@ -426,6 +431,305 @@ private extension ProximityConfiguration {
                 profiles: applicationProfiles.map(KMPProximityApplicationProfileAdapter.init)
             ),
             maximumMessageBytes: Int32(maximumMessageBytes)
+        )
+    }
+}
+
+/// Swift-native facade for the shared ISO reader-certificate and RICAL trust evaluator.
+public final class ProximityConfiguredReaderTrustEvaluator:
+    ProximityReaderTrustEvaluator,
+    KMPBackedProximityReaderTrustEvaluator,
+    @unchecked Sendable {
+    private let evaluator: WalletCore.ProximityConfiguredReaderTrustEvaluator
+
+    public init(configuration: ProximityReaderTrustConfiguration) {
+        evaluator = WalletCore.ProximityConfiguredReaderTrustEvaluator(
+            configuration: configuration.toKMPConfiguration()
+        )
+    }
+
+    fileprivate var kmpReaderTrustEvaluator: any WalletCore.ProximityReaderTrustEvaluator {
+        evaluator
+    }
+
+    public func evaluate(
+        _ evidence: ProximityReaderEvidence
+    ) async throws -> ProximityReaderTrustDecision {
+        try await evaluator.evaluate(evidence: evidence.toKMPEvidence()).toSwiftDecision()
+    }
+}
+
+/// Swift-native access to shared direct complete-CRL verification.
+///
+/// The application supplies issuer lookup certificates, selects the checked path scope, and owns
+/// transport/cache policy. Lookup certificates do not establish trust. Unsupported CRL forms and
+/// unavailable status remain indeterminate; verified revocation prevents disclosure.
+public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEvaluator, @unchecked Sendable {
+    private let evaluator: WalletCore.ProximityCrlRevocationEvaluator
+
+    /// Creates an explicit CRL evaluator for a reader revocation policy.
+    /// - Parameters:
+    ///   - issuerCertificatesDER: Public issuer lookup certificates, up to ten certificates.
+    ///   - scope: Whether to check only the reader or also its issuing authorities.
+    ///   - fetcher: Application transport with explicit timeout, redirect and destination policy.
+    /// - Throws: ``WalletError/invalidInput(_:)`` when issuer input is invalid or exceeds bounds.
+    public init(
+        issuerCertificatesDER: [Data],
+        scope: ProximityCRLScope,
+        fetcher: any ProximityCRLFetcher
+    ) throws {
+        guard (1...10).contains(issuerCertificatesDER.count),
+              issuerCertificatesDER.allSatisfy({ !$0.isEmpty && $0.count <= 65_536 }) else {
+            throw WalletError.invalidInput("CRL issuer certificates exceed the supported bounds.")
+        }
+        do {
+            evaluator = try WalletCore.ProximityCrlRevocationEvaluator(
+                issuerCertificatesDerBase64Url: issuerCertificatesDER.map { $0.base64URLEncodedString() },
+                scope: scope == .readerCertificate ? .readerCertificate : .readerCertificateAndIssuingAuthorities,
+                fetcher: KMPProximityCRLFetcherAdapter(fetcher)
+            )
+        } catch {
+            throw WalletError.invalidInput("CRL issuer certificates are invalid or exceed the supported bounds.")
+        }
+    }
+
+    /// Verifies the configured certificate scope using current complete CRLs.
+    /// - Parameter evidence: Authenticated reader evidence for one request scope.
+    /// - Returns: Good, revoked or indeterminate status, independently of certificate-path trust.
+    public func evaluate(_ evidence: ProximityReaderEvidence) async throws -> ProximityCertificateRevocationResult {
+        try Task.checkCancellation()
+        let result: any WalletCore.ProximityCertificateRevocationResult
+        do {
+            result = try await evaluator.evaluate(evidence: evidence.toKMPEvidence())
+        } catch {
+            try Task.checkCancellation()
+            throw WalletError.internalFailure("CRL evaluation could not complete.")
+        }
+        try Task.checkCancellation()
+        switch onEnum(of: result) {
+        case .good:
+            return .good
+        case let .revoked(value):
+            return .revoked(reason: value.reason)
+        case let .indeterminate(value):
+            return .indeterminate(reason: value.reason)
+        }
+    }
+}
+
+private final class KMPProximityCRLFetcherAdapter: WalletCore.ProximityCrlFetcher, @unchecked Sendable {
+    private let fetcher: any ProximityCRLFetcher
+
+    init(_ fetcher: any ProximityCRLFetcher) {
+        self.fetcher = fetcher
+    }
+
+    func __fetch(url: String, maximumBytes: Int32) async throws -> any WalletCore.ProximityCrlFetchResult {
+        guard let destination = URL(string: url) else {
+            return WalletCore.ProximityCrlFetchResultUnavailable.shared
+        }
+        switch try await fetcher.fetch(from: destination, maximumBytes: Int(maximumBytes)) {
+        case let .available(data):
+            guard !data.isEmpty, data.count <= Int(maximumBytes) else {
+                return WalletCore.ProximityCrlFetchResultUnavailable.shared
+            }
+            return WalletCore.ProximityCrlFetchResultAvailable(crlDerBase64Url: data.base64URLEncodedString())
+        case .unavailable:
+            return WalletCore.ProximityCrlFetchResultUnavailable.shared
+        }
+    }
+}
+
+private final class KMPProximityReaderRevocationEvaluatorAdapter:
+    WalletCore.ProximityReaderRevocationEvaluator,
+    @unchecked Sendable {
+    private let evaluator: any ProximityReaderRevocationEvaluator
+
+    init(_ evaluator: any ProximityReaderRevocationEvaluator) {
+        self.evaluator = evaluator
+    }
+
+    func __evaluate(
+        evidence: WalletCore.ProximityReaderEvidence
+    ) async throws -> any WalletCore.ProximityCertificateRevocationResult {
+        switch try await evaluator.evaluate(evidence.toSwiftEvidence()).storage {
+        case .good:
+            return WalletCore.ProximityCertificateRevocationResultGood.shared
+        case let .revoked(reason):
+            return WalletCore.ProximityCertificateRevocationResultRevoked(reason: reason)
+        case let .indeterminate(reason):
+            return WalletCore.ProximityCertificateRevocationResultIndeterminate(reason: reason)
+        }
+    }
+}
+
+private final class KMPProximityRICALSignerRevocationEvaluatorAdapter:
+    WalletCore.ProximityRicalSignerRevocationEvaluator,
+    @unchecked Sendable {
+    private let evaluator: any ProximityRICALSignerRevocationEvaluator
+
+    init(_ evaluator: any ProximityRICALSignerRevocationEvaluator) {
+        self.evaluator = evaluator
+    }
+
+    func __evaluate(
+        evidence: WalletCore.ProximityRicalSignerEvidence
+    ) async throws -> any WalletCore.ProximityCertificateRevocationResult {
+        let result = try await evaluator.evaluate(
+            ProximityRICALSignerEvidence(
+                providerID: evidence.providerId,
+                certificateChainDER: try evidence.certificateChainDerBase64Url.map {
+                    try decodedBase64URL($0, context: "RICAL signer certificate evidence")
+                }
+            )
+        )
+        switch result.storage {
+        case .good:
+            return WalletCore.ProximityCertificateRevocationResultGood.shared
+        case let .revoked(reason):
+            return WalletCore.ProximityCertificateRevocationResultRevoked(reason: reason)
+        case let .indeterminate(reason):
+            return WalletCore.ProximityCertificateRevocationResultIndeterminate(reason: reason)
+        }
+    }
+}
+
+private final class KMPProximityRICALProviderAdapter:
+    WalletCore.ProximityRicalProvider,
+    @unchecked Sendable {
+    private let provider: any ProximityRICALProvider
+
+    init(_ provider: any ProximityRICALProvider) {
+        self.provider = provider
+    }
+
+    func __current() async throws -> any WalletCore.ProximityRicalProviderResult {
+        switch try await provider.current().storage {
+        case let .available(signedRICAL):
+            return WalletCore.ProximityRicalProviderResultAvailable(
+                signedRicalBase64Url: signedRICAL.base64URLEncodedString()
+            )
+        case let .unavailable(reason):
+            return WalletCore.ProximityRicalProviderResultUnavailable(reason: reason)
+        case let .conflict(reason):
+            return WalletCore.ProximityRicalProviderResultConflict(reason: reason)
+        }
+    }
+}
+
+private final class KMPProximityRICALConstraintEvaluatorAdapter:
+    WalletCore.ProximityRicalConstraintEvaluator,
+    @unchecked Sendable {
+    private let evaluator: any ProximityRICALConstraintEvaluator
+
+    init(_ evaluator: any ProximityRICALConstraintEvaluator) {
+        self.evaluator = evaluator
+    }
+
+    func __accepts(
+        constraints: [WalletCore.ProximityRicalTrustConstraint],
+        reader: WalletCore.ProximityReaderEvidence
+    ) async throws -> KotlinBoolean {
+        let values = try constraints.map { constraint in
+            ProximityRICALTrustConstraint(
+                valuesCBOR: try constraint.valuesCborBase64Url.mapValues {
+                    try decodedBase64URL($0, context: "RICAL trust constraint")
+                }
+            )
+        }
+        return KotlinBoolean(bool: try await evaluator.accepts(values, reader: reader.toSwiftEvidence()))
+    }
+}
+
+private extension ProximityReaderTrustConfiguration {
+    func toKMPConfiguration() -> WalletCore.ProximityReaderTrustConfiguration {
+        WalletCore.ProximityReaderTrustConfiguration(
+            trustAnchors: trustAnchors.map {
+                WalletCore.ProximityReaderTrustAnchor(
+                    certificateDerBase64Url: $0.certificateDER.base64URLEncodedString(),
+                    displayName: $0.displayName
+                )
+            },
+            ricalProviders: ricalProviders.map { configuration in
+                WalletCore.ProximityRicalConfiguration(
+                    providerId: configuration.providerID,
+                    acceptedTypes: configuration.acceptedTypes,
+                    providerTrustAnchors: configuration.providerTrustAnchors.map {
+                        WalletCore.ProximityRicalProviderTrustAnchor(
+                            certificateDerBase64Url: $0.certificateDER.base64URLEncodedString()
+                        )
+                    },
+                    acceptedSignerCertificatePolicyOids: configuration.acceptedSignerCertificatePolicyOIDs,
+                    signerRevocationPolicy: configuration.signerRevocationPolicy.toKMPPolicy(),
+                    establishReaderTrust: configuration.establishReaderTrust,
+                    provider: KMPProximityRICALProviderAdapter(configuration.provider),
+                    constraintEvaluator: configuration.constraintEvaluator.map {
+                        KMPProximityRICALConstraintEvaluatorAdapter($0)
+                    }
+                )
+            },
+            revocationPolicy: revocationPolicy.toKMPPolicy()
+        )
+    }
+}
+
+private extension ProximityRICALSignerRevocationPolicy {
+    func toKMPPolicy() -> any WalletCore.ProximityRicalSignerRevocationPolicy {
+        switch self {
+        case .notChecked:
+            return WalletCore.ProximityRicalSignerRevocationPolicyNotChecked.shared
+        case let .check(evaluator):
+            return WalletCore.ProximityRicalSignerRevocationPolicyCheck(
+                evaluator: KMPProximityRICALSignerRevocationEvaluatorAdapter(evaluator)
+            )
+        }
+    }
+}
+
+private extension ProximityReaderRevocationPolicy {
+    func toKMPPolicy() -> any WalletCore.ProximityReaderRevocationPolicy {
+        switch self {
+        case .notChecked:
+            return WalletCore.ProximityReaderRevocationPolicyNotChecked.shared
+        case let .check(evaluator):
+            return WalletCore.ProximityReaderRevocationPolicyCheck(
+                evaluator: KMPProximityReaderRevocationEvaluatorAdapter(evaluator)
+            )
+        }
+    }
+}
+
+private extension ProximityReaderEvidence {
+    func toKMPEvidence() -> WalletCore.ProximityReaderEvidence {
+        WalletCore.ProximityReaderEvidence(
+            scope: scope.toKMPScope(),
+            authenticationIndex: Int32(authenticationIndex),
+            certificateChainDerBase64Url: certificateChainDER.map { $0.base64URLEncodedString() }
+        )
+    }
+}
+
+private extension WalletCore.ProximityReaderEvidence {
+    func toSwiftEvidence() throws -> ProximityReaderEvidence {
+        ProximityReaderEvidence(
+            scope: scope.toSwiftScope(),
+            authenticationIndex: Int(authenticationIndex),
+            certificateChainDER: try certificateChainDerBase64Url.map {
+                try decodedBase64URL($0, context: "reader certificate evidence")
+            }
+        )
+    }
+}
+
+private extension WalletCore.ProximityReaderTrustDecision {
+    func toSwiftDecision() -> ProximityReaderTrustDecision {
+        ProximityReaderTrustDecision(
+            state: state.toSwiftTrust(),
+            certificatePath: certificatePath.toSwiftPath(),
+            revocation: revocation.toSwiftRevocation(),
+            rical: rical.toSwiftRICAL(),
+            displayName: displayName,
+            reason: reason
         )
     }
 }
@@ -442,19 +746,7 @@ private final class KMPProximityReaderTrustEvaluatorAdapter:
     func __evaluate(
         evidence: WalletCore.ProximityReaderEvidence
     ) async throws -> WalletCore.ProximityReaderTrustDecision {
-        let certificateChain = try swiftArray(evidence.certificateChainDerBase64Url, of: String.self).map {
-            guard let data = Data(base64URLEncoded: $0) else {
-                throw WalletError.internalFailure("Wallet core returned invalid reader certificate evidence")
-            }
-            return data
-        }
-        let decision = try await evaluator.evaluate(
-            ProximityReaderEvidence(
-                scope: evidence.scope.toSwiftScope(),
-                authenticationIndex: Int(evidence.authenticationIndex),
-                certificateChainDER: certificateChain
-            )
-        )
+        let decision = try await evaluator.evaluate(evidence.toSwiftEvidence())
         return WalletCore.ProximityReaderTrustDecision(
             state: decision.state.toKMPState(),
             certificatePath: decision.certificatePath.toKMPState(),
@@ -993,7 +1285,7 @@ private extension WalletBridgeStoredDid {
     }
 }
 
-private extension Data {
+extension Data {
     func toKotlinByteArray() -> KotlinByteArray {
         let bytes = [UInt8](self)
         let array = KotlinByteArray(size: Int32(bytes.count))
@@ -1670,6 +1962,15 @@ private extension WalletCore.ProximityReaderAuthenticationScope {
     }
 }
 
+private extension ProximityReaderAuthenticationScope {
+    func toKMPScope() -> WalletCore.ProximityReaderAuthenticationScope {
+        switch self {
+        case .document(let index): return WalletCore.ProximityReaderAuthenticationScopeDocument(index: Int32(index.value))
+        case .wholeRequest: return WalletCore.ProximityReaderAuthenticationScopeWholeRequest.shared
+        }
+    }
+}
+
 private extension ProximityReaderTrustState {
     func toKMPState() -> WalletCore.ProximityReaderTrustState {
         switch self {
@@ -1685,6 +1986,7 @@ private extension ProximityReaderCertificatePathState {
     func toKMPState() -> WalletCore.ProximityReaderCertificatePathState {
         switch self {
         case .notEvaluated: return .notEvaluated
+        case .unknownAuthority: return .unknownAuthority
         case .invalid: return .invalid
         case .valid: return .valid
         }
@@ -2057,17 +2359,6 @@ private extension WalletCore.ProximityReaderAuthentication {
     }
 }
 
-private extension WalletCore.ProximityReaderAuthenticationValidity {
-    func toSwiftValidity() -> ProximityReaderAuthenticationValidity {
-        switch self {
-        case .absent: return .absent
-        case .malformed: return .malformed
-        case .invalid: return .invalid
-        case .valid: return .valid
-        }
-    }
-}
-
 private extension WalletCore.ProximityReaderAuthenticationSummary {
     func toSwiftSummary() -> ProximityReaderAuthenticationSummary {
         switch self {
@@ -2097,6 +2388,7 @@ private extension WalletCore.ProximityReaderCertificatePathState {
     func toSwiftPath() -> ProximityReaderCertificatePathState {
         switch self {
         case .notEvaluated: return .notEvaluated
+        case .unknownAuthority: return .unknownAuthority
         case .invalid: return .invalid
         case .valid: return .valid
         }
@@ -2172,13 +2464,13 @@ private extension WalletCore.ProximityApplicationAuthorization {
     }
 }
 
-private extension KotlinInstant {
+extension KotlinInstant {
     func toDate() -> Date {
         Date(timeIntervalSince1970: TimeInterval(epochSeconds) + TimeInterval(nanosecondsOfSecond) / 1_000_000_000)
     }
 }
 
-private extension Data {
+extension Data {
     init?(base64URLEncoded value: String) {
         var base64 = value.replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")

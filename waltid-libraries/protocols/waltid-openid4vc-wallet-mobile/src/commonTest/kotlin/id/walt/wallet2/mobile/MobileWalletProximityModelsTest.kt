@@ -115,7 +115,26 @@ class ProximityModelsTest {
                 revocation = ProximityReaderRevocationState.Revoked,
             )
         }
-
+        assertFailsWith<IllegalArgumentException> {
+            ProximityReaderTrustDecision(
+                state = ProximityReaderTrustState.Trusted,
+                certificatePath = ProximityReaderCertificatePathState.UnknownAuthority,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ProximityReaderTrustDecision(
+                state = ProximityReaderTrustState.ValidButUntrusted,
+                certificatePath = ProximityReaderCertificatePathState.Invalid,
+                revocation = ProximityReaderRevocationState.Good,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ProximityReaderTrustDecision(
+                state = ProximityReaderTrustState.ValidButUntrusted,
+                certificatePath = ProximityReaderCertificatePathState.UnknownAuthority,
+                rical = ProximityRicalState.Matched,
+            )
+        }
         val ricalEvidenceWithoutAutomaticTrust = ProximityReaderTrustDecision(
             state = ProximityReaderTrustState.ValidButUntrusted,
             certificatePath = ProximityReaderCertificatePathState.Valid,
@@ -127,6 +146,25 @@ class ProximityModelsTest {
             ProximityReaderTrustState.ValidButUntrusted,
             ricalEvidenceWithoutAutomaticTrust.state,
         )
+
+        val directTrustWithUnavailableRical = ProximityReaderTrustDecision(
+            state = ProximityReaderTrustState.Trusted,
+            certificatePath = ProximityReaderCertificatePathState.Valid,
+            revocation = ProximityReaderRevocationState.Good,
+            rical = ProximityRicalState.Unavailable,
+        )
+        assertEquals(ProximityReaderTrustState.Trusted, directTrustWithUnavailableRical.state)
+
+        assertFailsWith<IllegalArgumentException> {
+            ProximityReaderAuthentication(
+            scope = ProximityReaderAuthenticationScope.WholeRequest,
+            outcome = ProximityReaderAuthenticationOutcome.Valid(ProximityReaderTrustDecision(
+                state = ProximityReaderTrustState.Trusted,
+                certificatePath = ProximityReaderCertificatePathState.Valid,
+                revocation = ProximityReaderRevocationState.Indeterminate,
+            )),
+        )
+        }
     }
 
     @Test

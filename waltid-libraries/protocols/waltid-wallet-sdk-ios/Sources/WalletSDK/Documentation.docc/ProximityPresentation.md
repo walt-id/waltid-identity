@@ -41,9 +41,9 @@ for await state in session.states {
 
 The default configuration selects QR engagement and Bluetooth Low Energy
 retrieval. Capabilities keep implementation, profile permission, runtime
-availability, and selection separate for QR, NFC, BLE, and Wi-Fi Aware. A
-selected unavailable method prevents preparation rather than being silently
-substituted.
+observation, and selection separate for QR, NFC, BLE, and Wi-Fi Aware. An
+unprobed method reports `notChecked`. Hosts derive startability from the viable
+selected routes; an unavailable optional route does not block a usable route.
 
 Device signature is the default holder-authentication policy. Configure
 ``ProximityDeviceAuthenticationPolicy/macOnly``,
@@ -79,16 +79,99 @@ trust facts, document requests, retention intent, eligible credentials,
 disclosure alternatives, use-case and purpose assertions, and any recognized
 application authorization. These are protocol facts, not UI-derived state.
 
-Build ``ProximitySubmission`` only from the current review. The SDK
-binds and revalidates credential, holder-key, reader-trust, status, disclosure,
+Build ``ProximitySubmission`` only from the current review and dispatch
+`.approve(reviewID: review.reviewID, submission: submission)` or
+`.decline(reviewID: review.reviewID)`. A valid decision consumes that identity once;
+invalid submissions leave the review available for correction. Acceptance records
+the holder's decision, while signing and transmission may still fail.
+
+The SDK owns accepted values and detaches host projections. It binds and revalidates credential, holder-key, reader-trust, status, disclosure,
 and application-profile state before it sends a response. A stale or changed
-selection returns a typed rejection and does not disclose data.
+selection returns a typed rejection and does not disclose data. Recovery distinguishes
+retrying prerequisites in the active session from starting a new session after a
+terminal failure.
 
 Reader-authentication statements remain distinct by scope, document index, and
 statement index. During protected-key work,
 ``ProximityState/authorizingHolderKey(_:)`` carries one
 ``ProximityHolderAuthorizationRequest`` per approved document so a mixed
 signature/MAC response cannot be collapsed into a global authorization method.
+
+### Configure reader trust
+
+Cryptographic reader-authentication validity does not establish application
+trust. Provision Reader CA certificates through an out-of-band application
+channel and inject `ProximityConfiguredReaderTrustEvaluator` when the wallet
+requires a trusted reader:
+
+```swift
+let readerTrust = ProximityConfiguredReaderTrustEvaluator(
+    configuration: ProximityReaderTrustConfiguration(
+        trustAnchors: [
+            ProximityReaderTrustAnchor(
+                certificateDER: readerCA,
+                displayName: "Example reader authority"
+            )
+        ],
+        revocationPolicy: .check(applicationRevocationEvaluator)
+    )
+)
+let configuration = ProximityConfiguration(
+    readerPolicy: .requireTrusted,
+    readerTrustEvaluator: readerTrust
+)
+```
+
+The shared evaluator validates the ISO certificate profile, time, and path only
+against explicit application anchors. It performs no hidden network request and
+ships no reader trust list. Certificates carried by the reader are path inputs,
+not implicit anchors. Optional RICAL configuration similarly requires explicit
+provider roots and application-owned signer-revocation and constraint policies.
+A demo can pass a named test anchor through this same initializer; do not ship
+test anchors as production defaults.
+
+Use `ProximityCRLRevocationEvaluator` when the application supplies a complete-CRL transport:
+
+```swift
+let crlStatus = try ProximityCRLRevocationEvaluator(
+    issuerCertificatesDER: [readerCA],
+    scope: .readerCertificateAndIssuingAuthorities,
+    fetcher: applicationCRLFetcher
+)
+// Supply crlStatus to ProximityReaderTrustConfiguration(revocationPolicy: .check(crlStatus)).
+```
+
+`ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
+`ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,
+redirects, destination restrictions and caching. The shared verifier authenticates direct complete
+v2 CRLs and checks their scope and freshness; unsupported forms or unavailable status stay
+indeterminate. Issuer lookup certificates do not establish trust. Demo trust imports do not install
+a CRL client, and this CRL path does not implement OCSP.
+
+For holder-managed settings, validate and preview public trust material before
+persisting it:
+
+```swift
+let current = ProximityReaderTrustSettings()
+let preview = try await ProximityReaderTrustSettingsCodec.prepareImport(
+    sourceName: selectedURL.lastPathComponent,
+    data: selectedData,
+    existing: current
+)
+showImportReview(preview)
+
+// Only after explicit holder confirmation:
+let encoded = try ProximityReaderTrustSettingsCodec.encode(preview.resultingSettings)
+saveInAppPrivateStorage(encoded)
+```
+
+The importer accepts DER or certificate-only PEM Reader CAs and versioned
+walt.id JSON trust bundles with static signed RICAL configuration. It rejects
+private keys, PKCS#12/PFX, unknown bundle fields or versions, duplicates,
+non-current or invalid trust material, and files larger than 1 MiB. It performs
+no persistence or network request. Load one immutable settings snapshot when a
+new session starts and call ``ProximityReaderTrustSettings/applying(to:)`` so a
+settings change cannot mutate an active session.
 
 ### Lifecycle
 

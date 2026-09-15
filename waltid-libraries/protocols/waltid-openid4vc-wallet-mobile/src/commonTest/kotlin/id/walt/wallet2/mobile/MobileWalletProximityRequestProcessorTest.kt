@@ -13,6 +13,8 @@ import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.createAndSignDetached
 import id.walt.cose.toCoseKey
+import id.walt.cose.toCoseSigner
+import id.walt.cose.CoseContentType
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -60,6 +62,8 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -67,8 +71,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.*
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.Signer
 import id.walt.mdoc.proximity.MdocConsentDecision
@@ -87,6 +91,14 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -1054,6 +1066,203 @@ class ProximityRequestProcessorTest {
         }
     }
 
+    @Test
+    fun `reader certificate profile failures return encrypted empty responses before consent`() = runTest {
+        withFixture { fixture ->
+            val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
+            val configuration = ProximityConfiguration(
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
+                readerTrustEvaluator = ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
+                    trustAnchors = listOf(ProximityReaderTrustAnchor(certificates.root.encodedDer.toByteArray().encodeToBase64Url())),
+                )),
+            )
+            for (case in listOf("01", "02", "05", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16")) {
+                val modified = certificates.modified(case)
+                val result = wireExchange(fixture, requestWithNames("given_name"), configuration,
+                    authenticate = { request, transcript -> authenticateDocument(request, transcript, certificates.readerKey, listOf(modified)) })
+                val id = "mDL_SM_mdocRAuth_UF_$case"
+                assertIs<MdocHolderSessionResult.Failed>(result.result, id)
+                assertEquals(0, result.consentCalls, id)
+                assertEquals(0u, result.response.status, id)
+                assertEquals(null, result.response.documents, id)
+            }
+            // The selected DIS permits leaf-first multi-certificate x5chain (unlike appendix UF_22).
+            for (chain in listOf(listOf(certificates.leaf), listOf(certificates.leaf, certificates.root))) {
+                val result = wireExchange(fixture, requestWithNames("given_name"), configuration,
+                    authenticate = { request, transcript -> authenticateDocument(request, transcript, certificates.readerKey, chain.map { it.encodedDer.toByteArray() }) })
+                assertIs<MdocHolderSessionResult.Completed>(result.result)
+                assertEquals(1, result.consentCalls)
+                assertEquals(0u, result.response.status)
+                assertEquals(1, result.response.documents!!.size)
+            }
+        }
+    }
+
+    @Test
+    fun `reader COSE profile failures return an encrypted response without disclosure`() = runTest {
+        withFixture { fixture ->
+            val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
+            val configuration = ProximityConfiguration(
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
+                readerTrustEvaluator = ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
+                    trustAnchors = listOf(ProximityReaderTrustAnchor(certificates.root.encodedDer.toByteArray().encodeToBase64Url())),
+                )),
+            )
+            for (case in listOf("21", "23", "24", "25", "26", "27", "28")) {
+                val result = wireExchange(fixture, requestWithNames("given_name"), configuration, authenticate = { request, transcript ->
+                    val doc = request.docRequests.single()
+                    val payload = ReaderAuthenticationPayloads.forDocument(transcript, doc.itemsRequest)
+                    val protected = when (case) {
+                        "23" -> CoseHeaders(contentType = CoseContentType.AsString("application/cbor"))
+                        "24" -> CoseHeaders(algorithm = -37)
+                        else -> CoseHeaders(algorithm = -7)
+                    }
+                    val headers = CoseHeaders(algorithm = if (case == "25") -7 else null,
+                        x5chain = if (case == "21") emptyList() else listOf(CoseCertificate(certificates.leaf.encodedDer.toByteArray())))
+                    val signed = CoseSign1.createAndSignDetached(protected, headers, payload, certificates.readerKey.toCoseSigner(-7))
+                    val auth = when (case) {
+                        "26" -> {
+                            val wire = CborArray(listOf(CborByteString(signed.protected),
+                                CborMap(mapOf(CborInteger(32) to CborByteString(certificates.leaf.encodedDer.toByteArray()))),
+                                CborNull(), CborByteString(signed.signature)))
+                            coseCompliantCbor.decodeFromByteArray<CoseSign1>(coseCompliantCbor.encodeToByteArray<CborElement>(wire))
+                        }
+                        "27" -> {
+                            val altered = payload.copyOf().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+                            val embedded = coseCompliantCbor.encodeToByteArray<CborElement>(CborArray(listOf(CborString("Signature1"),
+                                CborByteString(signed.protected), CborByteString(byteArrayOf()), CborByteString(altered))))
+                            CoseSign1.createAndSign(protected, headers, embedded, certificates.readerKey.toCoseSigner(-7))
+                        }
+                        "28" -> signed.copy(signature = signed.signature.copyOf().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() })
+                        else -> signed
+                    }
+                    request.copy(docRequests = listOf(doc.copy(readerAuth = auth)))
+                })
+                val id = "mDL_SM_mdocRAuth_UF_$case"
+                assertIs<MdocHolderSessionResult.Failed>(result.result, id)
+                assertEquals(0, result.consentCalls, id)
+                assertTrue(result.response.status in setOf(0u, 10u), id)
+                assertEquals(null, result.response.documents, id)
+            }
+        }
+    }
+
+    @Test
+    fun `application CA revocation decision stops disclosure with the exact authenticated chain`() = runTest {
+        withFixture { fixture ->
+            val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
+            val chain = listOf(certificates.leaf, certificates.root).map { it.encodedDer.toByteArray() }
+            var revocationCalls = 0
+            val configuration = ProximityConfiguration(
+                readerPolicy = ProximityReaderPolicy.RequireTrusted,
+                readerTrustEvaluator = ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
+                    trustAnchors = listOf(ProximityReaderTrustAnchor(chain.last().encodeToBase64Url())),
+                    revocationPolicy = ProximityReaderRevocationPolicy.Check(ProximityReaderRevocationEvaluator { evidence ->
+                        assertEquals(chain.map { it.encodeToBase64Url() }, evidence.certificateChainDerBase64Url)
+                        revocationCalls++
+                        ProximityCertificateRevocationResult.Revoked("The reader CA was revoked")
+                    }),
+                )),
+            )
+            val result = wireExchange(fixture, requestWithNames("given_name"), configuration,
+                authenticate = { request, transcript -> authenticateDocument(request, transcript, certificates.readerKey, chain) })
+            assertEquals("reader_revoked", assertIs<MdocHolderSessionResult.Failed>(result.result).error.code)
+            assertEquals(1, revocationCalls)
+            assertEquals(0, result.consentCalls)
+            assertEquals(0u, result.response.status)
+            assertEquals(null, result.response.documents)
+        }
+    }
+
+    @Test
+    fun `verified CRLs including revoked authorities govern disclosure over the encrypted session`() = runTest {
+        withFixture { fixture ->
+            val certificates = ReaderCertificateProfileFixture.create(fixture.runtime)
+            val goodCrl = certificates.crl()
+            val revokedCrl = certificates.crl(listOf(certificates.root))
+            val staleCrl = certificates.crl(thisUpdate = Clock.System.now() - 2.hours, nextUpdate = Clock.System.now() - 1.hours)
+            val damagedCrl = goodCrl.copyOf().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+            for (scenario in CrlScenario.entries) {
+                val requests = mutableListOf<String>()
+                val client = HttpClient(MockEngine { request ->
+                    val url = request.url.toString()
+                    requests += url
+                    val authority = url == "https://reader.example/ca-crl"
+                    if (scenario == CrlScenario.Unavailable || (scenario == CrlScenario.LeafUnavailableAuthorityRevoked && !authority)) {
+                        respond(byteArrayOf(), HttpStatusCode.ServiceUnavailable)
+                    } else {
+                        val body = when (scenario) {
+                            CrlScenario.AuthorityRevoked, CrlScenario.LeafUnavailableAuthorityRevoked -> if (authority) revokedCrl else goodCrl
+                            CrlScenario.Stale -> staleCrl
+                            CrlScenario.InvalidSignature -> damagedCrl
+                            else -> goodCrl
+                        }
+                        respond(body, HttpStatusCode.OK)
+                    }
+                })
+                try {
+                    val crls = ProximityCrlRevocationEvaluator(
+                        listOf(certificates.root.encodedDer.toByteArray().encodeToBase64Url()),
+                        ProximityCrlScope.ReaderCertificateAndIssuingAuthorities,
+                        ProximityCrlFetcher { url, maximumBytes ->
+                            val response = client.get(url)
+                            if (response.status != HttpStatusCode.OK) ProximityCrlFetchResult.Unavailable
+                            else {
+                                val bytes = response.body<ByteArray>()
+                                assertTrue(bytes.size <= maximumBytes)
+                                ProximityCrlFetchResult.Available(bytes.encodeToBase64Url())
+                            }
+                        },
+                    )
+                    val configuration = ProximityConfiguration(
+                        readerPolicy = ProximityReaderPolicy.RequireTrusted,
+                        readerTrustEvaluator = ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
+                            trustAnchors = listOf(ProximityReaderTrustAnchor(certificates.root.encodedDer.toByteArray().encodeToBase64Url())),
+                            revocationPolicy = ProximityReaderRevocationPolicy.Check(crls),
+                        )),
+                    )
+                    val result = wireExchange(fixture, requestWithNames("given_name"), configuration,
+                        authenticate = { request, transcript -> authenticateDocument(request, transcript, certificates.readerKey,
+                            listOf(certificates.leaf.encodedDer.toByteArray())) })
+                    assertEquals(setOf("https://reader.example/crl", "https://reader.example/ca-crl"), requests.toSet(), scenario.name)
+                    assertEquals(0u, result.response.status, scenario.name)
+                    if (scenario == CrlScenario.Good) {
+                        assertIs<MdocHolderSessionResult.Completed>(result.result)
+                        assertEquals(1, result.consentCalls)
+                        assertEquals(1, result.response.documents!!.size)
+                    } else {
+                        val failed = assertIs<MdocHolderSessionResult.Failed>(result.result, scenario.name)
+                        if (scenario == CrlScenario.AuthorityRevoked || scenario == CrlScenario.LeafUnavailableAuthorityRevoked) {
+                            assertEquals("reader_revoked", failed.error.code, "mDL_SM_mdocRAuth_UF_29")
+                        }
+                        assertEquals(0, result.consentCalls, scenario.name)
+                        assertEquals(null, result.response.documents, scenario.name)
+                    }
+                } finally {
+                    client.close()
+                }
+            }
+        }
+    }
+
+    private enum class CrlScenario { Good, AuthorityRevoked, Unavailable, Stale, InvalidSignature, LeafUnavailableAuthorityRevoked }
+
+    private suspend fun authenticateDocument(
+        request: DeviceRequest,
+        transcript: SessionTranscript,
+        key: Key,
+        chain: List<ByteArray>,
+    ): DeviceRequest {
+        val doc = request.docRequests.single()
+        val auth = CoseSign1.createAndSignDetached(
+            protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256),
+            unprotectedHeaders = CoseHeaders(x5chain = chain.map(::CoseCertificate)),
+            detachedPayload = ReaderAuthenticationPayloads.forDocument(transcript, doc.itemsRequest),
+            key = key,
+        )
+        return request.copy(docRequests = listOf(doc.copy(readerAuth = auth)))
+    }
+
     private data class WireOutcome(val result: MdocHolderSessionResult, val response: DeviceResponse, val consentCalls: Int)
 
     private suspend fun wireExchange(
@@ -1061,7 +1270,9 @@ class ProximityRequestProcessorTest {
         request: DeviceRequest,
         configuration: ProximityConfiguration = ProximityConfiguration(),
         denyFamilyName: Boolean = false,
-    ): WireOutcome {
+        authenticate: suspend (DeviceRequest, SessionTranscript) -> DeviceRequest = { value, _ -> value },
+    ): WireOutcome = withContext(Dispatchers.Default) {
+        // Ktor and platform crypto use real dispatchers; virtual time must not expire their session.
         suspend fun key(id: String) = fixture.runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
             KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.KEY_AGREEMENT),
         ))
@@ -1093,14 +1304,14 @@ class ProximityRequestProcessorTest {
             }, context, capabilities)
         try {
             loopback.reader.send(ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(SessionEstablishment(
-                ByteStringWrapper(readerPublic, readerBytes), cipher.encrypt(coseCompliantCbor.encodeToByteArray(request)),
+                ByteStringWrapper(readerPublic, readerBytes), cipher.encrypt(coseCompliantCbor.encodeToByteArray(authenticate(request, transcript))),
             ))))
             val result = engine.run()
             val messages = mutableListOf<SessionData>()
             while (true) messages += coseCompliantCbor.decodeFromByteArray<SessionData>((loopback.reader.receive() ?: break).copy())
-            assertEquals(20u, messages.last().status)
+            assertEquals(20u, messages.lastOrNull()?.status, "Session result: $result")
             val encrypted = messages.mapNotNull { it.data }.single()
-            return WireOutcome(result, coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(encrypted)), consentCalls)
+            WireOutcome(result, coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(encrypted)), consentCalls)
         } finally {
             cipher.close()
             processor.cancel()

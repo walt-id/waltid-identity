@@ -47,7 +47,8 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
 - **iOS**: Based on [Signum library](https://github.com/a-sit-plus/signum) - Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support. Limited set of supported key types.
 - **JS**: Based on [Signum library](https://github.com/a-sit-plus/signum) - Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support. Limited set of supported key types.
 
-> Certificate revocation checks are not yet supported. 
+> Complete direct CRLs can be verified explicitly with `CertificateRevocationListVerifier`.
+> Chain validation does not automatically fetch or check revocation. OCSP is not implemented.
 > On iOS and JS system trust anchors are not supported.
 
 ---
@@ -338,6 +339,35 @@ fun jvmExtensionsExample(cert: X509Certificate) {
 
 ---
 
+## Explicit CRL verification
+
+`CertificateRevocationListVerifier` verifies application-supplied DER CRLs on JVM,
+Android, iOS and JavaScript. Select the certificate's issuer from an independently
+validated path, then inspect the result:
+
+```kotlin
+val status = CertificateRevocationListVerifier().verify(
+    crlDer = crlBytes,
+    certificate = readerCertificate,
+    issuer = readerAuthority,
+)
+when (status) {
+    is CrlCertificateStatus.Good -> acceptRevocationEvidence(status.nextUpdate)
+    is CrlCertificateStatus.Revoked -> rejectRevokedCertificate()
+    is CrlCertificateStatus.Indeterminate -> handleMissingRevocationEvidence()
+}
+```
+
+The supported profile is complete, direct X.509 v2 CRLs with AKI, CRL number and
+`nextUpdate`, signed with ECDSA or RSA PKCS#1 using SHA-256/384/512. The verifier
+checks exact signed DER, issuer name/key linkage, CA status, `cRLSign`, issuer
+validity, CRL freshness and certificate serial. Names must have identical DER
+encodings. Input is limited to 2 MiB, 10,000 revoked entries and 64 extensions per
+list or entry. Delta, indirect, partitioned and unsupported critical extensions
+are indeterminate. `Good` establishes revocation evidence only; it does not
+establish path trust. The caller owns transport, distribution-point selection,
+cache policy and checking any other certificates in the path.
+
 ## Platform notes
 
 - **JVM / Android**
@@ -349,7 +379,7 @@ fun jvmExtensionsExample(cert: X509Certificate) {
 
 - **iOS**
   - Supports explicit trust anchors and trusted-chain-root validation.
-  - System trust anchors and revocation checks are not supported yet.
+  - System trust anchors and automatic revocation checks are not supported.
 
 - **JavaScript (planned)**
   - WebCrypto does not expose a PKIX path builder; integrate a JS PKI lib or a WASM backend.
