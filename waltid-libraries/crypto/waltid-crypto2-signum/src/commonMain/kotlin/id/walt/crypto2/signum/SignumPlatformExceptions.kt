@@ -30,3 +30,9 @@ public class SignumKeyPolicyMismatchException(
     message: String,
     cause: Throwable? = null,
 ) : IllegalStateException("Signum key policy cannot satisfy alias $alias: $message", cause)
+
+/** The platform did not authorize this operation; this does not imply user cancellation. */
+public class SignumAuthorizationException(
+    message: String = "Key-use authorization was not completed",
+    cause: Throwable? = null,
+) : IllegalStateException(message, cause)

@@ -35,7 +35,7 @@ fun createIosDemoWallet(
                         recoveryProviders = listOf(id.walt.wallet2.recovery.keychain.KeychainIdentityRecovery("wallet-demo", crossProcessAccess.keychainAccessGroup)),
                         alternativeAuthorizations = if (config.signingProtectionMode.allows(WalletDemoSigningProtection.None))
                         listOf(KeyUseAuthorizationPolicy.None) else emptyList(),
-                        platform = id.walt.crypto2.signum.SignumPlatformPolicy.IosKeychain(accessGroup = crossProcessAccess.keychainAccessGroup),
+                        platform = id.walt.crypto2.keys.PlatformKeyConfiguration.IosKeychain(accessGroup = crossProcessAccess.keychainAccessGroup),
                     ),
                     attestationConfig = config.toWalletAttestationConfig(),
                     transactionDataProfiles = transactionDataProfiles.profiles,

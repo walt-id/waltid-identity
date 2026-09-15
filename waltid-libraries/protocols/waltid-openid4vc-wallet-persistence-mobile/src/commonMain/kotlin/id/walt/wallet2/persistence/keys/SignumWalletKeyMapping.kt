@@ -1,18 +1,36 @@
 package id.walt.wallet2.persistence.keys
 
 import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeyAttestation
+import id.walt.crypto2.keys.KeyAuthorizationEvidence
+import id.walt.crypto2.keys.KeyEncodingFormat
+import id.walt.crypto2.keys.KeyOrigin
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeySecurityLevel
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.KeychainAccessibility
 import id.walt.crypto2.keys.ManagedKey
-import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.PrivateKeyExporter
 import id.walt.crypto2.keys.Signer
+import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.signum.SignumAuthenticationPolicy
+import id.walt.crypto2.signum.SignumAuthorizationException
+import id.walt.crypto2.signum.SignumHardwarePolicy
 import id.walt.crypto2.signum.SignumInteractionContextUnavailableException
 import id.walt.crypto2.signum.SignumKeyInvalidatedException
 import id.walt.crypto2.signum.SignumKeyNotFoundException
-import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
+import id.walt.crypto2.signum.SignumKeyOrigin
 import id.walt.crypto2.signum.SignumKeyPolicy
-import id.walt.crypto2.signum.SignumHardwarePolicy
-import id.walt.crypto2.signum.SignumAuthenticationPolicy
+import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
+import id.walt.crypto2.signum.SignumKeychainAccessibility
+import id.walt.crypto2.signum.SignumManagedKey
+import id.walt.crypto2.signum.SignumPlatformPolicy
+import id.walt.crypto2.signum.SignumProtectionLevel
+import id.walt.crypto2.signum.SignumSecurityLevel
 import id.walt.crypto2.signum.SignumStoredKeyMetadataException
 import id.walt.crypto2.signum.SignumUserCancelledException
 
@@ -59,6 +77,7 @@ internal fun Throwable.toKeyUseAuthorizationException(
             cause = this,
         )
 
+    is SignumAuthorizationException,
     is SignumUserCancelledException ->
         KeyUseAuthorizationException(
             failure = KeyUseAuthorizationFailure.AuthorizationNotCompleted,
@@ -69,30 +88,31 @@ internal fun Throwable.toKeyUseAuthorizationException(
     else -> null
 }
 
-/** Wraps protected managed-key signing with the wallet's stable authorization failures. */
-internal fun ManagedKey.withWalletAuthorizationMapping(
-    authorizationPolicy: KeyUseAuthorizationPolicy,
-): ManagedKey {
-    if (authorizationPolicy is KeyUseAuthorizationPolicy.None) {
-        return this
-    }
-
+/** Gives signing and eligible private-key export the same mobile failure vocabulary. */
+internal fun ManagedKey.withWalletAuthorizationMapping(): ManagedKey {
     val delegate = this
-    val storedKey = delegate.storedKey
     return object : ManagedKey {
         override val storedKey = delegate.storedKey
         override val capabilities = delegate.capabilities.copy(
             signer = delegate.capabilities.signer?.let { signer ->
-                Signer { data, algorithm ->
-                    try {
-                        signer.sign(data, algorithm)
-                    } catch (cause: Throwable) {
-                        throw cause.toKeyUseAuthorizationException(storedKey.id.value) ?: cause
-                    }
+                Signer { data, algorithm -> mapKeyFailure(storedKey.id.value) { signer.sign(data, algorithm) } }
+            },
+            privateKeyExporter = delegate.capabilities.privateKeyExporter?.let { exporter ->
+                object : PrivateKeyExporter {
+                    override suspend fun exportPrivateKey(): EncodedKey =
+                        mapKeyFailure(storedKey.id.value) { exporter.exportPrivateKey() }
+                    override suspend fun exportPrivateKey(format: KeyEncodingFormat): EncodedKey =
+                        mapKeyFailure(storedKey.id.value) { exporter.exportPrivateKey(format) }
                 }
             },
         )
     }
+}
+
+private suspend inline fun <T> mapKeyFailure(keyId: String, operation: () -> T): T = try {
+    operation()
+} catch (cause: Throwable) {
+    throw cause.toKeyUseAuthorizationException(keyId) ?: cause
 }
 
 /** Interprets persisted Signum policy only when the complete wallet protected-key shape matches. */
@@ -183,13 +203,13 @@ private fun SignumAuthenticationPolicy.isWalletBiometricTimedReuse(): Boolean =
 
 /** Maps explicitly selected protection without changing the authorization policy. */
 internal fun WalletKeyRequirements.toSignumPolicy(prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt()): SignumKeyPolicy {
-    val legacy = authorizationPolicy.toSignumPolicy(prompt)
-    return legacy.copy(hardware = when (protection) {
-        WalletKeyProtection.PlatformDefault -> legacy.hardware
+    val authorization = authorizationPolicy.toSignumPolicy(prompt)
+    return authorization.copy(hardware = when (protection) {
+        WalletKeyProtection.PlatformDefault -> authorization.hardware
         WalletKeyProtection.HardwareRequired -> SignumHardwarePolicy.REQUIRED
         WalletKeyProtection.HardwarePreferred -> SignumHardwarePolicy.PREFERRED
         WalletKeyProtection.NativeStorage -> SignumHardwarePolicy.DISCOURAGED
-    }, platform = platform, attestationChallenge = attestationChallenge)
+    }, platform = platform.toSignumPlatformPolicy(), attestationChallenge = attestationChallenge)
 }
 
 internal val KeyUseAuthorizationPolicy.reuseSeconds: Int get() = when (this) {
@@ -202,3 +222,51 @@ internal val KeyUseAuthorizationPolicy.reuseSeconds: Int get() = when (this) {
 internal val KeyUseAuthorizationPolicy.requiresNativeControls: Boolean get() =
     this == KeyUseAuthorizationPolicy.BiometricAny || this is KeyUseAuthorizationPolicy.DeviceCredential ||
         this is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential
+
+/** Keeps provider types out of the mobile configuration and facts. */
+internal fun PlatformKeyConfiguration.toSignumPlatformPolicy(): SignumPlatformPolicy = when (this) {
+    PlatformKeyConfiguration.Default -> SignumPlatformPolicy.Default
+    is PlatformKeyConfiguration.AndroidKeystore -> SignumPlatformPolicy.AndroidKeystore(
+        strongBox = when (strongBox) {
+            HardwarePreference.REQUIRED -> SignumHardwarePolicy.REQUIRED
+            HardwarePreference.PREFERRED -> SignumHardwarePolicy.PREFERRED
+            HardwarePreference.DISCOURAGED -> SignumHardwarePolicy.DISCOURAGED
+        }, unlockedDeviceRequired = unlockedDeviceRequired,
+        userConfirmationRequired = userConfirmationRequired, userPresenceRequired = userPresenceRequired,
+        maxUsageCount = maxUsageCount, validFromEpochMillis = validFromEpochMillis, validUntilEpochMillis = validUntilEpochMillis,
+        attestKeyAlias = attestKeyAlias,
+    )
+    is PlatformKeyConfiguration.IosKeychain -> SignumPlatformPolicy.IosKeychain(
+        accessibility = when (accessibility) {
+            KeychainAccessibility.WHEN_UNLOCKED -> SignumKeychainAccessibility.WHEN_UNLOCKED
+            KeychainAccessibility.AFTER_FIRST_UNLOCK -> SignumKeychainAccessibility.AFTER_FIRST_UNLOCK
+            KeychainAccessibility.WHEN_UNLOCKED_DEVICE_ONLY -> SignumKeychainAccessibility.WHEN_UNLOCKED_DEVICE_ONLY
+            KeychainAccessibility.AFTER_FIRST_UNLOCK_DEVICE_ONLY -> SignumKeychainAccessibility.AFTER_FIRST_UNLOCK_DEVICE_ONLY
+            KeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY -> SignumKeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY
+        }, accessGroup = accessGroup,
+    )
+}
+
+internal fun SignumManagedKey.toWalletKeyFacts(
+    authorizationEvidence: KeyAuthorizationEvidence,
+): PlatformKeyFacts = PlatformKeyFacts(
+    origin = when (origin) {
+        SignumKeyOrigin.GENERATED -> KeyOrigin.GENERATED
+        SignumKeyOrigin.IMPORTED -> KeyOrigin.IMPORTED
+        SignumKeyOrigin.UNKNOWN -> KeyOrigin.UNKNOWN
+    },
+    securityLevel = when (securityLevel) {
+        SignumSecurityLevel.SOFTWARE -> KeySecurityLevel.SOFTWARE
+        SignumSecurityLevel.TRUSTED_ENVIRONMENT -> KeySecurityLevel.TRUSTED_ENVIRONMENT
+        SignumSecurityLevel.STRONGBOX -> KeySecurityLevel.STRONGBOX
+        SignumSecurityLevel.SECURE_ENCLAVE -> KeySecurityLevel.SECURE_ENCLAVE
+        SignumSecurityLevel.UNKNOWN -> KeySecurityLevel.UNKNOWN
+    },
+    protection = when (protectionLevel) {
+        SignumProtectionLevel.HARDWARE -> KeyProtectionLevel.HARDWARE
+        SignumProtectionLevel.SOFTWARE -> KeyProtectionLevel.SOFTWARE
+        SignumProtectionLevel.UNKNOWN -> KeyProtectionLevel.UNKNOWN
+    },
+    attestation = attestation?.let { KeyAttestation(it.format, it.statement, it.certificateChain) },
+    authorizationEvidence = authorizationEvidence,
+)

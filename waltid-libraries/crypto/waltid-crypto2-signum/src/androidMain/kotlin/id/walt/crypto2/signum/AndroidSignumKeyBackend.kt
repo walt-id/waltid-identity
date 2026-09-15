@@ -3,7 +3,6 @@ package id.walt.crypto2.signum
 import android.os.Build
 import android.security.keystore.KeyProperties
 import android.security.keystore.UserNotAuthenticatedException
-import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import at.asitplus.signum.supreme.os.AndroidKeystoreSigner
@@ -134,8 +133,9 @@ public class AndroidSignumKeyBackend(
                     if (interactionContext != null) {
                         unlockPrompt {
                             (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
-                                allowedAuthenticators = (if (auth.biometric) BIOMETRIC_STRONG else 0) or
-                                    (if (auth.deviceCredential) androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL else 0)
+                                message = auth.prompt
+                                allowedAuthenticators = auth.androidPromptAuthenticators
+                                cancelText = auth.androidPromptCancelText
                             }
                             activity = interactionContext
                         }

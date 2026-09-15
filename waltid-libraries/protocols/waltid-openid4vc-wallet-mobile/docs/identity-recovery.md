@@ -85,7 +85,7 @@ Portable records retain minimum storage and authorization requirements; a restor
 both those minimums and current host configuration. Device-specific aliases, access groups and old
 attestations are never replayed. This is not automatic interpretation of arbitrary ecosystem policy.
 
-`SignumPlatformPolicy.AndroidKeystore` and `.IosKeychain` configure the native destination. They do
+`PlatformKeyConfiguration.AndroidKeystore` and `.IosKeychain` configure the native destination. They do
 not turn an explicitly chosen encrypted-database option into a native key. Hosts requiring hardware
 must use `HardwareGenerated` or select an offered hardware option; a software option is always labeled.
 
@@ -254,3 +254,20 @@ Physical-device coverage and local provider round trips must be distinguished fr
 recovery. StrongBox-specific devices, the customer's Redmi and actual cross-device cloud restore
 remain separate qualification cases. Do not claim those paths verified from a TEE import, a simulator
 run or a synchronizable local put/get. No formal EUDI, HAIP, eIDAS or FIPS qualification is claimed.
+
+### Native implementation and authorization evidence
+
+`PlatformKeyConfiguration` and `PlatformKeyFacts` describe behavior and observations without exposing
+the signing library. `keyFacts.authorizationEvidence` distinguishes native authorization attributes
+(Android) from an SDK creation record bound to the native key (iOS). Neither is hardware attestation.
+A requested configuration is not itself evidence of the key's protection.
+
+The iOS adapter uses stable Signum for the supported generated Secure Enclave configurations and an
+Apple Keychain implementation for import/export, access groups, passcode-set-only accessibility and
+per-key timed reuse. Its recorded backend and namespace remain fixed for the key's lifetime. Keys
+with absent or inconsistent creation records are rejected; recovery creates a fresh entry containing
+the original key.
+
+Cancellation and failed authentication return no signature. Known native failures map to the wallet's
+authorization failure categories and retain native diagnostics. Unexpected faults remain distinguishable.
+The WAL-749 implementation does not claim WAL-1207's separate Signum-only authorization architecture.
