@@ -46,6 +46,7 @@ import kotlin.uuid.Uuid
  * Owns one wallet's active signing identity. Creation and recovery use complete SDK-issued options.
  * Native/backup prerequisites are revalidated at execution. The encrypted database journals interrupted
  * operations; a failed backup submission does not activate the new identity.
+ * Successful activation and initialization refresh the wallet's platform credential registration.
  *
  * Keep one writable wallet instance per database. Provider extensions may read established identities.
  */
@@ -59,6 +60,7 @@ public class WalletIdentities internal constructor(
     private val native: PlatformManagedKeyProvider,
     private val queries: WalletPersistenceQueries,
     private val didService: Crypto2DidService,
+    private val onActive: suspend () -> Unit,
 ) {
     private val owner = Any()
     private val mutex = Mutex()
@@ -86,7 +88,7 @@ public class WalletIdentities internal constructor(
      * Pending and unavailable states never cause replacement key generation. Use creationOptions for an explicit choice.
      */
     public suspend fun initialize(): IdentityOperationResult = when (val state = state()) {
-        is WalletIdentityState.Active -> IdentityOperationResult.Active(state.identity)
+        is WalletIdentityState.Active -> IdentityOperationResult.Active(state.identity).notifyActive()
         is WalletIdentityState.Pending -> IdentityOperationResult.Pending(state.identityId)
         is WalletIdentityState.Unavailable -> failed(state.reason)
         WalletIdentityState.Absent -> when (val options = creationOptions()) {
@@ -136,7 +138,7 @@ public class WalletIdentities internal constructor(
                 failed(classify(cause))
             }
         } finally { seed?.fill(0) }
-    }
+    }.notifyActive()
 
     /** Retries a persisted backup submission, or removes an interrupted pre-activation key operation. */
     public suspend fun resumePending(identityId: String): IdentityOperationResult = mutex.withLock {
@@ -159,7 +161,7 @@ public class WalletIdentities internal constructor(
                 failed(IdentityFailure.NativeOperationFailed)
             }
         }
-    }
+    }.notifyActive()
 
     /** Removes only pending local state. Any record already accepted by a provider remains discoverable
      * and can be deleted separately; cancellation never silently destroys a recovery copy.
@@ -363,6 +365,11 @@ public class WalletIdentities internal constructor(
         } catch (cause: CancellationException) { throw cause }
         catch (_: Exception) { failed(IdentityFailure.InvalidRecoveryRecord) }
         finally { bytes.fill(0) }
+    }.notifyActive()
+
+    // Publish only committed identities, after releasing the lifecycle lock so host callbacks may read state.
+    private suspend fun IdentityOperationResult.notifyActive(): IdentityOperationResult = also {
+        if (this is IdentityOperationResult.Active) onActive()
     }
 
     private suspend fun choices(intent: IdentityIntent, attestation: IdentityAttestationRequest): IdentityOptions {

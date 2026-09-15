@@ -210,7 +210,7 @@ public class MobileWallet internal constructor(
     private val deleteLocalPersistence: suspend () -> Unit = {},
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
-    private val identityService: id.walt.wallet2.mobile.identity.WalletIdentities? = null,
+    createIdentityService: ((suspend () -> Unit) -> id.walt.wallet2.mobile.identity.WalletIdentities)? = null,
 ) {
     private val eventStream = MobileWalletEventStream()
     /**
@@ -251,6 +251,8 @@ public class MobileWallet internal constructor(
         sessionStore = issuanceSessionStore,
         httpClient = issuanceHttpClient,
     )
+
+    private val identityService = createIdentityService?.invoke(::syncDigitalCredentialRegistration)
 
     /** Signing identity creation, backup and restoration; recovery integrations are explicitly configured. */
     public val identities: id.walt.wallet2.mobile.identity.WalletIdentities
@@ -416,7 +418,7 @@ public class MobileWallet internal constructor(
     /**
      * Outcome of the most recent platform registry synchronization, or null before the first one.
      *
-     * A wallet operation that stores or removes a credential synchronizes the registry afterwards
+     * Signing-key activation/initialization and credential storage/removal synchronize the registry afterwards
      * and does not fail if that synchronization does not succeed, so this is where an application
      * learns that the platform projection is stale. Recover by calling
      * [refreshDigitalCredentialRegistration] again; the wallet store it projects is unaffected.
