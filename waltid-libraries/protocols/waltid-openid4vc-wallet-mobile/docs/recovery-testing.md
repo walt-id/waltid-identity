@@ -1,5 +1,8 @@
 # Recovery qualification
 
+See the dated [physical-device qualification record](recovery-qualification.md)
+for completed smoke checks, fixes and remaining coverage.
+
 The recovery harness uses disposable wallets, real encrypted persistence and the
 configured native backup adapter. It verifies the original public key, DID and
 key identifier, destination protection, fresh challenge signatures and reopening
@@ -98,9 +101,9 @@ remains outside this simulator runner.
 - Android reinstall checks establish retention/retrieval after app removal, not
   remote cloud delivery.
 - Simulator Keychain checks establish local provider/persistence behavior, not
-  iCloud synchronization   or physical hardware protection.
+  iCloud synchronization or physical hardware protection.
 - Security-setting changes, authenticated restored-key use, cross-device
-  transfer and actual cloud   restoration require the separate device/provider
+  transfer and actual cloud restoration require the separate device/provider
   qualification plan.
 
 The Block Store contract suite additionally covers namespace isolation,
