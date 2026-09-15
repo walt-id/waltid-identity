@@ -18,6 +18,7 @@ import id.walt.walletdemo.compose.logic.walletapi2.createWalletApi2DemoWallet
 import id.walt.walletdemo.compose.logic.walletapi2.establishWalletApi2Session
 import id.walt.walletdemo.compose.logic.walletapi2.webIssuanceRedirectUri
 import id.walt.walletdemo.compose.ui.WalletDemoApp
+import id.walt.walletdemo.compose.ui.installWalletImageLoader
 import id.walt.walletdemo.compose.ui.WalletDemoBranding
 import id.walt.walletdemo.compose.ui.WalletDemoTheme
 import id.walt.walletdemo.compose.ui.screens.AccountAuthScreen
@@ -28,6 +29,7 @@ import kotlin.js.ExperimentalWasmJsInterop
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
+    installWalletImageLoader()
     ComposeViewport(document.body!!) {
         var branding by remember { mutableStateOf<WalletDemoBranding?>(null) }
         LaunchedEffect(Unit) { branding = loadWebBranding() }
