@@ -17,9 +17,10 @@ import sys
 import uuid
 import xml.etree.ElementTree as ET
 
+from ios_simulator_test import PACKAGE as IOS_PACKAGE, run_test
+
 PACKAGE = "id.walt.wallet2.mobile.test"
 TEST = "id.walt.wallet2.mobile.test.BlockStoreRecoveryWorkflowTest#runPhase"
-IOS_PACKAGE = "id.walt.wallet.recovery-tests"
 IOS_TEST = "id.walt.wallet2.mobile.test.KeychainRecoveryWorkflowTest.runPhase"
 
 
@@ -87,8 +88,7 @@ class Qualification:
                      "--recoveryRun=" + self.state["runId"], "--recoveryStorage=" + self.storage_for(phase)]
         if "expected" in self.state:
             arguments.append("--recoveryExpected=" + self.state["expected"])
-        return execute(["xcrun", "simctl", "launch", "--console", "--terminate-running-process",
-                        self.args.device, IOS_PACKAGE, *arguments])
+        return run_test(self.args.device, arguments)
 
     def shell(self, *args):
         return execute([self.adb, "-s", self.args.device, "shell", *args])

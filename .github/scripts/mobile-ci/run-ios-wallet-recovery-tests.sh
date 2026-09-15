@@ -5,7 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 identity_dir="$(cd "$script_dir/../../.." && pwd -P)"
 cd "$identity_dir"
 
-python3 -m unittest discover -s scripts/tests -p test_qualify_wallet_recovery.py
+python3 -m unittest discover -s scripts/tests -p 'test_*recovery*.py'
 mkdir -p build/reports/ios-wallet-recovery
 output=$(mktemp -d "$identity_dir/build/reports/ios-wallet-recovery/run.XXXXXX")
 python3 scripts/build-recovery-simulator-host.py --output "$output/host"
@@ -24,25 +24,9 @@ xcrun simctl bootstatus "$simulator" -b
 
 app="$output/host/RecoveryTests.app"
 xcrun simctl install "$simulator" "$app"
-xcrun simctl launch --console --terminate-running-process "$simulator" id.walt.wallet.recovery-tests \
+python3 scripts/ios_simulator_test.py --device "$simulator" --output "$output" -- \
   --ktest_filter=id.walt.wallet2.recovery.keychain.KeychainIdentityRecoveryTest.compatibleAccessibilityClassesPreserveTheRecordContract \
-  --require-keychain > "$output/keychain-contract.log" 2>&1
-python3 - "$output" <<'PY'
-from pathlib import Path
-import sys
-import xml.etree.ElementTree as ET
-
-output = Path(sys.argv[1])
-log = (output / 'keychain-contract.log').read_text()
-passed = '[  PASSED  ] 1 tests.' in log and '[  FAILED  ]' not in log
-suite = ET.Element('testsuite', name='recovery.keychain', tests='1', failures='0' if passed else '1')
-case = ET.SubElement(suite, 'testcase', classname='recovery.keychain', name='record-contract')
-if not passed:
-    ET.SubElement(case, 'failure', message='Expected one passing Keychain contract; see keychain-contract.log')
-ET.ElementTree(suite).write(output / 'results.xml', encoding='utf-8', xml_declaration=True)
-if not passed:
-    raise SystemExit('Keychain contract failed or produced incomplete results')
-PY
+  --require-keychain
 
 for pair in EncryptedDatabase:EncryptedDatabase NativeStorage:NativeStorage EncryptedDatabase:NativeStorage; do
   storage=${pair%:*}

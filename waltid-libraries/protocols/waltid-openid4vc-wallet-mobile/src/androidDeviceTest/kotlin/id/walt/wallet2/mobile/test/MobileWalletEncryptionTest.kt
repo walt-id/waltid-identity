@@ -237,8 +237,8 @@ class MobileWalletEncryptionTest {
         assertEquals(bootstrap.did, reopenedBootstrap.did, "Default DID store should survive wallet recreation")
         assertEquals(bootstrap.keyId, reopenedBootstrap.keyId, "Platform signing-key reference should survive wallet recreation")
         assertEquals(emptyList(), reopenedCredentials)
-        // Identity initialization does not read credential data.
-        assertEquals(2, credentialStore.listCredentialsCalls)
+        // Both initializations refresh credential registration, in addition to the two explicit reads.
+        assertEquals(4, credentialStore.listCredentialsCalls)
 
         wallet.deleteWallet()
         deleteDatabaseFiles(databaseFileName)
