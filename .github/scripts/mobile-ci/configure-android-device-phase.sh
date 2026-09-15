@@ -14,6 +14,14 @@ case "$phase" in
     artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**'
     emulator_target="default"
     ;;
+  wallet-recovery)
+    script="./waltid-identity/.github/scripts/mobile-ci/run-android-wallet-recovery-tests.sh"
+    emulator_api_level="35"
+    emulator_target="google_apis"
+    emulator_options="-no-snapshot -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
+    report_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/outputs/androidTest-results/**/*.xml\nwaltid-identity/build/reports/wallet-recovery/**/results.xml'
+    artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/outputs/androidTest-results/**\nwaltid-identity/build/reports/wallet-recovery/**'
+    ;;
   compose-demo)
     # The default image has no Google Play services. Keep GMS-only classes out of
     # instrumentation discovery; their class-level assumption would otherwise

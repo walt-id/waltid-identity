@@ -192,3 +192,6 @@ waltid-applications/waltid-wallet-demo-android/scripts/e2e.env
 
 # OpenID conformance runner local state
 waltid-services/waltid-openid4vp-conformance-runners/mongo/
+
+# Python test tooling
+__pycache__/

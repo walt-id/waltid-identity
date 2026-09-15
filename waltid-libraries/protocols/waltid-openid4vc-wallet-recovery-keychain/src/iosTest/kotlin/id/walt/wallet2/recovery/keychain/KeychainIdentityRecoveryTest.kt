@@ -2,6 +2,7 @@ package id.walt.wallet2.recovery.keychain
 
 import id.walt.wallet2.mobile.identity.*
 import kotlinx.coroutines.test.runTest
+import platform.Foundation.NSProcessInfo
 import kotlin.test.*
 import kotlin.uuid.Uuid
 
@@ -17,6 +18,9 @@ class KeychainIdentityRecoveryTest {
             try {
                 assertEquals("keychain:$namespace", provider.id)
                 val availability = provider.availability()
+                if (NSProcessInfo.processInfo.arguments.contains("--require-keychain")) {
+                    assertIs<RecoveryAvailability.Available>(availability, "Entitled-host qualification requires the real Keychain service")
+                }
                 if (availability is RecoveryAvailability.Unavailable) {
                     // Standalone simulator runners can lack the synchronization service. Verify that
                     // this is an explicit provider failure, never successful local/cloud submission.
