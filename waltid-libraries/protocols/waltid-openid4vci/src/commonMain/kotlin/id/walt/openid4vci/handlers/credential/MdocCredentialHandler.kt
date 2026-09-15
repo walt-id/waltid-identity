@@ -19,10 +19,18 @@ import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.sdjwt.SDMap
+import id.walt.w3c.issuance.dataFunctions
+import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -67,6 +75,7 @@ class MdocCredentialHandler(
                     )
                 )
             }
+            val mappedCredentialData = credentialData.mergeMdocPayloadWithMapping(dataMapping, issuerId, display)
 
             computeCredentialResult(
                 request = request,
@@ -74,7 +83,7 @@ class MdocCredentialHandler(
                 issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, verifiedProof ->
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
-                        credentialData = credentialData,
+                        credentialData = mappedCredentialData,
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
                         docType = docType,
@@ -87,7 +96,7 @@ class MdocCredentialHandler(
                         authorizedTransactionDataTypes = authorizedTransactionDataTypes,
                     )
                 },
-                credentialData = credentialData,
+                credentialData = mappedCredentialData,
                 x5Chain = x5Chain,
                 mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                 validFrom = validFrom,
@@ -119,10 +128,12 @@ class MdocCredentialHandler(
         validUntil: Instant?,
         verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult = try {
+        val mappedCredentialData = credentialData.mergeMdocPayloadWithMapping(dataMapping, issuerId, display)
+
         computeCredentialResult(
             request = request,
             configuration = configuration,
-            credentialData = credentialData,
+            credentialData = mappedCredentialData,
             x5Chain = x5Chain,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             validFrom = validFrom,
@@ -131,7 +142,7 @@ class MdocCredentialHandler(
             issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, verifiedProof ->
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
-                    credentialData = credentialData,
+                    credentialData = mappedCredentialData,
                     issuerKey = issuerKey.key,
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),
                     issuerCertificate = certificateChain,
@@ -151,6 +162,30 @@ class MdocCredentialHandler(
     } catch (e: Exception) {
         CredentialResponseResult.Failure(e.toCredentialHandlerError())
     }
+
+    private suspend fun JsonObject.mergeMdocPayloadWithMapping(
+        dataMapping: JsonObject?,
+        issuerId: String,
+        display: List<CredentialDisplay>?,
+    ): JsonObject = mergeSDJwtVCPayloadWithMapping(
+        mapping = dataMapping ?: JsonObject(emptyMap()),
+        context = mapOf(
+            "issuerId" to issuerId,
+            "issuerDid" to issuerId,
+            "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+        ).filterValues {
+            when (it) {
+                is JsonElement -> it !is JsonNull && (it !is JsonObject || it.isNotEmpty()) && (it !is JsonArray || it.isNotEmpty())
+                else -> it.toString().isNotEmpty()
+            }
+        }.mapValues { (_, value) ->
+            when (value) {
+                is JsonElement -> value
+                else -> JsonPrimitive(value.toString())
+            }
+        },
+        data = dataFunctions,
+    )
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun computeCredentialResult(

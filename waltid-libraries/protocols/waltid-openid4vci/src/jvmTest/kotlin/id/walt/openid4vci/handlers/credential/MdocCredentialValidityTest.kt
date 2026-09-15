@@ -23,6 +23,7 @@ import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 import kotlin.test.Test
@@ -69,6 +70,33 @@ class MdocCredentialValidityTest {
         assertEquals(until, explicit.validUntil)
     }
 
+    @Test
+    fun `data mapping overrides mdoc namespace data and evaluates functions before signing`() = runTest {
+        val namespace = "org.iso.18013.5.1"
+        val issued = fixture().issueCredential(
+            credentialData = buildJsonObject {
+                putJsonObject(namespace) {
+                    put("issue_date", "2019-10-20")
+                    put("expiry_date", "2024-10-20")
+                    put("issuing_authority", "request-authority")
+                }
+            },
+            dataMapping = buildJsonObject {
+                putJsonObject(namespace) {
+                    put("issue_date", "2026-09-15")
+                    put("expiry_date", "2027-09-15")
+                    put("issuing_authority", "<issuerId>")
+                }
+            },
+        )
+
+        val items = issued.namespaces!!.getValue(namespace).entries
+            .associate { it.value.elementIdentifier to it.value.elementValue }
+        assertEquals("2026-09-15", assertIs<CborString>(items.getValue("issue_date")).value)
+        assertEquals("2027-09-15", assertIs<CborString>(items.getValue("expiry_date")).value)
+        assertEquals("https://issuer.example", assertIs<CborString>(items.getValue("issuing_authority")).value)
+    }
+
     private suspend fun fixture(notBefore: String = "2026-01-01T00:00:00Z"): Fixture {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         suspend fun key(id: String) = runtime.generateSoftwareKey(
@@ -86,8 +114,22 @@ class MdocCredentialValidityTest {
 
     private class Fixture(val issuer: Key, val holder: Key, val certificate: X509Certificate) {
         suspend fun issue(time: String, validFrom: Instant? = null, validUntil: Instant? = null): ValidityInfo {
+            return issueCredential(
+                now = time,
+                validFrom = validFrom,
+                validUntil = validUntil,
+            ).decodeMobileSecurityObject().validityInfo
+        }
+
+        suspend fun issueCredential(
+            now: String = "2026-09-08T19:18:10Z",
+            credentialData: JsonObject = buildJsonObject { putJsonObject("org.example") { put("given_name", "Jane") } },
+            dataMapping: JsonObject? = null,
+            validFrom: Instant? = null,
+            validUntil: Instant? = null,
+        ): IssuerSigned {
             val configuration = CredentialConfiguration(CredentialFormat.MSO_MDOC, doctype = "org.example.mdoc")
-            val result = MdocCredentialHandler(roundValidityToTwelveHours = true, now = { Instant.parse(time) }).sign(
+            val result = MdocCredentialHandler(roundValidityToTwelveHours = true, now = { Instant.parse(now) }).sign(
                 request = DefaultCredentialRequest(
                     client = DefaultClient("test-client", emptyList(), emptySet(), emptySet()),
                     credentialIdentifier = null, credentialConfigurationId = "mdoc", proofs = null,
@@ -96,8 +138,8 @@ class MdocCredentialValidityTest {
                 configuration = configuration,
                 issuerKey = Crypto2CredentialSigningKey.select(issuer, configuration),
                 issuerId = "https://issuer.example",
-                credentialData = buildJsonObject { putJsonObject("org.example") { put("given_name", "Jane") } },
-                dataMapping = null, selectiveDisclosure = null, x5Chain = listOf(certificate),
+                credentialData = credentialData,
+                dataMapping = dataMapping, selectiveDisclosure = null, x5Chain = listOf(certificate),
                 display = null, w3cVersion = null, mDocNameSpacesDataMappingConfig = null,
                 authorizedTransactionDataTypes = null, credentialStatus = null,
                 validFrom = validFrom, validUntil = validUntil,
@@ -109,7 +151,7 @@ class MdocCredentialValidityTest {
             val encoded = assertNotNull(response.credentials).single().credential.jsonPrimitive.content
             val issued = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(encoded.base64UrlDecode())
             assertTrue(issued.issuerAuth.verify(issuer, -7))
-            return issued.decodeMobileSecurityObject().validityInfo
+            return issued
         }
     }
 }
