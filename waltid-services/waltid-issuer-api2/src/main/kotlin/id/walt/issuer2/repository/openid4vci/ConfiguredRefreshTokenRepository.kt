@@ -10,6 +10,7 @@ import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.refresh.DefaultRefreshTokenRecord
 import id.walt.openid4vci.repository.refresh.RefreshTokenRecord
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.serialization.Serializable
@@ -84,6 +85,7 @@ private data class StoredAccessTokenRequest(
     val grantedScopes: Set<String>,
     val requestedAudience: Set<String>,
     val grantedAudience: Set<String>,
+    val authorizationDetails: List<AuthorizationDetail> = emptyList(),
     val requestForm: Map<String, List<String>>,
     val session: StoredSession?,
     val issClaim: String?,
@@ -143,6 +145,7 @@ private fun AccessTokenRequest.toStoredRequest(): StoredAccessTokenRequest =
         grantedScopes = grantedScopes,
         requestedAudience = requestedAudience,
         grantedAudience = grantedAudience,
+        authorizationDetails = authorizationDetails,
         requestForm = requestForm,
         session = session?.toStoredSession(),
         issClaim = issClaim,
@@ -159,6 +162,7 @@ private fun StoredAccessTokenRequest.toAccessTokenRequest(): DefaultAccessTokenR
         grantedScopes = grantedScopes,
         requestedAudience = requestedAudience,
         grantedAudience = grantedAudience,
+        authorizationDetails = authorizationDetails,
         requestForm = requestForm,
         session = session?.toSession(),
         issClaim = issClaim,

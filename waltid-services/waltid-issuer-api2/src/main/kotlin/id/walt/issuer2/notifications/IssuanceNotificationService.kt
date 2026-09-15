@@ -77,7 +77,10 @@ class IssuanceNotificationService {
         Json.encodeToJsonElement(forNotificationPayload()).jsonObject
 
     private fun IssuanceSession.forNotificationPayload(): IssuanceSession =
-        copy(issuerKey = REDACTED_ISSUER_KEY, failure = null)
+        copy(
+            issuanceRequests = issuanceRequests.map { it.copy(issuerKey = REDACTED_ISSUER_KEY) },
+            failure = null,
+        )
 
     private fun IssuanceNotifications?.toKtorSessionNotifications(): KtorSessionNotifications? =
         this?.webhook?.let { webhook ->

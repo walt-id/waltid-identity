@@ -435,7 +435,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
-                        credentialData = credentialData,
+                        issuanceInputData = testIssuanceInputData(credentialData),
                         selectiveDisclosure = selectiveDisclosure,
                         proofValidationContext = proofSupport.validationContext(request)
                     )

@@ -228,7 +228,7 @@ class Wallet2MoreUseCasesTest {
                     val credResp = provider.createCredentialResponse(
                         request = request,
                         configuration = configuration, issuerKey = issuerKey,
-                        issuerId = issuerBase, credentialData = credentialData,
+                        issuerId = issuerBase, issuanceInputData = testIssuanceInputData(credentialData),
                         selectiveDisclosure = selectiveDisclosure,
                         proofValidationContext = proofSupport.validationContext(request)
                     )
@@ -249,7 +249,7 @@ class Wallet2MoreUseCasesTest {
                     val credResp = provider.createCredentialResponse(
                         request = request,
                         configuration = configuration, issuerKey = issuerKey,
-                        issuerId = issuerBase, credentialData = data,
+                        issuerId = issuerBase, issuanceInputData = testIssuanceInputData(data),
                         selectiveDisclosure = null,
                         proofValidationContext = proofSupport.validationContext(request)
                     )

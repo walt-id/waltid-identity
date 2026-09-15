@@ -5,6 +5,7 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
@@ -288,11 +289,16 @@ class TokenEventTest {
 
     private fun issuanceSession(sessionId: String) = IssuanceSession(
         sessionId = sessionId,
-        profileId = "test-profile",
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
-        credentialConfigurationId = "identity_credential",
-        issuerKey = JsonObject(emptyMap()),
-        credentialData = JsonObject(emptyMap()),
+        issuanceRequests = listOf(
+            IssuanceRequest(
+                credentialIdentifier = "credential",
+                profileId = "test-profile",
+                credentialConfigurationId = "identity_credential",
+                issuerKey = JsonObject(emptyMap()),
+                credentialData = JsonObject(emptyMap()),
+            )
+        ),
         expiresAt = Clock.System.now() + 1.hours,
     )
 
