@@ -47,6 +47,17 @@ data class GeneralFlowConfig(
     @SerialName("expiration_date") val expirationDate: Instant? =
         expirationDuration?.let { Clock.System.now().plus(it) },
 
+    /**
+     * How long to keep this session once it has been used, in ISO-8601 duration format.
+     *
+     * Overrides the verifier's configured retention. Omit both to use that, which is what deployments should
+     * normally do - a retention obligation belongs to the deployment, not to whoever opens a session.
+     */
+    @SerialName("retention_duration") val retentionDuration: Duration? = null,
+    /** Retention date (takes precedence over retention_duration if both set) */
+    @SerialName("retention_date") val retentionDate: Instant? =
+        retentionDuration?.let { Clock.System.now().plus(it) },
+
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
 
     @SerialName("client_metadata") val clientMetadata: ClientMetadata? = null,

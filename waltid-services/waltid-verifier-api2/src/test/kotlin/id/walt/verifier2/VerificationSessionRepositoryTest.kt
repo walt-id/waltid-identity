@@ -5,6 +5,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -127,6 +128,37 @@ class VerificationSessionRepositoryTest {
     }
 
     @Test
+    fun `a session with no retention date is kept indefinitely`() = runTest {
+        // Null retention is how a verifier configured to retain indefinitely is expressed. It used to be
+        // impossible - the field was non-nullable - even though its documentation offered it.
+        val repository = InMemoryVerificationSessionRepository()
+        val kept = session("kept").copy(
+            expirationDate = Clock.System.now() - 1.minutes,
+            retentionDate = null,
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            attempted = true,
+        )
+        repository.create(kept)
+
+        assertNull(kept.persistenceExpirationDate(), "no expiry date means nothing may discard it")
+        assertNotNull(repository.get("kept"))
+    }
+
+    @Test
+    fun `an unused session still expires when retention is indefinite`() = runTest {
+        // Retention only applies once a session has been used, so an abandoned one must not become immortal
+        // just because finished sessions are kept forever.
+        val repository = InMemoryVerificationSessionRepository()
+        val abandoned = session("abandoned").copy(
+            expirationDate = Clock.System.now() - 1.minutes,
+            retentionDate = null,
+        )
+        repository.create(abandoned)
+
+        assertNull(repository.get("abandoned"))
+    }
+
+    @Test
     fun `info route returns 404 for missing session`() = testApplication {
         application {
             install(ContentNegotiation) { json() }
@@ -136,6 +168,66 @@ class VerificationSessionRepositoryTest {
         }
 
         assertEquals(HttpStatusCode.NotFound, client.get("/verification-session/missing/info").status)
+    }
+
+    @Test
+    fun `delete route removes the session and reports 404 for a missing one`() = testApplication {
+        val repository = InMemoryVerificationSessionRepository()
+        repository.create(session("deletable"))
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+
+        assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/deletable").status)
+        assertNull(repository.get("deletable"), "the session should be gone")
+        assertEquals(HttpStatusCode.NotFound, client.delete("/verification-session/deletable").status)
+    }
+
+    @Test
+    fun `pii route removes personal data but keeps the session and its outcome`() = testApplication {
+        // The erasure counterpart to deleting: what is left has to still show that a verification happened and
+        // how it ended, which is the whole reason for having both.
+        val repository = InMemoryVerificationSessionRepository()
+        val used = session("purgeable").copy(
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            attempted = true,
+        ).apply { presentedRawData = Verification2Session.PresentedRawData(
+                vpToken = mapOf("stub" to listOf("a-raw-presentation")),
+                state = null,
+            ) }
+        repository.create(used)
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+
+        assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/purgeable/pii").status)
+
+        val remaining = assertNotNull(repository.get("purgeable"), "the session itself must survive a purge")
+        assertNull(remaining.session.presentedRawData, "the raw presentation is personal data")
+        assertNull(remaining.session.presentedCredentials, "the presented credentials are personal data")
+        assertEquals(
+            Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            remaining.session.status,
+            "the outcome is what is being kept",
+        )
+    }
+
+    @Test
+    fun `pii route reports 404 for a missing session`() = testApplication {
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(InMemoryVerificationSessionRepository()) } }
+        }
+
+        assertEquals(HttpStatusCode.NotFound, client.delete("/verification-session/missing/pii").status)
     }
 
     @Test
