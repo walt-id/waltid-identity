@@ -213,7 +213,7 @@ class MsoMdocsVerifier2IntegrationTest {
     }
 
     @Test
-    fun test() = runVerifierWalletFlow(port = 17011, clientId = "verifier2")
+    fun test() = runVerifierWalletFlow(port = 17011, clientId = null)
 
     @Test
     fun `omitted clientId generates redirect_uri and wallet presents`() =

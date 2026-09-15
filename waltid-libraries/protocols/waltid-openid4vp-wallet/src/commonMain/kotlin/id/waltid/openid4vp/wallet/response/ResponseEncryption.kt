@@ -97,19 +97,37 @@ object ResponseEncryption {
         }
 
         // 2. Select Verifier's Public Key
-        // We prefer a key explicitly marked for encryption ('use': 'enc'), otherwise fall back to the first available key.
-        val candidateKeys = metadata.jwks?.keys.orEmpty().filter { jwk ->
-            jwk["alg"]?.jsonPrimitive?.contentOrNull == SUPPORTED_ALGORITHM &&
-                jwk["use"]?.jsonPrimitive?.contentOrNull.let { it == null || it == "enc" }
+        // Accept keys explicitly marked for encryption or without a use value; deterministic
+        // thumbprint/kid ordering selects one when more than one key is eligible.
+        val keys = metadata.jwks?.keys.orEmpty()
+        require(keys.isNotEmpty()) { "client_metadata.jwks must contain at least one response-encryption key" }
+        val keyIds = keys.mapIndexed { index, jwk ->
+            (jwk["kid"] as? kotlinx.serialization.json.JsonPrimitive)
+                ?.takeIf { it.isString }
+                ?.content
+                ?.takeIf { it.isNotBlank() }
+                ?: throw IllegalArgumentException(
+                    "Every JWK in client_metadata.jwks must have a non-blank string kid (invalid key at index $index)"
+                )
         }
-        candidateKeys.forEach { jwk ->
+        require(keyIds.size == keyIds.toSet().size) {
+            "Every JWK in client_metadata.jwks must have a unique kid"
+        }
+        keys.forEach { jwk ->
             require(!Jwk.containsPrivateMaterial(jwk)) {
                 "Verifier response-encryption JWK must not contain private material"
             }
         }
-        val verifierJwk = candidateKeys.firstOrNull {
-            it["use"]?.jsonPrimitive?.contentOrNull == "enc" && isSupportedVerifierEncryptionJwk(it)
-        } ?: candidateKeys.firstOrNull(::isSupportedVerifierEncryptionJwk)
+
+        val candidateKeys = keys.filter { jwk ->
+            jwk["alg"]?.jsonPrimitive?.contentOrNull == SUPPORTED_ALGORITHM &&
+                jwk["use"]?.jsonPrimitive?.contentOrNull.let { it == null || it == "enc" }
+        }
+        val verifierJwk = candidateKeys
+            .filter(::isSupportedVerifierEncryptionJwk)
+            .map { jwk -> jwk to Jwk.sha256Thumbprint(encodePublicJwk(jwk)) }
+            .sortedWith(compareBy<Pair<JsonObject, String>>({ it.second }, { it.first["kid"]!!.jsonPrimitive.content }))
+            .firstOrNull()?.first
             ?: throw IllegalArgumentException(
                 "client_metadata.jwks must contain an encryption key with alg=$SUPPORTED_ALGORITHM"
             )
@@ -124,9 +142,12 @@ object ResponseEncryption {
 
     internal fun selectContentEncryption(advertised: List<String>?): JweContentEncryption {
         if (advertised == null) return JweContentEncryption.A128GCM
-        return advertised.firstNotNullOfOrNull { identifier ->
-            JweContentEncryption.entries.firstOrNull { it.identifier == identifier }
-        } ?: throw IllegalArgumentException("Verifier does not support a compatible response content-encryption algorithm")
+        require(advertised.isNotEmpty()) {
+            "encrypted_response_enc_values_supported must not be empty"
+        }
+        return listOf(JweContentEncryption.A256GCM, JweContentEncryption.A128GCM)
+            .firstOrNull { candidate -> candidate.identifier in advertised }
+            ?: throw IllegalArgumentException("Verifier does not support a compatible response content-encryption algorithm")
     }
 
     internal fun isSupportedVerifierEncryptionJwk(jwk: JsonObject): Boolean {

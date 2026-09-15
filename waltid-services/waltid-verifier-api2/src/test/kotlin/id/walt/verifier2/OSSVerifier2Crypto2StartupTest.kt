@@ -170,6 +170,7 @@ class OSSVerifier2Crypto2StartupTest {
     }
 
     @Test
+    @Test
     fun `omitted clientId still loads when clientMetadata is present`() = runTest {
         loadConfig(includeClientId = false, includeBundledOptionalFields = true)
         OSSVerifier2Manager.initialize()
