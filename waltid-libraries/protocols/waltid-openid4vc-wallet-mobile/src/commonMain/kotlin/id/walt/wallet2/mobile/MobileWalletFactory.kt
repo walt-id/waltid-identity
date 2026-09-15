@@ -2,7 +2,6 @@
 
 package id.walt.wallet2.mobile
 
-import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.did.dids.Crypto2DidService
 import app.cash.sqldelight.db.SqlDriver
@@ -14,7 +13,6 @@ import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
-import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
@@ -24,13 +22,11 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlin.uuid.Uuid
 
 /**
  * Configuration for creating a [MobileWallet].
  *
  * @property walletId Stable wallet identifier used for database naming and persisted wallet state.
- * @property defaultKeyType Key type used by [MobileWallet.bootstrap] when no key type override is supplied.
  * @property defaultKeyUseAuthorizationPolicy Authorization policy used for newly created keys.
  * The policy never changes an existing persisted key.
  * @property keyUseAuthorizationPrompt Prompt text used for protected signing operations.
@@ -50,7 +46,6 @@ import kotlin.uuid.Uuid
  */
 public data class MobileWalletConfig(
     public val walletId: String = "default",
-    public val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     public val attestationConfig: WalletAttestationConfig? = null,
     public val persistence: MobileWalletPersistence = MobileWalletPersistence(),
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
@@ -63,6 +58,8 @@ public data class MobileWalletConfig(
     public val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     public val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
     public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
+    /** Signing identity lifecycle and opt-in recovery integrations. */
+    public val identity: id.walt.wallet2.mobile.identity.IdentityConfiguration = id.walt.wallet2.mobile.identity.IdentityConfiguration(),
 )
 
 /**
@@ -200,29 +197,27 @@ internal fun createSqlDelightMobileWallet(
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
 ): MobileWallet {
     val queries = db.walletPersistenceQueries
-    val keyStore = SqlDelightKeyStore(keyProvider, queries)
+    val keyStore = SqlDelightKeyStore(keyProvider, queries, config.walletId)
     val credentialStore = config.persistence.credentialStore ?: SqlDelightCredentialStore(queries)
-    val didStore = config.persistence.didStore ?: SqlDelightDidStore(queries)
+    val didStore = config.persistence.didStore?.let { delegate ->
+        object : WalletDidStore by delegate {
+            override suspend fun getDefaultDid(): String? =
+                queries.selectActiveIdentity(config.walletId).executeAsOneOrNull()?.did
+        }
+    } ?: SqlDelightDidStore(queries, config.walletId)
     val issuanceSessionStore = SqlDelightIssuanceSessionStore(queries)
     return MobileWallet(
         walletId = config.walletId,
+        createIdentityService = { onActive ->
+            id.walt.wallet2.mobile.identity.WalletIdentities(
+                config.walletId, config.identity, config.defaultKeyUseAuthorizationPolicy, config.keyUseAuthorizationPrompt,
+                keyStore, didStore, keyProvider, queries, didService, onActive,
+            )
+        },
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
         issuanceSessionStore = issuanceSessionStore,
-        generateAndPersistKey = { keyType, policy ->
-            keyStore.generateKey(
-                WalletKeyCreationRequest(
-                    id = KeyId("wallet_key_${Uuid.random()}"),
-                    requirements = WalletKeyRequirements(
-                        spec = keyType.toKeySpec(),
-                        usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-                        authorizationPolicy = policy,
-                    ),
-                    prompt = config.keyUseAuthorizationPrompt,
-                )
-            )
-        },
         runKeyUseAuthorizationPreflight = { keyType, policy ->
             keyStore.preflight(
                 WalletKeyRequirements(
@@ -232,8 +227,6 @@ internal fun createSqlDelightMobileWallet(
                 )
             )
         },
-        didService = didService,
-        defaultKeyType = config.defaultKeyType,
         defaultKeyUseAuthorizationPolicy = config.defaultKeyUseAuthorizationPolicy,
         attestationConfig = config.attestationConfig,
         preferredLocales = config.preferredLocales,

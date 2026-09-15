@@ -13,6 +13,7 @@ data class SignumKeyPolicy(
     val keyAgreement: Boolean = false,
     /** Requests attestation evidence in addition to any hardware backing requirement. */
     val attestationChallenge: BinaryData? = null,
+    val platform: SignumPlatformPolicy = SignumPlatformPolicy.Default,
 ) {
     init {
         require(attestationChallenge == null || hardware != SignumHardwarePolicy.DISCOURAGED) {
@@ -36,6 +37,8 @@ sealed interface SignumAuthenticationPolicy {
     @Serializable
     data class UserPresence(
         val biometric: Boolean = true,
+        /** Controls enrollment binding for biometric-only policies. On iOS, combining biometrics with
+         * device credentials uses Apple's user-presence policy, which also accepts newly enrolled biometrics. */
         val allowNewBiometrics: Boolean = false,
         val deviceCredential: Boolean = true,
         val timeoutSeconds: Int = 0,
@@ -97,3 +100,11 @@ internal fun SignumKeyPolicy.effectiveProtection(attestation: SignumKeyAttestati
     hardware == SignumHardwarePolicy.DISCOURAGED -> SignumProtectionLevel.SOFTWARE
     else -> SignumProtectionLevel.UNKNOWN
 }
+
+/** Where the private signing material originated. */
+@Serializable
+enum class SignumKeyOrigin { GENERATED, IMPORTED, UNKNOWN }
+
+/** Native security level, not a certification or issuer assurance rating. */
+@Serializable
+enum class SignumSecurityLevel { SOFTWARE, TRUSTED_ENVIRONMENT, STRONGBOX, SECURE_ENCLAVE, UNKNOWN }

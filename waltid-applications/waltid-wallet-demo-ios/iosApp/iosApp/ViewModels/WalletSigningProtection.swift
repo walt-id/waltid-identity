@@ -21,6 +21,8 @@ enum WalletDemoSigningProtection: String, CaseIterable, Hashable, Sendable {
             throw WalletDemoSigningProtectionPolicyError.unsupportedTimeout(timeoutSeconds)
         case .biometricCurrentSet:
             throw WalletDemoSigningProtectionPolicyError.unsupportedPerOperationPolicy
+        case .biometricAny, .deviceCredential, .biometricOrDeviceCredential:
+            throw WalletDemoSigningProtectionPolicyError.unsupportedAuthorizationPolicy
         }
     }
 
@@ -40,11 +42,14 @@ enum WalletDemoSigningProtection: String, CaseIterable, Hashable, Sendable {
 }
 
 private enum WalletDemoSigningProtectionPolicyError: LocalizedError {
+    case unsupportedAuthorizationPolicy
     case unsupportedTimeout(Int)
     case unsupportedPerOperationPolicy
 
     var errorDescription: String? {
         switch self {
+        case .unsupportedAuthorizationPolicy:
+            "Wallet key uses an authorization policy outside this demo configuration"
         case .unsupportedTimeout(let seconds):
             "Wallet key uses an unsupported biometric signing timeout: \(seconds) seconds"
         case .unsupportedPerOperationPolicy:
@@ -96,25 +101,17 @@ enum WalletDemoSigningProtectionAvailability: Equatable, Sendable {
 
     func warningMessage(canChooseNoBiometricSigning: Bool) -> String? {
         let reason: String
-        let recovery: String
         switch self {
-        case .available:
-            return nil
-        case .biometricNotEnrolled:
-            reason = "no strong biometric is enrolled"
-            recovery = "you enroll a strong biometric"
-        case .biometricUnavailable:
-            reason = "strong biometric authentication is unavailable"
-            recovery = "strong biometric authentication becomes available"
-        case .unsupported:
-            reason = "the device cannot currently authorize it"
-            recovery = "this device can authorize biometric signing"
+        case .available: return nil
+        case .biometricNotEnrolled: reason = "no strong biometric is enrolled"
+        case .biometricUnavailable: reason = "strong biometric authentication is unavailable"
+        case .unsupported: reason = "the device cannot currently authorize it"
         }
         let alternative = canChooseNoBiometricSigning
-            ? " or you choose no biometric signing in Settings."
-            : ". Biometric signing is required by app configuration."
-        return "This wallet uses biometric signing, but \(reason). " +
-            "Issuance and presentation signing will fail until \(recovery)\(alternative)"
+            ? " To change signing approval, reset the wallet and set up a new key. This removes local credentials."
+            : " Biometric signing is required by app configuration."
+        return "This wallet uses biometric signing, but \(reason). Check the device's biometric settings. " +
+            "A key invalidated by enrollment changes cannot be used again.\(alternative)"
     }
 }
 

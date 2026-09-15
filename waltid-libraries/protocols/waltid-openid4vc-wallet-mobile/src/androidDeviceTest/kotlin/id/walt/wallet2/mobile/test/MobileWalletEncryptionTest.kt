@@ -1,5 +1,8 @@
 package id.walt.wallet2.mobile.test
 
+import id.walt.wallet2.mobile.identity.IdentityOperationResult
+import id.walt.wallet2.mobile.identity.WalletIdentity
+
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
@@ -193,8 +196,8 @@ class MobileWalletEncryptionTest {
         )
         val wallet = factory.create(config)
 
-        val bootstrap = wallet.bootstrap()
-        val reopenedBootstrap = factory.create(config).bootstrap()
+        val bootstrap = wallet.identities.initialize().activeIdentity()
+        val reopenedBootstrap = factory.create(config).identities.initialize().activeIdentity()
 
         assertEquals(bootstrap, reopenedBootstrap)
         assertEquals(listOf("$walletId:$databaseName", "$walletId:$databaseName"), provider.requestedKeys)
@@ -223,10 +226,10 @@ class MobileWalletEncryptionTest {
 
         val wallet = factory.create(config)
 
-        val bootstrap = wallet.bootstrap()
+        val bootstrap = wallet.identities.initialize().activeIdentity()
         val credentials = wallet.credentials()
         val reopenedWallet = factory.create(config)
-        val reopenedBootstrap = reopenedWallet.bootstrap()
+        val reopenedBootstrap = reopenedWallet.identities.initialize().activeIdentity()
         val reopenedCredentials = reopenedWallet.credentials()
 
         assertTrue(bootstrap.did.startsWith("did:"), "Custom credential stores should keep Android platform signing keys")
@@ -234,8 +237,7 @@ class MobileWalletEncryptionTest {
         assertEquals(bootstrap.did, reopenedBootstrap.did, "Default DID store should survive wallet recreation")
         assertEquals(bootstrap.keyId, reopenedBootstrap.keyId, "Platform signing-key reference should survive wallet recreation")
         assertEquals(emptyList(), reopenedCredentials)
-        // Each bootstrap refreshes the platform credential registry, in addition to the two
-        // explicit credentials() reads above.
+        // Both initializations refresh credential registration, in addition to the two explicit reads.
         assertEquals(4, credentialStore.listCredentialsCalls)
 
         wallet.deleteWallet()
@@ -335,3 +337,6 @@ class MobileWalletEncryptionTest {
         override fun apply() = Unit
     }
 }
+
+private fun IdentityOperationResult.activeIdentity(): WalletIdentity =
+    kotlin.test.assertIs<IdentityOperationResult.Active>(this).identity

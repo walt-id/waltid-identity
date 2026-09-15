@@ -14,6 +14,11 @@ struct SettingsView: View {
                     .font(.headline)
                     .accessibilityIdentifier(WalletAccessibilityID.settingsAppTitle)
             }
+            if let model = viewModel.identityScreen {
+                Section("Wallet signing key") {
+                    NavigationLink("Protection and recovery") { WalletIdentityView(model: model) }
+                }
+            }
             Section("Wallet DID") {
                 Text(viewModel.did.isEmpty ? "Not available" : viewModel.did)
                     .font(.footnote)
@@ -44,7 +49,13 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwkCopy)
             }
-            signingProtectionSection
+            if viewModel.identityScreen == nil { signingProtectionSection }
+            else {
+                Section {
+                    Text("To choose different key storage or signing approval, reset this wallet and set up a new key. Current credentials will be removed and must be issued again.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
             Section("Credential Sharing") {
                 Toggle(
                     "Show Walt Wallet preview for DC API Presentation",

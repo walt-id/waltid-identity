@@ -48,6 +48,7 @@ import kotlin.time.Clock
 public class SqlDelightKeyStore(
     private val managedKeyProvider: PlatformManagedKeyProvider,
     private val queries: WalletPersistenceQueries,
+    private val identityWalletId: String = "default",
 ) : MobileWalletKeyStore {
     private val softwareRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
 
@@ -104,7 +105,7 @@ public class SqlDelightKeyStore(
         managedKeyProvider.preflight(requirements).let { managedSupport ->
             if (managedSupport is KeyUseAuthorizationSupport.Supported) {
                 managedSupport
-            } else if (requirements.authorizationPolicy !is KeyUseAuthorizationPolicy.None) {
+            } else if (!requirements.permitsSoftwareFallback()) {
                 managedSupport
             } else if (supportsSoftware(requirements)) {
                 KeyUseAuthorizationSupport.Supported(requirements.authorizationPolicy)
@@ -126,7 +127,7 @@ public class SqlDelightKeyStore(
                 managedKeyProvider.generateManagedKey(request)
 
             is KeyUseAuthorizationSupport.Unsupported -> {
-                if (request.requirements.authorizationPolicy !is KeyUseAuthorizationPolicy.None) {
+                if (!request.requirements.permitsSoftwareFallback()) {
                     throw KeyUseAuthorizationException(
                         failure = managedSupport.reason.toAuthorizationFailure(),
                         message = "The platform cannot enforce ${request.requirements.authorizationPolicy} for ${request.requirements.spec}",
@@ -161,6 +162,40 @@ public class SqlDelightKeyStore(
         }
         return key
     }
+
+    /** Creates software material only when no native authorization requirement is selected. */
+    public suspend fun generateSoftwareKey(request: WalletKeyCreationRequest): StoredKeyMaterial {
+        require(request.requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
+            "Software storage cannot enforce native key-use authorization"
+        }
+        return softwareRuntime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+            request.id, request.requirements.spec, request.requirements.usages,
+        )).also { addCrypto2Key(it) }
+    }
+
+    /** Validates and persists an explicitly supplied software key. */
+    public suspend fun importSoftwareKey(stored: StoredKey.Software): StoredKeyMaterial =
+        softwareRuntime.restore(stored).also { addCrypto2Key(it) }
+
+    /** Returns a validated descriptor to trusted identity/recovery services. It can contain private material. */
+    public fun storedKey(keyId: String): StoredKey? = queries.selectByKeyId(keyId).executeAsOneOrNull()?.let {
+        decodeStoredKey(it.key_id, it.stored_key)
+    }
+
+    /** An established identity controls default-key selection, including when its key is missing. */
+    override suspend fun getDefaultCrypto2Key(usages: Set<KeyUsage>): StoredKeyMaterial? {
+        val active = queries.selectActiveIdentity(identityWalletId).executeAsOneOrNull() ?: return null
+        return getCrypto2Key(active.key_id, usages)
+    }
+
+    /** Keeps issuance/presentation key resolution on the same active identity as default-key lookup. */
+    override suspend fun getDefaultKeyMaterial(usages: Set<KeyUsage>): WalletKeyStoreEntry? =
+        getDefaultCrypto2Key(usages)?.let { WalletKeyStoreEntry(it.id.value, null, it) }
+
+    private fun WalletKeyRequirements.permitsSoftwareFallback(): Boolean =
+        authorizationPolicy == KeyUseAuthorizationPolicy.None &&
+            protection == id.walt.wallet2.persistence.keys.WalletKeyProtection.PlatformDefault &&
+            platform == id.walt.crypto2.keys.PlatformKeyConfiguration.Default
 
     private fun supportsSoftware(requirements: WalletKeyRequirements): Boolean = runCatching {
         softwareRuntime.resolveSoftwareProvider(

@@ -1,5 +1,7 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.algorithms.EcdsaSignatureCodec
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
@@ -17,6 +19,7 @@ import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.PublicKeyExporter
 import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.keys.toSpkiDer
 import id.walt.crypto2.keys.Verifier
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
 import id.walt.crypto2.providers.ManagedKeyProvider
@@ -43,7 +46,7 @@ class SignumManagedKeyProvider(
             validateHandle(handle, alias, request.spec, request.usages, options.policy)
         } catch (cause: Throwable) {
             try {
-                withContext(NonCancellable) { backend.delete(alias) }
+                withContext(NonCancellable) { backend.delete(alias, options.policy) }
             } catch (cleanupFailure: Throwable) {
                 cause.addSuppressed(cleanupFailure)
             }
@@ -54,6 +57,7 @@ class SignumManagedKeyProvider(
             policy = options.policy,
             protectionLevel = handle.protectionLevel,
             attestation = handle.attestation,
+            origin = handle.origin,
         )
         return key(
             stored = StoredKey.Managed(
@@ -70,6 +74,38 @@ class SignumManagedKeyProvider(
             providerData = providerData,
             handle = handle,
         )
+    }
+
+    /** Imports an explicitly supplied private key; never claims native generation. */
+    suspend fun importPrivateKey(request: GenerateManagedKeyRequest, material: EncodedKey.Jwk): SignumManagedKey {
+        val importer = requireNotNull(backend as? SignumPrivateKeyImportBackend) {
+            "This backend does not support private-key import"
+        }
+        val options = SignumKeyOptions.decode(request.providerOptions)
+        val alias = options.alias ?: request.id.value
+        require(material.privateMaterial) { "Private JWK material is required" }
+        require(importer.supportsImport(request.spec, request.usages, options.policy)) {
+            "The requested import policy is unsupported"
+        }
+        // The software runtime validates the private/public pair before any native mutation.
+        CryptoRuntime(defaultSoftwareKeyProviders())
+            .restore(StoredKey.Software(StoredKey.CURRENT_VERSION, request.id, request.spec,
+                request.usages, material))
+        val handle = importer.importPrivateKey(alias, material, request.spec, request.usages, options.policy)
+        try {
+            validateHandle(handle, alias, request.spec, request.usages, options.policy)
+            require(handle.origin == SignumKeyOrigin.IMPORTED) { "Imported key origin was not preserved" }
+            require(handle.publicKey == material.toSpkiDer(request.spec)) { "Imported public key changed" }
+            val data = SignumStoredKeyData(alias, options.policy, handle.protectionLevel,
+                handle.attestation, SignumKeyOrigin.IMPORTED)
+            return key(StoredKey.Managed(StoredKey.CURRENT_VERSION, request.id, request.spec,
+                request.usages, id, PROVIDER_SCHEMA_VERSION, data.encode(), handle.publicKey,
+                request.metadata), data, handle)
+        } catch (cause: Throwable) {
+            try { withContext(NonCancellable) { importer.deleteImportedKey(alias, options.policy) } }
+            catch (cleanup: Throwable) { cause.addSuppressed(cleanup) }
+            throw cause
+        }
     }
 
     suspend fun storedKeyForExisting(
@@ -90,6 +126,7 @@ class SignumManagedKeyProvider(
             policy = policy,
             protectionLevel = handle.protectionLevel,
             attestation = handle.attestation,
+            origin = handle.origin,
         )
         return StoredKey.Managed(
             version = StoredKey.CURRENT_VERSION,
@@ -109,7 +146,7 @@ class SignumManagedKeyProvider(
     suspend fun restoreSignumKey(stored: StoredKey.Managed): SignumManagedKey {
         val publicKey = storedMetadata("Stored Signum key is missing its SPKI public key") {
             require(stored.provider == id) { "Stored key belongs to a different provider" }
-            require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
+            require(stored.providerSchemaVersion in 1..PROVIDER_SCHEMA_VERSION) {
                 "Unsupported Signum provider schema: ${stored.providerSchemaVersion}"
             }
             stored.publicKey as? EncodedKey.SpkiDer
@@ -122,12 +159,17 @@ class SignumManagedKeyProvider(
             require(providerData.alias.isNotBlank()) { "Stored Signum key alias cannot be blank" }
             validateRequest(stored.spec, stored.usages, providerData.policy)
         }
-        val handle = backend.load(providerData.alias, stored.spec, stored.usages, providerData.policy)
+        val handle = (if (providerData.origin == SignumKeyOrigin.IMPORTED) {
+            (backend as? SignumPrivateKeyImportBackend)?.loadImportedKey(
+                providerData.alias, stored.spec, stored.usages, providerData.policy)
+        } else backend.load(providerData.alias, stored.spec, stored.usages, providerData.policy))
             ?: throw SignumKeyNotFoundException(providerData.alias)
         storedMetadata("Restored Signum key does not match its stored metadata") {
             validateHandle(handle, providerData.alias, stored.spec, stored.usages, providerData.policy)
+            require(handle.origin == providerData.origin) { "Signum key origin changed after restore" }
             require(handle.publicKey.data == publicKey.data) { "Signum key public key changed after restore" }
-            require(handle.protectionLevel == providerData.protectionLevel) {
+            require(providerData.protectionLevel != SignumProtectionLevel.HARDWARE ||
+                handle.protectionLevel == SignumProtectionLevel.HARDWARE) {
                 "Signum key protection level changed after restore"
             }
             require(handle.attestation == providerData.attestation) { "Signum key attestation changed after restore" }
@@ -138,7 +180,7 @@ class SignumManagedKeyProvider(
     suspend fun delete(stored: StoredKey.Managed, expectedAlias: String? = null): KeyDeletionResult {
         val providerData = storedMetadata("Stored Signum key metadata is invalid") {
             require(stored.provider == id) { "Stored key belongs to a different provider" }
-            require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
+            require(stored.providerSchemaVersion in 1..PROVIDER_SCHEMA_VERSION) {
                 "Unsupported Signum provider schema: ${stored.providerSchemaVersion}"
             }
             SignumStoredKeyData.decode(stored.providerData).also { data ->
@@ -147,7 +189,9 @@ class SignumManagedKeyProvider(
                 }
             }
         }
-        backend.delete(providerData.alias)
+        if (providerData.origin == SignumKeyOrigin.IMPORTED) {
+            requireNotNull(backend as? SignumPrivateKeyImportBackend).deleteImportedKey(providerData.alias, providerData.policy)
+        } else backend.delete(providerData.alias, providerData.policy)
         return KeyDeletionResult.Deleted
     }
 
@@ -155,7 +199,7 @@ class SignumManagedKeyProvider(
     fun storedPolicy(stored: StoredKey.Managed): SignumKeyPolicy {
         return storedMetadata("Stored Signum key metadata is invalid") {
             require(stored.provider == id) { "Stored key belongs to a different provider" }
-            require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
+            require(stored.providerSchemaVersion in 1..PROVIDER_SCHEMA_VERSION) {
                 "Unsupported Signum provider schema: ${stored.providerSchemaVersion}"
             }
             val data = SignumStoredKeyData.decode(stored.providerData)
@@ -175,7 +219,9 @@ class SignumManagedKeyProvider(
         private val providerData: SignumStoredKeyData,
         private val handle: SignumPlatformKey,
     ) : SignumManagedKey {
-        override val protectionLevel: SignumProtectionLevel = providerData.protectionLevel
+        override val protectionLevel: SignumProtectionLevel = handle.protectionLevel
+        override val origin: SignumKeyOrigin = handle.origin
+        override val securityLevel: SignumSecurityLevel = handle.securityLevel
         override val attestation: SignumKeyAttestation? = providerData.attestation
         private val signatureAlgorithms = handle.signatureAlgorithms.expandEcdsaEncodings()
         private val advertisedSignatureAlgorithms = signatureAlgorithms.takeIf {
@@ -202,6 +248,7 @@ class SignumManagedKeyProvider(
             },
             deleter = KeyDeleter { delete(storedKey) },
             publicKeyExporter = PublicKeyExporter { handle.publicKey },
+            privateKeyExporter = handle.privateKeyExporter,
             signatureAlgorithms = advertisedSignatureAlgorithms,
             keyAgreementAlgorithms = advertisedKeyAgreementAlgorithms,
             supportsSignatureAlgorithm = { it in advertisedSignatureAlgorithms },
@@ -278,11 +325,13 @@ class SignumManagedKeyProvider(
     }
 
     companion object {
-        private const val PROVIDER_SCHEMA_VERSION = 1
+        private const val PROVIDER_SCHEMA_VERSION = 2
     }
 }
 
 interface SignumManagedKey : ManagedKey {
+    val origin: SignumKeyOrigin get() = SignumKeyOrigin.UNKNOWN
+    val securityLevel: SignumSecurityLevel get() = SignumSecurityLevel.UNKNOWN
     val protectionLevel: SignumProtectionLevel
     val attestation: SignumKeyAttestation?
 }
@@ -293,6 +342,7 @@ private data class SignumStoredKeyData(
     val policy: SignumKeyPolicy,
     val protectionLevel: SignumProtectionLevel,
     val attestation: SignumKeyAttestation?,
+    val origin: SignumKeyOrigin = SignumKeyOrigin.GENERATED,
 ) {
     fun encode(): BinaryData = BinaryData(json.encodeToString(this).encodeToByteArray())
 

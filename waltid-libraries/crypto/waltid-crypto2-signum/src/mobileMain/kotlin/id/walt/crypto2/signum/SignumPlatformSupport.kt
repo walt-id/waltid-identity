@@ -25,6 +25,8 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toSpkiDer
 import id.walt.crypto2.serialization.BinaryData
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.seconds
@@ -33,6 +35,7 @@ internal fun PlatformSigningKeyConfigurationBase<*>.configureSignumKey(
     spec: KeySpec,
     usages: Set<KeyUsage>,
     policy: SignumKeyPolicy,
+    configureHardware: PlatformSigningKeyConfigurationBase.SecureHardwareConfiguration.() -> Unit = {},
 ) {
     when (spec) {
         is KeySpec.Ec -> ec {
@@ -54,27 +57,23 @@ internal fun PlatformSigningKeyConfigurationBase<*>.configureSignumKey(
         }
         else -> error("Unsupported Signum key specification: $spec")
     }
-    if (policy.hardware != SignumHardwarePolicy.DISCOURAGED ||
-        policy.authentication !is SignumAuthenticationPolicy.None ||
-        policy.attestationChallenge != null
-    ) {
-        hardware {
-            backing = when (policy.hardware) {
-                SignumHardwarePolicy.REQUIRED -> REQUIRED
-                SignumHardwarePolicy.PREFERRED -> PREFERRED
-                SignumHardwarePolicy.DISCOURAGED -> DISCOURAGED
-            }
-            policy.attestationChallenge?.let { challenge ->
-                attestation { this.challenge = challenge.toByteArray() }
-            }
-            (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
-                protection {
-                    timeout = auth.timeoutSeconds.seconds
-                    factors {
-                        biometry = auth.biometric
-                        biometryWithNewFactors = auth.allowNewBiometrics
-                        deviceLock = auth.deviceCredential
-                    }
+    hardware {
+        configureHardware()
+        backing = when (policy.hardware) {
+            SignumHardwarePolicy.REQUIRED -> REQUIRED
+            SignumHardwarePolicy.PREFERRED -> PREFERRED
+            SignumHardwarePolicy.DISCOURAGED -> DISCOURAGED
+        }
+        policy.attestationChallenge?.let { challenge ->
+            attestation { this.challenge = challenge.toByteArray() }
+        }
+        (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
+            protection {
+                timeout = auth.timeoutSeconds.seconds
+                factors {
+                    biometry = auth.biometric
+                    biometryWithNewFactors = auth.allowNewBiometrics
+                    deviceLock = auth.deviceCredential
                 }
             }
         }
@@ -125,7 +124,10 @@ internal class SignumPlatformKeyHandle(
         require(algorithm in signatureAlgorithms) { "Unsupported Signum signature algorithm" }
         return try {
             when (val result = signerFor(algorithm).sign(data)) {
-                is SignatureResult.Success -> result.signature.rawByteArray
+                is SignatureResult.Success -> {
+                    currentCoroutineContext().ensureActive()
+                    result.signature.rawByteArray
+                }
                 is SignatureResult.Failure -> throw SignumUserCancelledException(result.problem)
                 is SignatureResult.Error -> throw result.exception
             }

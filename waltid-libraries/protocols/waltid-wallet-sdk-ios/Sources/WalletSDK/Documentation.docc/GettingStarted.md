@@ -1,6 +1,6 @@
 # Getting Started
 
-Create a ``Wallet`` actor, bootstrap wallet state, and keep the actor as the
+Create a ``Wallet`` actor, initialize a signing identity, and keep the actor as the
 native iOS entry point for wallet operations.
 
 ## Overview
@@ -17,7 +17,6 @@ import WalletSDK
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
-        defaultKeyType: .secp256r1,
         defaultKeyUseAuthorizationPolicy: .biometricCurrentSet,
         keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
             message: "Authorize wallet signing",
@@ -58,12 +57,15 @@ let wallet = try await Wallet(
 
 ### Bootstrap DID State
 
-Call ``Wallet/bootstrap(keyType:didMethod:keyUseAuthorizationPolicy:)`` before issuance or presentation
+Call ``WalletIdentityService/initialize()`` before issuance or presentation
 flows that need wallet key material.
 
 ```swift
-let bootstrap = try await wallet.bootstrap(didMethod: "key")
-print(bootstrap.did)
+guard case .active(let identity) = try await wallet.identities.initialize() else {
+    // Show pending setup or an unavailable identity before continuing.
+    return
+}
+print(identity.did)
 ```
 
 Use ``Wallet/keyUseAuthorizationPreflight(keyType:policy:)`` to check a
@@ -76,13 +78,14 @@ simulator cannot validate Secure Enclave or Face ID behavior.
 
 Use `.biometricTimedReuse(timeoutSeconds:)` for a fixed 1–30 second interval
 after successful strong-biometric authorization. The interval does not slide on
-signing and new biometric enrollment does not invalidate the key. Check the
+signing and the policy accepts newly enrolled biometrics. The SDK defers protected-key access while
+biometrics are unavailable to avoid query failures during enrollment reset. This policy is not a
+recovery guarantee. Check the
 preflight result's `reuseEnforcement` and `timeoutValidation`: iOS reports
 provider-process enforcement with provider-configuration-only validation.
-Signum receives the requested interval, but its pinned public API cannot
-independently expose the effective positive timeout after restoration. Timed
-reuse is recent provider authentication, not issuance, presentation, or other
-wallet-action consent, and is not guaranteed to be key-local.
+The Apple adapter retains a per-key LocalAuthentication context for that interval; native
+Keychain metadata does not expose the interval for independent readback. Timed reuse is recent
+provider authentication, not consent for issuance, presentation, or another wallet action.
 
-Use the returned ``WalletBootstrapResult/did`` when a verifier flow needs an
+Use the returned ``WalletIdentity/did`` when a verifier flow needs an
 explicit wallet DID.

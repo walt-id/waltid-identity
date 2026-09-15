@@ -34,13 +34,13 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         await clearTestData(walletId: walletId)
 
         let wallet1 = try await makeWallet(walletId: walletId, attestation: offer.attestation)
-        let bootstrapResult = try await wallet1.bootstrap()
+        let bootstrapResult = try await initializeIdentity(wallet1)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
         let credentialIDs = try await receiveCredential(wallet: wallet1, offerURL: offerURL, transactionCode: offer.txCode)
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive \(selectedScenario.displayName)")
 
         let wallet2 = try await makeWallet(walletId: walletId, attestation: offer.attestation)
-        _ = try await wallet2.bootstrap()
+        _ = try await initializeIdentity(wallet2)
         let credentials = try await wallet2.credentials()
         XCTAssertFalse(credentials.isEmpty, "Enterprise credential should persist across controller recreation")
 
@@ -124,7 +124,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         await clearTestData(walletId: walletId)
 
         let wallet = try await makeWallet(walletId: walletId, attestation: offer.attestation)
-        _ = try await wallet.bootstrap()
+        _ = try await initializeIdentity(wallet)
 
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
         let credentialIDs = try await receiveCredential(wallet: wallet, offerURL: offerURL, transactionCode: offer.txCode)
@@ -142,7 +142,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         await clearTestData(walletId: walletId)
 
         let wallet = try await makeWallet(walletId: walletId, attestation: offer.attestation)
-        let bootstrapResult = try await wallet.bootstrap()
+        let bootstrapResult = try await initializeIdentity(wallet)
 
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
         let credentialIDs = try await receiveCredential(wallet: wallet, offerURL: offerURL, transactionCode: offer.txCode)
@@ -188,4 +188,11 @@ private func assertTransmittedSuccess(
         XCTFail(message(), file: file, line: line)
         return
     }
+}
+
+private func initializeIdentity(_ wallet: Wallet) async throws -> WalletIdentity {
+    guard case .active(let identity) = try await wallet.identities.initialize() else {
+        throw WalletError.invalidInput("Expected an active test identity")
+    }
+    return identity
 }

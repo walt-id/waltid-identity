@@ -49,7 +49,6 @@ import kotlin.time.Instant
  * Configuration used when creating an iOS [WalletSdkBridge].
  *
  * @property walletId Stable wallet identifier used for database naming and persisted wallet state.
- * @property defaultKeyType Key type used by wallet bootstrap when no key type override is supplied.
  * @property persistence Wallet-local persistence configuration.
  * @property databaseKeyProvider Swift-owned database key provider used when [persistence] uses
  * [WalletBridgeDatabaseKeyConfiguration.Provided].
@@ -65,7 +64,6 @@ import kotlin.time.Instant
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
-    public val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
@@ -79,6 +77,8 @@ public data class WalletBridgeConfiguration(
     public val defaultKeyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
         WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
     public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
+    /** Shared identity policy and trusted, explicitly registered recovery providers. */
+    public val identity: id.walt.wallet2.mobile.identity.IdentityConfiguration = id.walt.wallet2.mobile.identity.IdentityConfiguration(),
 )
 
 /**
@@ -99,6 +99,9 @@ public data class WalletBridgeKeyUseAuthorizationPolicy(
                     "Timed biometric reuse timeout must be between 1 and 30 seconds"
                 }
 
+            WalletBridgeKeyUseAuthorizationPolicyType.DeviceCredential,
+            WalletBridgeKeyUseAuthorizationPolicyType.BiometricOrDeviceCredential -> require(timeoutSeconds != null && timeoutSeconds in 0..30)
+            WalletBridgeKeyUseAuthorizationPolicyType.BiometricAny,
             WalletBridgeKeyUseAuthorizationPolicyType.None,
             WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet ->
                 require(timeoutSeconds == null) { "Only timed biometric reuse accepts a timeout" }
@@ -122,9 +125,15 @@ public enum class WalletBridgeKeyUseAuthorizationPolicyType {
     None,
     BiometricCurrentSet,
     BiometricTimedReuse,
+    BiometricAny,
+    DeviceCredential,
+    BiometricOrDeviceCredential,
 }
 
 internal fun WalletBridgeKeyUseAuthorizationPolicy.toCorePolicy(): KeyUseAuthorizationPolicy = when (type) {
+    WalletBridgeKeyUseAuthorizationPolicyType.BiometricAny -> KeyUseAuthorizationPolicy.BiometricAny
+    WalletBridgeKeyUseAuthorizationPolicyType.DeviceCredential -> KeyUseAuthorizationPolicy.DeviceCredential(requireNotNull(timeoutSeconds))
+    WalletBridgeKeyUseAuthorizationPolicyType.BiometricOrDeviceCredential -> KeyUseAuthorizationPolicy.BiometricOrDeviceCredential(requireNotNull(timeoutSeconds))
     WalletBridgeKeyUseAuthorizationPolicyType.None -> KeyUseAuthorizationPolicy.None
     WalletBridgeKeyUseAuthorizationPolicyType.BiometricCurrentSet -> KeyUseAuthorizationPolicy.BiometricCurrentSet
     WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse ->
@@ -132,6 +141,9 @@ internal fun WalletBridgeKeyUseAuthorizationPolicy.toCorePolicy(): KeyUseAuthori
 }
 
 internal fun KeyUseAuthorizationPolicy.toBridgePolicy(): WalletBridgeKeyUseAuthorizationPolicy = when (this) {
+    KeyUseAuthorizationPolicy.BiometricAny -> WalletBridgeKeyUseAuthorizationPolicy(WalletBridgeKeyUseAuthorizationPolicyType.BiometricAny)
+    is KeyUseAuthorizationPolicy.DeviceCredential -> WalletBridgeKeyUseAuthorizationPolicy(WalletBridgeKeyUseAuthorizationPolicyType.DeviceCredential, timeoutSeconds)
+    is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> WalletBridgeKeyUseAuthorizationPolicy(WalletBridgeKeyUseAuthorizationPolicyType.BiometricOrDeviceCredential, timeoutSeconds)
     KeyUseAuthorizationPolicy.None -> WalletBridgeKeyUseAuthorizationPolicy.None
     KeyUseAuthorizationPolicy.BiometricCurrentSet -> WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet
     is KeyUseAuthorizationPolicy.BiometricTimedReuse -> WalletBridgeKeyUseAuthorizationPolicy(
@@ -159,7 +171,7 @@ public data class WalletBridgeKeyPreflight internal constructor(
         require(supported == (failure == null) && supported == (effectivePolicy != null)) {
             "Wallet bridge preflight must include an effective policy exactly when supported"
         }
-        val timed = effectivePolicy?.type == WalletBridgeKeyUseAuthorizationPolicyType.BiometricTimedReuse
+        val timed = (effectivePolicy?.timeoutSeconds ?: 0) > 0
         require((reuseEnforcement != null) == timed && (timeoutValidation != null) == timed) {
             "Timed bridge preflight must include enforcement and timeout validation only for timed policy"
         }
@@ -232,7 +244,6 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
     }
     return MobileWalletConfig(
         walletId = walletId,
-        defaultKeyType = defaultKeyType,
         attestationConfig = attestation,
         credentialIssuerMetadataTrustResolver = issuerMetadataTrustResolver?.let { bridgeResolver ->
             CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->
@@ -244,6 +255,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         transactionDataProfiles = transactionDataProfiles,
         defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy.toCorePolicy(),
         keyUseAuthorizationPrompt = keyUseAuthorizationPrompt,
+        identity = identity,
         crossProcessAccess = appGroupIdentifier?.let { appGroup ->
             MobileWalletCrossProcessAccess(
                 appGroupIdentifier = appGroup,

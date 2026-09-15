@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletBootstrapResult
+import id.walt.wallet2.mobile.identity.*
 import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
 import id.walt.wallet2.mobile.MobileWalletAnnexCRequest
 import id.walt.wallet2.mobile.MobileWalletAnnexCSubmission
@@ -58,21 +58,62 @@ public class WalletSdkBridge private constructor(
      */
     public val events: Flow<MobileWalletEvent> = eventFlow
 
-    /**
-     * Initializes the bridged wallet and returns the persisted key and DID information.
-     */
-    public suspend fun bootstrap(
-        keyType: MobileWalletKeyType? = null,
-        didMethod: String = "key",
-        keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy? = null,
-    ): WalletBridgeResult<MobileWalletBootstrapResult> =
-        walletBridgeCall {
-            operations.bootstrap(
-                keyType = keyType,
-                didMethod = didMethod,
-                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy?.toCorePolicy(),
-            )
-        }
+    /** Reopens the selected identity or creates the configured default through the shared lifecycle. */
+    public suspend fun initializeIdentity(): WalletBridgeResult<IdentityOperationResult> =
+        walletBridgeCall { operations.identities.initialize() }
+
+    /** Enumerates complete SDK-owned identity choices. */
+    public suspend fun identityCreationOptions(intent: IdentityIntent = IdentityIntent.WithoutRecovery,
+        attestation: IdentityAttestationRequest = IdentityAttestationRequest.None): WalletBridgeResult<IdentityOptions> =
+        walletBridgeCall { operations.identities.creationOptions(intent, attestation) }
+
+    /** Creates the identity described by an SDK-issued option. */
+    public suspend fun createIdentity(option: IdentityCreationOption): WalletBridgeResult<IdentityOperationResult> =
+        walletBridgeCall { operations.identities.create(option) }
+
+    /** Reads the active, pending or unavailable identity state. */
+    public suspend fun identityState(): WalletBridgeResult<WalletIdentityState> =
+        walletBridgeCall { operations.identities.state() }
+
+    /** Requests deletion without claiming that every synchronized copy has disappeared. */
+    public suspend fun deleteIdentityRecovery(candidate: RecoveryCandidate): WalletBridgeResult<RecoveryReceipt> =
+        walletBridgeCall { operations.identities.deleteRecovery(candidate) }
+
+    /** Resumes an interrupted identity operation. */
+    public suspend fun resumeIdentity(identityId: String): WalletBridgeResult<IdentityOperationResult> =
+        walletBridgeCall { operations.identities.resumePending(identityId) }
+
+    /** Cancels pending local setup without deleting an already submitted provider record. */
+    public suspend fun cancelPendingIdentity(identityId: String): WalletBridgeResult<Unit> =
+        walletBridgeCall { operations.identities.cancelPending(identityId) }
+
+    /** Offers backup only for an existing exportable key or retained recovery secret. */
+    public suspend fun identityBackupOptions(identityId: String): WalletBridgeResult<List<IdentityBackupOption>> =
+        walletBridgeCall { operations.identities.backupOptions(identityId) }
+
+    /** Submits a selected identity backup. */
+    public suspend fun backupIdentity(option: IdentityBackupOption): WalletBridgeResult<IdentityOperationResult> =
+        walletBridgeCall { operations.identities.backup(option) }
+
+    /** Lists explicitly configured private-key custodians under the current export policy. */
+    public suspend fun identityCustodyOptions(identityId: String): WalletBridgeResult<List<IdentityCustodyOption>> =
+        walletBridgeCall { operations.identities.custodyOptions(identityId) }
+
+    /** Imports a copy into an explicit custodian without claiming portable recovery. */
+    public suspend fun transferIdentityToCustody(option: IdentityCustodyOption): WalletBridgeResult<IdentityCustodyResult> =
+        walletBridgeCall { operations.identities.transferToCustody(option) }
+
+    /** Discovers safe backup references from registered providers. */
+    public suspend fun identityRecoveryCandidates(): WalletBridgeResult<List<RecoveryCandidate>> =
+        walletBridgeCall { operations.identities.recoveryCandidates() }
+
+    /** Validates a backup and offers supported restoration destinations. */
+    public suspend fun identityRestorationOptions(candidate: RecoveryCandidate): WalletBridgeResult<List<IdentityRestorationOption>> =
+        walletBridgeCall { operations.identities.restorationOptions(candidate) }
+
+    /** Restores the exact original signing identity. */
+    public suspend fun restoreIdentity(option: IdentityRestorationOption): WalletBridgeResult<IdentityOperationResult> =
+        walletBridgeCall { operations.identities.restore(option) }
 
     /** Checks whether a key-use authorization request is supported without creating a key. */
     public suspend fun keyUseAuthorizationPreflight(
@@ -236,6 +277,7 @@ public class WalletSdkBridge private constructor(
 }
 
 internal interface WalletSdkBridgeOperations {
+    val identities: WalletIdentities get() = error("Identity lifecycle is not supplied by this test double")
     fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
         error("Digital Credentials are not implemented by this test bridge")
 
@@ -245,12 +287,6 @@ internal interface WalletSdkBridgeOperations {
     suspend fun submitAnnexCPresentation(
         submission: MobileWalletAnnexCSubmission,
     ): MobileWalletDigitalCredentialResponse = error("Annex C is not implemented by this test bridge")
-
-    suspend fun bootstrap(
-        keyType: MobileWalletKeyType?,
-        didMethod: String,
-        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
-    ): MobileWalletBootstrapResult
 
     suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType,
@@ -311,6 +347,8 @@ internal interface WalletSdkBridgeOperations {
 internal class MobileWalletSdkBridgeOperations(
     private val wallet: MobileWallet,
 ) : WalletSdkBridgeOperations {
+    override val identities: WalletIdentities get() = wallet.identities
+
     override fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
         wallet.digitalCredentialCapabilities()
 
@@ -320,17 +358,6 @@ internal class MobileWalletSdkBridgeOperations(
     override suspend fun submitAnnexCPresentation(
         submission: MobileWalletAnnexCSubmission,
     ): MobileWalletDigitalCredentialResponse = wallet.submitAnnexCPresentation(submission)
-
-    override suspend fun bootstrap(
-        keyType: MobileWalletKeyType?,
-        didMethod: String,
-        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
-    ): MobileWalletBootstrapResult =
-        wallet.bootstrap(
-            keyType = keyType,
-            didMethod = didMethod,
-            keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
-        )
 
     override suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType,

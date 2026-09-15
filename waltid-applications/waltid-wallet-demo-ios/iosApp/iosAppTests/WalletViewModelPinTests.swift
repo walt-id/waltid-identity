@@ -10,6 +10,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-setup-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
+            identityDocumentRegistrationUpdate: {},
             pinStore: pinStore
         )
 
@@ -28,6 +29,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-lock-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
+            identityDocumentRegistrationUpdate: {},
             pinStore: pinStore
         )
         viewModel.unlockForTests()
@@ -48,6 +50,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-reset-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
+            identityDocumentRegistrationUpdate: {},
             pinStore: pinStore
         )
         viewModel.unlockForTests()
@@ -66,6 +69,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-bio-enable-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
+            identityDocumentRegistrationUpdate: {},
             pinStore: pinStore,
             biometricAuthenticator: biometrics
         )
@@ -89,6 +93,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-bio-enable-cancel-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
+            identityDocumentRegistrationUpdate: {},
             pinStore: pinStore,
             biometricAuthenticator: biometrics
         )
@@ -113,6 +118,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-bio-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
+            identityDocumentRegistrationUpdate: {},
             pinStore: pinStore,
             biometricAuthenticator: biometrics
         )
@@ -133,6 +139,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-bio-cancel-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
+            identityDocumentRegistrationUpdate: {},
             pinStore: pinStore,
             biometricAuthenticator: biometrics
         )
@@ -212,6 +219,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-signup-available-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
+            identityDocumentRegistrationUpdate: {},
             biometricAuthenticator: biometrics
         )
 
@@ -225,6 +233,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-signup-unavailable-\(UUID().uuidString)",
             walletClient: MockWalletClient(),
+            identityDocumentRegistrationUpdate: {},
             biometricAuthenticator: biometrics
         )
 

@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     id("waltid.full.library")
+    id("waltid.optional-ios-abi")
     id("waltid.publish.maven")
 }
 
@@ -71,6 +72,10 @@ kotlin {
             if (enableIosBuild) {
                 iosMain.get().dependsOn(mobileMain)
                 named("iosTest") {
+                    // Keychain lifecycle tests require an app host, not a bare Kotlin/Native process.
+                    if (providers.gradleProperty("enableIosKeychainTests").orNull == "true") {
+                        kotlin.srcDir("src/iosAppTest/kotlin")
+                    }
                     dependencies {
                         implementation(kotlin("test"))
                         implementation(identityLibs.kotlinx.coroutines.test)

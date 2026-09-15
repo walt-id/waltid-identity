@@ -66,6 +66,37 @@ jobs:
           test-report-check-name: iOS Simulator Test Report
           test-result-artifact-name: ios-simulator-test-results
 
+      - name: Run Keychain contracts and wallet recovery workflows
+        id: wallet_recovery
+        if: ${{ !cancelled() }}
+        timeout-minutes: 35
+        env:
+          DEVELOPER_DIR: ${{ env.XCODE_DEVELOPER_DIR }}
+        run: ./waltid-identity/.github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh
+
+      - name: Publish iOS wallet recovery report
+        if: always() && steps.wallet_recovery.outcome != 'skipped'
+        uses: mikepenz/action-junit-report@v6
+        with:
+          update_check: true
+          job_name: ${{ env.JOB_NAME_PREFIX }}ios-simulator-tests
+          check_name: iOS Wallet Recovery Test Report
+          report_paths: waltid-identity/build/reports/ios-wallet-recovery/**/results.xml
+          require_tests: true
+          include_passed: false
+          include_skipped: false
+
+      - name: Upload iOS wallet recovery reports
+        if: always() && steps.wallet_recovery.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-wallet-recovery-reports
+          path: |
+            waltid-identity/build/reports/ios-wallet-recovery/**/*.xml
+            waltid-identity/build/reports/ios-wallet-recovery/**/*.json
+            waltid-identity/build/reports/ios-wallet-recovery/**/*.log
+          retention-days: 30
+
   wallet-core-consumer-tests:
     if: ${{ github.event_name == 'workflow_dispatch' || inputs.run-native || inputs.run-compose }}
     runs-on: macos-26

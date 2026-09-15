@@ -2,6 +2,10 @@ package id.walt.wallet2.persistence.keys
 
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyEncodingFormat
+import id.walt.crypto2.keys.PrivateKeyExporter
+import kotlinx.coroutines.CancellationException
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyId
@@ -13,6 +17,7 @@ import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.signum.SignumInteractionContextUnavailableException
+import id.walt.crypto2.signum.SignumKeyUnavailableException
 import id.walt.crypto2.signum.SignumKeyInvalidatedException
 import id.walt.crypto2.signum.SignumKeyNotFoundException
 import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
@@ -20,6 +25,7 @@ import id.walt.crypto2.signum.SignumKeyPolicy
 import id.walt.crypto2.signum.SignumHardwarePolicy
 import id.walt.crypto2.signum.SignumAuthenticationPolicy
 import id.walt.crypto2.signum.SignumStoredKeyMetadataException
+import id.walt.crypto2.signum.SignumAuthorizationException
 import id.walt.crypto2.signum.SignumUserCancelledException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,11 +38,15 @@ class SignumWalletKeyMappingTest {
     @Test
     fun `maps known Signum failures at the built-in provider boundary`() {
         val failures = listOf(
+            SignumAuthorizationException() to
+                KeyUseAuthorizationFailure.AuthorizationNotCompleted,
             SignumInteractionContextUnavailableException() to
                 KeyUseAuthorizationFailure.InteractionContextUnavailable,
             SignumUserCancelledException(IllegalStateException("cancelled")) to
                 KeyUseAuthorizationFailure.AuthorizationNotCompleted,
             SignumKeyNotFoundException("key") to
+                KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
+            SignumKeyUnavailableException("key") to
                 KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
             SignumKeyInvalidatedException("key") to
                 KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
@@ -94,9 +104,7 @@ class SignumWalletKeyMappingTest {
             )
         }
 
-        val protected = delegate.withWalletAuthorizationMapping(
-            KeyUseAuthorizationPolicy.BiometricCurrentSet,
-        )
+        val protected = delegate.withWalletAuthorizationMapping()
 
         val failure = assertFailsWith<KeyUseAuthorizationException> {
             requireNotNull(protected.capabilities.signer).sign(
@@ -158,12 +166,14 @@ class SignumWalletKeyMappingTest {
 
         assertEquals(expected, timed.toSignumPolicy())
         assertEquals(timed, expected.toWalletPolicy(valid))
+        assertEquals(KeyUseAuthorizationPolicy.BiometricAny,
+            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(timeoutSeconds = 0)).toWalletPolicy(valid))
+        assertEquals(KeyUseAuthorizationPolicy.BiometricOrDeviceCredential(10),
+            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(deviceCredential = true)).toWalletPolicy(valid))
 
         listOf(
-            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(timeoutSeconds = 0)),
             expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(timeoutSeconds = 31)),
             expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(allowNewBiometrics = false)),
-            expected.copy(authentication = (expected.authentication as SignumAuthenticationPolicy.UserPresence).copy(deviceCredential = true)),
         ).forEach { malformed ->
             val failure = assertFailsWith<KeyUseAuthorizationException> {
                 malformed.toWalletPolicy(valid)
@@ -202,6 +212,30 @@ class SignumWalletKeyMappingTest {
             timeoutValidation = KeyUseAuthorizationReuseTimeoutValidation.IndependentReadback,
         )
         assertEquals(timed, support.effectivePolicy)
+    }
+
+    @Test
+    fun `private export maps authorization failures and preserves coroutine cancellation`() = runTest {
+        for (cause in listOf(SignumAuthorizationException(), CancellationException("caller cancelled"))) {
+            val delegate = object : ManagedKey {
+                override val storedKey = storedManagedKey(KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+                override val capabilities = KeyCapabilities(privateKeyExporter = object : PrivateKeyExporter {
+                    override suspend fun exportPrivateKey(): EncodedKey = throw cause
+                    override suspend fun exportPrivateKey(format: KeyEncodingFormat): EncodedKey = throw cause
+                })
+            }
+            val exporter = requireNotNull(delegate.withWalletAuthorizationMapping().capabilities.privateKeyExporter)
+            for (explicitFormat in listOf(false, true)) {
+                val actual = assertFailsWith<Exception> {
+                    if (explicitFormat) exporter.exportPrivateKey(KeyEncodingFormat.JWK) else exporter.exportPrivateKey()
+                }
+                if (cause is CancellationException) assertEquals(cause, actual)
+                else {
+                    assertEquals(KeyUseAuthorizationFailure.AuthorizationNotCompleted, assertIs<KeyUseAuthorizationException>(actual).failure)
+                    assertEquals(cause, actual.cause)
+                }
+            }
+        }
     }
 
     private fun storedManagedKey(spec: KeySpec, usages: Set<KeyUsage>) = StoredKey.Managed(
