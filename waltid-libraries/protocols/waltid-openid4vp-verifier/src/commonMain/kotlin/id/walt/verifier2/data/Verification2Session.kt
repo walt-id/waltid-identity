@@ -27,6 +27,17 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 
+/**
+ * How long a used session is kept when nothing configures retention.
+ *
+ * Ten years is not a considered policy, it is what this has always been; it stays the default so no existing
+ * deployment changes behaviour. Deployments with a real retention obligation should configure one.
+ */
+const val DEFAULT_RETENTION_YEARS: Int = 10
+
+/** How long an unused session survives when the request sets no expiry. */
+const val UNUSED_SESSION_LIFETIME_MINUTES: Int = 10
+
 @Serializable
 data class Verification2Session(
     /**
@@ -46,7 +57,7 @@ data class Verification2Session(
      * **The Session is no longer eligible for expiry if it was used and presentation data was made available**
      * (no matter if successful or failed)
      */
-    val expirationDate: Instant? = Clock.System.now().plus(10, DateTimeUnit.MINUTE, TimeZone.UTC),
+    val expirationDate: Instant? = Clock.System.now().plus(UNUSED_SESSION_LIFETIME_MINUTES, DateTimeUnit.MINUTE, TimeZone.UTC),
 
     /**
      * (Optional) Retention date.
@@ -54,8 +65,11 @@ data class Verification2Session(
      *
      * After this date, it will be deleted with all associated verification information.
      * If you would like to keep data of successful/failed Verification Sessions indefinitely, set the retentionDate to null.
+     *
+     * Set from `retention_duration`/`retention_date` on the request, or from the verifier's configured retention
+     * when the request says nothing - see `VerificationSessionCreator.createVerificationSession`.
      */
-    val retentionDate: Instant = Clock.System.now().plus(10, DateTimeUnit.YEAR, TimeZone.UTC),
+    val retentionDate: Instant? = Clock.System.now().plus(DEFAULT_RETENTION_YEARS, DateTimeUnit.YEAR, TimeZone.UTC),
 
     /**
      * Current status for this Verification Session
@@ -144,9 +158,16 @@ data class Verification2Session(
     @SerialName("failure")
     var failure: SessionFailure? = null,
 ) {
-    fun persistenceExpirationDate(): Instant =
+    /**
+     * When the stored session may be discarded, or null to keep it indefinitely.
+     *
+     * A session that was used - attempted, or finished either way - is kept until [retentionDate], which is
+     * null for a verifier configured to retain indefinitely. An unused one is dropped at [expirationDate], so
+     * an abandoned session never lingers because retention is generous.
+     */
+    fun persistenceExpirationDate(): Instant? =
         if (attempted || status in setOf(VerificationSessionStatus.SUCCESSFUL, VerificationSessionStatus.FAILED)) retentionDate
-        else expirationDate ?: creationDate.plus(10, DateTimeUnit.MINUTE, TimeZone.UTC)
+        else expirationDate ?: creationDate.plus(UNUSED_SESSION_LIFETIME_MINUTES, DateTimeUnit.MINUTE, TimeZone.UTC)
 
 
     fun deletePII() {
