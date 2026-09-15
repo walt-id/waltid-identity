@@ -13,7 +13,10 @@ import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
 import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.prefixes.ClientId
+import id.walt.openid4vp.clientidprefix.prefixes.PreRegistered
 import id.walt.openid4vp.clientidprefix.prefixes.RedirectUri
+import id.walt.openid4vp.clientidprefix.prefixes.Unsupported
 import id.walt.x509.platformSupportsPkixCertificatePathValidation
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -54,7 +57,15 @@ object AuthorizationRequestResolver {
         val clientIdError: ClientIdError,
     ) : IllegalArgumentException(
         "Could not verify signed AuthorizationRequest with client id prefix: ${clientIdError::class.simpleName} - ${clientIdError.message}",
-    )
+    ) {
+        val errorCode: String
+            get() = when (clientIdError) {
+                is ClientIdError.InvalidClient,
+                is ClientIdError.PreRegisteredClientNotFound,
+                -> "invalid_client"
+                else -> "invalid_request"
+            }
+    }
 
     data class RequestUriFetchResponse(
         val status: HttpStatusCode,
@@ -69,8 +80,10 @@ object AuthorizationRequestResolver {
      *
      * [ALLOW_UNSIGNED] is the default: signed Request Objects with a signable client ID prefix
      * (`x509_san_dns`, `x509_hash`, DID, attestation, pre-registered) are accepted, and unsigned
-     * JSON / `redirect_uri` requests fetched via `request_uri` are accepted. [REQUIRE_SIGNED]
-     * rejects unsigned encodings and the `redirect_uri` prefix; reserved for a future HAIP profile.
+     * JSON / `alg: none` / query requests are accepted for `redirect_uri` and for a
+     * `pre-registered` client that the Wallet already holds with matching `redirect_uris`.
+     * [REQUIRE_SIGNED] rejects unsigned encodings and the `redirect_uri` prefix; reserved for a
+     * future HAIP profile.
      */
     enum class UnsignedRequestObjectPolicy {
         ALLOW_UNSIGNED,
@@ -273,8 +286,9 @@ object AuthorizationRequestResolver {
                 requireUnsignedRequestObjectAllowed(
                     clientId = parameters["client_id"],
                     policy = unsignedRequestObjectPolicy,
+                    trustConfiguration = trustConfiguration,
                 )
-                parsePlainRequest(parameters)
+                parsePlainRequest(parameters, trustConfiguration)
             } else parseParametersLegacy(parameters),
         )
     }
@@ -327,37 +341,46 @@ object AuthorizationRequestResolver {
     }
 
     /**
-     * Plain requests are authenticated only by the redirect_uri client identifier. Other client
-     * identifier prefixes require a signed Request Object or a configured registration.
+     * Plain requests are authenticated by the `redirect_uri` client identifier, or by a
+     * pre-registered client that the Wallet already holds (including URL-shaped ids present in
+     * [ClientIdTrustConfiguration.preRegisteredClients]). Other prefixes require a signed Request
+     * Object.
      */
-    private fun parsePlainRequest(parameters: Parameters): AuthorizationRequest {
+    private suspend fun parsePlainRequest(
+        parameters: Parameters,
+        trustConfiguration: ClientIdTrustConfiguration,
+    ): AuthorizationRequest {
         val clientId = requireNotNull(parameters["client_id"]) {
             "client_id is required in an Authorization Request"
         }
         val client = ClientIdPrefixParser.parse(clientId).getOrElse { error ->
             throw IllegalArgumentException("Could not parse client_id prefix: $clientId", error)
         }
-        require(client is RedirectUri) {
+        if (client is RedirectUri) {
+            val embeddedUri = client.rawValue.substringAfter(':')
+            val responseMode = parameters["response_mode"]
+            val deliveryParameter = if (responseMode in setOf("direct_post", "direct_post.jwt")) {
+                "response_uri"
+            } else {
+                "redirect_uri"
+            }
+            parameters[deliveryParameter]?.let { explicitUri ->
+                require(explicitUri == embeddedUri) {
+                    "Authorization Request $deliveryParameter '$explicitUri' does not match the " +
+                        "redirect_uri client_id '$embeddedUri'"
+                }
+            }
+            return parseParameters(Parameters.build {
+                appendAll(parameters)
+                if (parameters[deliveryParameter] == null) append(deliveryParameter, embeddedUri)
+            })
+        }
+        require(isPreRegisteredClientId(client, trustConfiguration)) {
             "Client Identifier '$clientId' cannot be authenticated as a plain request"
         }
-
-        val embeddedUri = client.rawValue.substringAfter(':')
-        val responseMode = parameters["response_mode"]
-        val deliveryParameter = if (responseMode in setOf("direct_post", "direct_post.jwt")) {
-            "response_uri"
-        } else {
-            "redirect_uri"
-        }
-        parameters[deliveryParameter]?.let { explicitUri ->
-            require(explicitUri == embeddedUri) {
-                "Authorization Request $deliveryParameter '$explicitUri' does not match the " +
-                    "redirect_uri client_id '$embeddedUri'"
-            }
-        }
-        return parseParameters(Parameters.build {
-            appendAll(parameters)
-            if (parameters[deliveryParameter] == null) append(deliveryParameter, embeddedUri)
-        })
+        val request = parseParameters(parameters)
+        authenticatePreRegisteredAuthorizationRequest(request, trustConfiguration)
+        return request
     }
 
     private fun parseParametersLegacy(parameters: Parameters): AuthorizationRequest =
@@ -414,6 +437,7 @@ object AuthorizationRequestResolver {
                 outerClientId = outerClientId,
                 enforceFinalRequestObject = enforceFinalRequestObject,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+                trustConfiguration = trustConfiguration,
             )
             else -> throw IllegalArgumentException("Unsupported AuthorizationRequest content type: $contentType")
         }
@@ -485,12 +509,15 @@ object AuthorizationRequestResolver {
             requireUnsignedRequestObjectAllowed(
                 clientId = authReqJws.payload["client_id"]?.jsonPrimitive?.contentOrNull,
                 policy = unsignedRequestObjectPolicy,
+                trustConfiguration = trustConfiguration,
             )
+            val authorizationRequest = json.decodeFromJsonElement(
+                deserializer = AuthorizationRequest.serializer(),
+                element = applyRedirectUriPrefixBinding(authReqJws.payload),
+            )
+            authenticatePreRegisteredAuthorizationRequest(authorizationRequest, trustConfiguration)
             return ResolvedAuthorizationRequest.UnsignedRequestObject(
-                authorizationRequest = json.decodeFromJsonElement(
-                    deserializer = AuthorizationRequest.serializer(),
-                    element = applyRedirectUriPrefixBinding(authReqJws.payload),
-                ),
+                authorizationRequest = authorizationRequest,
                 requestObject = requestObject,
             )
         }
@@ -603,19 +630,20 @@ object AuthorizationRequestResolver {
 
     /**
      * Unsigned JSON from `request_uri` is the Verifier2 bootstrap path. It is accepted when the
-     * Client Identifier is `redirect_uri`. Signed-only wallets ([UnsignedRequestObjectPolicy.REQUIRE_SIGNED])
-     * reject it.
+     * Client Identifier is `redirect_uri`, or a pre-registered client the Wallet already holds.
+     * Signed-only wallets ([UnsignedRequestObjectPolicy.REQUIRE_SIGNED]) reject it.
      */
-    private fun resolveFromUnsignedJson(
+    private suspend fun resolveFromUnsignedJson(
         body: String,
         outerClientId: String?,
         enforceFinalRequestObject: Boolean,
         unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
+        trustConfiguration: ClientIdTrustConfiguration,
     ): ResolvedAuthorizationRequest {
         if (!enforceFinalRequestObject) {
             return ResolvedAuthorizationRequest.Plain(json.decodeFromString(body))
         }
-        requireUnsignedRequestObjectAllowed(outerClientId, unsignedRequestObjectPolicy)
+        requireUnsignedRequestObjectAllowed(outerClientId, unsignedRequestObjectPolicy, trustConfiguration)
         val payload = json.parseToJsonElement(body)
         require(payload is JsonObject) {
             "Unsigned authorization request from request_uri must be a JSON object"
@@ -625,36 +653,79 @@ object AuthorizationRequestResolver {
             element = applyRedirectUriPrefixBinding(payload),
         ).also { it.dcqlQuery?.precheck() }
         requireMatchingClientId(outerClientId, authorizationRequest.clientId)
+        authenticatePreRegisteredAuthorizationRequest(authorizationRequest, trustConfiguration)
         return ResolvedAuthorizationRequest.Plain(authorizationRequest)
     }
 
     /**
      * Unsigned Authorization Requests are JSON from `request_uri`, query parameters, or `alg: none`
-     * JWTs. They are accepted when [UnsignedRequestObjectPolicy.ALLOW_UNSIGNED] is set **and**
-     * the Client Identifier Prefix is `redirect_uri`.
+     * JWTs. They are accepted when [UnsignedRequestObjectPolicy.ALLOW_UNSIGNED] is set **and** the
+     * Client Identifier Prefix yields a request-to-destination binding without a signature:
+     * `redirect_uri`, or `pre-registered` when the Wallet holds that id (including a URL-shaped id
+     * present in [ClientIdTrustConfiguration.preRegisteredClients]).
      *
-     * That is the unsigned Verifier2 bootstrap: JSON at `request_uri` named by `redirect_uri:<response
-     * destination>`. Signed Request Objects remain accepted under either policy.
-     * [UnsignedRequestObjectPolicy.REQUIRE_SIGNED] rejects `redirect_uri` entirely because
-     * that prefix cannot carry a signature.
+     * Signed Request Objects remain accepted under either policy.
+     * [UnsignedRequestObjectPolicy.REQUIRE_SIGNED] rejects unsigned encodings entirely because
+     * `redirect_uri` cannot carry a signature and unsigned pre-registered is out of profile.
      *
      * Unsigned JSON or `alg: none` for a signable prefix (`x509_san_dns`, DID, attestation, …) is
      * always refused. Accepting it would let anyone claim, say, `x509_san_dns:bank.example.com`.
      */
-    private fun requireUnsignedRequestObjectAllowed(clientId: String?, policy: UnsignedRequestObjectPolicy) {
+    private fun requireUnsignedRequestObjectAllowed(
+        clientId: String?,
+        policy: UnsignedRequestObjectPolicy,
+        trustConfiguration: ClientIdTrustConfiguration,
+    ) {
         if (policy != UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) {
             throw UnsignedAuthorizationRequestNotAllowedException(
                 "Unsigned Authorization Request is not allowed",
             )
         }
-        val isRedirectUri = clientId
-            ?.let { ClientIdPrefixParser.parse(it).getOrNull() }
-            ?.let { it is RedirectUri }
-            ?: false
-        if (!isRedirectUri) {
+        val parsed = clientId?.let { ClientIdPrefixParser.parse(it).getOrNull() }
+        val allowed = parsed is RedirectUri || isPreRegisteredClientId(parsed, trustConfiguration)
+        if (!allowed) {
             throw UnsignedAuthorizationRequestNotAllowedException(
-                "Unsigned Authorization Request is only allowed for the redirect_uri client identifier prefix",
+                "Unsigned Authorization Request is only allowed for the redirect_uri client identifier prefix " +
+                    "or a pre-registered client the Wallet already holds",
             )
+        }
+    }
+
+    private fun isPreRegisteredClientId(
+        clientId: ClientId?,
+        trustConfiguration: ClientIdTrustConfiguration,
+    ): Boolean = clientId is PreRegistered ||
+        (clientId is Unsupported && clientId.rawValue in trustConfiguration.preRegisteredClients)
+
+    private suspend fun authenticatePreRegisteredAuthorizationRequest(
+        request: AuthorizationRequest,
+        trustConfiguration: ClientIdTrustConfiguration,
+        requestObjectJws: String? = null,
+    ) {
+        val clientId = request.clientId ?: return
+        val parsed = ClientIdPrefixParser.parse(clientId).getOrNull() ?: return
+        if (!isPreRegisteredClientId(parsed, trustConfiguration)) return
+        val context = RequestContext(
+            clientId = clientId,
+            clientMetadata = request.clientMetadata,
+            requestObjectJws = requestObjectJws,
+            redirectUri = request.redirectUri,
+            responseUri = request.responseUri,
+        )
+        when (
+            val validationResult = ClientIdPrefixAuthenticator.authenticate(
+                parsed,
+                context,
+                preRegisteredMetadataProvider = { id ->
+                    trustConfiguration.preRegisteredClients[id]?.let {
+                        json.encodeToString(ClientMetadata.serializer(), it)
+                    }
+                },
+                trustConfiguration = trustConfiguration,
+            )
+        ) {
+            is ClientValidationResult.Success -> Unit
+            is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(validationResult.error)
         }
     }
 
