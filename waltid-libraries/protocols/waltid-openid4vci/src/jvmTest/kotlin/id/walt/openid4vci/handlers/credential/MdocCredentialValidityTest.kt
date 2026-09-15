@@ -12,6 +12,7 @@ import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.openid4vci.CredentialFormat
@@ -95,9 +96,13 @@ class MdocCredentialValidityTest {
                         add("mapped-value")
                     }
                 }
+                put("id", "<uuid>")
+                put("issuanceDate", "<timestamp>")
+                put("expirationDate", "<timestamp-in:365d>")
             },
         )
 
+        assertEquals(setOf(namespace), issued.namespaces!!.keys)
         val items = issued.namespaces!!.getValue(namespace).entries
             .associate { it.value.elementIdentifier to it.value.elementValue }
         assertEquals("2026-09-15", assertIs<CborString>(items.getValue("issue_date")).value)
@@ -108,6 +113,91 @@ class MdocCredentialValidityTest {
             listOf("https://issuer.example", "mapped-value"),
             administrativeNumber.map { assertIs<CborString>(it).value },
         )
+    }
+
+    @Test
+    fun `date template functions produce YYYY-MM-DD strings accepted by full-date CBOR conversion`() = runTest {
+        val namespace = "org.iso.18013.5.1"
+        val issued = fixture().issueCredential(
+            credentialData = buildJsonObject {
+                putJsonObject(namespace) {
+                    put("issue_date", "2019-10-20")
+                    put("expiry_date", "2024-10-20")
+                }
+            },
+            dataMapping = buildJsonObject {
+                putJsonObject(namespace) {
+                    put("issue_date", "<date>")
+                    put("expiry_date", "<date-in:365d>")
+                }
+            },
+        )
+        val items = issued.namespaces!!.getValue(namespace).entries
+            .associate { it.value.elementIdentifier to it.value.elementValue }
+        val issueDate = assertIs<CborString>(items.getValue("issue_date")).value
+        val expiryDate = assertIs<CborString>(items.getValue("expiry_date")).value
+        // Both must be YYYY-MM-DD (10 chars, no time component)
+        assertEquals(10, issueDate.length, "issue_date must be YYYY-MM-DD, got: $issueDate")
+        assertEquals(10, expiryDate.length, "expiry_date must be YYYY-MM-DD, got: $expiryDate")
+        assertTrue(expiryDate > issueDate, "expiry_date must be after issue_date")
+    }
+
+    @Test
+    fun `date template functions produce CBOR full-date tag 1004 via mDocNameSpacesDataMappingConfig`() = runTest {
+        val namespace = "org.iso.18013.5.1"
+        val issued = fixture().issueCredential(
+            credentialData = buildJsonObject {
+                putJsonObject(namespace) {
+                    put("issue_date", "placeholder")
+                    put("expiry_date", "placeholder")
+                    put("given_name", "Jane")
+                }
+            },
+            dataMapping = buildJsonObject {
+                putJsonObject(namespace) {
+                    put("issue_date", "<date>")
+                    put("expiry_date", "<date-in:365d>")
+                }
+            },
+            mDocNameSpacesDataMappingConfig = mapOf(
+                namespace to Json.decodeFromString<JsonObjectToCborMappingConfig>(
+                    """{"entriesConfigMap":{"issue_date":{"type":"string","conversionType":"stringToFullDate"},"expiry_date":{"type":"string","conversionType":"stringToFullDate"}}}"""
+                )
+            ),
+        )
+        val items = issued.namespaces!!.getValue(namespace).entries
+            .associate { it.value.elementIdentifier to it.value.elementValue }
+
+        val issueDate = assertIs<CborString>(items.getValue("issue_date"))
+        val expiryDate = assertIs<CborString>(items.getValue("expiry_date"))
+
+        // Values must be YYYY-MM-DD (10 chars)
+        assertEquals(10, issueDate.value.length, "issue_date must be YYYY-MM-DD, got: ${issueDate.value}")
+        assertEquals(10, expiryDate.value.length, "expiry_date must be YYYY-MM-DD, got: ${expiryDate.value}")
+        assertTrue(expiryDate.value > issueDate.value, "expiry_date must be after issue_date")
+
+        // Both must carry CBOR tag 1004 (RFC 8943 full-date)
+        assertEquals(listOf(1004uL), issueDate.tags, "issue_date must have tag 1004")
+        assertEquals(listOf(1004uL), expiryDate.tags, "expiry_date must have tag 1004")
+
+        // Unmapped field must pass through unchanged
+        assertEquals("Jane", assertIs<CborString>(items.getValue("given_name")).value)
+    }
+
+    @Test
+    fun `non-object namespace mapping values are silently dropped to prevent signer crash`() = runTest {
+        val namespace = "org.iso.18013.5.1"
+        val issued = fixture().issueCredential(
+            credentialData = buildJsonObject {
+                putJsonObject(namespace) { put("given_name", "Jane") }
+            },
+            dataMapping = buildJsonObject {
+                put(namespace, "not-an-object")
+            },
+        )
+        val items = issued.namespaces!!.getValue(namespace).entries
+            .associate { it.value.elementIdentifier to it.value.elementValue }
+        assertEquals("Jane", assertIs<CborString>(items.getValue("given_name")).value)
     }
 
     private suspend fun fixture(notBefore: String = "2026-01-01T00:00:00Z"): Fixture {
@@ -138,6 +228,7 @@ class MdocCredentialValidityTest {
             now: String = "2026-09-08T19:18:10Z",
             credentialData: JsonObject = buildJsonObject { putJsonObject("org.example") { put("given_name", "Jane") } },
             dataMapping: JsonObject? = null,
+            mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
             validFrom: Instant? = null,
             validUntil: Instant? = null,
         ): IssuerSigned {
@@ -153,7 +244,7 @@ class MdocCredentialValidityTest {
                 issuerId = "https://issuer.example",
                 credentialData = credentialData,
                 dataMapping = dataMapping, selectiveDisclosure = null, x5Chain = listOf(certificate),
-                display = null, w3cVersion = null, mDocNameSpacesDataMappingConfig = null,
+                display = null, w3cVersion = null, mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                 authorizedTransactionDataTypes = null, credentialStatus = null,
                 validFrom = validFrom, validUntil = validUntil,
                 verifiedProofs = listOf(
