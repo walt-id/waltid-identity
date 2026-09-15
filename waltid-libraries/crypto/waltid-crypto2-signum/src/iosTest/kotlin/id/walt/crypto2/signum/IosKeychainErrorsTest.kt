@@ -3,6 +3,7 @@ package id.walt.crypto2.signum
 import at.asitplus.signum.supreme.CFCryptoOperationFailed
 import kotlinx.coroutines.CancellationException
 import platform.Foundation.NSOSStatusErrorDomain
+import platform.CryptoTokenKit.*
 import platform.LocalAuthentication.LAErrorDomain
 import platform.LocalAuthentication.LAErrorAuthenticationFailed
 import platform.LocalAuthentication.LAErrorUserCancel
@@ -30,6 +31,25 @@ class IosKeychainErrorsTest {
             IosKeychainException(NSOSStatusErrorDomain, errSecInteractionNotAllowed.toLong(), "Locked")))
         val cancellation = CancellationException("Job cancelled")
         assertSame(cancellation, cancellation.mapSignumFailure("key"))
+    }
+
+    @Test
+    fun tokenFailuresDoNotAssumePermanentInvalidation() {
+        val unavailable = IosKeychainException(TKErrorDomain, TKErrorCodeCorruptedData, "Token data unavailable")
+        assertSame(unavailable, assertIs<SignumKeyUnavailableException>(iosKeychainFailure("key", unavailable)).cause)
+        assertIs<SignumKeyUnavailableException>(iosKeychainFailure("key",
+            IosKeychainException(TKErrorDomain, TKErrorCodeObjectNotFound, "Object unavailable")))
+        assertIs<SignumKeyUnavailableException>(iosKeychainFailure("key",
+            IosKeychainException(TKErrorDomain, TKErrorCodeTokenNotFound, "Token unavailable")))
+        assertIs<SignumUserCancelledException>(iosKeychainFailure("key",
+            IosKeychainException(TKErrorDomain, TKErrorCodeCanceledByUser, "Cancelled")))
+        assertIs<SignumAuthorizationException>(iosKeychainFailure("key",
+            IosKeychainException(TKErrorDomain, TKErrorCodeAuthenticationFailed, "Denied")))
+        assertIs<SignumInteractionContextUnavailableException>(iosKeychainFailure("key",
+            IosKeychainException(TKErrorDomain, TKErrorCodeAuthenticationNeeded, "Interaction required")))
+        assertIs<SignumKeyUnavailableException>(CFCryptoOperationFailed("decode key", errSecDecode).mapSignumFailure("key"))
+        val unknown = IosKeychainException(TKErrorDomain, TKErrorCodeBadParameter, "Invalid parameter")
+        assertSame(unknown, iosKeychainFailure("key", unknown))
     }
 
     @Test

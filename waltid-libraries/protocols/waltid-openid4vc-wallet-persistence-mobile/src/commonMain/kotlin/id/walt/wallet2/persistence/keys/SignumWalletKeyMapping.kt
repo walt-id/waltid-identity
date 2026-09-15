@@ -21,6 +21,7 @@ import id.walt.crypto2.signum.SignumAuthenticationPolicy
 import id.walt.crypto2.signum.SignumAuthorizationException
 import id.walt.crypto2.signum.SignumHardwarePolicy
 import id.walt.crypto2.signum.SignumInteractionContextUnavailableException
+import id.walt.crypto2.signum.SignumKeyUnavailableException
 import id.walt.crypto2.signum.SignumKeyInvalidatedException
 import id.walt.crypto2.signum.SignumKeyNotFoundException
 import id.walt.crypto2.signum.SignumKeyOrigin
@@ -62,6 +63,7 @@ internal fun Throwable.toKeyUseAuthorizationException(
             cause = this,
         )
 
+    is SignumKeyUnavailableException,
     is SignumKeyInvalidatedException,
     is SignumKeyNotFoundException ->
         KeyUseAuthorizationException(

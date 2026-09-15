@@ -60,14 +60,14 @@ persisted policy; changing the default never weakens or recreates an existing ke
 `BiometricTimedReuse(timeoutSeconds)` is available for a fixed 1–30 second,
 non-sliding reuse interval. It also requires P-256, strong biometrics, and no
 device-credential fallback, but intentionally permits new biometric enrollment
-without invalidating the key. Android reports `PlatformKeyStore` with
+without binding the key to the current set. Resetting all biometrics can still make ordinary iOS
+Keychain keys unavailable; see the [lifecycle limitations](docs/identity-recovery.md#platform-capabilities). Android reports `PlatformKeyStore` with
 `IndependentReadback`: native KeyStore metadata can be read back and compared
 with the requested interval after creation or restoration. iOS reports
-`ProviderProcess` with `ProviderConfigurationOnly`: Signum receives the
-requested interval, but its pinned public API cannot independently expose the
-effective positive timeout after restoration. Timed reuse is recent
-platform or provider authentication, not issuance, presentation, or other
-wallet-action consent, and is not guaranteed to be key-local.
+`ProviderProcess` with `ProviderConfigurationOnly`: the Apple adapter retains a per-key
+LocalAuthentication context for the configured interval; native Keychain metadata cannot independently
+verify that interval. Android reuse may cover other eligible keys. Timed reuse is recent platform or
+provider authentication, not consent for issuance, presentation, or another wallet action.
 
 ## Receiving credentials
 

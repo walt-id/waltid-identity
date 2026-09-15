@@ -111,7 +111,8 @@ public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
 
     /// Strong biometric authentication for every operation; new biometric enrollment invalidates the key.
     case biometricCurrentSet
-    /// Accepts newly enrolled strong biometrics without invalidating the key.
+    /// Accepts newly enrolled strong biometrics. Protected-key access is deferred while biometrics are unavailable.
+    /// This policy does not guarantee key recovery.
     case biometricAny
     /// Uses the device credential; zero means authorization for each use.
     case deviceCredential(timeoutSeconds: Int)
@@ -120,9 +121,9 @@ public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
 
     ///
     /// Strong biometric authentication reusable for a fixed, non-sliding interval after authorization.
-    /// Android verifies the native KeyStore interval. iOS records the interval at creation but cannot
-    /// independently inspect its effective positive timeout after restoration. This is recent platform
-    /// or provider authentication, not consent for issuance, presentation, or another wallet action.
+    /// iOS retains a per-key LocalAuthentication context; native Keychain metadata cannot independently
+    /// verify the interval. Uses the same biometric availability guard as `biometricAny`.
+    /// This is recent authentication, not consent for issuance, presentation, or another wallet action.
     case biometricTimedReuse(timeoutSeconds: Int)
 }
 

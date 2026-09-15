@@ -13,7 +13,9 @@ public sealed interface KeyUseAuthorizationPolicy {
     @Serializable
     public data object None : KeyUseAuthorizationPolicy
 
-    /** Every private-key use accepts an enrolled strong biometric; new enrollment does not invalidate it. */
+    /** Every private-key use accepts an enrolled strong biometric without binding to the current set.
+     * On iOS, protected-key access is deferred while biometrics are unavailable to avoid
+     * enrollment-reset query failures. Accepting new enrollment is not a recovery guarantee. */
     @Serializable
     public data object BiometricAny : KeyUseAuthorizationPolicy
 
@@ -39,14 +41,15 @@ public sealed interface KeyUseAuthorizationPolicy {
      * Strong biometric authorization may be reused for private-key operations during the fixed
      * interval. The interval starts with successful authentication and never slides on signing.
      *
-     * New biometric enrollment does not invalidate this key. Android can independently read back
+     * This policy accepts new enrollment and uses the iOS availability guard described by [BiometricAny].
+     * Android can independently read back
      * this interval from native KeyStore metadata after creation or restoration. iOS enforces the interval
      * through a fixed LocalAuthentication context lifetime; native Keychain metadata does not expose
      * that reuse interval for independent readback.
      *
      * Timed reuse is recent platform or provider authentication. It is not authorization or
-     * consent for issuance, presentation, or another wallet action, and is not guaranteed to be
-     * key-local.
+     * consent for issuance, presentation, or another wallet action. Android reuse may cover other
+     * eligible keys; iOS contexts are scoped to a key within the provider process.
      */
     @Serializable
     public data class BiometricTimedReuse(

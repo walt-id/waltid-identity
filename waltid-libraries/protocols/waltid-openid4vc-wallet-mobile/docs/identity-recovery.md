@@ -135,6 +135,16 @@ Protected Confirmation signs its own confirmation structure, so it is not offere
 JOSE/COSE identity signatures. Trusted physical-presence controls without a supported interaction
 path are likewise unavailable. Application-password and composite-AND Keychain ACL workflows are
 not exposed by this identity service; it does not substitute the wallet PIN for a native credential.
+On affected iOS versions, querying an ordinary biometric-only Keychain entry while Face ID is
+unenrolled can leave it unavailable after re-enrollment, even with `biometryAny`. Apple DTS has
+[identified a related reset symptom as a possible OS bug](https://developer.apple.com/forums/thread/774790).
+The SDK checks biometric availability before protected-key lookup and use, returning temporary
+unavailability without querying the entry when biometrics are unavailable. Passcode-capable policies
+remain usable. This guard does not weaken native authorization or restore entries already lost;
+retain an independent recovery record when key continuity is required. Direct native access outside
+the SDK must also avoid this trigger. Temporary failures do not imply permanent invalidation, and
+reopening never silently replaces the signing key.
+
 Android on-body authentication is not offered as a stronger authorization guarantee. These limits
 are explicit; arbitrary native flags are not accepted and then ignored.
 
