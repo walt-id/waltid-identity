@@ -38,6 +38,110 @@
           "oracle": "A successfully decrypted counter-one message cannot be replayed as counter two."
         }
       ]
+    },
+    "android-ble-callbacks": {
+      "executionClass": "deterministic",
+      "sources": [
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/androidHostTest/kotlin/id/walt/mdoc/proximity/mobile/AndroidCentralGattCallbackTest.kt",
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/androidHostTest/kotlin/id/walt/mdoc/proximity/mobile/AndroidPeripheralGattCallbackTest.kt"
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/build/test-results/testAndroidHostTest/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "foreignGattCannotDeliverDataOrCompleteAnOperation",
+          "oracle": "Only the owned GATT can deliver data or complete the pending native operation."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "notificationSnapshotsBytesAndIgnoresUnknownCharacteristics",
+          "oracle": "Notification bytes are copied at callback delivery and unknown characteristics are ignored."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "disconnectIsTerminalAndLateCallbacksCannotReviveSession",
+          "oracle": "Disconnect produces one terminal result, closes owned resources and suppresses late callbacks."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "closeUnblocksPendingConnectionWithoutAdvancingVirtualTime",
+          "oracle": "Cancellation unblocks pending connect immediately and disposes owned GATT."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "writeWaitsForMatchingCompletionAndDiscardsAlreadyDeliveredDuplicates",
+          "oracle": "Writes wait for the matching completion; an already queued obsolete callback cannot acknowledge a new write."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "cccdCompletionMustBelongToTheSubscribedCharacteristic",
+          "oracle": "Descriptor UUID alone cannot acknowledge subscription to a different characteristic."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidPeripheralGattCallbackTest",
+          "name": "wrongPeerAndQueuedDuplicateCannotAcknowledgeANotification",
+          "oracle": "Only the selected peer can acknowledge notifications and already queued duplicates are discarded."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidPeripheralGattCallbackTest",
+          "name": "disconnectWhileSendingUnblocksNotificationAndFreshRoleRecovers",
+          "oracle": "Disconnect releases a blocked notification and a fresh role can send."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidPeripheralGattCallbackTest",
+          "name": "wrongPeerWritesAndDuplicateTerminationDoNotDiscloseOrRetainResources",
+          "oracle": "Wrong-peer writes cannot inject data and repeated termination disposes resources once."
+        }
+      ]
+    },
+    "ios-ble-callbacks": {
+      "executionClass": "deterministic",
+      "sources": [
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/iosSimulatorArm64Test/kotlin/id/walt/mdoc/proximity/mobile/IosCentralGattCallbackTest.kt",
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/iosSimulatorArm64Test/kotlin/id/walt/mdoc/proximity/mobile/IosPeripheralGattCallbackTest.kt"
+      ],
+      "reportsByPlatform": {
+        "ios-simulator": "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/build/test-results/iosSimulatorArm64Test/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosCentralGattCallbackTest",
+          "name": "foreignPeripheralCannotInjectNotificationsOrDisconnectTheSelectedPeer",
+          "oracle": "Foreign CoreBluetooth peripheral callbacks cannot inject bytes or terminate the selected connection."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosCentralGattCallbackTest",
+          "name": "backpressureRequiresTheMatchingReadyCallbackAndAnActuallyWritableQueue",
+          "oracle": "A ready callback releases backpressure only for the selected peer and when CoreBluetooth reports writable capacity."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosCentralGattCallbackTest",
+          "name": "disconnectUnblocksSendingDisposesOnceAndFreshSessionRecovers",
+          "oracle": "Disconnect interrupts pending sends, disposes once and permits a fresh session."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosCentralGattCallbackTest",
+          "name": "readMatchesCharacteristicAndSubscriptionChecksNativeState",
+          "oracle": "Read completion matches its characteristic and notification subscription confirms native state."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosPeripheralGattCallbackTest",
+          "name": "backpressurePreservesExactPacketOrderAndCancellationDisposesOnce",
+          "oracle": "Peripheral backpressure preserves packet order; cancellation disposes owned resources once."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosPeripheralGattCallbackTest",
+          "name": "unsubscribeUnblocksSendingWithoutWaitingForTheOuterDeadline",
+          "oracle": "Selected-peer unsubscribe releases blocked sending without waiting for the outer deadline."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosPeripheralGattCallbackTest",
+          "name": "selectedPeerWritesReachTheChannelAndOtherPeerCannotInjectOrTerminate",
+          "oracle": "Only selected-peer writes reach the incoming channel or terminate the connection."
+        }
+      ]
     }
   }
 }
