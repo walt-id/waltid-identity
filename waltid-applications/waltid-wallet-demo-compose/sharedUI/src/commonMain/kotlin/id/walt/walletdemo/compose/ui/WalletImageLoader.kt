@@ -1,7 +1,6 @@
 package id.walt.walletdemo.compose.ui
 
 import coil3.ImageLoader
-import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.decode.Decoder
 import coil3.fetch.SourceFetchResult
@@ -13,7 +12,8 @@ import okio.use
 
 internal expect fun walletImageDecoderFactory(): Decoder.Factory
 
-internal fun installWalletImageLoader(context: PlatformContext) {
+/** Registers the shared decoder configuration before a host creates any wallet or provider UI. */
+fun installWalletImageLoader() {
     SingletonImageLoader.setSafe { imageContext ->
         ImageLoader.Builder(imageContext)
             .components {
@@ -22,7 +22,6 @@ internal fun installWalletImageLoader(context: PlatformContext) {
             }
             .build()
     }
-    SingletonImageLoader.get(context)
 }
 
 internal class RasterGateDecoderFactory : Decoder.Factory {

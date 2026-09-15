@@ -87,6 +87,7 @@ dependencies {
 
     androidTestImplementation(identityLibs.androidx.test.ext.junit)
     androidTestImplementation(identityLibs.androidx.test.runner)
+    androidTestImplementation(identityLibs.coil.compose)
     androidTestImplementation(identityLibs.androidx.test.uiautomator)
     androidTestImplementation(identityLibs.ktor.client.android)
     androidTestImplementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
