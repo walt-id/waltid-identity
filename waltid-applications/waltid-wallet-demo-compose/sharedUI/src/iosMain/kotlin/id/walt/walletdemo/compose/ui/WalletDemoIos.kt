@@ -83,6 +83,7 @@ fun walletDemoViewController(
     transactionDataProfilesUrl: String = "",
     signingProtectionMode: String = "optional",
 ): UIViewController {
+    installWalletImageLoader()
     val parsedSigningProtectionMode = WalletDemoSigningProtectionMode.parse(signingProtectionMode)
     val config = DemoWalletConfig(
         walletId = walletId,

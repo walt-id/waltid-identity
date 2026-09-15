@@ -16,10 +16,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import coil3.compose.LocalPlatformContext
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationContinuation
@@ -53,11 +51,6 @@ internal fun WalletDemoAppHost(
     onResetWallet: () -> Unit = { controller.resetWallet() },
     onSignOut: (() -> Unit)? = null,
 ) {
-    val imageContext = LocalPlatformContext.current
-    remember(imageContext) {
-        installWalletImageLoader(imageContext)
-        true
-    }
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
         continuation = state.pendingPresentationContinuation?.continuation,
