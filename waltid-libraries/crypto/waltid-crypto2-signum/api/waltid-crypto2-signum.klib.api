@@ -436,6 +436,13 @@ final class id.walt.crypto2.signum/SignumKeyPolicyMismatchException : kotlin/Ill
         final fun <get-alias>(): kotlin/String // id.walt.crypto2.signum/SignumKeyPolicyMismatchException.alias.<get-alias>|<get-alias>(){}[0]
 }
 
+final class id.walt.crypto2.signum/SignumKeyUnavailableException : kotlin/IllegalStateException { // id.walt.crypto2.signum/SignumKeyUnavailableException|null[0]
+    constructor <init>(kotlin/String, kotlin/Throwable? = ...) // id.walt.crypto2.signum/SignumKeyUnavailableException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
+
+    final val alias // id.walt.crypto2.signum/SignumKeyUnavailableException.alias|{}alias[0]
+        final fun <get-alias>(): kotlin/String // id.walt.crypto2.signum/SignumKeyUnavailableException.alias.<get-alias>|<get-alias>(){}[0]
+}
+
 final class id.walt.crypto2.signum/SignumManagedKeyProvider : id.walt.crypto2.providers/ManagedKeyProvider { // id.walt.crypto2.signum/SignumManagedKeyProvider|null[0]
     constructor <init>(id.walt.crypto2.signum/SignumPlatformBackend) // id.walt.crypto2.signum/SignumManagedKeyProvider.<init>|<init>(id.walt.crypto2.signum.SignumPlatformBackend){}[0]
 

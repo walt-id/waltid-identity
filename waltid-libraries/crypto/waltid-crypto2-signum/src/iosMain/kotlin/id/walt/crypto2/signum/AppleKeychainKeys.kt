@@ -87,7 +87,7 @@ internal object AppleKeychainKeys {
                 throw cause
             } finally { CFRelease(privateKey) }
             val native = IosKeyIdentity(persistentReference, publicKey.data,
-                if (policy.authentication == SignumAuthenticationPolicy.None)
+                if (!actualEnclave && policy.authentication == SignumAuthenticationPolicy.None)
                     CFBridgingRelease(CFRetain(policy.iosSettings().accessibility.nativeAccessibility)) as String else null,
                 actualEnclave)
             try { requireNotNull(load(alias, policy, material != null, publicKey, native)) }
@@ -157,7 +157,7 @@ internal object AppleKeychainKeys {
         override val attestation: SignumKeyAttestation? = null
         override val privateKeyExporter: PrivateKeyExporter? = if (protectionLevel == SignumProtectionLevel.SOFTWARE) {
             PrivateKeyExporter {
-                authorization.use { context -> withKey(alias, nativeIdentity, context) { key -> memScoped {
+                authorization.use { context -> withKey(alias, policy, nativeIdentity, context) { key -> memScoped {
                     val error = alloc<CFErrorRefVar>(); error.value = null
                     val data = SecKeyCopyExternalRepresentation(key, error.ptr) ?: throw takeKeychainFailure(alias, error.value)
                     val raw = try { data.toBytes() } finally { CFRelease(data) }
@@ -187,7 +187,7 @@ internal object AppleKeychainKeys {
             require(algorithm == SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)) { "Unsupported signature algorithm" }
             val coroutineContext = currentCoroutineContext()
             authorization.use { context ->
-                val signature = withKey(alias, nativeIdentity, context) { key ->
+                val signature = withKey(alias, policy, nativeIdentity, context) { key ->
                     retained(data.toNSData()) { input -> memScoped {
                         val error = alloc<CFErrorRefVar>(); error.value = null
                         val result = SecKeyCreateSignature(key, kSecKeyAlgorithmECDSASignatureMessageX962SHA256,
@@ -302,8 +302,10 @@ internal object AppleKeychainKeys {
         }
     }
 
-    private fun <T> withKey(alias: String, native: IosKeyIdentity, context: LAContext?, block: (SecKeyRef) -> T): T =
-        referenceQuery(native).use { query ->
+    private fun <T> withKey(alias: String, policy: SignumKeyPolicy, native: IosKeyIdentity,
+        context: LAContext?, block: (SecKeyRef) -> T): T {
+        requireIosKeyBiometrics(alias, policy)
+        return referenceQuery(native).use { query ->
             query.put(kSecReturnRef, kCFBooleanTrue)
             context?.let { query.putRetained(kSecUseAuthenticationContext, it) }
             memScoped {
@@ -313,6 +315,7 @@ internal object AppleKeychainKeys {
                 try { block(key) } finally { CFRelease(key) }
             }
         }
+    }
 
     private fun publicKey(alias: String, key: SecKeyRef): EncodedKey.SpkiDer {
         val public = SecKeyCopyPublicKey(key) ?: error("Keychain public key unavailable")

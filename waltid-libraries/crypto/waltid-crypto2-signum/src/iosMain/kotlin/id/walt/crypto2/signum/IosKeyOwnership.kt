@@ -134,7 +134,8 @@ internal fun iosKeyIdentity(alias: String, policy: SignumKeyPolicy, engine: IosK
                         waltCfEqual(it, kSecAttrTokenIDSecureEnclave)
                     } == true
                     IosKeyIdentity(BinaryData(reference.toBytes()), BinaryData(publicKeyIdentifier),
-                        if (policy.authentication == SignumAuthenticationPolicy.None) CFBridgingRelease(CFRetain(accessibility)) as String else null, enclave)
+                        // Enclave accessibility belongs to its opaque ACL; the outer item may report Always.
+                        if (!enclave && policy.authentication == SignumAuthenticationPolicy.None) CFBridgingRelease(CFRetain(accessibility)) as String else null, enclave)
                 } finally { CFRelease(attributes) }
             }
         }

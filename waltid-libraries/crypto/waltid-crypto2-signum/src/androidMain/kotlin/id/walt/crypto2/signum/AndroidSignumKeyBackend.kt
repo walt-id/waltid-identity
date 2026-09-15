@@ -13,6 +13,7 @@ import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ProviderId
+import kotlinx.coroutines.CancellationException
 
 /**
  * Android-only Signum backend backed by Android KeyStore.
@@ -97,6 +98,13 @@ public class AndroidSignumKeyBackend(
             throw failure.mapSignumFailure(alias)
         }
         validateNativePolicy(signer, policy, alias)
+        if (policy.authentication is SignumAuthenticationPolicy.UserPresence) {
+            try {
+                (signer as AndroidKeystoreSigner).checkKeyInvalidation()
+            } catch (cause: Throwable) {
+                throw cause.mapSignumFailure(alias)
+            }
+        }
         return handle(alias, spec, usages, policy, signer)
     }
 
@@ -145,10 +153,11 @@ public class AndroidSignumKeyBackend(
                 }
             },
             operationFailureMapper = { failure ->
+                val mapped = failure.mapSignumFailure(alias)
                 if ((policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.timeoutSeconds?.let { it > 0 } == true) {
-                    failure.mapTimedReuseInteractionContextFailure(alias, availableInteractionContext() != null)
+                    mapped.mapTimedReuseInteractionContextFailure(alias, availableInteractionContext() != null)
                 } else {
-                    failure
+                    mapped
                 }
             },
             nativePublicKey = signer.publicKey,
@@ -289,7 +298,7 @@ internal fun validateAndroidNativePolicy(
  * wallet boundary failure before a provider-specific exception can escape.
  */
 internal fun Throwable.mapTimedReuseInteractionContextFailure(alias: String, hasInteractionContext: Boolean): Throwable {
-    if (hasInteractionContext) return this
+    if (hasInteractionContext || this is CancellationException || this is SignumKeyInvalidatedException) return this
     val causes = generateSequence(this) { it.cause }.toList()
     return if (causes.any { it is UserNotAuthenticatedException || it is UnsupportedOperationException }) {
         SignumInteractionContextUnavailableException(
@@ -301,7 +310,8 @@ internal fun Throwable.mapTimedReuseInteractionContextFailure(alias: String, has
     }
 }
 
-private fun Throwable.mapSignumFailure(alias: String): Throwable {
+internal fun Throwable.mapSignumFailure(alias: String): Throwable {
+    if (this is CancellationException) return this
     val causes = generateSequence(this) { it.cause }.toList()
     return when {
         causes.any { it is android.security.keystore.KeyPermanentlyInvalidatedException } ->

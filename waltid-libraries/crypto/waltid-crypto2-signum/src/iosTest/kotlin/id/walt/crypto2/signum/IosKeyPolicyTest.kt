@@ -25,7 +25,10 @@ class IosKeyPolicyTest {
     fun routingPreservesExportabilityAndPerKeyReuse() {
         assertEquals(IosKeyEngine.APPLE_KEYCHAIN, iosKeyEngine(spec, policy))
         val hardware = policy.copy(hardware = SignumHardwarePolicy.REQUIRED)
-        assertEquals(IosKeyEngine.SIGNUM, iosKeyEngine(spec, hardware))
+        assertEquals(IosKeyEngine.APPLE_KEYCHAIN, iosKeyEngine(spec, hardware))
+        assertFalse(IosSignumKeyBackend().supports(spec, setOf(KeyUsage.SIGN, KeyUsage.KEY_AGREEMENT),
+            hardware.copy(keyAgreement = true)))
+        assertEquals(IosKeyEngine.SIGNUM, iosKeyEngine(KeySpec.Ec(EcCurve.P384), policy))
         assertEquals(IosKeyEngine.SIGNUM, iosKeyEngine(spec, hardware.copy(authentication = SignumAuthenticationPolicy.UserPresence())))
         assertEquals(IosKeyEngine.APPLE_KEYCHAIN, iosKeyEngine(spec, hardware.copy(
             authentication = SignumAuthenticationPolicy.UserPresence(timeoutSeconds = 10))))

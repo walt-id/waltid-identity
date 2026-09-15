@@ -17,6 +17,7 @@ import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.signum.SignumInteractionContextUnavailableException
+import id.walt.crypto2.signum.SignumKeyUnavailableException
 import id.walt.crypto2.signum.SignumKeyInvalidatedException
 import id.walt.crypto2.signum.SignumKeyNotFoundException
 import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
@@ -44,6 +45,8 @@ class SignumWalletKeyMappingTest {
             SignumUserCancelledException(IllegalStateException("cancelled")) to
                 KeyUseAuthorizationFailure.AuthorizationNotCompleted,
             SignumKeyNotFoundException("key") to
+                KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
+            SignumKeyUnavailableException("key") to
                 KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
             SignumKeyInvalidatedException("key") to
                 KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
