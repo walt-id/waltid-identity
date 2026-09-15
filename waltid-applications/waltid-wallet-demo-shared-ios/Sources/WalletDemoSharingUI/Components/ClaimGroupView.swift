@@ -32,11 +32,13 @@ public struct ClaimGroupView: View {
 
     @ViewBuilder
     private var claimItems: some View {
-        ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
-            if index > 0 {
-                Divider()
+        LazyVStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
+                if index > 0 {
+                    Divider()
+                }
+                ClaimValueRow(item: item)
             }
-            ClaimValueRow(item: item)
         }
     }
 }

@@ -44,6 +44,9 @@ public actual class MobileWalletFactory {
         } else config
         return createEncryptedSqlDelightMobileWallet(
             config = platformConfig,
+            registrationProjection = if (platformConfig.credentialRegistry is IosIdentityDocumentRegistry) {
+                MobileWalletRegistryProjection.MdocIdentity
+            } else MobileWalletRegistryProjection.Full,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             managedDatabaseKeyProvider = IosDatabaseEncryptionKeyProvider(sharedAccess?.keychainAccessGroup),
             // Signum's IosKeychainProvider does not expose kSecAttrAccessGroup, so signing keys land
