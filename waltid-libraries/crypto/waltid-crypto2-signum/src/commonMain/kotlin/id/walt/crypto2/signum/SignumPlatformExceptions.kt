@@ -6,6 +6,12 @@ public class SignumKeyNotFoundException(
     cause: Throwable? = null,
 ) : IllegalStateException("Signum key alias does not exist: $alias", cause)
 
+/** Native key use failed without establishing permanent invalidation. Preserve the key for retry. */
+public class SignumKeyUnavailableException(
+    public val alias: String,
+    cause: Throwable? = null,
+) : IllegalStateException("Signum key alias is currently unavailable: $alias", cause)
+
 /** The native platform key can no longer be used with its persisted policy. */
 public class SignumKeyInvalidatedException(
     public val alias: String,

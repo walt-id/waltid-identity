@@ -212,6 +212,12 @@ public final class id/walt/crypto2/signum/SignumKeyPolicyMismatchException : jav
 	public final fun getAlias ()Ljava/lang/String;
 }
 
+public final class id/walt/crypto2/signum/SignumKeyUnavailableException : java/lang/IllegalStateException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAlias ()Ljava/lang/String;
+}
+
 public final class id/walt/crypto2/signum/SignumKeychainAccessibility : java/lang/Enum {
 	public static final field AFTER_FIRST_UNLOCK Lid/walt/crypto2/signum/SignumKeychainAccessibility;
 	public static final field AFTER_FIRST_UNLOCK_DEVICE_ONLY Lid/walt/crypto2/signum/SignumKeychainAccessibility;

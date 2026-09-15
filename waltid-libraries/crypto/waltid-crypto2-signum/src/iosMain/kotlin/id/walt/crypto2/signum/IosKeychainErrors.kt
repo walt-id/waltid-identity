@@ -3,6 +3,7 @@
 package id.walt.crypto2.signum
 
 import platform.CoreFoundation.*
+import platform.CryptoTokenKit.*
 import platform.Foundation.CFBridgingRelease
 import platform.Foundation.NSError
 import platform.Foundation.NSOSStatusErrorDomain
@@ -20,10 +21,23 @@ internal class IosKeychainException(
 internal fun iosKeychainFailure(alias: String, error: IosKeychainException): Throwable = when (error.domain) {
     NSOSStatusErrorDomain -> when (error.code.toInt()) {
         errSecItemNotFound -> SignumKeyNotFoundException(alias, error)
+        errSecDecode -> SignumKeyUnavailableException(alias, error)
         errSecUserCanceled -> SignumUserCancelledException(error)
         errSecAuthFailed -> SignumAuthorizationException(cause = error)
         errSecInteractionNotAllowed -> SignumInteractionContextUnavailableException(
             "Keychain interaction is not allowed in the current device or application state", error,
+        )
+        else -> error
+    }
+    TKErrorDomain -> when (error.code) {
+        // CorruptedData also occurs while biometrics are absent, even for a key that works
+        // after re-enrollment. It is not proof of permanent invalidation or user cancellation.
+        TKErrorCodeCorruptedData, TKErrorCodeObjectNotFound, TKErrorCodeTokenNotFound ->
+            SignumKeyUnavailableException(alias, error)
+        TKErrorCodeCanceledByUser -> SignumUserCancelledException(error)
+        TKErrorCodeAuthenticationFailed -> SignumAuthorizationException(cause = error)
+        TKErrorCodeAuthenticationNeeded -> SignumInteractionContextUnavailableException(
+            "Token authorization requires user interaction", error,
         )
         else -> error
     }
