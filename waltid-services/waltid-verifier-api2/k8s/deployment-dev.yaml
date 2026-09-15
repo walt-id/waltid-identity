@@ -47,6 +47,9 @@ spec:
             capabilities:
               drop:
                 - ALL
+          resources:
+            limits:
+              memory: "1Gi"
           volumeMounts:
             - name: verifier2-web-config
               mountPath: "/waltid-verifier-api2/config/web.conf"
