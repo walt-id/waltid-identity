@@ -19,6 +19,7 @@ import id.walt.verifier2.handlers.authrequest.Verifier2RequestUriPostHandler.res
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.respondHandleDirectPostResponse
 import id.walt.verifier2.openapi.VerificationSessionCreateOpenApi
 import id.walt.vical.*
+import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -154,6 +155,43 @@ object Verifier2Service {
                             repository.get(call.parameters.getOrFail(VERIFICATION_SESSION))?.session
                                 ?: throw VerificationSessionNotFoundException(call.parameters.getOrFail(VERIFICATION_SESSION))
                         call.respond(verifierSession.publicView())
+                    }
+
+                    delete("", {
+                        summary = "Delete a verification session"
+                        description = "Removes the session and everything recorded about the verification. " +
+                                "To keep the record but remove the personal data, delete its pii instead."
+                        request { pathParameter<String>(VERIFICATION_SESSION) }
+                        response {
+                            HttpStatusCode.NoContent to { description = "Session deleted" }
+                            HttpStatusCode.NotFound to { description = "No such session" }
+                        }
+                    }) {
+                        val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
+                        if (!repository.delete(sessionId)) throw VerificationSessionNotFoundException(sessionId)
+                        call.respond(HttpStatusCode.NoContent)
+                    }
+
+                    delete("pii", {
+                        summary = "Purge the personal data of a verification session"
+                        description = "Keeps the session and its outcome, and removes the presented credentials, " +
+                                "the raw presentation, the ephemeral keys and the per-policy detail. For " +
+                                "answering an erasure request without losing the record that a verification " +
+                                "took place."
+                        request { pathParameter<String>(VERIFICATION_SESSION) }
+                        response {
+                            HttpStatusCode.NoContent to { description = "Personal data purged" }
+                            HttpStatusCode.NotFound to { description = "No such session" }
+                        }
+                    }) {
+                        val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
+                        val current = repository.get(sessionId)
+                            ?: throw VerificationSessionNotFoundException(sessionId)
+                        // Compare-and-set rather than a blind write: a presentation may be landing on this
+                        // session concurrently, and the purge must not resurrect the state it read.
+                        val purged = current.session.copyForStorage().apply { deletePII() }
+                        repository.compareAndSet(sessionId, current.version, purged)
+                        call.respond(HttpStatusCode.NoContent)
                     }
 
                     route({
