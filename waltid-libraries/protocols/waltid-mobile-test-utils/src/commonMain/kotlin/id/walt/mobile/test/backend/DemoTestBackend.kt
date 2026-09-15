@@ -45,10 +45,10 @@ object DemoTestBackend {
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
     private const val ISSUER_IDENTIFIER = "$ISSUER_BASE_URL/openid4vci"
     // RFC 7638 thumbprint of the issuer2 metadata signing key published at
-    // https://issuer2.demo.walt.id/openid4vci/jwks. This is an independent trust anchor;
+    // https://issuer2.demo.walt.id/openid4vci/jwks (verified 2026-09-15). This is an independent trust anchor;
     // it must not be learned from the signed metadata JWT itself.
     private const val ISSUER_METADATA_SIGNING_KEY_THUMBPRINT =
-        "zzdUH_zEnMxbcddreuhZGxGescuP-X7Aub_GnAm9IHI"
+        "Tq0T3ytmPJnXFBBrP2-7c_5R_eSV5T0pMtPPuWcArac"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
     // The demo verifier only accepts signed requests for an explicitly configured client ID.
     const val PUBLIC_DEMO_VERIFIER_CLIENT_ID = "verifier2"
@@ -191,13 +191,16 @@ object DemoTestBackend {
      * query parameter instead of a `credential_offer_uri`. The issuer defaults to `BY_REFERENCE`,
      * which is what the QR and deep link flows consume; DC API issuance needs the offer object itself
      * because it is passed to `navigator.credentials.create` / Credential Manager verbatim.
+     * [runtimeOverrides] supplies test-specific credential data without changing the shared issuer profile.
      */
     suspend fun createOffer(
         scenario: CredentialScenario,
         withGeneratedTransactionCode: Boolean = false,
         inlineOffer: Boolean = false,
+        runtimeOverrides: JsonObject? = null,
     ): GeneratedOffer {
         val payload = buildJsonObject {
+            runtimeOverrides?.let { put("runtimeOverrides", it) }
             put("profileId", scenario.profileId)
             put("authMethod", "PRE_AUTHORIZED")
             if (inlineOffer) put("valueMode", "BY_VALUE")
