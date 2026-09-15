@@ -1,6 +1,9 @@
 package id.walt.wallet2.custody.enterprise
 
+import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.toSpkiDer
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.wallet2.mobile.identity.*
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
@@ -61,18 +64,33 @@ class EnterpriseIdentityKeyCustodianTest {
         }
     }
 
-    @Test fun rejectsMalformedOversizedAndDifferentKeyResponses() = runTest {
-        val conflicting = jwk.replace("_owZzgkFGR68KYqSRXklMfJvDOziRgY56Lw5y39waoI", "anebTPlpuKDlOcf2L7PTCtaqj4DjDx0Siq_WiiznLqA")
-        for ((body, expected) in listOf("{}" to IdentityProviderFailure.Rejected,
-            "!" to IdentityProviderFailure.Rejected, " ".repeat(65537) to IdentityProviderFailure.Rejected,
-            """{"key":{"jwk":$conflicting}}""" to IdentityProviderFailure.Conflict)) {
-            val client = HttpClient(MockEngine { respond(body) })
-            try {
-                EnterpriseIdentityKeyCustodian(client, url).use { adapter ->
-                    assertEquals(expected, assertFailsWith<IdentityProviderException> { adapter.importKey(identity, key) }.failure)
-                }
-            } finally { client.close() }
+    @Test fun rejectsMalformedResponses() = runTest {
+        for (body in listOf("{}", "!", """{"key":{"jwk":{"kty":"EC","crv":"P-256"}}}""")) {
+            assertResponseFailure(body, IdentityProviderFailure.Rejected)
         }
+    }
+
+    @Test fun rejectsOversizedResponses() = runTest {
+        assertResponseFailure(" ".repeat(65537), IdentityProviderFailure.Rejected)
+    }
+
+    @Test fun reportsConflictForADifferentValidKey() = runTest {
+        // The P-256 generator is a valid public key. Changing just one coordinate can create
+        // an invalid point that native providers reject before the adapter compares keys.
+        val differentJwk = """{"kty":"EC","crv":"P-256","x":"axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY","y":"T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU"}"""
+        val differentKey = EncodedKey.Jwk(BinaryData(differentJwk.encodeToByteArray()), false)
+        val spec = KeySpec.Ec(EcCurve.P256)
+        assertNotEquals(key.toSpkiDer(spec), differentKey.toSpkiDer(spec))
+        assertResponseFailure("""{"key":{"jwk":$differentJwk}}""", IdentityProviderFailure.Conflict)
+    }
+
+    private suspend fun assertResponseFailure(body: String, expected: IdentityProviderFailure) {
+        val client = HttpClient(MockEngine { respond(body) })
+        try {
+            EnterpriseIdentityKeyCustodian(client, url).use { adapter ->
+                assertEquals(expected, assertFailsWith<IdentityProviderException> { adapter.importKey(identity, key) }.failure)
+            }
+        } finally { client.close() }
     }
 
     @Test fun validatesDestinationAndPreservesHostClientOwnership() = runTest {
