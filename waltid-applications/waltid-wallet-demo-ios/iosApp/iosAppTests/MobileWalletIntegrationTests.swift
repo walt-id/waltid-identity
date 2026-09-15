@@ -262,7 +262,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(reopenedBootstrap.did, bootstrap.did, "Default DID store should survive wallet facade recreation")
         XCTAssertEqual(reopenedBootstrap.keyID, bootstrap.keyID, "Platform signing-key reference should survive wallet facade recreation")
         XCTAssertTrue(reopenedCredentials.isEmpty)
-        // Each bootstrap refreshes the native document registry, in addition to the two
+        // Each identity initialization refreshes the native document registry, in addition to the two
         // explicit credentials() reads above.
         XCTAssertEqual(listCredentialsCalls, 4)
 

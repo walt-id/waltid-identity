@@ -94,7 +94,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
         line: line
     )
 
-    // Only the host wallet bootstraps, because only the host app ever does.
+    // Only the host initializes the signing key; the provider reopens established state.
     var hostConfiguration = try namespace.walletConfiguration(walletID: walletID)
     // Simulators cannot create Secure Enclave keys protected by biometryCurrentSet. These
     // assertions cover shared-storage wiring; protected extension signing remains device coverage.
@@ -117,7 +117,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
     // Asserted on the Keychain item rather than through a wallet API, because the only wallet API that
     // forces key resolution is `identities.initialize()`, which writes.
     try assertSigningKeyIsUsableFromSharedAccessGroup(
-        keyID: hostBootstrap.keyID,
+        publicJWK: hostBootstrap.publicJWK,
         expectedAccessGroup: keychainAccessGroup,
         file: file,
         line: line
@@ -165,7 +165,7 @@ public func assertProviderResolvesThePublishedWalletID(
 ) async throws {
     XCTAssertNotEqual(walletID, "default", "This assertion is meaningless against the default wallet id", file: file, line: line)
 
-    // Bootstrapping is what publishes the projection: it synchronizes the platform registry afterwards,
+    // Initializing the signing key publishes the projection: it synchronizes the platform registry afterwards,
     // and the iOS registry writes the wallet id it was built with into the App Group.
     var hostConfiguration = try namespace.walletConfiguration(walletID: walletID)
     // This assertion covers publishing the selected wallet identifier, not biometric enforcement.
@@ -200,39 +200,49 @@ public func assertProviderResolvesThePublishedWalletID(
 /// Signs and verifies rather than only reading attributes, because the extension has to produce a
 /// device-authentication signature with this key.
 private func assertSigningKeyIsUsableFromSharedAccessGroup(
-    keyID: String,
+    publicJWK: String,
     expectedAccessGroup: String,
     file: StaticString,
     line: UInt
 ) throws {
-    // Signum's IosKeychainProvider keys the item by the wallet's alias in kSecAttrApplicationLabel
-    // and its own constant tag in kSecAttrApplicationTag, so keyID is the only handle a test has.
+    // Match the public key, not an adapter's private alias/tag convention. The wallet's logical
+    // key ID is stable across recovery, while each native entry has its own alias.
+    let jwk = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(publicJWK.utf8)) as? [String: String])
+    XCTAssertEqual(jwk["kty"], "EC", file: file, line: line)
+    XCTAssertEqual(jwk["crv"], "P-256", file: file, line: line)
+    func coordinate(_ name: String) throws -> Data {
+        let value = try XCTUnwrap(jwk[name], file: file, line: line)
+            .replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        let data = try XCTUnwrap(Data(base64Encoded: value + String(repeating: "=", count: (4 - value.count % 4) % 4)), file: file, line: line)
+        XCTAssertEqual(data.count, 32, file: file, line: line)
+        return data
+    }
+    let expectedPublicKey = try Data([0x04]) + coordinate("x") + coordinate("y")
     let query: [CFString: Any] = [
         kSecClass: kSecClassKey,
         kSecAttrKeyClass: kSecAttrKeyClassPrivate,
-        kSecAttrApplicationLabel: keyID,
-        kSecAttrApplicationTag: Data("supreme.privatekey".utf8),
-        kSecReturnAttributes: true,
+        kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+        kSecAttrAccessGroup: expectedAccessGroup,
+        kSecUseDataProtectionKeychain: true,
+        kSecMatchLimit: kSecMatchLimitAll,
         kSecReturnRef: true,
     ]
     var result: CFTypeRef?
     XCTAssertEqual(
         SecItemCopyMatching(query as CFDictionary, &result),
         errSecSuccess,
-        "The wallet signing key \(keyID) is not in the Keychain under the alias the wallet reported",
+        "No private signing key is accessible in the shared Keychain group",
         file: file,
         line: line
     )
-    let attributes = try XCTUnwrap(result as? [CFString: Any], file: file, line: line)
-    XCTAssertEqual(
-        attributes[kSecAttrAccessGroup] as? String,
-        expectedAccessGroup,
-        "The signing key landed outside the shared access group, so the extension cannot sign with it",
-        file: file,
-        line: line
-    )
-
-    let privateKey = try XCTUnwrap(attributes[kSecValueRef] as! SecKey?, file: file, line: line)
+    let keys = try XCTUnwrap(result as? [SecKey], file: file, line: line)
+    let matchingKeys = keys.filter { key in
+        guard let publicKey = SecKeyCopyPublicKey(key),
+              let bytes = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else { return false }
+        return bytes == expectedPublicKey
+    }
+    XCTAssertEqual(matchingKeys.count, 1, "The wallet's public key must identify one shared signing key", file: file, line: line)
+    let privateKey = try XCTUnwrap(matchingKeys.first, file: file, line: line)
     let publicKey = try XCTUnwrap(
         SecKeyCopyPublicKey(privateKey),
         "The shared signing key has no public half",

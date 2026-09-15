@@ -208,10 +208,12 @@ internal fun createSqlDelightMobileWallet(
     val issuanceSessionStore = SqlDelightIssuanceSessionStore(queries)
     return MobileWallet(
         walletId = config.walletId,
-        identityService = id.walt.wallet2.mobile.identity.WalletIdentities(
-            config.walletId, config.identity, config.defaultKeyUseAuthorizationPolicy, config.keyUseAuthorizationPrompt,
-            keyStore, didStore, keyProvider, queries, didService,
-        ),
+        createIdentityService = { onActive ->
+            id.walt.wallet2.mobile.identity.WalletIdentities(
+                config.walletId, config.identity, config.defaultKeyUseAuthorizationPolicy, config.keyUseAuthorizationPrompt,
+                keyStore, didStore, keyProvider, queries, didService, onActive,
+            )
+        },
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
