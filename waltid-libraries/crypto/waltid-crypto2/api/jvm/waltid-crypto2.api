@@ -950,6 +950,20 @@ public abstract interface class id/walt/crypto2/keys/Encryptor {
 	public abstract fun encrypt ([BLid/walt/crypto2/algorithms/AsymmetricEncryptionAlgorithm;[BLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class id/walt/crypto2/keys/HardwarePreference : java/lang/Enum {
+	public static final field Companion Lid/walt/crypto2/keys/HardwarePreference$Companion;
+	public static final field DISCOURAGED Lid/walt/crypto2/keys/HardwarePreference;
+	public static final field PREFERRED Lid/walt/crypto2/keys/HardwarePreference;
+	public static final field REQUIRED Lid/walt/crypto2/keys/HardwarePreference;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/keys/HardwarePreference;
+	public static fun values ()[Lid/walt/crypto2/keys/HardwarePreference;
+}
+
+public final class id/walt/crypto2/keys/HardwarePreference$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class id/walt/crypto2/keys/HpkeAeadId {
 	public static final field Companion Lid/walt/crypto2/keys/HpkeAeadId$Companion;
 	public static final synthetic fun box-impl (Ljava/lang/String;)Lid/walt/crypto2/keys/HpkeAeadId;
@@ -1142,6 +1156,52 @@ public final class id/walt/crypto2/keys/KeyAgreementKey$DefaultImpls {
 	public static fun getCapabilities (Lid/walt/crypto2/keys/KeyAgreementKey;)Lid/walt/crypto2/keys/KeyCapabilities;
 }
 
+public final class id/walt/crypto2/keys/KeyAttestation {
+	public static final field Companion Lid/walt/crypto2/keys/KeyAttestation$Companion;
+	public fun <init> (Ljava/lang/String;Lid/walt/crypto2/serialization/BinaryData;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Lid/walt/crypto2/serialization/BinaryData;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lid/walt/crypto2/serialization/BinaryData;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Lid/walt/crypto2/serialization/BinaryData;Ljava/util/List;)Lid/walt/crypto2/keys/KeyAttestation;
+	public static synthetic fun copy$default (Lid/walt/crypto2/keys/KeyAttestation;Ljava/lang/String;Lid/walt/crypto2/serialization/BinaryData;Ljava/util/List;ILjava/lang/Object;)Lid/walt/crypto2/keys/KeyAttestation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCertificateChain ()Ljava/util/List;
+	public final fun getFormat ()Ljava/lang/String;
+	public final fun getStatement ()Lid/walt/crypto2/serialization/BinaryData;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/keys/KeyAttestation$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/keys/KeyAttestation$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/keys/KeyAttestation;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/keys/KeyAttestation;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyAttestation$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyAuthorizationEvidence : java/lang/Enum {
+	public static final field CREATION_RECORD Lid/walt/crypto2/keys/KeyAuthorizationEvidence;
+	public static final field Companion Lid/walt/crypto2/keys/KeyAuthorizationEvidence$Companion;
+	public static final field NATIVE_ATTRIBUTES Lid/walt/crypto2/keys/KeyAuthorizationEvidence;
+	public static final field UNKNOWN Lid/walt/crypto2/keys/KeyAuthorizationEvidence;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/keys/KeyAuthorizationEvidence;
+	public static fun values ()[Lid/walt/crypto2/keys/KeyAuthorizationEvidence;
+}
+
+public final class id/walt/crypto2/keys/KeyAuthorizationEvidence$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class id/walt/crypto2/keys/KeyCapabilities {
 	public fun <init> ()V
 	public fun <init> (Lid/walt/crypto2/keys/Signer;Lid/walt/crypto2/keys/DigestSigner;Lid/walt/crypto2/keys/Verifier;Lid/walt/crypto2/keys/Encryptor;Lid/walt/crypto2/keys/Decryptor;Lid/walt/crypto2/keys/KeyAgreement;Lid/walt/crypto2/keys/KeyWrapper;Lid/walt/crypto2/keys/KeyUnwrapper;Lid/walt/crypto2/keys/KeyDeleter;Lid/walt/crypto2/keys/PublicKeyExporter;Lid/walt/crypto2/keys/PrivateKeyExporter;Ljava/util/Set;Ljava/util/Set;Ljava/util/Set;Ljava/util/Set;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
@@ -1252,6 +1312,50 @@ public final synthetic class id/walt/crypto2/keys/KeyId$$serializer : kotlinx/se
 }
 
 public final class id/walt/crypto2/keys/KeyId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyOrigin : java/lang/Enum {
+	public static final field Companion Lid/walt/crypto2/keys/KeyOrigin$Companion;
+	public static final field GENERATED Lid/walt/crypto2/keys/KeyOrigin;
+	public static final field IMPORTED Lid/walt/crypto2/keys/KeyOrigin;
+	public static final field UNKNOWN Lid/walt/crypto2/keys/KeyOrigin;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/keys/KeyOrigin;
+	public static fun values ()[Lid/walt/crypto2/keys/KeyOrigin;
+}
+
+public final class id/walt/crypto2/keys/KeyOrigin$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyProtectionLevel : java/lang/Enum {
+	public static final field Companion Lid/walt/crypto2/keys/KeyProtectionLevel$Companion;
+	public static final field HARDWARE Lid/walt/crypto2/keys/KeyProtectionLevel;
+	public static final field SOFTWARE Lid/walt/crypto2/keys/KeyProtectionLevel;
+	public static final field UNKNOWN Lid/walt/crypto2/keys/KeyProtectionLevel;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/keys/KeyProtectionLevel;
+	public static fun values ()[Lid/walt/crypto2/keys/KeyProtectionLevel;
+}
+
+public final class id/walt/crypto2/keys/KeyProtectionLevel$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeySecurityLevel : java/lang/Enum {
+	public static final field Companion Lid/walt/crypto2/keys/KeySecurityLevel$Companion;
+	public static final field SECURE_ENCLAVE Lid/walt/crypto2/keys/KeySecurityLevel;
+	public static final field SOFTWARE Lid/walt/crypto2/keys/KeySecurityLevel;
+	public static final field STRONGBOX Lid/walt/crypto2/keys/KeySecurityLevel;
+	public static final field TRUSTED_ENVIRONMENT Lid/walt/crypto2/keys/KeySecurityLevel;
+	public static final field UNKNOWN Lid/walt/crypto2/keys/KeySecurityLevel;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/keys/KeySecurityLevel;
+	public static fun values ()[Lid/walt/crypto2/keys/KeySecurityLevel;
+}
+
+public final class id/walt/crypto2/keys/KeySecurityLevel$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
@@ -1479,6 +1583,22 @@ public final class id/walt/crypto2/keys/KeyWrappingKey$DefaultImpls {
 	public static fun getCapabilities (Lid/walt/crypto2/keys/KeyWrappingKey;)Lid/walt/crypto2/keys/KeyCapabilities;
 }
 
+public final class id/walt/crypto2/keys/KeychainAccessibility : java/lang/Enum {
+	public static final field AFTER_FIRST_UNLOCK Lid/walt/crypto2/keys/KeychainAccessibility;
+	public static final field AFTER_FIRST_UNLOCK_DEVICE_ONLY Lid/walt/crypto2/keys/KeychainAccessibility;
+	public static final field Companion Lid/walt/crypto2/keys/KeychainAccessibility$Companion;
+	public static final field WHEN_PASSCODE_SET_DEVICE_ONLY Lid/walt/crypto2/keys/KeychainAccessibility;
+	public static final field WHEN_UNLOCKED Lid/walt/crypto2/keys/KeychainAccessibility;
+	public static final field WHEN_UNLOCKED_DEVICE_ONLY Lid/walt/crypto2/keys/KeychainAccessibility;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/keys/KeychainAccessibility;
+	public static fun values ()[Lid/walt/crypto2/keys/KeychainAccessibility;
+}
+
+public final class id/walt/crypto2/keys/KeychainAccessibility$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public abstract interface class id/walt/crypto2/keys/ManagedKey : id/walt/crypto2/keys/StorableKey {
 	public static final field Companion Lid/walt/crypto2/keys/ManagedKey$Companion;
 	public fun getId-1AhpoWA ()Ljava/lang/String;
@@ -1537,6 +1657,96 @@ public final synthetic class id/walt/crypto2/keys/MontgomeryCurve$$serializer : 
 public final class id/walt/crypto2/keys/MontgomeryCurve$Companion {
 	public final fun getX25519-O_xRVB4 ()Ljava/lang/String;
 	public final fun getX448-O_xRVB4 ()Ljava/lang/String;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class id/walt/crypto2/keys/PlatformKeyConfiguration {
+	public static final field Companion Lid/walt/crypto2/keys/PlatformKeyConfiguration$Companion;
+}
+
+public final class id/walt/crypto2/keys/PlatformKeyConfiguration$AndroidKeystore : id/walt/crypto2/keys/PlatformKeyConfiguration {
+	public static final field Companion Lid/walt/crypto2/keys/PlatformKeyConfiguration$AndroidKeystore$Companion;
+	public fun <init> ()V
+	public fun <init> (Lid/walt/crypto2/keys/HardwarePreference;ZZZLjava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/String;)V
+	public synthetic fun <init> (Lid/walt/crypto2/keys/HardwarePreference;ZZZLjava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lid/walt/crypto2/keys/HardwarePreference;
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()Ljava/lang/Integer;
+	public final fun component6 ()Ljava/lang/Long;
+	public final fun component7 ()Ljava/lang/Long;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun copy (Lid/walt/crypto2/keys/HardwarePreference;ZZZLjava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/String;)Lid/walt/crypto2/keys/PlatformKeyConfiguration$AndroidKeystore;
+	public static synthetic fun copy$default (Lid/walt/crypto2/keys/PlatformKeyConfiguration$AndroidKeystore;Lid/walt/crypto2/keys/HardwarePreference;ZZZLjava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/keys/PlatformKeyConfiguration$AndroidKeystore;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAttestKeyAlias ()Ljava/lang/String;
+	public final fun getMaxUsageCount ()Ljava/lang/Integer;
+	public final fun getStrongBox ()Lid/walt/crypto2/keys/HardwarePreference;
+	public final fun getUnlockedDeviceRequired ()Z
+	public final fun getUserConfirmationRequired ()Z
+	public final fun getUserPresenceRequired ()Z
+	public final fun getValidFromEpochMillis ()Ljava/lang/Long;
+	public final fun getValidUntilEpochMillis ()Ljava/lang/Long;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/keys/PlatformKeyConfiguration$AndroidKeystore$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/keys/PlatformKeyConfiguration$AndroidKeystore$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/keys/PlatformKeyConfiguration$AndroidKeystore;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/keys/PlatformKeyConfiguration$AndroidKeystore;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/PlatformKeyConfiguration$AndroidKeystore$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/PlatformKeyConfiguration$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/PlatformKeyConfiguration$Default : id/walt/crypto2/keys/PlatformKeyConfiguration {
+	public static final field INSTANCE Lid/walt/crypto2/keys/PlatformKeyConfiguration$Default;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain : id/walt/crypto2/keys/PlatformKeyConfiguration {
+	public static final field Companion Lid/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain$Companion;
+	public fun <init> ()V
+	public fun <init> (Lid/walt/crypto2/keys/KeychainAccessibility;Ljava/lang/String;)V
+	public synthetic fun <init> (Lid/walt/crypto2/keys/KeychainAccessibility;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lid/walt/crypto2/keys/KeychainAccessibility;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lid/walt/crypto2/keys/KeychainAccessibility;Ljava/lang/String;)Lid/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain;
+	public static synthetic fun copy$default (Lid/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain;Lid/walt/crypto2/keys/KeychainAccessibility;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccessGroup ()Ljava/lang/String;
+	public final fun getAccessibility ()Lid/walt/crypto2/keys/KeychainAccessibility;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 

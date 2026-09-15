@@ -330,7 +330,7 @@ class SignumManagedKeyProvider(
 }
 
 interface SignumManagedKey : ManagedKey {
-    val origin: SignumKeyOrigin get() = SignumKeyOrigin.GENERATED
+    val origin: SignumKeyOrigin get() = SignumKeyOrigin.UNKNOWN
     val securityLevel: SignumSecurityLevel get() = SignumSecurityLevel.UNKNOWN
     val protectionLevel: SignumProtectionLevel
     val attestation: SignumKeyAttestation?

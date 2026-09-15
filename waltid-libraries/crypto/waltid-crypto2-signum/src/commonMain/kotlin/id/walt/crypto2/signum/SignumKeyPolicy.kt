@@ -37,6 +37,8 @@ sealed interface SignumAuthenticationPolicy {
     @Serializable
     data class UserPresence(
         val biometric: Boolean = true,
+        /** Controls enrollment binding for biometric-only policies. On iOS, combining biometrics with
+         * device credentials uses Apple's user-presence policy, which also accepts newly enrolled biometrics. */
         val allowNewBiometrics: Boolean = false,
         val deviceCredential: Boolean = true,
         val timeoutSeconds: Int = 0,

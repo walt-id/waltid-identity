@@ -53,6 +53,12 @@ public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresenc
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class id/walt/crypto2/signum/SignumAuthorizationException : java/lang/IllegalStateException {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
 public final class id/walt/crypto2/signum/SignumHardwarePolicy : java/lang/Enum {
 	public static final field Companion Lid/walt/crypto2/signum/SignumHardwarePolicy$Companion;
 	public static final field DISCOURAGED Lid/walt/crypto2/signum/SignumHardwarePolicy;

@@ -14,9 +14,9 @@ import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.keys.toSpkiDer
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.signum.SignumKeyOrigin
-import id.walt.crypto2.signum.SignumProtectionLevel
-import id.walt.crypto2.signum.SignumSecurityLevel
+import id.walt.crypto2.keys.KeyOrigin
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeySecurityLevel
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.wallet2.data.WalletDidEntry
@@ -388,7 +388,7 @@ public class WalletIdentities internal constructor(
     }
 
     private fun nativeSettingsPermitIdentitySigning(): Boolean {
-        val settings = configuration.platform as? id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore ?: return true
+        val settings = configuration.platform as? id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore ?: return true
         val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
         // Identity signatures cover protocol bytes. Protected Confirmation requires signing its own CBOR structure.
         if (settings.userConfirmationRequired || settings.userPresenceRequired) return false
@@ -432,19 +432,19 @@ public class WalletIdentities internal constructor(
         val stored = (key as StorableKey).storedKey
         val facts = facts(stored).let { observed ->
             if (stored is StoredKey.Software && record.phase == IdentityPhase.Preparing) observed.copy(origin =
-                if (record.backup == null) SignumKeyOrigin.GENERATED else SignumKeyOrigin.IMPORTED)
+                if (record.backup == null) KeyOrigin.GENERATED else KeyOrigin.IMPORTED)
             else observed
         }
-        check(record.storage != IdentityKeyStorage.Hardware || facts.protection == SignumProtectionLevel.HARDWARE)
+        check(record.storage != IdentityKeyStorage.Hardware || facts.protection == KeyProtectionLevel.HARDWARE)
         check(record.policy != IdentityKeyPolicy.HardwareGenerated ||
-            (facts.origin == SignumKeyOrigin.GENERATED && facts.protection == SignumProtectionLevel.HARDWARE))
+            (facts.origin == KeyOrigin.GENERATED && facts.protection == KeyProtectionLevel.HARDWARE))
         return WalletIdentity(record.id, record.keyId, did, publicJwk, record.storage,
             record.requirements.authorizationPolicy, facts)
     }
 
     private suspend fun facts(stored: StoredKey): PlatformKeyFacts = when (stored) {
         is StoredKey.Managed -> native.keyFacts(stored)
-        is StoredKey.Software -> PlatformKeyFacts(securityLevel = SignumSecurityLevel.SOFTWARE, protection = SignumProtectionLevel.SOFTWARE)
+        is StoredKey.Software -> PlatformKeyFacts(securityLevel = KeySecurityLevel.SOFTWARE, protection = KeyProtectionLevel.SOFTWARE)
     }
 
     private fun permitsRecovery(record: IdentityRecord): Boolean =

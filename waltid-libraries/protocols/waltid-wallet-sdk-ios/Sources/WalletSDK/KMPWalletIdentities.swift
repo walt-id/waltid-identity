@@ -124,6 +124,12 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
         case .secureEnclave: level = .secureEnclave
         case .unknown: level = .unknown
         }
+        let authorizationEvidence: WalletKeyAuthorizationEvidence
+        switch value.keyFacts.authorizationEvidence {
+        case .unknown: authorizationEvidence = .unknown
+        case .nativeAttributes: authorizationEvidence = .nativeAttributes
+        case .creationRecord: authorizationEvidence = .creationRecord
+        }
         let recovery: WalletIdentityRecoveryState
         switch onEnum(of: value.recovery) {
         case .disabled: recovery = .disabled
@@ -135,7 +141,7 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
         }
         return .init(id: value.id, keyID: value.keyId, did: value.did, publicJWK: value.publicJwk,
                      storage: storage(value.storage), authorization: toSwiftAuthorizationPolicy(value.authorization),
-                     origin: origin, securityLevel: level,
+                     origin: origin, securityLevel: level, authorizationEvidence: authorizationEvidence,
                      attestation: value.keyFacts.attestation.map { .init(format: $0.format,
                          statement: bytes($0.statement), certificateChain: $0.certificateChain.map(bytes)) }, recovery: recovery, custody: value.custody.map(custodyReference))
     }
@@ -207,9 +213,9 @@ extension WalletIdentityConfiguration {
         case .walletDefault: authorization = WalletCore.IdentityAuthorizationWalletDefault.shared
         case .explicit(let selected): authorization = WalletCore.IdentityAuthorizationExplicit(policy: selected.toKMPNativeAuthorization())
         }
-        let platform: any Waltid_crypto2_signumSignumPlatformPolicy
+        let platform: any Waltid_crypto2PlatformKeyConfiguration
         if let keychain {
-            let accessibility: Waltid_crypto2_signumSignumKeychainAccessibility
+            let accessibility: Waltid_crypto2KeychainAccessibility
             switch keychain.accessibility {
             case .whenUnlocked: accessibility = .whenUnlocked
             case .afterFirstUnlock: accessibility = .afterFirstUnlock
@@ -217,8 +223,8 @@ extension WalletIdentityConfiguration {
             case .afterFirstUnlockDeviceOnly: accessibility = .afterFirstUnlockDeviceOnly
             case .whenPasscodeSetDeviceOnly: accessibility = .whenPasscodeSetDeviceOnly
             }
-            platform = Waltid_crypto2_signumSignumPlatformPolicyIosKeychain(accessibility: accessibility, accessGroup: keychain.accessGroup)
-        } else { platform = Waltid_crypto2_signumSignumPlatformPolicyDefault.shared }
+            platform = Waltid_crypto2PlatformKeyConfigurationIosKeychain(accessibility: accessibility, accessGroup: keychain.accessGroup)
+        } else { platform = Waltid_crypto2PlatformKeyConfigurationDefault.shared }
         return WalletCore.IdentityConfiguration(recoveryProviders: recoveryProviders.map(KMPRecoveryProvider.init), keyCustodians: keyCustodians.map(KMPCustodian.init), authorization: authorization,
                                                 policy: policy, platform: platform,
                                                 alternativeAuthorizations: alternativeAuthorizations.map { $0.toKMPNativeAuthorization() },

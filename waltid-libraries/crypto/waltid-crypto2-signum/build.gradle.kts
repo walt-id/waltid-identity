@@ -71,6 +71,10 @@ kotlin {
             if (enableIosBuild) {
                 iosMain.get().dependsOn(mobileMain)
                 named("iosTest") {
+                    // Keychain lifecycle tests require an app host, not a bare Kotlin/Native process.
+                    if (providers.gradleProperty("enableIosKeychainTests").orNull == "true") {
+                        kotlin.srcDir("src/iosAppTest/kotlin")
+                    }
                     dependencies {
                         implementation(kotlin("test"))
                         implementation(identityLibs.kotlinx.coroutines.test)

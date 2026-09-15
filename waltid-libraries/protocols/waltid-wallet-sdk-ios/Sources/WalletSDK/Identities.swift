@@ -48,6 +48,17 @@ public enum WalletIdentitySecurityLevel: Sendable {
     case unknown
 }
 
+/// How signing authorization was established, independently of hardware backing or attestation.
+public enum WalletKeyAuthorizationEvidence: Sendable {
+    /// The provider has not established the authorization policy.
+    case unknown
+    /// Authorization settings were read from native key attributes.
+    case nativeAttributes
+    /// Settings come from an SDK creation record bound to the native entry.
+    /// iOS does not expose complete authorization flags for independent readback.
+    case creationRecord
+}
+
 /// Fresh generation evidence request. iOS currently offers no native signing-key attestation.
 public enum WalletIdentityAttestationRequest: Sendable {
     /// Requests no native attestation evidence.
@@ -274,6 +285,8 @@ public struct WalletIdentity: Sendable {
     public let origin: WalletIdentityKeyOrigin
     /// Observed signing execution tier.
     public let securityLevel: WalletIdentitySecurityLevel
+    /// Evidence used to validate the signing authorization policy; this is not attestation.
+    public let authorizationEvidence: WalletKeyAuthorizationEvidence
     /// Optional native evidence; does not establish certification or a key-attestation JWT.
     public let attestation: WalletIdentityKeyAttestation?
     /// Last known recovery action for this identity.

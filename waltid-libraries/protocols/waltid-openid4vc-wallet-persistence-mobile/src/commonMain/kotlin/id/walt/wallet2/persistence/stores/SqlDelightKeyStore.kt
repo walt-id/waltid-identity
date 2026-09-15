@@ -195,7 +195,7 @@ public class SqlDelightKeyStore(
     private fun WalletKeyRequirements.permitsSoftwareFallback(): Boolean =
         authorizationPolicy == KeyUseAuthorizationPolicy.None &&
             protection == id.walt.wallet2.persistence.keys.WalletKeyProtection.PlatformDefault &&
-            platform == id.walt.crypto2.signum.SignumPlatformPolicy.Default
+            platform == id.walt.crypto2.keys.PlatformKeyConfiguration.Default
 
     private fun supportsSoftware(requirements: WalletKeyRequirements): Boolean = runCatching {
         softwareRuntime.resolveSoftwareProvider(
