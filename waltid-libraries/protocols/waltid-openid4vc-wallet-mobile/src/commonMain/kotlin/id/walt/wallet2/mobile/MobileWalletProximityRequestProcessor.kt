@@ -16,6 +16,7 @@ import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.proximity.DeviceRequestReaderAuthentication
+import id.walt.mdoc.proximity.DeviceRequestReaderAuthenticationDisplay
 import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocApplicationAuthorization
 import id.walt.mdoc.proximity.MdocApplicationAuthorizationDetail
@@ -312,6 +313,12 @@ internal class ProximityRequestProcessor(
         enforceReaderPolicy(readerAuthentication, selectedRequestIndices)
         var eligible = selection.eligibleDocuments.filter { it.requestIndex in selectedRequestIndices }
         val readerDisplay = readerAuthentication.toPublicEntries()
+        val selectedReaderDisplay = readerDisplay.filter { authentication ->
+            when (val scope = authentication.scope) {
+                ProximityReaderAuthenticationScope.WholeRequest -> true
+                is ProximityReaderAuthenticationScope.Document -> scope.index in selectedRequestIndices
+            }
+        }
         val eligibleCredentialIds = eligible.map(SelectedDocument::credentialId).toSet()
         val profileSnapshots = evaluateApplicationProfiles(
             context,
@@ -372,7 +379,7 @@ internal class ProximityRequestProcessor(
             reviewId = ProximityReviewId(Uuid.random().toString()),
             exchange = context.exchange,
             documents = documentReviews,
-            readerAuthentication = readerDisplay,
+            readerAuthentication = selectedReaderDisplay,
             useCases = useCases,
             applicationAuthorizations = profileSnapshots.map(ApplicationProfileSnapshot::public),
         )
@@ -388,7 +395,14 @@ internal class ProximityRequestProcessor(
                 )
             },
             purposeHints = useCases.flatMap { it.purposeHints }.associate { it.type to it.code },
-            readerAuthentication = readerAuthentication.toDisplaySafe(),
+            readerAuthentication = readerAuthentication.toDisplaySafe().let { display ->
+                DeviceRequestReaderAuthenticationDisplay(
+                    wholeRequest = display.wholeRequest,
+                    documents = display.documents.filter { entry ->
+                        (entry.scope as ReaderAuthenticationScope.Document).index in selectedRequestIndices
+                    },
+                )
+            },
             submissionBindingDigest = bindingDigest,
             applicationAuthorizations = profileSnapshots.map(ApplicationProfileSnapshot::lower),
         )

@@ -3,13 +3,25 @@
 package id.walt.wallet2.mobile
 
 import android.content.Context
+import android.content.ComponentName
 import androidx.fragment.app.FragmentActivity
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
 import id.walt.mdoc.proximity.mobile.AndroidBleProximityTransportFactory
+import id.walt.mdoc.proximity.mobile.AndroidMdocHostApduService
+import id.walt.mdoc.proximity.mobile.AndroidNfcHostPlatformAdapter
 import kotlinx.serialization.ExperimentalSerializationApi
+
+/**
+ * App-owned Android HCE service used for mdoc NFC engagement and retrieval.
+ *
+ * @property serviceClass Dedicated manifest-declared service subclass routing the three mdoc AIDs.
+ */
+public data class AndroidMobileWalletNfcConfiguration(
+    public val serviceClass: Class<out AndroidMdocHostApduService>,
+)
 
 /**
  * Android [MobileWallet] factory backed by Android KeyStore and an app-private SQLDelight database.
@@ -19,6 +31,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 public actual class MobileWalletFactory(
     private val context: Context,
     private val interactionContextProvider: () -> FragmentActivity? = { null },
+    private val nfcConfiguration: AndroidMobileWalletNfcConfiguration? = null,
 ) {
     /**
      * Creates an Android mobile wallet for [config].
@@ -40,6 +53,12 @@ public actual class MobileWalletFactory(
     ): MobileWallet {
         val applicationContext = context.applicationContext
         val driverFactory = DriverFactory(applicationContext)
+        val nfcHostAdapter = nfcConfiguration?.let { nfc ->
+            val service = ComponentName(applicationContext, nfc.serviceClass)
+            AndroidNfcHostPlatformAdapter(applicationContext, service) {
+                interactionContextProvider()
+            }
+        }
         val platformConfig = if (config.credentialRegistry === UnavailableMobileWalletCredentialRegistry) {
             config.copy(credentialRegistry = AndroidDigitalCredentialRegistry(applicationContext))
         } else config
@@ -49,6 +68,7 @@ public actual class MobileWalletFactory(
             managedDatabaseKeyProvider = AndroidDatabaseEncryptionKeyProvider(applicationContext),
             platformKeyProvider = AndroidPlatformKeyProvider(applicationContext, interactionContextProvider),
             proximityTransportFactory = AndroidBleProximityTransportFactory(applicationContext),
+            proximityNfcHostPlatformAdapter = nfcHostAdapter,
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
         )

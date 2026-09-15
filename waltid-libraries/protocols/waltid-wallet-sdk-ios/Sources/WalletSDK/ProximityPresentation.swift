@@ -12,7 +12,7 @@ public enum ProximityProfile: String, Sendable, CaseIterable, Equatable {
 }
 
 /// BLE roles the holder prepares for one session.
-public enum ProximityBLERoles: Sendable {
+public enum ProximityBLERoles: Sendable, Hashable {
     /// Connect to a reader that advertises the GATT service.
     case centralClient
     /// Advertise a GATT service for a reader to connect to.
@@ -22,29 +22,167 @@ public enum ProximityBLERoles: Sendable {
 }
 
 /// BLE bearer selection policy. This is intended for integration and debug configuration, not normal UI.
-public enum ProximityBLEBearerPolicy: Sendable {
+public enum ProximityBLEBearerPolicy: Sendable, Hashable {
     /// Use the interoperable GATT bearer only.
     case gattOnly
     /// Prefer L2CAP when negotiated and otherwise use GATT.
     case preferL2CAP
 }
 
-/// Holder-to-reader engagement methods selected for a session.
-public enum ProximityEngagementMethod: Sendable, Hashable {
-    /// Display an ISO device-engagement QR code.
-    case qr
-    /// Use NFC static handover for device engagement.
-    case nfc
+/// Complete BLE bearer configuration; it exists only when BLE retrieval is selected.
+public struct ProximityBLEConfiguration: Sendable, Hashable {
+    /// BLE roles prepared for the session.
+    public let roles: ProximityBLERoles
+    /// BLE bearer-selection policy.
+    public let bearerPolicy: ProximityBLEBearerPolicy
+
+    /// Creates a complete BLE retrieval configuration.
+    /// - Parameters:
+    ///   - roles: BLE roles to prepare for the session.
+    ///   - bearerPolicy: Policy used to select the BLE bearer.
+    public init(
+        roles: ProximityBLERoles = .dual,
+        bearerPolicy: ProximityBLEBearerPolicy = .preferL2CAP
+    ) {
+        self.roles = roles
+        self.bearerPolicy = bearerPolicy
+    }
 }
 
-/// Device-retrieval transports selected for a session.
-public enum ProximityRetrievalMethod: Sendable, Hashable {
-    /// Retrieve the response over Bluetooth Low Energy.
-    case bluetoothLowEnergy
-    /// Retrieve the response over NFC.
-    case nfc
-    /// Retrieve the response over Wi-Fi Aware.
-    case wifiAware
+/// Complete conventional NFC retrieval length contract.
+public struct ProximityNFCRetrievalConfiguration: Sendable, Hashable {
+    /// Maximum command-data length accepted from the reader.
+    public let maximumCommandDataLength: Int
+    /// Maximum response-data length returned to the reader.
+    public let maximumResponseDataLength: Int
+
+    /// Creates a validated conventional NFC retrieval configuration.
+    /// - Parameters:
+    ///   - maximumCommandDataLength: Maximum command-data length accepted from the reader.
+    ///   - maximumResponseDataLength: Maximum response-data length returned to the reader.
+    public init(
+        maximumCommandDataLength: Int = 65_535,
+        maximumResponseDataLength: Int = 65_536
+    ) {
+        precondition((255...65_535).contains(maximumCommandDataLength))
+        precondition((256...65_536).contains(maximumResponseDataLength))
+        self.maximumCommandDataLength = maximumCommandDataLength
+        self.maximumResponseDataLength = maximumResponseDataLength
+    }
+}
+
+/// One or both conventional retrieval methods used by QR, Static Handover, or Negotiated Handover.
+public struct ProximityRetrievalOptions: Sendable, Hashable {
+    /// Optional BLE role and bearer policy.
+    public let bluetoothLowEnergy: ProximityBLEConfiguration?
+    /// Optional conventional NFC command/response contract.
+    public let nfc: ProximityNFCRetrievalConfiguration?
+
+    /// Creates a nonempty conventional retrieval configuration.
+    /// - Parameters:
+    ///   - bluetoothLowEnergy: Optional BLE role and bearer configuration.
+    ///   - nfc: Optional conventional NFC command/response configuration.
+    public init(
+        bluetoothLowEnergy: ProximityBLEConfiguration? = .init(),
+        nfc: ProximityNFCRetrievalConfiguration? = nil
+    ) {
+        precondition(bluetoothLowEnergy != nil || nfc != nil)
+        self.bluetoothLowEnergy = bluetoothLowEnergy
+        self.nfc = nfc
+    }
+}
+
+/// Conventional NFC Forum handover mode.
+public enum ProximityNFCHandover: Sendable, Hashable {
+    /// Holder-selected retrieval methods.
+    case staticHandover
+    /// Reader-selected retrieval method.
+    case negotiatedHandover
+}
+
+/// Conventional NFC handover and its compatible retrieval plans.
+public struct ProximityNFCSessionConfiguration: Sendable, Hashable {
+    /// NFC Forum handover mode.
+    public let handover: ProximityNFCHandover
+    /// Nonempty retrieval plan offered through NFC.
+    public let retrieval: ProximityRetrievalOptions
+    /// Optional nonempty retrieval plan offered through QR.
+    public let qrFallback: ProximityRetrievalOptions?
+
+    /// Creates a conventional NFC session with an optional QR fallback.
+    /// - Parameters:
+    ///   - handover: NFC Forum handover mode.
+    ///   - retrieval: Bearers offered through NFC.
+    ///   - qrFallback: QR bearers, using the same BLE policy and NFC length limits when shared.
+    public init(
+        handover: ProximityNFCHandover,
+        retrieval: ProximityRetrievalOptions,
+        qrFallback: ProximityRetrievalOptions? = nil
+    ) {
+        requireSharedBLEPolicy(retrieval.bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
+        precondition(retrieval.nfc == nil || qrFallback?.nfc == nil || retrieval.nfc == qrFallback?.nfc,
+                     "QR and NFC handover must use the same conventional NFC retrieval length limits")
+        self.handover = handover
+        self.retrieval = retrieval
+        self.qrFallback = qrFallback
+    }
+}
+
+/// Provisional NFCv2 engagement and its mandatory same-channel retrieval.
+public struct ProximityNFCV2SessionConfiguration: Sendable, Hashable {
+    /// Maximum command-data length accepted by the provisional holder application.
+    public let maximumCommandDataLength: Int
+    /// Optional NFCv2 alternate BLE bearer.
+    public let bluetoothLowEnergy: ProximityBLEConfiguration?
+    /// Optional nonempty retrieval plan offered through QR.
+    public let qrFallback: ProximityRetrievalOptions?
+
+    /// Creates an NFCv2 session with optional alternate BLE and QR retrieval.
+    /// - Parameters:
+    ///   - maximumCommandDataLength: Validated NFCv2 command-data limit.
+    ///   - bluetoothLowEnergy: Optional alternate BLE bearer.
+    ///   - qrFallback: Bearers offered through QR, when selected.
+    public init(
+        maximumCommandDataLength: Int = 65_536,
+        bluetoothLowEnergy: ProximityBLEConfiguration? = nil,
+        qrFallback: ProximityRetrievalOptions? = nil
+    ) {
+        precondition((1...65_536).contains(maximumCommandDataLength))
+        requireSharedBLEPolicy(bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
+        self.maximumCommandDataLength = maximumCommandDataLength
+        self.bluetoothLowEnergy = bluetoothLowEnergy
+        self.qrFallback = qrFallback
+    }
+}
+
+/// Owns engagement and compatible retrieval together for one single-use session.
+public enum ProximitySessionConfiguration: Sendable, Hashable {
+    /// QR engagement with a nonempty conventional retrieval plan.
+    case qr(ProximityRetrievalOptions = .init())
+    /// Conventional NFC handover with an optional QR fallback.
+    case nfc(ProximityNFCSessionConfiguration)
+    /// Provisional NFCv2 engagement with its same-channel retrieval and optional paths.
+    case provisionalNFCV2(ProximityNFCV2SessionConfiguration = .init())
+}
+
+private func requireSharedBLEPolicy(
+    _ nfc: ProximityBLEConfiguration?, _ qr: ProximityBLEConfiguration?
+) {
+    precondition(nfc == nil || qr == nil || nfc == qr, "QR and NFC must use the same BLE policy")
+}
+
+extension ProximitySessionConfiguration {
+    var qrRetrieval: ProximityRetrievalOptions? {
+        switch self {
+        case let .qr(retrieval): return retrieval
+        case let .nfc(configuration): return configuration.qrFallback
+        case let .provisionalNFCV2(configuration): return configuration.qrFallback
+        }
+    }
+
+    var usesProvisionalNFCV2: Bool {
+        if case .provisionalNFCV2 = self { true } else { false }
+    }
 }
 
 /// Reader-authentication policy applied before disclosure review.
@@ -727,14 +865,8 @@ public protocol ProximityApplicationProfile: Sendable {
 public struct ProximityConfiguration: Sendable {
     /// Versioned interoperability profile.
     public let profile: ProximityProfile
-    /// BLE roles prepared for the session.
-    public let bleRoles: ProximityBLERoles
-    /// BLE bearer-selection policy.
-    public let bearerPolicy: ProximityBLEBearerPolicy
-    /// Engagement methods the host intends to offer.
-    public let engagementMethods: Set<ProximityEngagementMethod>
-    /// Retrieval methods the host intends to offer.
-    public let retrievalMethods: Set<ProximityRetrievalMethod>
+    /// Engagement and compatible retrieval plans owned by this session.
+    public let session: ProximitySessionConfiguration
     /// Reader-authentication policy.
     public let readerPolicy: ProximityReaderPolicy
     /// Holder-authentication policy frozen before review.
@@ -751,10 +883,7 @@ public struct ProximityConfiguration: Sendable {
     /// Creates immutable configuration for one single-use session.
     /// - Parameters:
     ///   - profile: Versioned interoperability profile.
-    ///   - bleRoles: BLE roles to prepare.
-    ///   - bearerPolicy: BLE bearer policy.
-    ///   - engagementMethods: Nonempty selected engagement methods.
-    ///   - retrievalMethods: Nonempty selected retrieval methods.
+    ///   - session: Engagement and compatible retrieval plans.
     ///   - readerPolicy: Reader-authentication policy.
     ///   - deviceAuthenticationPolicy: Allowed holder-authentication methods and preference.
     ///   - readerTrustEvaluator: Optional explicit trust boundary.
@@ -763,10 +892,7 @@ public struct ProximityConfiguration: Sendable {
     ///   - maximumMessageBytes: Positive limit of at most 16 MiB.
     public init(
         profile: ProximityProfile = .iso180135Edition2DIS2026,
-        bleRoles: ProximityBLERoles = .dual,
-        bearerPolicy: ProximityBLEBearerPolicy = .preferL2CAP,
-        engagementMethods: Set<ProximityEngagementMethod> = [.qr],
-        retrievalMethods: Set<ProximityRetrievalMethod> = [.bluetoothLowEnergy],
+        session: ProximitySessionConfiguration = .qr(),
         readerPolicy: ProximityReaderPolicy = .allowAnonymousOrUntrusted,
         deviceAuthenticationPolicy: ProximityDeviceAuthenticationPolicy = .signatureOnly,
         readerTrustEvaluator: (any ProximityReaderTrustEvaluator)? = nil,
@@ -775,17 +901,16 @@ public struct ProximityConfiguration: Sendable {
         maximumMessageBytes: Int = 1_048_576
     ) {
         precondition(maximumMessageBytes > 0 && maximumMessageBytes <= 16_777_216)
-        precondition(!engagementMethods.isEmpty)
-        precondition(!retrievalMethods.isEmpty)
         precondition(profile != .eudiARF3FCAF202608 || readerPolicy == .requireTrusted)
         precondition(profile != .eudiARF3FCAF202608 || deviceAuthenticationPolicy == .signatureOnly)
+        precondition(
+            profile != .iso1801352021 || !session.usesProvisionalNFCV2,
+            "NFC Engagement v2 is not part of the ISO/IEC 18013-5:2021 compatibility profile"
+        )
         precondition(applicationProfiles.allSatisfy { isProximityNonBlank($0.id) })
         precondition(Set(applicationProfiles.map(\.id)).count == applicationProfiles.count)
         self.profile = profile
-        self.bleRoles = bleRoles
-        self.bearerPolicy = bearerPolicy
-        self.engagementMethods = engagementMethods
-        self.retrievalMethods = retrievalMethods
+        self.session = session
         self.readerPolicy = readerPolicy
         self.deviceAuthenticationPolicy = deviceAuthenticationPolicy
         self.readerTrustEvaluator = readerTrustEvaluator
@@ -853,6 +978,8 @@ public enum ProximityRemediationAction: Sendable, Hashable {
     case openApplicationSettings
     /// Ask the user to enable Bluetooth through the platform-owned surface.
     case enableBluetooth
+    /// Ask the user to enable NFC through the platform-owned surface.
+    case enableNFC
     /// Explain that the selected capability requires another device.
     case useSupportedDevice
     /// Re-run capability checks without another system surface.
@@ -897,25 +1024,50 @@ public enum ProximityRuntimeObservation: Sendable, Equatable {
 public struct ProximityCapabilities: Sendable, Equatable {
     /// Profile used to evaluate capability policy.
     public let profile: ProximityProfile
+    /// Selected plans relating transport observations to viable routes.
+    public let session: ProximitySessionConfiguration
     /// QR device-engagement capability.
     public let qrEngagement: ProximityTransportCapability
     /// NFC device-engagement capability.
     public let nfcEngagement: ProximityTransportCapability
     /// Bluetooth Low Energy retrieval capability.
     public let bluetoothLowEnergy: ProximityTransportCapability
-    /// NFC retrieval capability.
+    /// Conventional NFC retrieval capability.
     public let nfcRetrieval: ProximityTransportCapability
+    /// Provisional NFCv2 same-channel retrieval capability.
+    public let nfcV2Retrieval: ProximityTransportCapability
     /// Wi-Fi Aware retrieval capability.
     public let wifiAwareRetrieval: ProximityTransportCapability
-    /// Whether at least one selected engagement and one selected retrieval method may start now.
-    public var mayStart: Bool {
-        [qrEngagement, nfcEngagement].contains(where: \.mayStart)
-            && [bluetoothLowEnergy, nfcRetrieval, wifiAwareRetrieval].contains(where: \.mayStart)
+    /// Whether the selected QR plan has an available engagement and bearer.
+    public var qrMayStart: Bool { qrEngagement.mayStart && planMayStart(session.qrRetrieval) }
+    /// Whether the selected NFC plan has an available engagement and bearer.
+    public var nfcMayStart: Bool {
+        guard nfcEngagement.mayStart else { return false }
+        switch session {
+        case .qr: return false
+        case let .nfc(configuration): return planMayStart(configuration.retrieval)
+        case .provisionalNFCV2: return nfcV2Retrieval.mayStart
+        }
+    }
+    /// Whether at least one complete selected route can start.
+    public var mayStart: Bool { qrMayStart || nfcMayStart }
+
+    private func planMayStart(_ plan: ProximityRetrievalOptions?) -> Bool {
+        guard let plan else { return false }
+        return (plan.bluetoothLowEnergy != nil && bluetoothLowEnergy.mayStart)
+            || (plan.nfc != nil && nfcRetrieval.mayStart)
     }
     /// Stable, de-duplicated remediation actions for unavailable selected dimensions.
     public var remediationActions: [ProximityRemediationAction] {
         var seen = Set<ProximityRemediationAction>()
-        return [qrEngagement, nfcEngagement, bluetoothLowEnergy, nfcRetrieval, wifiAwareRetrieval]
+        return [
+            qrEngagement,
+            nfcEngagement,
+            bluetoothLowEnergy,
+            nfcRetrieval,
+            nfcV2Retrieval,
+            wifiAwareRetrieval,
+        ]
             .filter(\.selected)
             .flatMap(\.remediationActions)
             .filter { seen.insert($0).inserted }

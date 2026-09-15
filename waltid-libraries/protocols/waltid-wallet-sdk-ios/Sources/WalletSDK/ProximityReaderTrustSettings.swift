@@ -119,10 +119,7 @@ public struct ProximityReaderTrustSettings: Sendable, Equatable {
 
         return ProximityConfiguration(
             profile: configuration.profile,
-            bleRoles: configuration.bleRoles,
-            bearerPolicy: configuration.bearerPolicy,
-            engagementMethods: configuration.engagementMethods,
-            retrievalMethods: configuration.retrievalMethods,
+            session: configuration.session,
             readerPolicy: readerPolicy.presentationPolicy,
             deviceAuthenticationPolicy: configuration.deviceAuthenticationPolicy,
             readerTrustEvaluator: evaluator,

@@ -12,13 +12,20 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.proximity.EngagementContext
 import id.walt.mdoc.proximity.MdocDeviceEngagementFactory
 import id.walt.mdoc.proximity.MdocEngagementMode
+import id.walt.mdoc.proximity.MdocEngagementSource
 import id.walt.mdoc.proximity.MdocHolderProtocolEngine
 import id.walt.mdoc.proximity.MdocHolderSessionResult
 import id.walt.mdoc.proximity.MdocHolderSessionState
+import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocProtocolFeature
 import id.walt.mdoc.proximity.MdocProximityProfile
 import id.walt.mdoc.proximity.MdocSessionCapabilities
+import id.walt.mdoc.proximity.ProximityTransportKind
+import id.walt.mdoc.proximity.ProximityTransportProvider
+import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ProximityError as EngineProximityError
+import id.walt.mdoc.proximity.QrMdocEngagementSource
+import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.mobile.BleBearerPolicy
 import id.walt.mdoc.proximity.mobile.BleMdocRoleSelection
 import id.walt.mdoc.proximity.mobile.BleMdocRoles
@@ -26,6 +33,13 @@ import id.walt.mdoc.proximity.mobile.BleProximityAvailability
 import id.walt.mdoc.proximity.mobile.BleProximityTransportConfiguration
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.BleServiceUuid
+import id.walt.mdoc.proximity.mobile.NfcHostAvailability
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.NfcMdocEngagementConfiguration
+import id.walt.mdoc.proximity.mobile.NfcMdocEngagementProfile
+import id.walt.mdoc.proximity.mobile.NfcMdocEngagementScope
+import id.walt.mdoc.proximity.mobile.NfcMdocEngagementSource
+import id.walt.mdoc.proximity.mobile.NfcV2MaximumCommandDataLength
 import id.walt.wallet2.data.Wallet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -37,20 +51,23 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.uuid.Uuid
 
 internal class ProximityCoordinator(
     private val wallet: Wallet,
-    private val transportFactory: BleProximityTransportFactory?,
+    private val bleTransportFactory: BleProximityTransportFactory?,
+    private val nfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
     private val sessionDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val activeMutex = Mutex()
@@ -60,44 +77,55 @@ internal class ProximityCoordinator(
         configuration: ProximityConfiguration,
     ): ProximityCapabilities {
         val owned = configuration.snapshot()
-        val availability = transportFactory?.capability(owned.bleRoles.toTransportSelection())
-            ?: BleProximityAvailability.Unavailable(
-                code = "ble_transport_unavailable",
-                message = "BLE proximity presentation is unavailable on this wallet platform",
-            )
+        val bleConfiguration = owned.session.bleConfiguration
+        val bleSelected = bleConfiguration != null
+        val bleAvailability = if (bleSelected) {
+            bleTransportFactory?.capability(bleConfiguration.roles.toTransportSelection())
+                ?: BleProximityAvailability.Unavailable(
+                    code = "ble_transport_unavailable",
+                    message = "BLE proximity presentation is unavailable on this wallet platform",
+                )
+        } else null
+        val nfcEngagementSelected = owned.session !is ProximitySessionConfiguration.Qr
+        val nfcRetrievalSelected = owned.session.nfcRetrieval?.nfc != null || owned.session.qrRetrieval?.nfc != null
+        val nfcV2RetrievalSelected =
+            owned.session is ProximitySessionConfiguration.ProvisionalNfcV2
+        val nfcSelected = nfcEngagementSelected || nfcRetrievalSelected
+        val nfcAvailability = if (nfcSelected) {
+            nfcHostPlatformAdapter?.capability()
+                ?: NfcHostAvailability.Unavailable(
+                    code = "nfc_host_unavailable",
+                    message = "NFC host-card presentation is unavailable on this wallet platform",
+                )
+        } else null
         return ProximityCapabilities(
             profile = owned.profile,
-            qrEngagement = ProximityTransportCapability(
-                implemented = true,
-                profilePermitted = true,
-                runtime = ProximityRuntimeObservation.Available,
-                selected = ProximityEngagementMethod.Qr in owned.engagementMethods,
+            session = owned.session,
+            qrEngagement = availableCapability(owned.session.qrRetrieval != null),
+            nfcEngagement = nfcCapability(
+                nfcEngagementSelected,
+                nfcHostPlatformAdapter != null,
+                nfcAvailability,
             ),
-            nfcEngagement = unavailableCapability(
-                selected = ProximityEngagementMethod.Nfc in owned.engagementMethods,
+            bluetoothLowEnergy = bleCapability(
+                bleSelected,
+                bleTransportFactory != null,
+                bleAvailability,
             ),
-            bluetoothLowEnergy = ProximityTransportCapability(
-                implemented = transportFactory != null,
-                profilePermitted = true,
-                runtime = when (availability) {
-                    BleProximityAvailability.Available -> ProximityRuntimeObservation.Available
-                    is BleProximityAvailability.Unavailable -> ProximityRuntimeObservation.Unavailable(
-                        error = ProximityError(
-                            category = ProximityErrorCategory.Capability,
-                            code = availability.code,
-                            message = availability.message,
-                            recovery = ProximityRecovery.RetryPrerequisites,
-                        ),
-                        remediationActions = availability.code.toRemediationActions(),
-                    )
-                },
-                selected = ProximityRetrievalMethod.BluetoothLowEnergy in owned.retrievalMethods,
+            nfcRetrieval = nfcCapability(
+                nfcRetrievalSelected,
+                nfcHostPlatformAdapter != null,
+                nfcAvailability,
             ),
-            nfcRetrieval = unavailableCapability(
-                selected = ProximityRetrievalMethod.Nfc in owned.retrievalMethods,
+            nfcV2Retrieval = nfcCapability(
+                nfcV2RetrievalSelected,
+                nfcHostPlatformAdapter != null,
+                nfcAvailability,
             ),
             wifiAwareRetrieval = unavailableCapability(
-                selected = ProximityRetrievalMethod.WifiAware in owned.retrievalMethods,
+                selected = false,
+                code = "wifi_aware_not_implemented",
+                message = "Wi-Fi Aware retrieval is not implemented by this wallet build",
             ),
         )
     }
@@ -112,7 +140,8 @@ internal class ProximityCoordinator(
             val session = ProximitySessionImpl(
                 wallet = wallet,
                 configuration = owned,
-                transportFactory = transportFactory,
+                bleTransportFactory = bleTransportFactory,
+                nfcHostPlatformAdapter = nfcHostPlatformAdapter,
                 capabilityCheck = { capabilities(owned) },
                 initialCapabilities = initialCapabilities,
                 sessionDispatcher = sessionDispatcher,
@@ -132,7 +161,8 @@ internal class ProximityCoordinator(
 private class ProximitySessionImpl(
     private val wallet: Wallet,
     private val configuration: ProximityConfiguration,
-    private val transportFactory: BleProximityTransportFactory?,
+    private val bleTransportFactory: BleProximityTransportFactory?,
+    private val nfcHostPlatformAdapter: NfcHostPlatformAdapter?,
     private val capabilityCheck: suspend () -> ProximityCapabilities,
     initialCapabilities: ProximityCapabilities,
     sessionDispatcher: CoroutineDispatcher,
@@ -147,6 +177,21 @@ private class ProximitySessionImpl(
     private val initialCapabilities = initialCapabilities
     override val state: StateFlow<ProximityState> = owner.state
     private lateinit var sessionJob: Job
+    private val engineReference = MutableStateFlow<MdocHolderProtocolEngine?>(null)
+    override val connectedRoute: ProximityConnectedRoute?
+        get() = engineReference.value?.connectedRoute?.let { route ->
+            ProximityConnectedRoute(
+                engagement = when (route.engagement) {
+                    MdocEngagementMode.Qr -> ProximityEngagementMethod.Qr
+                    MdocEngagementMode.Nfc -> ProximityEngagementMethod.Nfc
+                },
+                transport = when (route.transport) {
+                    ProximityTransportKind.BLE -> ProximityTransport.BluetoothLowEnergy
+                    ProximityTransportKind.NFC -> ProximityTransport.Nfc
+                    ProximityTransportKind.WIFI_AWARE -> ProximityTransport.WifiAware
+                },
+            )
+        }
 
     @OptIn(DelicateCoroutinesApi::class)
     fun start() {
@@ -179,7 +224,6 @@ private class ProximitySessionImpl(
                 prerequisites = capabilityCheck()
             }
             owner.publish(ProximityState.Preparing(configuration.profile))
-            val factory = requireNotNull(transportFactory)
             runtime = CryptoRuntime(defaultSoftwareKeyProviders())
             eDeviceKey = runtime.generateSoftwareKey(
                 GenerateSoftwareKeyRequest(
@@ -190,16 +234,6 @@ private class ProximitySessionImpl(
             )
             val engagementFactory = MdocDeviceEngagementFactory()
             val eDeviceKeyBytes = engagementFactory.encodeEDeviceKeyBytes(eDeviceKey)
-            val transport = factory.create(
-                BleProximityTransportConfiguration(
-                    roles = configuration.bleRoles.createTransactionRoles(),
-                    bearerPolicy = when (configuration.bearerPolicy) {
-                        ProximityBleBearerPolicy.GattOnly -> BleBearerPolicy.GattOnly
-                        ProximityBleBearerPolicy.PreferL2cap -> BleBearerPolicy.PreferL2cap
-                    },
-                    eDeviceKeyBytes = eDeviceKeyBytes,
-                )
-            )
             val profile = configuration.profile.toEngineProfile()
             val capabilities = MdocSessionCapabilities.forSession(
                 profile = profile,
@@ -219,19 +253,28 @@ private class ProximitySessionImpl(
                 readerAuthenticationAlgorithms = READER_AUTHENTICATION_ALGORITHMS,
             )
             owner.attach(processor)
+            val engagementSources = buildEngagementSources(
+                prerequisites = prerequisites,
+                eDeviceKeyBytes = eDeviceKeyBytes,
+                engagementFactory = engagementFactory,
+            )
             val engine = MdocHolderProtocolEngine(
                 eDeviceKey = eDeviceKey,
-                transportProviders = listOf(transport),
+                engagementSources = engagementSources,
                 requestProcessor = processor,
                 consentHandler = owner,
                 engagementContext = EngagementContext(
                     profile = profile,
                     maximumMessageBytes = configuration.maximumMessageBytes,
-                    engagementMode = MdocEngagementMode.Qr,
+                    engagementMode = if (configuration.session.qrRetrieval != null) {
+                        MdocEngagementMode.Qr
+                    } else {
+                        MdocEngagementMode.Nfc
+                    },
                 ),
                 capabilities = capabilities,
-                engagementFactory = engagementFactory,
             )
+            engineReference.value = engine
             val stateCollector = scope.launch {
                 engine.state.collect(::publishEngineState)
             }
@@ -252,12 +295,14 @@ private class ProximitySessionImpl(
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) { owner.cancel() }
             throw cancelled
+        } catch (failure: ProximityException) {
+            owner.publish(ProximityState.Failed(failure.error.toWalletError()))
         } catch (_: Throwable) {
             owner.publish(ProximityState.Failed(
                 ProximityError(
                     category = ProximityErrorCategory.Internal,
-                    code = "session_failed",
-                    message = "The proximity presentation session failed",
+                    code = "session_preparation_failed",
+                    message = "The proximity presentation session could not be prepared",
                     recovery = ProximityRecovery.StartNewSession,
                 )
             ))
@@ -273,23 +318,69 @@ private class ProximitySessionImpl(
         }
     }
 
+    private fun buildEngagementSources(
+        prerequisites: ProximityCapabilities,
+        eDeviceKeyBytes: ImmutableBytes,
+        engagementFactory: MdocDeviceEngagementFactory,
+    ): List<MdocEngagementSource> {
+        val selected = configuration.session
+        fun newBleProviders(ble: ProximityBleConfiguration?, sharedUuid: Boolean = false): List<ProximityTransportProvider> =
+            if (ble == null || !prerequisites.bluetoothLowEnergy.mayStart) emptyList() else listOf(
+                requireNotNull(bleTransportFactory).create(
+                    BleProximityTransportConfiguration(
+                        roles = ble.roles.createTransactionRoles(sharedUuid),
+                        bearerPolicy = ble.bearerPolicy.toTransportPolicy(),
+                        eDeviceKeyBytes = eDeviceKeyBytes,
+                    )
+                )
+            )
+        val qrPlan = selected.qrRetrieval
+        val nfcDirect = selected.nfcRetrieval?.nfc?.takeIf { prerequisites.nfcRetrieval.mayStart }?.toTransportMethod()
+        val qrDirect = qrPlan?.nfc?.takeIf { prerequisites.nfcRetrieval.mayStart }?.toTransportMethod()
+        fun nfcSource(scope: NfcMdocEngagementScope): NfcMdocEngagementSource = NfcMdocEngagementSource(
+            configuration = NfcMdocEngagementConfiguration(
+                scope = scope,
+                conventionalRetrieval = nfcDirect.takeUnless { scope is NfcMdocEngagementScope.QrOnly },
+                qrRetrieval = qrDirect.takeUnless { scope is NfcMdocEngagementScope.NfcOnly },
+            ),
+            platform = requireNotNull(nfcHostPlatformAdapter),
+            alternateTransportProviders = if (scope is NfcMdocEngagementScope.QrOnly) emptyList() else newBleProviders(
+                selected.nfcBle,
+                sharedUuid = selected is ProximitySessionConfiguration.ConventionalNfc &&
+                    selected.handover == ProximityNfcHandover.Static,
+            ),
+            qrTransportProviders = if (scope is NfcMdocEngagementScope.NfcOnly) emptyList() else newBleProviders(qrPlan?.bluetoothLowEnergy),
+            engagementFactory = engagementFactory,
+        )
+        val source = when {
+            prerequisites.nfcMayStart -> {
+                val profile = when (selected) {
+                    is ProximitySessionConfiguration.Qr -> error("QR configuration cannot start NFC engagement")
+                    is ProximitySessionConfiguration.ConventionalNfc -> when (selected.handover) {
+                        ProximityNfcHandover.Static -> NfcMdocEngagementProfile.Static
+                        ProximityNfcHandover.Negotiated -> NfcMdocEngagementProfile.Negotiated
+                    }
+                    is ProximitySessionConfiguration.ProvisionalNfcV2 ->
+                        NfcMdocEngagementProfile.ProvisionalV2(NfcV2MaximumCommandDataLength(selected.maximumCommandDataLength))
+                }
+                nfcSource(if (prerequisites.qrMayStart) NfcMdocEngagementScope.QrAndNfc(profile) else NfcMdocEngagementScope.NfcOnly(profile))
+            }
+            prerequisites.qrMayStart && qrDirect != null -> nfcSource(NfcMdocEngagementScope.QrOnly)
+            prerequisites.qrMayStart -> QrMdocEngagementSource(newBleProviders(qrPlan?.bluetoothLowEnergy), engagementFactory = engagementFactory)
+            else -> error("Proximity prerequisites passed without a viable selected route")
+        }
+        return listOf(source)
+    }
+
     private suspend fun publishEngineState(engineState: MdocHolderSessionState) {
         val next = when (engineState) {
             MdocHolderSessionState.Idle -> return
             is MdocHolderSessionState.Preparing -> ProximityState.Preparing(configuration.profile)
             is MdocHolderSessionState.EngagementReady -> ProximityState.EngagementReady(
-                listOf(
-                    ProximityEngagement.Qr(
-                        requireNotNull(engineState.qrPayload) { "QR engagement payload is missing" }
-                    )
-                )
+                engineState.toWalletEngagements()
             )
             is MdocHolderSessionState.Connecting -> ProximityState.Connecting(
-                listOf(
-                    ProximityEngagement.Qr(
-                        requireNotNull(engineState.qrPayload) { "QR engagement payload is missing" }
-                    )
-                )
+                engineState.toWalletEngagements()
             )
             is MdocHolderSessionState.AwaitingRequest ->
                 ProximityState.AwaitingRequest(engineState.exchange)
@@ -311,14 +402,44 @@ private class ProximitySessionImpl(
         owner.publish(next)
     }
 
+    private fun MdocHolderSessionState.EngagementReady.toWalletEngagements():
+        List<ProximityEngagement> = walletEngagements(qrPayload, engagementModes)
+
+    private fun MdocHolderSessionState.Connecting.toWalletEngagements():
+        List<ProximityEngagement> = walletEngagements(qrPayload, engagementModes)
+
+    private fun walletEngagements(
+        qrPayload: String?,
+        modes: Set<MdocEngagementMode>,
+    ): List<ProximityEngagement> = buildList {
+        if (MdocEngagementMode.Qr in modes) {
+            add(ProximityEngagement.Qr(requireNotNull(qrPayload) { "QR engagement payload is missing" }))
+        }
+        if (MdocEngagementMode.Nfc in modes) add(ProximityEngagement.Nfc)
+    }
+
     private companion object {
         val READER_AUTHENTICATION_ALGORITHMS: Set<Int> = setOf(
             Cose.Algorithm.ES256,
+            Cose.Algorithm.ESP256,
             Cose.Algorithm.ES384,
+            Cose.Algorithm.ESP384,
             Cose.Algorithm.ES512,
+            Cose.Algorithm.ESP512,
             Cose.Algorithm.EdDSA,
+            Cose.Algorithm.Ed25519,
+            Cose.Algorithm.Ed448,
         )
     }
+}
+
+@OptIn(ExperimentalSerializationApi::class)
+private fun ProximityNfcRetrievalConfiguration.toTransportMethod(): DeviceRetrievalMethod.Nfc =
+    DeviceRetrievalMethod.Nfc(maximumCommandDataLength.toUInt(), maximumResponseDataLength.toUInt())
+
+private fun ProximityBleBearerPolicy.toTransportPolicy(): BleBearerPolicy = when (this) {
+    ProximityBleBearerPolicy.GattOnly -> BleBearerPolicy.GattOnly
+    ProximityBleBearerPolicy.PreferL2cap -> BleBearerPolicy.PreferL2cap
 }
 
 private fun ProximityBleRoles.toTransportSelection(): BleMdocRoleSelection = when (this) {
@@ -327,29 +448,88 @@ private fun ProximityBleRoles.toTransportSelection(): BleMdocRoleSelection = whe
     ProximityBleRoles.Dual -> BleMdocRoleSelection.DUAL
 }
 
-private fun ProximityBleRoles.createTransactionRoles(): BleMdocRoles = when (this) {
+private fun ProximityBleRoles.createTransactionRoles(sharedUuid: Boolean): BleMdocRoles = when (this) {
     ProximityBleRoles.CentralClient -> BleMdocRoles.CentralClient(transactionUuid())
     ProximityBleRoles.PeripheralServer -> BleMdocRoles.PeripheralServer(transactionUuid())
     ProximityBleRoles.Dual -> {
         val reader = transactionUuid()
-        var holder = transactionUuid()
-        while (holder == reader) holder = transactionUuid()
+        var holder = if (sharedUuid) reader else transactionUuid()
+        while (!sharedUuid && holder == reader) holder = transactionUuid()
         BleMdocRoles.Dual(reader, holder)
     }
 }
 
 private fun transactionUuid(): BleServiceUuid = BleServiceUuid.parse(Uuid.random().toString())
 
+private fun availableCapability(selected: Boolean): ProximityTransportCapability =
+    ProximityTransportCapability(
+        implemented = true,
+        profilePermitted = true,
+        runtime = ProximityRuntimeObservation.Available,
+        selected = selected,
+    )
+
+private fun bleCapability(
+    selected: Boolean,
+    implemented: Boolean,
+    availability: BleProximityAvailability?,
+): ProximityTransportCapability = when (availability) {
+    BleProximityAvailability.Available -> availableCapability(selected)
+    is BleProximityAvailability.Unavailable -> unavailableCapability(
+        selected = selected,
+        implemented = implemented,
+        code = availability.code,
+        message = availability.message,
+        remediationActions = availability.code.toRemediationActions(),
+    )
+    null -> ProximityTransportCapability(
+        implemented = implemented, profilePermitted = true, selected = selected,
+        runtime = ProximityRuntimeObservation.NotChecked,
+    )
+}
+
+private fun nfcCapability(
+    selected: Boolean,
+    implemented: Boolean,
+    availability: NfcHostAvailability?,
+): ProximityTransportCapability = when (availability) {
+    NfcHostAvailability.Available -> availableCapability(selected)
+    is NfcHostAvailability.Unavailable -> unavailableCapability(
+        selected = selected,
+        implemented = implemented,
+        code = availability.code,
+        message = availability.message,
+        remediationActions = availability.code.toRemediationActions(),
+    )
+    null -> ProximityTransportCapability(
+        implemented = implemented, profilePermitted = true, selected = selected,
+        runtime = ProximityRuntimeObservation.NotChecked,
+    )
+}
+
 private fun unavailableCapability(
     selected: Boolean,
+    implemented: Boolean = false,
+    code: String,
+    message: String,
+    remediationActions: List<ProximityRemediationAction> = emptyList(),
 ): ProximityTransportCapability = ProximityTransportCapability(
-    implemented = false,
+    implemented = implemented,
     profilePermitted = true,
-    selected = selected,
-    runtime = ProximityRuntimeObservation.NotChecked,
+        selected = selected,
+    runtime = if (!implemented) ProximityRuntimeObservation.NotChecked else
+        ProximityRuntimeObservation.Unavailable(
+            error = ProximityError(
+                category = ProximityErrorCategory.Capability,
+                code = code,
+                message = message,
+                recovery = if (remediationActions.isNotEmpty()) ProximityRecovery.RetryPrerequisites else ProximityRecovery.None,
+            ),
+            remediationActions = remediationActions,
+        ),
 )
 
-private fun String.toRemediationActions(): List<ProximityRemediationAction> = when (this) {
+internal fun String.toRemediationActions(): List<ProximityRemediationAction> = when (this) {
     "ble_permission_missing",
     "ble_permission_not_determined" -> listOf(ProximityRemediationAction.RequestBluetoothPermission)
     "ble_permission_denied",
@@ -359,7 +539,20 @@ private fun String.toRemediationActions(): List<ProximityRemediationAction> = wh
     "ble_scanner_unavailable",
     "ble_advertiser_unavailable",
     "ble_transport_unavailable" -> listOf(ProximityRemediationAction.UseSupportedDevice)
-    else -> listOf(ProximityRemediationAction.Retry)
+    "ble_state_unknown" -> listOf(ProximityRemediationAction.Retry)
+    "nfc_powered_off" -> listOf(ProximityRemediationAction.EnableNfc)
+    "nfc_hce_unsupported",
+    "nfc_adapter_unavailable",
+    "nfc_host_unavailable",
+    "nfc_card_session_unsupported" -> listOf(ProximityRemediationAction.UseSupportedDevice)
+    "nfc_access_not_accepted",
+    "nfc_system_ineligible" -> listOf(ProximityRemediationAction.OpenApplicationSettings)
+    "nfc_system_unavailable",
+    "nfc_session_already_active",
+    "nfc_foreground_routing_required",
+    "nfc_card_session_active",
+    "nfc_session_expired" -> listOf(ProximityRemediationAction.Retry)
+    else -> emptyList()
 }
 
 private fun ProximityProfile.toEngineProfile(): MdocProximityProfile = when (this) {
@@ -392,7 +585,7 @@ internal fun EngineProximityError.toWalletError(): ProximityError = ProximityErr
     },
     code = code,
     message = message,
-    recovery = if (this is EngineProximityError.Transport || code in setOf("changed_submission", "stale_consent", "stale_submission")) {
+    recovery = if (this is EngineProximityError.Transport || this is EngineProximityError.Capability || code in setOf("request_processing_failed", "response_processing_failed", "changed_submission", "stale_consent", "stale_submission")) {
         ProximityRecovery.StartNewSession
     } else {
         ProximityRecovery.None
