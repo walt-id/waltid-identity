@@ -113,6 +113,9 @@ jobs:
           fi
           git fetch --prune origin main
           ./gradlew \
+            :build-logic:test \
+            :waltid-libraries:crypto:waltid-crypto2:checkKotlinAbi \
+            :waltid-libraries:crypto:waltid-crypto2-signum:checkKotlinAbi \
             :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi \
             :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:checkKotlinAbi \
             :waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-blockstore:checkKotlinAbi \

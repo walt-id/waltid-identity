@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     id("waltid.full.library")
+    id("waltid.optional-ios-abi")
     id("waltid.publish.maven")
 }
 

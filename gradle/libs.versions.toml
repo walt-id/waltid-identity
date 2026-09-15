@@ -1,6 +1,7 @@
 [versions]
 # Build/compilation versions
 kotlin = "2.4.0"
+binary-compatibility-validator = "0.18.2"
 suspend-transform = "2.4.0-0.14.0"
 jspecify = "1.0.0"
 
@@ -146,6 +147,7 @@ google-blockstore = { module = "com.google.android.gms:play-services-auth-blocks
 
 # Plugins
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+binary-compatibility-validator = { module = "org.jetbrains.kotlinx:binary-compatibility-validator", version.ref = "binary-compatibility-validator" }
 
 kotlin-plugin-serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
 ktor-gradle-plugin = { module = "io.ktor.plugin:plugin", version.ref = "ktor" }
