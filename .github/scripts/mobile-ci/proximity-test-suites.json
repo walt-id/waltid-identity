@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "physicalClassPrefixes": [
+    "id.walt.proximity.physical.",
+    "ProximityPhysicalDeviceTests"
+  ],
+  "suites": {
+    "independent-session-vectors": {
+      "executionClass": "deterministic",
+      "sources": [
+        "waltid-libraries/credentials/waltid-mdoc-proximity/src/commonTest/kotlin/id/walt/mdoc/proximity/IndependentSessionVectorTest.kt"
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-libraries/credentials/waltid-mdoc-proximity/build/test-results/testAndroidHostTest/*.xml",
+        "jvm": "waltid-libraries/credentials/waltid-mdoc-proximity/build/test-results/jvmTest/*.xml",
+        "ios-simulator": "waltid-libraries/credentials/waltid-mdoc-proximity/build/test-results/iosSimulatorArm64Test/*.xml",
+        "js-node": "waltid-libraries/credentials/waltid-mdoc-proximity/build/test-results/jsNodeTest/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.mdoc.proximity.IndependentSessionVectorTest",
+          "name": "publicPeerVectorMatchesKeyAgreementTranscriptAndBothDirections",
+          "oracle": "Exact external request/response ciphertext and plaintext match through real platform ECDH and production derivation/cipher."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.IndependentSessionVectorTest",
+          "name": "publicPeerCiphertextMutationsFailClosedAndFreshControlRecovers",
+          "oracle": "Body/tag mutations, truncation and reflected direction fail closed and each retains a valid control."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.IndependentSessionVectorTest",
+          "name": "publicPeerTranscriptMutationCannotAuthenticateTheCanonicalRequest",
+          "oracle": "A single transcript mutation cannot authenticate the canonical request; unchanged control succeeds."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.IndependentSessionVectorTest",
+          "name": "publicPeerCounterOneCannotBeReplayedAsCounterTwo",
+          "oracle": "A successfully decrypted counter-one message cannot be replayed as counter two."
+        }
+      ]
+    }
+  }
+}

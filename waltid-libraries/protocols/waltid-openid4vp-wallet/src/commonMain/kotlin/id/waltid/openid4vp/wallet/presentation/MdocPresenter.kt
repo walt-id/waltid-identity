@@ -472,8 +472,7 @@ object MdocPresenter {
      * Builds one selectively disclosed Annex C document using the same device-authentication
      * implementation as OpenID4VP. The native platform adapter never handles signing or claims.
      *
-     * Annex C is reached only through the mobile Digital Credentials adapters, whose signing keys are
-     * always platform-managed, so there is no legacy-key overload: this path is crypto2-only.
+     * The caller supplies the crypto2 holder-key handle; this method does not assume how that key is stored.
      */
     suspend fun buildAnnexCDocument(
         digitalCredential: DigitalCredential,
