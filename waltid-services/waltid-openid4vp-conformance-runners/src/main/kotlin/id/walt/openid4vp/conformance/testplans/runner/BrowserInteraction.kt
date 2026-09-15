@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
 import com.microsoft.playwright.Page
+import com.microsoft.playwright.options.WaitUntilState
 import id.walt.openid4vp.conformance.testplans.httpdata.TestRunResult
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -32,9 +33,13 @@ internal fun TestRunResult.browserInteractionSummary(): String =
         "visitedUrlsWithMethod=${browser.visitedUrlsWithMethod.map { it.shortJson() }}, " +
         "visited=${browser.visited.map { it.shortJson() }}"
 
-internal fun openBrowserInteraction(page: Page, interaction: BrowserInteraction) {
+internal fun openBrowserInteraction(
+    page: Page,
+    interaction: BrowserInteraction,
+    waitUntil: WaitUntilState = WaitUntilState.LOAD,
+) {
     if (!interaction.method.equals("POST", ignoreCase = true)) {
-        page.navigate(interaction.url)
+        page.navigate(interaction.url, Page.NavigateOptions().setWaitUntil(waitUntil))
         return
     }
 
@@ -52,7 +57,8 @@ internal fun openBrowserInteraction(page: Page, interaction: BrowserInteraction)
           <form method="post" action="${action.htmlEscape()}">$inputs</form>
           <script>document.forms[0].submit();</script>
         </body></html>
-        """.trimIndent()
+        """.trimIndent(),
+        Page.SetContentOptions().setWaitUntil(waitUntil),
     )
 }
 

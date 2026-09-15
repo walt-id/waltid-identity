@@ -18,6 +18,7 @@ import kotlinx.serialization.json.Json
 class IssuerInterface(private val issuerBaseUrl: String) : AutoCloseable {
 
     private val httpClient = HttpClient {
+        expectSuccess = true
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -37,7 +38,7 @@ class IssuerInterface(private val issuerBaseUrl: String) : AutoCloseable {
         val response = httpClient.post("$issuerBaseUrl/issuer2/credential-offers") {
             contentType(ContentType.Application.Json)
             setBody(CredentialOfferRequest(
-                profileId = profileId,
+                credentials = listOf(CredentialOfferCredential(profileId)),
                 authMethod = authMethod,
                 txCode = preAuthorizedTxCode?.toTxCodeMetadata(),
                 txCodeValue = preAuthorizedTxCode,
@@ -61,10 +62,15 @@ class IssuerInterface(private val issuerBaseUrl: String) : AutoCloseable {
 
 @Serializable
 data class CredentialOfferRequest(
-    val profileId: String,
+    val credentials: List<CredentialOfferCredential>,
     val authMethod: CredentialOfferAuthMethod,
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
+)
+
+@Serializable
+data class CredentialOfferCredential(
+    val profileId: String,
 )
 
 @Serializable
@@ -78,11 +84,17 @@ data class TxCode(
 @Serializable
 data class CredentialOfferResponse(
     val offerId: String,
-    val profileId: String,
+    val credentials: List<CredentialOfferCredentialResponse>,
     val authMethod: String,
     val expiresAt: Long,
     val credentialOffer: String,
     val txCodeValue: String? = null,
+)
+
+@Serializable
+data class CredentialOfferCredentialResponse(
+    val profileId: String,
+    val credentialConfigurationId: String,
 )
 
 @Serializable
