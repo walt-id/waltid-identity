@@ -33,7 +33,10 @@ python3 scripts/build-recovery-simulator-host.py --output build/ios-recovery-hos
 
 Android uses `id.walt.wallet2.mobile.test`; iOS uses
 `id.walt.wallet.recovery-tests`. The iOS builder embeds Keychain entitlements
-and the SQLCipher runtime in a simulator-only app. The runner uses Android SDK
+and the SQLCipher runtime in a simulator-only UIKit app. Tests run off the main
+thread while UIKit services the application lifecycle. Each launch writes its
+own log and exit marker; a process ID or incomplete test output cannot count as
+completion. The runner uses Android SDK
 tools or Xcode’s `xcrun simctl` for installation and launch. These are test
 hosts, not distributable demo apps.
 
@@ -152,5 +155,5 @@ The iOS script uses the selected Xcode and newest available iOS runtime. Set
 default iPhone 17 type is unavailable.
 
 Host runner regressions: `python3 -m unittest discover -s scripts/tests -p
-test_qualify_wallet_recovery.py`. SDK lifecycle regressions:
+'test_*recovery*.py'`. SDK lifecycle regressions:
 `:waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:testAndroidHostTest`.
