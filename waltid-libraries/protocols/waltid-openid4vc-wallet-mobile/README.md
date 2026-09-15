@@ -43,6 +43,7 @@ Recovery providers are optional dependencies and registrations. The base SDK ena
 
 See the [identity lifecycle guide](docs/identity-recovery.md) for the platform matrix, configuration,
 recovery limitations and standards boundaries, and the [versioned recovery format](docs/identity-recovery-format.md).
+The [recovery qualification guide](docs/recovery-testing.md) describes the isolated test hosts, resumable phases and evidence boundaries.
 
 ## Key-use authorization
 

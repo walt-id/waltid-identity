@@ -3,6 +3,8 @@ package id.walt.wallet2.recovery.blockstore
 import android.content.Context
 import com.google.android.gms.auth.blockstore.Blockstore
 import com.google.android.gms.auth.blockstore.BlockstoreClient
+import com.google.android.gms.auth.blockstore.BlockstoreStatusCodes
+import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.auth.blockstore.DeleteBytesRequest
 import com.google.android.gms.auth.blockstore.RetrieveBytesRequest
 import com.google.android.gms.auth.blockstore.StoreBytesData
@@ -72,11 +74,13 @@ public class BlockStoreIdentityRecovery(
     }
 
     override suspend fun store(recordId: String, record: IdentityRecoveryData): RecoveryReceipt = mutex.withLock {
-        if (availability() !is RecoveryAvailability.Available) throw IdentityProviderException(IdentityProviderFailure.TemporarilyUnavailable)
         val key = key(recordId)
         val bytes = record.copyBytes()
         try {
-            require(bytes.size <= BlockstoreClient.MAX_SIZE) { "Recovery record exceeds the Block Store entry limit" }
+            require(key.encodeToByteArray().size + bytes.size <= BlockstoreClient.MAX_SIZE) {
+                "Recovery identifier and record exceed the Block Store entry limit"
+            }
+            if (availability() !is RecoveryAvailability.Available) throw IdentityProviderException(IdentityProviderFailure.TemporarilyUnavailable)
             val existing = retrieveUnlocked(recordId)
             try {
                 if (existing != null && !existing.contentEquals(bytes)) throw IdentityProviderException(IdentityProviderFailure.Conflict)
@@ -112,6 +116,12 @@ public class BlockStoreIdentityRecovery(
 
 private suspend fun <T> Task<T>.awaitResult(): T = suspendCancellableCoroutine { continuation ->
     addOnSuccessListener { if (continuation.isActive) continuation.resume(it) }
-    addOnFailureListener { if (continuation.isActive) continuation.resumeWithException(IdentityProviderException(IdentityProviderFailure.TemporarilyUnavailable)) }
+    addOnFailureListener { cause ->
+        val failure = when ((cause as? ApiException)?.statusCode) {
+            BlockstoreStatusCodes.MAX_SIZE_EXCEEDED, BlockstoreStatusCodes.TOO_MANY_ENTRIES -> IdentityProviderFailure.Rejected
+            else -> IdentityProviderFailure.TemporarilyUnavailable
+        }
+        if (continuation.isActive) continuation.resumeWithException(IdentityProviderException(failure))
+    }
     addOnCanceledListener { continuation.cancel() }
 }

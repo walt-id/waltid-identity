@@ -324,9 +324,12 @@ public class WalletIdentities internal constructor(
         if (option.owner !== owner || configuration.policy != IdentityKeyPolicy.GeneralPurpose ||
             option.authorization !in authorizations || option.storage !in supportedStorage(importing = true, option.authorization)) return@withLock failed(IdentityFailure.StaleOption)
         val provider = providers[option.reference.providerId] ?: return@withLock failed(IdentityFailure.ProviderUnavailable)
-        if (provider.availability() !is RecoveryAvailability.Available) return@withLock failed(IdentityFailure.ProviderUnavailable)
-        val bytes = provider.retrieve(option.reference.recordId)?.copyBytes()
-            ?: return@withLock failed(IdentityFailure.ProviderUnavailable)
+        val bytes = try {
+            if (provider.availability() !is RecoveryAvailability.Available) return@withLock failed(IdentityFailure.ProviderUnavailable)
+            provider.retrieve(option.reference.recordId)?.copyBytes()
+                ?: return@withLock failed(IdentityFailure.ProviderUnavailable)
+        } catch (cause: CancellationException) { throw cause }
+        catch (cause: Exception) { return@withLock failed(providerFailure(cause)) }
         try {
             if (!fingerprint(bytes).contentEquals(option.fingerprint)) return@withLock failed(IdentityFailure.StaleOption)
             val recovery = decodeRecovery(bytes, option.reference.recordId)

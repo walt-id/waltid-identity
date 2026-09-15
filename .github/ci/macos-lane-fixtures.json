@@ -116,6 +116,15 @@
       "name": "iOS phase runner affects all macOS lanes",
       "files": [".github/scripts/mobile-ci/run-ios-phase.py"],
       "lanes": ["ios-simulator", "native", "compose", "enterprise", "sdk-docs"]
+    },
+    {
+      "name": "portable recovery tooling selects simulator coverage",
+      "files": [
+        "scripts/qualify-wallet-recovery.py",
+        "scripts/build-recovery-simulator-host.py",
+        ".github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh"
+      ],
+      "lanes": ["ios-simulator"]
     }
   ]
 }
