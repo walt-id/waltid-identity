@@ -11,8 +11,6 @@ import id.walt.certificate.x509.validation.validator.X509CertificateSignatureVal
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -202,11 +200,12 @@ class X509CertificateChainValidationTest {
              * and without a system trust store to ensure the same behavior in JS and JVM
              */
             setTrust(trustStore)
-            addValidators(X509CertificateValidityValidator(
-                allowValidityInFuture = true,
-                timeProvider = {
-                getTestTime()
-            }))
+            addValidators(
+                X509CertificateValidityValidator(
+                    allowValidityInFuture = true,
+                    clock = testClock
+                )
+            )
         }
 
         val caCertUtil = X509CertificateUtil {
@@ -217,16 +216,16 @@ class X509CertificateChainValidationTest {
             setTrust(trustStore)
             addValidators(
                 X509CertificateBasicConstraintsValidator(leafCanBeCa = true),
-                X509CertificateValidityValidator(timeProvider = {
-                    getTestTime()
-                })
+                X509CertificateValidityValidator(clock = testClock)
             )
         }
 
         // Google certificates are valid till 24.09.2026
         private val timeOffset = Clock.System.now() - Instant.parse("2026-09-01T00:00:00Z")
 
-        private fun getTestTime() =
-            Clock.System.now() - timeOffset
+        private val testClock: Clock = object : Clock {
+            override fun now(): Instant =
+                Clock.System.now() - timeOffset
+        }
     }
 }

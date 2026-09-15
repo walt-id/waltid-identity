@@ -13,14 +13,14 @@ import kotlin.time.Duration.Companion.days
  */
 class X509CertificateValidityValidator(
     private val allowValidityInFuture: Boolean = false,
-    private val clock: Clock = Clock.System
+    private val clock: Clock
 ) : X509CertificateValidator {
 
     override val id: String = ID
 
     constructor(
         allowValidityInFuture: Boolean = false
-    ) : this(allowValidityInFuture = allowValidityInFuture, timeProvider = { Clock.System.now() })
+    ) : this(allowValidityInFuture = allowValidityInFuture, clock = Clock.System)
 
     override suspend fun validate(
         context: ValidationContext,
