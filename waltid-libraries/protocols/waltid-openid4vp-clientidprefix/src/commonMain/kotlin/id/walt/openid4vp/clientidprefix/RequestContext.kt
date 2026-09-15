@@ -28,7 +28,9 @@ data class RequestContext(
 
 data class ClientIdTrustConfiguration(
     /**
-     * List of trusted X.509 certificate DERs in base64 format.
+     * Wallet-controlled X.509 trust store for `x509_hash` / `x509_san_dns` Request Objects.
+     * Null fails those prefixes closed. Callers typically wrap PEM pins and/or Trust Registry
+     * relying-party certificates in [InMemoryTrustStore].
      */
     val x509TrustAnchors: X509CertificateTrustStore? = null,
     val trustedVerifierAttestationIssuers: Set<String> = emptySet(),
