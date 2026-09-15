@@ -209,7 +209,7 @@ private struct ReaderTrustSettingsView: View {
 
     var body: some View {
         List {
-            Section("Reader policy") {
+            Section {
                 policyChoice(
                     .allowAnonymousOrUntrusted,
                     title: "Allow anonymous or untrusted readers",
@@ -229,8 +229,10 @@ private struct ReaderTrustSettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.red)
                 }
+            } header: {
+                Text("Reader policy")
+                    .accessibilityIdentifier(WalletAccessibilityID.readerTrustPolicy)
             }
-            .accessibilityIdentifier(WalletAccessibilityID.readerTrustPolicy)
 
             Section("Configured trust material") {
                 if controller.settings.trustAnchors.isEmpty,

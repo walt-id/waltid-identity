@@ -26,6 +26,7 @@ final class MockWalletUITests: XCTestCase {
             "Wallet ready"
         )
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        ui.assertExists(identifier: "wallet.settingsReaderAuthentication")
         ui.tapElement(identifier: "wallet.settingsReaderAuthentication")
 
         let allowUntrusted = app.descendants(matching: .any)[
@@ -52,7 +53,13 @@ final class MockWalletUITests: XCTestCase {
             identifier: "wallet.readerTrustReset",
             fallbackLabel: "Reset Reader Authentication settings"
         )
-        ui.tapButton(identifier: "wallet.readerTrustResetConfirm", fallbackLabel: "Reset")
+        let resetConfirmation = app.buttons["wallet.readerTrustResetConfirm"].firstMatch
+        let resetReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND hittable == true"),
+            object: resetConfirmation
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [resetReady], timeout: 10), .completed)
+        resetConfirmation.tap()
         XCTAssertEqual(allowUntrusted.value as? String, "Selected")
         XCTAssertFalse(app.buttons["wallet.readerTrustReset"].exists)
     }
