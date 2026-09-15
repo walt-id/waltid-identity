@@ -1112,7 +1112,7 @@ class WalletDemoAppTestScenarios(
         val proximity = WalletDemoProximityController(backend, approvalModeProvider = settings::proximityApprovalMode,
             profileProvider = settings::proximityTransportProfile, scope = CoroutineScope(Dispatchers.Unconfined), dispatcher = Dispatchers.Unconfined)
         val trust = DemoReaderTrustSettingsController(InMemoryDemoReaderTrustSettingsStore())
-        setContent { MobileWalletDemoApp(controller, proximity, trust) }
+        setWalletContent { MobileWalletDemoApp(controller, proximity, trust) }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
         onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
