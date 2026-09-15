@@ -163,6 +163,14 @@ class X509CertificateChainValidationTest {
 
     companion object {
 
+        // Google certificates are valid till 24.09.2026
+        private val timeOffset = Clock.System.now() - Instant.parse("2026-09-01T00:00:00Z")
+
+        private val testClock: Clock = object : Clock {
+            override fun now(): Instant =
+                Clock.System.now() - timeOffset
+        }
+
         val trustStore = InMemoryTrustStore(
             listOf(gtsRootR4CrtPem)
                 .map { X509CertificateUtil.parseCertificatePem(it) })
@@ -218,14 +226,6 @@ class X509CertificateChainValidationTest {
                 X509CertificateBasicConstraintsValidator(leafCanBeCa = true),
                 X509CertificateValidityValidator(clock = testClock)
             )
-        }
-
-        // Google certificates are valid till 24.09.2026
-        private val timeOffset = Clock.System.now() - Instant.parse("2026-09-01T00:00:00Z")
-
-        private val testClock: Clock = object : Clock {
-            override fun now(): Instant =
-                Clock.System.now() - timeOffset
         }
     }
 }
