@@ -8,7 +8,7 @@ import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.did.dids.Crypto2DidService
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.*
 import id.walt.wallet2.mobile.createSqlDelightMobileWallet
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.*
@@ -18,6 +18,56 @@ import kotlinx.coroutines.CancellationException
 import kotlin.test.*
 
 class WalletIdentitiesTest {
+    @Test fun `activation and reopening publish the registry outside the identity lock`() = runTest {
+        lateinit var current: MobileWallet
+        var notifications = 0
+        Fixture(onRegistryChanged = {
+            assertIs<WalletIdentityState.Active>(current.identities.state())
+            notifications++
+        }).use { fixture ->
+            current = fixture.wallet
+            val original = assertIs<IdentityOperationResult.Active>(current.identities.initialize()).identity
+            assertEquals(1, notifications)
+            current = fixture.reopen()
+            assertEquals(original, assertIs<IdentityOperationResult.Active>(current.identities.initialize()).identity)
+            assertEquals(2, notifications)
+        }
+    }
+
+    @Test fun `pending setup is not published until resumed and recovery publishes its destination`() = runTest {
+        var sourceNotifications = 0
+        Fixture(onRegistryChanged = { sourceNotifications++ }).use { source ->
+            source.provider.failStore = true
+            val option = assertIs<IdentityOptions.Available>(source.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended
+            val pending = assertIs<IdentityOperationResult.Pending>(source.wallet.identities.create(option))
+            assertEquals(0, sourceNotifications)
+            source.provider.failStore = false
+            val original = assertIs<IdentityOperationResult.Active>(source.wallet.identities.resumePending(pending.identityId)).identity
+            assertEquals(1, sourceNotifications)
+            var destinationNotifications = 0
+            Fixture(provider = source.provider, onRegistryChanged = { destinationNotifications++ }).use { destination ->
+                val restore = destination.wallet.identities.restorationOptions(destination.wallet.identities.recoveryCandidates().single()).single()
+                val restored = assertIs<IdentityOperationResult.Active>(destination.wallet.identities.restore(restore)).identity
+                assertEquals(original.publicJwk, restored.publicJwk)
+                assertEquals(1, destinationNotifications)
+            }
+        }
+    }
+
+    @Test fun `registration and host notification failures do not undo an active identity`() = runTest {
+        val registry = object : MobileWalletCredentialRegistry {
+            override val capabilities = UnavailableMobileWalletCredentialRegistry.capabilities
+            override suspend fun replace(registryId: String, records: List<MobileWalletCredentialRegistryRecord>): MobileWalletCredentialRegistrationResult =
+                error("Registry unavailable")
+        }
+        Fixture(registry = registry, onRegistryChanged = { error("Host notification failed") }).use { fixture ->
+            val identity = assertIs<IdentityOperationResult.Active>(fixture.wallet.identities.initialize()).identity
+            assertEquals(identity, assertIs<WalletIdentityState.Active>(fixture.wallet.identities.state()).identity)
+            assertEquals(false, fixture.wallet.digitalCredentialRegistration.value?.available)
+            assertEquals("Registry unavailable", fixture.wallet.digitalCredentialRegistration.value?.reason)
+        }
+    }
+
     @Test fun `cancelled submission preserves accepted backup and resumes the same key after restart`() = runTest {
         Fixture().use { fixture ->
             fixture.provider.cancelAfterStore = true
@@ -454,11 +504,13 @@ class WalletIdentitiesTest {
     private class Fixture(
         configuration: IdentityConfiguration? = null,
         val provider: MemoryRecovery = MemoryRecovery(),
+        registry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
+        onRegistryChanged: suspend () -> Unit = {},
     ) : AutoCloseable {
         private val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         private val db = WalletPersistenceDatabase(driver)
         val queries = db.walletPersistenceQueries
-        private val config = MobileWalletConfig(identity = configuration ?: IdentityConfiguration(
+        private val config = MobileWalletConfig(credentialRegistry = registry, onDigitalCredentialRegistryChanged = onRegistryChanged, identity = configuration ?: IdentityConfiguration(
             recoveryProviders = listOf(provider), authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
         init { WalletPersistenceDatabase.Schema.create(driver) }
         val wallet = reopen()
