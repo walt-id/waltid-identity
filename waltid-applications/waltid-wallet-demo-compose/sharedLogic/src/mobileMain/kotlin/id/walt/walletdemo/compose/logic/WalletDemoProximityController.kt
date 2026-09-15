@@ -586,17 +586,24 @@ class WalletDemoProximityController(
 private val ProximityCapabilities.automaticPermissionActions:
     List<ProximityRemediationAction>
     get() = remediationActions.filter {
-        it == ProximityRemediationAction.RequestBluetoothPermission
+        it == ProximityRemediationAction.RequestBluetoothPermission ||
+            it == ProximityRemediationAction.RequestNearbyWifiPermission ||
+            it == ProximityRemediationAction.RequestLocalNetworkPermission
     }
 
 internal fun WalletDemoProximityTransportProfile.configuration(): ProximityConfiguration =
     when (this) {
         WalletDemoProximityTransportProfile.Default,
-        WalletDemoProximityTransportProfile.Bluetooth -> {
+        WalletDemoProximityTransportProfile.Bluetooth,
+        WalletDemoProximityTransportProfile.WifiAware -> {
             val retrieval = ProximityRetrievalOptions(
+                bluetoothLowEnergy = ProximityBleConfiguration().takeUnless {
+                    this == WalletDemoProximityTransportProfile.WifiAware
+                },
                 nfc = ProximityNfcRetrievalConfiguration().takeIf {
                     this == WalletDemoProximityTransportProfile.Default
                 },
+                wifiAware = this != WalletDemoProximityTransportProfile.Bluetooth,
             )
             ProximityConfiguration(
                 session = ProximitySessionConfiguration.ConventionalNfc(
@@ -614,6 +621,10 @@ internal fun WalletDemoProximityTransportProfile.configuration(): ProximityConfi
                         bearerPolicy = ProximityBleBearerPolicy.GattOnly,
                     ),
                 ),
+            )
+        WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware ->
+            ProximityConfiguration(
+                session = ProximitySessionConfiguration.ProvisionalNfcV2(wifiAware = true),
             )
         WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct ->
             ProximityConfiguration(

@@ -169,7 +169,10 @@ class ProximityModelsTest {
         val nfc = ProximityRetrievalOptions(
             bluetoothLowEnergy = null, nfc = ProximityNfcRetrievalConfiguration(),
         )
-        val plans = listOf(ble, nfc, ble.copy(nfc = nfc.nfc))
+        val plans = listOf(ble, nfc, ble.copy(nfc = nfc.nfc)).let { conventional ->
+            conventional + conventional.map { it.copy(wifiAware = true) } +
+                ProximityRetrievalOptions(bluetoothLowEnergy = null, wifiAware = true)
+        }
         plans.forEach { retrieval ->
             ProximityConfiguration(session = ProximitySessionConfiguration.Qr(retrieval))
             ProximityNfcHandover.entries.forEach { handover ->
@@ -183,9 +186,13 @@ class ProximityModelsTest {
                     )
                 }
             }
-            ProximityConfiguration(
-                session = ProximitySessionConfiguration.ProvisionalNfcV2(qrFallback = retrieval,)
-            )
+            for (wifiAware in listOf(false, true)) for (bluetooth in listOf(null, ble.bluetoothLowEnergy)) {
+                ProximityConfiguration(
+                    session = ProximitySessionConfiguration.ProvisionalNfcV2(
+                        bluetoothLowEnergy = bluetooth, qrFallback = retrieval, wifiAware = wifiAware,
+                    )
+                )
+            }
         }
         assertFailsWith<IllegalArgumentException> {
             ProximitySessionConfiguration.ConventionalNfc(

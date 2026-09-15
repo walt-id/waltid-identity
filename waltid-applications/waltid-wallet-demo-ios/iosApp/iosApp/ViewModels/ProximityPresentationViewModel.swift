@@ -93,8 +93,8 @@ final class ProximityPresentationViewModel: ObservableObject {
             .init(
                 session: .nfc(.init(
                     handover: .negotiatedHandover,
-                    retrieval: .init(nfc: .init()),
-                    qrFallback: .init(nfc: .init())
+                    retrieval: .init(nfc: .init(), wifiAware: true),
+                    qrFallback: .init(nfc: .init(), wifiAware: true)
                 ))
             )
         },
@@ -618,6 +618,8 @@ private final class IOSProximityHostActionExecutor: NSObject, ProximityHostActio
             return await requestBluetoothPermission()
         case .openApplicationSettings, .enableBluetooth:
             return await openSettingsAndWaitForReturn()
+        case .requestNearbyWifiPermission, .requestLocalNetworkPermission, .enableWifi:
+            return .cancelled
         case .enableNFC:
             // iOS does not expose an app-addressable NFC power control.
             return .cancelled

@@ -9,7 +9,7 @@
 `waltid-mdoc-proximity-mobile` connects the
 [shared proximity engine](../waltid-mdoc-proximity/README.md) to platform radios.
 It owns BLE role setup, Ident checks, GATT/L2CAP framing, NFC handover/APDU framing
-and transport lifecycle. The shared engine owns engagement coordination,
+and Wi-Fi Aware transport. The shared engine owns engagement coordination,
 session encryption, request processing, consent and trust decisions.
 
 | Transport | Android | iOS |
@@ -17,6 +17,7 @@ session encryption, request processing, consent and trust decisions.
 | BLE central/client and peripheral/server | Native Bluetooth adapters; GATT and L2CAP | CoreBluetooth adapters; GATT and L2CAP |
 | Conventional NFC engagement and retrieval | Host-card emulation adapter | Host boundary consumed by Swift WalletSDK's entitlement-gated CardSession adapter |
 | Provisional NFCv2 | Explicit edition-2 draft path | Same host boundary; platform access and reader support required |
+| ISO Wi-Fi Aware, mandatory NCS-SK-128 | API 33+ with the required hardware, cipher and NAN facilities | Reports unimplemented for this ISO transaction-service model |
 
 These are implementation boundaries. Physical-device and independent-reader
 qualification remain separate from compilation, unit tests and API availability.
@@ -104,9 +105,31 @@ NFC host deactivation ends a direct APDU connection even while the wallet awaits
 consent. Conventional handover does not close the selected BLE connection; NFCv2
 hybrid retrieval remains viable while its alternate bearer is active or connecting.
 
+Wi-Fi Aware forwards local and observed platform closure without starting an
+additional socket read.
+
 Successful L2CAP completion permits a one-second drain before native cleanup.
 This allows queued response bytes to leave the radio stack; it is not a reader
 acknowledgement. Cancellation and error cleanup remain immediate.
+
+## Wi-Fi Aware
+
+`AndroidWifiAwareProximityTransportFactory` requires API 33+, Wi-Fi Aware,
+NCS-SK-128, a 2.4 GHz NAN band and available publish/NDP resources. Android 13+
+hosts request `NEARBY_WIFI_DEVICES`; target-37 hosts also request
+`ACCESS_LOCAL_NETWORK`. Capability checks perform no radio attach or prompt.
+
+The provider publishes the transaction-derived service, establishes a secure
+responder data path and serves bounded sequential `POST /mdoc` exchanges. Each
+provider owns one publisher and one accept operation. Concurrent QR/NFC routes
+use separate keys and service names; never share a provider between them.
+Callback resources enter their owner before coroutine delivery, and cancellation
+closes blocking sockets before joining workers. NFCv2 HTTP reads and duplicate
+responses respect request/response ordering.
+
+The iOS factory reports a specific unimplemented result because Apple's paired,
+statically declared DNS-SD service model cannot express the ISO transaction
+service name.
 
 ## Tests and design references
 
@@ -118,4 +141,5 @@ From the unified-build root:
 
 - [BLE building blocks and qualification boundary](docs/adr/0001-ble-building-block-selection.md)
 - [NFC, handover and provisional NFCv2](docs/adr/0002-nfc-building-block-selection.md)
+- [Wi-Fi Aware sources and platform scope](docs/adr/0003-wifi-aware-building-block-selection.md)
 - [Wallet integration, reader trust and credential selection](../../protocols/waltid-openid4vc-wallet-mobile/README.md#in-person-proximity-presentation)

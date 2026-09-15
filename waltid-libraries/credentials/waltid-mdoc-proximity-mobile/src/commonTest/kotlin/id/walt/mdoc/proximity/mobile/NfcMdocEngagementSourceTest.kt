@@ -45,15 +45,21 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
@@ -124,6 +130,270 @@ class NfcMdocEngagementSourceTest {
             assertEquals(setOf(ProximityTransportKind.NFC), prepared.readiness.availableTransports)
             prepared.sources.single().close(ProximityCloseReason.COMPLETED)
             loopback.holder.close(ProximityCloseReason.COMPLETED)
+        }
+    }
+
+
+    @Test
+    fun `independent Wi-Fi endpoints bind the winning key and transcript despite QR waiting first`() = runTest {
+        for (qrWins in listOf(false, true)) for (connectionBeforeHandover in listOf(false, true)) {
+            withKey { nfcKey -> withKey { qrKey ->
+                val nfc = FakeNfcPlatform()
+                val radio = EngagementWifiPlatform()
+                val factory = MdocDeviceEngagementFactory()
+                val nfcBytes = factory.encodeEDeviceKeyBytes(nfcKey)
+                val qrBytes = factory.encodeEDeviceKeyBytes(qrKey)
+                fun provider(bytes: ImmutableBytes) = DefaultWifiAwareProximityTransportProvider(
+                    WifiAwareProximityTransportConfiguration(bytes), radio,
+                )
+                val source = NfcMdocEngagementSource(
+                    NfcMdocEngagementConfiguration(NfcMdocEngagementScope.QrAndNfc(NfcMdocEngagementProfile.Static)),
+                    nfc, listOf(provider(nfcBytes)), listOf(provider(qrBytes)), qrDeviceKey = qrKey,
+                )
+                val coordinator = MdocEngagementCoordinator()
+                val prepared = coordinator.prepare(listOf(source), context(nfcKey), this)
+                val selection = async { coordinator.awaitWinner(prepared) }
+                runCurrent()
+                val nfcEndpoint = radio.endpoints.getValue(WifiAwareProtocol.deriveServiceName(nfcBytes))
+                val qrEndpoint = radio.endpoints.getValue(WifiAwareProtocol.deriveServiceName(qrBytes))
+                assertEquals(2, radio.endpoints.size)
+                assertEquals(1, qrEndpoint.awaitCount)
+                assertEquals(0, nfcEndpoint.awaitCount)
+                val winnerEndpoint = if (qrWins) qrEndpoint else nfcEndpoint
+                if (connectionBeforeHandover) winnerEndpoint.connected.complete(winnerEndpoint.raw)
+                // Keep both engagement candidates prepared while the reader obtains exact Hs.
+                assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(select(MdocNfcAid.NDEF_APPLICATION)))
+                assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(selectFile(0xe104)))
+                val file = NfcResponseApdu.decode(nfc.router.process(readBinary(0, 65_536)).copy()).data.copy()
+                val exactSelect = file.copyOfRange(2, file.size)
+                if (!connectionBeforeHandover) winnerEndpoint.connected.complete(winnerEndpoint.raw)
+                val engaged = selection.await().engaged
+                assertSame(if (qrWins) qrKey else nfcKey, engaged.eDeviceKey)
+                if (qrWins) {
+                    assertEquals(MdocSessionHandover.Qr, engaged.sessionHandover)
+                    val expected = factory.create(qrKey, listOf(DeviceRetrievalMethod.WifiAware(
+                        supportedBands = byteArrayOf(0x04),
+                    )), context(qrKey).engagementContext.copy(engagementMode = MdocEngagementMode.Qr), context(qrKey).capabilities)
+                    assertContentEquals(expected.engagement.encodedCopy(), engaged.deviceEngagement.copy())
+                } else {
+                    assertContentEquals(exactSelect, assertIs<MdocSessionHandover.NfcConnection>(engaged.sessionHandover).handoverSelect.copy())
+                    val record = NfcHandoverCodec.validateSelect(exactSelect).carriers.single().auxiliaryRecords.single()
+                    assertContentEquals(record.payload.copy(), engaged.deviceEngagement.copy())
+                }
+                val loser = if (qrWins) nfcEndpoint else qrEndpoint
+                assertEquals(listOf(ProximityCloseReason.LOST_RACE), loser.closeReasons)
+                assertTrue(winnerEndpoint.closeReasons.isEmpty())
+                assertFalse(winnerEndpoint.raw.closed)
+                prepared.sources.single().close(ProximityCloseReason.COMPLETED)
+                assertEquals(listOf(ProximityCloseReason.COMPLETED), winnerEndpoint.closeReasons)
+                assertTrue(winnerEndpoint.raw.closed)
+            } }
+        }
+    }
+
+    @Test
+    fun `reader-selected NFC Wi-Fi keeps its own endpoint key and exact transcript while QR waits`() = runTest {
+        val profiles = listOf(NfcMdocEngagementProfile.Negotiated,
+            NfcMdocEngagementProfile.ProvisionalV2(NfcV2MaximumCommandDataLength(65_536)))
+        for (profile in profiles) withKey { nfcKey -> withKey { qrKey ->
+            val nfc = FakeNfcPlatform()
+            val radio = EngagementWifiPlatform()
+            val factory = MdocDeviceEngagementFactory()
+            val nfcBytes = factory.encodeEDeviceKeyBytes(nfcKey)
+            val qrBytes = factory.encodeEDeviceKeyBytes(qrKey)
+            fun provider(bytes: ImmutableBytes) = DefaultWifiAwareProximityTransportProvider(
+                WifiAwareProximityTransportConfiguration(bytes), radio)
+            val source = NfcMdocEngagementSource(
+                NfcMdocEngagementConfiguration(NfcMdocEngagementScope.QrAndNfc(profile)),
+                nfc, listOf(provider(nfcBytes)), listOf(provider(qrBytes)), qrDeviceKey = qrKey)
+            val coordinator = MdocEngagementCoordinator()
+            val prepared = coordinator.prepare(listOf(source), context(nfcKey), this)
+            val selection = async { coordinator.awaitWinner(prepared) }
+            runCurrent()
+            val qr = radio.endpoints.getValue(WifiAwareProtocol.deriveServiceName(qrBytes))
+            assertEquals(1, qr.awaitCount)
+            assertEquals(1, radio.endpoints.size)
+            val exactRequest: ByteArray
+            val exactSelect: ByteArray
+            if (profile is NfcMdocEngagementProfile.ProvisionalV2) {
+                exactRequest = v2Request(DeviceRetrievalMethod.NfcV2,
+                    DeviceRetrievalMethod.WifiAware(supportedBands = byteArrayOf(0x14)))
+                assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(select(MdocNfcAid.NFC_V2)))
+                val response = nfc.router.process(envelope(NfcDo53.encode(exactRequest)))
+                assertStatus(NfcStatusWord.SUCCESS, response)
+                exactSelect = NfcDo53.decode(NfcResponseApdu.decode(response.copy()).data.copy(), 4096)
+            } else {
+                val template = NfcMdocCarrierCodec.encode(DeviceRetrievalMethod.WifiAware(
+                    "12345678", supportedBands = byteArrayOf(0x14)), ImmutableBytes.of(byteArrayOf(0x57)),
+                    emptyList(), NfcMdocActor.HOLDER)
+                // Pinned NAN Carrier fields: mandatory cipher offer, then supported bands; no holder secret.
+                val reader = template.copy(carrierRecord = template.carrierRecord.copy(
+                    payload = ImmutableBytes.of(byteArrayOf(2, 1, 1, 2, 4, 0x14))))
+                exactRequest = NfcHandoverCodec.encodeRequest(listOf(reader))
+                assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(select(MdocNfcAid.NDEF_APPLICATION)))
+                assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(selectFile(0xe104)))
+                assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(updateBinary(0, withNlen(serviceSelect()))))
+                assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(updateBinary(0, withNlen(exactRequest))))
+                val file = NfcResponseApdu.decode(nfc.router.process(readBinary(0, 65_536)).copy()).data.copy()
+                exactSelect = file.copyOfRange(2, file.size)
+            }
+            val endpoint = radio.endpoints.getValue(WifiAwareProtocol.deriveServiceName(nfcBytes))
+            endpoint.connected.complete(endpoint.raw)
+            val engaged = selection.await().engaged
+            assertSame(nfcKey, engaged.eDeviceKey)
+            assertEquals(MdocEngagementMode.Nfc, engaged.engagementMode)
+            val handover = engaged.sessionHandover
+            val selected = if (profile is NfcMdocEngagementProfile.ProvisionalV2) {
+                val exact = assertIs<MdocSessionHandover.ProvisionalNfcV2>(handover)
+                assertContentEquals(exactRequest, exact.handoverRequest.copy())
+                assertContentEquals(exactSelect, exact.handoverSelect.copy())
+                val map = coseCompliantCbor.decodeFromByteArray<CborMap>(exactSelect)
+                val methods = assertIs<CborArray>(assertIs<CborMap>(map[CborInteger(0)])[CborInteger(2)])
+                DeviceRetrievalMethodCodec.decode(coseCompliantCbor.encodeToByteArray(CborElement.serializer(), methods.single()))
+            } else {
+                val exact = assertIs<MdocSessionHandover.NfcConnection>(handover)
+                assertContentEquals(exactRequest, exact.handoverRequest!!.copy())
+                assertContentEquals(exactSelect, exact.handoverSelect.copy())
+                NfcMdocCarrierCodec.decode(NfcHandoverCodec.validateSelect(exactSelect).carriers.single(), NfcMdocActor.HOLDER)
+            }
+            val wifi = assertIs<DeviceRetrievalMethod.WifiAware>(selected)
+            assertEquals(WifiAwareProtocol.derivePassphrase(nfcBytes), wifi.passphraseInfo)
+            assertContentEquals(byteArrayOf(0x04), wifi.supportedBands)
+            assertEquals(listOf(ProximityCloseReason.LOST_RACE), qr.closeReasons)
+            val request = byteArrayOf(1, 2, 3)
+            endpoint.raw.input.send("POST /mdoc HTTP/1.1\r\nHost: [fe80::1]\r\nContent-Type: application/cbor\r\nContent-Length: 3\r\n\r\n".encodeToByteArray() + request)
+            assertContentEquals(request, engaged.connection.receive()!!.copy())
+            engaged.connection.send(ImmutableBytes.of(byteArrayOf(9)))
+            runCurrent()
+            assertEquals(1, endpoint.awaitCount)
+            assertTrue(endpoint.raw.writes.single().last() == 9.toByte())
+            assertFalse(endpoint.raw.closed)
+            prepared.sources.single().close(ProximityCloseReason.COMPLETED)
+            assertEquals(listOf(ProximityCloseReason.COMPLETED), endpoint.closeReasons)
+        } }
+    }
+
+    @Test
+    fun `optional QR preparation failure retains the prepared NFC Wi-Fi endpoint`() = runTest {
+        withKey { nfcKey -> withKey { qrKey ->
+            val nfc = FakeNfcPlatform()
+            val radio = EngagementWifiPlatform(maximumPublications = 1)
+            val factory = MdocDeviceEngagementFactory()
+            suspend fun provider(key: Key) = DefaultWifiAwareProximityTransportProvider(
+                WifiAwareProximityTransportConfiguration(factory.encodeEDeviceKeyBytes(key)), radio,
+            )
+            val source = NfcMdocEngagementSource(
+                NfcMdocEngagementConfiguration(NfcMdocEngagementScope.QrAndNfc(NfcMdocEngagementProfile.Static)),
+                nfc, listOf(provider(nfcKey)), listOf(provider(qrKey)), qrDeviceKey = qrKey,
+            )
+            val coordinator = MdocEngagementCoordinator()
+            val prepared = coordinator.prepare(listOf(source), context(nfcKey), this)
+            assertEquals(setOf(MdocEngagementMode.Nfc), prepared.sources.single().modes)
+            assertNull(prepared.readiness.qrPayload)
+            val selection = async { coordinator.awaitWinner(prepared) }
+            runCurrent()
+            assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(select(MdocNfcAid.NDEF_APPLICATION)))
+            assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(selectFile(0xe104)))
+            assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(readBinary(0, 65_536)))
+            val endpoint = radio.endpoints.values.single()
+            endpoint.connected.complete(endpoint.raw)
+            val engaged = selection.await().engaged
+            assertSame(nfcKey, engaged.eDeviceKey)
+            assertEquals(MdocEngagementMode.Nfc, engaged.engagementMode)
+            assertTrue(endpoint.closeReasons.isEmpty())
+            prepared.sources.single().close(ProximityCloseReason.COMPLETED)
+            assertEquals(listOf(ProximityCloseReason.COMPLETED), endpoint.closeReasons)
+        } }
+    }
+
+    @Test
+    fun `concurrent Wi-Fi cancellation failure and success close both endpoints and allow restart`() = runTest {
+        for (outcome in listOf("cancel-before-handover", "cancel-after-handover", "qr-failure", "both-success")) {
+            withKey { nfcKey -> withKey { qrKey ->
+                val nfc = FakeNfcPlatform()
+                val radio = EngagementWifiPlatform()
+                val factory = MdocDeviceEngagementFactory()
+                val nfcBytes = factory.encodeEDeviceKeyBytes(nfcKey)
+                val qrBytes = factory.encodeEDeviceKeyBytes(qrKey)
+                fun provider(bytes: ImmutableBytes) = DefaultWifiAwareProximityTransportProvider(
+                    WifiAwareProximityTransportConfiguration(bytes), radio,
+                )
+                val source = NfcMdocEngagementSource(
+                    NfcMdocEngagementConfiguration(NfcMdocEngagementScope.QrAndNfc(NfcMdocEngagementProfile.Static)),
+                    nfc, listOf(provider(nfcBytes)), listOf(provider(qrBytes)), qrDeviceKey = qrKey,
+                )
+                val coordinator = MdocEngagementCoordinator()
+                val prepared = coordinator.prepare(listOf(source), context(nfcKey), this)
+                val selection = async { coordinator.awaitWinner(prepared) }
+                runCurrent()
+                val qr = radio.endpoints.getValue(WifiAwareProtocol.deriveServiceName(qrBytes))
+                val endpoint = radio.endpoints.getValue(WifiAwareProtocol.deriveServiceName(nfcBytes))
+                if (outcome != "cancel-before-handover") {
+                    assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(select(MdocNfcAid.NDEF_APPLICATION)))
+                    assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(selectFile(0xe104)))
+                    assertStatus(NfcStatusWord.SUCCESS, nfc.router.process(readBinary(0, 65_536)))
+                    runCurrent()
+                    assertEquals(1, endpoint.awaitCount)
+                }
+                if (outcome.startsWith("cancel")) {
+                    selection.cancelAndJoin()
+                } else {
+                    if (outcome == "qr-failure") qr.connected.completeExceptionally(IllegalStateException("reader left"))
+                    else qr.connected.complete(qr.raw)
+                    endpoint.connected.complete(endpoint.raw)
+                    val engaged = selection.await().engaged
+                    if (outcome == "qr-failure") assertSame(nfcKey, engaged.eDeviceKey)
+                    prepared.sources.single().close(ProximityCloseReason.COMPLETED)
+                }
+                for (publisher in radio.endpoints.values) {
+                    assertEquals(1, publisher.closeReasons.size)
+                    assertTrue(publisher.raw.closed)
+                    assertTrue(publisher.awaitCount <= 1)
+                }
+            } }
+        }
+    }
+
+    private class EngagementWifiPlatform(private val maximumPublications: Int = 2) : WifiAwarePlatformAdapter {
+        val endpoints = linkedMapOf<String, EngagementWifiPublisher>()
+        override suspend fun capability() = WifiAwareProximityAvailability.Available
+        override suspend fun preparePublisher(
+            serviceName: String, passphrase: String, sessionScope: CoroutineScope,
+        ): WifiAwarePreparedPlatformPublisher {
+            if (endpoints.size >= maximumPublications) throw ProximityException(
+                ProximityError.Capability("wifi_capacity", "No publication slot remains"),
+            )
+            return EngagementWifiPublisher().also {
+            check(endpoints.put(serviceName, it) == null) { "Concurrent engagements cannot advertise the same service identity" }
+            }
+        }
+    }
+
+    private class EngagementWifiPublisher : WifiAwarePreparedPlatformPublisher {
+        override val supportedBands = WifiAwareSupportedBands.fromBytes(byteArrayOf(0x04))
+        val connected = CompletableDeferred<WifiAwareRawConnection>()
+        val closeReasons = mutableListOf<ProximityCloseReason>()
+        var awaitCount = 0
+        val raw = EngagementWifiRawConnection()
+        class EngagementWifiRawConnection : WifiAwareRawConnection {
+            private val closure = CompletableDeferred<ProximityCloseReason>()
+            override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
+            var closed = false
+            val input = Channel<ByteArray>(1)
+            val writes = mutableListOf<ByteArray>()
+            override suspend fun read(maximumBytes: Int): ByteArray? = input.receiveCatching().getOrNull()
+            override suspend fun write(bytes: ByteArray) { writes += bytes.copyOf() }
+            override fun close(reason: ProximityCloseReason) { closed = true; closure.complete(reason); input.close() }
+        }
+        override suspend fun awaitConnection(): WifiAwareRawConnection {
+            check(++awaitCount == 1)
+            return connected.await()
+        }
+        override fun close(reason: ProximityCloseReason) {
+            if (closeReasons.isNotEmpty()) return
+            closeReasons += reason
+            connected.cancel()
+            raw.close(reason)
         }
     }
 
