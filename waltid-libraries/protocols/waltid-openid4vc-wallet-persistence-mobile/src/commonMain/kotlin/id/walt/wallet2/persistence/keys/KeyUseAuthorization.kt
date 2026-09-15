@@ -113,7 +113,7 @@ public data class WalletKeyRequirements(
     public val usages: Set<KeyUsage>,
     public val authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
     public val protection: WalletKeyProtection = WalletKeyProtection.PlatformDefault,
-    public val platform: id.walt.crypto2.signum.SignumPlatformPolicy = id.walt.crypto2.signum.SignumPlatformPolicy.Default,
+    public val platform: id.walt.crypto2.keys.PlatformKeyConfiguration = id.walt.crypto2.keys.PlatformKeyConfiguration.Default,
     /** Fresh native generation challenge; import cannot satisfy native key-generation attestation. */
     public val attestationChallenge: id.walt.crypto2.serialization.BinaryData? = null,
 ) {

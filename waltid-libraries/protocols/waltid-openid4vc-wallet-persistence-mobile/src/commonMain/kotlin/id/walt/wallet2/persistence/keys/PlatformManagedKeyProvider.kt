@@ -55,11 +55,13 @@ public interface PlatformManagedKeyProvider {
 @kotlinx.serialization.Serializable
 public data class PlatformKeyFacts(
     /** Native generation/import origin, or unknown when unavailable. */
-    public val origin: id.walt.crypto2.signum.SignumKeyOrigin = id.walt.crypto2.signum.SignumKeyOrigin.UNKNOWN,
+    public val origin: id.walt.crypto2.keys.KeyOrigin = id.walt.crypto2.keys.KeyOrigin.UNKNOWN,
     /** Observed execution tier, independent of key origin. */
-    public val securityLevel: id.walt.crypto2.signum.SignumSecurityLevel = id.walt.crypto2.signum.SignumSecurityLevel.UNKNOWN,
+    public val securityLevel: id.walt.crypto2.keys.KeySecurityLevel = id.walt.crypto2.keys.KeySecurityLevel.UNKNOWN,
     /** Native key protection classification. */
-    public val protection: id.walt.crypto2.signum.SignumProtectionLevel = id.walt.crypto2.signum.SignumProtectionLevel.UNKNOWN,
+    public val protection: id.walt.crypto2.keys.KeyProtectionLevel = id.walt.crypto2.keys.KeyProtectionLevel.UNKNOWN,
     /** Native evidence, not a verified key-attestation JWT or certification result. */
-    public val attestation: id.walt.crypto2.signum.SignumKeyAttestation? = null,
+    public val attestation: id.walt.crypto2.keys.KeyAttestation? = null,
+    /** How the authorization policy was established; iOS ACL flags cannot be independently read back. */
+    public val authorizationEvidence: id.walt.crypto2.keys.KeyAuthorizationEvidence = id.walt.crypto2.keys.KeyAuthorizationEvidence.UNKNOWN,
 )

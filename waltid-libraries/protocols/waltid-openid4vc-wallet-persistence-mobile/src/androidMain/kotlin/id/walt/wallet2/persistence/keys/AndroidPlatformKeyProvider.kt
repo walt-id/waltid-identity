@@ -99,14 +99,8 @@ public class AndroidPlatformKeyProvider(
                 usages = request.requirements.usages,
                 providerOptions = SignumKeyOptions(alias = request.nativeAlias, policy = request.toSignumPolicy()).encode(),
             )
-        ).withWalletAuthorizationMapping(request.requirements.authorizationPolicy)
+        ).withWalletAuthorizationMapping()
     } catch (cause: Throwable) {
-        if (
-            request.requirements.authorizationPolicy is KeyUseAuthorizationPolicy.None &&
-            cause is SignumKeyPolicyMismatchException
-        ) {
-            throw cause
-        }
         throw cause.toKeyUseAuthorizationException(
             protectedKeyId = request.id.value,
             policyMismatchFailure = KeyUseAuthorizationFailure.UnsupportedCombination,
@@ -117,14 +111,20 @@ public class AndroidPlatformKeyProvider(
         backend.supportsImport(requirements.spec, requirements.usages, requirements.nativePolicy())
 
     override suspend fun importManagedKey(request: WalletKeyCreationRequest,
-        material: id.walt.crypto2.keys.EncodedKey.Jwk): ManagedKey =
+        material: id.walt.crypto2.keys.EncodedKey.Jwk): ManagedKey = try {
         signumProvider.importPrivateKey(GenerateManagedKeyRequest(
             id = request.id, metadata = mapOf("wallet.nativeAlias" to request.nativeAlias), spec = request.requirements.spec, usages = request.requirements.usages,
             providerOptions = SignumKeyOptions(alias = request.nativeAlias, policy = request.toSignumPolicy()).encode(),
-        ), material).withWalletAuthorizationMapping(request.requirements.authorizationPolicy)
+        ), material).withWalletAuthorizationMapping()
+    } catch (cause: Throwable) {
+        throw cause.toKeyUseAuthorizationException(request.id.value, KeyUseAuthorizationFailure.UnsupportedCombination) ?: cause
+    }
 
-    override suspend fun keyFacts(stored: StoredKey.Managed): PlatformKeyFacts =
-        signumProvider.restoreSignumKey(stored).let { PlatformKeyFacts(it.origin, it.securityLevel, it.protectionLevel, it.attestation) }
+    override suspend fun keyFacts(stored: StoredKey.Managed): PlatformKeyFacts = try {
+        signumProvider.restoreSignumKey(stored).let { it.toWalletKeyFacts(id.walt.crypto2.keys.KeyAuthorizationEvidence.NATIVE_ATTRIBUTES) }
+    } catch (cause: Throwable) {
+        throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
+    }
 
     override fun keyUseAuthorizationPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy = try {
         signumProvider.storedPolicy(stored).toWalletPolicy(stored)
@@ -136,7 +136,7 @@ public class AndroidPlatformKeyProvider(
         val policy = keyUseAuthorizationPolicy(stored)
         return try {
             PlatformManagedKeyRestoration.Restored(
-                signumProvider.restore(stored).withWalletAuthorizationMapping(policy),
+                signumProvider.restore(stored).withWalletAuthorizationMapping(),
                 policy,
             )
         } catch (_: SignumKeyNotFoundException) {

@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile.test
 
 import androidx.test.platform.app.InstrumentationRegistry
-import id.walt.crypto2.signum.SignumKeyOrigin
+import id.walt.crypto2.keys.KeyOrigin
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.identity.*
@@ -32,7 +32,7 @@ class WalletIdentityRecoveryDeviceTest {
                 requireNotNull(selected)
                 val created = assertIs<IdentityOperationResult.Active>(original.identities.create(selected)).identity
                 println("Identity destination=$storage security=${created.keyFacts.securityLevel} origin=${created.keyFacts.origin}")
-                if (storage == IdentityKeyStorage.Hardware) assertEquals(SignumKeyOrigin.IMPORTED, created.keyFacts.origin)
+                if (storage == IdentityKeyStorage.Hardware) assertEquals(KeyOrigin.IMPORTED, created.keyFacts.origin)
                 val reopened = factory.create(originalConfiguration)
                 assertEquals(created, assertIs<WalletIdentityState.Active>(reopened.identities.state()).identity)
                 val candidate = destination.identities.recoveryCandidates().single()

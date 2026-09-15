@@ -1,6 +1,6 @@
 package id.walt.wallet2.mobile.identity
 
-import id.walt.crypto2.signum.SignumPlatformPolicy
+import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import kotlinx.serialization.Serializable
 
@@ -15,7 +15,7 @@ public data class IdentityConfiguration(
     /** Host/issuer constraints, not a declaration of EUDI or HAIP certification. */
     public val policy: IdentityKeyPolicy = IdentityKeyPolicy.GeneralPurpose,
     /** Advanced settings for this device's native key backend. */
-    public val platform: SignumPlatformPolicy = SignumPlatformPolicy.Default,
+    public val platform: PlatformKeyConfiguration = PlatformKeyConfiguration.Default,
     /** Explicit alternatives the host permits. Choosing weaker authorization always requires a different option. */
     public val alternativeAuthorizations: List<KeyUseAuthorizationPolicy> = emptyList(),
     /** Minimum provider evidence required for activation and disposal of local recovery material. */

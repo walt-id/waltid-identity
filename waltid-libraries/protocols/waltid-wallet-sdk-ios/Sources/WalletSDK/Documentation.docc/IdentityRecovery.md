@@ -62,6 +62,18 @@ The SDK verifies the destination public key and records a public reference. The 
 available and recovery status stays unchanged. This integration does not store an identity recovery
 record or configure remote signing. Device-bound and hardware-generated policies prohibit custody.
 
+### Authorization evidence
+
+``WalletIdentity/authorizationEvidence`` distinguishes native attribute inspection from an SDK
+creation record bound to the native entry. iOS access-control flags and ACL-protected accessibility
+cannot be independently read back through the public Security API. The SDK rejects unowned keys,
+policy changes and replaced native entries; creation records are not attestation.
+
+Supported generated Secure Enclave configurations use published stable Signum. Import/export,
+explicit access groups, passcode-set-only accessibility and per-key timed reuse use the Apple
+Keychain adapter. The choice stays internal and is fixed for each existing key. The same public
+configuration and failure types apply to both implementations.
+
 ### Scope and assurance
 
 ``WalletIdentityPolicy`` expresses application constraints, not EUDI, HAIP or eIDAS

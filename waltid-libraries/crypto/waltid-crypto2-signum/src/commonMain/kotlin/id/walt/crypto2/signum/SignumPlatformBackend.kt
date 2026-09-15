@@ -36,7 +36,7 @@ interface SignumPlatformBackend {
 interface SignumPlatformKey {
     val alias: String
     /** Native generation and private-key import are distinct assurance claims. */
-    val origin: SignumKeyOrigin get() = SignumKeyOrigin.GENERATED
+    val origin: SignumKeyOrigin get() = SignumKeyOrigin.UNKNOWN
     /** Observed hardware tier, where the platform exposes it. */
     val securityLevel: SignumSecurityLevel get() = SignumSecurityLevel.UNKNOWN
     val spec: KeySpec

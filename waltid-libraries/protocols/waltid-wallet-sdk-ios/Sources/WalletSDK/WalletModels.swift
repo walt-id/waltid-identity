@@ -120,7 +120,7 @@ public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
 
     ///
     /// Strong biometric authentication reusable for a fixed, non-sliding interval after authorization.
-    /// Android verifies the native KeyStore interval. iOS configures the interval in Signum but cannot
+    /// Android verifies the native KeyStore interval. iOS records the interval at creation but cannot
     /// independently inspect its effective positive timeout after restoration. This is recent platform
     /// or provider authentication, not consent for issuance, presentation, or another wallet action.
     case biometricTimedReuse(timeoutSeconds: Int)

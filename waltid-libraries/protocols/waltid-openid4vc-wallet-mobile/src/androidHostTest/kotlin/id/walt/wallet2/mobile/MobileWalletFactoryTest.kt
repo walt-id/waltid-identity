@@ -240,9 +240,9 @@ class MobileWalletFactoryTest {
         }
 
         override suspend fun keyFacts(stored: StoredKey.Managed): PlatformKeyFacts = PlatformKeyFacts(
-            origin = id.walt.crypto2.signum.SignumKeyOrigin.GENERATED,
-            protection = id.walt.crypto2.signum.SignumProtectionLevel.SOFTWARE,
-            securityLevel = id.walt.crypto2.signum.SignumSecurityLevel.SOFTWARE,
+            origin = id.walt.crypto2.keys.KeyOrigin.GENERATED,
+            protection = id.walt.crypto2.keys.KeyProtectionLevel.SOFTWARE,
+            securityLevel = id.walt.crypto2.keys.KeySecurityLevel.SOFTWARE,
         )
         override suspend fun deleteUncommittedKey(request: WalletKeyCreationRequest, imported: Boolean) = Unit
 

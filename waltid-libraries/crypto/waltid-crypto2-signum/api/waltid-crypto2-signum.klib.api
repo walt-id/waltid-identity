@@ -303,6 +303,10 @@ sealed interface id.walt.crypto2.signum/SignumPlatformPolicy { // id.walt.crypto
     }
 }
 
+final class id.walt.crypto2.signum/SignumAuthorizationException : kotlin/IllegalStateException { // id.walt.crypto2.signum/SignumAuthorizationException|null[0]
+    constructor <init>(kotlin/String = ..., kotlin/Throwable? = ...) // id.walt.crypto2.signum/SignumAuthorizationException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
+}
+
 final class id.walt.crypto2.signum/SignumInteractionContextUnavailableException : kotlin/IllegalStateException { // id.walt.crypto2.signum/SignumInteractionContextUnavailableException|null[0]
     constructor <init>(kotlin/String = ..., kotlin/Throwable? = ...) // id.walt.crypto2.signum/SignumInteractionContextUnavailableException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
 }
