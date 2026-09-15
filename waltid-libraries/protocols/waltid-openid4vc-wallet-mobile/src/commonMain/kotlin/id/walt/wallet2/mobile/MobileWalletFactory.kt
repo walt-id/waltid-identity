@@ -81,7 +81,8 @@ public data class MobileWalletCrossProcessAccess(
  *
  * Wallet apps should keep this list aligned with the ecosystem or service they trust.
  * Requests containing transaction data with a type outside this list are rejected before
- * the user can submit a presentation.
+ * the user can submit a presentation. See [MobileWalletTransactionDataProfiles] for a
+ * ready-made catalog.
  *
  * @property type Collision-resistant OpenID4VP `transaction_data.type` value.
  * @property displayName Human-readable label for consent UI.

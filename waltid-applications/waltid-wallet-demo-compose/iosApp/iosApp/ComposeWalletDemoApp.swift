@@ -11,7 +11,6 @@ struct ComposeWalletDemoApp: App {
     private let attestationAttesterPath: String
     private let attestationBearerToken: String
     private let attestationHostHeader: String
-    private let transactionDataProfilesUrl: String
     private let signingProtectionMode: String
 
     init() {
@@ -22,7 +21,6 @@ struct ComposeWalletDemoApp: App {
         attestationAttesterPath = env["ATTESTATION_ATTESTER_PATH"] ?? defaults.string(forKey: "ATTESTATION_ATTESTER_PATH") ?? DemoBackendDefaults.attestationAttesterPath
         attestationBearerToken = env["ATTESTATION_BEARER_TOKEN"] ?? defaults.string(forKey: "ATTESTATION_BEARER_TOKEN") ?? DemoBackendDefaults.attestationBearerToken
         attestationHostHeader = env["ATTESTATION_HOST_HEADER"] ?? defaults.string(forKey: "ATTESTATION_HOST_HEADER") ?? DemoBackendDefaults.attestationHostHeader
-        transactionDataProfilesUrl = env["TRANSACTION_DATA_PROFILES_URL"] ?? defaults.string(forKey: "TRANSACTION_DATA_PROFILES_URL") ?? DemoBackendDefaults.transactionDataProfilesURL
         signingProtectionMode = walletSigningProtectionMode(environment: env, defaults: defaults)
     }
 
@@ -34,7 +32,6 @@ struct ComposeWalletDemoApp: App {
                 attestationAttesterPath: attestationAttesterPath,
                 attestationBearerToken: attestationBearerToken,
                 attestationHostHeader: attestationHostHeader,
-                transactionDataProfilesUrl: transactionDataProfilesUrl,
                 appGroupIdentifier: Self.namespace.appGroupIdentifier,
                 keychainAccessGroup: Self.requiredKeychainAccessGroup,
                 // The wallet republishes its desired projection, which is not Apple's store; only this
@@ -101,5 +98,4 @@ private enum DemoBackendDefaults {
     static let attestationAttesterPath = ""
     static let attestationBearerToken = ""
     static let attestationHostHeader = ""
-    static let transactionDataProfilesURL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
 }

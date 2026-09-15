@@ -31,6 +31,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
+import id.walt.wallet2.mobile.MobileWalletTransactionDataProfiles
 import id.walt.wallet2.mobile.MobileWalletRequestAuthentication
 import id.walt.wallet2.mobile.MobileWalletClientIdScheme
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
@@ -72,13 +73,10 @@ import kotlin.test.assertTrue
 class MobileWalletIntegrationTest {
 
     companion object {
-        private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
         private const val EUDI_PID_SD_JWT_CREDENTIAL_ID = "eu.europa.ec.eudi.pid_vc_sd_jwt"
         private const val EUDI_EHIC_SD_JWT_CREDENTIAL_ID = "eu.europa.ec.eudi.ehic_sd_jwt_vc"
 
-        private val DEMO_TRANSACTION_DATA_PROFILES = demoTransactionDataProfiles(
-            paymentAuthorizationFields = listOf("merchant_name", "amount", "currency"),
-        )
+        private val DEMO_TRANSACTION_DATA_PROFILES = MobileWalletTransactionDataProfiles.all
 
         @OptIn(ExperimentalSerializationApi::class)
         private val DEMO_VERIFIER_TRUST = ClientIdTrustConfiguration(
@@ -86,21 +84,6 @@ class MobileWalletIntegrationTest {
                 DemoTestBackend.PUBLIC_DEMO_VERIFIER_CLIENT_ID to ClientMetadata(
                     jwks = ClientMetadata.Jwks(listOf(DemoTestBackend.publicDemoVerifierRequestObjectSigningJwk)),
                 ),
-            ),
-        )
-
-        private fun demoTransactionDataProfiles(
-            paymentAuthorizationFields: Iterable<String>,
-        ) = listOf(
-            MobileWalletTransactionDataProfile(
-                type = PAYMENT_AUTHORIZATION_TYPE,
-                displayName = "Payment Authorization",
-                fields = paymentAuthorizationFields.toList(),
-            ),
-            MobileWalletTransactionDataProfile(
-                type = "org.waltid.transaction-data.account-access",
-                displayName = "Account Access",
-                fields = listOf("account_identifier", "access_scope"),
             ),
         )
     }
@@ -243,11 +226,10 @@ class MobileWalletIntegrationTest {
     @Test
     fun previewAndSubmitTransactionDataAgainstDemoIssuer2AndVerifier2() = runBlocking {
         val scenario = DemoTestBackend.transactionDataPresentationScenario
-        val paymentAuthorizationFields = DemoTestBackend.transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
         val client = MobileWalletFactory(context).create(
             walletConfig(
                 prefix = "transaction-data-${scenario.id}",
-                transactionDataProfiles = demoTransactionDataProfiles(paymentAuthorizationFields),
+                transactionDataProfiles = DEMO_TRANSACTION_DATA_PROFILES,
             ),
         )
         val bootstrapResult = client.bootstrap()

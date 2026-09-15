@@ -27,6 +27,24 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(configuration.preferredLocales, Locale.preferredLanguages)
     }
 
+    func testWellKnownTransactionDataProfilesStayOptInAndCoverDemoTypes() {
+        XCTAssertTrue(WalletConfiguration().transactionDataProfiles.isEmpty)
+        XCTAssertEqual(
+            WalletTransactionDataProfile.all,
+            [
+                .paymentAuthorization,
+                .accountAccess,
+                .scaPayment,
+                .paymentCard,
+            ]
+        )
+        XCTAssertEqual(
+            WalletTransactionDataProfile.paymentAuthorization.fields,
+            ["merchant_name", "amount", "currency"]
+        )
+        XCTAssertEqual(WalletTransactionDataProfile.scaPayment.fields, ["payload"])
+    }
+
     func testIssuanceCredentialPreviewRetainsLogoAccessibilityText() {
         let preview = IssuanceCredentialPreview(
             configurationID: "mdl",

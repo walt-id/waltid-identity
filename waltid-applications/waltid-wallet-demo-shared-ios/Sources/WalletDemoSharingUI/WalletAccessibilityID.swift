@@ -34,7 +34,6 @@ public enum WalletAccessibilityID {
     public static let pinSubmitButton = identifier("pinSubmitButton")
     public static let pinBiometricToggle = identifier("pinBiometricToggle")
     public static let pinBiometricButton = identifier("pinBiometricButton")
-    public static let transactionDataProfilesWarning = identifier("transactionDataProfilesWarning")
     public static let credentialsLoading = identifier("credentials", "loading")
     public static let credentialsEmpty = identifier("credentials", "empty")
     public static let credentialDetailsScreen = identifier("credentialDetailsScreen")

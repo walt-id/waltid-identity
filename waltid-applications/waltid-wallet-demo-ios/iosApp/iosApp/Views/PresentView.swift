@@ -75,10 +75,6 @@ struct PresentView: View {
 
                 WalletTabStatusBanner(viewModel: viewModel, tab: .present)
 
-                if let warning = viewModel.transactionDataProfilesWarning {
-                    WarningBannerView(message: warning)
-                }
-
                 if let error = viewModel.presentationError {
                     PresentationErrorView(
                         error: error,
@@ -96,10 +92,6 @@ struct PresentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 WalletTabStatusBanner(viewModel: viewModel, tab: .present)
-
-                if let warning = viewModel.transactionDataProfilesWarning {
-                    WarningBannerView(message: warning)
-                }
 
                 SharingReviewView(
                     review: review,

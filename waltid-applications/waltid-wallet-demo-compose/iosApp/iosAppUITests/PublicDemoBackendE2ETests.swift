@@ -308,7 +308,6 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     private func isolatedWalletEnvironment() -> [String: String] {
         [
             "WALLET_ID": "compose-ios-public-demo-\(UUID().uuidString)",
-            "TRANSACTION_DATA_PROFILES_URL": DemoBackend.transactionDataProfilesURL.absoluteString,
         ]
     }
 }

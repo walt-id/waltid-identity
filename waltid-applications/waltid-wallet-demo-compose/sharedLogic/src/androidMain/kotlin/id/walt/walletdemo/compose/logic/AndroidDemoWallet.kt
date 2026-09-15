@@ -4,24 +4,21 @@ import android.content.Context
 import android.os.LocaleList
 import id.walt.wallet2.mobile.MobileWallet
 import androidx.fragment.app.FragmentActivity
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletTransactionDataProfiles
 
 /**
- * An Android demo [MobileWallet] together with anything the caller must warn the user about.
+ * An Android demo [MobileWallet] together with bootstrap helpers the caller needs.
  *
  * @property wallet The configured wallet.
- * @property transactionDataProfilesWarning Set when the accepted transaction data profiles could not
- *   be loaded, in which case the wallet rejects every request carrying `transaction_data`.
  */
 data class AndroidDemoMobileWallet(
     val wallet: MobileWallet,
-    val transactionDataProfilesWarning: String?,
 ) {
     suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult {
-        val demoWallet = MobileDemoWallet(wallet, transactionDataProfilesWarning)
+        val demoWallet = MobileDemoWallet(wallet)
         val availability = demoWallet.signingProtectionAvailability(signingProtection)
         check(availability == WalletDemoSigningProtectionAvailability.Available) {
             "Signing protection is unavailable: $availability"
@@ -48,13 +45,12 @@ suspend fun createAndroidDemoMobileWallet(
     config: DemoWalletConfig = DemoWalletConfig(),
     interactionContextProvider: () -> FragmentActivity? = { null },
 ): AndroidDemoMobileWallet {
-    val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
     return AndroidDemoMobileWallet(
         wallet = MobileWalletFactory(context, interactionContextProvider).create(
             MobileWalletConfig(
                 walletId = config.walletId,
                 attestationConfig = config.toWalletAttestationConfig(),
-                transactionDataProfiles = transactionDataProfiles.profiles,
+                transactionDataProfiles = MobileWalletTransactionDataProfiles.all,
                 preferredLocales = LocaleList.getDefault().let { locales ->
                     List(locales.size()) { index -> locales[index].toLanguageTag() }
                 },
@@ -66,7 +62,6 @@ suspend fun createAndroidDemoMobileWallet(
                 ),
             )
         ),
-        transactionDataProfilesWarning = transactionDataProfiles.warning,
     )
 }
 
@@ -77,8 +72,6 @@ fun createAndroidDemoWallet(
 ): DemoWallet {
 
     return LazyDemoWallet {
-        createAndroidDemoMobileWallet(context, config, interactionContextProvider).let { created ->
-            MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning)
-        }
+        MobileDemoWallet(createAndroidDemoMobileWallet(context, config, interactionContextProvider).wallet)
     }
 }

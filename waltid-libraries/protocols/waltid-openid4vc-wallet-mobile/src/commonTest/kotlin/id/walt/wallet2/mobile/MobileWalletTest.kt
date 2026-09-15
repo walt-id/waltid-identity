@@ -266,6 +266,31 @@ class MobileWalletTest {
     }
 
     @Test
+    fun wellKnownTransactionDataProfilesStayOptInAndCoverDemoTypes() {
+        assertEquals(emptyList(), MobileWalletConfig().transactionDataProfiles)
+
+        val catalog = MobileWalletTransactionDataProfiles.all
+        assertEquals(
+            listOf(
+                MobileWalletTransactionDataProfiles.paymentAuthorization,
+                MobileWalletTransactionDataProfiles.accountAccess,
+                MobileWalletTransactionDataProfiles.scaPayment,
+                MobileWalletTransactionDataProfiles.paymentCard,
+            ),
+            catalog,
+        )
+        assertEquals(
+            listOf("merchant_name", "amount", "currency"),
+            MobileWalletTransactionDataProfiles.paymentAuthorization.fields,
+        )
+        assertEquals(listOf("payload"), MobileWalletTransactionDataProfiles.scaPayment.fields)
+        assertEquals(
+            catalog.map { it.type }.toSet(),
+            catalog.toTransactionDataTypeRegistry().types,
+        )
+    }
+
+    @Test
     fun persistenceCanCombineProvidedDatabaseKeyWithCredentialAndDidStoreOverrides() {
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()

@@ -17,18 +17,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     private let testWalletId = "ios-unit-test-wallet"
     private static let eudiPidSdJwtCredentialID = "eu.europa.ec.eudi.pid_vc_sd_jwt"
     private static let eudiEhicSdJwtCredentialID = "eu.europa.ec.eudi.ehic_sd_jwt_vc"
-    private static let demoTransactionDataProfiles: [WalletTransactionDataProfile] = [
-        WalletTransactionDataProfile(
-            type: "org.waltid.transaction-data.payment-authorization",
-            displayName: "Payment Authorization",
-            fields: ["amount", "currency", "payee"]
-        ),
-        WalletTransactionDataProfile(
-            type: "org.waltid.transaction-data.account-access",
-            displayName: "Account Access",
-            fields: ["account_identifier", "access_scope"]
-        )
-    ]
+    private static let demoTransactionDataProfiles: [WalletTransactionDataProfile] = WalletTransactionDataProfile.all
 
     // Timeouts (aligned with Android for cross-platform consistency)
     private let verifierPollingTimeout: TimeInterval = 30  // 30 sec - backend verification

@@ -1,10 +1,10 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletTransactionDataProfiles
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import platform.Foundation.NSLocale
 import platform.Foundation.preferredLanguages
 
@@ -26,13 +26,12 @@ fun createIosDemoWallet(
 ): DemoWallet {
 
     return LazyDemoWallet {
-        val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
         MobileDemoWallet(
             MobileWalletFactory().create(
                 MobileWalletConfig(
                     walletId = config.walletId,
                     attestationConfig = config.toWalletAttestationConfig(),
-                    transactionDataProfiles = transactionDataProfiles.profiles,
+                    transactionDataProfiles = MobileWalletTransactionDataProfiles.all,
                     preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },
                     crossProcessAccess = crossProcessAccess,
                     onDigitalCredentialRegistryChanged = onDigitalCredentialRegistryChanged,
@@ -44,7 +43,6 @@ fun createIosDemoWallet(
                     ),
                 )
             ),
-            warning = transactionDataProfiles.warning,
         )
     }
 }

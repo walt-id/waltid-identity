@@ -1914,6 +1914,19 @@ final object id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols { // 
         final fun <get-OPENID4VP_UNSIGNED>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED.<get-OPENID4VP_UNSIGNED>|<get-OPENID4VP_UNSIGNED>(){}[0]
 }
 
+final object id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles { // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles|null[0]
+    final val accountAccess // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles.accountAccess|{}accountAccess[0]
+        final fun <get-accountAccess>(): id.walt.wallet2.mobile/MobileWalletTransactionDataProfile // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles.accountAccess.<get-accountAccess>|<get-accountAccess>(){}[0]
+    final val all // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles.all|{}all[0]
+        final fun <get-all>(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles.all.<get-all>|<get-all>(){}[0]
+    final val paymentAuthorization // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles.paymentAuthorization|{}paymentAuthorization[0]
+        final fun <get-paymentAuthorization>(): id.walt.wallet2.mobile/MobileWalletTransactionDataProfile // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles.paymentAuthorization.<get-paymentAuthorization>|<get-paymentAuthorization>(){}[0]
+    final val paymentCard // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles.paymentCard|{}paymentCard[0]
+        final fun <get-paymentCard>(): id.walt.wallet2.mobile/MobileWalletTransactionDataProfile // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles.paymentCard.<get-paymentCard>|<get-paymentCard>(){}[0]
+    final val scaPayment // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles.scaPayment|{}scaPayment[0]
+        final fun <get-scaPayment>(): id.walt.wallet2.mobile/MobileWalletTransactionDataProfile // id.walt.wallet2.mobile/MobileWalletTransactionDataProfiles.scaPayment.<get-scaPayment>|<get-scaPayment>(){}[0]
+}
+
 final object id.walt.wallet2.mobile/UnavailableMobileWalletCredentialRegistry : id.walt.wallet2.mobile/MobileWalletCredentialRegistry { // id.walt.wallet2.mobile/UnavailableMobileWalletCredentialRegistry|null[0]
     final val capabilities // id.walt.wallet2.mobile/UnavailableMobileWalletCredentialRegistry.capabilities|{}capabilities[0]
         final fun <get-capabilities>(): id.walt.wallet2.mobile/MobileWalletDigitalCredentialCapabilities // id.walt.wallet2.mobile/UnavailableMobileWalletCredentialRegistry.capabilities.<get-capabilities>|<get-capabilities>(){}[0]

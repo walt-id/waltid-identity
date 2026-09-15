@@ -21,7 +21,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        ui.launch(environment: publicDemoEnvironment())
+        ui.launch()
 
         let readyStatus = ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
@@ -90,7 +90,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        ui.launch(environment: publicDemoEnvironment())
+        ui.launch()
 
         let readyStatus = ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
@@ -145,7 +145,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let transactionCode = try XCTUnwrap(offer.txCode)
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        ui.launch(environment: publicDemoEnvironment())
+        ui.launch()
 
         let readyStatus = ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
@@ -209,10 +209,6 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
     private func publicDemoScenario() throws -> DemoCredentialScenario {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == "eudi-pid-mdoc" })
-    }
-
-    private func publicDemoEnvironment() -> [String: String] {
-        ["TRANSACTION_DATA_PROFILES_URL": DemoBackend.transactionDataProfilesURL.absoluteString]
     }
 
     private func incorrectCode(for code: String) -> String {

@@ -286,7 +286,44 @@ public struct WalletTransactionDataProfile: Equatable, Sendable {
         self.displayName = displayName ?? type
         self.fields = fields
     }
+}
 
+extension WalletTransactionDataProfile {
+    /// walt.id payment-authorization type used by the public demo verifier.
+    public static let paymentAuthorization = WalletTransactionDataProfile(
+        type: "org.waltid.transaction-data.payment-authorization",
+        displayName: "Payment Authorization",
+        fields: ["merchant_name", "amount", "currency"]
+    )
+
+    /// walt.id account-access type used by the public demo verifier.
+    public static let accountAccess = WalletTransactionDataProfile(
+        type: "org.waltid.transaction-data.account-access",
+        displayName: "Account Access",
+        fields: ["account_identifier", "access_scope"]
+    )
+
+    /// EUDI TS-12 SCA payment type. The Credential Manager matcher reads the nested `payload`.
+    public static let scaPayment = WalletTransactionDataProfile(
+        type: "urn:eudi:sca:payment:1",
+        displayName: "SCA Payment",
+        fields: ["payload"]
+    )
+
+    /// Interop identifier used by some OpenID4VP payment-card verifiers.
+    public static let paymentCard = WalletTransactionDataProfile(
+        type: "payment_card",
+        displayName: "Payment Card",
+        fields: ["merchant_name", "amount"]
+    )
+
+    /// Every well-known profile in this catalog.
+    public static let all: [WalletTransactionDataProfile] = [
+        .paymentAuthorization,
+        .accountAccess,
+        .scaPayment,
+        .paymentCard,
+    ]
 }
 
 /// Wallet-local persistence configuration.

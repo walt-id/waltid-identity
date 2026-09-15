@@ -73,10 +73,6 @@ struct ReceiveView: View {
                     showActions: false
                 )
 
-                if let warning = viewModel.transactionDataProfilesWarning {
-                    WarningBannerView(message: warning)
-                }
-
                 deferredCredentials
             }
             .padding()

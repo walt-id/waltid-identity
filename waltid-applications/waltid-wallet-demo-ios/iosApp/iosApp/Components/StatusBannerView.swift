@@ -82,20 +82,3 @@ struct StatusBannerView: View {
         return branding.onPrimaryContainer
     }
 }
-
-struct WarningBannerView: View {
-    let message: String
-
-    var body: some View {
-        Text(message)
-            .font(.subheadline)
-            .lineLimit(3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color.orange.opacity(0.16))
-            .foregroundColor(.orange)
-            .cornerRadius(8)
-            .accessibilityIdentifier(WalletAccessibilityID.transactionDataProfilesWarning)
-    }
-}

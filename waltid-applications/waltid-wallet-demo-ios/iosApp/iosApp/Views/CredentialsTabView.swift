@@ -31,10 +31,6 @@ struct CredentialsTabView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if selectedDetailsID == nil {
                         WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
-
-                        if let warning = viewModel.transactionDataProfilesWarning {
-                            WarningBannerView(message: warning)
-                        }
                     }
 
                     if !viewModel.isReady {

@@ -28,9 +28,14 @@ public struct DemoMetadataSigner {
 public final class DemoBackend {
     public static let shared = DemoBackend()
     private static let eudiPidSdJwtVct = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1"
-    public static let transactionDataProfilesURL = URL(string: "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles")!
     private static let paymentAuthorizationType = "org.waltid.transaction-data.payment-authorization"
     private static let requiredPaymentAuthorizationFields: Set<String> = ["merchant_name", "amount", "currency"]
+    private static let transactionDataProfiles: [String: Set<String>] = [
+        paymentAuthorizationType: requiredPaymentAuthorizationFields,
+        "org.waltid.transaction-data.account-access": ["account_identifier", "access_scope"],
+        "urn:eudi:sca:payment:1": ["payload"],
+        "payment_card": ["merchant_name", "amount"],
+    ]
 
     public static let scenarios: [DemoCredentialScenario] = [
         DemoCredentialScenario(
@@ -216,7 +221,7 @@ public final class DemoBackend {
     public func createTransactionDataVerifierSession(
         scenario: DemoCredentialScenario = DemoBackend.transactionDataPresentationScenario
     ) async throws -> DemoVerifierSession {
-        let fields = try await transactionDataProfileFields(type: Self.paymentAuthorizationType)
+        let fields = try transactionDataProfileFields(type: Self.paymentAuthorizationType)
         let missingFields = Self.requiredPaymentAuthorizationFields.subtracting(fields)
         guard missingFields.isEmpty else {
             throw NSError(
@@ -231,22 +236,15 @@ public final class DemoBackend {
         )
     }
 
-    public func transactionDataProfileFields(type: String) async throws -> Set<String> {
-        let response = try await client.textRequest(
-            url: Self.transactionDataProfilesURL,
-            retryTransientFailures: true
-        )
-        let json = try JSONSerialization.jsonObject(with: Data(response.body.utf8), options: [])
-        guard let profiles = json as? [[String: Any]],
-              let profile = profiles.first(where: { $0["type"] as? String == type }),
-              let fields = profile["fields"] as? [String] else {
+    public func transactionDataProfileFields(type: String) throws -> Set<String> {
+        guard let fields = Self.transactionDataProfiles[type] else {
             throw NSError(
                 domain: "WalletE2E",
                 code: 306,
-                userInfo: [NSLocalizedDescriptionKey: "Missing public demo transaction data profile: \(type)"]
+                userInfo: [NSLocalizedDescriptionKey: "Missing transaction data profile: \(type)"]
             )
         }
-        return Set(fields)
+        return fields
     }
 
     private func createVerifierSession(

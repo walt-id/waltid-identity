@@ -46,7 +46,6 @@ fun walletDemoViewController(
     attestationAttesterPath: String = "",
     attestationBearerToken: String = "",
     attestationHostHeader: String = "",
-    transactionDataProfilesUrl: String = "",
     signingProtectionMode: String = "optional",
 ): UIViewController {
     val parsedSigningProtectionMode = WalletDemoSigningProtectionMode.parse(signingProtectionMode)
@@ -56,7 +55,6 @@ fun walletDemoViewController(
         attestationAttesterPath = attestationAttesterPath,
         attestationBearerToken = attestationBearerToken,
         attestationHostHeader = attestationHostHeader,
-        transactionDataProfilesUrl = transactionDataProfilesUrl,
         signingProtectionMode = parsedSigningProtectionMode,
     )
     require(appGroupIdentifier.isNotEmpty()) {

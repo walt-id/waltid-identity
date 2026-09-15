@@ -19,7 +19,6 @@ internal fun demoWalletConfig(): DemoWalletConfig = DemoWalletConfig(
     attestationAttesterPath = BuildConfig.ATTESTATION_ATTESTER_PATH,
     attestationBearerToken = BuildConfig.ATTESTATION_BEARER_TOKEN,
     attestationHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
-    transactionDataProfilesUrl = BuildConfig.TRANSACTION_DATA_PROFILES_URL,
     signingProtectionMode = WalletDemoSigningProtectionMode.parse(BuildConfig.WALLET_SIGNING_PROTECTION_MODE),
 )
 

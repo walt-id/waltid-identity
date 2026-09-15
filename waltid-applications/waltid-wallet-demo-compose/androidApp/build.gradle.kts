@@ -6,7 +6,6 @@ plugins {
 }
 
 val javaVersion = identityLibs.versions.java.library.get().toInt()
-val publicDemoTransactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
 val walletSigningProtectionMode =
     ((findProperty("walletSigningProtectionMode") as String?) ?: "optional").trim().lowercase()
 require(walletSigningProtectionMode in setOf("required", "optional", "disabled")) {
@@ -37,7 +36,6 @@ android {
         buildConfigField("String", "ATTESTATION_ATTESTER_PATH", "\"${findProperty("attestation.attesterPath") ?: ""}\"")
         buildConfigField("String", "ATTESTATION_BEARER_TOKEN", "\"${findProperty("attestation.bearerToken") ?: ""}\"")
         buildConfigField("String", "ATTESTATION_HOST_HEADER", "\"${findProperty("attestation.hostHeader") ?: ""}\"")
-        buildConfigField("String", "TRANSACTION_DATA_PROFILES_URL", "\"${findProperty("transactionDataProfiles.url") ?: publicDemoTransactionDataProfilesUrl}\"")
         buildConfigField("String", "WALLET_SIGNING_PROTECTION_MODE", "\"$walletSigningProtectionMode\"")
     }
 

@@ -27,7 +27,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -58,7 +57,6 @@ object DemoTestBackend {
     private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_X = "G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0"
     private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_Y = "VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"
 
-    const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
     private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
 
@@ -356,11 +354,11 @@ object DemoTestBackend {
         transactionData = listOf(paymentAuthorizationTransactionData("pid")),
     )
 
-    /** One generic payment-authorization item using the current public-demo profile contract. */
-    suspend fun paymentAuthorizationTransactionData(credentialId: String): JsonObject {
+    /** One generic payment-authorization item using the local well-known profile contract. */
+    fun paymentAuthorizationTransactionData(credentialId: String): JsonObject {
         val fields = transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
         check(fields.containsAll(requiredPaymentAuthorizationFields)) {
-            "Public demo transaction data profile '$PAYMENT_AUTHORIZATION_TYPE' is missing required fields: " +
+            "Transaction data profile '$PAYMENT_AUTHORIZATION_TYPE' is missing required fields: " +
                 (requiredPaymentAuthorizationFields - fields).joinToString()
         }
         return buildPaymentAuthorizationTransactionData(credentialId)
@@ -388,14 +386,11 @@ object DemoTestBackend {
      * the same strings on the Credential Manager prompt and on the wallet's own review. `amount` is a
      * JSON number because the Credential Manager matcher reads it as one for this type and skips the
      * entry if it is a string.
-     *
-     * The profile is fetched rather than assumed so that a deployment which still declares the old
-     * `payment_details` type fails here, instead of producing an item the matcher silently drops.
      */
-    suspend fun scaPaymentTransactionData(credentialId: String): JsonObject {
+    fun scaPaymentTransactionData(credentialId: String): JsonObject {
         val fields = transactionDataProfileFields(SCA_PAYMENT_TYPE)
         check(fields.contains("payload")) {
-            "Demo transaction data profile '$SCA_PAYMENT_TYPE' does not declare 'payload': $fields"
+            "Transaction data profile '$SCA_PAYMENT_TYPE' does not declare 'payload': $fields"
         }
         return buildJsonObject {
             put("type", JsonPrimitive(SCA_PAYMENT_TYPE))
@@ -418,24 +413,16 @@ object DemoTestBackend {
         }
     }
 
-    suspend fun transactionDataProfileFields(type: String): Set<String> {
-        val response = client.get(TRANSACTION_DATA_PROFILES_URL) {
-            accept(ContentType.Application.Json)
-        }
-        val body = response.bodyAsText()
-        if (!response.status.isSuccess()) {
-            error("HTTP ${response.status.value} from public demo transaction data profiles endpoint: $body")
-        }
-        return json.parseToJsonElement(body)
-            .jsonArray
-            .firstOrNull { profile -> profile.jsonObject["type"]?.jsonPrimitive?.content == type }
-            ?.jsonObject
-            ?.get("fields")
-            ?.jsonArray
-            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
-            ?.toSet()
-            ?: error("Missing public demo transaction data profile: $type")
-    }
+    fun transactionDataProfileFields(type: String): Set<String> =
+        TRANSACTION_DATA_PROFILE_FIELDS[type]
+            ?: error("Missing transaction data profile: $type")
+
+    private val TRANSACTION_DATA_PROFILE_FIELDS = mapOf(
+        PAYMENT_AUTHORIZATION_TYPE to setOf("merchant_name", "amount", "currency"),
+        "org.waltid.transaction-data.account-access" to setOf("account_identifier", "access_scope"),
+        SCA_PAYMENT_TYPE to setOf("payload"),
+        "payment_card" to setOf("merchant_name", "amount"),
+    )
 
     private suspend fun createVerifierSession(
         credentialQuery: JsonObject,

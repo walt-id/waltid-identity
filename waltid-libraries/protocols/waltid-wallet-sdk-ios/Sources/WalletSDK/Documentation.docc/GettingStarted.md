@@ -32,6 +32,10 @@ Apps that own database-key recovery can pass ``WalletPersistence`` with
 ``WalletDatabaseKeyConfiguration/provided(_:)`` and a
 ``WalletDatabaseKeyProvider`` implementation.
 
+``WalletConfiguration/transactionDataProfiles`` is empty by default. Pass
+``WalletTransactionDataProfile/all`` or a subset of the well-known profiles
+when the wallet should accept OpenID4VP `transaction_data`.
+
 Apps can provide ``WalletPersistence/credentialStore`` or ``WalletPersistence/didStore`` when they own credential or DID durability.
 Omitted stores use the encrypted local database. Signing keys are always
 platform-managed and remain in the iOS Keychain. Credential and DID stores can
