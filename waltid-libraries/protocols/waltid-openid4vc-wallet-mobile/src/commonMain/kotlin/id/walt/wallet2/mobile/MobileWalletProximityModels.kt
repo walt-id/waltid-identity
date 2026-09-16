@@ -921,7 +921,8 @@ public data class ProximityReview(
 ) {
     /**
      * Coverage and trust summary computed in the shared SDK for all reviewed documents.
-     * Invalid, malformed and revoked statements remain visible even alongside trusted coverage.
+     * The model preserves invalid, malformed and revoked states for completeness. The session
+     * processor rejects those states before consent; render their terminal error instead.
      */
     public val readerAuthenticationSummary: ProximityReaderAuthenticationSummary
         get() {

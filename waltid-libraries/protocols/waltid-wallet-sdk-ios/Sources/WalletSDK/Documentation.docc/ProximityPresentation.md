@@ -101,6 +101,17 @@ engagement identifiers and ephemeral key material.
 A final request with no returnable data ends in `ProximityState.noData(exchange:)`. No credential
 data was sent for that request; earlier exchanges in the same session may have
 shared approved data. Render `ProximityReview.readerAuthenticationSummary` for
-the request summary: it accounts for whole-request authentication coverage while
-preserving malformed, invalid, and revoked authentication warnings. Individual
-`readerAuthentication` entries remain available for detailed inspection.
+the request summary: it accounts for document and whole-request authentication coverage.
+Malformed or cryptographically invalid authentication and revoked readers are rejected
+before a review is produced. Render those outcomes from the session's terminal error,
+not as consent-time warnings. Individual `readerAuthentication` entries remain
+available for detailed inspection of requests that reach review.
+
+### Recoverable host input
+
+Construct application-supplied configuration, trust decisions, profile authorizations,
+and disclosure submissions with `try`. Invalid values throw `WalletError.invalidInput`
+before a model can reach the bridge. A throwing trust evaluator or application-profile
+implementation can propagate that error; it must not turn invalid evidence into trust.
+`ProximityConfiguration()` remains the fixed, valid default. Handle construction errors
+in the host UI instead of using `try!` for imported or user-supplied values.

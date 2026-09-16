@@ -198,6 +198,7 @@ public struct ProximityReaderTrustDecision: Sendable, Equatable {
     public let reason: String?
 
     /// Creates a coherent application-owned reader-trust decision.
+    /// - Throws: `WalletError.invalidInput` if the values violate the model contract.
     /// - Parameters:
     ///   - state: Final trust state.
     ///   - certificatePath: Certificate-path result.
@@ -212,14 +213,14 @@ public struct ProximityReaderTrustDecision: Sendable, Equatable {
         rical: ProximityRICALState = .notEvaluated,
         displayName: String? = nil,
         reason: String? = nil
-    ) {
-        precondition(state != .notEvaluated, "A trust evaluator must return an evaluated state")
-        precondition(state != .revoked || revocation == .revoked)
-        precondition(revocation != .revoked || state == .revoked)
-        precondition(state != .trusted || certificatePath == .valid)
-        precondition(state != .trusted || revocation != .indeterminate)
-        precondition(displayName == nil || isProximityNonBlank(displayName!))
-        precondition(reason == nil || isProximityNonBlank(reason!))
+    ) throws {
+        try requireProximityInput(state != .notEvaluated, "A trust evaluator must return an evaluated state")
+        try requireProximityInput(state != .revoked || revocation == .revoked)
+        try requireProximityInput(revocation != .revoked || state == .revoked)
+        try requireProximityInput(state != .trusted || certificatePath == .valid)
+        try requireProximityInput(state != .trusted || revocation != .indeterminate)
+        try requireProximityInput(displayName == nil || isProximityNonBlank(displayName!))
+        try requireProximityInput(reason == nil || isProximityNonBlank(reason!))
         self.state = state
         self.certificatePath = certificatePath
         self.revocation = revocation
@@ -313,12 +314,13 @@ public struct ProximityApplicationAuthorizationDetail: Sendable, Equatable, Iden
     public let value: String
 
     /// Creates one display-safe authorization detail.
+    /// - Throws: `WalletError.invalidInput` if the values violate the model contract.
     /// - Parameters:
     ///   - id: Stable profile-defined detail identifier.
     ///   - label: Display-safe detail label.
     ///   - value: Display-safe detail value.
-    public init(id: String, label: String, value: String) {
-        precondition(isProximityNonBlank(id) && isProximityNonBlank(label) && isProximityNonBlank(value))
+    public init(id: String, label: String, value: String) throws {
+        try requireProximityInput(isProximityNonBlank(id) && isProximityNonBlank(label) && isProximityNonBlank(value))
         self.id = id
         self.label = label
         self.value = value
@@ -337,14 +339,15 @@ public struct ProximityDeviceSignedElement: Sendable, Equatable {
     public let valueCBOR: Data
 
     /// Creates an exact device-signed element.
+    /// - Throws: `WalletError.invalidInput` if the values violate the model contract.
     /// - Parameters:
     ///   - credentialID: Credential whose device key authenticates the value.
     ///   - namespace: Device namespace.
     ///   - elementIdentifier: Element identifier.
     ///   - valueCBOR: Exact encoded CBOR value.
-    public init(credentialID: String, namespace: String, elementIdentifier: String, valueCBOR: Data) {
-        precondition(isProximityNonBlank(credentialID))
-        precondition(
+    public init(credentialID: String, namespace: String, elementIdentifier: String, valueCBOR: Data) throws {
+        try requireProximityInput(isProximityNonBlank(credentialID))
+        try requireProximityInput(
             isProximityNonBlank(namespace) && isProximityNonBlank(elementIdentifier) && !valueCBOR.isEmpty
         )
         self.credentialID = credentialID
@@ -370,6 +373,7 @@ public struct ProximityApplicationAuthorization: Sendable, Equatable {
     public let resultBindingDigest: Data
 
     /// Creates a recognized application-profile authorization.
+    /// - Throws: `WalletError.invalidInput` if the values violate the model contract.
     /// - Parameters:
     ///   - profileID: Stable profile identifier.
     ///   - displayTitle: Display-safe review title.
@@ -384,19 +388,19 @@ public struct ProximityApplicationAuthorization: Sendable, Equatable {
         compatibleCredentialIDs: Set<String>,
         deviceSignedElements: [ProximityDeviceSignedElement] = [],
         resultBindingDigest: Data
-    ) {
-        precondition(isProximityNonBlank(profileID) && isProximityNonBlank(displayTitle))
-        precondition(!details.isEmpty && Set(details.map(\.id)).count == details.count)
-        precondition(
+    ) throws {
+        try requireProximityInput(isProximityNonBlank(profileID) && isProximityNonBlank(displayTitle))
+        try requireProximityInput(!details.isEmpty && Set(details.map(\.id)).count == details.count)
+        try requireProximityInput(
             !compatibleCredentialIDs.isEmpty && compatibleCredentialIDs.allSatisfy(isProximityNonBlank)
         )
-        precondition(deviceSignedElements.allSatisfy { compatibleCredentialIDs.contains($0.credentialID) })
-        precondition(
+        try requireProximityInput(deviceSignedElements.allSatisfy { compatibleCredentialIDs.contains($0.credentialID) })
+        try requireProximityInput(
             Set(deviceSignedElements.map {
                 "\($0.credentialID)\u{0}\($0.namespace)\u{0}\($0.elementIdentifier)"
             }).count == deviceSignedElements.count
         )
-        precondition(resultBindingDigest.count == 32, "Application-profile binding must be SHA-256")
+        try requireProximityInput(resultBindingDigest.count == 32, "Application-profile binding must be SHA-256")
         self.profileID = profileID
         self.displayTitle = displayTitle
         self.details = details
@@ -451,7 +455,14 @@ public struct ProximityConfiguration: Sendable {
     /// Maximum accepted protocol message size in bytes.
     public let maximumMessageBytes: Int
 
+    /// Creates the built-in valid configuration without application-supplied values.
+    public init() {
+        // Only fixed SDK defaults enter this construction path.
+        try! self.init(profile: .iso180135Edition2DIS2026)
+    }
+
     /// Creates immutable configuration for one single-use session.
+    /// - Throws: `WalletError.invalidInput` if the values violate the model contract.
     /// - Parameters:
     ///   - profile: Versioned interoperability profile.
     ///   - bleRoles: BLE roles to prepare.
@@ -476,14 +487,14 @@ public struct ProximityConfiguration: Sendable {
         credentialStatusEvaluator: (any ProximityCredentialStatusEvaluator)? = nil,
         applicationProfiles: [any ProximityApplicationProfile] = [],
         maximumMessageBytes: Int = 1_048_576
-    ) {
-        precondition(maximumMessageBytes > 0 && maximumMessageBytes <= 16_777_216)
-        precondition(!engagementMethods.isEmpty)
-        precondition(!retrievalMethods.isEmpty)
-        precondition(profile != .eudiARF3FCAF202608 || readerPolicy == .requireTrusted)
-        precondition(profile != .eudiARF3FCAF202608 || deviceAuthenticationPolicy == .signatureOnly)
-        precondition(applicationProfiles.allSatisfy { isProximityNonBlank($0.id) })
-        precondition(Set(applicationProfiles.map(\.id)).count == applicationProfiles.count)
+    ) throws {
+        try requireProximityInput(maximumMessageBytes > 0 && maximumMessageBytes <= 16_777_216)
+        try requireProximityInput(!engagementMethods.isEmpty)
+        try requireProximityInput(!retrievalMethods.isEmpty)
+        try requireProximityInput(profile != .eudiARF3FCAF202608 || readerPolicy == .requireTrusted)
+        try requireProximityInput(profile != .eudiARF3FCAF202608 || deviceAuthenticationPolicy == .signatureOnly)
+        try requireProximityInput(applicationProfiles.allSatisfy { isProximityNonBlank($0.id) })
+        try requireProximityInput(Set(applicationProfiles.map(\.id)).count == applicationProfiles.count)
         self.profile = profile
         self.bleRoles = bleRoles
         self.bearerPolicy = bearerPolicy
@@ -685,11 +696,12 @@ public struct ProximityElementReference: Sendable, Hashable {
     public let elementIdentifier: String
 
     /// Creates an issuer-signed element reference.
+    /// - Throws: `WalletError.invalidInput` if the values violate the model contract.
     /// - Parameters:
     ///   - namespace: Issuer namespace.
     ///   - elementIdentifier: Element identifier within the namespace.
-    public init(namespace: String, elementIdentifier: String) {
-        precondition(isProximityNonBlank(namespace) && isProximityNonBlank(elementIdentifier))
+    public init(namespace: String, elementIdentifier: String) throws {
+        try requireProximityInput(isProximityNonBlank(namespace) && isProximityNonBlank(elementIdentifier))
         self.namespace = namespace
         self.elementIdentifier = elementIdentifier
     }
@@ -820,13 +832,14 @@ public struct ProximityDocumentSubmission: Sendable, Equatable {
     public let disclosedElements: Set<ProximityElementReference>
 
     /// Creates a document submission tied to a frozen review.
+    /// - Throws: `WalletError.invalidInput` if the values violate the model contract.
     /// - Parameters:
     ///   - requestIndex: Document-request index.
     ///   - credentialID: Selected credential identifier.
     ///   - disclosedElements: Nonempty approved element set.
-    public init(requestIndex: Int, credentialID: String, disclosedElements: Set<ProximityElementReference>) {
-        precondition(requestIndex >= 0 && isProximityNonBlank(credentialID))
-        precondition(!disclosedElements.isEmpty)
+    public init(requestIndex: Int, credentialID: String, disclosedElements: Set<ProximityElementReference>) throws {
+        try requireProximityInput(requestIndex >= 0 && isProximityNonBlank(credentialID))
+        try requireProximityInput(!disclosedElements.isEmpty)
         self.requestIndex = requestIndex
         self.credentialID = credentialID
         self.disclosedElements = disclosedElements
@@ -841,12 +854,13 @@ public struct ProximitySubmission: Sendable, Equatable {
     public let continueAfterResponse: Bool
 
     /// Creates a complete exchange submission.
+    /// - Throws: `WalletError.invalidInput` if the values violate the model contract.
     /// - Parameters:
     ///   - documents: Nonempty approved document submissions.
     ///   - continueAfterResponse: Whether another exchange may follow.
-    public init(documents: [ProximityDocumentSubmission], continueAfterResponse: Bool = false) {
-        precondition(!documents.isEmpty)
-        precondition(Set(documents.map(\.requestIndex)).count == documents.count)
+    public init(documents: [ProximityDocumentSubmission], continueAfterResponse: Bool = false) throws {
+        try requireProximityInput(!documents.isEmpty)
+        try requireProximityInput(Set(documents.map(\.requestIndex)).count == documents.count)
         self.documents = documents
         self.continueAfterResponse = continueAfterResponse
     }
@@ -1034,4 +1048,9 @@ public actor ProximitySession {
 
 private func isProximityNonBlank(_ value: String) -> Bool {
     !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+}
+
+/// Input validation is recoverable at host and bridge boundaries; messages contain no supplied data.
+private func requireProximityInput(_ condition: Bool, _ message: String = "Invalid proximity input") throws {
+    guard condition else { throw WalletError.invalidInput(message) }
 }
