@@ -544,8 +544,10 @@ private struct ProximityDisclosureSummary: View {
                 if let document = review.documents.first(where: { $0.requestIndex == selected.requestIndex }),
                    let credential = document.credentialOptions.first(where: { $0.credentialID == selected.credentialID }) {
                     Text(credential.label ?? String(localized: "Credential")).font(.headline)
-                    ForEach(Array(credential.requestedElements.filter {
-                        selected.disclosedElements.contains(.init(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier))
+                    ForEach(Array(credential.requestedElements.filter { element in
+                        selected.disclosedElements.contains {
+                            $0.namespace == element.namespace && $0.elementIdentifier == element.elementIdentifier
+                        }
                     }.enumerated()), id: \.offset) { _, element in
                         Text(element.elementIdentifier.replacingOccurrences(of: "_", with: " ").capitalized)
                         if element.intentToRetain {
@@ -744,9 +746,11 @@ private struct ProximityDocumentContent: View {
                 let details = credentialDetailsByID[credential.credentialID]
                 Divider()
                 Text("Data to share").font(.headline)
-                if !document.requiredElements.isSubset(of: Set(credential.requestedElements.map {
-                    try ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
-                })) {
+                if !document.requiredElements.allSatisfy({ required in
+                    credential.requestedElements.contains {
+                        $0.namespace == required.namespace && $0.elementIdentifier == required.elementIdentifier
+                    }
+                }) {
                     Text("This credential cannot provide all the required data. Choose another credential or decline sharing.")
                         .font(.footnote).foregroundStyle(.red)
                 }

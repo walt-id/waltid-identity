@@ -15,8 +15,8 @@ final class KMPProximityProjectionTests: XCTestCase {
             return XCTFail("The real KMP bridge did not publish review")
         }
         XCTAssertEqual(projected.documents[0].credentialOptions[0].requestedElements.map(\.elementIdentifier), fields)
-        let selected: Set<WalletSDK.ProximityElementReference> = Set(fields.map {
-            .init(namespace: "org.iso.18013.5.1", elementIdentifier: $0)
+        let selected: Set<WalletSDK.ProximityElementReference> = Set(try fields.map {
+            try .init(namespace: "org.iso.18013.5.1", elementIdentifier: $0)
         })
         let result = try await session.dispatch(.approve(reviewID: projected.reviewID, submission: .init(documents: [
             .init(requestIndex: 0, credentialID: "credential-1", disclosedElements: selected)
@@ -25,7 +25,7 @@ final class KMPProximityProjectionTests: XCTestCase {
         let forwarded = try XCTUnwrap(core.lastApproval)
         XCTAssertEqual(forwarded.reviewId.value, projected.reviewID.value)
         XCTAssertEqual(forwarded.submission.documents.count, 1)
-        XCTAssertEqual(forwarded.submission.toSwiftSubmission().documents[0].disclosedElements, selected)
+        XCTAssertEqual(try forwarded.submission.toSwiftSubmission().documents[0].disclosedElements, selected)
         let nextState1 = await iterator.next()
         XCTAssertEqual(nextState1, .sendingResponse(exchange: 1))
         let beforeCompletion = Date()
@@ -83,7 +83,7 @@ final class KMPProximityProjectionTests: XCTestCase {
         XCTAssertTrue(projected.legalActions.isEmpty)
     }
 
-    func testSubmissionProjectionPreservesEveryApprovedField() {
+    func testSubmissionProjectionPreservesEveryApprovedField() throws {
         let fields: Set<WalletCore.ProximityElementReference> = [
             .init(namespace: "org.iso.18013.5.1", elementIdentifier: "age_over_18"),
             .init(namespace: "org.iso.18013.5.1", elementIdentifier: "portrait"),
@@ -94,15 +94,15 @@ final class KMPProximityProjectionTests: XCTestCase {
                 .init(requestIndex: 1, credentialId: "credential-2", disclosedElements: fields),
             ], continueAfterResponse: continueAfterResponse)
 
-            let projected = submission.toSwiftSubmission()
+            let projected = try submission.toSwiftSubmission()
 
             XCTAssertEqual(projected.continueAfterResponse, continueAfterResponse)
             XCTAssertEqual(projected.documents.map(\.requestIndex), [0, 1])
             XCTAssertEqual(projected.documents.map(\.credentialID), ["credential-1", "credential-2"])
             for document in projected.documents {
                 XCTAssertEqual(document.disclosedElements, [
-                    .init(namespace: "org.iso.18013.5.1", elementIdentifier: "age_over_18"),
-                    .init(namespace: "org.iso.18013.5.1", elementIdentifier: "portrait"),
+                    try .init(namespace: "org.iso.18013.5.1", elementIdentifier: "age_over_18"),
+                    try .init(namespace: "org.iso.18013.5.1", elementIdentifier: "portrait"),
                 ])
             }
         }
@@ -128,7 +128,7 @@ final class KMPProximityProjectionTests: XCTestCase {
             let projected = try review.toSwiftReview()
 
             let expected: Set<WalletSDK.ProximityElementReference> = requiredFields.isEmpty ? [] : [
-                .init(namespace: portrait.namespace, elementIdentifier: portrait.elementIdentifier),
+                try .init(namespace: portrait.namespace, elementIdentifier: portrait.elementIdentifier),
             ]
             XCTAssertEqual(projected.requiredElements, expected)
             XCTAssertEqual(projected.credentialOptions.count, 1)
