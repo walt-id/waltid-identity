@@ -103,11 +103,49 @@ logical IDs. The retained older Enclave fixture returned typed `ProtectedKeyUnav
 its native `CryptoTokenKit -10` cause without declaring permanent invalidation. Generated Enclave
 keys remain unrecoverable. No further passcode change was needed for this final repair retry.
 
+## iCloud synchronization and authenticated recovery — September 16
+
+At `718f0c200c9a31a581af851ed517592603a4730a`, the physical iPhone (iOS 27.0)
+and a Mac (macOS 26.6.2) used the same Apple Account, enabled iCloud Keychain
+synchronization and the same entitled test-app access group. Fresh test namespaces
+were checked for absence before writes. The Mac helper was local test tooling;
+this does not add macOS SDK support.
+
+Production SDK recovery records created on iPhone arrived on Mac with matching
+SHA-256 digests. The Mac then generated independent P-256 keys and wrote new
+recovery records. The iPhone retrieved matching bytes through the production
+provider and restored into empty test wallets using ordinary Keychain storage.
+The records sent from iPhone contained derived-key material; the new Mac records
+restored on iPhone contained exported-key material. Private records traveled only
+through Keychain synchronization; the runner exchanged public metadata and digests.
+
+Restoration passed without signing authorization, with passcode approval on every
+use, and with a ten-second passcode reuse window. Each case preserved the original
+public key, DID and logical IDs, verified a fresh signature against the original
+public key, rejected an altered challenge and passed signing in a fresh app process.
+The per-use key returned `AuthorizationNotCompleted` on cancellation, produced no
+signature, retained its identity and signed on retry after reopening. The timed
+key prompted on first use and after expiry, with no prompt for the immediate repeat;
+the operator confirmed exactly two prompts.
+
+The timed record was initially absent, so the first restoration check failed before
+import or authentication. The local harness was corrected to allow a bounded
+180-second delivery wait; on retry the record was already present and restoration
+passed. Both results were retained. This bound is a test limit, not an iCloud
+delivery guarantee or evidence of controlled offline/service-outage handling.
+
+All disposable test wallets and synchronized records were removed on iPhone;
+subsequent Mac reads confirmed deletion propagation. These checks qualify
+`WhenUnlocked` synchronized records for the tested account and OS combination.
+They do not qualify iPhone-to-iPhone migration, recovery after losing all trusted
+Apple devices, or every signing policy and synchronization failure mode.
+
 ## Remaining qualification
 
 - Actual Android device-to-device transfer and encrypted-cloud delivery/restore.
-- Actual iCloud Keychain synchronization and recovery on a second Apple device,
-  including account-recovery scenarios. Same-device reads are not sync evidence.
+- iPhone-to-iPhone migration and Apple Account recovery after loss of trusted devices.
+- Controlled offline/delayed synchronization, service outages and conflicts; additional
+  synchronization accessibility and signing-policy combinations.
 - Additional authentication-factor and generated/imported policy combinations, and
   OS/device coverage beyond these cases. The TEE recovery result does not qualify StrongBox recovery.
 
