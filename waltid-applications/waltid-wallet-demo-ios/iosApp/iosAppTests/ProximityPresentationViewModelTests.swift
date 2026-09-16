@@ -10,7 +10,7 @@ import WalletDemoIdentityDocumentSupport
 @preconcurrency import WalletCore
 
 final class ProximityPresentationViewModelTests: XCTestCase {
-    func testSessionConfigurationMatrixRoundTripsThroughKotlinBridge() {
+    func testSessionConfigurationMatrixRoundTripsThroughKotlinBridge() throws {
         let ble = WalletSDK.ProximityBLEConfiguration(roles: .centralClient, bearerPolicy: .gattOnly)
         let plans: [WalletSDK.ProximityRetrievalOptions] = [
             .init(bluetoothLowEnergy: ble),
@@ -34,7 +34,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         }
         for profile in WalletSDK.ProximityProfile.allCases {
             for session in sessions where profile != .iso1801352021 || !session.usesProvisionalNFCV2 {
-                let configuration = WalletSDK.ProximityConfiguration(
+                let configuration = try WalletSDK.ProximityConfiguration(
                     profile: profile, session: session,
                     readerPolicy: profile == .eudiARF3FCAF202608 ? .requireTrusted : .allowAnonymousOrUntrusted
                 )
@@ -43,7 +43,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         }
     }
 
-    func testLifecyclePolicyPreservesTransientInactiveStateAndInterruptsOnBackground() {
+    func testLifecyclePolicyPreservesTransientInactiveStateAndInterruptsOnBackground() throws {
         XCTAssertFalse(ProximityPresentationLifecyclePolicy.shouldInterrupt(for: .active))
         XCTAssertFalse(ProximityPresentationLifecyclePolicy.shouldInterrupt(for: .inactive))
         XCTAssertTrue(ProximityPresentationLifecyclePolicy.shouldInterrupt(for: .background))
@@ -51,7 +51,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testInvalidHostConfigurationDoesNotStartSessionAndCanBeDismissed() {
+    func testInvalidHostConfigurationDoesNotStartSessionAndCanBeDismissed() throws {
         let client = FakeProximityWalletClient(session: FakeProximitySession())
         let viewModel = ProximityPresentationViewModel(
             client: client,
@@ -545,7 +545,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         XCTAssertEqual(result.bytes as Data, Data(payload.utf8))
     }
 
-    func testQRCodeRendererRejectsUnsupportedProximityPayloadsAndOversizeText() {
+    func testQRCodeRendererRejectsUnsupportedProximityPayloadsAndOversizeText() throws {
         XCTAssertNil(WalletQRCodeRenderer.proximityImage(payload: "https://example.com"))
         XCTAssertNil(WalletQRCodeRenderer.proximityImage(payload: "mdoc:é"))
         XCTAssertNil(
@@ -653,7 +653,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         XCTAssertNil(directRetrieval.qrFallback)
     }
 
-    func testCompatibilityProfilesPreserveEngagementAndNarrowTransfer() {
+    func testCompatibilityProfilesPreserveEngagementAndNarrowTransfer() throws {
         for profile in [WalletDemoProximityTransportProfile.bluetooth] {
             guard case .nfc(let session) = profile.configuration.session else { return XCTFail("Expected NFC with QR fallback") }
             XCTAssertEqual(session.handover, .negotiatedHandover)
@@ -664,7 +664,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
 
     }
 
-    func testNativeProfilePersistenceUsesStableComposeValuesAndFallsBackSafely() {
+    func testNativeProfilePersistenceUsesStableComposeValuesAndFallsBackSafely() throws {
         let suiteName = "id.walt.walletdemo.tests.\(UUID().uuidString)"
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
 

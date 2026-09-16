@@ -57,7 +57,7 @@ final class ProximityPhysicalDeviceTests: XCTestCase {
                     let fields: Set<WalletSDK.ProximityElementReference> = Set(["given_name", "family_name"].map {
                         .init(namespace: "org.iso.18013.5.1", elementIdentifier: $0)
                     })
-                    let submission = WalletSDK.ProximitySubmission(documents: [
+                    let submission = try WalletSDK.ProximitySubmission(documents: [
                         .init(requestIndex: 0, credentialID: "peer-mdl", disclosedElements: fields)
                     ])
                     approvedReview = review

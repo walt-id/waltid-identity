@@ -745,52 +745,55 @@ private struct ProximityDocumentContent: View {
                 Divider()
                 Text("Data to share").font(.headline)
                 if !document.requiredElements.isSubset(of: Set(credential.requestedElements.map {
-                    ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+                    try ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
                 })) {
                     Text("This credential cannot provide all the required data. Choose another credential or decline sharing.")
                         .font(.footnote).foregroundStyle(.red)
                 }
                 ForEach(Array(credential.requestedElements.enumerated()), id: \.offset) { _, element in
-                    let reference = ProximityElementReference(
+                    if let reference = try? ProximityElementReference(
                         namespace: element.namespace,
                         elementIdentifier: element.elementIdentifier
-                    )
-                    Toggle(isOn: binding(for: reference)) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            let claims = details?.mdocClaims(
-                                namespace: element.namespace,
-                                elementIdentifier: element.elementIdentifier
-                            ) ?? []
-                            if !claims.isEmpty {
-                                ForEach(claims) { claim in
-                                    ClaimValueRow(item: claim)
+                    ) {
+                        Toggle(isOn: binding(for: reference)) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                let claims = details?.mdocClaims(
+                                    namespace: element.namespace,
+                                    elementIdentifier: element.elementIdentifier
+                                ) ?? []
+                                if !claims.isEmpty {
+                                    ForEach(claims) { claim in
+                                        ClaimValueRow(item: claim)
+                                    }
+                                } else {
+                                    Text(CredentialDisplayVocabulary.humanizedLabel(element.elementIdentifier))
+                                        .font(.caption.weight(.semibold))
+                                    Text("Value preview unavailable")
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
                                 }
-                            } else {
-                                Text(CredentialDisplayVocabulary.humanizedLabel(element.elementIdentifier))
-                                    .font(.caption.weight(.semibold))
-                                Text("Value preview unavailable")
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
-                            }
-                            if element.intentToRetain {
-                                Text("Reader intends to retain this data")
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
-                            }
-                            if document.requiredElements.contains(reference) {
-                                Text("Required for this identity check").font(.caption).foregroundStyle(.secondary)
+                                if element.intentToRetain {
+                                    Text("Reader intends to retain this data")
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
+                                }
+                                if document.requiredElements.contains(reference) {
+                                    Text("Required for this identity check").font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                         }
-                    }
-                    .toggleStyle(ReviewCheckboxToggleStyle())
-                    .disabled(document.requiredElements.contains(reference))
-                    .accessibilityIdentifier(
-                        WalletAccessibilityID.proximityElement(
-                            requestIndex: document.requestIndex,
-                            namespace: element.namespace,
-                            elementIdentifier: element.elementIdentifier
+                        .toggleStyle(ReviewCheckboxToggleStyle())
+                        .disabled(document.requiredElements.contains(reference))
+                        .accessibilityIdentifier(
+                            WalletAccessibilityID.proximityElement(
+                                requestIndex: document.requestIndex,
+                                namespace: element.namespace,
+                                elementIdentifier: element.elementIdentifier
+                            )
                         )
-                    )
+                    } else {
+                        Text("This requested field cannot be shared.").foregroundStyle(.red)
+                    }
                 }
                 MetadataDisclosure(title: "Technical details", initiallyExpanded: false) {
                     MetadataDetailList(items: technicalDetails(for: credential))
