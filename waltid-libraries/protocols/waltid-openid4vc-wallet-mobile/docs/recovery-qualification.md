@@ -1,4 +1,4 @@
-# Device qualification — 2026-09-15
+# Device qualification — 2026-09-16
 
 These are recorded observations for WAL-749, not a claim that every supported
 policy, device or OS version has been qualified. The test devices were a
@@ -63,17 +63,53 @@ physical deployment helpers and device/account details remain outside the
 repository. The portable runner and regression tests are described in
 [Recovery qualification](recovery-testing.md).
 
+## Additional security transitions — September 16
+
+On the OnePlus, removing all fingerprints preserved PIN use for both combined policies. After
+re-enrollment, enrollment-tolerant and combined keys retained their public keys; the current-set
+key recovered explicitly. A missing-enrollment error that stable Signum classified as cancellation
+was corrected at the mobile boundary and verified in the no-fingerprint checks.
+
+Removing the OnePlus PIN invalidated all six authenticated controls; the unauthenticated control
+still signed. Restoring a PIN and fingerprint did not revive the protected keys. All five recoverable
+wallets recovered from their actual Block Store records and passed fresh-process signing checks
+with the original public keys, DIDs and logical IDs. The generated protected control remained
+unavailable. The real Block Store service reported E2EE unavailable, and encrypted-cloud writes
+were refused without leaving a record. E2EE was still unavailable after device protection was
+restored; this does not establish cloud delivery or restoration of backup availability.
+
+Two iPhone passcode-removal cycles reproduced missing-passcode error misclassification and
+passcode-set-only keys whose retained native metadata incorrectly appeared active. The first
+cycle included an unrecorded Keychain/password prompt choice; the repeat used fresh keys and
+had no such prompt. Account state was not reset between runs. Default-accessibility controls
+still signed after protection was restored. The unavailable ordinary passcode-set key recovered
+from its retained backup and passed a fresh-process check. The generated passcode-set Enclave
+control remained unusable and exposed an unmapped token error. Neither cycle produced an
+unauthorized signature.
+
+The fixes distinguish missing credentials, map unknown token failures to typed unavailability,
+and bind passcode-set-only ownership records to passcode lifetime. With fresh keys, all eight
+passcode-off and all eight post-restoration checks passed: both passcode-bound controls were
+unavailable before any signing probe, and the four credential-capable controls reported exactly
+`DeviceCredentialNotSet` while the passcode was absent. Restoring protection did not revive the
+passcode-bound keys; the other six keys retained their original public keys.
+
+Explicit recovery then exposed a missing-ownership classification that blocked repair while native
+metadata survived. Returning no owned key when its creation record is absent fixes that boundary
+without adopting, overwriting or deleting the unowned entry. After this correction, the two default
+controls and two unavailable controls passed again; the backed-up ordinary Keychain key recovered
+into a fresh alias and passed a fresh-process signature check with its original public key, DID and
+logical IDs. The retained older Enclave fixture returned typed `ProtectedKeyUnavailable`, preserving
+its native `CryptoTokenKit -10` cause without declaring permanent invalidation. Generated Enclave
+keys remain unrecoverable. No further passcode change was needed for this final repair retry.
+
 ## Remaining qualification
 
 - Actual Android device-to-device transfer and encrypted-cloud delivery/restore.
-- Real-service refusal when Block Store end-to-end encryption is unavailable.
 - Actual iCloud Keychain synchronization and recovery on a second Apple device,
   including account-recovery scenarios. Same-device reads are not sync evidence.
-- Removing the device PIN/passcode, then restoring protection; ordinary changes
-  with protection retained do not cover removal.
-- Removing all Android fingerprints, additional authentication-factor and
-  generated/imported policy combinations, and OS/device coverage beyond these
-  cases. The TEE recovery result does not qualify StrongBox recovery.
+- Additional authentication-factor and generated/imported policy combinations, and
+  OS/device coverage beyond these cases. The TEE recovery result does not qualify StrongBox recovery.
 
 Simulator/emulator contracts and host tests remain useful automated regressions,
 but cannot replace these transport, hardware and operator-controlled checks.

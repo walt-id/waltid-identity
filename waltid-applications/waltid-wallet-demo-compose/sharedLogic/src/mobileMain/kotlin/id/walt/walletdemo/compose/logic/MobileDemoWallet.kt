@@ -166,6 +166,8 @@ internal class MobileDemoWallet(
         is KeyUseAuthorizationSupport.Unsupported -> when (support.reason) {
             KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled ->
                 WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+            KeyUseAuthorizationUnsupportedReason.DeviceCredentialNotSet ->
+                WalletDemoSigningProtectionAvailability.DeviceCredentialNotSet
             KeyUseAuthorizationUnsupportedReason.BiometricUnavailable ->
                 WalletDemoSigningProtectionAvailability.BiometricUnavailable
             KeyUseAuthorizationUnsupportedReason.UnsupportedCombination ->

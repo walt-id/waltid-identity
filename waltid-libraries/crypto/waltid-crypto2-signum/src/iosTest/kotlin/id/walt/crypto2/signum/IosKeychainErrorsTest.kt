@@ -48,8 +48,12 @@ class IosKeychainErrorsTest {
         assertIs<SignumInteractionContextUnavailableException>(iosKeychainFailure("key",
             IosKeychainException(TKErrorDomain, TKErrorCodeAuthenticationNeeded, "Interaction required")))
         assertIs<SignumKeyUnavailableException>(CFCryptoOperationFailed("decode key", errSecDecode).mapSignumFailure("key"))
-        val unknown = IosKeychainException(TKErrorDomain, TKErrorCodeBadParameter, "Invalid parameter")
-        assertSame(unknown, iosKeychainFailure("key", unknown))
+        val badParameter = IosKeychainException(TKErrorDomain, TKErrorCodeBadParameter, "Invalid parameter")
+        assertSame(badParameter, iosKeychainFailure("key", badParameter))
+        for (code in listOf(-10L, -999L)) {
+            val unknown = IosKeychainException(TKErrorDomain, code, "Unrecognized token failure")
+            assertSame(unknown, assertIs<SignumKeyUnavailableException>(iosKeychainFailure("key", unknown)).cause)
+        }
     }
 
     @Test

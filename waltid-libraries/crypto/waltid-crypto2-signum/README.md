@@ -30,7 +30,10 @@ persistent reference, public key and observed attributes. Reopening rejects a ch
 record or replaced key. Prompt localization is separate from immutable security settings. Existing
 keys without a creation record cannot be adopted by supplying a desired policy; recovery imports the
 original material into a fresh owned entry. Incomplete creation leaves no active key; an entry left by
-process termination is not silently adopted or replaced.
+process termination is not silently adopted or replaced. For passcode-set-only keys, the creation
+record uses the same passcode-bound accessibility. Its removal prevents reopening and use through
+already opened handles, even if native token metadata survives. A missing record is reported as no owned key, even if native metadata survives. The SDK does not
+adopt, overwrite or delete that unowned entry; explicit recovery imports into a fresh alias.
 
 Secure Enclave access control protects the key separately from its outer Keychain item; the latter
 can report a different accessibility class. Its accessibility therefore comes from the bound creation

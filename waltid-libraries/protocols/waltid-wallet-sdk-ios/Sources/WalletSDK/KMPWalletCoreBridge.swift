@@ -1520,6 +1520,7 @@ private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationU
         case .unsupportedCombination: return .unsupportedCombination
         case .biometricUnavailable: return .biometricUnavailable
         case .biometricNotEnrolled: return .biometricNotEnrolled
+        case .deviceCredentialNotSet: return .deviceCredentialNotSet
         }
     }
 }
@@ -1530,6 +1531,7 @@ private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationF
         case .unsupportedCombination: return .unsupportedCombination
         case .biometricUnavailable: return .biometricUnavailable
         case .biometricNotEnrolled: return .biometricNotEnrolled
+        case .deviceCredentialNotSet: return .deviceCredentialNotSet
         case .interactionContextUnavailable: return .interactionContextUnavailable
         case .authorizationNotCompleted: return .authorizationNotCompleted
         case .protectedKeyUnavailable: return .protectedKeyUnavailable

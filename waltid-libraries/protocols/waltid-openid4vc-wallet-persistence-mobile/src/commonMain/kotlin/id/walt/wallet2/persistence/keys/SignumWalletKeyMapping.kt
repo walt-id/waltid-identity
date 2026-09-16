@@ -91,30 +91,43 @@ internal fun Throwable.toKeyUseAuthorizationException(
 }
 
 /** Gives signing and eligible private-key export the same mobile failure vocabulary. */
-internal fun ManagedKey.withWalletAuthorizationMapping(): ManagedKey {
+internal fun ManagedKey.withWalletAuthorizationMapping(
+    authorizationAvailabilityFailure: () -> KeyUseAuthorizationFailure? = { null },
+): ManagedKey {
     val delegate = this
     return object : ManagedKey {
         override val storedKey = delegate.storedKey
         override val capabilities = delegate.capabilities.copy(
             signer = delegate.capabilities.signer?.let { signer ->
-                Signer { data, algorithm -> mapKeyFailure(storedKey.id.value) { signer.sign(data, algorithm) } }
+                Signer { data, algorithm -> mapKeyFailure(storedKey.id.value, authorizationAvailabilityFailure) { signer.sign(data, algorithm) } }
             },
             privateKeyExporter = delegate.capabilities.privateKeyExporter?.let { exporter ->
                 object : PrivateKeyExporter {
                     override suspend fun exportPrivateKey(): EncodedKey =
-                        mapKeyFailure(storedKey.id.value) { exporter.exportPrivateKey() }
+                        mapKeyFailure(storedKey.id.value, authorizationAvailabilityFailure) { exporter.exportPrivateKey() }
                     override suspend fun exportPrivateKey(format: KeyEncodingFormat): EncodedKey =
-                        mapKeyFailure(storedKey.id.value) { exporter.exportPrivateKey(format) }
+                        mapKeyFailure(storedKey.id.value, authorizationAvailabilityFailure) { exporter.exportPrivateKey(format) }
                 }
             },
         )
     }
 }
 
-private suspend inline fun <T> mapKeyFailure(keyId: String, operation: () -> T): T = try {
+private suspend inline fun <T> mapKeyFailure(
+    keyId: String,
+    authorizationAvailabilityFailure: () -> KeyUseAuthorizationFailure?,
+    operation: () -> T,
+): T = try {
     operation()
 } catch (cause: Throwable) {
-    throw cause.toKeyUseAuthorizationException(keyId) ?: cause
+    // Stable Signum can collapse missing enrollment and cancellation into the same failure.
+    // Consult availability only after authorization fails; valid native reuse still succeeds.
+    val unavailable = if (cause is SignumAuthorizationException || cause is SignumUserCancelledException) {
+        authorizationAvailabilityFailure()
+    } else null
+    throw unavailable?.let {
+        KeyUseAuthorizationException(it, "Required key-use authentication is unavailable", cause)
+    } ?: cause.toKeyUseAuthorizationException(keyId) ?: cause
 }
 
 /** Interprets persisted Signum policy only when the complete wallet protected-key shape matches. */

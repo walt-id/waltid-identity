@@ -2,6 +2,8 @@ package id.walt.wallet2.persistence.keys
 
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeychainAccessibility
+import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
@@ -12,18 +14,8 @@ import id.walt.crypto2.signum.SignumKeyOptions
 import id.walt.crypto2.signum.SignumKeyPolicy
 import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
 import id.walt.crypto2.signum.SignumManagedKeyProvider
-import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.ObjCObjectVar
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.value
 import platform.Foundation.NSProcessInfo
-import platform.LocalAuthentication.LAContext
-import platform.LocalAuthentication.LAErrorBiometryNotAvailable
-import platform.LocalAuthentication.LAErrorBiometryNotEnrolled
-import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthenticationWithBiometrics
 
 /** Managed-key provider backed by iOS Keychain and Secure Enclave. */
 public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
@@ -37,7 +29,12 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
             !backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
+        val passcodeBound = (requirements.platform as? PlatformKeyConfiguration.IosKeychain)?.accessibility ==
+            KeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY
         if (requirements.authorizationPolicy is KeyUseAuthorizationPolicy.None) {
+            if (passcodeBound) iosAuthorizationAvailabilityFailure(KeyUseAuthorizationPolicy.DeviceCredential())?.let {
+                return KeyUseAuthorizationSupport.Unsupported(it)
+            }
             return requirements.authorizationPolicy.supportedOnIos()
         }
         val failure = when {
@@ -45,7 +42,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
                 requirements.usages != setOf(KeyUsage.SIGN, KeyUsage.VERIFY) ->
                 KeyUseAuthorizationUnsupportedReason.UnsupportedCombination
             isSimulator -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
-            else -> biometricAvailabilityFailure(requirements.authorizationPolicy)
+            else -> iosAuthorizationAvailabilityFailure(requirements.authorizationPolicy)
         }
         return failure?.let { KeyUseAuthorizationSupport.Unsupported(it) }
             ?: requirements.authorizationPolicy.supportedOnIos()
@@ -60,7 +57,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
                 usages = request.requirements.usages,
                 providerOptions = SignumKeyOptions(alias = request.nativeAlias, policy = request.toSignumPolicy()).encode(),
             )
-        ).withWalletAuthorizationMapping()
+        ).withIosAuthorizationMapping(request.requirements.authorizationPolicy)
     } catch (cause: Throwable) {
         throw cause.toKeyUseAuthorizationException(
             protectedKeyId = request.id.value,
@@ -76,7 +73,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         signumProvider.importPrivateKey(GenerateManagedKeyRequest(
             id = request.id, metadata = mapOf("wallet.nativeAlias" to request.nativeAlias), spec = request.requirements.spec, usages = request.requirements.usages,
             providerOptions = SignumKeyOptions(alias = request.nativeAlias, policy = request.toSignumPolicy()).encode(),
-        ), material).withWalletAuthorizationMapping()
+        ), material).withIosAuthorizationMapping(request.requirements.authorizationPolicy)
     } catch (cause: Throwable) {
         throw cause.toKeyUseAuthorizationException(request.id.value, KeyUseAuthorizationFailure.UnsupportedCombination) ?: cause
     }
@@ -97,7 +94,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         val policy = keyUseAuthorizationPolicy(stored)
         return try {
             PlatformManagedKeyRestoration.Restored(
-                signumProvider.restore(stored).withWalletAuthorizationMapping(),
+                signumProvider.restore(stored).withIosAuthorizationMapping(policy),
                 policy,
             )
         } catch (_: SignumKeyNotFoundException) {
@@ -126,21 +123,8 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
     private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy =
         requirements.nativePolicy(prompt)
 
-    @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
-    private fun biometricAvailabilityFailure(policy: KeyUseAuthorizationPolicy): KeyUseAuthorizationUnsupportedReason? = memScoped {
-        val error = alloc<ObjCObjectVar<platform.Foundation.NSError?>>()
-        val available = LAContext().canEvaluatePolicy(
-            if (policy is KeyUseAuthorizationPolicy.DeviceCredential || policy is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential)
-                platform.LocalAuthentication.LAPolicyDeviceOwnerAuthentication else LAPolicyDeviceOwnerAuthenticationWithBiometrics,
-            error.ptr,
-        )
-        if (available) return@memScoped null
-        when (error.value?.code) {
-            LAErrorBiometryNotEnrolled -> KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled
-            LAErrorBiometryNotAvailable -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
-            else -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
-        }
-    }
+    private fun ManagedKey.withIosAuthorizationMapping(policy: KeyUseAuthorizationPolicy): ManagedKey =
+        withWalletAuthorizationMapping { iosAuthorizationAvailabilityFailure(policy)?.toAuthorizationFailure() }
 
 }
 

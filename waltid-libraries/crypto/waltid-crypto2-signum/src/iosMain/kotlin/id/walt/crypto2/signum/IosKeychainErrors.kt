@@ -39,7 +39,10 @@ internal fun iosKeychainFailure(alias: String, error: IosKeychainException): Thr
         TKErrorCodeAuthenticationNeeded -> SignumInteractionContextUnavailableException(
             "Token authorization requires user interaction", error,
         )
-        else -> error
+        TKErrorCodeNotImplemented, TKErrorCodeBadParameter -> error
+        // Unknown token failures do not establish cancellation or permanent key loss.
+        // Keep native diagnostics while exposing a stable, retryable availability failure.
+        else -> SignumKeyUnavailableException(alias, error)
     }
     LAErrorDomain -> when (error.code) {
         LAErrorUserCancel, LAErrorAppCancel, LAErrorSystemCancel -> SignumUserCancelledException(error)

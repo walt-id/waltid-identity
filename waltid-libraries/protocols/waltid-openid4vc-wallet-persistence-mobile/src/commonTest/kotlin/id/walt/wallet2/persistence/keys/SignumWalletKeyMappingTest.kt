@@ -238,6 +238,64 @@ class SignumWalletKeyMappingTest {
         }
     }
 
+    @Test
+    fun `authorization failure uses current availability without misclassifying cancellation`() = runTest {
+        for (nativeFailure in listOf(SignumUserCancelledException(IllegalStateException("authorization failed")), SignumAuthorizationException())) {
+            var availability: KeyUseAuthorizationFailure? = null
+            val delegate = object : ManagedKey {
+                override val storedKey = storedManagedKey(KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN))
+                override val capabilities = KeyCapabilities(
+                    signer = Signer { _, _ -> throw nativeFailure },
+                    privateKeyExporter = object : PrivateKeyExporter {
+                        override suspend fun exportPrivateKey(): EncodedKey = throw nativeFailure
+                        override suspend fun exportPrivateKey(format: KeyEncodingFormat): EncodedKey = throw nativeFailure
+                    },
+                )
+            }
+            val mapped = delegate.withWalletAuthorizationMapping { availability }.capabilities
+            val operations: List<suspend () -> Unit> = listOf(
+                { requireNotNull(mapped.signer).sign(byteArrayOf(1), SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)) },
+                { requireNotNull(mapped.privateKeyExporter).exportPrivateKey() },
+                { requireNotNull(mapped.privateKeyExporter).exportPrivateKey(KeyEncodingFormat.JWK) },
+            )
+            for (current in listOf(KeyUseAuthorizationFailure.BiometricNotEnrolled,
+                KeyUseAuthorizationFailure.DeviceCredentialNotSet, null)) {
+                availability = current
+                for (operation in operations) {
+                    val failure = assertFailsWith<KeyUseAuthorizationException> { operation() }
+                    assertEquals(current ?: KeyUseAuthorizationFailure.AuthorizationNotCompleted, failure.failure)
+                    assertEquals(nativeFailure, failure.cause)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `successful native reuse invalidation and coroutine cancellation bypass availability checks`() = runTest {
+        val cancelled = CancellationException("caller cancelled")
+        var nativeFailure: Throwable? = null
+        var availabilityCalls = 0
+        val delegate = object : ManagedKey {
+            override val storedKey = storedManagedKey(KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN))
+            override val capabilities = KeyCapabilities(signer = Signer { _, _ ->
+                nativeFailure?.let { throw it }
+                byteArrayOf(42)
+            })
+        }
+        val signer = requireNotNull(delegate.withWalletAuthorizationMapping {
+            availabilityCalls++
+            KeyUseAuthorizationFailure.BiometricNotEnrolled
+        }.capabilities.signer)
+        val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
+        assertEquals(42, signer.sign(byteArrayOf(1), algorithm).single().toInt())
+        nativeFailure = SignumKeyInvalidatedException("key")
+        assertEquals(KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
+            assertFailsWith<KeyUseAuthorizationException> { signer.sign(byteArrayOf(1), algorithm) }.failure)
+        nativeFailure = cancelled
+        assertEquals(cancelled, assertFailsWith<CancellationException> { signer.sign(byteArrayOf(1), algorithm) })
+        assertEquals(0, availabilityCalls)
+    }
+
     private fun storedManagedKey(spec: KeySpec, usages: Set<KeyUsage>) = StoredKey.Managed(
         version = StoredKey.CURRENT_VERSION,
         id = KeyId("protected"),

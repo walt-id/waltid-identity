@@ -87,6 +87,7 @@ enum WalletDemoSigningProtectionMode: String, Equatable, Sendable {
 enum WalletDemoSigningProtectionAvailability: Equatable, Sendable {
     case available
     case biometricNotEnrolled
+    case deviceCredentialNotSet
     case biometricUnavailable
     case unsupported
 
@@ -94,6 +95,7 @@ enum WalletDemoSigningProtectionAvailability: Equatable, Sendable {
         switch self {
         case .available: nil
         case .biometricNotEnrolled: "Set up a strong biometric in device settings, then try again."
+        case .deviceCredentialNotSet: "Set up a device PIN or passcode in settings, then try again."
         case .biometricUnavailable: "Strong biometric authentication is not available on this device."
         case .unsupported: "This signing protection is not supported on this device."
         }
@@ -103,6 +105,8 @@ enum WalletDemoSigningProtectionAvailability: Equatable, Sendable {
         let reason: String
         switch self {
         case .available: return nil
+        case .deviceCredentialNotSet:
+            return "Set up a device PIN or passcode in settings, then try again. Restoring device security does not restore invalidated signing keys."
         case .biometricNotEnrolled: reason = "no strong biometric is enrolled"
         case .biometricUnavailable: reason = "strong biometric authentication is unavailable"
         case .unsupported: reason = "the device cannot currently authorize it"

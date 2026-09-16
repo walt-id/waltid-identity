@@ -84,3 +84,9 @@ Credential synchronization and reissuance remain separate from signing-key recov
 
 See the Kotlin SDK's [identity lifecycle guide](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/docs/identity-recovery.md)
 for the platform matrix and the versioned recovery record specification.
+
+Missing device credentials produce `deviceCredentialNotSet`, separately from missing biometric
+enrollment or cancelled approval. A key configured with passcode-set-only accessibility also has a
+passcode-bound ownership record: removing the passcode prevents reopening and further use, even
+if native token metadata remains. Enabling a passcode again does not restore the key. Recoverable
+keys require explicit recovery from their independent backup; Secure Enclave keys cannot be restored.

@@ -116,14 +116,9 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
 
     private suspend fun loadOwned(alias: String, spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy,
         origin: SignumKeyOrigin): SignumPlatformKey? = lifecycle.withLock {
-        val record = IosKeyOwnershipStore.read(alias, policy)
-        if (record == null) {
-            requireIosKeyBiometrics(alias, policy)
-            if (IosKeyEngine.entries.any { iosKeyExists(alias, policy, it) }) {
-                throw SignumKeyPolicyMismatchException(alias, "existing key has no SDK creation record; import recovered material into a fresh alias")
-            }
-            return@withLock null
-        }
+        // No receipt means no owned key. Do not inspect or adopt an unowned native alias;
+        // callers may explicitly recover the original material into a fresh alias.
+        val record = IosKeyOwnershipStore.read(alias, policy) ?: return@withLock null
         record.validate(alias, policy, spec, usages, origin)
         requireIosKeyBiometrics(alias, policy)
         validateOwnedEntry(alias, record)
@@ -164,6 +159,9 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
     }
 
     private fun validateOwnedEntry(alias: String, record: IosKeyOwnership) {
+        if (IosKeyOwnershipStore.read(alias, record.policy) != record) {
+            throw SignumKeyPolicyMismatchException(alias, "key ownership record is missing or changed")
+        }
         if (record.engine == IosKeyEngine.APPLE_KEYCHAIN) {
             AppleKeychainKeys.validateIdentity(alias, record.policy, record.native)
             return
