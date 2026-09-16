@@ -269,9 +269,11 @@ signing, credential synchronization and later recovery from custody are separate
 ## Evidence limits
 
 Physical-device coverage and local provider round trips must be distinguished from OS device-loss
-recovery. StrongBox-specific devices, the customer's Redmi and actual cross-device cloud restore
-remain separate qualification cases. Do not claim those paths verified from a TEE import, a simulator
-run or a synchronizable local put/get. No formal EUDI, HAIP, eIDAS or FIPS qualification is claimed.
+recovery. TEE and StrongBox protection, local recovery, cross-device synchronization and cloud
+restore require separate evidence. The [qualification record](recovery-qualification.md) describes
+the tested capabilities and remaining gaps. Do not infer hardware or transport qualification from
+a simulator run or a synchronizable local put/get. No formal EUDI, HAIP, eIDAS or FIPS qualification
+is claimed.
 
 ### Native implementation and authorization evidence
 
