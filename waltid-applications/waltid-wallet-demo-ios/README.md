@@ -96,3 +96,9 @@ fixture Gradle tasks documented in the mobile guide.
 Review actions carry the identity of the displayed review. Each new review resets
 holder choices and continuation. Permission prompts are needed only when no
 selected route can start; terminal recovery creates a new single-use session.
+
+The native proximity journey creates an SDK session and renders its prerequisite actions.
+The SDK waits for viable capabilities before preparing transport; Bluetooth permission is
+requested only when the holder selects the offered action. Compose currently requests that
+permission during host preflight. Guided preflight alignment is delivered by the stacked
+[NFC demo PR #2166](https://github.com/walt-id/waltid-identity/pull/2166).

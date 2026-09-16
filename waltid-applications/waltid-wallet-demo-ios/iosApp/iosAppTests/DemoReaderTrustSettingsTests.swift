@@ -110,10 +110,10 @@ final class DemoReaderTrustSettingsTests: XCTestCase {
         XCTAssertEqual(selection, .cancelled)
     }
 
-    func testSwiftSettingsApplyReaderPolicyToSessionConfiguration() {
+    func testSwiftSettingsApplyReaderPolicyToSessionConfiguration() throws {
         let settings = ProximityReaderTrustSettings(readerPolicy: .requireTrusted)
 
-        let configuration = settings.applying()
+        let configuration = try settings.applying()
 
         XCTAssertEqual(configuration.readerPolicy, .requireTrusted)
         XCTAssertNil(configuration.readerTrustEvaluator)

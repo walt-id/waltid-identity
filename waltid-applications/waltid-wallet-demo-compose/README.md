@@ -32,7 +32,7 @@ The Android and iOS apps expose a dedicated **Present in person** journey for ho
 proximity presentation. The Wallet SDK remains the source of session, request, reader-authentication,
 trust, disclosure, and terminal-state meaning; the shared Compose UI renders those facts and performs
 only platform-owned permission, settings, lifecycle, screen-awake, and brightness actions.
-Before creating a session, the demo queries the SDK capabilities and automatically requests any
+Before creating a session, the Compose demo queries the SDK capabilities and automatically requests any
 runtime permission required by the selected proximity configuration. A permission that Android no
 longer allows the app to request is shown as an explicit **Open app settings** action; returning from
 Settings rechecks the selected configuration before session creation. Radio, power, and settings

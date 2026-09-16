@@ -43,7 +43,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     @Published private(set) var startupFailed = false
 
     private let client: any ProximityWalletClient
-    private let configurationProvider: @MainActor () -> ProximityConfiguration
+    private let configurationProvider: @MainActor () throws -> ProximityConfiguration
     private let hostActions: any ProximityHostActionExecutor
     private var session: (any DemoProximityPresentationSession)?
     private var observationTask: Task<Void, Never>?
@@ -52,7 +52,7 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     init(
         client: any ProximityWalletClient,
-        configurationProvider: @escaping @MainActor () -> ProximityConfiguration = {
+        configurationProvider: @escaping @MainActor () throws -> ProximityConfiguration = {
             .init()
         },
         hostActions: (any ProximityHostActionExecutor)? = nil
@@ -94,7 +94,14 @@ final class ProximityPresentationViewModel: ObservableObject {
         startupFailed = false
         sessionGeneration &+= 1
         let generation = sessionGeneration
-        let configuration = configurationProvider()
+        let configuration: ProximityConfiguration
+        do {
+            configuration = try configurationProvider()
+        } catch {
+            startupFailed = true
+            actionErrorMessage = error.localizedDescription
+            return
+        }
         observationTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -121,22 +128,26 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func selectCredential(requestIndex: Int, credentialID: String) {
-        guard let document = review?.documents.first(where: { $0.requestIndex == requestIndex }),
-              let credential = document.credentialOptions.first(where: { $0.credentialID == credentialID }) else {
-            return
-        }
-        replaceSelection(
-            ProximityDocumentSelection(
-                requestIndex: requestIndex,
-                credentialID: credentialID,
-                disclosedElements: Set(credential.requestedElements.map {
-                    ProximityElementReference(
-                        namespace: $0.namespace,
-                        elementIdentifier: $0.elementIdentifier
-                    )
-                })
+        do {
+            guard let document = review?.documents.first(where: { $0.requestIndex == requestIndex }),
+                  let credential = document.credentialOptions.first(where: { $0.credentialID == credentialID }) else {
+                return
+            }
+            replaceSelection(
+                ProximityDocumentSelection(
+                    requestIndex: requestIndex,
+                    credentialID: credentialID,
+                    disclosedElements: Set(try credential.requestedElements.map {
+                        try ProximityElementReference(
+                            namespace: $0.namespace,
+                            elementIdentifier: $0.elementIdentifier
+                        )
+                    })
+                )
             )
-        )
+        } catch {
+            actionErrorMessage = error.localizedDescription
+        }
     }
 
     func toggleElement(requestIndex: Int, element: ProximityElementReference) {
@@ -168,27 +179,31 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func approve() {
-        guard canApprove, let review else { return }
-        let documents = review.documents.compactMap { document -> ProximityDocumentSubmission? in
-            guard let selection = selections.first(where: { $0.requestIndex == document.requestIndex }) else {
-                return nil
+        do {
+            guard canApprove, let review else { return }
+            let documents = try review.documents.compactMap { document -> ProximityDocumentSubmission? in
+                guard let selection = selections.first(where: { $0.requestIndex == document.requestIndex }) else {
+                    return nil
+                }
+                return try ProximityDocumentSubmission(
+                    requestIndex: selection.requestIndex,
+                    credentialID: selection.credentialID,
+                    disclosedElements: selection.disclosedElements
+                )
             }
-            return ProximityDocumentSubmission(
-                requestIndex: selection.requestIndex,
-                credentialID: selection.credentialID,
-                disclosedElements: selection.disclosedElements
-            )
-        }
-        guard documents.count == review.documents.count else { return }
-        dispatch(
-            .approve(
-                reviewID: review.reviewID,
-                submission: ProximitySubmission(
-                    documents: documents,
-                    continueAfterResponse: continueAfterResponse
+            guard documents.count == review.documents.count else { return }
+            dispatch(
+                .approve(
+                    reviewID: review.reviewID,
+                    submission: try ProximitySubmission(
+                        documents: documents,
+                        continueAfterResponse: continueAfterResponse
+                    )
                 )
             )
-        )
+        } catch {
+            actionErrorMessage = error.localizedDescription
+        }
     }
 
     func decline() {
@@ -299,11 +314,16 @@ final class ProximityPresentationViewModel: ObservableObject {
     private func publish(_ state: ProximityState) {
         let previousReviewID = review?.reviewID
         sessionState = state
+        actionErrorMessage = nil
         if case .reviewRequired(let review) = state, previousReviewID != review.reviewID {
-            selections = review.defaultSelections
+            do {
+                selections = try review.defaultSelections
+            } catch {
+                selections = []
+                actionErrorMessage = error.localizedDescription
+            }
             continueAfterResponse = false
         }
-        actionErrorMessage = nil
     }
 
     private func replaceSelection(_ selection: ProximityDocumentSelection) {
@@ -409,18 +429,20 @@ extension ProximityState {
 
 private extension ProximityReview {
     var defaultSelections: [ProximityDocumentSelection] {
-        documents.compactMap { document in
-            guard let credential = document.credentialOptions.first else { return nil }
-            return ProximityDocumentSelection(
-                requestIndex: document.requestIndex,
-                credentialID: credential.credentialID,
-                disclosedElements: Set(credential.requestedElements.map {
-                    ProximityElementReference(
-                        namespace: $0.namespace,
-                        elementIdentifier: $0.elementIdentifier
-                    )
-                })
-            )
+        get throws {
+            try documents.compactMap { document in
+                guard let credential = document.credentialOptions.first else { return nil }
+                return ProximityDocumentSelection(
+                    requestIndex: document.requestIndex,
+                    credentialID: credential.credentialID,
+                    disclosedElements: Set(try credential.requestedElements.map {
+                        try ProximityElementReference(
+                            namespace: $0.namespace,
+                            elementIdentifier: $0.elementIdentifier
+                        )
+                    })
+                )
+            }
         }
     }
 }
