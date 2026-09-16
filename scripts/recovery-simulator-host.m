@@ -24,9 +24,9 @@ static char **testArgv;
         setbuf(stdout, NULL);
         setbuf(stderr, NULL);
         int result = main(testArgc, testArgv);
-        printf("\nRECOVERY_HOST_EXIT=%d\n", result);
+        printf("\nRECOVERY_TEST_EXIT=%d\n", result);
         fflush(stdout);
-        exit(result);
+        // Let the runner collect the result and terminate the app after launch is acknowledged.
     });
     return YES;
 }
