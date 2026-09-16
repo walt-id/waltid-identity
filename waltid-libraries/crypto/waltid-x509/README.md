@@ -439,7 +439,7 @@ check(wrpacResult.valid) { "Not a valid WRPAC certificate: ${wrpacResult.log}" }
 (`NORMALIZED_CERT_POLICY_NATURAL_PERSON`/`NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON`/`QUALIFIED_CERT_POLICY_NATURAL_PERSON`/`QUALIFIED_CERT_POLICY_LEGAL_PERSON` - natural/legal person crossed with
 non-qualified/qualified), at least one contact method (`contactEmail`/`contactUri`) for the
 mandatory `subjectAltName`, and a revocation mechanism (`crlDistributionPointUri` or
-`ocspResponderUri`). `EtsiWrpacX509CertificateProfile` re-validates all of that, plus the
+`ocspResponderUri`). `EtsiWrpAcX509CertificateProfile` re-validates all of that, plus the
 policy-conditional `qcStatements` (required for the QCP policies only, with `QcType` required
 additionally for QCP-l) and the policy-driven natural/legal person subject DN shape - cross-checked
 against the [eudi-lib-kmp-etsi-1196x2](https://github.com/eu-digital-identity-wallet/eudi-lib-kmp-etsi-1196x2)
@@ -453,7 +453,7 @@ reference implementation.
 
 ### WRPRC certificate generation - draft, incomplete
 
-> **`EtsiWrprcX509CertificateProfile` is a draft.** Unlike every other profile in this library,
+> **`EtsiWrpRcX509CertificateProfile` is a draft.** Unlike every other profile in this library,
 > there is no reference implementation to cross-check WRPRC (ETSI TS 119 475) against, and the
 > encoding of its defining feature - the Relying Party's *registered intended use* - isn't
 > confirmed (it likely needs a new custom X.509 extension). This profile only implements the

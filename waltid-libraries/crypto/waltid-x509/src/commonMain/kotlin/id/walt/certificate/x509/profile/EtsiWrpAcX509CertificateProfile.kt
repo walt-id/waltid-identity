@@ -41,7 +41,7 @@ import id.walt.crypto2.keys.Key
  * mechanism below. This profile always requires one. Support is deferred to a follow-up, since it
  * needs its own extension type with little reuse elsewhere.
  */
-object EtsiWrpacX509CertificateProfile : EtsiWalletRelyingPartyX509CertificateProfile(), X509CertificateProfile,
+object EtsiWrpAcX509CertificateProfile : EtsiWalletRelyingPartyX509CertificateProfile(), X509CertificateProfile,
     X509CertificateValidator {
 
     const val ID = "etsi-wrpac"
@@ -142,6 +142,10 @@ object EtsiWrpacX509CertificateProfile : EtsiWalletRelyingPartyX509CertificatePr
             }
         }
     }
+
+    fun X509CertificateDataBuilder.profileEtsiWrpAccessCertificates() =
+        profileEtsiWalletRelyingParty()
+
 
     override suspend fun validate(context: ValidationContext, x509Certificate: X509Certificate) {
         validateVersionV3(context, x509Certificate)

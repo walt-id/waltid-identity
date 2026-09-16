@@ -3,7 +3,7 @@ package id.walt.certificate.x509.profile
 import id.walt.certificate.x509.TestKeyUtil
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
-import id.walt.certificate.x509.profile.EtsiWrprcX509CertificateProfile.profileWrpRegistrationCertificate
+import id.walt.certificate.x509.profile.EtsiWrpRcX509CertificateProfile.profileEtsiWrpRegistrationCertificate
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -15,9 +15,9 @@ import kotlin.test.assertTrue
 
 /**
  * Covers only the baseline certificate shape this DRAFT profile implements - see
- * [EtsiWrprcX509CertificateProfile]'s class doc for what's deliberately not validated yet.
+ * [EtsiWrpRcX509CertificateProfile]'s class doc for what's deliberately not validated yet.
  */
-class EtsiWrprcX509CertificateProfileTest {
+class EtsiWrpRcX509CertificateProfileTest {
 
     private val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
 
@@ -31,7 +31,7 @@ class EtsiWrprcX509CertificateProfileTest {
 
         val subjectKey = TestKeyUtil.genEcKey("wrprc-subject")
         val cert = X509CertificateUtil.createCertificate(rootKey, rootCert, sigAlg) {
-            profileWrpRegistrationCertificate(
+            profileEtsiWrpRegistrationCertificate(
                 subjectKey = subjectKey,
                 subjectDn = "CN=Example Relying Party,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
                 certificatePolicyOids = listOf("0.4.0.194118.1.2"),
@@ -42,7 +42,7 @@ class EtsiWrprcX509CertificateProfileTest {
         val result = validator.validate(cert)
         assertTrue(result.valid, "Validation log: ${result.log}")
         assertTrue(
-            result.log.any { it.validatorId == "${EtsiWrprcX509CertificateProfile.ID}.registeredIntendedUse" },
+            result.log.any { it.validatorId == "${EtsiWrpRcX509CertificateProfile.ID}.registeredIntendedUse" },
             "Expected a WARNING flagging the unvalidated registered intended use, log: ${result.log}"
         )
     }
@@ -52,7 +52,7 @@ class EtsiWrprcX509CertificateProfileTest {
         val subjectKey = TestKeyUtil.genEcKey("wrprc-no-policy")
         assertFailsWith<IllegalArgumentException> {
             X509CertificateUtil.createSelfSignedCertificate(subjectKey, sigAlg) {
-                profileWrpRegistrationCertificate(
+                profileEtsiWrpRegistrationCertificate(
                     subjectKey = subjectKey,
                     subjectDn = "CN=Example Relying Party,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
                     certificatePolicyOids = emptyList(),
@@ -62,6 +62,6 @@ class EtsiWrprcX509CertificateProfileTest {
     }
 
     companion object {
-        private val validator = X509SingleCertificateValidator(listOf(EtsiWrprcX509CertificateProfile))
+        private val validator = X509SingleCertificateValidator(listOf(EtsiWrpRcX509CertificateProfile))
     }
 }

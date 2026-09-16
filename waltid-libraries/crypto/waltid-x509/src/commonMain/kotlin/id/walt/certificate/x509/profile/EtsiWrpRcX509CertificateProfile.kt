@@ -29,7 +29,7 @@ import id.walt.crypto2.keys.Key
  * WRPRC's defining feature is that it encodes a Relying Party's *registered intended use* - the
  * attribute/purpose scope a national registrar has authorized it to request from a wallet, which
  * is what would let a wallet explain to the user *why* a request is allowed. Unlike
- * [EtsiWrpacX509CertificateProfile] (ETSI TS 119 411-8), there is no reference implementation to
+ * [EtsiWrpAcX509CertificateProfile] (ETSI TS 119 411-8), there is no reference implementation to
  * cross-check against for this profile (the eudi-lib-kmp-etsi-1196x2 checkout used for every other
  * profile in this file has no WRPRC assessment or code), and the exact encoding of "registered
  * intended use" is not confirmed - the implementation plan flags it as likely needing a brand-new
@@ -40,20 +40,20 @@ import id.walt.crypto2.keys.Key
  * ETSI EUDI profile in this package (end-entity, keyUsage, subjectKeyIdentifier, certificatePolicies
  * presence, conditional authorityInfoAccess, restricted extension criticality, key size, legal-person
  * DN, not-self-signed) - reused directly from [EtsiProviderCertificateSupport] /
- * [EtsiWrpacX509CertificateProfile] rather than guessed at. It intentionally does NOT validate the
+ * [EtsiWrpAcX509CertificateProfile] rather than guessed at. It intentionally does NOT validate the
  * registered intended use itself: [validate] always emits a WARNING log entry flagging that gap,
  * rather than silently passing a certificate a real WRPRC issuer might reject, or silently pretending
  * to check something ETSI actually requires.
  *
  * The subject is assumed to always be a legal person (a registered Relying Party is an
  * organization) since no policy-OID-driven natural/legal distinction is confirmed for this
- * profile - unlike [EtsiWrpacX509CertificateProfile], where the reference implementation confirms
+ * profile - unlike [EtsiWrpAcX509CertificateProfile], where the reference implementation confirms
  * that distinction exists.
  *
  * TODO(EUDI Phase 3): read ETSI TS 119 475 primary source, model the "registered intended use"
  * extension, and turn the WARNING below into real validation.
  */
-object EtsiWrprcX509CertificateProfile : EtsiWalletRelyingPartyX509CertificateProfile(), X509CertificateProfile,
+object EtsiWrpRcX509CertificateProfile : EtsiWalletRelyingPartyX509CertificateProfile(), X509CertificateProfile,
     X509CertificateValidator {
 
     const val ID = "etsi-wrprc"
@@ -74,7 +74,7 @@ object EtsiWrprcX509CertificateProfile : EtsiWalletRelyingPartyX509CertificatePr
      * @param caIssuerUri / [ocspResponderUri] populate authorityInfoAccess, required since WRPRC
      *   certificates are always CA-issued (EN 319 412-2 4.4.1).
      */
-    fun X509CertificateDataBuilder.profileWrpRegistrationCertificate(
+    fun X509CertificateDataBuilder.profileEtsiWrpRegistrationCertificate(
         subjectKey: Key,
         subjectDn: String,
         certificatePolicyOids: List<String>,
@@ -103,6 +103,9 @@ object EtsiWrprcX509CertificateProfile : EtsiWalletRelyingPartyX509CertificatePr
             }
         }
     }
+
+    fun X509CertificateDataBuilder.profileEtsiWrpRegistrationCertificate() =
+        profileEtsiWalletRelyingParty()
 
     override suspend fun validate(context: ValidationContext, x509Certificate: X509Certificate) {
         validateVersionV3(context, x509Certificate)

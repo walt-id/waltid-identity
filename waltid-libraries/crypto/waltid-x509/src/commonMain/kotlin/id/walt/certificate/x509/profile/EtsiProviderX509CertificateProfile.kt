@@ -54,7 +54,7 @@ import id.walt.crypto2.keys.Key
  * A handful of these checks (end-entity, keyUsage, subjectKeyIdentifier, certificatePolicies
  * presence, conditional authorityInfoAccess, public key algorithm/size, person-DN field shape) are
  * identical across every ETSI EUDI end-entity profile in this package, not just the two Provider
- * profiles - [EtsiWrpacX509CertificateProfile] and [EtsiWrprcX509CertificateProfile] reuse them
+ * profiles - [EtsiWrpAcX509CertificateProfile] and [EtsiWrpRcX509CertificateProfile] reuse them
  * directly rather than duplicating the logic.
  */
 sealed class EtsiProviderX509CertificateProfile {
@@ -94,21 +94,13 @@ sealed class EtsiProviderX509CertificateProfile {
         ocspResponderUri: String? = null,
     ) {
         require(certificatePolicyOids.isNotEmpty()) { "At least one certificate policy OID is required" }
+        applyProviderCertificate(qcTypeOid)
         this.subjectDn = subjectDn
         if (subjectKey != null) {
             subjectPublicKey(subjectKey)
         } else {
             subjectPublicKeySelfSigned()
         }
-        extensionBasicConstraints {
-            critical = true
-            cA = false
-        }
-        extensionKeyUsage {
-            critical = true
-            addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
-        }
-        extensionSubjectKeyIdentifier()
         extensionCertificatePolicies {
             certificatePolicyOids.forEach { addPolicy(it) }
         }
@@ -123,6 +115,25 @@ sealed class EtsiProviderX509CertificateProfile {
             }
         }
     }
+
+    protected fun X509CertificateDataBuilder.applyProviderCertificate(
+        qcTypeOid: String,
+    ) {
+        extensionBasicConstraints {
+            critical = true
+            cA = false
+        }
+        extensionKeyUsage {
+            critical = true
+            addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
+        }
+        extensionSubjectKeyIdentifier()
+        extensionQcStatements {
+            addQcCompliance()
+            addQcType(qcTypeOid)
+        }
+    }
+
 
     protected fun validateProviderCertificate(
         context: ValidationContext,
@@ -288,8 +299,8 @@ sealed class EtsiProviderX509CertificateProfile {
 
     /**
      * Same field-shape checks as [validatePersonDn], but the natural-vs-legal-person distinction
-     * is given explicitly rather than detected from the DN - used by [EtsiWrpacX509CertificateProfile]
-     * / [EtsiWrprcX509CertificateProfile], whose person role is determined by the certificate's
+     * is given explicitly rather than detected from the DN - used by [EtsiWrpAcX509CertificateProfile]
+     * / [EtsiWrpRcX509CertificateProfile], whose person role is determined by the certificate's
      * policy OID (or, for WRPRC's issuer, is always a legal person) rather than by DN inspection.
      */
     fun validatePersonDnByRole(

@@ -1,9 +1,14 @@
 package id.walt.certificate.x509.profile
 
 import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.dn.DistinguishedName
 import id.walt.certificate.x509.extension.AuthorityInfoAccessExtension.Companion.extensionAuthorityInfoAccess
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.CertificatePoliciesExtension.Companion.extensionCertificatePolicies
+import id.walt.certificate.x509.extension.KeyUsageExtension
+import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 
@@ -45,7 +50,7 @@ sealed class EtsiWalletRelyingPartyX509CertificateProfile {
          * Certificate policy OIDs per ETSI TS 119 411-8 clause 5.3 (Wallet Relying Party Access
          * Certificate policy identifiers).
          *
-         * Used by [EtsiWrpacX509CertificateProfile]. NCP = normalized certificate policy, QCP = qualified
+         * Used by [EtsiWrpAcX509CertificateProfile]. NCP = normalized certificate policy, QCP = qualified
          * certificate policy; "-n" / "-l" select the natural-person / legal-person variant.
          */
 
@@ -85,6 +90,19 @@ sealed class EtsiWalletRelyingPartyX509CertificateProfile {
          */
         const val QUALIFIED_CERT_POLICY_LEGAL_PERSON: String = "0.4.0.194118.1.4"
     }
+
+    protected fun X509CertificateDataBuilder.profileEtsiWalletRelyingParty() {
+        extensionBasicConstraints {
+            critical = true
+            cA = false
+        }
+        extensionKeyUsage {
+            critical = true
+            addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
+        }
+        extensionSubjectKeyIdentifier()
+    }
+
 
     /**
      * EN 319 412-2 4.3.3: certificatePolicies extension shall be present.
@@ -154,8 +172,8 @@ sealed class EtsiWalletRelyingPartyX509CertificateProfile {
 
     /**
      * Same field-shape checks as [validatePersonDn], but the natural-vs-legal-person distinction
-     * is given explicitly rather than detected from the DN - used by [EtsiWrpacX509CertificateProfile]
-     * / [EtsiWrprcX509CertificateProfile], whose person role is determined by the certificate's
+     * is given explicitly rather than detected from the DN - used by [EtsiWrpAcX509CertificateProfile]
+     * / [EtsiWrpRcX509CertificateProfile], whose person role is determined by the certificate's
      * policy OID (or, for WRPRC's issuer, is always a legal person) rather than by DN inspection.
      */
     protected fun validatePersonDnByRole(

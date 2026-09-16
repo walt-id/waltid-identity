@@ -57,6 +57,11 @@ object EtsiPidProviderX509CertificateProfile : EtsiProviderX509CertificateProfil
         )
     }
 
+    fun X509CertificateDataBuilder.profileEtsiPidProviderCertificate() =
+        applyProviderCertificate(
+            qcTypeOid = QUALIFIED_CERTIFICATE_STATEMENT_ETSI_PID_PROVIDER,
+        )
+
     override suspend fun validate(
         context: ValidationContext,
         x509Certificate: X509Certificate

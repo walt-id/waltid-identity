@@ -47,16 +47,19 @@ object EtsiWalletProviderX509CertificateProfile : EtsiProviderX509CertificatePro
         certificatePolicyOids: List<String>,
         caIssuerUri: String? = null,
         ocspResponderUri: String? = null,
-    ) {
+    ): Unit = applyProviderCertificate(
+        subjectKey = subjectKey,
+        subjectDn = subjectDn,
+        qcTypeOid = QUALIFIED_CERTIFICATE_STATEMENT_ETSI_WALLET_PROVIDER,
+        certificatePolicyOids = certificatePolicyOids,
+        caIssuerUri = caIssuerUri,
+        ocspResponderUri = ocspResponderUri
+    )
+
+    fun X509CertificateDataBuilder.profileEtsiWalletProviderCertificate(): Unit =
         applyProviderCertificate(
-            subjectKey = subjectKey,
-            subjectDn = subjectDn,
             qcTypeOid = QUALIFIED_CERTIFICATE_STATEMENT_ETSI_WALLET_PROVIDER,
-            certificatePolicyOids = certificatePolicyOids,
-            caIssuerUri = caIssuerUri,
-            ocspResponderUri = ocspResponderUri,
         )
-    }
 
     override suspend fun validate(
         context: ValidationContext,

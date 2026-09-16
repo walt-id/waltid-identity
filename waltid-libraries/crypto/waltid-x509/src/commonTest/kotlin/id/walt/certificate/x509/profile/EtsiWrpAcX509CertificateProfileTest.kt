@@ -3,7 +3,7 @@ package id.walt.certificate.x509.profile
 import id.walt.certificate.x509.TestKeyUtil
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
-import id.walt.certificate.x509.profile.EtsiWrpacX509CertificateProfile.profileWrpAccessCertificate
+import id.walt.certificate.x509.profile.EtsiWrpAcX509CertificateProfile.profileWrpAccessCertificate
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -14,7 +14,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class EtsiWrpacX509CertificateProfileTest {
+class EtsiWrpAcX509CertificateProfileTest {
 
     private val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
 
@@ -124,10 +124,10 @@ class EtsiWrpacX509CertificateProfileTest {
 
         val result = validator.validate(cert)
         assertFalse(result.valid)
-        assertTrue(result.log.any { it.validatorId == "${EtsiWrpacX509CertificateProfile.ID}.issuerDn" })
+        assertTrue(result.log.any { it.validatorId == "${EtsiWrpAcX509CertificateProfile.ID}.issuerDn" })
     }
 
     companion object {
-        private val validator = X509SingleCertificateValidator(listOf(EtsiWrpacX509CertificateProfile))
+        private val validator = X509SingleCertificateValidator(listOf(EtsiWrpAcX509CertificateProfile))
     }
 }
