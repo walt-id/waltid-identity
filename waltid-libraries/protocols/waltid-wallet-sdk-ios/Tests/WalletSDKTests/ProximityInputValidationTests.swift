@@ -51,6 +51,9 @@ final class ProximityInputValidationTests: XCTestCase {
         assertInvalid { try ProximityElementReference(namespace: "", elementIdentifier: "name") }
         let element = try ProximityElementReference(namespace: "ns", elementIdentifier: "name")
         assertInvalid { try ProximityDocumentSubmission(requestIndex: -1, credentialID: "id", disclosedElements: [element]) }
+        assertInvalid { try ProximityDocumentSubmission(requestIndex: Int(Int32.max) + 1, credentialID: "id", disclosedElements: [element]) }
+        XCTAssertEqual(try ProximityDocumentSubmission(requestIndex: Int(Int32.max), credentialID: "id",
+            disclosedElements: [element]).requestIndex, Int(Int32.max))
         assertInvalid { try ProximityDocumentSubmission(requestIndex: 0, credentialID: "id", disclosedElements: []) }
         assertInvalid { try ProximitySubmission(documents: []) }
         let document = try ProximityDocumentSubmission(requestIndex: 0, credentialID: "id", disclosedElements: [element])

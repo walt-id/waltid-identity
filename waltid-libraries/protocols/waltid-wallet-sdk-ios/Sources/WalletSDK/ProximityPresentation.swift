@@ -838,7 +838,7 @@ public struct ProximityDocumentSubmission: Sendable, Equatable {
     ///   - credentialID: Selected credential identifier.
     ///   - disclosedElements: Nonempty approved element set.
     public init(requestIndex: Int, credentialID: String, disclosedElements: Set<ProximityElementReference>) throws {
-        try requireProximityInput(requestIndex >= 0 && isProximityNonBlank(credentialID))
+        try requireProximityInput((0...Int(Int32.max)).contains(requestIndex) && isProximityNonBlank(credentialID))
         try requireProximityInput(!disclosedElements.isEmpty)
         self.requestIndex = requestIndex
         self.credentialID = credentialID
