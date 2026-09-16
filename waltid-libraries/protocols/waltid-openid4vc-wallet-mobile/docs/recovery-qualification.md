@@ -140,6 +140,38 @@ subsequent Mac reads confirmed deletion propagation. These checks qualify
 They do not qualify iPhone-to-iPhone migration, recovery after losing all trusted
 Apple devices, or every signing policy and synchronization failure mode.
 
+## Samsung StrongBox recovery — September 16
+
+At `461cb546ac64e77d8110729bba8e72997d2e4821`, a Samsung SM-G998B running
+Android 15 passed SDK recovery checks with StrongBox explicitly required. Native
+readback reported `STRONGBOX`, the expected generated/imported origin and native
+authorization attributes. The generated control signed after reopening. Recoverable
+identities were restored from actual Block Store records after deleting their local
+test wallet and signing key. Signing in a fresh app process retained the original
+public key, DID and logical IDs. Restoration also rejected a weaker
+encrypted-database destination.
+
+The recovered configurations were no signing authorization, biometric or device
+credential approval, and the combined policy with ten-second reuse. Fingerprint
+approval passed throughout the authenticated recovery flow. Cancellation returned
+`AuthorizationNotCompleted` without a signature; the recovered key retained its
+identity and signed on retry using the existing PIN. The timed check verified
+first use, immediate reuse and use after expiry; the operator confirmed exactly
+two fingerprint prompts after the previous authorization window had expired.
+
+On the OnePlus, which does not advertise StrongBox, the same required configuration
+did not offer native or hardware creation options and left the test wallet without
+a signing identity. Samsung reported encrypted-cloud backup available. OnePlus
+reported it unavailable and refused a synthetic write without leaving a record.
+These were availability checks, not cloud upload or delivery tests.
+
+All checks used an isolated application and temporary keys/records. Test wallets
+and Block Store records were deleted, and the newly installed test app was removed
+from Samsung. Its accounts, screen lock and biometric enrollment were unchanged.
+This qualifies the tested StrongBox local-loss recovery and authorization cases;
+it does not qualify cross-device transport, cloud restore, or additional hardware,
+authorization and lifecycle combinations.
+
 ## Remaining qualification
 
 - Actual Android device-to-device transfer and encrypted-cloud delivery/restore.
@@ -147,7 +179,7 @@ Apple devices, or every signing policy and synchronization failure mode.
 - Controlled offline/delayed synchronization, service outages and conflicts; additional
   synchronization accessibility and signing-policy combinations.
 - Additional authentication-factor and generated/imported policy combinations, and
-  OS/device coverage beyond these cases. The TEE recovery result does not qualify StrongBox recovery.
+  OS/device coverage beyond these cases. StrongBox coverage is limited to the Samsung cases above.
 
 Simulator/emulator contracts and host tests remain useful automated regressions,
 but cannot replace these transport, hardware and operator-controlled checks.
