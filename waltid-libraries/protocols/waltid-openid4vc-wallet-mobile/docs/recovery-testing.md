@@ -35,8 +35,12 @@ Android uses `id.walt.wallet2.mobile.test`; iOS uses
 `id.walt.wallet.recovery-tests`. The iOS builder embeds Keychain entitlements
 and the SQLCipher runtime in a simulator-only UIKit app. Tests run off the main
 thread while UIKit services the application lifecycle. Each launch writes its
-own log and exit marker; a process ID or incomplete test output cannot count as
-completion. The runner uses Android SDK
+own log and test-result marker; a process ID or incomplete test output cannot
+count as completion. The host stays alive until the runner collects its result
+and stops it, avoiding an exit during launch acknowledgment. Launch and test
+execution share a 180-second deadline; setup and cleanup commands have separate
+30-second limits. A timeout fails the phase without retrying it, and preserves
+available command output and the host log. The runner uses Android SDK
 tools or Xcode’s `xcrun simctl` for installation and launch. These are test
 hosts, not distributable demo apps.
 
