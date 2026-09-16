@@ -92,8 +92,9 @@ class InMemoryVerificationSessionRepository : VerificationSessionRepository {
 
     override suspend fun get(sessionId: String): VerificationSessionSnapshot? = synchronized(sessions) {
         sessions[sessionId]?.let { snapshot ->
+            // No expiry date means the verifier is configured to retain indefinitely, so the session stays.
             val expiresAt = snapshot.session.persistenceExpirationDate()
-            if (expiresAt < Clock.System.now()) {
+            if (expiresAt != null && expiresAt < Clock.System.now()) {
                 sessions.remove(sessionId)
                 null
             } else snapshot.copyForCaller()

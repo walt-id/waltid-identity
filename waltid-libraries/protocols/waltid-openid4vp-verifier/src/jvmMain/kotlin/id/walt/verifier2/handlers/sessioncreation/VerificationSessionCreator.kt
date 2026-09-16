@@ -48,6 +48,7 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.uuid.Uuid
 import id.walt.crypto2.keys.Key as Crypto2Key
 
@@ -111,6 +112,7 @@ object VerificationSessionCreator {
         key: Key? = null,
         x5c: List<String>? = null,
         typeRegistry: TransactionDataTypeRegistry? = null,
+        retention: Duration? = null,
     ): Verification2Session = createVerificationSessionInternal(
         setup = setup,
         clientId = clientId,
@@ -119,6 +121,7 @@ object VerificationSessionCreator {
         urlHost = urlHost,
         key = key,
         x5c = x5c,
+        retention = retention,
         crypto2Key = null,
         crypto2JwsAlgorithm = null,
         crypto2CoseAlgorithm = null,
@@ -138,6 +141,7 @@ object VerificationSessionCreator {
         coseAlgorithm: Int,
         signingKeyReference: String? = null,
         typeRegistry: TransactionDataTypeRegistry? = null,
+        retention: Duration? = null,
     ): Verification2Session = createVerificationSessionInternal(
         setup = setup,
         clientId = clientId,
@@ -151,6 +155,7 @@ object VerificationSessionCreator {
         crypto2CoseAlgorithm = coseAlgorithm,
         signingKeyReference = signingKeyReference,
         typeRegistry = typeRegistry,
+        retention = retention,
     )
 
     private suspend fun createVerificationSessionInternal(
@@ -176,6 +181,8 @@ object VerificationSessionCreator {
         crypto2CoseAlgorithm: Int?,
         signingKeyReference: String?,
         typeRegistry: TransactionDataTypeRegistry?,
+        /** Verifier-level retention, overridden by the request and ignored when it is not finite. */
+        retention: Duration? = null,
     ): Verification2Session {
         require(key == null || crypto2Key == null) { "Provide either a v1 or crypto2 verifier signing key" }
         val signingKey = crypto2Key?.let {
@@ -465,7 +472,14 @@ object VerificationSessionCreator {
 
         val now = Clock.System.now()
         val expiration = setup.core.expirationDate
-        val retentionDate = now.plus(10, DateTimeUnit.YEAR, TimeZone.UTC)
+        // Per-session first, then whatever the verifier is configured to retain for, then the historical
+        // default. A configured retention of Duration.INFINITE means keep indefinitely, which
+        // persistenceExpirationDate() expresses as null - no expiry date, so nothing ever discards it.
+        val retentionDate = when {
+            setup.core.retentionDate != null -> setup.core.retentionDate
+            retention != null -> retention.takeIf { it.isFinite() }?.let { now.plus(it) }
+            else -> now.plus(DEFAULT_RETENTION_YEARS, DateTimeUnit.YEAR, TimeZone.UTC)
+        }
 
         val signedAuthorizationRequest = if (isSignedRequest) {
             val requestSigningKey = requireNotNull(signingKey)
