@@ -88,6 +88,8 @@ WALLET_SDK_BRIDGE_FIXTURES=1 xcodebuild test \
   -workspace "$root/WalletSDK.xcworkspace" -scheme WalletSDKTests \
   -destination "$destination" \
   -only-testing:WalletSDKTests/KMPProximityProjectionTests \
+  -only-testing:WalletSDKTests/ProximityBridgeContractTests \
+  -only-testing:WalletSDKTests/ProximityInputValidationTests \
   -resultBundlePath "$run_dir/Tests.xcresult" \
   -derivedDataPath "$root/bridge-fixture-derived" \
   -parallel-testing-enabled NO \
