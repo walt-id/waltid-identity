@@ -16,6 +16,8 @@ Similar names and declared test counts alone do not establish that a test execut
 | --- | --- | --- |
 | Missing discovery, stale framework, physical leakage | Existing Gradle/JUnit/XCTest runners | Exact passing IDs, nonzero execution, owned-suite skip rejection and forbidden physical prefixes; fixture/release header checks and separate physical sources/target |
 | Field projection and receipt | `KMPProximityProjectionTests` submission/review collection regressions | Real native `StateFlow` through the Swift bridge, exact selected fields in forwarded approval and receipt, cancellation and error projection |
+| Recoverable Swift host inputs | `ProximityInputValidationTests`; native invalid-configuration startup regression | Invalid configuration, trust/profile results and disclosure selections throw; stored settings cannot weaken a profile's trust policy; request indices fit the shared integer range |
+| KMP/Swift capability drift | `ProximityBridgeContractTests` against real WalletCore outputs | 24 transport flag/runtime combinations and 192 route combinations compare start decisions and ordered remediation; this does not prove every model invariant equivalent |
 | Rendered stale consent | Shared Compose review/terminal scenarios; native view-model cancellation, settings replacement and preparation tests | Android/iOS replacement review and cancellation remove stale controls; Android prepared receipt details exclude unselected fields; native combined selection preserves exact elements and proof |
 | NFC fragmentation and lifecycle | `NfcRetrievalApduProcessorTest` APDU order, malformed DO53, request two and deactivation; native CardSession adapter tests | Android successful close retains routing through the final response fragment; bounded drain, send failure, disconnect and fresh-generation recovery |
 | Native BLE callback identity | Common framing, handshake, incoming packet and provider tests | Real Android/CoreBluetooth callback adapters reject wrong peers/attributes, dispose on disconnect/cancellation, preserve ordered bytes under backpressure and permit fresh recovery |
@@ -36,7 +38,9 @@ Path eligibility includes the guard scripts and native simulator test sources.
 
 `run-ios-wallet-sdk-tests.sh` assembles the release and test-fixture XCFrameworks
 from the selected checkout, checks their headers, records source and binary hashes,
-and explicitly runs `WalletSDKTests/KMPProximityProjectionTests` on a simulator.
+and explicitly runs `KMPProximityProjectionTests`, `ProximityBridgeContractTests` and
+`ProximityInputValidationTests` in `WalletSDKTests` on a simulator. The discovery guard
+requires every named test to pass; missing or skipped tests fail the lane.
 Testing only the demo's `iosAppTests` cannot replace this package suite. Its
 `WALLET_SDK_BRIDGE_FIXTURES=1` framework has the same SDK sources and an additional
 test-only session producer. The ordinary release framework has no test producer.
