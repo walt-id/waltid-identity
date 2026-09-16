@@ -722,8 +722,8 @@ private extension WalletCore.ProximityReaderEvidence {
 }
 
 private extension WalletCore.ProximityReaderTrustDecision {
-    func toSwiftDecision() -> ProximityReaderTrustDecision {
-        ProximityReaderTrustDecision(
+    func toSwiftDecision() throws -> ProximityReaderTrustDecision {
+        try ProximityReaderTrustDecision(
             state: state.toSwiftTrust(),
             certificatePath: certificatePath.toSwiftPath(),
             revocation: revocation.toSwiftRevocation(),
@@ -2029,7 +2029,7 @@ private extension WalletCore.ProximityCapabilities {
     }
 }
 
-private extension WalletCore.ProximityTransportCapability {
+extension WalletCore.ProximityTransportCapability {
     func toSwiftCapability() -> ProximityTransportCapability {
         let observation: ProximityRuntimeObservation
         switch onEnum(of: runtime) {

@@ -61,6 +61,13 @@ final class ProximityInputValidationTests: XCTestCase {
         XCTAssertEqual(try ProximitySubmission(documents: [document]).documents, [document])
     }
 
+    func testStoredPolicyCannotDowngradeAProfileThatRequiresTrustedReaders() throws {
+        let configuration = try ProximityConfiguration(profile: .eudiARF3FCAF202608, readerPolicy: .requireTrusted)
+        assertInvalid { try ProximityReaderTrustSettings().applying(to: configuration) }
+        XCTAssertEqual(try ProximityReaderTrustSettings(readerPolicy: .requireTrusted)
+            .applying(to: configuration).readerPolicy, .requireTrusted)
+    }
+
     private func assertInvalid<T>(_ operation: () throws -> T, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertThrowsError(try operation(), file: file, line: line) { error in
             guard case WalletError.invalidInput = error else {

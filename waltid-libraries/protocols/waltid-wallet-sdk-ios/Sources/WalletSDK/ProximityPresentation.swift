@@ -1350,3 +1350,7 @@ private func isProximityNonBlank(_ value: String) -> Bool {
 private func isProximityX509Certificate(_ data: Data) -> Bool {
     !data.isEmpty && SecCertificateCreateWithData(nil, data as CFData) != nil
 }
+
+private func requireProximityInput(_ condition: Bool, _ message: String = "Invalid proximity input") throws {
+    guard condition else { throw WalletError.invalidInput(message) }
+}

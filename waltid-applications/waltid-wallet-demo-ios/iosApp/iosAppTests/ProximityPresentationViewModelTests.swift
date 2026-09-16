@@ -7,6 +7,23 @@ import ZXingCpp
 
 final class ProximityPresentationViewModelTests: XCTestCase {
     @MainActor
+    func testInvalidHostConfigurationDoesNotStartSessionAndCanBeDismissed() {
+        let client = FakeProximityWalletClient(session: FakeProximitySession())
+        let viewModel = ProximityPresentationViewModel(
+            client: client,
+            configurationProvider: { try ProximityConfiguration(maximumMessageBytes: 0) },
+            hostActions: FakeProximityHostActionExecutor()
+        )
+        viewModel.start()
+        XCTAssertEqual(client.startCount, 0)
+        XCTAssertTrue(viewModel.startupFailed)
+        XCTAssertNotNil(viewModel.actionErrorMessage)
+        viewModel.dismiss()
+        XCTAssertFalse(viewModel.active)
+        XCTAssertFalse(viewModel.startupFailed)
+    }
+
+    @MainActor
     func testStartObservesSessionAndLifecycleCancelsActiveExchange() async throws {
         let session = FakeProximitySession()
         let client = FakeProximityWalletClient(session: session)
@@ -60,7 +77,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             hostActions: FakeProximityHostActionExecutor()
         )
         let review = combinedProximityReview()
-        let familyName = ProximityElementReference(
+        let familyName = try ProximityElementReference(
             namespace: "org.iso.18013.5.1",
             elementIdentifier: "family_name"
         )
@@ -156,7 +173,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             client: client,
             configurationProvider: {
                 resolutionCount += 1
-                return ProximityConfiguration(readerPolicy: policy)
+                return try ProximityConfiguration(readerPolicy: policy)
             },
             hostActions: FakeProximityHostActionExecutor()
         )

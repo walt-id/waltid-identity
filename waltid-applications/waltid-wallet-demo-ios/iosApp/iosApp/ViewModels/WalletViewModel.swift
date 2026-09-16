@@ -632,7 +632,7 @@ class WalletViewModel: ObservableObject {
                 ?? (resolvedWalletClient as? any ProximityWalletClient)
                 ?? UnavailableProximityWalletClient(),
             configurationProvider: {
-                readerTrustSettings.sessionSnapshot().applying()
+                try readerTrustSettings.sessionSnapshot().applying()
             }
         )
         self.identityDocumentRegistrationUpdate = identityDocumentRegistrationUpdate ?? {

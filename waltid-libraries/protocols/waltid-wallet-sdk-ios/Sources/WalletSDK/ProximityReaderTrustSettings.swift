@@ -111,13 +111,14 @@ public struct ProximityReaderTrustSettings: Sendable, Equatable {
     }
 
     /// Applies this immutable settings snapshot to one new proximity session.
+    /// - Throws: A settings-codec or invalid-input error when the snapshot cannot be applied.
     /// - Parameter configuration: Base presentation configuration to update.
     public func applying(
         to configuration: ProximityConfiguration = .init()
-    ) -> ProximityConfiguration {
-        let evaluator = configuredReaderTrustEvaluator(for: self)
+    ) throws -> ProximityConfiguration {
+        let evaluator = try configuredReaderTrustEvaluator(for: self)
 
-        return ProximityConfiguration(
+        return try ProximityConfiguration(
             profile: configuration.profile,
             bleRoles: configuration.bleRoles,
             bearerPolicy: configuration.bearerPolicy,
@@ -315,23 +316,23 @@ private func decodedReaderTrustBase64URL(_ encoded: String) -> Data? {
     return Data(base64Encoded: base64)
 }
 
-private func validatedBase64URL(_ encoded: String) -> Data {
+private func validatedBase64URL(_ encoded: String) throws -> Data {
     guard let data = decodedReaderTrustBase64URL(encoded), !data.isEmpty else {
-        preconditionFailure("Validated reader trust settings contained invalid Base64URL data")
+        throw ProximityReaderTrustSettingsCodecError.invalidCoreData
     }
     return data
 }
 
 private func configuredReaderTrustEvaluator(
     for settings: ProximityReaderTrustSettings
-) -> (any ProximityReaderTrustEvaluator)? {
+) throws -> (any ProximityReaderTrustEvaluator)? {
     guard !settings.trustAnchors.isEmpty || !settings.ricalProviders.isEmpty else { return nil }
     #if canImport(WalletCore) && os(iOS)
-    return ProximityConfiguredReaderTrustEvaluator(
+    return try ProximityConfiguredReaderTrustEvaluator(
         configuration: ProximityReaderTrustConfiguration(
             trustAnchors: settings.trustAnchors.map {
                 ProximityReaderTrustAnchor(
-                    certificateDER: validatedBase64URL($0.certificateDERBase64URL),
+                    certificateDER: try validatedBase64URL($0.certificateDERBase64URL),
                     displayName: $0.displayName
                 )
             },
@@ -339,21 +340,21 @@ private func configuredReaderTrustEvaluator(
                 ProximityRICALConfiguration(
                     providerID: provider.providerID,
                     acceptedTypes: provider.acceptedTypes,
-                    providerTrustAnchors: provider.providerTrustAnchorsDERBase64URL.map {
-                        ProximityRICALProviderTrustAnchor(certificateDER: validatedBase64URL($0))
+                    providerTrustAnchors: try provider.providerTrustAnchorsDERBase64URL.map {
+                        ProximityRICALProviderTrustAnchor(certificateDER: try validatedBase64URL($0))
                     },
                     acceptedSignerCertificatePolicyOIDs:
                         provider.acceptedSignerCertificatePolicyOIDs,
                     establishReaderTrust: provider.establishesReaderTrust,
                     provider: StaticProximityRICALProvider(
-                        signedRICAL: validatedBase64URL(provider.signedRICALBase64URL)
+                        signedRICAL: try validatedBase64URL(provider.signedRICALBase64URL)
                     )
                 )
             }
         )
     )
     #else
-    preconditionFailure("Configured reader trust requires WalletCore")
+    throw ProximityReaderTrustSettingsCodecError.walletCoreUnavailable
     #endif
 }
 
