@@ -1,8 +1,9 @@
 # Device qualification — 2026-09-16
 
 These are recorded observations for WAL-749, not a claim that every supported
-policy, device or OS version has been qualified. The test devices were a
-OnePlus GM1913 running Android 12 and an iPhone running iOS 27.0. Runs started
+policy, device or OS version has been qualified. The initial checks used an
+Android 12 device with TEE-backed Keystore but no StrongBox support, and a
+physical iOS 27.0 device with Secure Enclave and Face ID. Runs started
 at `e14f7a01404988e51d88454d84b6b8ab8d77726c`; failures were retained and
 retested with the Android invalidation and iOS key-handling fixes accompanying
 this report. The later registration-publication fix is covered by automated
@@ -30,7 +31,7 @@ recovery rejected a weaker encrypted-database destination. Recovery phases ran
 in separate application processes. Operators entered credentials only on the
 devices and confirmed approvals, cancellations and the two-prompt reuse checks.
 
-The OnePlus also reported encrypted-cloud backup available and accepted a
+The Android 12 device also reported encrypted-cloud backup available and accepted a
 synthetic record for local retrieval/deletion. **This did not establish cloud
 upload, delivery or restoration.**
 
@@ -65,20 +66,20 @@ repository. The portable runner and regression tests are described in
 
 ## Additional security transitions — September 16
 
-On the OnePlus, removing all fingerprints preserved PIN use for both combined policies. After
-re-enrollment, enrollment-tolerant and combined keys retained their public keys; the current-set
+On the Android 12 device, removing all fingerprints preserved PIN use for both combined policies.
+After re-enrollment, enrollment-tolerant and combined keys retained their public keys; the current-set
 key recovered explicitly. A missing-enrollment error that stable Signum classified as cancellation
 was corrected at the mobile boundary and verified in the no-fingerprint checks.
 
-Removing the OnePlus PIN invalidated all six authenticated controls; the unauthenticated control
-still signed. Restoring a PIN and fingerprint did not revive the protected keys. All five recoverable
+Removing the PIN on the Android 12 device invalidated all six authenticated controls;
+the unauthenticated control still signed. Restoring a PIN and fingerprint did not revive the protected keys. All five recoverable
 wallets recovered from their actual Block Store records and passed fresh-process signing checks
 with the original public keys, DIDs and logical IDs. The generated protected control remained
 unavailable. The real Block Store service reported E2EE unavailable, and encrypted-cloud writes
 were refused without leaving a record. E2EE was still unavailable after device protection was
 restored; this does not establish cloud delivery or restoration of backup availability.
 
-Two iPhone passcode-removal cycles reproduced missing-passcode error misclassification and
+Two iOS passcode-removal cycles reproduced missing-passcode error misclassification and
 passcode-set-only keys whose retained native metadata incorrectly appeared active. The first
 cycle included an unrecorded Keychain/password prompt choice; the repeat used fresh keys and
 had no such prompt. Account state was not reset between runs. Default-accessibility controls
@@ -105,18 +106,18 @@ keys remain unrecoverable. No further passcode change was needed for this final 
 
 ## iCloud synchronization and authenticated recovery — September 16
 
-At `718f0c200c9a31a581af851ed517592603a4730a`, the physical iPhone (iOS 27.0)
-and a Mac (macOS 26.6.2) used the same Apple Account, enabled iCloud Keychain
+At `718f0c200c9a31a581af851ed517592603a4730a`, the physical iOS 27.0 device
+and a macOS 26.6.2 endpoint used the same Apple Account, enabled iCloud Keychain
 synchronization and the same entitled test-app access group. Fresh test namespaces
-were checked for absence before writes. The Mac helper was local test tooling;
+were checked for absence before writes. The macOS helper was local test tooling;
 this does not add macOS SDK support.
 
-Production SDK recovery records created on iPhone arrived on Mac with matching
-SHA-256 digests. The Mac then generated independent P-256 keys and wrote new
-recovery records. The iPhone retrieved matching bytes through the production
+Production SDK recovery records created on iOS arrived on macOS with matching
+SHA-256 digests. The macOS helper then generated independent P-256 keys and wrote new
+recovery records. The iOS device retrieved matching bytes through the production
 provider and restored into empty test wallets using ordinary Keychain storage.
-The records sent from iPhone contained derived-key material; the new Mac records
-restored on iPhone contained exported-key material. Private records traveled only
+The records sent from iOS contained derived-key material; the new macOS records
+restored on iOS contained exported-key material. Private records traveled only
 through Keychain synchronization; the runner exchanged public metadata and digests.
 
 Restoration passed without signing authorization, with passcode approval on every
@@ -134,17 +135,17 @@ import or authentication. The local harness was corrected to allow a bounded
 passed. Both results were retained. This bound is a test limit, not an iCloud
 delivery guarantee or evidence of controlled offline/service-outage handling.
 
-All disposable test wallets and synchronized records were removed on iPhone;
-subsequent Mac reads confirmed deletion propagation. These checks qualify
+All disposable test wallets and synchronized records were removed on iOS;
+subsequent macOS reads confirmed deletion propagation. These checks qualify
 `WhenUnlocked` synchronized records for the tested account and OS combination.
-They do not qualify iPhone-to-iPhone migration, recovery after losing all trusted
-Apple devices, or every signing policy and synchronization failure mode.
+They do not qualify migration between physical iOS devices, recovery after losing
+all trusted Apple devices, or every signing policy and synchronization failure mode.
 
-## Samsung StrongBox recovery — September 16
+## StrongBox recovery — September 16
 
-At `461cb546ac64e77d8110729bba8e72997d2e4821`, a Samsung SM-G998B running
-Android 15 passed SDK recovery checks with StrongBox explicitly required. Native
-readback reported `STRONGBOX`, the expected generated/imported origin and native
+At `461cb546ac64e77d8110729bba8e72997d2e4821`, a StrongBox-capable
+Android 15 device passed SDK recovery checks with StrongBox explicitly required.
+Native readback reported `STRONGBOX`, the expected generated/imported origin and native
 authorization attributes. The generated control signed after reopening. Recoverable
 identities were restored from actual Block Store records after deleting their local
 test wallet and signing key. Signing in a fresh app process retained the original
@@ -159,15 +160,17 @@ identity and signed on retry using the existing PIN. The timed check verified
 first use, immediate reuse and use after expiry; the operator confirmed exactly
 two fingerprint prompts after the previous authorization window had expired.
 
-On the OnePlus, which does not advertise StrongBox, the same required configuration
+On the Android 12 device without StrongBox support, the same required configuration
 did not offer native or hardware creation options and left the test wallet without
-a signing identity. Samsung reported encrypted-cloud backup available. OnePlus
-reported it unavailable and refused a synthetic write without leaving a record.
+a signing identity. The StrongBox-capable Android 15 device reported encrypted-cloud
+backup available. The Android 12 device reported it unavailable and refused a
+synthetic write without leaving a record.
 These were availability checks, not cloud upload or delivery tests.
 
 All checks used an isolated application and temporary keys/records. Test wallets
 and Block Store records were deleted, and the newly installed test app was removed
-from Samsung. Its accounts, screen lock and biometric enrollment were unchanged.
+from the StrongBox-capable device. Its accounts, screen lock and biometric
+enrollment were unchanged.
 This qualifies the tested StrongBox local-loss recovery and authorization cases;
 it does not qualify cross-device transport, cloud restore, or additional hardware,
 authorization and lifecycle combinations.
@@ -175,11 +178,11 @@ authorization and lifecycle combinations.
 ## Remaining qualification
 
 - Actual Android device-to-device transfer and encrypted-cloud delivery/restore.
-- iPhone-to-iPhone migration and Apple Account recovery after loss of trusted devices.
+- Migration between physical iOS devices and Apple Account recovery after loss of trusted devices.
 - Controlled offline/delayed synchronization, service outages and conflicts; additional
   synchronization accessibility and signing-policy combinations.
 - Additional authentication-factor and generated/imported policy combinations, and
-  OS/device coverage beyond these cases. StrongBox coverage is limited to the Samsung cases above.
+  OS/device coverage beyond these cases. StrongBox coverage is limited to the cases above.
 
 Simulator/emulator contracts and host tests remain useful automated regressions,
 but cannot replace these transport, hardware and operator-controlled checks.

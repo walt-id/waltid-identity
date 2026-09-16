@@ -98,7 +98,7 @@ package. An interrupted installation can be retried with `reinstall` without
 repeating the uninstall.
 
 iOS uninstall does not establish Keychain loss, so the harness rejects that
-operation. Physical iPhone testing needs an appropriately signed host and
+operation. Physical iOS device testing needs an appropriately signed host and
 remains outside this simulator runner.
 
 ## Evidence boundaries
@@ -156,7 +156,7 @@ only its own simulator:
 
 The iOS script uses the selected Xcode and newest available iOS runtime. Set
 `IOS_RECOVERY_DEVICE_TYPE` to an installed simulator device type when the
-default iPhone 17 type is unavailable.
+configured default simulator type is unavailable.
 
 Host runner regressions: `python3 -m unittest discover -s scripts/tests -p
 'test_*recovery*.py'`. SDK lifecycle regressions:
