@@ -68,8 +68,8 @@ object EtsiWrpAcX509CertificateProfile : EtsiWalletRelyingPartyX509CertificatePr
     /**
      * @param subjectKey the Relying Party's public key. WRPAC certificates are always CA-issued
      *   (TS 119 411-8 6.6.1) - unlike the Provider profiles, there is no self-signed variant.
-     * @param policyOid exactly one of [Etsi119411Part8.NORMALIZED_CERT_POLICY_NATURAL_PERSON], [Etsi119411Part8.NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON],
-     *   [Etsi119411Part8.QUALIFIED_CERT_POLICY_NATURAL_PERSON], [Etsi119411Part8.QUALIFIED_CERT_POLICY_LEGAL_PERSON] - determines both the
+     * @param policyOid exactly one of [EtsiWalletRelyingPartyX509CertificateProfile.NORMALIZED_CERT_POLICY_NATURAL_PERSON], [EtsiWalletRelyingPartyX509CertificateProfile.NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON],
+     *   [EtsiWalletRelyingPartyX509CertificateProfile.QUALIFIED_CERT_POLICY_NATURAL_PERSON], [EtsiWalletRelyingPartyX509CertificateProfile.QUALIFIED_CERT_POLICY_LEGAL_PERSON] - determines both the
      *   natural-vs-legal-person subject DN shape and whether qcStatements are required.
      * @param contactUri / [contactEmail] populate the mandatory subjectAltName contact information
      *   (TS 119 411-8 6.6.1); at least one is required. Telephone contact info is not modelled yet -
@@ -92,7 +92,7 @@ object EtsiWrpAcX509CertificateProfile : EtsiWalletRelyingPartyX509CertificatePr
         crlDistributionPointUri: String? = null,
     ) {
         require(policyOid in allPolicyOids) {
-            "policyOid must be one of the WRPAC policy OIDs (Etsi119411Part8), but was '$policyOid'"
+            "policyOid must be one of the WRPAC policy OIDs (EtsiWalletRelyingPartyX509CertificateProfile), but was '$policyOid'"
         }
         require(contactUri != null || contactEmail != null) {
             "At least one of contactUri or contactEmail is required (subjectAltName contact info)"
@@ -184,7 +184,7 @@ object EtsiWrpAcX509CertificateProfile : EtsiWalletRelyingPartyX509CertificatePr
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
                 "certificatePolicies",
-                "Certificate must declare exactly one WRPAC policy OID (Etsi119411Part8), found $policyOids"
+                "Certificate must declare exactly one WRPAC policy OID, found $policyOids"
             )
             return null
         }

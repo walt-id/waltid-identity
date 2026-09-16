@@ -39,8 +39,8 @@ import id.walt.crypto2.keys.Key
  * What's implemented below is only the baseline end-entity certificate shape shared by every other
  * ETSI EUDI profile in this package (end-entity, keyUsage, subjectKeyIdentifier, certificatePolicies
  * presence, conditional authorityInfoAccess, restricted extension criticality, key size, legal-person
- * DN, not-self-signed) - reused directly from [EtsiProviderCertificateSupport] /
- * [EtsiWrpAcX509CertificateProfile] rather than guessed at. It intentionally does NOT validate the
+ * DN, not-self-signed) - reused directly from [EtsiWalletRelyingPartyX509CertificateProfile] /
+ * [X509CertificateProfileValidationUtil] / [EtsiWrpAcX509CertificateProfile] rather than guessed at. It intentionally does NOT validate the
  * registered intended use itself: [validate] always emits a WARNING log entry flagging that gap,
  * rather than silently passing a certificate a real WRPRC issuer might reject, or silently pretending
  * to check something ETSI actually requires.

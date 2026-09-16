@@ -43,7 +43,7 @@ import id.walt.crypto2.keys.Key
  * Shared builder/validator logic for the ETSI TS 119 412-6 "provider" certificate profiles -
  * PID Provider ([EtsiPidProviderX509CertificateProfile]) and Wallet Provider
  * ([EtsiWalletProviderX509CertificateProfile]). Both profiles are identical except for the
- * QcType statement OID they carry (id-etsi-qct-pid vs id-etsi-qct-wal, [Etsi119412Part6]) - per
+ * QcType statement OID they carry (id-etsi-qct-pid vs id-etsi-qct-wal, ETSI TS 119 412-6 Annex A) - per
  * the reference implementation both use the same issuer/subject DN validation regardless of
  * whether the certificate belongs to a natural or legal person.
  *

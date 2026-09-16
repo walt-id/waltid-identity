@@ -20,7 +20,7 @@ object EtsiPidProviderX509CertificateProfile : EtsiProviderX509CertificateProfil
     /**
      * OID for the QcType statement that identifies this certificate as an ETSI PID Provider
      * certificate, asserted in the `qcStatements` extension alongside QcCompliance
-     * (PID-4.5-01, [Etsi119412Part6]).
+     * (PID-4.5-01, ETSI TS 119 412-6 Annex A).
      *
      * ```
      * id-etsi-qct-pid OBJECT IDENTIFIER ::= { itu-t(0) identified-organization(4) etsi(0)

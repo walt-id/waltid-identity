@@ -22,7 +22,7 @@ object EtsiWalletProviderX509CertificateProfile : EtsiProviderX509CertificatePro
     /**
      * OID for the QcType statement that identifies this certificate as an ETSI Wallet Provider
      * certificate, asserted in the `qcStatements` extension alongside QcCompliance
-     * (WAL-5.1-01, [Etsi119412Part6]).
+     * (WAL-5.1-01, ETSI TS 119 412-6 Annex A).
      *
      * ```
      * id-etsi-qct-wal OBJECT IDENTIFIER ::= { itu-t(0) identified-organization(4) etsi(0)
