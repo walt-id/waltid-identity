@@ -23,7 +23,7 @@ class AndroidInteractiveAuthorizationTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as KeyAuthorizationTestActivity
         instrumentation.waitForIdleSync()
         try {
-            val backend = AndroidSignumKeyBackend { activity }
+            val backend = AndroidSignumKeyBackend(activity) { activity }
             val sourceAlias = "authorization-source-${UUID.randomUUID()}"
             val spec = KeySpec.Ec(EcCurve.P256)
             val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)

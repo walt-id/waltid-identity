@@ -34,7 +34,7 @@ public class AndroidPlatformKeyProvider(
     private val interactionContextProvider: () -> FragmentActivity? = { null },
 ) : PlatformManagedKeyProvider {
     private val applicationContext = context.applicationContext
-    private val backend = AndroidSignumKeyBackend(interactionContextProvider)
+    private val backend = AndroidSignumKeyBackend(applicationContext, interactionContextProvider)
     private val signumProvider = SignumManagedKeyProvider(backend)
     private val capabilityMutex = Mutex()
     private val hardwareCapabilities = mutableMapOf<id.walt.crypto2.signum.SignumHardwarePolicy, Boolean>()

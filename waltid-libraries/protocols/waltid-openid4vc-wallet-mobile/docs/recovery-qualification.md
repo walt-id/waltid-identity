@@ -175,6 +175,31 @@ This qualifies the tested StrongBox local-loss recovery and authorization cases;
 it does not qualify cross-device transport, cloud restore, or additional hardware,
 authorization and lifecycle combinations.
 
+## StrongBox preference matrix — September 16
+
+The durable `AndroidStrongBoxPreferenceTest` passed all 36 cases across a StrongBox-capable
+Android 15 device, a TEE-only Android 12 device and an Android 15 emulator with software-backed
+Keystore. Each target ran all three StrongBox preferences for generated and imported P-256 keys,
+with hardware backing both preferred and required. No cases were skipped.
+
+| StrongBox preference | StrongBox-capable device | TEE-only device | Software-backed emulator |
+| --- | --- | --- | --- |
+| Required | StrongBox | Rejected | Rejected |
+| Preferred | StrongBox | TEE | Software only when hardware was not required |
+| Discouraged | TEE | TEE | Software only when hardware was not required |
+
+Successful cases verified native security level, key origin, original public-key preservation and
+signatures before and after reopening through a new backend instance. Rejected requests left no key;
+all temporary aliases were deleted. These checks did not involve recovery-provider transport,
+authentication prompts or device-security changes.
+
+The first runs exposed a preferred-StrongBox import failure on both targets without StrongBox:
+Android wrapped hardware unavailability in `KeyStoreException`, bypassing the generation-style
+exception handler. The adapter now checks the public StrongBox feature declaration before requesting
+it. Preferred requests use the available Keystore; required requests fail. Native readback still
+enforces the requested protection. The complete matrix passed after this fix; earlier failures are
+retained in local evidence. Signum Supreme remained at 0.15.0.
+
 ## Remaining qualification
 
 - Actual Android device-to-device transfer and encrypted-cloud delivery/restore.

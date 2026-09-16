@@ -11,13 +11,15 @@ import kotlin.test.*
 import kotlin.uuid.Uuid
 
 /** Fixed private fixture derived independently with Python HMAC and OpenSSL P-256. Never production material. */
-internal suspend fun exerciseNativePrivateImport(backend: SignumPlatformBackend, policy: SignumKeyPolicy) {
-    val provider = SignumManagedKeyProvider(backend)
-    val id = KeyId("wal749-import-test-${Uuid.random()}")
-    val material = EncodedKey.Jwk(BinaryData(("""{"kty":"EC","crv":"P-256",\
+internal val nativeImportTestMaterial = EncodedKey.Jwk(BinaryData(("""{"kty":"EC","crv":"P-256",\
 "x":"Wy87Jza-MAxBSOvUNi73uIaWmnTDrZ5wSTf_PqIaNYc",\
 "y":"emY2LnzjX8MeSJxPM1mP9c924_V6drBDVB9BCxDYKb8",\
 "d":"uqDwic1tOTnxFp6amne7WMZU8-6SqRMQbn95fClcK3g"}""").replace("\\\n", "").encodeToByteArray()), true)
+
+internal suspend fun exerciseNativePrivateImport(backend: SignumPlatformBackend, policy: SignumKeyPolicy) {
+    val provider = SignumManagedKeyProvider(backend)
+    val id = KeyId("wal749-import-test-${Uuid.random()}")
+    val material = nativeImportTestMaterial
     val spec = KeySpec.Ec(EcCurve.P256)
     val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
     val request = GenerateManagedKeyRequest(id, spec, usages, providerOptions = SignumKeyOptions(policy = policy).encode())
