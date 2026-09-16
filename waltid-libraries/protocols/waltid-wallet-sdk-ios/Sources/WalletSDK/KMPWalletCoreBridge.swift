@@ -2208,7 +2208,7 @@ private extension ProximityRICALState {
     }
 }
 
-private extension WalletCore.ProximityCapabilities {
+extension WalletCore.ProximityCapabilities {
     func toSwiftCapabilities() -> ProximityCapabilities {
         ProximityCapabilities(
             profile: profile.toSwiftProfile(),
@@ -2255,7 +2255,7 @@ private extension WalletCore.ProximityRecovery {
     }
 }
 
-private extension WalletCore.ProximityRemediationAction {
+extension WalletCore.ProximityRemediationAction {
     func toSwiftAction() -> ProximityRemediationAction {
         switch self {
         case .requestBluetoothPermission: return .requestBluetoothPermission

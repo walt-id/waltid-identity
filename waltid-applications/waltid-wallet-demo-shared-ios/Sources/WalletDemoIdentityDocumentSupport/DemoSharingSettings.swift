@@ -59,7 +59,7 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
                 )
             )
         case .provisionalNfcV2WifiAware:
-            return ProximityConfiguration(
+            return try! ProximityConfiguration(
                 session: .provisionalNFCV2(.init(wifiAware: true))
             )
         case .provisionalNfcV2Direct:
