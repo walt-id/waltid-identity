@@ -53,7 +53,7 @@ internal fun SignumKeyPolicy.supportsAndroidSettings(importing: Boolean): Boolea
 }
 
 internal suspend fun importAndroidPrivateKey(alias: String, material: EncodedKey.Jwk,
-                                             spec: KeySpec, policy: SignumKeyPolicy) {
+                                             spec: KeySpec, policy: SignumKeyPolicy, hasStrongBox: Boolean) {
     val store = androidKeyStore()
     require(!store.containsAlias(alias)) { "Key alias already exists" }
     val jwk = Json.parseToJsonElement(material.data.toByteArray().decodeToString()).jsonObject
@@ -82,7 +82,7 @@ internal suspend fun importAndroidPrivateKey(alias: String, material: EncodedKey
                     setInvalidatedByBiometricEnrollment(it.biometric && !it.allowNewBiometrics)
                 }
             }.build()
-        val strongBox = settings.strongBox != SignumHardwarePolicy.DISCOURAGED
+        val strongBox = settings.strongBox.requestStrongBox(hasStrongBox)
         try {
             store.setEntry(alias, KeyStore.PrivateKeyEntry(key, arrayOf(certificate)), protection(strongBox))
         } catch (cause: android.security.keystore.StrongBoxUnavailableException) {
@@ -98,7 +98,7 @@ internal fun SignumAuthenticationPolicy.UserPresence.androidAuthenticationTypes(
     (if (biometric) KeyProperties.AUTH_BIOMETRIC_STRONG else 0) or
         (if (deviceCredential) KeyProperties.AUTH_DEVICE_CREDENTIAL else 0)
 
-internal fun generateAndroidP256Key(alias: String, policy: SignumKeyPolicy) {
+internal fun generateAndroidP256Key(alias: String, policy: SignumKeyPolicy, hasStrongBox: Boolean) {
     require(!androidKeyStore().containsAlias(alias)) { "Key alias already exists" }
     val settings = policy.androidSettings()
     fun generate(strongBox: Boolean) {
@@ -125,11 +125,22 @@ internal fun generateAndroidP256Key(alias: String, policy: SignumKeyPolicy) {
             }.build()
         KeyPairGenerator.getInstance("EC", "AndroidKeyStore").apply { initialize(parameters) }.generateKeyPair()
     }
-    try { generate(settings.strongBox != SignumHardwarePolicy.DISCOURAGED) }
+    try { generate(settings.strongBox.requestStrongBox(hasStrongBox)) }
     catch (cause: android.security.keystore.StrongBoxUnavailableException) {
         if (settings.strongBox != SignumHardwarePolicy.PREFERRED) throw cause
         if (androidKeyStore().containsAlias(alias)) androidKeyStore().deleteEntry(alias)
         generate(false)
+    }
+}
+
+// Import can wrap absent StrongBox in an opaque KeyStoreException on older Android versions.
+// Use the public feature check before requesting it; native readback still verifies the result.
+private fun SignumHardwarePolicy.requestStrongBox(available: Boolean): Boolean = when (this) {
+    SignumHardwarePolicy.DISCOURAGED -> false
+    SignumHardwarePolicy.PREFERRED -> available
+    SignumHardwarePolicy.REQUIRED -> {
+        if (!available) throw android.security.keystore.StrongBoxUnavailableException("StrongBox is not available")
+        true
     }
 }
 

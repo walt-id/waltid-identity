@@ -11,7 +11,10 @@ needed directly.
 attestation are independent requirements.
 
 On Android, Signum performs signing and key-use authorization, including for keys created or imported
-by the native settings adapter. Combined biometric/device-credential prompts omit the negative
+by the native settings adapter. `AndroidSignumKeyBackend` takes an Android `Context` to check
+StrongBox availability without retaining an activity. Explicit native configurations skip unavailable
+StrongBox when preferred and reject it when required; native readback still verifies the actual
+protection. Combined biometric/device-credential prompts omit the negative
 button, as required by AndroidX. Reopening an authenticated signing key also starts and aborts a
 native operation to detect permanent invalidation that a KeyStore lookup alone can miss. This check
 does not prompt or sign; needing authentication is distinct from permanent invalidation. Native
@@ -54,6 +57,12 @@ A native token failure can indicate temporary unavailability rather than permane
 the key for retry. Cancellation and failed authorization remain separate failures.
 
 ## Native regression tests
+
+`AndroidStrongBoxPreferenceTest` checks generated and imported P-256 keys with each StrongBox
+preference and both preferred/required hardware backing. Run it on API 31+ targets with StrongBox,
+TEE-only Keystore and software-backed Keystore. It checks native protection, reopening, signatures
+and cleanup, including rejected requests, without authentication prompts or security-setting changes.
+The existing Android wallet CI lane runs the emulator cases automatically.
 
 The default iOS tests cover pure policy and error translation. Keychain lifecycle tests live in
 `src/iosAppTest` and require an application host with Keychain access. On an Apple Silicon Mac with

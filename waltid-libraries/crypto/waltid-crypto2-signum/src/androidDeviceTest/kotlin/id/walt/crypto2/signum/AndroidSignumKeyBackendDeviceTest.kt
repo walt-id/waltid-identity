@@ -43,7 +43,7 @@ class AndroidSignumKeyBackendDeviceTest {
     fun invalidationChecksAbortWithoutConsumingTheKeysSingleUse() = runTest {
         assumeTrue(Build.VERSION.SDK_INT >= 31)
         val alias = "invalidation-probe-${Uuid.random()}"
-        val backend = AndroidSignumKeyBackend()
+        val backend = AndroidSignumKeyBackend(InstrumentationRegistry.getInstrumentation().targetContext)
         val policy = SignumKeyPolicy(platform = SignumPlatformPolicy.AndroidKeystore(
             strongBox = SignumHardwarePolicy.DISCOURAGED, maxUsageCount = 1))
         try {
@@ -66,25 +66,25 @@ class AndroidSignumKeyBackendDeviceTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         assumeTrue(context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
         val alias = "invalidation-locked-${Uuid.random()}"
-        val backend = AndroidSignumKeyBackend()
+        val backend = AndroidSignumKeyBackend(InstrumentationRegistry.getInstrumentation().targetContext)
         val policy = SignumKeyPolicy(authentication = SignumAuthenticationPolicy.UserPresence(
             biometric = false, deviceCredential = true, timeoutSeconds = 10))
         val spec = KeySpec.Ec(EcCurve.P256)
         val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
         try {
             backend.create(alias, spec, usages, policy)
-            assertNotNull(AndroidSignumKeyBackend().load(alias, spec, usages, policy))
+            assertNotNull(AndroidSignumKeyBackend(InstrumentationRegistry.getInstrumentation().targetContext).load(alias, spec, usages, policy))
         } finally { backend.delete(alias) }
     }
 
     @Test
     fun importedP256RetainsOriginalKeyAfterDeletionAndReimport() = runTest {
-        exerciseNativePrivateImport(AndroidSignumKeyBackend(), SignumKeyPolicy(hardware = SignumHardwarePolicy.PREFERRED,
+        exerciseNativePrivateImport(AndroidSignumKeyBackend(InstrumentationRegistry.getInstrumentation().targetContext), SignumKeyPolicy(hardware = SignumHardwarePolicy.PREFERRED,
             platform = SignumPlatformPolicy.AndroidKeystore(strongBox = SignumHardwarePolicy.DISCOURAGED)))
     }
 
     @Test
     fun platformKeySurvivesProviderRestart() = runTest {
-        exercisePlatformSignumBackend(AndroidSignumKeyBackend(), AndroidSignumKeyBackend())
+        exercisePlatformSignumBackend(AndroidSignumKeyBackend(InstrumentationRegistry.getInstrumentation().targetContext), AndroidSignumKeyBackend(InstrumentationRegistry.getInstrumentation().targetContext))
     }
 }

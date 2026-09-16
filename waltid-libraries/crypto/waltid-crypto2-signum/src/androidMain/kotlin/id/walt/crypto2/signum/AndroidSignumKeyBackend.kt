@@ -1,5 +1,7 @@
 package id.walt.crypto2.signum
 
+import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.security.keystore.KeyProperties
 import android.security.keystore.UserNotAuthenticatedException
@@ -24,8 +26,11 @@ import kotlinx.coroutines.CancellationException
  * reusable authorization has expired; an already authorized signing operation remains headless.
  */
 public class AndroidSignumKeyBackend(
+    context: Context,
     private val interactionContextProvider: () -> FragmentActivity? = { null },
 ) : SignumPlatformBackend, SignumPrivateKeyImportBackend {
+    private val hasStrongBox = context.applicationContext.packageManager
+        .hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)
     override val id = ProviderId("android-keystore-signum")
 
     override fun supports(spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): Boolean =
@@ -45,7 +50,7 @@ public class AndroidSignumKeyBackend(
     ): SignumPlatformKey {
         require(supports(spec, usages, policy)) { "Android Signum backend does not support the requested key and policy" }
         val signer = if (policy.platform is SignumPlatformPolicy.AndroidKeystore) {
-            generateAndroidP256Key(alias, policy)
+            generateAndroidP256Key(alias, policy, hasStrongBox)
             AndroidKeyStoreProvider.getSignerForKey(alias).getOrThrow()
         } else AndroidKeyStoreProvider.createSigningKey(alias) {
             configureSignumKey(spec, usages, policy)
@@ -70,7 +75,7 @@ public class AndroidSignumKeyBackend(
     override suspend fun importPrivateKey(alias: String, material: id.walt.crypto2.keys.EncodedKey.Jwk,
         spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): SignumPlatformKey {
         require(supportsImport(spec, usages, policy)) { "Unsupported Android private-key import policy" }
-        importAndroidPrivateKey(alias, material, spec, policy)
+        importAndroidPrivateKey(alias, material, spec, policy, hasStrongBox)
         try { return requireNotNull(loadImportedKey(alias, spec, usages, policy)) }
         catch (cause: Throwable) {
             try { deleteImportedKey(alias, policy) } catch (cleanup: Throwable) { cause.addSuppressed(cleanup) }
