@@ -2,7 +2,7 @@ import XCTest
 @testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
-    func testProximityStreamCompletesAtEveryTerminalStateWithoutForwardingLaterStates() async {
+    func testProximityStreamCompletesAtEveryTerminalStateWithoutForwardingLaterStates() async throws {
         let terminals: [ProximityState] = [
             .completed(exchanges: 1, declined: false), .noData(exchange: 2), .cancelled,
             .failed(.init(category: .transport, code: "closed", message: "Closed", recovery: .startNewSession)),
@@ -301,7 +301,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNotNil(wallet)
     }
 
-    func testProximityConfigurationUsesStableNativeDefaults() {
+    func testProximityConfigurationUsesStableNativeDefaults() throws {
         let configuration = ProximityConfiguration()
 
         acceptsSendable(configuration)
@@ -314,7 +314,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertTrue(configuration.applicationProfiles.isEmpty)
     }
 
-    func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() {
+    func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() throws {
         let evidence = ProximityReaderEvidence(
             scope: .wholeRequest,
             authenticationIndex: 1,
@@ -325,7 +325,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNil(evidence.scope.documentRequestIndex)
     }
 
-    func testProximityHolderAuthorizationKeepsPerDocumentMethods() {
+    func testProximityHolderAuthorizationKeepsPerDocumentMethods() throws {
         let authorization = ProximityHolderAuthorization(
             reviewID: ProximityReviewID(value: UUID().uuidString),
             exchange: 2,
@@ -369,7 +369,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.proximitySession.closeCalls, 1)
     }
 
-    func testProximityCapabilitiesAllowUnavailableSelectedAlternatives() {
+    func testProximityCapabilitiesAllowUnavailableSelectedAlternatives() throws {
         let available = ProximityTransportCapability(
             implemented: true,
             profilePermitted: true,
@@ -396,7 +396,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertFalse(capabilities.nfcEngagement.mayStart)
     }
 
-    func testProximityScopeOutcomeAndRuntimeFactsAreIndependent() {
+    func testProximityScopeOutcomeAndRuntimeFactsAreIndependent() throws {
         let evidence = ProximityReaderEvidence(
             scope: .document(index: 2), authenticationIndex: 0, certificateChainDER: [Data([0x30, 0x00])]
         )
@@ -421,9 +421,9 @@ final class WalletAPITests: XCTestCase {
         let wallet = Wallet(bridge: bridge)
         let session = try await wallet.startProximityPresentation()
         let reviewID = ProximityReviewID(value: UUID().uuidString)
-        let submission = ProximitySubmission(documents: [
-            ProximityDocumentSubmission(requestIndex: 0, credentialID: "credential-1", disclosedElements: [
-                ProximityElementReference(namespace: "org.example", elementIdentifier: "name")
+        let submission = try ProximitySubmission(documents: [
+            try ProximityDocumentSubmission(requestIndex: 0, credentialID: "credential-1", disclosedElements: [
+                try ProximityElementReference(namespace: "org.example", elementIdentifier: "name")
             ])
         ])
         _ = try await session.dispatch(.approve(reviewID: reviewID, submission: submission))

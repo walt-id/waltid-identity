@@ -525,11 +525,11 @@ private final class KMPProximityApplicationProfileAdapter:
                 requestedDocuments: swiftArray(
                     input.requestedDocuments,
                     of: WalletCore.ProximityApplicationDocumentRequest.self
-                ).map { $0.toSwiftRequest() },
+                ).map { try $0.toSwiftRequest() },
                 readerAuthentication: swiftArray(
                     input.readerAuthentication,
                     of: WalletCore.ProximityReaderAuthentication.self
-                ).map { $0.toSwiftAuthentication() }
+                ).map { try $0.toSwiftAuthentication() }
             )
         )
         switch result {
@@ -1944,7 +1944,7 @@ private extension WalletCore.ProximityHolderAuthorization {
 
 private extension WalletCore.ProximityReview {
     func toSwiftReview() throws -> ProximityReview {
-        ProximityReview(
+        try ProximityReview(
             reviewID: ProximityReviewID(value: reviewId.value),
             exchange: Int(exchange),
             documents: try swiftArray(documents, of: WalletCore.ProximityDocumentReview.self).map {
@@ -1953,7 +1953,7 @@ private extension WalletCore.ProximityReview {
             readerAuthentication: swiftArray(
                 readerAuthentication,
                 of: WalletCore.ProximityReaderAuthentication.self
-            ).map { $0.toSwiftAuthentication() },
+            ).map { try $0.toSwiftAuthentication() },
             readerAuthenticationSummary: readerAuthenticationSummary.toSwiftSummary(),
             useCases: swiftArray(useCases, of: WalletCore.ProximityUseCase.self).map {
                 $0.toSwiftUseCase()
@@ -1981,7 +1981,7 @@ private extension WalletCore.ProximityDocumentReview {
 
 private extension WalletCore.ProximityCredentialOption {
     func toSwiftOption() throws -> ProximityCredentialOption {
-        ProximityCredentialOption(
+        try ProximityCredentialOption(
             credentialID: credentialId,
             label: label,
             issuer: issuer,
@@ -1990,7 +1990,7 @@ private extension WalletCore.ProximityCredentialOption {
             requestedElements: swiftArray(
                 requestedElements,
                 of: WalletCore.ProximityRequestedElement.self
-            ).map { $0.toSwiftElement() }
+            ).map { try $0.toSwiftElement() }
         )
     }
 }
@@ -2005,34 +2005,34 @@ private extension WalletCore.ProximityDeviceAuthenticationMethod {
 }
 
 private extension WalletCore.ProximityApplicationDocumentRequest {
-    func toSwiftRequest() -> ProximityApplicationDocumentRequest {
-        ProximityApplicationDocumentRequest(
+    func toSwiftRequest() throws -> ProximityApplicationDocumentRequest {
+        try ProximityApplicationDocumentRequest(
             requestIndex: Int(requestIndex),
             documentType: docType,
             requestedElements: swiftArray(
                 requestedElements,
                 of: WalletCore.ProximityRequestedElement.self
-            ).map { $0.toSwiftElement() }
+            ).map { try $0.toSwiftElement() }
         )
     }
 }
 
 private extension WalletCore.ProximityRequestedElement {
-    func toSwiftElement() -> ProximityRequestedElement {
-        ProximityRequestedElement(
+    func toSwiftElement() throws -> ProximityRequestedElement {
+        try ProximityRequestedElement(
             namespace: namespace,
             elementIdentifier: elementIdentifier,
             intentToRetain: intentToRetain,
             satisfiesRequestedElements: swiftArray(
                 satisfiesRequestedElements,
                 of: WalletCore.ProximityElementReference.self
-            ).map { ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier) }
+            ).map { try ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier) }
         )
     }
 }
 
 private extension WalletCore.ProximityReaderAuthentication {
-    func toSwiftAuthentication() -> ProximityReaderAuthentication {
+    func toSwiftAuthentication() throws -> ProximityReaderAuthentication {
         let result: ProximityReaderAuthenticationOutcome
         switch onEnum(of: outcome) {
         case .absent: result = .absent
@@ -2040,7 +2040,7 @@ private extension WalletCore.ProximityReaderAuthentication {
         case let .invalid(value): result = .invalid(reason: value.reason)
         case let .valid(value):
             let trust = value.trust
-            result = .valid(ProximityReaderTrustDecision(
+            result = .valid(try ProximityReaderTrustDecision(
                 state: trust.state.toSwiftTrust(),
                 certificatePath: trust.certificatePath.toSwiftPath(),
                 revocation: trust.revocation.toSwiftRevocation(),
@@ -2148,19 +2148,19 @@ private extension WalletCore.ProximityUseCase {
 private extension WalletCore.ProximityApplicationAuthorization {
     func toSwiftAuthorization() throws -> ProximityApplicationAuthorization {
         let digest = try decodedBase64URL(resultBindingDigestBase64Url, context: "application binding digest")
-        return ProximityApplicationAuthorization(
+        return try ProximityApplicationAuthorization(
             profileID: profileId,
             displayTitle: displayTitle,
             details: swiftArray(
                 details,
                 of: WalletCore.ProximityApplicationAuthorizationDetail.self
-            ).map { ProximityApplicationAuthorizationDetail(id: $0.id, label: $0.label, value: $0.value) },
+            ).map { try ProximityApplicationAuthorizationDetail(id: $0.id, label: $0.label, value: $0.value) },
             compatibleCredentialIDs: swiftSet(compatibleCredentialIds, of: String.self),
             deviceSignedElements: try swiftArray(
                 deviceSignedElements,
                 of: WalletCore.ProximityDeviceSignedElement.self
             ).map {
-                ProximityDeviceSignedElement(
+                try ProximityDeviceSignedElement(
                     credentialID: $0.credentialId,
                     namespace: $0.namespace,
                     elementIdentifier: $0.elementIdentifier,
