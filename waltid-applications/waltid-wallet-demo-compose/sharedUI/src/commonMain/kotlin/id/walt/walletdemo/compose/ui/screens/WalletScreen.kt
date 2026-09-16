@@ -20,7 +20,7 @@ import id.walt.walletdemo.compose.logic.WalletSessionState
 internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
     val setup = state.session as? WalletSessionState.IdentitySetup
     if (setup != null) {
-        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeIdentity, controller::cancelIdentity, controller::refreshIdentityChoices)
+        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeIdentity, controller::cancelIdentity, controller::refreshIdentityChoices, refreshing = state.identityBusy)
         return
     }
     val uriHandler = LocalUriHandler.current
@@ -35,11 +35,16 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
     }
 
     if (showingSettings) {
+        val ready = state.session as? WalletSessionState.Ready
+        LaunchedEffect(ready?.did, ready?.keyId) {
+            if (ready != null) controller.refreshIdentityDetails()
+        }
         SettingsScreen(
             state = state,
             onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
             onBack = { showingSettings = false },
             onIdentityAction = controller::performIdentityAction,
+            onRefreshIdentityDetails = controller::refreshIdentityDetails,
             onLock = controller::lock,
             onResetWallet = controller::resetWallet,
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
@@ -57,7 +62,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             } else {
                 WalletHeader(
                     state = state,
-                    onSettings = { controller.refreshIdentityDetails(); showingSettings = true },
+                    onSettings = { showingSettings = true },
                     onDismissStatus = controller::dismissStatus,
                     onToggleStatusExpanded = controller::toggleStatusExpanded,
                 )

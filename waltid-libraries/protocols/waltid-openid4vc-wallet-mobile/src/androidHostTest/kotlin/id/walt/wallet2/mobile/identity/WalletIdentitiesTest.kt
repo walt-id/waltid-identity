@@ -18,6 +18,36 @@ import kotlinx.coroutines.CancellationException
 import kotlin.test.*
 
 class WalletIdentitiesTest {
+    @Test fun `unavailable provider reason survives alongside a usable recovery route`() = runTest {
+        val cloud = MemoryRecovery("cloud").apply { available = false }
+        val transfer = MemoryRecovery("transfer")
+        Fixture(IdentityConfiguration(recoveryProviders = listOf(cloud, transfer),
+            authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None))).use { fixture ->
+            val statuses = fixture.wallet.identities.recoveryProviderStatuses()
+            assertEquals(listOf("cloud", "transfer"), statuses.map { it.id })
+            assertEquals("Fixture unavailable", assertIs<RecoveryAvailability.Unavailable>(statuses[0].availability).reason)
+            assertIs<RecoveryAvailability.Available>(statuses[1].availability)
+            val options = assertIs<IdentityOptions.Available>(fixture.wallet.identities.creationOptions(IdentityIntent.Recoverable))
+            assertTrue((listOf(options.recommended) + options.alternatives).all { it.providerId == "transfer" })
+            cloud.available = true
+            assertTrue(fixture.wallet.identities.recoveryProviderStatuses().all { it.availability is RecoveryAvailability.Available })
+        }
+    }
+
+    @Test fun `provider service failure is isolated and redacted but cancellation propagates`() = runTest {
+        val broken = MemoryRecovery("broken").apply { availabilityFailure = IllegalStateException("private service details") }
+        val available = MemoryRecovery("available")
+        Fixture(IdentityConfiguration(recoveryProviders = listOf(broken, available),
+            authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None))).use { fixture ->
+            val status = fixture.wallet.identities.recoveryProviderStatuses().first()
+            assertEquals("The recovery service could not be reached. Try again.",
+                assertIs<RecoveryAvailability.Unavailable>(status.availability).reason)
+            assertIs<IdentityOptions.Available>(fixture.wallet.identities.creationOptions(IdentityIntent.Recoverable))
+            broken.availabilityFailure = CancellationException("cancelled")
+            assertFailsWith<CancellationException> { fixture.wallet.identities.recoveryProviderStatuses() }
+        }
+    }
+
     @Test fun `activation and reopening publish the registry outside the identity lock`() = runTest {
         lateinit var current: MobileWallet
         var notifications = 0
@@ -518,8 +548,7 @@ class WalletIdentitiesTest {
         override fun close() { driver.close() }
     }
 
-    private class MemoryRecovery : IdentityRecoveryProvider {
-        override val id = "test-memory"
+    private class MemoryRecovery(override val id: String = "test-memory") : IdentityRecoveryProvider {
         override val displayName = "Test-only memory provider"
         val records = mutableMapOf<String, ByteArray>()
         var corruptReadback = false
@@ -527,11 +556,15 @@ class WalletIdentitiesTest {
         var receipt = RecoveryReceipt.AcceptedLocally
         var failStore = false
         var available = true
+        var availabilityFailure: Exception? = null
         var cancelAfterStore = false
         var cancelRetrieve = false
         var retrieveFailure: IdentityProviderFailure? = null
-        override suspend fun availability() = if (available) RecoveryAvailability.Available(RecoveryProtection.ApplicationEncrypted, RecoveryScope.Custom)
-            else RecoveryAvailability.Unavailable("Fixture unavailable")
+        override suspend fun availability(): RecoveryAvailability {
+            availabilityFailure?.let { throw it }
+            return if (available) RecoveryAvailability.Available(RecoveryProtection.ApplicationEncrypted, RecoveryScope.Custom)
+                else RecoveryAvailability.Unavailable("Fixture unavailable")
+        }
         override suspend fun list() = records.keys.toList()
         override suspend fun store(recordId: String, record: IdentityRecoveryData): RecoveryReceipt {
             failure?.let { throw IdentityProviderException(it) }

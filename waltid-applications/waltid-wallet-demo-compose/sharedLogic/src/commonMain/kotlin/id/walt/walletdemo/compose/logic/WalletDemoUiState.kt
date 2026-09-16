@@ -4,7 +4,7 @@ data class WalletDemoUiState(
     val auth: WalletAuthState = WalletAuthState.Setup(),
     val isAuthenticating: Boolean = false,
     val biometricUnlockAvailable: Boolean = false,
-    val identityDetails: WalletDemoIdentityDetails? = null,
+    val identityDetails: WalletDemoIdentityDetailsState = WalletDemoIdentityDetailsState.Loading,
     val identityBusy: Boolean = false,
     val session: WalletSessionState = WalletSessionState.NotBootstrapped,
     val signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,

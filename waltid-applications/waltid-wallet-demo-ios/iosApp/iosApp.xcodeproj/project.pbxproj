@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A74900000000000000000010 /* TestHelpers.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
         A74900000000000000000001 /* WalletSDKKeychainRecovery in Frameworks */ = {isa = PBXBuildFile; productRef = A74900000000000000000002 /* WalletSDKKeychainRecovery */; };
         A74900000000000000000003 /* WalletIdentityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A74900000000000000000004 /* WalletIdentityView.swift */; };
 		0221E8E7784E493B08CF5888 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDK */; };
@@ -90,6 +91,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		A74900000000000000000011 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (A74900000000000000000010 /* TestHelpers.framework in Embed Frameworks */,);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A7520000000000000000000B /* Embed ExtensionKit Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -494,6 +504,7 @@
 				E2E00020AAAA000000000020 /* Sources */,
 				D69044572FDAA6D7009AB1FB /* Frameworks */,
 				E2E00021AAAA000000000021 /* Resources */,
+				A74900000000000000000011 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);

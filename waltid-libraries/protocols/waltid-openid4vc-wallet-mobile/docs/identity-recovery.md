@@ -43,6 +43,7 @@ silent change in authorization, hardware requirements or recovery intent.
 | --- | --- |
 | `state()` | Read absent, active, pending or unavailable identity state. |
 | `initialize()` | Initialize without recovery using the configured key policy. |
+| `recoveryProviderStatuses()` | Read each configured provider's availability and unmet prerequisites; does not confirm delivery. |
 | `creationOptions()` / `create()` | Select and execute a supported new identity configuration. |
 | `resumePending()` / `cancelPending()` | Retry or cancel pending local setup. Already submitted provider records are deleted only explicitly. |
 | `backupOptions()` / `backup()` | Back up a retained recovery secret or an existing exportable software key. |

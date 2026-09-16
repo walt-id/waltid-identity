@@ -35,14 +35,16 @@ internal class MobileDemoWallet(
     private val identityChoices = mutableMapOf<String, IdentityAction>()
 
     override suspend fun identityDetails(): WalletDemoIdentityDetails? {
-        val identity = (mobileWallet.identities.state() as? WalletIdentityState.Active)?.identity ?: return null
+        val identity = checkNotNull((mobileWallet.identities.state() as? WalletIdentityState.Active)?.identity) {
+            "The wallet has no active signing key."
+        }
         identityChoices.clear()
         val choices = mutableListOf<WalletDemoIdentityChoice>()
         for (option in mobileWallet.identities.backupOptions(identity.id)) {
             val id = Uuid.random().toString()
             identityChoices[id] = IdentityAction.Backup(option)
-            choices += WalletDemoIdentityChoice(id, "Back up with ${option.providerName}",
-                "Saves a recovery secret for this signing key and DID. Credentials are not included.", true)
+            val recovery = recoveryChoice(option.providerName, option.recoveryAvailability.scope)
+            choices += WalletDemoIdentityChoice(id, recovery.title, recovery.detail, true)
         }
         for (candidate in mobileWallet.identities.recoveryCandidates().filter { it.reference.recordId == identity.id }) {
             val id = Uuid.random().toString()
@@ -53,14 +55,14 @@ internal class MobileDemoWallet(
             identity.authorization.identityDescription(), when (val recovery = identity.recovery) {
                 IdentityRecoveryState.Disabled -> "No recovery backup submitted."
                 is IdentityRecoveryState.Submitted -> if (recovery.receipt == RecoveryReceipt.AcceptedLocally)
-                    "Recovery record accepted locally; cloud delivery unknown." else "Recovery submission confirmed by provider."
+                    "Recovery record accepted locally; delivery to another device is not confirmed." else "Recovery submission confirmed by provider."
                 is IdentityRecoveryState.Recovered -> "The original signing key and DID were restored on this installation."
-                is IdentityRecoveryState.RemovalRequested -> "Deletion requested; removal from other devices is not verified."
+                is IdentityRecoveryState.RemovalRequested -> "Recovery record deletion requested; removal from other devices is not verified."
             }, choices)
     }
 
     override suspend fun identitySetup(): WalletDemoIdentitySetup? {
-        identityChoices.clear()
+        val setupActions = mutableMapOf<String, IdentityAction>()
         val state = mobileWallet.identities.state()
         if (state is WalletIdentityState.Active) return null
         if (state is WalletIdentityState.Pending) return WalletDemoIdentitySetup.Pending(state.identityId)
@@ -70,11 +72,9 @@ internal class MobileDemoWallet(
                 val options = mobileWallet.identities.creationOptions(intent) as? IdentityOptions.Available ?: continue
                 for (option in listOf(options.recommended) + options.alternatives) {
                     val id = Uuid.random().toString()
-                    identityChoices[id] = IdentityAction.Create(option)
+                    setupActions[id] = IdentityAction.Create(option)
                     val recovery = option.recoveryProviderName?.let { provider ->
-                        WalletDemoKeyChoice("backup:$provider", "Back up with $provider",
-                            "Save a recovery secret for the same signing key and DID. Credentials are not included. " +
-                                "Cloud delivery depends on the provider and is not confirmed by a local save.")
+                        recoveryChoice(provider, option.recoveryAvailability?.scope)
                     } ?: WalletDemoKeyChoice("new", "No recovery backup",
                         "Keep this key on this device. If it is lost, you may need to have your credentials issued again.")
                     choices += WalletDemoKeySetupOption(id, recovery,
@@ -85,18 +85,32 @@ internal class MobileDemoWallet(
         for (candidate in mobileWallet.identities.recoveryCandidates()) {
             for (option in mobileWallet.identities.restorationOptions(candidate)) {
                 val id = Uuid.random().toString()
-                identityChoices[id] = IdentityAction.Restore(option)
+                setupActions[id] = IdentityAction.Restore(option)
                 choices += WalletDemoKeySetupOption(id,
                     WalletDemoKeyChoice("restore:${candidate.reference}", "Restore from ${candidate.providerName}",
                         "Restore the original signing key and DID. Credentials are not included.\n${option.did}"),
                     storageChoice(option.storage, true), option.authorization.approvalChoice(), restoring = true)
             }
         }
+        val recoveryUnavailableReasons = if (state == WalletIdentityState.Absent) {
+            mobileWallet.identities.recoveryProviderStatuses().mapNotNull { provider ->
+                (provider.availability as? RecoveryAvailability.Unavailable)?.let { "${provider.displayName}: ${it.reason}" }
+            }
+        } else emptyList()
+        identityChoices.clear()
+        identityChoices.putAll(setupActions)
         return WalletDemoIdentitySetup.Choose(choices, if (state is WalletIdentityState.Unavailable)
             "The existing signing key is unavailable. Restore its original key to use credentials bound to it."
             else null, recoveryStorageNotice = if (isIos)
-                "The Secure Enclave cannot restore a key. Recoverable keys use Keychain or the encrypted wallet database." else null)
+                "The Secure Enclave cannot restore a key. Recoverable keys use Keychain or the encrypted wallet database." else null,
+            recoveryUnavailableReasons = recoveryUnavailableReasons)
     }
+
+    private fun recoveryChoice(provider: String, scope: RecoveryScope?): WalletDemoKeyChoice =
+        if (scope == RecoveryScope.DeviceTransfer) WalletDemoKeyChoice("backup:$provider", "Prepare device transfer",
+            "Save a recovery secret for transfer to another Android device. You need this device for the transfer. No cloud backup; credentials are not included.")
+        else WalletDemoKeyChoice("backup:$provider", "Back up with $provider",
+            "Save a recovery secret for the same signing key and DID. Credentials are not included. Cloud delivery depends on the provider and is not confirmed by a local save.")
 
     private fun storageChoice(storage: IdentityKeyStorage, recoverable: Boolean): WalletDemoKeyChoice = when (storage) {
         IdentityKeyStorage.Hardware -> WalletDemoKeyChoice(storage.name,

@@ -1341,6 +1341,25 @@ final class id.walt.wallet2.mobile.identity/IdentityRecoveryData { // id.walt.wa
     }
 }
 
+final class id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus { // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus|null[0]
+    constructor <init>(kotlin/String, kotlin/String, id.walt.wallet2.mobile.identity/RecoveryAvailability) // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.<init>|<init>(kotlin.String;kotlin.String;id.walt.wallet2.mobile.identity.RecoveryAvailability){}[0]
+
+    final val availability // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.availability|{}availability[0]
+        final fun <get-availability>(): id.walt.wallet2.mobile.identity/RecoveryAvailability // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.availability.<get-availability>|<get-availability>(){}[0]
+    final val displayName // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.displayName|{}displayName[0]
+        final fun <get-displayName>(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.displayName.<get-displayName>|<get-displayName>(){}[0]
+    final val id // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.id|{}id[0]
+        final fun <get-id>(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.id.<get-id>|<get-id>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.component2|component2(){}[0]
+    final fun component3(): id.walt.wallet2.mobile.identity/RecoveryAvailability // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., id.walt.wallet2.mobile.identity/RecoveryAvailability = ...): id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.copy|copy(kotlin.String;kotlin.String;id.walt.wallet2.mobile.identity.RecoveryAvailability){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus.toString|toString(){}[0]
+}
+
 final class id.walt.wallet2.mobile.identity/IdentityRestorationOption { // id.walt.wallet2.mobile.identity/IdentityRestorationOption|null[0]
     final val authorization // id.walt.wallet2.mobile.identity/IdentityRestorationOption.authorization|{}authorization[0]
         final fun <get-authorization>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.mobile.identity/IdentityRestorationOption.authorization.<get-authorization>|<get-authorization>(){}[0]
@@ -1367,6 +1386,7 @@ final class id.walt.wallet2.mobile.identity/WalletIdentities { // id.walt.wallet
     final suspend fun deleteRecovery(id.walt.wallet2.mobile.identity/RecoveryCandidate): id.walt.wallet2.mobile.identity/RecoveryReceipt // id.walt.wallet2.mobile.identity/WalletIdentities.deleteRecovery|deleteRecovery(id.walt.wallet2.mobile.identity.RecoveryCandidate){}[0]
     final suspend fun initialize(): id.walt.wallet2.mobile.identity/IdentityOperationResult // id.walt.wallet2.mobile.identity/WalletIdentities.initialize|initialize(){}[0]
     final suspend fun recoveryCandidates(): kotlin.collections/List<id.walt.wallet2.mobile.identity/RecoveryCandidate> // id.walt.wallet2.mobile.identity/WalletIdentities.recoveryCandidates|recoveryCandidates(){}[0]
+    final suspend fun recoveryProviderStatuses(): kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus> // id.walt.wallet2.mobile.identity/WalletIdentities.recoveryProviderStatuses|recoveryProviderStatuses(){}[0]
     final suspend fun restorationOptions(id.walt.wallet2.mobile.identity/RecoveryCandidate): kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityRestorationOption> // id.walt.wallet2.mobile.identity/WalletIdentities.restorationOptions|restorationOptions(id.walt.wallet2.mobile.identity.RecoveryCandidate){}[0]
     final suspend fun restore(id.walt.wallet2.mobile.identity/IdentityRestorationOption): id.walt.wallet2.mobile.identity/IdentityOperationResult // id.walt.wallet2.mobile.identity/WalletIdentities.restore|restore(id.walt.wallet2.mobile.identity.IdentityRestorationOption){}[0]
     final suspend fun resumePending(kotlin/String): id.walt.wallet2.mobile.identity/IdentityOperationResult // id.walt.wallet2.mobile.identity/WalletIdentities.resumePending|resumePending(kotlin.String){}[0]
@@ -1704,6 +1724,7 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge { // id.walt.wal
     final suspend fun identityCreationOptions(id.walt.wallet2.mobile.identity/IdentityIntent = ..., id.walt.wallet2.mobile.identity/IdentityAttestationRequest = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/IdentityOptions> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityCreationOptions|identityCreationOptions(id.walt.wallet2.mobile.identity.IdentityIntent;id.walt.wallet2.mobile.identity.IdentityAttestationRequest){}[0]
     final suspend fun identityCustodyOptions(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityCustodyOption>> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityCustodyOptions|identityCustodyOptions(kotlin.String){}[0]
     final suspend fun identityRecoveryCandidates(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin.collections/List<id.walt.wallet2.mobile.identity/RecoveryCandidate>> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityRecoveryCandidates|identityRecoveryCandidates(){}[0]
+    final suspend fun identityRecoveryProviderStatuses(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityRecoveryProviderStatus>> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityRecoveryProviderStatuses|identityRecoveryProviderStatuses(){}[0]
     final suspend fun identityRestorationOptions(id.walt.wallet2.mobile.identity/RecoveryCandidate): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin.collections/List<id.walt.wallet2.mobile.identity/IdentityRestorationOption>> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityRestorationOptions|identityRestorationOptions(id.walt.wallet2.mobile.identity.RecoveryCandidate){}[0]
     final suspend fun identityState(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/WalletIdentityState> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.identityState|identityState(){}[0]
     final suspend fun initializeIdentity(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/IdentityOperationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.initializeIdentity|initializeIdentity(){}[0]

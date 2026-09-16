@@ -22,6 +22,85 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun signingDetailsFailureStaysDistinctFromUnsupportedAndCanBeRetried() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
+        val details = WalletDemoIdentityDetails("Hardware", "Generated", "None", "No backup", emptyList())
+        wallet.identityDetailsGate = CompletableDeferred()
+        wallet.identityDetailsValue = details
+        controller.refreshIdentityDetails()
+        controller.refreshIdentityDetails()
+        runCurrent()
+        assertEquals(WalletDemoIdentityDetailsState.Loading, controller.state.value.identityDetails)
+        assertTrue(controller.state.value.identityBusy)
+        assertEquals(1, wallet.identityDetailsCalls)
+
+        wallet.identityDetailsGate!!.complete(Unit)
+        runCurrent()
+        assertEquals(WalletDemoIdentityDetailsState.Available(details), controller.state.value.identityDetails)
+        assertFalse(controller.state.value.identityBusy)
+
+        wallet.identityDetailsError = IllegalStateException("Provider offline")
+        controller.refreshIdentityDetails()
+        runCurrent()
+        assertTrue(controller.state.value.identityDetails is WalletDemoIdentityDetailsState.Failed)
+        assertFalse(controller.state.value.identityBusy)
+
+        wallet.identityDetailsError = null
+        controller.refreshIdentityDetails()
+        runCurrent()
+        assertEquals(WalletDemoIdentityDetailsState.Available(details), controller.state.value.identityDetails)
+
+        wallet.identityDetailsValue = null
+        controller.refreshIdentityDetails()
+        runCurrent()
+        assertEquals(WalletDemoIdentityDetailsState.Unsupported, controller.state.value.identityDetails)
+    }
+
+    @Test
+    fun foregroundRefreshKeepsSetupVisibleAndDoesNotBootstrapOrDuplicateRequests() = runTest {
+        val original = WalletDemoIdentitySetup.Choose(emptyList())
+        val wallet = FakeDemoWallet().apply { identitySetupValue = original }
+        val controller = unlockedControllerWith(wallet, this)
+        val calls = wallet.identitySetupCalls
+        wallet.identitySetupGate = CompletableDeferred()
+        val refreshed = WalletDemoIdentitySetup.Choose(emptyList(), message = "Provider now available")
+        wallet.identitySetupValue = refreshed
+
+        controller.handleApplicationForegrounded()
+        controller.handleApplicationForegrounded()
+        runCurrent()
+        assertEquals(original, (controller.state.value.session as WalletSessionState.IdentitySetup).setup)
+        assertTrue(controller.state.value.identityBusy)
+        assertEquals(calls + 1, wallet.identitySetupCalls)
+        assertEquals(0, wallet.bootstrapCalls)
+
+        wallet.identitySetupGate!!.complete(Unit)
+        runCurrent()
+        assertEquals(refreshed, (controller.state.value.session as WalletSessionState.IdentitySetup).setup)
+        assertFalse(controller.state.value.identityBusy)
+    }
+
+    @Test
+    fun failedOptionsRefreshRetainsSetupAndCanBeRetried() = runTest {
+        val original = WalletDemoIdentitySetup.Choose(emptyList())
+        val wallet = FakeDemoWallet().apply { identitySetupValue = original }
+        val controller = unlockedControllerWith(wallet, this)
+        wallet.identitySetupError = IllegalStateException("Provider offline")
+        controller.refreshIdentityChoices()
+        runCurrent()
+        assertEquals(original, (controller.state.value.session as WalletSessionState.IdentitySetup).setup)
+        assertTrue(controller.state.value.warning!!.contains("Provider offline"))
+        assertFalse(controller.state.value.identityBusy)
+
+        wallet.identitySetupError = null
+        controller.refreshIdentityChoices()
+        runCurrent()
+        assertNull(controller.state.value.warning)
+        assertEquals(0, wallet.bootstrapCalls)
+    }
+
+    @Test
     fun pinStorageReadFailureStaysLockedUntilRetrySucceeds() = runTest {
         val pinStore = RecoverableDemoPinStore()
         val wallet = FakeDemoWallet()
@@ -2418,6 +2497,28 @@ private class FakeDemoWallet(
         val removed = remaining.size != credentials.size
         credentials = remaining
         return removed
+    }
+
+    var identityDetailsValue: WalletDemoIdentityDetails? = null
+    var identityDetailsGate: CompletableDeferred<Unit>? = null
+    var identityDetailsError: Exception? = null
+    var identityDetailsCalls = 0
+    override suspend fun identityDetails(): WalletDemoIdentityDetails? {
+        identityDetailsCalls++
+        identityDetailsGate?.await()
+        identityDetailsError?.let { throw it }
+        return identityDetailsValue
+    }
+
+    var identitySetupValue: WalletDemoIdentitySetup? = null
+    var identitySetupGate: CompletableDeferred<Unit>? = null
+    var identitySetupError: Exception? = null
+    var identitySetupCalls = 0
+    override suspend fun identitySetup(): WalletDemoIdentitySetup? {
+        identitySetupCalls++
+        identitySetupGate?.await()
+        identitySetupError?.let { throw it }
+        return identitySetupValue
     }
 
     override suspend fun deleteWallet() {

@@ -77,7 +77,9 @@ final class WalletIdentityScreenModel: ObservableObject {
     @Published private(set) var choices: [Choice] = []
     @Published private(set) var message: String?
     @Published private(set) var busy = false
-    private var refreshing = false
+    @Published private(set) var refreshing = false
+    @Published private(set) var loadFailed = false
+    @Published private(set) var recoveryUnavailableReasons: [String] = []
     private let service: WalletIdentityService
     private let onActivated: @MainActor () -> Void
 
@@ -88,14 +90,31 @@ final class WalletIdentityScreenModel: ObservableObject {
 
     func refresh() async {
         guard !refreshing else { return }
+        let previous = selected
+        let previousIdentity = identity
+        let previousChoices = choices
+        let previousOptions = setupOptions
+        let previousUnavailableReasons = recoveryUnavailableReasons
         refreshing = true
-        defer { refreshing = false }
+        loadFailed = false
+        defer {
+            if let previous, let retained = setupOptions.first(where: {
+                $0.recovery.id == previous.recovery.id && $0.storage.id == previous.storage.id &&
+                    $0.approval.id == previous.approval.id
+            }) {
+                selectedID = retained.id
+            } else {
+                step = .recovery
+                selectedID = setupOptions.first?.id
+            }
+            refreshing = false
+        }
         do {
             choices = []
             setupOptions = []
             selectedID = nil
-            step = .recovery
             message = nil
+            recoveryUnavailableReasons = []
             switch try await service.state() {
             case .active(let identity):
                 self.identity = identity
@@ -127,6 +146,10 @@ final class WalletIdentityScreenModel: ObservableObject {
                 })
             case .absent:
                 identity = nil
+                recoveryUnavailableReasons = try await service.recoveryProviderStatuses().compactMap { provider in
+                    if case .unavailable(let reason) = provider.availability { return "\(provider.displayName): \(reason)" }
+                    return nil
+                }
                 for intent in [WalletIdentityIntent.withoutRecovery, .recoverable] {
                     if case .available(let recommended, let alternatives) = try await service.creationOptions(intent: intent) {
                         for option in [recommended] + alternatives {
@@ -148,8 +171,15 @@ final class WalletIdentityScreenModel: ObservableObject {
                 message = "The existing signing key needs attention: \(reason)."
                 try await addRecoveryChoices()
             }
-        } catch is CancellationError { return }
-        catch { message = error.localizedDescription }
+        } catch {
+            identity = previousIdentity
+            choices = previousChoices
+            setupOptions = previousOptions
+            recoveryUnavailableReasons = previousUnavailableReasons
+            if error is CancellationError { return }
+            loadFailed = true
+            message = error.localizedDescription
+        }
     }
 
     func perform(_ choice: Choice) {
@@ -230,6 +260,7 @@ final class WalletIdentityScreenModel: ObservableObject {
 
 struct WalletIdentityView: View {
     @ObservedObject var model: WalletIdentityScreenModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var deletion: WalletIdentityScreenModel.Choice?
 
     var body: some View {
@@ -249,6 +280,9 @@ struct WalletIdentityView: View {
                             Text("Your wallet uses a signing key to prove that you hold your credentials.")
                             Text("\(model.step.rawValue + 1) of 3 · \(model.step.title)").font(.title3.weight(.semibold))
                             Text(stepDescription).font(.callout).foregroundStyle(.secondary)
+                            if model.step == .recovery {
+                                ForEach(model.recoveryUnavailableReasons, id: \.self) { Text($0).font(.callout) }
+                            }
                             if model.step == .storage && selected.recovery.id != "new" {
                                 Text("The Secure Enclave cannot restore a key. Recoverable keys use Keychain or the encrypted wallet database.").font(.callout)
                             }
@@ -288,9 +322,12 @@ struct WalletIdentityView: View {
                 Section {
                     if model.busy { ProgressView("Saving signing key…") }
                     if model.identity == nil && model.setupOptions.isEmpty && model.choices.isEmpty && model.message == nil {
-                        Text("No configured option is available. Check device authorization and backup settings, then refresh.")
+                        Text("No configured option is available. Check device authorization and backup settings, then return to the app.")
                     }
-                    Button("Refresh available options") { Task { await model.refresh() } }
+                    if model.loadFailed || (model.identity == nil && model.setupOptions.isEmpty && model.choices.isEmpty) ||
+                        (model.selected != nil && model.step == .recovery && !model.recoveryUnavailableReasons.isEmpty) {
+                        Button("Try again") { Task { await model.refresh() } }
+                    }
                 }
                 if model.identity != nil {
                     Section {
@@ -299,7 +336,7 @@ struct WalletIdentityView: View {
                     }
                 }
             }
-            .disabled(model.busy)
+            .disabled(model.busy || model.refreshing)
             .onChange(of: model.step) { _ in proxy.scrollTo("setup-top", anchor: .top) }
             .safeAreaInset(edge: .bottom) {
                 if let selected = model.selected {
@@ -316,7 +353,7 @@ struct WalletIdentityView: View {
                         .buttonStyle(.borderedProminent)
                         .accessibilityIdentifier("wallet.keySetupContinue")
                     }
-                    .disabled(model.busy)
+                    .disabled(model.busy || model.refreshing)
                     .padding().background(.bar)
                 }
             }
@@ -324,9 +361,14 @@ struct WalletIdentityView: View {
         .navigationTitle(model.identity == nil ? "Set up your wallet" : "Wallet signing key")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.refresh() }
-        .confirmationDialog("Delete this recovery record?", isPresented: Binding(get: { deletion != nil }, set: { if !$0 { deletion = nil } })) {
+        .onChange(of: scenePhase) { phase in
+            if phase == .active && !model.busy { Task { await model.refresh() } }
+        }
+        .alert("Delete recovery record?", isPresented: Binding(get: { deletion != nil }, set: { if !$0 { deletion = nil } })) {
             if let choice = deletion { Button("Delete recovery record", role: .destructive) { model.perform(choice); deletion = nil } }
             Button("Cancel", role: .cancel) { deletion = nil }
+        } message: {
+            Text("This requests deletion from the provider. It does not erase signing keys already restored on other devices.")
         }
     }
 
@@ -362,7 +404,7 @@ struct WalletIdentityView: View {
     private func recoveryDescription(_ state: WalletIdentityRecoveryState) -> String {
         switch state {
         case .disabled: "No recovery backup submitted."
-        case .submitted(_, let receipt): receipt == .acceptedLocally ? "Recovery record accepted locally; cloud delivery unknown." : "Recovery submission confirmed by provider."
+        case .submitted(_, let receipt): receipt == .acceptedLocally ? "Recovery record accepted locally; delivery to another device is not confirmed." : "Recovery submission confirmed by provider."
         case .recovered: "The original signing key and DID were restored on this installation."
         case .removalRequested: "Recovery record deletion requested; removal from other devices is not verified."
         }

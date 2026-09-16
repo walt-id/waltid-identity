@@ -159,15 +159,20 @@ class WalletDemoAppTestScenarios(
             )
         }
         onAllNodesWithText("new").assertCountEquals(1)
-        onNodeWithTag(WalletUiTestTags.keySetupChoice("Recovery", 1)).performClick()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Recovery", 1)).performScrollTo().performClick().assertIsSelected()
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
         onAllNodesWithText("hardware").assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).performClick()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
         onAllNodesWithText("biometric").assertCountEquals(0)
-        onNodeWithText("Back").performClick()
-        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).assertIsSelected()
-        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        onAllNodesWithText("Refresh available options").assertCountEquals(0)
+        if (hasSystemBackNavigation) {
+            onAllNodesWithText("Back").assertCountEquals(0)
+        } else {
+            onNodeWithText("Back").performClick()
+            onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).assertIsSelected()
+            onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        }
         assertEquals(null, submitted)
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
         assertEquals("backup-database-none", submitted)

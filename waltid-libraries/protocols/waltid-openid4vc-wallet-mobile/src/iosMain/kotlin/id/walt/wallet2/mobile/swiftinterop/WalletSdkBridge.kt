@@ -62,6 +62,10 @@ public class WalletSdkBridge private constructor(
     public suspend fun initializeIdentity(): WalletBridgeResult<IdentityOperationResult> =
         walletBridgeCall { operations.identities.initialize() }
 
+    /** Reports current provider prerequisites, including unavailable integrations. */
+    public suspend fun identityRecoveryProviderStatuses(): WalletBridgeResult<List<IdentityRecoveryProviderStatus>> =
+        walletBridgeCall { operations.identities.recoveryProviderStatuses() }
+
     /** Enumerates complete SDK-owned identity choices. */
     public suspend fun identityCreationOptions(intent: IdentityIntent = IdentityIntent.WithoutRecovery,
         attestation: IdentityAttestationRequest = IdentityAttestationRequest.None): WalletBridgeResult<IdentityOptions> =

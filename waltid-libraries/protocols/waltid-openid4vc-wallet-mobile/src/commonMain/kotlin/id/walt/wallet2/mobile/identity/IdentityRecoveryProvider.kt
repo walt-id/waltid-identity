@@ -22,6 +22,16 @@ public interface IdentityRecoveryProvider {
     public suspend fun delete(recordId: String): RecoveryReceipt
 }
 
+/** Current status of one configured provider, including providers that cannot offer a backup.
+ * @property id Stable configured provider identifier.
+ * @property displayName Provider name for presentation.
+ * @property availability Current prerequisites, not evidence of backup delivery. */
+public data class IdentityRecoveryProviderStatus(
+    public val id: String,
+    public val displayName: String,
+    public val availability: RecoveryAvailability,
+)
+
 /** Secret bytes crossing the trusted provider boundary. Never log or include them in UI/analytics. */
 public class IdentityRecoveryData(bytes: ByteArray) {
     private val bytes: ByteArray = bytes.copyOf()

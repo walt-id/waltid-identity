@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.*
+import id.walt.walletdemo.compose.ui.SystemBackHandler
+import id.walt.walletdemo.compose.ui.hasSystemBackNavigation
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -27,15 +29,30 @@ internal fun IdentitySetupScreen(
     onResume: (String) -> Unit,
     onCancel: (String) -> Unit,
     onRefresh: () -> Unit,
+    refreshing: Boolean = false,
 ) {
     val options = (setup as? WalletDemoIdentitySetup.Choose)?.options.orEmpty()
-    var selectedId by remember(setup) { mutableStateOf(options.firstOrNull()?.id) }
-    var step by remember(setup) { mutableStateOf(WalletDemoKeySetupStep.Recovery) }
-    val selected = options.find { it.id == selectedId }
+    var selection by remember { mutableStateOf(options.firstOrNull()) }
+    var step by remember { mutableStateOf(WalletDemoKeySetupStep.Recovery) }
+    val currentSelection = selection
+    val retainedSelection = options.find {
+        currentSelection != null && it.recovery.id == currentSelection.recovery.id &&
+            it.storage.id == currentSelection.storage.id && it.approval.id == currentSelection.approval.id
+    }
+    val selected = retainedSelection ?: options.firstOrNull()
+    SystemBackHandler(enabled = step != WalletDemoKeySetupStep.Recovery) {
+        step = WalletDemoKeySetupStep.entries[step.ordinal - 1]
+    }
+    LaunchedEffect(options) {
+        if (selection != null && retainedSelection == null) {
+            selection = options.firstOrNull()
+            step = WalletDemoKeySetupStep.Recovery
+        }
+    }
     val scroll = rememberScrollState()
     LaunchedEffect(step) { scroll.scrollTo(0) }
 
-    Surface(Modifier.fillMaxSize().testTag(WalletUiTestTags.IdentitySetup)) {
+    Surface(Modifier.fillMaxSize().safeDrawingPadding().testTag(WalletUiTestTags.IdentitySetup)) {
         Column {
             Column(Modifier.weight(1f).verticalScroll(scroll).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Set up your wallet", style = MaterialTheme.typography.headlineMedium)
@@ -51,7 +68,7 @@ internal fun IdentitySetupScreen(
                     is WalletDemoIdentitySetup.Choose -> {
                         setup.message?.let { Text(it) }
                         if (selected == null) {
-                            Text("No configured option is available. Check device authorization and backup settings, then refresh.")
+                            Text("No configured option is available. Check device authorization and backup settings, then return to the app.")
                         } else {
                             Text("${step.ordinal + 1} of 3 · ${step.title}", style = MaterialTheme.typography.titleLarge)
                             Text(when (step) {
@@ -59,14 +76,17 @@ internal fun IdentitySetupScreen(
                                 WalletDemoKeySetupStep.Storage -> "Choose where signing happens. Only storage compatible with your recovery choice is shown."
                                 WalletDemoKeySetupStep.Approval -> "Choose when the system asks you to approve signing. This is separate from unlocking the app."
                             })
+                            if (step == WalletDemoKeySetupStep.Recovery) {
+                                setup.recoveryUnavailableReasons.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                            }
                             if (step == WalletDemoKeySetupStep.Storage && selected.recovery.id != "new") {
                                 setup.recoveryStorageNotice?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                             }
                             Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 step.options(options, selected).map(step::choice).distinctBy { it.id }.forEachIndexed { index, choice ->
                                     KeyChoiceCard(choice, step.choice(selected).id == choice.id,
-                                        Modifier.testTag(WalletUiTestTags.keySetupChoice(step.name, index))) {
-                                        selectedId = step.select(options, selected, choice.id).id
+                                        Modifier.testTag(WalletUiTestTags.keySetupChoice(step.name, index)), enabled = !refreshing) {
+                                        selection = step.select(options, selected, choice.id)
                                     }
                                 }
                             }
@@ -79,18 +99,21 @@ internal fun IdentitySetupScreen(
                         }
                     }
                 }
-                TextButton(onClick = onRefresh) { Text("Refresh available options") }
+                if (warning != null || (setup is WalletDemoIdentitySetup.Choose &&
+                    (options.isEmpty() || (step == WalletDemoKeySetupStep.Recovery && setup.recoveryUnavailableReasons.isNotEmpty())))) {
+                    TextButton(onClick = onRefresh, enabled = !refreshing) { Text("Try again") }
+                }
             }
             if (selected != null) {
                 HorizontalDivider()
                 Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (step != WalletDemoKeySetupStep.Recovery) {
+                    if (!hasSystemBackNavigation && step != WalletDemoKeySetupStep.Recovery) {
                         TextButton(onClick = { step = WalletDemoKeySetupStep.entries[step.ordinal - 1] }) { Text("Back") }
                     }
                     Button(onClick = {
                         if (step == WalletDemoKeySetupStep.Approval) onChoose(selected.id)
                         else step = WalletDemoKeySetupStep.entries[step.ordinal + 1]
-                    }, modifier = Modifier.weight(1f).testTag(WalletUiTestTags.KeySetupContinue)) {
+                    }, enabled = !refreshing, modifier = Modifier.weight(1f).testTag(WalletUiTestTags.KeySetupContinue)) {
                         Text(if (step != WalletDemoKeySetupStep.Approval) "Continue" else if (selected.restoring) "Restore signing key" else "Create signing key")
                     }
                 }
@@ -100,9 +123,9 @@ internal fun IdentitySetupScreen(
 }
 
 @Composable
-private fun KeyChoiceCard(choice: WalletDemoKeyChoice, selected: Boolean, modifier: Modifier, onSelect: () -> Unit) {
+private fun KeyChoiceCard(choice: WalletDemoKeyChoice, selected: Boolean, modifier: Modifier, enabled: Boolean, onSelect: () -> Unit) {
     OutlinedCard(
-        modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
+        modifier.fillMaxWidth().selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onSelect),
         border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.outlinedCardColors(containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface),
     ) {

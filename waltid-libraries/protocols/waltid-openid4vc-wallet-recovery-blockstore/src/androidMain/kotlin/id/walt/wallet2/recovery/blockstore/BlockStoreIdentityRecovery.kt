@@ -36,7 +36,7 @@ public enum class BlockStoreRecoveryMode {
  * Opt-in Android recovery provider. The base wallet SDK has no dependency on this artifact.
  * Block Store accepts at most 16 entries per app and 4096 bytes per entry. Submission and deletion
  * report local acceptance; neither operation proves that a cloud copy has been delivered or deleted.
- * Use one writable instance per namespace. Android's service supplies no compare-and-set primitive.
+ * Use one writable instance per namespace and mode. Android's service supplies no compare-and-set primitive.
  */
 public class BlockStoreIdentityRecovery(
     context: Context,
@@ -61,12 +61,12 @@ public class BlockStoreIdentityRecovery(
         when (mode) {
             BlockStoreRecoveryMode.EncryptedCloud -> if (endToEnd)
                 RecoveryAvailability.Available(RecoveryProtection.OperatingSystemEndToEnd, RecoveryScope.Cloud)
-            else RecoveryAvailability.Unavailable("Block Store cloud end-to-end encryption is unavailable")
+            else RecoveryAvailability.Unavailable("Google reports that end-to-end encrypted backup is unavailable. Check Google backup and screen-lock settings, then try again.")
             BlockStoreRecoveryMode.DeviceTransfer ->
                 RecoveryAvailability.Available(RecoveryProtection.OperatingSystemProtected, RecoveryScope.DeviceTransfer)
         }
     } catch (cause: CancellationException) { throw cause }
-    catch (_: Exception) { RecoveryAvailability.Unavailable("Block Store is unavailable") }
+    catch (_: Exception) { RecoveryAvailability.Unavailable("Could not check Google backup availability. Check your connection and Google Play services, then try again.") }
 
     override suspend fun list(): List<String> = mutex.withLock {
         client.retrieveBytes(RetrieveBytesRequest.Builder().setRetrieveAll(true).build()).awaitResult()
