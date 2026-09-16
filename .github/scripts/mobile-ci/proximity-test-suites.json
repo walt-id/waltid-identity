@@ -202,7 +202,11 @@
     },
     "swift-bridge": {
       "executionClass": "simulated-platform",
-      "source": "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/KMPProximityProjectionTests.swift",
+      "sources": [
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/KMPProximityProjectionTests.swift",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityBridgeContractTests.swift",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityInputValidationTests.swift"
+      ],
       "requiredTests": [
         {
           "class": "KMPProximityProjectionTests",
@@ -228,6 +232,41 @@
           "class": "KMPProximityProjectionTests",
           "name": "testFailedStatePreservesCodeRecoveryAndHasNoLegalActions",
           "oracle": "Stable error identity and recovery survive projection with no remaining legal actions."
+        },
+        {
+          "class": "ProximityBridgeContractTests",
+          "name": "testAggregateRoutesAndRemediationOrderMatchKMP",
+          "oracle": "192 configured route combinations preserve shared start decisions and ordered remediation actions."
+        },
+        {
+          "class": "ProximityBridgeContractTests",
+          "name": "testTransportDecisionsMatchKMPForEveryFlagAndRuntimeState",
+          "oracle": "All 24 transport flag and runtime combinations preserve the shared capability decision."
+        },
+        {
+          "class": "ProximityInputValidationTests",
+          "name": "testConfigurationRejectsInvalidLimitsAndProfilePolicyRecoverably",
+          "oracle": "Configuration bounds and profile policy reject invalid host input without trapping."
+        },
+        {
+          "class": "ProximityInputValidationTests",
+          "name": "testTrustDecisionRejectsIncoherentEvidenceWithoutGrantingTrust",
+          "oracle": "Incoherent host trust evidence fails recoverably without granting trust."
+        },
+        {
+          "class": "ProximityInputValidationTests",
+          "name": "testProfileAuthorizationRejectsIncompleteOrUnboundHostResults",
+          "oracle": "Profile authorization retains completeness, uniqueness and credential binding checks."
+        },
+        {
+          "class": "ProximityInputValidationTests",
+          "name": "testDisclosureRejectsEmptyAndDuplicateSelectionsRecoverably",
+          "oracle": "Empty, duplicate and out-of-range disclosure selections fail recoverably."
+        },
+        {
+          "class": "ProximityInputValidationTests",
+          "name": "testStoredPolicyCannotDowngradeAProfileThatRequiresTrustedReaders",
+          "oracle": "Stored settings cannot override the trusted-reader policy required by the selected profile."
         }
       ]
     },
