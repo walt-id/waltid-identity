@@ -9,17 +9,13 @@ import id.walt.certificate.x509.extension.CertificatePoliciesExtension.Companion
 import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateAuthorityInfoAccessIfCaIssued
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateCertificatePoliciesPresent
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateEndEntity
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateKeyUsage
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateNotSelfSigned
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validatePersonDnByRole
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validatePublicKeyAlgorithm
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateSubjectKeyIdentifier
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateExtensionsAreNotCritical
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateSerialNumber
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateVersion
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateBasicConstraintIsEndEntity
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateExtensionsAreNotCritical
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateKeyUsageIsDigitalSignature
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateNotSelfSigned
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateSerialNumber
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateSubjectKeyIdentifierIsPresent
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateVersionV3
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
@@ -57,7 +53,8 @@ import id.walt.crypto2.keys.Key
  * TODO(EUDI Phase 3): read ETSI TS 119 475 primary source, model the "registered intended use"
  * extension, and turn the WARNING below into real validation.
  */
-object EtsiWrprcX509CertificateProfile : X509CertificateProfile, X509CertificateValidator {
+object EtsiWrprcX509CertificateProfile : EtsiWalletRelyingPartyX509CertificateProfile(), X509CertificateProfile,
+    X509CertificateValidator {
 
     const val ID = "etsi-wrprc"
 
@@ -108,12 +105,14 @@ object EtsiWrprcX509CertificateProfile : X509CertificateProfile, X509Certificate
     }
 
     override suspend fun validate(context: ValidationContext, x509Certificate: X509Certificate) {
-        validateVersion(context, x509Certificate)
+        validateVersionV3(context, x509Certificate)
         validateSerialNumber(context, x509Certificate)
-        validateEndEntity(context, x509Certificate)
+        validateBasicConstraintIsEndEntity(context, x509Certificate)
+        // WRPAC (TS 119 411-8) / WRPRC (TS 119 475): both are always CA-issued, unlike PID/Wallet
+        // Provider certificates which may be self-signed.
         validateNotSelfSigned(context, x509Certificate)
-        validateKeyUsage(context, x509Certificate)
-        validateSubjectKeyIdentifier(context, x509Certificate)
+        validateKeyUsageIsDigitalSignature(context, x509Certificate)
+        validateSubjectKeyIdentifierIsPresent(context, x509Certificate)
         validateCertificatePoliciesPresent(context, x509Certificate)
         validateAuthorityInfoAccessIfCaIssued(context, x509Certificate)
         validatePublicKeyAlgorithm(context, x509Certificate)
@@ -124,7 +123,7 @@ object EtsiWrprcX509CertificateProfile : X509CertificateProfile, X509Certificate
             ValidationResult.Severity.WARNING,
             "registeredIntendedUse",
             "Not yet validated - ETSI TS 119 475 primary-source reading is required before this " +
-                "profile can enforce the Relying Party's registered attribute scope (known gap, see class doc)."
+                    "profile can enforce the Relying Party's registered attribute scope (known gap, see class doc)."
         )
     }
 }

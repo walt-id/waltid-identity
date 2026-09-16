@@ -357,7 +357,7 @@ val result = pidProviderCertUtil.validateCertificateChain(listOf(pidProviderCert
 check(result.valid) { "Not a valid PID Provider certificate: ${result.log}" }
 ```
 
-`profilePidProviderCertificate` sets the mandatory extensions (`basicConstraints` cA=false,
+`profileEtsiPidProviderCertificate` sets the mandatory extensions (`basicConstraints` cA=false,
 `keyUsage` digitalSignature-only, `subjectKeyIdentifier`, `certificatePolicies`, `qcStatements`
 with `QcCompliance` + the `id-etsi-qct-pid` `QcType`, and `authorityInfoAccess` when the issuing
 certificate isn't self-signed), and validates the issuer/subject DN as either a natural or legal
@@ -370,7 +370,7 @@ certificate as its trust anchor, so both shapes are valid.
 
 ### Wallet Provider certificate generation and validation
 
-`EtsiWalletProviderX509CertificateProfile` / `profileWalletProviderCertificate` are identical in
+`EtsiWalletProviderX509CertificateProfile` / `profileEtsiWalletProviderCertificate` are identical in
 shape - the only difference is the `QcType` OID carried (`id-etsi-qct-wal` instead of
 `id-etsi-qct-pid`):
 
@@ -436,7 +436,7 @@ check(wrpacResult.valid) { "Not a valid WRPAC certificate: ${wrpacResult.log}" }
 ```
 
 `profileWrpAccessCertificate` requires exactly one of the four `Etsi119411Part8` policy OIDs
-(`NCP_N_EUDIWRP`/`NCP_L_EUDIWRP`/`QCP_N_EUDIWRP`/`QCP_L_EUDIWRP` - natural/legal person crossed with
+(`NORMALIZED_CERT_POLICY_NATURAL_PERSON`/`NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON`/`QUALIFIED_CERT_POLICY_NATURAL_PERSON`/`QUALIFIED_CERT_POLICY_LEGAL_PERSON` - natural/legal person crossed with
 non-qualified/qualified), at least one contact method (`contactEmail`/`contactUri`) for the
 mandatory `subjectAltName`, and a revocation mechanism (`crlDistributionPointUri` or
 `ocspResponderUri`). `EtsiWrpacX509CertificateProfile` re-validates all of that, plus the

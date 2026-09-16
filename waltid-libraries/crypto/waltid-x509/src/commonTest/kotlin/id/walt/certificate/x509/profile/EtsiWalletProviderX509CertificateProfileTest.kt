@@ -3,8 +3,8 @@ package id.walt.certificate.x509.profile
 import id.walt.certificate.x509.TestKeyUtil
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
-import id.walt.certificate.x509.profile.EtsiPidProviderX509CertificateProfile.profilePidProviderCertificate
-import id.walt.certificate.x509.profile.EtsiWalletProviderX509CertificateProfile.profileWalletProviderCertificate
+import id.walt.certificate.x509.profile.EtsiPidProviderX509CertificateProfile.profileEtsiPidProviderCertificate
+import id.walt.certificate.x509.profile.EtsiWalletProviderX509CertificateProfile.profileEtsiWalletProviderCertificate
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -28,7 +28,7 @@ class EtsiWalletProviderX509CertificateProfileTest {
 
         val subjectKey = TestKeyUtil.genEcKey("wal-provider")
         val cert = X509CertificateUtil.createCertificate(rootKey, rootCert, sigAlg) {
-            profileWalletProviderCertificate(
+            profileEtsiWalletProviderCertificate(
                 subjectKey = subjectKey,
                 subjectDn = "CN=Example Wallet Provider,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
                 certificatePolicyOids = listOf("0.4.0.194112.1.2"),
@@ -51,7 +51,7 @@ class EtsiWalletProviderX509CertificateProfileTest {
 
         val subjectKey = TestKeyUtil.genEcKey("cross-role-subject-2")
         val pidCert = X509CertificateUtil.createCertificate(rootKey, rootCert, sigAlg) {
-            profilePidProviderCertificate(
+            profileEtsiPidProviderCertificate(
                 subjectKey = subjectKey,
                 subjectDn = "CN=Example PID Provider,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
                 certificatePolicyOids = listOf("0.4.0.194112.1.1"),

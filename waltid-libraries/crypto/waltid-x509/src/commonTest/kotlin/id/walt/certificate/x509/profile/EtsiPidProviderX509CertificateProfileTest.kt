@@ -3,8 +3,8 @@ package id.walt.certificate.x509.profile
 import id.walt.certificate.x509.TestKeyUtil
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
-import id.walt.certificate.x509.profile.EtsiPidProviderX509CertificateProfile.profilePidProviderCertificate
-import id.walt.certificate.x509.profile.EtsiWalletProviderX509CertificateProfile.profileWalletProviderCertificate
+import id.walt.certificate.x509.profile.EtsiPidProviderX509CertificateProfile.profileEtsiPidProviderCertificate
+import id.walt.certificate.x509.profile.EtsiWalletProviderX509CertificateProfile.profileEtsiWalletProviderCertificate
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -29,7 +29,7 @@ class EtsiPidProviderX509CertificateProfileTest {
 
         val subjectKey = TestKeyUtil.genEcKey("pid-provider")
         val cert = X509CertificateUtil.createCertificate(rootKey, rootCert, sigAlg) {
-            profilePidProviderCertificate(
+            profileEtsiPidProviderCertificate(
                 subjectKey = subjectKey,
                 subjectDn = "CN=Example PID Provider,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
                 certificatePolicyOids = listOf("0.4.0.194112.1.1"),
@@ -45,7 +45,7 @@ class EtsiPidProviderX509CertificateProfileTest {
     fun shouldCreateValidSelfSignedPidProviderCertificate() = runTest {
         val issuerKey = TestKeyUtil.genEcKey("pid-self-signed")
         val cert = X509CertificateUtil.createSelfSignedCertificate(issuerKey, sigAlg) {
-            profilePidProviderCertificate(
+            profileEtsiPidProviderCertificate(
                 subjectDn = "CN=Example PID Provider,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
                 certificatePolicyOids = listOf("0.4.0.194112.1.1"),
             )
@@ -65,7 +65,7 @@ class EtsiPidProviderX509CertificateProfileTest {
 
         val subjectKey = TestKeyUtil.genEcKey("pid-np-provider")
         val cert = X509CertificateUtil.createCertificate(rootKey, rootCert, sigAlg) {
-            profilePidProviderCertificate(
+            profileEtsiPidProviderCertificate(
                 subjectKey = subjectKey,
                 subjectDn = "CN=Jane Doe,GivenName=Jane,Surname=Doe,SerialNumber=AT-12345,C=AT",
                 certificatePolicyOids = listOf("0.4.0.194112.1.1"),
@@ -82,7 +82,7 @@ class EtsiPidProviderX509CertificateProfileTest {
         val subjectKey = TestKeyUtil.genEcKey("pid-no-policy")
         assertFailsWith<IllegalArgumentException> {
             X509CertificateUtil.createSelfSignedCertificate(subjectKey, sigAlg) {
-                profilePidProviderCertificate(
+                profileEtsiPidProviderCertificate(
                     subjectKey = subjectKey,
                     subjectDn = "CN=Example PID Provider,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
                     certificatePolicyOids = emptyList(),
@@ -101,7 +101,7 @@ class EtsiPidProviderX509CertificateProfileTest {
 
         val subjectKey = TestKeyUtil.genEcKey("pid-no-aia")
         val cert = X509CertificateUtil.createCertificate(rootKey, rootCert, sigAlg) {
-            profilePidProviderCertificate(
+            profileEtsiPidProviderCertificate(
                 subjectKey = subjectKey,
                 subjectDn = "CN=Example PID Provider,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
                 certificatePolicyOids = listOf("0.4.0.194112.1.1"),
@@ -125,7 +125,7 @@ class EtsiPidProviderX509CertificateProfileTest {
 
         val subjectKey = TestKeyUtil.genEcKey("cross-role-subject")
         val walletCert = X509CertificateUtil.createCertificate(rootKey, rootCert, sigAlg) {
-            profileWalletProviderCertificate(
+            profileEtsiWalletProviderCertificate(
                 subjectKey = subjectKey,
                 subjectDn = "CN=Example Wallet Provider,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
                 certificatePolicyOids = listOf("0.4.0.194112.1.1"),

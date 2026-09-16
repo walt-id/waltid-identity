@@ -2,8 +2,6 @@ package id.walt.certificate.x509.profile
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.applyProviderCertificate
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateProviderCertificate
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
 import id.walt.crypto2.keys.Key
@@ -16,9 +14,22 @@ import id.walt.crypto2.keys.Key
  * which otherwise references the same requirements as the PID Provider profile
  * ([EtsiPidProviderX509CertificateProfile], clause 4, PID-4.2/-4.3/-4.4).
  */
-object EtsiWalletProviderX509CertificateProfile : X509CertificateProfile, X509CertificateValidator {
+object EtsiWalletProviderX509CertificateProfile : EtsiProviderX509CertificateProfile(), X509CertificateProfile,
+    X509CertificateValidator {
 
     const val ID = "etsi-wallet-provider"
+
+    /**
+     * OID for the QcType statement that identifies this certificate as an ETSI Wallet Provider
+     * certificate, asserted in the `qcStatements` extension alongside QcCompliance
+     * (WAL-5.1-01, [Etsi119412Part6]).
+     *
+     * ```
+     * id-etsi-qct-wal OBJECT IDENTIFIER ::= { itu-t(0) identified-organization(4) etsi(0)
+     *   eudiw(194126) qct(1) wal(2) }
+     * ```
+     */
+    const val QUALIFIED_CERTIFICATE_STATEMENT_ETSI_WALLET_PROVIDER: String = "0.4.0.194126.1.2"
 
     override val id: String = ID
 
@@ -30,7 +41,7 @@ object EtsiWalletProviderX509CertificateProfile : X509CertificateProfile, X509Ce
      * @param caIssuerUri / [ocspResponderUri] populate the authorityInfoAccess extension, required
      *   unless the certificate is self-signed (PID-4.4.3-01, referenced by WAL-5.1-01).
      */
-    fun X509CertificateDataBuilder.profileWalletProviderCertificate(
+    fun X509CertificateDataBuilder.profileEtsiWalletProviderCertificate(
         subjectKey: Key? = null,
         subjectDn: String,
         certificatePolicyOids: List<String>,
@@ -40,7 +51,7 @@ object EtsiWalletProviderX509CertificateProfile : X509CertificateProfile, X509Ce
         applyProviderCertificate(
             subjectKey = subjectKey,
             subjectDn = subjectDn,
-            qcTypeOid = Etsi119412Part6.ID_ETSI_QCT_WAL,
+            qcTypeOid = QUALIFIED_CERTIFICATE_STATEMENT_ETSI_WALLET_PROVIDER,
             certificatePolicyOids = certificatePolicyOids,
             caIssuerUri = caIssuerUri,
             ocspResponderUri = ocspResponderUri,
@@ -51,6 +62,10 @@ object EtsiWalletProviderX509CertificateProfile : X509CertificateProfile, X509Ce
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-        validateProviderCertificate(context, x509Certificate, Etsi119412Part6.ID_ETSI_QCT_WAL)
+        validateProviderCertificate(
+            context,
+            x509Certificate,
+            QUALIFIED_CERTIFICATE_STATEMENT_ETSI_WALLET_PROVIDER
+        )
     }
 }

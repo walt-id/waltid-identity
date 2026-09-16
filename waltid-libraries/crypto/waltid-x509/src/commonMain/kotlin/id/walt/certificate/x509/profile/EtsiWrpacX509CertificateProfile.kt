@@ -16,16 +16,13 @@ import id.walt.certificate.x509.extension.QcStatementsExtension.Companion.extens
 import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateAuthorityInfoAccessIfCaIssued
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateEndEntity
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateKeyUsage
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateNotSelfSigned
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validatePersonDnByRole
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validatePublicKeyAlgorithm
-import id.walt.certificate.x509.profile.EtsiProviderCertificateSupport.validateSubjectKeyIdentifier
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateExtensionsAreNotCritical
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateSerialNumber
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateVersion
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateBasicConstraintIsEndEntity
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateExtensionsAreNotCritical
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateKeyUsageIsDigitalSignature
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateNotSelfSigned
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateSerialNumber
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateSubjectKeyIdentifierIsPresent
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateVersionV3
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
@@ -44,7 +41,8 @@ import id.walt.crypto2.keys.Key
  * mechanism below. This profile always requires one. Support is deferred to a follow-up, since it
  * needs its own extension type with little reuse elsewhere.
  */
-object EtsiWrpacX509CertificateProfile : X509CertificateProfile, X509CertificateValidator {
+object EtsiWrpacX509CertificateProfile : EtsiWalletRelyingPartyX509CertificateProfile(), X509CertificateProfile,
+    X509CertificateValidator {
 
     const val ID = "etsi-wrpac"
 
@@ -55,16 +53,23 @@ object EtsiWrpacX509CertificateProfile : X509CertificateProfile, X509Certificate
         BasicConstraintsExtension.OID,
     )
 
-    private val naturalPersonPolicyOids = setOf(Etsi119411Part8.NCP_N_EUDIWRP, Etsi119411Part8.QCP_N_EUDIWRP)
-    private val legalPersonPolicyOids = setOf(Etsi119411Part8.NCP_L_EUDIWRP, Etsi119411Part8.QCP_L_EUDIWRP)
-    private val qualifiedPolicyOids = setOf(Etsi119411Part8.QCP_N_EUDIWRP, Etsi119411Part8.QCP_L_EUDIWRP)
+    private val naturalPersonPolicyOids = setOf(
+        NORMALIZED_CERT_POLICY_NATURAL_PERSON,
+        QUALIFIED_CERT_POLICY_NATURAL_PERSON
+    )
+    private val legalPersonPolicyOids = setOf(
+        NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON,
+        QUALIFIED_CERT_POLICY_LEGAL_PERSON
+    )
+    private val qualifiedPolicyOids =
+        setOf(QUALIFIED_CERT_POLICY_NATURAL_PERSON, QUALIFIED_CERT_POLICY_LEGAL_PERSON)
     private val allPolicyOids = naturalPersonPolicyOids + legalPersonPolicyOids
 
     /**
      * @param subjectKey the Relying Party's public key. WRPAC certificates are always CA-issued
      *   (TS 119 411-8 6.6.1) - unlike the Provider profiles, there is no self-signed variant.
-     * @param policyOid exactly one of [Etsi119411Part8.NCP_N_EUDIWRP], [Etsi119411Part8.NCP_L_EUDIWRP],
-     *   [Etsi119411Part8.QCP_N_EUDIWRP], [Etsi119411Part8.QCP_L_EUDIWRP] - determines both the
+     * @param policyOid exactly one of [Etsi119411Part8.NORMALIZED_CERT_POLICY_NATURAL_PERSON], [Etsi119411Part8.NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON],
+     *   [Etsi119411Part8.QUALIFIED_CERT_POLICY_NATURAL_PERSON], [Etsi119411Part8.QUALIFIED_CERT_POLICY_LEGAL_PERSON] - determines both the
      *   natural-vs-legal-person subject DN shape and whether qcStatements are required.
      * @param contactUri / [contactEmail] populate the mandatory subjectAltName contact information
      *   (TS 119 411-8 6.6.1); at least one is required. Telephone contact info is not modelled yet -
@@ -128,7 +133,7 @@ object EtsiWrpacX509CertificateProfile : X509CertificateProfile, X509Certificate
             extensionQcStatements {
                 addQcCompliance()
                 addQcSscd()
-                if (policyOid == Etsi119411Part8.QCP_L_EUDIWRP) {
+                if (policyOid == QUALIFIED_CERT_POLICY_LEGAL_PERSON) {
                     // The reference implementation only requires this statement's presence for
                     // QCP-l, not a specific attestation type OID (unlike the PID/Wallet Provider
                     // profiles' id-etsi-qct-pid/wal) - so no typeOid is asserted here.
@@ -139,12 +144,15 @@ object EtsiWrpacX509CertificateProfile : X509CertificateProfile, X509Certificate
     }
 
     override suspend fun validate(context: ValidationContext, x509Certificate: X509Certificate) {
-        validateVersion(context, x509Certificate)
+        validateVersionV3(context, x509Certificate)
         validateSerialNumber(context, x509Certificate)
-        validateEndEntity(context, x509Certificate)
+        validateBasicConstraintIsEndEntity(context, x509Certificate)
+
+        // WRPAC (TS 119 411-8) / WRPRC (TS 119 475): both are always CA-issued, unlike PID/Wallet
+        // Provider certificates which may be self-signed.
         validateNotSelfSigned(context, x509Certificate)
-        validateKeyUsage(context, x509Certificate)
-        validateSubjectKeyIdentifier(context, x509Certificate)
+        validateKeyUsageIsDigitalSignature(context, x509Certificate)
+        validateSubjectKeyIdentifierIsPresent(context, x509Certificate)
         val policyOid = validateCertificatePolicy(context, x509Certificate)
         validateAuthorityInfoAccessIfCaIssued(context, x509Certificate)
         validateAuthorityKeyIdentifier(context, x509Certificate)
@@ -153,7 +161,12 @@ object EtsiWrpacX509CertificateProfile : X509CertificateProfile, X509Certificate
         validatePublicKeyAlgorithm(context, x509Certificate)
         if (policyOid != null) {
             validateQcStatements(context, x509Certificate, policyOid)
-            validatePersonDnByRole(context, "subject", x509Certificate.data.subjectDn, policyOid in legalPersonPolicyOids)
+            validatePersonDnByRole(
+                context,
+                "subject",
+                x509Certificate.data.subjectDn,
+                policyOid in legalPersonPolicyOids
+            )
         }
         validatePersonDnByRole(context, "issuer", x509Certificate.data.issuerDn, isLegalPerson = true)
         validateExtensionsAreNotCritical(context, x509Certificate, criticalExtensions)
@@ -177,7 +190,11 @@ object EtsiWrpacX509CertificateProfile : X509CertificateProfile, X509Certificate
     /** EN 319 412-2 4.3.1: authorityKeyIdentifier required (populated automatically for CA-issued certs). */
     private fun validateAuthorityKeyIdentifier(context: ValidationContext, x509Certificate: X509Certificate) {
         if (x509Certificate.data.extensionAuthorityKeyIdentifier == null) {
-            context.addLogEntry(ValidationResult.Severity.ERROR, "authorityKeyIdentifier", "Certificate extension 'authorityKeyIdentifier' is not present")
+            context.addLogEntry(
+                ValidationResult.Severity.ERROR,
+                "authorityKeyIdentifier",
+                "Certificate extension 'authorityKeyIdentifier' is not present"
+            )
         }
     }
 
@@ -221,15 +238,27 @@ object EtsiWrpacX509CertificateProfile : X509CertificateProfile, X509Certificate
         if (policyOid !in qualifiedPolicyOids) return
         val statements = x509Certificate.data.extensionQcStatements?.statements.orEmpty()
         if (!statements.contains(QcStatementsExtension.QcStatement.QcCompliance)) {
-            context.addLogEntry(ValidationResult.Severity.ERROR, "qcStatements", "Certificate extension 'qcStatements' is missing the mandatory QcCompliance statement")
+            context.addLogEntry(
+                ValidationResult.Severity.ERROR,
+                "qcStatements",
+                "Certificate extension 'qcStatements' is missing the mandatory QcCompliance statement"
+            )
         }
         if (!statements.contains(QcStatementsExtension.QcStatement.QcSSCD)) {
-            context.addLogEntry(ValidationResult.Severity.ERROR, "qcStatements", "Certificate extension 'qcStatements' is missing the mandatory QcSSCD statement")
+            context.addLogEntry(
+                ValidationResult.Severity.ERROR,
+                "qcStatements",
+                "Certificate extension 'qcStatements' is missing the mandatory QcSSCD statement"
+            )
         }
-        if (policyOid == Etsi119411Part8.QCP_L_EUDIWRP) {
+        if (policyOid == QUALIFIED_CERT_POLICY_LEGAL_PERSON) {
             val hasQcType = statements.any { it.statementId == QcStatementsExtension.QcStatement.ID_QC_TYPE }
             if (!hasQcType) {
-                context.addLogEntry(ValidationResult.Severity.ERROR, "qcStatements", "Certificate extension 'qcStatements' is missing the mandatory QcType statement required for QCP-l")
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "qcStatements",
+                    "Certificate extension 'qcStatements' is missing the mandatory QcType statement required for QCP-l"
+                )
             }
         }
     }

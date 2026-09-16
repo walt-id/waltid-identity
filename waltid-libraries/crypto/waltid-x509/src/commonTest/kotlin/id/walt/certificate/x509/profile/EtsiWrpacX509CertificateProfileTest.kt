@@ -33,7 +33,7 @@ class EtsiWrpacX509CertificateProfileTest {
             profileWrpAccessCertificate(
                 subjectKey = subjectKey,
                 subjectDn = "CN=Jane Doe,GivenName=Jane,Surname=Doe,SerialNumber=RP-12345,C=AT",
-                policyOid = Etsi119411Part8.NCP_N_EUDIWRP,
+                policyOid = EtsiWalletRelyingPartyX509CertificateProfile.NORMALIZED_CERT_POLICY_NATURAL_PERSON,
                 contactEmail = "relying-party@example.com",
                 caIssuerUri = "https://ca.example.com/root.crt",
                 crlDistributionPointUri = "https://ca.example.com/crl",
@@ -52,7 +52,7 @@ class EtsiWrpacX509CertificateProfileTest {
             profileWrpAccessCertificate(
                 subjectKey = subjectKey,
                 subjectDn = "CN=Example Relying Party,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
-                policyOid = Etsi119411Part8.QCP_L_EUDIWRP,
+                policyOid = EtsiWalletRelyingPartyX509CertificateProfile.QUALIFIED_CERT_POLICY_LEGAL_PERSON,
                 contactUri = "https://relying-party.example.com/contact",
                 caIssuerUri = "https://ca.example.com/root.crt",
                 ocspResponderUri = "https://ca.example.com/ocsp",
@@ -71,7 +71,7 @@ class EtsiWrpacX509CertificateProfileTest {
                 profileWrpAccessCertificate(
                     subjectKey = subjectKey,
                     subjectDn = "CN=Example Relying Party,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
-                    policyOid = Etsi119411Part8.NCP_L_EUDIWRP,
+                    policyOid = EtsiWalletRelyingPartyX509CertificateProfile.NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON,
                     crlDistributionPointUri = "https://ca.example.com/crl",
                 )
             }
@@ -86,7 +86,7 @@ class EtsiWrpacX509CertificateProfileTest {
                 profileWrpAccessCertificate(
                     subjectKey = subjectKey,
                     subjectDn = "CN=Example Relying Party,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
-                    policyOid = Etsi119411Part8.NCP_L_EUDIWRP,
+                    policyOid =  EtsiWalletRelyingPartyX509CertificateProfile.NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON,
                     contactEmail = "relying-party@example.com",
                 )
             }
@@ -116,7 +116,7 @@ class EtsiWrpacX509CertificateProfileTest {
             profileWrpAccessCertificate(
                 subjectKey = rootKey,
                 subjectDn = rootCert.data.subjectDn,
-                policyOid = Etsi119411Part8.NCP_L_EUDIWRP,
+                policyOid = EtsiWalletRelyingPartyX509CertificateProfile.NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON,
                 contactEmail = "relying-party@example.com",
                 crlDistributionPointUri = "https://ca.example.com/crl",
             )
