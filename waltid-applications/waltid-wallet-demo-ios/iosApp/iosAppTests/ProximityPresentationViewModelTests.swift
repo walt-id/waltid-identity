@@ -310,7 +310,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         XCTAssertEqual(submission.documents.first(where: { $0.requestIndex == 0 })?.disclosedElements,
                        [familyName])
         XCTAssertEqual(submission.documents.first(where: { $0.requestIndex == 1 })?.disclosedElements,
-                       [.init(namespace: "org.waltid.example.proof", elementIdentifier: "eligible")])
+                       [try .init(namespace: "org.waltid.example.proof", elementIdentifier: "eligible")])
 
         await session.emit(.awaitingNextRequest(completedExchanges: 1))
         try await waitUntil { viewModel.sessionState == .awaitingNextRequest(completedExchanges: 1) }
@@ -332,7 +332,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     func testPreparingCreatesOneFreshSessionReopensNfcAndRevokesOnDismissal() async throws {
         let review = combinedProximityReview()
         let bridge = FakePreparedSharingBridge()
-        let submission = fixtureSubmission(review)
+        let submission = try fixtureSubmission(review)
         let sharing = WalletSDK.ProximityPreparedSharing(review: review, submission: submission,
             expiresAt: Date().addingTimeInterval(60), bridge: bridge)
         let plan = WalletSDK.ProximitySharingPlan(review: review, expiresAt: Date().addingTimeInterval(600),
@@ -374,7 +374,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     func testPreparedRetryReturnsToReviewBeforeCreatingAnotherSession() async throws {
         let review = combinedProximityReview()
         let sharing = WalletSDK.ProximityPreparedSharing(review: review,
-            submission: fixtureSubmission(review), expiresAt: Date().addingTimeInterval(60),
+            submission: try fixtureSubmission(review), expiresAt: Date().addingTimeInterval(60),
             bridge: FakePreparedSharingBridge())
         let plan = WalletSDK.ProximitySharingPlan(review: review, expiresAt: Date().addingTimeInterval(600),
             readerCertificateSHA256: "test-fingerprint", bridge: FakeSharingPlanBridge(sharing: sharing))
@@ -404,7 +404,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     func testBackgroundDuringPreparedPermissionSetupRevokesAndCloses() async throws {
         let review = combinedProximityReview()
         let bridge = FakePreparedSharingBridge()
-        let sharing = WalletSDK.ProximityPreparedSharing(review: review, submission: fixtureSubmission(review),
+        let sharing = WalletSDK.ProximityPreparedSharing(review: review, submission: try fixtureSubmission(review),
             expiresAt: Date().addingTimeInterval(60), bridge: bridge)
         let plan = WalletSDK.ProximitySharingPlan(review: review, expiresAt: Date().addingTimeInterval(600),
             readerCertificateSHA256: "fixture", bridge: FakeSharingPlanBridge(sharing: sharing))
@@ -439,9 +439,9 @@ final class ProximityPresentationViewModelTests: XCTestCase {
                     requestedElements: [.init(namespace: "org.iso.18013.5.1", elementIdentifier: "given_name",
                         intentToRetain: false, satisfiesRequestedElements: [])])])],
             readerAuthentication: [.init(scope: .wholeRequest, authenticationIndex: 0,
-                outcome: .valid(.init(state: .trusted, certificatePath: .valid, displayName: "City service desk")))],
+                outcome: .valid(try .init(state: .trusted, certificatePath: .valid, displayName: "City service desk")))],
             readerAuthenticationSummary: .trusted, useCases: [], applicationAuthorizations: [])
-        let selection = fixtureSubmission(review)
+        let selection = try fixtureSubmission(review)
         let sharing = WalletSDK.ProximityPreparedSharing(review: review, submission: selection,
             expiresAt: Date().addingTimeInterval(60), bridge: FakePreparedSharingBridge())
         let plan = WalletSDK.ProximitySharingPlan(review: review, expiresAt: Date().addingTimeInterval(600),
@@ -597,7 +597,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let viewModel = ProximityPresentationViewModel(
             client: client,
             configurationProvider: {
-                WalletSDK.ProximityReaderTrustSettings(readerPolicy: policy).applying(
+                try WalletSDK.ProximityReaderTrustSettings(readerPolicy: policy).applying(
                     to: profile.configuration
                 )
             },
@@ -1150,12 +1150,12 @@ final class ProximityPresentationViewModelTests: XCTestCase {
 
 }
 
-private func fixtureSubmission(_ review: WalletSDK.ProximityReview) -> WalletSDK.ProximitySubmission {
-    .init(documents: review.documents.map { document in
+private func fixtureSubmission(_ review: WalletSDK.ProximityReview) throws -> WalletSDK.ProximitySubmission {
+    try .init(documents: review.documents.map { document in
         let credential = document.credentialOptions[0]
-        return .init(requestIndex: document.requestIndex, credentialID: credential.credentialID,
-            disclosedElements: Set(credential.requestedElements.map {
-                .init(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+        return try .init(requestIndex: document.requestIndex, credentialID: credential.credentialID,
+            disclosedElements: Set(try credential.requestedElements.map {
+                try .init(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
             }))
     })
 }
