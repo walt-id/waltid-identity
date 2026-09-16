@@ -50,6 +50,10 @@ kotlin {
 
         jvmMain.dependencies {
             implementation(project(":waltid-libraries:crypto:waltid-cose"))
+            // For the shared Client Identifier Prefix vocabulary and the canonical x509_hash
+            // derivation, so that producing a client_id here and verifying it wallet-side cannot
+            // drift apart. See X509Hash.hashOfCertificate.
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
         }
 
         commonTest.dependencies {
