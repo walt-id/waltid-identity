@@ -29,13 +29,14 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
     public var id: String { rawValue }
 
     /// Resolves this persisted demo choice to the same typed SDK configuration as the Compose app.
+    // These closed demo presets contain only fixed, tested SDK values.
     public var configuration: ProximityConfiguration {
         switch self {
         case .defaultProfile, .bluetooth:
             let retrieval = ProximityRetrievalOptions(
                 nfc: self == .defaultProfile ? .init() : nil
             )
-            return ProximityConfiguration(
+            return try! ProximityConfiguration(
                 session: .nfc(.init(
                     handover: .negotiatedHandover,
                     retrieval: retrieval,
@@ -43,7 +44,7 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
                 ))
             )
         case .provisionalNfcV2Hybrid:
-            return ProximityConfiguration(
+            return try! ProximityConfiguration(
                 session: .provisionalNFCV2(
                     .init(
                         bluetoothLowEnergy: .init(
@@ -54,7 +55,7 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
                 )
             )
         case .provisionalNfcV2Direct:
-            return ProximityConfiguration(
+            return try! ProximityConfiguration(
                 session: .provisionalNFCV2()
             )
         }

@@ -76,7 +76,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     private let client: any ProximityWalletClient
-    private let configurationProvider: @MainActor () -> ProximityConfiguration
+    private let configurationProvider: @MainActor () throws -> ProximityConfiguration
     private let hostActions: any ProximityHostActionExecutor
     private var session: (any DemoProximityPresentationSession)?
     private var observationTask: Task<Void, Never>?
@@ -89,8 +89,8 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     init(
         client: any ProximityWalletClient,
-        configurationProvider: @escaping @MainActor () -> ProximityConfiguration = {
-            .init(
+        configurationProvider: @escaping @MainActor () throws -> ProximityConfiguration = {
+            try .init(
                 session: .nfc(.init(
                     handover: .negotiatedHandover,
                     retrieval: .init(nfc: .init()),
@@ -165,6 +165,15 @@ final class ProximityPresentationViewModel: ObservableObject {
         }
     }
 
+    private func readConfiguration() -> ProximityConfiguration? {
+        do { return try configurationProvider() }
+        catch {
+            startupFailed = session == nil
+            actionErrorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
     func start() {
         guard !active else { return }
         active = true
@@ -177,7 +186,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         startupFailed = false
         sessionGeneration &+= 1
         let generation = sessionGeneration
-        let configuration = configurationProvider()
+        guard let configuration = readConfiguration() else { return }
         switch configuration.approval {
         case .askEachTime: approvalMode = .askEachTime
         case .prepareBeforeSharing: approvalMode = .prepareSharing
@@ -256,22 +265,26 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func selectCredential(requestIndex: Int, credentialID: String) {
-        guard let document = review?.documents.first(where: { $0.requestIndex == requestIndex }),
-              let credential = document.credentialOptions.first(where: { $0.credentialID == credentialID }) else {
-            return
-        }
-        replaceSelection(
-            ProximityDocumentSelection(
-                requestIndex: requestIndex,
-                credentialID: credentialID,
-                disclosedElements: Set(credential.requestedElements.map {
-                    ProximityElementReference(
-                        namespace: $0.namespace,
-                        elementIdentifier: $0.elementIdentifier
-                    )
-                })
+        do {
+            guard let document = review?.documents.first(where: { $0.requestIndex == requestIndex }),
+                  let credential = document.credentialOptions.first(where: { $0.credentialID == credentialID }) else {
+                return
+            }
+            replaceSelection(
+                ProximityDocumentSelection(
+                    requestIndex: requestIndex,
+                    credentialID: credentialID,
+                    disclosedElements: Set(try credential.requestedElements.map {
+                        try ProximityElementReference(
+                            namespace: $0.namespace,
+                            elementIdentifier: $0.elementIdentifier
+                        )
+                    })
+                )
             )
-        )
+        } catch {
+            actionErrorMessage = error.localizedDescription
+        }
     }
 
     func toggleElement(requestIndex: Int, element: ProximityElementReference) {
@@ -304,29 +317,33 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func approve() {
-        guard canApprove, let review else { return }
-        let documents = review.documents.compactMap { document -> ProximityDocumentSubmission? in
-            guard let selection = selections.first(where: { $0.requestIndex == document.requestIndex }) else {
-                return nil
-            }
-            return ProximityDocumentSubmission(
-                requestIndex: selection.requestIndex,
-                credentialID: selection.credentialID,
-                disclosedElements: selection.disclosedElements
-            )
-        }
-        guard documents.count == review.documents.count else { return }
-        let submission = ProximitySubmission(documents: documents, continueAfterResponse: continueAfterResponse)
-        if case .preparationRequired(let plan, _) = sessionState {
-            do {
-                switch try plan.approve(submission) {
-                case .prepared(let sharing):
-                    guard let configuration = effectiveConfiguration else { return }
-                    replaceSession(configuration.withApproval(.prepared(sharing)))
-                case .rejected(let error): actionErrorMessage = error.message
+        do {
+            guard canApprove, let review else { return }
+            let documents = try review.documents.compactMap { document -> ProximityDocumentSubmission? in
+                guard let selection = selections.first(where: { $0.requestIndex == document.requestIndex }) else {
+                    return nil
                 }
-            } catch { actionErrorMessage = Self.demoSessionFailureMessage }
-        } else { dispatch(.approve(reviewID: review.reviewID, submission: submission)) }
+                return try ProximityDocumentSubmission(
+                    requestIndex: selection.requestIndex,
+                    credentialID: selection.credentialID,
+                    disclosedElements: selection.disclosedElements
+                )
+            }
+            guard documents.count == review.documents.count else { return }
+            let submission = try ProximitySubmission(documents: documents, continueAfterResponse: continueAfterResponse)
+            if case .preparationRequired(let plan, _) = sessionState {
+                do {
+                    switch try plan.approve(submission) {
+                    case .prepared(let sharing):
+                        guard let configuration = effectiveConfiguration else { return }
+                        replaceSession(configuration.withApproval(.prepared(sharing)))
+                    case .rejected(let error): actionErrorMessage = error.message
+                    }
+                } catch { actionErrorMessage = Self.demoSessionFailureMessage }
+            } else { dispatch(.approve(reviewID: review.reviewID, submission: submission)) }
+        } catch {
+            actionErrorMessage = error.localizedDescription
+        }
     }
 
     func decline() {
@@ -452,7 +469,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         guard isTerminal else { return }
         guard let effectiveConfiguration else { return }
         if case .prepared = effectiveConfiguration.approval, showRecentRequest() { return }
-        let configuration = configurationProvider()
+        guard let configuration = readConfiguration() else { return }
         let approval = configuration.approval
         if case .askEachTime = approval { approvalMode = .askEachTime }
         else { approvalMode = .prepareSharing }
@@ -464,7 +481,8 @@ final class ProximityPresentationViewModel: ObservableObject {
     private func showRecentRequest() -> Bool {
         guard isTerminal, let plan = recentPlan, !plan.isExpired else { return false }
         publish(.preparationRequired(plan))
-        selections = plan.review.defaultSelections
+        do { selections = try plan.review.defaultSelections }
+        catch { actionErrorMessage = error.localizedDescription; return false }
         preparedSharing = nil
         return true
     }
@@ -479,7 +497,7 @@ final class ProximityPresentationViewModel: ObservableObject {
             capabilities.remediationActions.contains(.requestBluetoothPermission): break
         default: return
         }
-        let configuration = configurationProvider()
+        guard let configuration = readConfiguration() else { return }
         let mode: WalletDemoProximityApprovalMode
         if case .askEachTime = configuration.approval { mode = .askEachTime }
         else { mode = .prepareSharing }
@@ -569,6 +587,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     private func publish(_ state: ProximityState) {
         let previousReviewID = review?.reviewID
         sessionState = state
+        actionErrorMessage = nil
         switch state {
         case .preparing: break
         case .checkingPrerequisites(let capabilities) where capabilities.mayStart && !capabilities.remediationActions.contains(.requestBluetoothPermission): break
@@ -579,10 +598,10 @@ final class ProximityPresentationViewModel: ObservableObject {
         if case .preparationRequired(let plan, _) = state { recentPlan = plan }
         else if let plan = session?.sharingPlan { recentPlan = plan }
         if let review, previousReviewID != review.reviewID {
-            selections = review.defaultSelections
+            do { selections = try review.defaultSelections }
+            catch { selections = []; actionErrorMessage = error.localizedDescription }
             continueAfterResponse = false
         }
-        actionErrorMessage = nil
         refreshPreferences()
         if case .engagementReady = state, preparedSharing != nil, !preparedEngagementLaunched,
            let preferredEngagement, engagementChoices.contains(preferredEngagement) {
@@ -731,18 +750,20 @@ extension ProximityState {
 
 private extension ProximityReview {
     var defaultSelections: [ProximityDocumentSelection] {
-        documents.compactMap { document in
-            guard document.credentialOptions.count == 1, let credential = document.credentialOptions.first else { return nil }
-            return ProximityDocumentSelection(
-                requestIndex: document.requestIndex,
-                credentialID: credential.credentialID,
-                disclosedElements: Set(credential.requestedElements.map {
-                    ProximityElementReference(
-                        namespace: $0.namespace,
-                        elementIdentifier: $0.elementIdentifier
-                    )
-                })
-            )
+        get throws {
+            try documents.compactMap { document in
+                guard document.credentialOptions.count == 1, let credential = document.credentialOptions.first else { return nil }
+                return ProximityDocumentSelection(
+                    requestIndex: document.requestIndex,
+                    credentialID: credential.credentialID,
+                    disclosedElements: Set(try credential.requestedElements.map {
+                        try ProximityElementReference(
+                            namespace: $0.namespace,
+                            elementIdentifier: $0.elementIdentifier
+                        )
+                    })
+                )
+            }
         }
     }
 }

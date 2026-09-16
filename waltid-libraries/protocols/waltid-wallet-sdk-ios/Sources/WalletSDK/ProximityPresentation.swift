@@ -893,7 +893,7 @@ public struct ProximityConfiguration: Sendable {
     /// Maximum accepted protocol message size in bytes.
     public let maximumMessageBytes: Int
     /// Explicit holder-approval behavior; a stored preference never creates an approval.
-    public let approval: ProximityApproval
+    public private(set) var approval: ProximityApproval
 
     /// Creates the built-in valid configuration without application-supplied values.
     public init() {
@@ -947,10 +947,9 @@ public struct ProximityConfiguration: Sendable {
     /// Replaces only approval behavior, preserving the profile, trust and transport policies.
     /// - Parameter approval: Holder-approval behavior to use in the returned configuration.
     public func withApproval(_ approval: ProximityApproval) -> ProximityConfiguration {
-        .init(profile: profile, session: session, readerPolicy: readerPolicy,
-              deviceAuthenticationPolicy: deviceAuthenticationPolicy, readerTrustEvaluator: readerTrustEvaluator,
-              credentialStatusEvaluator: credentialStatusEvaluator, applicationProfiles: applicationProfiles,
-              maximumMessageBytes: maximumMessageBytes, approval: approval)
+        var updated = self
+        updated.approval = approval
+        return updated
     }
 }
 

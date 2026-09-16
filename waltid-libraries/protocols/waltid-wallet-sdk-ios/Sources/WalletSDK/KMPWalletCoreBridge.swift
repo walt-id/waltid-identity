@@ -479,14 +479,14 @@ private extension WalletCore.ProximitySharingPlan {
 
 private extension WalletCore.ProximityPreparedSharing {
     func toSwiftPreparedSharing() throws -> ProximityPreparedSharing {
-        .init(review: try review.toSwiftReview(), submission: submission.toSwiftSubmission(),
+        .init(review: try review.toSwiftReview(), submission: try submission.toSwiftSubmission(),
               expiresAt: expiresAt.toDate(), bridge: KMPPreparedSharingBridge(self))
     }
 }
 
 private extension WalletCore.ProximitySharingReceipt {
     func toSwiftReceipt() throws -> ProximitySharingReceipt {
-        .init(review: try review.toSwiftReview(), submission: submission.toSwiftSubmission(),
+        .init(review: try review.toSwiftReview(), submission: try submission.toSwiftSubmission(),
               approvalTiming: approvalTiming == .beforeConnection ? .beforeConnection : .duringConnection,
               completedAt: completedAt.toDate())
     }
@@ -504,11 +504,11 @@ private extension ProximitySubmission {
 }
 
 extension WalletCore.ProximitySubmission {
-    func toSwiftSubmission() -> ProximitySubmission {
-        .init(documents: swiftArray(documents, of: WalletCore.ProximityDocumentSubmission.self).map { document in
-            ProximityDocumentSubmission(requestIndex: Int(document.requestIndex), credentialID: document.credentialId,
-                disclosedElements: Set(swiftSet(document.disclosedElements, of: WalletCore.ProximityElementReference.self).map {
-                    ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+    func toSwiftSubmission() throws -> ProximitySubmission {
+        try .init(documents: swiftArray(documents, of: WalletCore.ProximityDocumentSubmission.self).map { document in
+            try ProximityDocumentSubmission(requestIndex: Int(document.requestIndex), credentialID: document.credentialId,
+                disclosedElements: Set(try swiftSet(document.disclosedElements, of: WalletCore.ProximityElementReference.self).map {
+                    try ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
                 }))
         }, continueAfterResponse: continueAfterResponse)
     }
@@ -2461,7 +2461,7 @@ private extension WalletCore.ProximityReview {
 
 extension WalletCore.ProximityDocumentReview {
     func toSwiftReview() throws -> ProximityDocumentReview {
-        ProximityDocumentReview(
+        try ProximityDocumentReview(
             requestIndex: Int(requestIndex),
             documentType: docType,
             credentialOptions: try swiftArray(
@@ -2469,7 +2469,7 @@ extension WalletCore.ProximityDocumentReview {
                 of: WalletCore.ProximityCredentialOption.self
             ).map { try $0.toSwiftOption() },
             requiredElements: Set(swiftSet(requiredElements, of: WalletCore.ProximityElementReference.self).map {
-                ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+                try ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
             })
         )
     }
