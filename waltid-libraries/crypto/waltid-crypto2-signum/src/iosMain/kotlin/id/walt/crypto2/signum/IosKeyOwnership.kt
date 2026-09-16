@@ -75,7 +75,11 @@ internal object IosKeyOwnershipStore {
     }
 
     fun write(alias: String, policy: SignumKeyPolicy, record: IosKeyOwnership) = receiptQuery(alias, policy).use { query ->
-        query.put(kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+        // Bind the mandatory ownership record to the same passcode lifetime. Native token
+        // metadata can outlive the usable key; a surviving receipt must not authorize reopening.
+        val accessibility = if (policy.iosSettings().accessibility == SignumKeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY)
+            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly else kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        query.put(kSecAttrAccessible, accessibility)
         query.putRetained(kSecValueData, Json.encodeToString(record).encodeToByteArray().toNSData())
         // Never overwrite a receipt belonging to another generation of the alias.
         checkKeychainStatus(SecItemAdd(query.ref, null), alias)

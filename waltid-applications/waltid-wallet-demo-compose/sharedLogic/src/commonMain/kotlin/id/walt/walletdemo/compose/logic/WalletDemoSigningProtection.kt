@@ -51,6 +51,7 @@ enum class WalletDemoSigningProtectionMode {
 enum class WalletDemoSigningProtectionAvailability {
     Available,
     BiometricNotEnrolled,
+    DeviceCredentialNotSet,
     BiometricUnavailable,
     Unsupported,
 }
@@ -59,6 +60,8 @@ fun WalletDemoSigningProtectionAvailability.displayMessage(): String? = when (th
     WalletDemoSigningProtectionAvailability.Available -> null
     WalletDemoSigningProtectionAvailability.BiometricNotEnrolled ->
         WalletDisplayText.BiometricNotEnrolled
+    WalletDemoSigningProtectionAvailability.DeviceCredentialNotSet ->
+        WalletDisplayText.DeviceCredentialNotSet
     WalletDemoSigningProtectionAvailability.BiometricUnavailable ->
         WalletDisplayText.BiometricUnavailable
     WalletDemoSigningProtectionAvailability.Unsupported ->

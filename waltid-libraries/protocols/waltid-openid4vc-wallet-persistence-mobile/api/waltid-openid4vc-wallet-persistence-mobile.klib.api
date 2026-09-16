@@ -10,6 +10,7 @@ final enum class id.walt.wallet2.persistence.keys/KeyUseAuthorizationFailure : k
     enum entry AuthorizationNotCompleted // id.walt.wallet2.persistence.keys/KeyUseAuthorizationFailure.AuthorizationNotCompleted|null[0]
     enum entry BiometricNotEnrolled // id.walt.wallet2.persistence.keys/KeyUseAuthorizationFailure.BiometricNotEnrolled|null[0]
     enum entry BiometricUnavailable // id.walt.wallet2.persistence.keys/KeyUseAuthorizationFailure.BiometricUnavailable|null[0]
+    enum entry DeviceCredentialNotSet // id.walt.wallet2.persistence.keys/KeyUseAuthorizationFailure.DeviceCredentialNotSet|null[0]
     enum entry InteractionContextUnavailable // id.walt.wallet2.persistence.keys/KeyUseAuthorizationFailure.InteractionContextUnavailable|null[0]
     enum entry InvalidStoredKeyMetadata // id.walt.wallet2.persistence.keys/KeyUseAuthorizationFailure.InvalidStoredKeyMetadata|null[0]
     enum entry ProtectedKeyUnavailable // id.walt.wallet2.persistence.keys/KeyUseAuthorizationFailure.ProtectedKeyUnavailable|null[0]
@@ -62,6 +63,7 @@ final enum class id.walt.wallet2.persistence.keys/KeyUseAuthorizationReuseTimeou
 final enum class id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason : kotlin/Enum<id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason> { // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason|null[0]
     enum entry BiometricNotEnrolled // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled|null[0]
     enum entry BiometricUnavailable // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.BiometricUnavailable|null[0]
+    enum entry DeviceCredentialNotSet // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.DeviceCredentialNotSet|null[0]
     enum entry UnsupportedCombination // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.UnsupportedCombination|null[0]
 
     final val entries // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.entries|#static{}entries[0]

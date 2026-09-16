@@ -87,6 +87,8 @@ public enum class KeyUseAuthorizationFailure {
     UnsupportedCombination,
     BiometricUnavailable,
     BiometricNotEnrolled,
+    /** The device has no PIN, passcode or password configured. */
+    DeviceCredentialNotSet,
     InteractionContextUnavailable,
     AuthorizationNotCompleted,
     ProtectedKeyUnavailable,
@@ -191,6 +193,8 @@ public enum class KeyUseAuthorizationUnsupportedReason {
     UnsupportedCombination,
     BiometricUnavailable,
     BiometricNotEnrolled,
+    /** The device has no PIN, passcode or password configured. */
+    DeviceCredentialNotSet,
 }
 
 /**
@@ -219,6 +223,7 @@ internal fun KeyUseAuthorizationUnsupportedReason.toAuthorizationFailure(): KeyU
     KeyUseAuthorizationUnsupportedReason.UnsupportedCombination -> KeyUseAuthorizationFailure.UnsupportedCombination
     KeyUseAuthorizationUnsupportedReason.BiometricUnavailable -> KeyUseAuthorizationFailure.BiometricUnavailable
     KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled -> KeyUseAuthorizationFailure.BiometricNotEnrolled
+    KeyUseAuthorizationUnsupportedReason.DeviceCredentialNotSet -> KeyUseAuthorizationFailure.DeviceCredentialNotSet
 }
 
 /** Signing-key protection is independent of the authorization needed to use the key. */

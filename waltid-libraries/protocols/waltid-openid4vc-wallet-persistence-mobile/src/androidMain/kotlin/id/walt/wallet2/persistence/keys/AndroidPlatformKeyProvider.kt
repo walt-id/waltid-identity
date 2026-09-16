@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.uuid.Uuid
+import android.app.KeyguardManager
 import android.content.Context
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
@@ -76,15 +77,7 @@ public class AndroidPlatformKeyProvider(
             requirements.spec != KeySpec.Ec(EcCurve.P256) ||
                 requirements.usages != setOf(KeyUsage.SIGN, KeyUsage.VERIFY) ->
                 KeyUseAuthorizationUnsupportedReason.UnsupportedCombination
-            else -> when (BiometricManager.from(applicationContext).canAuthenticate(when (requirements.authorizationPolicy) {
-                    is KeyUseAuthorizationPolicy.DeviceCredential -> BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                    is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                    else -> BIOMETRIC_STRONG
-                })) {
-                BiometricManager.BIOMETRIC_SUCCESS -> null
-                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled
-                else -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
-            }
+            else -> authorizationAvailabilityFailure(requirements.authorizationPolicy)
         }
         return failure?.let { KeyUseAuthorizationSupport.Unsupported(it) }
             ?: requirements.authorizationPolicy.supportedOnAndroid()
@@ -99,7 +92,7 @@ public class AndroidPlatformKeyProvider(
                 usages = request.requirements.usages,
                 providerOptions = SignumKeyOptions(alias = request.nativeAlias, policy = request.toSignumPolicy()).encode(),
             )
-        ).withWalletAuthorizationMapping()
+        ).withAndroidAuthorizationMapping(request.requirements.authorizationPolicy)
     } catch (cause: Throwable) {
         throw cause.toKeyUseAuthorizationException(
             protectedKeyId = request.id.value,
@@ -115,7 +108,7 @@ public class AndroidPlatformKeyProvider(
         signumProvider.importPrivateKey(GenerateManagedKeyRequest(
             id = request.id, metadata = mapOf("wallet.nativeAlias" to request.nativeAlias), spec = request.requirements.spec, usages = request.requirements.usages,
             providerOptions = SignumKeyOptions(alias = request.nativeAlias, policy = request.toSignumPolicy()).encode(),
-        ), material).withWalletAuthorizationMapping()
+        ), material).withAndroidAuthorizationMapping(request.requirements.authorizationPolicy)
     } catch (cause: Throwable) {
         throw cause.toKeyUseAuthorizationException(request.id.value, KeyUseAuthorizationFailure.UnsupportedCombination) ?: cause
     }
@@ -136,7 +129,7 @@ public class AndroidPlatformKeyProvider(
         val policy = keyUseAuthorizationPolicy(stored)
         return try {
             PlatformManagedKeyRestoration.Restored(
-                signumProvider.restore(stored).withWalletAuthorizationMapping(),
+                signumProvider.restore(stored).withAndroidAuthorizationMapping(policy),
                 policy,
             )
         } catch (_: SignumKeyNotFoundException) {
@@ -158,6 +151,29 @@ public class AndroidPlatformKeyProvider(
             throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
         }
     }
+
+    private fun authenticationAvailability(policy: KeyUseAuthorizationPolicy): Int =
+        if (policy is KeyUseAuthorizationPolicy.None) BiometricManager.BIOMETRIC_SUCCESS
+        else BiometricManager.from(applicationContext).canAuthenticate(when (policy) {
+            is KeyUseAuthorizationPolicy.DeviceCredential -> BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            else -> BIOMETRIC_STRONG
+        })
+
+    private fun authorizationAvailabilityFailure(policy: KeyUseAuthorizationPolicy): KeyUseAuthorizationUnsupportedReason? {
+        if (policy is KeyUseAuthorizationPolicy.None) return null
+        if (!applicationContext.getSystemService(KeyguardManager::class.java).isDeviceSecure) {
+            return KeyUseAuthorizationUnsupportedReason.DeviceCredentialNotSet
+        }
+        return when (authenticationAvailability(policy)) {
+            BiometricManager.BIOMETRIC_SUCCESS -> null
+            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled
+            else -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
+        }
+    }
+
+    private fun ManagedKey.withAndroidAuthorizationMapping(policy: KeyUseAuthorizationPolicy): ManagedKey =
+        withWalletAuthorizationMapping { authorizationAvailabilityFailure(policy)?.toAuthorizationFailure() }
 
     private fun WalletKeyRequirements.nativePolicy(prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt()): SignumKeyPolicy =
         toSignumPolicy(prompt).let { policy ->

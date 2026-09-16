@@ -641,6 +641,7 @@ public class WalletIdentities internal constructor(
         KeyUseAuthorizationFailure.ProtectedKeyUnavailable -> IdentityFailure.KeyUnavailable
         KeyUseAuthorizationFailure.InvalidStoredKeyMetadata -> IdentityFailure.InvalidRecoveryRecord
         KeyUseAuthorizationFailure.BiometricUnavailable, KeyUseAuthorizationFailure.BiometricNotEnrolled,
+        KeyUseAuthorizationFailure.DeviceCredentialNotSet,
         KeyUseAuthorizationFailure.InteractionContextUnavailable, KeyUseAuthorizationFailure.AuthorizationNotCompleted ->
             IdentityFailure.AuthorizationNotCompleted
         null -> IdentityFailure.NativeOperationFailed

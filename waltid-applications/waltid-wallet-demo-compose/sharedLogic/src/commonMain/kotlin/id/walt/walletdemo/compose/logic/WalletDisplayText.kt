@@ -56,6 +56,7 @@ internal object WalletDisplayText {
     const val EnableBiometricUnlock = "Enable biometric unlock"
     const val BiometricUnlockNotAuthorized = "Biometric unlock was not authorized. Use the PIN instead."
     const val BiometricNotEnrolled = "Set up a strong biometric in device settings, then try again."
+    const val DeviceCredentialNotSet = "Set up a device PIN or passcode in settings, then try again."
     const val BiometricUnavailable = "Strong biometric authentication is not available on this device."
     const val SigningProtectionUnsupported = "This signing protection is not supported on this device."
     const val ReceivedCredentialsUnavailable = "received credentials are not available locally"
@@ -75,6 +76,8 @@ internal object WalletDisplayText {
         val reason = when (availability) {
             WalletDemoSigningProtectionAvailability.Available -> return ""
             WalletDemoSigningProtectionAvailability.BiometricNotEnrolled -> "no strong biometric is enrolled"
+            WalletDemoSigningProtectionAvailability.DeviceCredentialNotSet ->
+                return "$DeviceCredentialNotSet Restoring device security does not restore invalidated signing keys."
             WalletDemoSigningProtectionAvailability.BiometricUnavailable -> "strong biometric authentication is unavailable"
             WalletDemoSigningProtectionAvailability.Unsupported -> "the device cannot currently authorize it"
         }

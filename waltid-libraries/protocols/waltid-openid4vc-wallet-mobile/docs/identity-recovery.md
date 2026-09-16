@@ -145,6 +145,14 @@ retain an independent recovery record when key continuity is required. Direct na
 the SDK must also avoid this trigger. Temporary failures do not imply permanent invalidation, and
 reopening never silently replaces the signing key.
 
+Missing device credentials are reported as `DeviceCredentialNotSet`, separately from missing
+biometric enrollment and cancelled authorization. After a native authorization failure, the SDK
+checks current availability to distinguish these conditions; successful native timed reuse is unchanged.
+On iOS, a key configured with `WHEN_PASSCODE_SET_DEVICE_ONLY` also has a passcode-bound ownership
+record. Removing the passcode removes the record required to reopen or use the key, even if native
+token metadata remains. Re-enabling the passcode does not restore that record. Recovery is explicit
+and requires a retained backup; Secure Enclave keys cannot be recovered.
+
 Android on-body authentication is not offered as a stronger authorization guarantee. These limits
 are explicit; arbitrary native flags are not accepted and then ignored.
 

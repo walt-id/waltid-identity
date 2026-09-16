@@ -73,14 +73,29 @@ class IosKeyOwnershipTest {
     }
 
     @Test
-    fun missingReceiptCannotBeReconstructedFromCallerPolicy() = runTest {
+    fun missingReceiptPreventsUseWithoutDeletingOrAdoptingTheNativeKey() = runTest {
         val alias = "unowned-${NSUUID().UUIDString}"
+        val recoveredAlias = "$alias-recovered"
         val backend = IosSignumKeyBackend()
         try {
-            backend.create(alias, spec, usages, policy)
+            val opened = backend.create(alias, spec, usages, policy)
+            val material = assertNotNull(opened.privateKeyExporter).exportPrivateKey()
+            val native = assertNotNull(iosKeyIdentity(alias, policy, IosKeyEngine.APPLE_KEYCHAIN))
             IosKeyOwnershipStore.delete(alias, policy)
-            assertFailsWith<SignumKeyPolicyMismatchException> { backend.load(alias, spec, usages, policy) }
-        } finally { AppleKeychainKeys.delete(alias, policy) }
+            assertNull(backend.load(alias, spec, usages, policy))
+            assertFailsWith<SignumKeyPolicyMismatchException> { opened.sign(byteArrayOf(1), algorithm) }
+            assertFailsWith<SignumKeyPolicyMismatchException> { assertNotNull(opened.privateKeyExporter).exportPrivateKey() }
+            backend.delete(alias, policy)
+            assertFailsWith<IllegalArgumentException> { backend.create(alias, spec, usages, policy) }
+            assertEquals(native, iosKeyIdentity(alias, policy, IosKeyEngine.APPLE_KEYCHAIN))
+            val recovered = backend.importPrivateKey(recoveredAlias,
+                assertIs<id.walt.crypto2.keys.EncodedKey.Jwk>(material), spec, usages, policy)
+            assertEquals(opened.publicKey, recovered.publicKey)
+            assertTrue(opened.verify(byteArrayOf(1), recovered.sign(byteArrayOf(1), algorithm), algorithm))
+        } finally {
+            AppleKeychainKeys.delete(alias, policy)
+            backend.delete(recoveredAlias, policy)
+        }
     }
 
     @Test

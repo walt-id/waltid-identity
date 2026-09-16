@@ -57,6 +57,7 @@ final class SDKWalletClient: WalletClient {
         switch try await wallet().keyUseAuthorizationPreflight(policy: signingProtection.authorizationPolicy) {
         case .supported: .available
         case .unsupported(.biometricNotEnrolled): .biometricNotEnrolled
+        case .unsupported(.deviceCredentialNotSet): .deviceCredentialNotSet
         case .unsupported(.biometricUnavailable): .biometricUnavailable
         case .unsupported(.unsupportedCombination): .unsupported
         }
