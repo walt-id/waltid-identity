@@ -313,7 +313,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertTrue(configuration.applicationProfiles.isEmpty)
     }
 
-    func testProximityConfigurationRepresentsCombinedNFCSessionPrecisely() {
+    func testProximityConfigurationRepresentsCombinedNFCSessionPrecisely() throws {
         let ble = ProximityBLEConfiguration(roles: .peripheralServer, bearerPolicy: .gattOnly)
         let qr = ProximityRetrievalOptions(
             bluetoothLowEnergy: ble,
@@ -322,38 +322,38 @@ final class WalletAPITests: XCTestCase {
         let session = ProximitySessionConfiguration.provisionalNFCV2(.init(
             maximumCommandDataLength: 4_096, bluetoothLowEnergy: ble, qrFallback: qr
         ))
-        let configuration = ProximityConfiguration(session: session)
+        let configuration = try ProximityConfiguration(session: session)
         XCTAssertEqual(configuration.session, session)
         XCTAssertEqual(configuration.session.qrRetrieval, qr)
     }
 
-    func testProximitySessionConfigurationMatrix() {
+    func testProximitySessionConfigurationMatrix() throws {
         let ble = ProximityRetrievalOptions()
         let nfc = ProximityRetrievalOptions(bluetoothLowEnergy: nil, nfc: .init())
         let plans = [ble, nfc, .init(nfc: .init())]
         for retrieval in plans {
-            XCTAssertEqual(ProximityConfiguration(session: .qr(retrieval)).session, .qr(retrieval))
+            XCTAssertEqual(try ProximityConfiguration(session: .qr(retrieval)).session, .qr(retrieval))
             for handover in [ProximityNFCHandover.staticHandover, .negotiatedHandover] {
                 for qr in [nil] + plans.map(Optional.some) {
                     let session = ProximitySessionConfiguration.nfc(.init(
                         handover: handover, retrieval: retrieval, qrFallback: qr
                     ))
-                    XCTAssertEqual(ProximityConfiguration(session: session).session.qrRetrieval, qr)
+                    XCTAssertEqual(try ProximityConfiguration(session: session).session.qrRetrieval, qr)
                 }
             }
             let session = ProximitySessionConfiguration.provisionalNFCV2(.init(qrFallback: retrieval))
-            XCTAssertEqual(ProximityConfiguration(session: session).session.qrRetrieval, retrieval)
+            XCTAssertEqual(try ProximityConfiguration(session: session).session.qrRetrieval, retrieval)
         }
     }
 
-    func testApplyingReaderTrustSettingsPreservesTransportConfiguration() {
-        let configuration = ProximityConfiguration(
+    func testApplyingReaderTrustSettingsPreservesTransportConfiguration() throws {
+        let configuration = try ProximityConfiguration(
             session: .provisionalNFCV2(.init(
                 bluetoothLowEnergy: .init(roles: .peripheralServer, bearerPolicy: .gattOnly)
             )),
             maximumMessageBytes: 2_097_152
         )
-        let updated = ProximityReaderTrustSettings(readerPolicy: .requireTrusted).applying(to: configuration)
+        let updated = try ProximityReaderTrustSettings(readerPolicy: .requireTrusted).applying(to: configuration)
         XCTAssertEqual(updated.session, configuration.session)
         XCTAssertEqual(updated.readerPolicy, ProximityReaderPolicy.requireTrusted)
         XCTAssertEqual(updated.maximumMessageBytes, configuration.maximumMessageBytes)
