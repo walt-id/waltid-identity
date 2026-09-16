@@ -166,6 +166,9 @@ class WalletDemoController(
         foregroundSequence += 1
         refreshBiometricSigningAvailability(foregroundSequence)
         unlockWithBiometrics()
+        if (_state.value.auth == WalletAuthState.Unlocked && _state.value.session is WalletSessionState.IdentitySetup) {
+            refreshIdentityChoices()
+        }
     }
 
     fun dismissSigningProtectionWarning() {
@@ -1501,11 +1504,26 @@ class WalletDemoController(
     }
 
     fun refreshIdentityDetails() {
+        val session = _state.value.session as? WalletSessionState.Ready ?: return
         if (_state.value.identityBusy) return
+        fun isCurrentWallet(): Boolean = (_state.value.session as? WalletSessionState.Ready)?.let {
+            it.did == session.did && it.keyId == session.keyId
+        } == true
+        _state.update { it.copy(identityBusy = true, identityDetails = WalletDemoIdentityDetailsState.Loading) }
         scope.launch(dispatcher) {
-            try { val details = wallet.identityDetails(); _state.update { it.copy(identityDetails = details) } }
-            catch (cause: kotlinx.coroutines.CancellationException) { throw cause }
-            catch (cause: Exception) { _state.update { it.copy(warning = WalletDisplayText.failure("Identity details unavailable", cause)) } }
+            try {
+                val details = wallet.identityDetails()
+                if (isCurrentWallet()) _state.update {
+                    it.copy(identityDetails = details?.let(WalletDemoIdentityDetailsState::Available)
+                        ?: WalletDemoIdentityDetailsState.Unsupported)
+                }
+            } catch (cause: CancellationException) { throw cause }
+            catch (cause: Exception) {
+                if (isCurrentWallet()) _state.update {
+                    it.copy(identityDetails = WalletDemoIdentityDetailsState.Failed(
+                        WalletDisplayText.failure("Signing key details unavailable", cause)))
+                }
+            } finally { _state.update { it.copy(identityBusy = false) } }
         }
     }
 
@@ -1516,7 +1534,8 @@ class WalletDemoController(
             try {
                 wallet.chooseIdentity(choiceId)
                 val details = wallet.identityDetails()
-                _state.update { it.copy(identityDetails = details) }
+                _state.update { it.copy(identityDetails = details?.let(WalletDemoIdentityDetailsState::Available)
+                    ?: WalletDemoIdentityDetailsState.Unsupported) }
             } catch (cause: kotlinx.coroutines.CancellationException) { throw cause }
             catch (cause: Exception) { _state.update { it.copy(warning = WalletDisplayText.failure("Recovery operation failed", cause)) } }
             finally { _state.update { it.copy(identityBusy = false) } }
@@ -1526,10 +1545,28 @@ class WalletDemoController(
     fun chooseIdentity(choiceId: String) = runIdentityChoice { wallet.chooseIdentity(choiceId) }
     fun cancelIdentity(identityId: String) = runIdentityChoice { wallet.cancelIdentity(identityId) }
     fun resumeIdentity(identityId: String) = runIdentityChoice { wallet.resumeIdentity(identityId) }
-    fun refreshIdentityChoices() { bootstrapIfNeeded() }
+    fun refreshIdentityChoices() {
+        val session = _state.value.session as? WalletSessionState.IdentitySetup ?: return
+        if (_state.value.identityBusy) return
+        _state.update { it.copy(identityBusy = true) }
+        scope.launch(dispatcher) {
+            try {
+                val setup = wallet.identitySetup()
+                if (_state.value.session !== session) return@launch
+                _state.update { it.copy(session = setup?.let(WalletSessionState::IdentitySetup)
+                    ?: WalletSessionState.NotBootstrapped, warning = null) }
+                if (setup == null) bootstrapIfNeeded()
+            } catch (cause: CancellationException) { throw cause }
+            catch (cause: Exception) {
+                if (_state.value.session === session) _state.update {
+                    it.copy(warning = WalletDisplayText.failure("Key options unavailable", cause))
+                }
+            } finally { _state.update { it.copy(identityBusy = false) } }
+        }
+    }
 
     private fun runIdentityChoice(action: suspend () -> Unit) {
-        if (_state.value.session !is WalletSessionState.IdentitySetup) return
+        if (_state.value.identityBusy || _state.value.session !is WalletSessionState.IdentitySetup) return
         _state.update { it.copy(session = WalletSessionState.Bootstrapping) }
         scope.launch(dispatcher) {
             try { action() }

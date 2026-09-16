@@ -16,7 +16,12 @@ data class WalletDemoKeySetupOption(
 )
 
 sealed interface WalletDemoIdentitySetup {
-    data class Choose(val options: List<WalletDemoKeySetupOption>, val message: String? = null, val recoveryStorageNotice: String? = null) : WalletDemoIdentitySetup
+    data class Choose(
+        val options: List<WalletDemoKeySetupOption>,
+        val message: String? = null,
+        val recoveryStorageNotice: String? = null,
+        val recoveryUnavailableReasons: List<String> = emptyList(),
+    ) : WalletDemoIdentitySetup
     data class Pending(val identityId: String) : WalletDemoIdentitySetup
 }
 
@@ -48,3 +53,11 @@ enum class WalletDemoKeySetupStep(val title: String) {
 /** Public facts and SDK-issued actions only; no recovery secret reaches UI state. */
 data class WalletDemoIdentityDetails(val storage: String, val origin: String, val authorization: String,
     val recovery: String, val choices: List<WalletDemoIdentityChoice>)
+
+/** Loading and failure must not be mistaken for a wallet without identity management. */
+sealed interface WalletDemoIdentityDetailsState {
+    data object Loading : WalletDemoIdentityDetailsState
+    data object Unsupported : WalletDemoIdentityDetailsState
+    data class Available(val details: WalletDemoIdentityDetails) : WalletDemoIdentityDetailsState
+    data class Failed(val message: String) : WalletDemoIdentityDetailsState
+}

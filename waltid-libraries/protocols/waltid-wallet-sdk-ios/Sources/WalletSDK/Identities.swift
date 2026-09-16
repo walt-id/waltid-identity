@@ -198,6 +198,16 @@ public enum WalletRecoveryScope: Sendable {
     /// Uses an application-defined recovery route.
     case custom
 }
+/// Availability of one configured recovery provider, including unmet prerequisites.
+public struct WalletRecoveryProviderStatus: Sendable {
+    /// Stable configured provider identifier.
+    public let id: String
+    /// Provider name for presentation.
+    public let displayName: String
+    /// Current availability; does not confirm cloud delivery.
+    public let availability: WalletRecoveryAvailability
+}
+
 /// Current provider prerequisites, rechecked before execution.
 public enum WalletRecoveryAvailability: Sendable {
     /// The provider currently meets the stated protection and route prerequisites.
@@ -416,6 +426,10 @@ public actor WalletIdentityService {
     init(core: any WalletIdentityCore) { self.core = core }
     /// Reopens the selected identity, or creates the recommended identity without recovery with configured defaults.
     public func initialize() async throws -> WalletIdentityOperationResult { try await core.initialize() }
+    /// Reports each configured recovery provider, including unmet prerequisites.
+    public func recoveryProviderStatuses() async throws -> [WalletRecoveryProviderStatus] {
+        try await core.recoveryProviderStatuses()
+    }
     /// Lists complete choices compatible with the current native and recovery prerequisites.
     /// - Parameters:
     ///   - intent: Whether the new identity must have a recovery record.
@@ -480,6 +494,7 @@ public actor WalletIdentityService {
 @available(macOS 10.15, *)
 protocol WalletIdentityCore: Sendable {
     func initialize() async throws -> WalletIdentityOperationResult
+    func recoveryProviderStatuses() async throws -> [WalletRecoveryProviderStatus]
     func creationOptions(intent: WalletIdentityIntent, attestation: WalletIdentityAttestationRequest) async throws -> WalletIdentityOptions
     func create(_ option: WalletIdentityCreationOption) async throws -> WalletIdentityOperationResult
     func state() async throws -> WalletIdentityState
@@ -498,6 +513,7 @@ protocol WalletIdentityCore: Sendable {
 @available(macOS 10.15, *)
 struct UnavailableWalletIdentityCore: WalletIdentityCore {
     func initialize() async throws -> WalletIdentityOperationResult { throw unavailable() }
+    func recoveryProviderStatuses() async throws -> [WalletRecoveryProviderStatus] { throw unavailable() }
     private func unavailable() -> WalletError { .internalFailure("Identity lifecycle requires the iOS wallet core") }
     func creationOptions(intent: WalletIdentityIntent, attestation: WalletIdentityAttestationRequest) async throws -> WalletIdentityOptions { throw unavailable() }
     func create(_ option: WalletIdentityCreationOption) async throws -> WalletIdentityOperationResult { throw unavailable() }

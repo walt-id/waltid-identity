@@ -200,6 +200,14 @@ it. Preferred requests use the available Keystore; required requests fail. Nativ
 enforces the requested protection. The complete matrix passed after this fix; earlier failures are
 retained in local evidence. Signum Supreme remained at 0.15.0.
 
+## Qualification scope for review
+
+The current review covers the SDK, recovery adapters and demo flows exercised above.
+Play-distributed Android cloud restore and migration between two physical iPhones are
+outside this qualification scope. Provider service outages are external dependencies;
+they must remain visible failures rather than trigger weaker protection or a replacement key.
+The unqualified cases below are limits on deployment claims, not claims of failed implementation.
+
 ## Remaining qualification
 
 - Actual Android device-to-device transfer and encrypted-cloud delivery/restore.

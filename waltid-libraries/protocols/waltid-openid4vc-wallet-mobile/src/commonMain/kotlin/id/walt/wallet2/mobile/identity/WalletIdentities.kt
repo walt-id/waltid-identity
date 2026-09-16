@@ -421,9 +421,17 @@ public class WalletIdentities internal constructor(
             (!option.recoverable || (configuration.policy == IdentityKeyPolicy.GeneralPurpose &&
                 providers[option.providerId]?.availability() == option.recoveryAvailability))
 
+    /** Reports each configured recovery provider, including its unmet prerequisites. */
+    public suspend fun recoveryProviderStatuses(): List<IdentityRecoveryProviderStatus> = providers.values.map { provider ->
+        val availability = try { provider.availability() }
+        catch (cause: CancellationException) { throw cause }
+        catch (_: Exception) { RecoveryAvailability.Unavailable("The recovery service could not be reached. Try again.") }
+        IdentityRecoveryProviderStatus(provider.id, provider.displayName, availability)
+    }
+
     private suspend fun availableProviders(): List<Pair<IdentityRecoveryProvider, RecoveryAvailability.Available>> =
-        providers.values.mapNotNull { provider ->
-            (provider.availability() as? RecoveryAvailability.Available)?.let { provider to it }
+        recoveryProviderStatuses().mapNotNull { status ->
+            (status.availability as? RecoveryAvailability.Available)?.let { providers.getValue(status.id) to it }
         }
 
     private suspend fun createKey(record: IdentityRecord, material: EncodedKey.Jwk?): Key {

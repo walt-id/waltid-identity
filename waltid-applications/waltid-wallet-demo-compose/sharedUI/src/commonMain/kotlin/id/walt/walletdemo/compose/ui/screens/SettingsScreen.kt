@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
+import id.walt.walletdemo.compose.logic.WalletDemoIdentityDetailsState
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
@@ -60,6 +61,7 @@ internal fun SettingsScreen(
     onProximityTransportProfileChange: ((WalletDemoProximityTransportProfile) -> Unit)?,
     onBack: () -> Unit,
     onIdentityAction: (String) -> Unit,
+    onRefreshIdentityDetails: () -> Unit,
     onLock: () -> Unit,
     onResetWallet: () -> Unit,
     onSignOut: (() -> Unit)? = null,
@@ -76,7 +78,7 @@ internal fun SettingsScreen(
 
     deleteRecovery?.let { id ->
         AlertDialog(onDismissRequest = { deleteRecovery = null }, title = { Text("Delete recovery record?") },
-            text = { Text("This requests deletion from the provider. It does not erase identities already restored on other devices.") },
+            text = { Text("This requests deletion from the provider. It does not erase signing keys already restored on other devices.") },
             confirmButton = { TextButton(onClick = { deleteRecovery = null; onIdentityAction(id) }) { Text("Delete recovery record") } },
             dismissButton = { TextButton(onClick = { deleteRecovery = null }) { Text("Cancel") } })
     }
@@ -141,7 +143,7 @@ internal fun SettingsScreen(
                 copyTag = WalletUiTestTags.SettingsPublicJwkCopy,
                 onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
             )
-            state.identityDetails?.let { identity ->
+            (state.identityDetails as? WalletDemoIdentityDetailsState.Available)?.details?.let { identity ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Wallet signing key", style = MaterialTheme.typography.titleMedium)
                     Text("${identity.storage} · ${identity.origin}")
@@ -157,17 +159,24 @@ internal fun SettingsScreen(
                 }
             }
             if (state.pinLockEnabled) {
-                if (state.identityDetails == null) {
-                    SigningProtectionSettings(state = state, ready = ready, onRequestChange = onRequestSigningProtectionChange)
-                } else {
-                    Text("To choose different key storage or signing approval, reset this wallet and set up a new key. Current credentials will be removed and must be issued again.",
-                        style = MaterialTheme.typography.bodySmall)
+                when (val details = state.identityDetails) {
+                    WalletDemoIdentityDetailsState.Loading -> CircularProgressIndicator()
+                    WalletDemoIdentityDetailsState.Unsupported ->
+                        SigningProtectionSettings(state = state, ready = ready, onRequestChange = onRequestSigningProtectionChange)
+                    is WalletDemoIdentityDetailsState.Failed -> Column {
+                        Text(details.message)
+                        TextButton(onClick = onRefreshIdentityDetails) { Text("Try again") }
+                    }
+                    is WalletDemoIdentityDetailsState.Available ->
+                        Text("Reset this wallet to choose different key storage or signing approval. This removes local credentials; key recovery does not restore them.",
+                            style = MaterialTheme.typography.bodySmall)
                 }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(WalletUiTestTags.SettingsCredentialSharing),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
+
                 ) {
                     Text(
                         "Credential Sharing",
@@ -274,7 +283,7 @@ internal fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("Reset wallet?") },
-            text = { Text("This deletes the wallet DID, keys, credentials, and PIN. This cannot be undone.") },
+            text = { Text("This removes local wallet keys, credentials and the app PIN. Saved key recovery records remain. Key recovery does not restore credentials.") },
             confirmButton = {
                 TextButton(
                     onClick = {

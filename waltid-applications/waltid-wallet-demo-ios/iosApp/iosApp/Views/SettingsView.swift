@@ -55,7 +55,7 @@ struct SettingsView: View {
             if viewModel.identityScreen == nil { signingProtectionSection }
             else {
                 Section {
-                    Text("To choose different key storage or signing approval, reset this wallet and set up a new key. Current credentials will be removed and must be issued again.")
+                    Text("Reset this wallet to choose different key storage or signing approval. This removes local credentials; key recovery does not restore them.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -89,10 +89,9 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
-        .confirmationDialog(
+        .alert(
             "Reset wallet?",
-            isPresented: $confirmReset,
-            titleVisibility: .visible
+            isPresented: $confirmReset
         ) {
             Button("Reset", role: .destructive) {
                 viewModel.resetWallet()
@@ -100,7 +99,7 @@ struct SettingsView: View {
             .accessibilityIdentifier(WalletAccessibilityID.settingsResetConfirm)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes the wallet DID, keys, credentials, and PIN. This cannot be undone.")
+            Text("This removes local wallet keys, credentials and the app PIN. Saved key recovery records remain. Key recovery does not restore credentials.")
         }
         .confirmationDialog(
             "Change signing protection?",

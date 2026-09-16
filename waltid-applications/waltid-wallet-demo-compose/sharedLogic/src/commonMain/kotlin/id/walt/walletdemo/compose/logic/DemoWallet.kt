@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 interface DemoWallet {
+    /** Returns null only when this wallet does not support identity management. */
     suspend fun identityDetails(): WalletDemoIdentityDetails? = null
     suspend fun identitySetup(): WalletDemoIdentitySetup? = null
     suspend fun chooseIdentity(choiceId: String): Unit = error("Identity choices are unavailable")

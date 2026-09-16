@@ -20,6 +20,17 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
     func initialize() async throws -> WalletIdentityOperationResult {
         try operation(value(await bridge.initializeIdentity(), as: (any WalletCore.IdentityOperationResult).self))
     }
+    func recoveryProviderStatuses() async throws -> [WalletRecoveryProviderStatus] {
+        let statuses = try value(await bridge.identityRecoveryProviderStatuses(), as: [WalletCore.IdentityRecoveryProviderStatus].self)
+        return statuses.map { status in
+            let state: WalletRecoveryAvailability
+            switch onEnum(of: status.availability) {
+            case .available(let available): state = availability(available)
+            case .unavailable(let unavailable): state = .unavailable(reason: unavailable.reason)
+            }
+            return .init(id: status.id, displayName: status.displayName, availability: state)
+        }
+    }
     func creationOptions(intent: WalletIdentityIntent, attestation: WalletIdentityAttestationRequest) async throws -> WalletIdentityOptions {
         let request: any WalletCore.IdentityAttestationRequest
         switch attestation {

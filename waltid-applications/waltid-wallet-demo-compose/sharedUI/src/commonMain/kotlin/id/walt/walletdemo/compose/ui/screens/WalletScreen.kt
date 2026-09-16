@@ -29,7 +29,7 @@ internal fun WalletScreen(
 ) {
     val setup = state.session as? WalletSessionState.IdentitySetup
     if (setup != null) {
-        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeIdentity, controller::cancelIdentity, controller::refreshIdentityChoices)
+        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeIdentity, controller::cancelIdentity, controller::refreshIdentityChoices, refreshing = state.identityBusy)
         return
     }
     val openAuthorizationRequest = rememberAuthorizationRequestOpener()
@@ -44,6 +44,10 @@ internal fun WalletScreen(
     }
 
     if (showingSettings) {
+        val ready = state.session as? WalletSessionState.Ready
+        LaunchedEffect(ready?.did, ready?.keyId) {
+            if (ready != null) controller.refreshIdentityDetails()
+        }
         SettingsScreen(
             state = state,
             onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
@@ -52,6 +56,7 @@ internal fun WalletScreen(
             },
             onBack = { showingSettings = false },
             onIdentityAction = controller::performIdentityAction,
+            onRefreshIdentityDetails = controller::refreshIdentityDetails,
             onLock = controller::lock,
             onResetWallet = onResetWallet,
             onSignOut = onSignOut,
@@ -72,7 +77,7 @@ internal fun WalletScreen(
             } else {
                 WalletHeader(
                     state = state,
-                    onSettings = { onOpenSettings(); controller.refreshIdentityDetails(); showingSettings = true },
+                    onSettings = { onOpenSettings(); showingSettings = true },
                     onDismissStatus = controller::dismissStatus,
                     onToggleStatusExpanded = controller::toggleStatusExpanded,
                 )
