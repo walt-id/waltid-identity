@@ -109,8 +109,9 @@ material before saving it in the wallet App Group, rejects private keys and PKCS
 identities, and applies one immutable settings snapshot to each new proximity session.
 
 Review actions carry the identity of the displayed review. Each new review resets
-holder choices and continuation. Permission prompts are needed only when no
-selected route can start; terminal recovery creates a new single-use session.
+holder choices and continuation. Selected permissions are offered explicitly; an optional
+permission can be skipped only when the SDK reports a complete viable alternative route.
+Terminal recovery creates a new single-use session.
 
 ## Local wallet data
 
