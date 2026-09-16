@@ -17,6 +17,7 @@ import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.val
 import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateKeyUsageIsDigitalSignature
 import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validatePositiveValidity
 import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateSerialNumber
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateSubjectKeyIdentifierIsPresent
 import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateVersionV3
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
@@ -151,33 +152,13 @@ sealed class EtsiProviderX509CertificateProfile {
 
         // PID-4.4.1-01 / WAL-5.1-01: keyUsage digitalSignature, critical, and no other bit set.
         validateKeyUsageIsDigitalSignature(context, x509Certificate)
-        validateSubjectKeyIdentifier(context, x509Certificate)
+        validateSubjectKeyIdentifierIsPresent(context, x509Certificate)
         validateCertificatePoliciesPresent(context, x509Certificate)
         validateAuthorityInfoAccessIfCaIssued(context, x509Certificate)
         validateQcStatements(context, x509Certificate, qcTypeOid)
         validatePublicKeyAlgorithm(context, x509Certificate)
         validateIssuerAndSubjectDn(context, x509Certificate)
         validateExtensionsAreNotCritical(context, x509Certificate, criticalExtensions)
-    }
-
-    /**
-     * PID-4.4.2-01 / WAL-5.1-01: subjectKeyIdentifier required, not critical.
-     */
-    fun validateSubjectKeyIdentifier(context: ValidationContext, x509Certificate: X509Certificate) {
-        val extension = x509Certificate.data.extensionSubjectKeyIdentifier
-        if (extension == null) {
-            context.addLogEntry(
-                ValidationResult.Severity.ERROR,
-                "subjectKeyIdentifier",
-                "Certificate extension 'subjectKeyIdentifier' is not present"
-            )
-        } else if (extension.critical) {
-            context.addLogEntry(
-                ValidationResult.Severity.ERROR,
-                "subjectKeyIdentifier",
-                "Certificate extension 'subjectKeyIdentifier' must not have a critical flag set"
-            )
-        }
     }
 
     /**
