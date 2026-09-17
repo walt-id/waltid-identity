@@ -7,18 +7,14 @@ import com.ionspin.kotlin.bignum.integer.Sign
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.HMAC
 import dev.whyoleg.cryptography.algorithms.SHA256
-import dev.whyoleg.cryptography.random.CryptographyRandom
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.serialization.BinaryData
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
 
-/** Version 1 derivation shared by Android and iOS. See identity-recovery-format.md before changing it. */
-internal object IdentityRecoveryMaterial {
-    /** Generates 256 bits of OS-backed entropy. Callers must keep these bytes secret. */
-    fun createSeed(): ByteArray = CryptographyRandom.nextBytes(32)
-
+/** Reads existing derived version 1 records. New recoverable keys use ordinary private JWKs. */
+internal object LegacyRecoveryDerivation {
     /** Derives a P-256 private JWK for a versioned identity domain and nonnegative index. */
     suspend fun derive(seed: ByteArray, identityDomain: String, keyIndex: Int = 0): EncodedKey.Jwk {
         require(seed.size == 32) { "An identity seed must contain 32 bytes" }

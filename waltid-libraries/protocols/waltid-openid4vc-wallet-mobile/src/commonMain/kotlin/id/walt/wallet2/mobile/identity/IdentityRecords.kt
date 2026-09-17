@@ -68,7 +68,7 @@ internal data class RecoveryRecord(
         val material = when (val source = secret) {
             is RecoverySecret.Derived -> {
                 val seed = recoveryBase64.decode(source.seed)
-                try { IdentityRecoveryMaterial.derive(seed, source.domain, source.index) }
+                try { LegacyRecoveryDerivation.derive(seed, source.domain, source.index) }
                 finally { seed.fill(0) }
             }
             is RecoverySecret.Exported -> EncodedKey.Jwk(BinaryData(source.jwk.encodeToByteArray()), true)

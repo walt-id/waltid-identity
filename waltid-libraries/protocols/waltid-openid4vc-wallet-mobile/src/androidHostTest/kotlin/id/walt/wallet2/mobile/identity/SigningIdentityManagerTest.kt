@@ -10,6 +10,7 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.ManagedKey
@@ -348,11 +349,11 @@ class SigningIdentityManagerTest {
             val identity = assertIs<SigningIdentityOperationResult.Active>(source.wallet.signingIdentity.create(
                 assertIs<SigningIdentityCreationOptions.Available>(source.wallet.signingIdentity.creationOptions(SigningIdentityIntent.Recoverable)).recommended)).identity
             val original = recordJson.decodeFromString<RecoveryRecord>(source.provider.records.getValue(identity.id).decodeToString())
-            val derived = assertIs<RecoverySecret.Derived>(original.secret)
+            assertIs<RecoverySecret.Exported>(original.secret)
             val invalid = listOf(
                 original.copy(identityId = "different-record"),
                 original.copy(publicJwk = original.publicJwk.dropLast(1) + ",\"d\":\"secret\"}"),
-                original.copy(secret = derived.copy(domain = "different-domain")),
+                original.copy(secret = RecoverySecret.Derived(recoveryBase64.encode(ByteArray(32)), "different-domain")),
                 original.copy(format = "unknown-format"),
                 original.copy(version = 2),
             )
@@ -582,6 +583,43 @@ class SigningIdentityManagerTest {
         }
     }
 
+    @Test fun `legacy derived backups restore and pending retries retain original bytes`() = runTest {
+        Fixture().use { source ->
+            val id = "legacy-fixture"
+            val keyId = "legacy-key"
+            val seed = ByteArray(32) { it.toByte() }
+            val material = LegacyRecoveryDerivation.derive(seed, id)
+            val publicJwk = material.toPublicJwk(identitySpec).data.toByteArray().decodeToString()
+            val did = "did:jwk:" + recoveryBase64.encode(publicJwk.encodeToByteArray())
+            val reference = IdentityBackupReference(source.provider.id, id)
+            val recovery = RecoveryRecord(identityId = id, keyId = keyId, did = did, publicJwk = publicJwk,
+                secret = RecoverySecret.Derived(recoveryBase64.encode(seed), id),
+                constraints = RecoveryConstraints(SigningIdentityKeyStorage.EncryptedDatabase, KeyUseAuthorizationPolicy.None, RecoveryConfirmation.LocalAcceptance))
+            val identity = SigningIdentity(id, keyId, did, publicJwk, SigningIdentityKeyStorage.EncryptedDatabase,
+                KeyUseAuthorizationPolicy.None, PlatformKeyFacts(KeyOrigin.IMPORTED, KeySecurityLevel.SOFTWARE, KeyProtectionLevel.SOFTWARE))
+            val pending = IdentityRecord(id = id, keyId = keyId, phase = IdentityPhase.AwaitingBackup,
+                storage = identity.storage, requirements = WalletKeyRequirements(identitySpec, identityUsages),
+                policy = SigningIdentityKeyPolicy.GeneralPurpose, identity = identity, recovery = recovery,
+                backup = reference, recoveryAvailability = source.provider.availability() as RecoveryAvailability.Available)
+            val originalBytes = recovery.encode()
+            source.provider.records[id] = originalBytes.copyOf()
+            source.queries.insert(keyId, 0, StoredKeyCodec.encodeToString(
+                StoredKey.Software(StoredKey.CURRENT_VERSION, KeyId(keyId), identitySpec, identityUsages, material)))
+            source.queries.insertDid(did, "{}")
+            source.queries.putIdentityRecord("default", pending.phase.name, recordJson.encodeToString(pending))
+            assertEquals(did, assertIs<SigningIdentityOperationResult.Active>(source.reopen().signingIdentity.resumePending(id)).identity.did)
+            assertContentEquals(originalBytes, source.provider.records.getValue(id))
+            Fixture(provider = source.provider).use { destination ->
+                val manager = destination.wallet.signingIdentity
+                val option = manager.restorationOptions(manager.discoverRecovery().candidates.single()).single()
+                val restored = assertIs<SigningIdentityOperationResult.Active>(manager.restore(option)).identity
+                assertEquals(did, restored.did)
+                assertEquals(publicJwk, restored.publicJwk)
+                assertEquals(keyId, restored.keyId)
+            }
+        }
+    }
+
     @Test fun `only missing or permanently invalidated native material permits repair`() = runTest {
         for (outcome in NativeFixture.Outcome.entries) {
             val native = NativeFixture()
@@ -590,6 +628,8 @@ class SigningIdentityManagerTest {
                 val choices = assertIs<SigningIdentityCreationOptions.Available>(manager.creationOptions(SigningIdentityIntent.Recoverable))
                 val selected = (listOf(choices.recommended) + choices.alternatives).single { it.storage == SigningIdentityKeyStorage.NativeStorage }
                 val original = assertIs<SigningIdentityOperationResult.Active>(manager.create(selected)).identity
+                assertIs<RecoverySecret.Exported>(recordJson.decodeFromString<RecoveryRecord>(fixture.provider.records.getValue(original.id).decodeToString()).secret)
+                assertEquals(1, fixture.queries.selectAll().executeAsList().size, "Native creation must not retain an operational software key")
                 val restore = manager.restorationOptions(manager.discoverRecovery().candidates.single()).single { it.storage == selected.storage }
                 native.outcome = outcome
                 val result = manager.restore(restore)

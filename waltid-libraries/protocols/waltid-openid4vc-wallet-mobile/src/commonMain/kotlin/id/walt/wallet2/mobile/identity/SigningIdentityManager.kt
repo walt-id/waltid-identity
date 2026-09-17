@@ -2,6 +2,8 @@ package id.walt.wallet2.mobile.identity
 
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.SHA256
+import dev.whyoleg.cryptography.random.CryptographyRandom
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
@@ -111,39 +113,43 @@ public class SigningIdentityManager internal constructor(
         if (currentState() !is SigningIdentityState.Absent) return@withLock failed(SigningIdentityFailure.ExistingIdentity)
         val id = Uuid.random().toString()
         val keyId = "wallet_identity_${Uuid.random()}"
-        val seed = if (option.recoverable) IdentityRecoveryMaterial.createSeed() else null
+        val material = try {
+            if (option.recoverable) {
+                // Ephemeral generation: only the selected destination becomes an operational wallet key.
+                val generated = software.generateSoftwareKey(GenerateSoftwareKeyRequest(KeyId(keyId), identitySpec, identityUsages))
+                requireNotNull(generated.capabilities.privateKeyExporter).exportPrivateKey() as EncodedKey.Jwk
+            } else null
+        } catch (cause: CancellationException) { throw cause }
+        catch (cause: Exception) { return@withLock failed(classify(cause)) }
+        val preparing = IdentityRecord(
+            id = id, keyId = keyId, nativeAlias = "$keyId.identity.${Uuid.random()}", phase = IdentityPhase.Preparing, storage = option.storage,
+            requirements = requirements(option.storage, option.authorization, option.attestation), policy = configuration.policy,
+            backup = option.providerId?.let { IdentityBackupReference(it, id) },
+            recoveryAvailability = option.recoveryAvailability, recoveryConfirmation = configuration.recoveryConfirmation,
+        )
+        reserve(preparing)
         try {
-            val material = seed?.let { IdentityRecoveryMaterial.derive(it, id) }
-            val preparing = IdentityRecord(
-                id = id, keyId = keyId, nativeAlias = "$keyId.identity.${Uuid.random()}", phase = IdentityPhase.Preparing, storage = option.storage,
-                requirements = requirements(option.storage, option.authorization, option.attestation), policy = configuration.policy,
-                backup = option.providerId?.let { IdentityBackupReference(it, id) },
-                recoveryAvailability = option.recoveryAvailability, recoveryConfirmation = configuration.recoveryConfirmation,
-            )
-            reserve(preparing)
-            try {
-                val key = createKey(preparing, material)
-                MobileDidSupport.ensureInitialized()
-                val registered = didService.registerByKey("jwk", key, DidJwkCreateOptions())
-                val publicJwk = publicJwk(key)
-                val recovery = seed?.let { RecoveryRecord(
-                    identityId = id, keyId = keyId, did = registered.did, publicJwk = publicJwk,
-                    secret = RecoverySecret.Derived(recoveryBase64.encode(it), id),
-                    constraints = recoveryConstraints(preparing),
-                ) }
-                val identity = describe(preparing, registered.did, publicJwk, key)
-                proveOriginalKey(key, publicJwk)
-                val prepared = preparing.copy(identity = identity, recovery = recovery)
-                write(prepared)
-                dids.addDid(WalletDidEntry(registered.did, registered.didDocument.toJsonObject()))
-                finish(prepared)
-            } catch (cause: Throwable) {
-                // Once backup submission can have happened, retain the journal for idempotent retry.
-                if (read()?.phase == IdentityPhase.Preparing) cleanup(read() ?: preparing, material != null, cause)
-                if (cause is CancellationException) throw cause
-                failed(classify(cause))
-            }
-        } finally { seed?.fill(0) }
+            val key = createKey(preparing, material)
+            MobileDidSupport.ensureInitialized()
+            val registered = didService.registerByKey("jwk", key, DidJwkCreateOptions())
+            val publicJwk = publicJwk(key)
+            val recovery = material?.let { RecoveryRecord(
+                identityId = id, keyId = keyId, did = registered.did, publicJwk = publicJwk,
+                secret = RecoverySecret.Exported(it.data.toByteArray().decodeToString()),
+                constraints = recoveryConstraints(preparing),
+            ) }
+            val identity = describe(preparing, registered.did, publicJwk, key)
+            proveOriginalKey(key, publicJwk)
+            val prepared = preparing.copy(identity = identity, recovery = recovery)
+            write(prepared)
+            dids.addDid(WalletDidEntry(registered.did, registered.didDocument.toJsonObject()))
+            finish(prepared)
+        } catch (cause: Throwable) {
+            // Once backup submission can have happened, retain the journal for idempotent retry.
+            if (read()?.phase == IdentityPhase.Preparing) cleanup(read() ?: preparing, material != null, cause)
+            if (cause is CancellationException) throw cause
+            failed(classify(cause))
+        }
     }.notifyActive()
 
     /** Retries a persisted backup submission, or removes an interrupted pre-activation key operation. */
@@ -610,7 +616,7 @@ public class SigningIdentityManager internal constructor(
     private suspend fun proveOriginalKey(key: Key, publicJwk: String) {
         val public = software.restore(StoredKey.Software(StoredKey.CURRENT_VERSION, KeyId("identity-proof"), identitySpec,
             setOf(id.walt.crypto2.keys.KeyUsage.VERIFY), EncodedKey.Jwk(BinaryData(publicJwk.encodeToByteArray()), false)))
-        val challenge = IdentityRecoveryMaterial.createSeed()
+        val challenge = CryptographyRandom.nextBytes(32)
         try {
             val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
             val signature = requireNotNull(key.capabilities.signer).sign(challenge, algorithm)
