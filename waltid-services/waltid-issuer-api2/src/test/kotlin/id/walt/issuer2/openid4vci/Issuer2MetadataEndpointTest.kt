@@ -109,6 +109,7 @@ class Issuer2MetadataEndpointTest {
         assertEquals(ISSUER_BASE_URL, credentialIssuerMetadata.credentialIssuer)
         assertEquals("$ISSUER_BASE_URL/credential", credentialIssuerMetadata.credentialEndpoint)
         assertEquals("$ISSUER_BASE_URL/nonce", credentialIssuerMetadata.nonceEndpoint)
+        assertEquals("$ISSUER_BASE_URL/deferred_credential", credentialIssuerMetadata.deferredCredentialEndpoint)
         assertEquals(setOf("en-US", "de-DE"), credentialIssuerMetadata.display?.mapNotNull { it.locale }?.toSet())
 
         assertEquals(ISSUER_BASE_URL, authorizationServerMetadata.issuer)

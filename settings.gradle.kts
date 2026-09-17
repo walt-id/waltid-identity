@@ -164,6 +164,7 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
 
     repositories {
+        mavenLocal()
         maven("https://maven.waltid.dev/releases")
         maven("https://maven.waltid.dev/snapshots")
         mavenCentral()

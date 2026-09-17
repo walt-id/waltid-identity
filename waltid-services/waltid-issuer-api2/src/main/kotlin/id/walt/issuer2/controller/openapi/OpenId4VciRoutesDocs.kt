@@ -201,6 +201,10 @@ object OpenId4VciRoutesDocs {
                     mediaTypes(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
                 }
             }
+            HttpStatusCode.Accepted to {
+                description = "Credential accepted for deferred issuance; response body contains transaction_id and interval."
+                body<JsonObject>()
+            }
             HttpStatusCode.BadRequest to {
                 description = "Invalid credential request"
                 body<CredentialError>()
@@ -219,6 +223,63 @@ object OpenId4VciRoutesDocs {
             }
             HttpStatusCode.InternalServerError to {
                 description = "Credential processing failed"
+                body<OAuthError>()
+            }
+        }
+    }
+
+    fun deferredCredential(): RouteConfig.() -> Unit = {
+        summary = "Deferred Credential endpoint"
+        description =
+            "Poll or resume a previously deferred credential issuance. The request must contain a valid transaction_id. While pending the issuer returns 202 with the same transaction_id and interval; once the transaction is completed it returns the issued credential; once the transaction has been consumed it is rejected with invalid_transaction_id."
+        request {
+            headerParameter<String>("Authorization") {
+                required = true
+                description = "Bearer or DPoP access-token authorization"
+            }
+            headerParameter<String>("DPoP") {
+                required = false
+                description = "Required when presenting a DPoP-bound access token"
+            }
+            body<JsonObject> {
+                description = "Deferred Credential request containing a transaction_id and the request metadata expected by the issuer."
+                mediaTypes(ContentType.Application.Json)
+            }
+            body<String> {
+                description = "Encrypted Deferred Credential Request as compact JWE"
+                mediaTypes(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
+            }
+        }
+        response {
+            HttpStatusCode.OK to {
+                description = "Deferred credential has been issued; body contains the credential response."
+                body<JsonObject>()
+                body<String> {
+                    mediaTypes(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
+                }
+            }
+            HttpStatusCode.Accepted to {
+                description = "Deferred credential is still pending; body contains the transaction_id and interval."
+                body<JsonObject>()
+            }
+            HttpStatusCode.BadRequest to {
+                description = "Missing or invalid transaction_id, invalid deferred request state, or the transaction has already been consumed."
+                body<CredentialError>()
+            }
+            HttpStatusCode.Unauthorized to {
+                description = "Deferred Credential authorization failed"
+                body<OAuthError>()
+            }
+            HttpStatusCode.Forbidden to {
+                description = "Deferred Credential access is insufficiently scoped"
+                body<OAuthError>()
+            }
+            HttpStatusCode.UnsupportedMediaType to {
+                description = "Unsupported deferred credential request media type"
+                body<CredentialError>()
+            }
+            HttpStatusCode.InternalServerError to {
+                description = "Deferred Credential processing failed"
                 body<OAuthError>()
             }
         }
