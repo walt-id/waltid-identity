@@ -13,7 +13,7 @@ import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPersistence
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase

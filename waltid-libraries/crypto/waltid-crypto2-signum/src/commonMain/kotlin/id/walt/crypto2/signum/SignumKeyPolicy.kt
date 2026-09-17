@@ -1,32 +1,31 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeyAttestation
+
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.keys.KeyUsage
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class SignumKeyPolicy(
-    /** Hardware backing preference; [SignumHardwarePolicy.REQUIRED] requires backend-observed hardware. */
-    val hardware: SignumHardwarePolicy = SignumHardwarePolicy.PREFERRED,
+    /** Hardware backing preference; [HardwarePreference.REQUIRED] requires backend-observed hardware. */
+    val hardware: HardwarePreference = HardwarePreference.PREFERRED,
     val authentication: SignumAuthenticationPolicy = SignumAuthenticationPolicy.None,
     /** Enables platform ECDH for keys with [KeyUsage.KEY_AGREEMENT] usage. */
     val keyAgreement: Boolean = false,
     /** Requests attestation evidence in addition to any hardware backing requirement. */
     val attestationChallenge: BinaryData? = null,
-    val platform: SignumPlatformPolicy = SignumPlatformPolicy.Default,
+    @Serializable(with = SignumPlatformConfigurationSerializer::class)
+    val platform: PlatformKeyConfiguration = PlatformKeyConfiguration.Default,
 ) {
     init {
-        require(attestationChallenge == null || hardware != SignumHardwarePolicy.DISCOURAGED) {
+        require(attestationChallenge == null || hardware != HardwarePreference.DISCOURAGED) {
             "Attestation requires preferred or required hardware backing"
         }
     }
-}
-
-@Serializable
-enum class SignumHardwarePolicy {
-    REQUIRED,
-    PREFERRED,
-    DISCOURAGED,
 }
 
 @Serializable
@@ -75,36 +74,10 @@ internal fun SignumAuthenticationPolicy.isBiometricTimedReuse(): Boolean =
         !deviceCredential &&
         timeoutSeconds > 0
 
-@Serializable
-enum class SignumProtectionLevel {
-    HARDWARE,
-    SOFTWARE,
-    UNKNOWN,
-}
-
-@Serializable
-data class SignumKeyAttestation(
-    val format: String,
-    val statement: BinaryData,
-    val certificateChain: List<BinaryData> = emptyList(),
-) {
-    init {
-        require(format.isNotBlank()) { "Attestation format cannot be blank" }
-        require(statement.size > 0) { "Attestation statement cannot be empty" }
-    }
-}
-
 /** Derives only evidence-backed protection; REQUIRED is verified by each native backend before reporting HARDWARE. */
-internal fun SignumKeyPolicy.effectiveProtection(attestation: SignumKeyAttestation?): SignumProtectionLevel = when {
-    attestation != null -> SignumProtectionLevel.HARDWARE
-    hardware == SignumHardwarePolicy.DISCOURAGED -> SignumProtectionLevel.SOFTWARE
-    else -> SignumProtectionLevel.UNKNOWN
+internal fun SignumKeyPolicy.effectiveProtection(attestation: KeyAttestation?): KeyProtectionLevel = when {
+    attestation != null -> KeyProtectionLevel.HARDWARE
+    hardware == HardwarePreference.DISCOURAGED -> KeyProtectionLevel.SOFTWARE
+    else -> KeyProtectionLevel.UNKNOWN
 }
 
-/** Where the private signing material originated. */
-@Serializable
-enum class SignumKeyOrigin { GENERATED, IMPORTED, UNKNOWN }
-
-/** Native security level, not a certification or issuer assurance rating. */
-@Serializable
-enum class SignumSecurityLevel { SOFTWARE, TRUSTED_ENVIRONMENT, STRONGBOX, SECURE_ENCLAVE, UNKNOWN }

@@ -1,5 +1,12 @@
 package id.walt.wallet2.persistence.keys
 
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation
+
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EncodedKey
@@ -22,7 +29,7 @@ import id.walt.crypto2.signum.SignumKeyInvalidatedException
 import id.walt.crypto2.signum.SignumKeyNotFoundException
 import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
 import id.walt.crypto2.signum.SignumKeyPolicy
-import id.walt.crypto2.signum.SignumHardwarePolicy
+import id.walt.crypto2.keys.HardwarePreference
 import id.walt.crypto2.signum.SignumAuthenticationPolicy
 import id.walt.crypto2.signum.SignumStoredKeyMetadataException
 import id.walt.crypto2.signum.SignumAuthorizationException
@@ -126,7 +133,7 @@ class SignumWalletKeyMappingTest {
     @Test
     fun `restored biometric policy requires the complete protected wallet key shape`() {
         val policy = SignumKeyPolicy(
-            hardware = SignumHardwarePolicy.REQUIRED,
+            hardware = HardwarePreference.REQUIRED,
             authentication = SignumAuthenticationPolicy.UserPresence(
                 biometric = true,
                 allowNewBiometrics = false,
@@ -153,7 +160,7 @@ class SignumWalletKeyMappingTest {
     fun `maps the complete timed biometric reuse policy`() {
         val timed = KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
         val expected = SignumKeyPolicy(
-            hardware = SignumHardwarePolicy.REQUIRED,
+            hardware = HardwarePreference.REQUIRED,
             authentication = SignumAuthenticationPolicy.UserPresence(
                 biometric = true,
                 allowNewBiometrics = true,

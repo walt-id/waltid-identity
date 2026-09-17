@@ -1,5 +1,8 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+
 import android.app.KeyguardManager
 import android.os.Build
 import android.security.keystore.KeyPermanentlyInvalidatedException
@@ -44,8 +47,8 @@ class AndroidSignumKeyBackendDeviceTest {
         assumeTrue(Build.VERSION.SDK_INT >= 31)
         val alias = "invalidation-probe-${Uuid.random()}"
         val backend = AndroidSignumKeyBackend(InstrumentationRegistry.getInstrumentation().targetContext)
-        val policy = SignumKeyPolicy(platform = SignumPlatformPolicy.AndroidKeystore(
-            strongBox = SignumHardwarePolicy.DISCOURAGED, maxUsageCount = 1))
+        val policy = SignumKeyPolicy(platform = PlatformKeyConfiguration.AndroidKeystore(
+            strongBox = HardwarePreference.DISCOURAGED, maxUsageCount = 1))
         try {
             val key = backend.create(alias, KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY), policy)
             // More operations than a device can keep pending also detects a missing explicit abort.
@@ -79,8 +82,8 @@ class AndroidSignumKeyBackendDeviceTest {
 
     @Test
     fun importedP256RetainsOriginalKeyAfterDeletionAndReimport() = runTest {
-        exerciseNativePrivateImport(AndroidSignumKeyBackend(InstrumentationRegistry.getInstrumentation().targetContext), SignumKeyPolicy(hardware = SignumHardwarePolicy.PREFERRED,
-            platform = SignumPlatformPolicy.AndroidKeystore(strongBox = SignumHardwarePolicy.DISCOURAGED)))
+        exerciseNativePrivateImport(AndroidSignumKeyBackend(InstrumentationRegistry.getInstrumentation().targetContext), SignumKeyPolicy(hardware = HardwarePreference.PREFERRED,
+            platform = PlatformKeyConfiguration.AndroidKeystore(strongBox = HardwarePreference.DISCOURAGED)))
     }
 
     @Test

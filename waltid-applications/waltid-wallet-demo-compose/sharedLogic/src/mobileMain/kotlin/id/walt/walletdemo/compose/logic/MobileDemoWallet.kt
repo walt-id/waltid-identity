@@ -21,9 +21,9 @@ import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.WalletAttestationConfig
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 
 internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,

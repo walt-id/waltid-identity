@@ -1,5 +1,9 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeyOrigin
+
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
@@ -30,12 +34,12 @@ internal suspend fun exerciseNativePrivateImport(backend: SignumPlatformBackend,
         repeat(2) {
             val imported = provider.importPrivateKey(request, material)
             stored = imported.storedKey
-            assertEquals(SignumKeyOrigin.IMPORTED, imported.origin)
-            if (imported.protectionLevel == SignumProtectionLevel.HARDWARE) assertNull(imported.capabilities.privateKeyExporter)
+            assertEquals(KeyOrigin.IMPORTED, imported.origin)
+            if (imported.protectionLevel == KeyProtectionLevel.HARDWARE) assertNull(imported.capabilities.privateKeyExporter)
             assertEquals(material.toSpkiDer(spec), imported.storedKey.publicKey)
-            if (policy.hardware == SignumHardwarePolicy.REQUIRED) assertEquals(SignumProtectionLevel.HARDWARE, imported.protectionLevel)
+            if (policy.hardware == HardwarePreference.REQUIRED) assertEquals(KeyProtectionLevel.HARDWARE, imported.protectionLevel)
             val reopened = SignumManagedKeyProvider(backend).restoreSignumKey(imported.storedKey)
-            assertEquals(SignumKeyOrigin.IMPORTED, reopened.origin)
+            assertEquals(KeyOrigin.IMPORTED, reopened.origin)
             val data = "WAL-749 original-key proof".encodeToByteArray()
             val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
             val signature = assertNotNull(reopened.capabilities.signer).sign(data, algorithm)

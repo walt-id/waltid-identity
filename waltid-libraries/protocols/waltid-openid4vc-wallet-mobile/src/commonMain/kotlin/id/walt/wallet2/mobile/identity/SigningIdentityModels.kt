@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile.identity
 
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyFacts
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.PlatformKeyFacts
 
 /** Public identity details. Never contains a seed, private key or database encryption key.
  * @property id Stable identity identifier, preserved across recovery.

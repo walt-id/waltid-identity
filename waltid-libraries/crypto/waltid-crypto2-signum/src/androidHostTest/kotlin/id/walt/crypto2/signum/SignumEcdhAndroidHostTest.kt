@@ -1,5 +1,8 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeyAttestation
+
 import at.asitplus.signum.indispensable.ECCurve
 import at.asitplus.signum.supreme.sign.EphemeralKey
 import id.walt.crypto2.algorithms.DigestAlgorithm
@@ -116,8 +119,8 @@ class SignumEcdhAndroidHostTest {
                 override val alias = alias
                 override val spec = ecSpec
                 override val publicKey = EncodedKey.SpkiDer(BinaryData(key.publicKey.encodeToTlv().derEncoded))
-                override val protectionLevel = SignumProtectionLevel.SOFTWARE
-                override val attestation: SignumKeyAttestation? = null
+                override val protectionLevel = KeyProtectionLevel.SOFTWARE
+                override val attestation: KeyAttestation? = null
                 override val signatureAlgorithms = setOf(
                     SignatureAlgorithm.Ecdsa(ecSpec.curve.digestAlgorithm())
                 )

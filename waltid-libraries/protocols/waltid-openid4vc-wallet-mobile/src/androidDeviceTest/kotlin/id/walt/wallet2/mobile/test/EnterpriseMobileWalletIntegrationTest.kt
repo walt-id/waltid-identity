@@ -17,7 +17,7 @@ import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.WalletAttestationConfig
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.util.UUID

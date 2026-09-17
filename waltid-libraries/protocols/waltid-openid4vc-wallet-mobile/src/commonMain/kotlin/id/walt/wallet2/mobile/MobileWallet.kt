@@ -21,8 +21,8 @@ import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.data.WalletSessionEvent
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialOption
 import id.walt.wallet2.handlers.PresentationCredentialRequirement

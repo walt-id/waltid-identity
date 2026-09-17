@@ -1,5 +1,9 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeyAttestation
+
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.CryptoSignature
 import at.asitplus.signum.indispensable.Digest
@@ -60,9 +64,9 @@ internal fun PlatformSigningKeyConfigurationBase<*>.configureSignumKey(
     hardware {
         configureHardware()
         backing = when (policy.hardware) {
-            SignumHardwarePolicy.REQUIRED -> REQUIRED
-            SignumHardwarePolicy.PREFERRED -> PREFERRED
-            SignumHardwarePolicy.DISCOURAGED -> DISCOURAGED
+            HardwarePreference.REQUIRED -> REQUIRED
+            HardwarePreference.PREFERRED -> PREFERRED
+            HardwarePreference.DISCOURAGED -> DISCOURAGED
         }
         policy.attestationChallenge?.let { challenge ->
             attestation { this.challenge = challenge.toByteArray() }
@@ -108,8 +112,8 @@ internal fun PlatformSignerConfigurationBase.configureSignumOperation(
 internal class SignumPlatformKeyHandle(
     override val alias: String,
     override val spec: KeySpec,
-    override val protectionLevel: SignumProtectionLevel,
-    override val attestation: SignumKeyAttestation?,
+    override val protectionLevel: KeyProtectionLevel,
+    override val attestation: KeyAttestation?,
     private val authentication: SignumAuthenticationPolicy,
     private val signerFor: suspend (SignatureAlgorithm) -> PlatformSigningProviderSigner<*, *>,
     private val operationFailureMapper: (Throwable) -> Throwable = { it },
@@ -178,8 +182,8 @@ internal suspend fun EncodedKey.toSignumEcdhPeer(spec: KeySpec.Ec): CryptoPublic
     return peer
 }
 
-internal fun PlatformSigningProviderSigner<*, *>.toAttestation(): SignumKeyAttestation? = attestation?.let {
-    SignumKeyAttestation(
+internal fun PlatformSigningProviderSigner<*, *>.toAttestation(): KeyAttestation? = attestation?.let {
+    KeyAttestation(
         format = "signum-json",
         statement = BinaryData(Json.encodeToString(it).encodeToByteArray()),
     )

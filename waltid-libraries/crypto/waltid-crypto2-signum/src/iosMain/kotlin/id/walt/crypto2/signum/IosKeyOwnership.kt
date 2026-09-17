@@ -2,6 +2,11 @@
 
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeychainAccessibility
+import id.walt.crypto2.keys.KeyOrigin
+
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.serialization.BinaryData
@@ -26,15 +31,15 @@ internal data class IosKeyOwnership(
     val policy: SignumKeyPolicy,
     val spec: KeySpec,
     val usages: Set<KeyUsage>,
-    val origin: SignumKeyOrigin,
+    val origin: KeyOrigin,
     val publicKey: id.walt.crypto2.keys.EncodedKey.SpkiDer,
     val native: IosKeyIdentity,
 ) {
-    fun validate(alias: String, policy: SignumKeyPolicy, spec: KeySpec, usages: Set<KeyUsage>, origin: SignumKeyOrigin) {
+    fun validate(alias: String, policy: SignumKeyPolicy, spec: KeySpec, usages: Set<KeyUsage>, origin: KeyOrigin) {
         if (version != 1 || this.policy != policy.immutableIosPolicy() || this.spec != spec ||
-            this.usages != usages || this.origin != origin || origin == SignumKeyOrigin.UNKNOWN ||
+            this.usages != usages || this.origin != origin || origin == KeyOrigin.UNKNOWN ||
             native.persistentReference.size == 0 || native.publicKeyIdentifier.size == 0 || publicKey.data.size == 0 ||
-            (origin == SignumKeyOrigin.IMPORTED && native.secureEnclave)) {
+            (origin == KeyOrigin.IMPORTED && native.secureEnclave)) {
             throw SignumKeyPolicyMismatchException(alias, "requested policy differs from the owned key's creation record")
         }
     }
@@ -55,8 +60,8 @@ internal fun SignumKeyPolicy.immutableIosPolicy(): SignumKeyPolicy = copy(
     ) ?: SignumAuthenticationPolicy.None,
 )
 
-internal fun SignumKeyPolicy.iosSettings(): SignumPlatformPolicy.IosKeychain =
-    platform as? SignumPlatformPolicy.IosKeychain ?: SignumPlatformPolicy.IosKeychain()
+internal fun SignumKeyPolicy.iosSettings(): PlatformKeyConfiguration.IosKeychain =
+    platform as? PlatformKeyConfiguration.IosKeychain ?: PlatformKeyConfiguration.IosKeychain()
 
 /** Private native record. A missing record never authorizes adoption of an existing alias. */
 internal object IosKeyOwnershipStore {
@@ -77,7 +82,7 @@ internal object IosKeyOwnershipStore {
     fun write(alias: String, policy: SignumKeyPolicy, record: IosKeyOwnership) = receiptQuery(alias, policy).use { query ->
         // Bind the mandatory ownership record to the same passcode lifetime. Native token
         // metadata can outlive the usable key; a surviving receipt must not authorize reopening.
-        val accessibility = if (policy.iosSettings().accessibility == SignumKeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY)
+        val accessibility = if (policy.iosSettings().accessibility == KeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY)
             kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly else kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         query.put(kSecAttrAccessible, accessibility)
         query.putRetained(kSecValueData, Json.encodeToString(record).encodeToByteArray().toNSData())
@@ -151,18 +156,18 @@ internal fun iosKeyIdentity(alias: String, policy: SignumKeyPolicy, engine: IosK
 internal fun IosKeyIdentity.validate(alias: String, policy: SignumKeyPolicy) {
     val expectedAccessibility = CFBridgingRelease(CFRetain(policy.iosSettings().accessibility.nativeAccessibility)) as String
     if ((accessibility != null && accessibility != expectedAccessibility) ||
-        (policy.hardware == SignumHardwarePolicy.REQUIRED && !secureEnclave) ||
-        (policy.hardware == SignumHardwarePolicy.DISCOURAGED && secureEnclave)) {
+        (policy.hardware == HardwarePreference.REQUIRED && !secureEnclave) ||
+        (policy.hardware == HardwarePreference.DISCOURAGED && secureEnclave)) {
         throw SignumKeyPolicyMismatchException(alias, "native backing ($secureEnclave) or accessibility ($accessibility) differs from the policy (${policy.hardware}, $expectedAccessibility)")
     }
 }
 
-internal val SignumKeychainAccessibility.nativeAccessibility: CFStringRef? get() = when (this) {
-    SignumKeychainAccessibility.WHEN_UNLOCKED -> kSecAttrAccessibleWhenUnlocked
-    SignumKeychainAccessibility.AFTER_FIRST_UNLOCK -> kSecAttrAccessibleAfterFirstUnlock
-    SignumKeychainAccessibility.WHEN_UNLOCKED_DEVICE_ONLY -> kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-    SignumKeychainAccessibility.AFTER_FIRST_UNLOCK_DEVICE_ONLY -> kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-    SignumKeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY -> kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
+internal val KeychainAccessibility.nativeAccessibility: CFStringRef? get() = when (this) {
+    KeychainAccessibility.WHEN_UNLOCKED -> kSecAttrAccessibleWhenUnlocked
+    KeychainAccessibility.AFTER_FIRST_UNLOCK -> kSecAttrAccessibleAfterFirstUnlock
+    KeychainAccessibility.WHEN_UNLOCKED_DEVICE_ONLY -> kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+    KeychainAccessibility.AFTER_FIRST_UNLOCK_DEVICE_ONLY -> kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+    KeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY -> kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
 }
 
 internal class KeychainDictionary : AutoCloseable {

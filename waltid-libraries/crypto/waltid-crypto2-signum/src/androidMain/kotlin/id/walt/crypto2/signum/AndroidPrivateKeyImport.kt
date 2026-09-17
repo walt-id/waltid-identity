@@ -1,5 +1,8 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -37,14 +40,14 @@ import kotlin.time.Duration.Companion.days
 
 internal fun androidKeyStore(): KeyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
-internal fun SignumKeyPolicy.androidSettings(): SignumPlatformPolicy.AndroidKeystore = when (val settings = platform) {
-    SignumPlatformPolicy.Default -> SignumPlatformPolicy.AndroidKeystore()
-    is SignumPlatformPolicy.AndroidKeystore -> settings
+internal fun SignumKeyPolicy.androidSettings(): PlatformKeyConfiguration.AndroidKeystore = when (val settings = platform) {
+    PlatformKeyConfiguration.Default -> PlatformKeyConfiguration.AndroidKeystore()
+    is PlatformKeyConfiguration.AndroidKeystore -> settings
     else -> error("iOS key settings cannot be applied to Android")
 }
 
 internal fun SignumKeyPolicy.supportsAndroidSettings(importing: Boolean): Boolean {
-    if (platform is SignumPlatformPolicy.IosKeychain) return false
+    if (platform is PlatformKeyConfiguration.IosKeychain) return false
     val settings = androidSettings()
     if (importing && (attestationChallenge != null || settings.attestKeyAlias != null)) return false
     if (Build.VERSION.SDK_INT < 31 && (settings.maxUsageCount != null || settings.attestKeyAlias != null)) return false
@@ -86,7 +89,7 @@ internal suspend fun importAndroidPrivateKey(alias: String, material: EncodedKey
         try {
             store.setEntry(alias, KeyStore.PrivateKeyEntry(key, arrayOf(certificate)), protection(strongBox))
         } catch (cause: android.security.keystore.StrongBoxUnavailableException) {
-            if (settings.strongBox != SignumHardwarePolicy.PREFERRED) throw cause
+            if (settings.strongBox != HardwarePreference.PREFERRED) throw cause
             // Only a classified lack of StrongBox permits falling back to the requested TEE policy.
             if (store.containsAlias(alias)) store.deleteEntry(alias)
             store.setEntry(alias, KeyStore.PrivateKeyEntry(key, arrayOf(certificate)), protection(false))
@@ -127,7 +130,7 @@ internal fun generateAndroidP256Key(alias: String, policy: SignumKeyPolicy, hasS
     }
     try { generate(settings.strongBox.requestStrongBox(hasStrongBox)) }
     catch (cause: android.security.keystore.StrongBoxUnavailableException) {
-        if (settings.strongBox != SignumHardwarePolicy.PREFERRED) throw cause
+        if (settings.strongBox != HardwarePreference.PREFERRED) throw cause
         if (androidKeyStore().containsAlias(alias)) androidKeyStore().deleteEntry(alias)
         generate(false)
     }
@@ -135,10 +138,10 @@ internal fun generateAndroidP256Key(alias: String, policy: SignumKeyPolicy, hasS
 
 // Import can wrap absent StrongBox in an opaque KeyStoreException on older Android versions.
 // Use the public feature check before requesting it; native readback still verifies the result.
-private fun SignumHardwarePolicy.requestStrongBox(available: Boolean): Boolean = when (this) {
-    SignumHardwarePolicy.DISCOURAGED -> false
-    SignumHardwarePolicy.PREFERRED -> available
-    SignumHardwarePolicy.REQUIRED -> {
+private fun HardwarePreference.requestStrongBox(available: Boolean): Boolean = when (this) {
+    HardwarePreference.DISCOURAGED -> false
+    HardwarePreference.PREFERRED -> available
+    HardwarePreference.REQUIRED -> {
         if (!available) throw android.security.keystore.StrongBoxUnavailableException("StrongBox is not available")
         true
     }

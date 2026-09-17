@@ -1,5 +1,16 @@
 package id.walt.wallet2.persistence.keys
 
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
+import id.walt.crypto2.keys.PlatformKeyFacts
+import id.walt.crypto2.keys.reuseSeconds
+import id.walt.crypto2.keys.toAuthorizationFailure
+import id.walt.crypto2.keys.HardwarePreference
+
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeychainAccessibility
@@ -10,6 +21,7 @@ import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
 import id.walt.crypto2.signum.IosSignumKeyBackend
 import id.walt.crypto2.signum.SignumKeyNotFoundException
+import id.walt.crypto2.signum.SignumKeyInvalidatedException
 import id.walt.crypto2.signum.SignumKeyOptions
 import id.walt.crypto2.signum.SignumKeyPolicy
 import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
@@ -25,7 +37,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
         val signumPolicy = requirements.nativePolicy()
-        if ((isSimulator && signumPolicy.hardware == id.walt.crypto2.signum.SignumHardwarePolicy.REQUIRED) ||
+        if ((isSimulator && signumPolicy.hardware == id.walt.crypto2.keys.HardwarePreference.REQUIRED) ||
             !backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
@@ -97,6 +109,8 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
                 signumProvider.restore(stored).withIosAuthorizationMapping(policy),
                 policy,
             )
+        } catch (_: SignumKeyInvalidatedException) {
+            PlatformManagedKeyRestoration.Invalidated(policy)
         } catch (_: SignumKeyNotFoundException) {
             PlatformManagedKeyRestoration.Missing(policy)
         } catch (cause: Throwable) {

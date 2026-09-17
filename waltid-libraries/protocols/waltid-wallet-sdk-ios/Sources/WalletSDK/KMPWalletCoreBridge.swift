@@ -1481,7 +1481,7 @@ private extension WalletBridgeKeyUseAuthorizationPolicy {
 }
 
 func toSwiftAuthorizationPolicy(
-    _ policy: any Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicy
+    _ policy: any Waltid_crypto2KeyUseAuthorizationPolicy
 ) -> WalletKeyUseAuthorizationPolicy {
     switch onEnum(of: policy) {
     case .none:
@@ -1514,7 +1514,7 @@ private extension WalletBridgeKeyUseAuthorizationReuseTimeoutValidation {
     }
 }
 
-private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationUnsupportedReason {
+private extension Waltid_crypto2KeyUseAuthorizationUnsupportedReason {
     func toSwiftAuthorizationUnsupportedReason() -> WalletKeyUseAuthorizationUnsupportedReason {
         switch self {
         case .unsupportedCombination: return .unsupportedCombination
@@ -1525,7 +1525,7 @@ private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationU
     }
 }
 
-private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationFailure {
+private extension Waltid_crypto2KeyUseAuthorizationFailure {
     func toSwiftAuthorizationFailure() -> WalletKeyUseAuthorizationFailure {
         switch self {
         case .unsupportedCombination: return .unsupportedCombination

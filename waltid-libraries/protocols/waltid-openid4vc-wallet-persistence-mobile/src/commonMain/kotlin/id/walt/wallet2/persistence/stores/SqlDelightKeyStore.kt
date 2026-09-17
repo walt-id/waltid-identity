@@ -23,15 +23,15 @@ import id.walt.wallet2.data.WalletKeyUsageUnsupportedException
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
-import id.walt.wallet2.persistence.keys.toAuthorizationFailure
+import id.walt.crypto2.keys.toAuthorizationFailure
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -255,6 +255,7 @@ public class SqlDelightKeyStore(
         is StoredKey.Managed -> {
             val restoration = managedKeyProvider.restoreManagedKey(stored)
             when (restoration) {
+                is PlatformManagedKeyRestoration.Invalidated,
                 is PlatformManagedKeyRestoration.Missing -> {
                     if (restoration.authorizationPolicy !is KeyUseAuthorizationPolicy.None) {
                         throw KeyUseAuthorizationException(

@@ -1,5 +1,17 @@
 package id.walt.wallet2.persistence.keys
 
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
+import id.walt.crypto2.keys.PlatformKeyFacts
+import id.walt.crypto2.keys.reuseSeconds
+import id.walt.crypto2.keys.toAuthorizationFailure
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
@@ -20,6 +32,7 @@ import id.walt.crypto2.signum.AndroidSignumKeyBackend
 import id.walt.crypto2.signum.SignumKeyPolicy
 import id.walt.crypto2.signum.SignumKeyOptions
 import id.walt.crypto2.signum.SignumKeyNotFoundException
+import id.walt.crypto2.signum.SignumKeyInvalidatedException
 import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
 import id.walt.crypto2.signum.SignumManagedKeyProvider
 
@@ -37,17 +50,17 @@ public class AndroidPlatformKeyProvider(
     private val backend = AndroidSignumKeyBackend(applicationContext, interactionContextProvider)
     private val signumProvider = SignumManagedKeyProvider(backend)
     private val capabilityMutex = Mutex()
-    private val hardwareCapabilities = mutableMapOf<id.walt.crypto2.signum.SignumHardwarePolicy, Boolean>()
+    private val hardwareCapabilities = mutableMapOf<id.walt.crypto2.keys.HardwarePreference, Boolean>()
 
     // Feature declarations are not reliable evidence of a P-256 key's actual execution tier.
     // Probe an owned, unauthenticated alias once per backing preference and always remove it.
     private suspend fun supportsHardware(policy: SignumKeyPolicy): Boolean = capabilityMutex.withLock {
-        val backing = (policy.platform as? id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore)?.strongBox
-            ?: id.walt.crypto2.signum.SignumHardwarePolicy.DISCOURAGED
+        val backing = (policy.platform as? id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore)?.strongBox
+            ?: id.walt.crypto2.keys.HardwarePreference.DISCOURAGED
         hardwareCapabilities[backing]?.let { return@withLock it }
         val alias = "wallet_capability_${Uuid.random()}"
-        val probe = SignumKeyPolicy(hardware = id.walt.crypto2.signum.SignumHardwarePolicy.REQUIRED,
-            platform = id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore(strongBox = backing))
+        val probe = SignumKeyPolicy(hardware = id.walt.crypto2.keys.HardwarePreference.REQUIRED,
+            platform = id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore(strongBox = backing))
         val supported = try {
             backend.create(alias, KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY), probe)
             true
@@ -60,13 +73,13 @@ public class AndroidPlatformKeyProvider(
 
     override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
         val signumPolicy = requirements.nativePolicy()
-        val settings = signumPolicy.platform as? id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore
-        if ((settings?.strongBox == id.walt.crypto2.signum.SignumHardwarePolicy.REQUIRED &&
+        val settings = signumPolicy.platform as? id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore
+        if ((settings?.strongBox == id.walt.crypto2.keys.HardwarePreference.REQUIRED &&
                 !applicationContext.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_STRONGBOX_KEYSTORE)) ||
             !backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
-        if (signumPolicy.hardware == id.walt.crypto2.signum.SignumHardwarePolicy.REQUIRED &&
+        if (signumPolicy.hardware == id.walt.crypto2.keys.HardwarePreference.REQUIRED &&
             !supportsHardware(signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
@@ -132,6 +145,8 @@ public class AndroidPlatformKeyProvider(
                 signumProvider.restore(stored).withAndroidAuthorizationMapping(policy),
                 policy,
             )
+        } catch (_: SignumKeyInvalidatedException) {
+            PlatformManagedKeyRestoration.Invalidated(policy)
         } catch (_: SignumKeyNotFoundException) {
             PlatformManagedKeyRestoration.Missing(policy)
         } catch (cause: Throwable) {
@@ -179,15 +194,15 @@ public class AndroidPlatformKeyProvider(
         toSignumPolicy(prompt).let { policy ->
             if (spec != KeySpec.Ec(EcCurve.P256)) return@let policy
             val settings = when (val platform = policy.platform) {
-                id.walt.crypto2.signum.SignumPlatformPolicy.Default -> id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore()
-                is id.walt.crypto2.signum.SignumPlatformPolicy.AndroidKeystore -> platform
+                id.walt.crypto2.keys.PlatformKeyConfiguration.Default -> id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore()
+                is id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore -> platform
                 else -> return@let policy
             }
             // API 31 import wraps absent StrongBox in a generic KeyStoreException. Use the public
             // capability flag before import rather than interpreting exception text or weakening hardware.
-            val effective = if (settings.strongBox == id.walt.crypto2.signum.SignumHardwarePolicy.PREFERRED &&
+            val effective = if (settings.strongBox == id.walt.crypto2.keys.HardwarePreference.PREFERRED &&
                 !applicationContext.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_STRONGBOX_KEYSTORE))
-                settings.copy(strongBox = id.walt.crypto2.signum.SignumHardwarePolicy.DISCOURAGED) else settings
+                settings.copy(strongBox = id.walt.crypto2.keys.HardwarePreference.DISCOURAGED) else settings
             policy.copy(platform = effective)
         }
 

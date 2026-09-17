@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.LocaleList
 import id.walt.wallet2.mobile.MobileWallet
 import androidx.fragment.app.FragmentActivity
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory

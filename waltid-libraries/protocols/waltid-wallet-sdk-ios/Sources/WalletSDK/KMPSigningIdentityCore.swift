@@ -248,20 +248,20 @@ extension SigningIdentityConfiguration {
 }
 
 private extension WalletKeyUseAuthorizationPolicy {
-    func toKMPNativeAuthorization() -> any Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicy {
+    func toKMPNativeAuthorization() -> any Waltid_crypto2KeyUseAuthorizationPolicy {
         switch self {
-        case .none: return Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicyNone.shared
-        case .biometricCurrentSet: return Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicyBiometricCurrentSet.shared
-        case .biometricAny: return Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicyBiometricAny.shared
+        case .none: return Waltid_crypto2KeyUseAuthorizationPolicyNone.shared
+        case .biometricCurrentSet: return Waltid_crypto2KeyUseAuthorizationPolicyBiometricCurrentSet.shared
+        case .biometricAny: return Waltid_crypto2KeyUseAuthorizationPolicyBiometricAny.shared
         case .biometricTimedReuse(let seconds):
             precondition((1...30).contains(seconds))
-            return Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicyBiometricTimedReuse(timeoutSeconds: Int32(seconds))
+            return Waltid_crypto2KeyUseAuthorizationPolicyBiometricTimedReuse(timeoutSeconds: Int32(seconds))
         case .deviceCredential(let seconds):
             precondition((0...30).contains(seconds))
-            return Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicyDeviceCredential(timeoutSeconds: Int32(seconds))
+            return Waltid_crypto2KeyUseAuthorizationPolicyDeviceCredential(timeoutSeconds: Int32(seconds))
         case .biometricOrDeviceCredential(let seconds):
             precondition((0...30).contains(seconds))
-            return Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicyBiometricOrDeviceCredential(timeoutSeconds: Int32(seconds))
+            return Waltid_crypto2KeyUseAuthorizationPolicyBiometricOrDeviceCredential(timeoutSeconds: Int32(seconds))
         }
     }
 }

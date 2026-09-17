@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile.identity
 
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyFacts
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import kotlin.test.Test
 import kotlin.test.assertEquals

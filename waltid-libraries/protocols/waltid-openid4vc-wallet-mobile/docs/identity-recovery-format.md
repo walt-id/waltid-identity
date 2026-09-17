@@ -26,7 +26,7 @@ The record is serialized with defaults included and unknown fields rejected on r
   "publicJwk": "<original public JWK JSON string>",
   "constraints": {
     "storage": "NativeStorage",
-    "authorization": {"type": "id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy.None"},
+    "authorization": {"type": "id.walt.crypto2.keys.KeyUseAuthorizationPolicy.None"},
     "confirmation": "LocalAcceptance"
   },
   "secret": {

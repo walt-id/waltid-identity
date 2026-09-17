@@ -1,5 +1,9 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeychainAccessibility
+
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
@@ -11,7 +15,7 @@ import kotlin.test.*
 
 class IosKeyPolicyTest {
     private val spec = KeySpec.Ec(EcCurve.P256)
-    private val policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.DISCOURAGED)
+    private val policy = SignumKeyPolicy(hardware = HardwarePreference.DISCOURAGED)
 
     @Test
     fun changingPromptTextDoesNotChangeSecurityPolicy() {
@@ -24,7 +28,7 @@ class IosKeyPolicyTest {
     @Test
     fun routingPreservesExportabilityAndPerKeyReuse() {
         assertEquals(IosKeyEngine.APPLE_KEYCHAIN, iosKeyEngine(spec, policy))
-        val hardware = policy.copy(hardware = SignumHardwarePolicy.REQUIRED)
+        val hardware = policy.copy(hardware = HardwarePreference.REQUIRED)
         assertEquals(IosKeyEngine.APPLE_KEYCHAIN, iosKeyEngine(spec, hardware))
         assertFalse(IosSignumKeyBackend().supports(spec, setOf(KeyUsage.SIGN, KeyUsage.KEY_AGREEMENT),
             hardware.copy(keyAgreement = true)))
@@ -33,8 +37,8 @@ class IosKeyPolicyTest {
         assertEquals(IosKeyEngine.APPLE_KEYCHAIN, iosKeyEngine(spec, hardware.copy(
             authentication = SignumAuthenticationPolicy.UserPresence(timeoutSeconds = 10))))
         assertEquals(IosKeyEngine.APPLE_KEYCHAIN, iosKeyEngine(spec, hardware.copy(
-            platform = SignumPlatformPolicy.IosKeychain(accessGroup = "test.group"))))
+            platform = PlatformKeyConfiguration.IosKeychain(accessGroup = "test.group"))))
         assertEquals(IosKeyEngine.APPLE_KEYCHAIN, iosKeyEngine(spec, hardware.copy(
-            platform = SignumPlatformPolicy.IosKeychain(SignumKeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY))))
+            platform = PlatformKeyConfiguration.IosKeychain(KeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY))))
     }
 }
