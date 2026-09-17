@@ -80,4 +80,3 @@ internal fun SignumKeyPolicy.effectiveProtection(attestation: KeyAttestation?): 
     hardware == HardwarePreference.DISCOURAGED -> KeyProtectionLevel.SOFTWARE
     else -> KeyProtectionLevel.UNKNOWN
 }
-

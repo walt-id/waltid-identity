@@ -26,7 +26,7 @@ The record is serialized with defaults included and unknown fields rejected on r
   "publicJwk": "<original public JWK JSON string>",
   "constraints": {
     "storage": "NativeStorage",
-    "authorization": {"type": "id.walt.crypto2.keys.KeyUseAuthorizationPolicy.None"},
+    "authorization": {"type": "id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy.None"},
     "confirmation": "LocalAcceptance"
   },
   "secret": {
@@ -38,7 +38,7 @@ The record is serialized with defaults included and unknown fields rejected on r
 }
 ```
 
-For an existing exportable software key, `secret` instead contains:
+New recoverable identities and backups of existing exportable keys use ordinary crypto2 P-256 generation and the exported private-JWK form:
 
 ```json
 {"type":"exported","jwk":"<validated P-256 private JWK JSON string>"}
@@ -56,11 +56,13 @@ native storage cannot become database storage. Authorization must match an expli
 current host option. Native aliases, access groups and old device attestations are not portable policy. Hardware-generated/device-bound
 host policies prohibit the operation independently of the record's cryptographic validity.
 
-## Derivation
+## Legacy derivation reader
 
-For `derived` records:
+The example above is the retained legacy form. New creation never generates a seed/domain/index record. Existing derived records remain readable and pending submissions retry their original bytes at the same record ID.
 
-1. Generate a 32-byte seed using the platform cryptographic random source.
+For existing `derived` records:
+
+1. Decode the original 32-byte seed from the record.
 2. Compute `PRK = HMAC-SHA-256(key = UTF8("id.walt.wallet.identity/recovery/v1"), message = seed)`.
 3. For `attempt` from 0 through 255, compute:
    `candidate = HMAC-SHA-256(PRK, UTF8("P-256/signing/" + domain + "/" + index + "/" + attempt) || 0x01)`.
@@ -73,8 +75,7 @@ For `derived` records:
 
 This is HKDF-SHA-256 extract followed by a single 32-byte expand block for each explicitly separated
 retry context. Decimal integers use ASCII digits without leading zeroes; zero is `0`. `domain` is
-1–128 printable non-space ASCII characters. `index` is an integer from 0 through 2^31−1. Production
-creation uses the newly generated identity UUID and index zero. The format retains the domain/index
+1–128 printable non-space ASCII characters. `index` is an integer from 0 through 2^31−1. The former creation path used the identity UUID and index zero. The format retains the domain/index
 rather than relying on a wallet database name or device identifier.
 
 ## Independent fixture
