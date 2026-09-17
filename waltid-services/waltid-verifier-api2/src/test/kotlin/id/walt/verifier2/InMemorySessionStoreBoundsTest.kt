@@ -125,6 +125,67 @@ class InMemorySessionStoreBoundsTest {
         )
     }
 
+    @Test
+    fun `the store is bounded by retained bytes, not only by session count`() = runTest {
+        // A session count cannot bound memory: a heap dump of six presentations of an mdoc carrying a 230 KB
+        // portrait measured 1.64 MiB retained each, with this store the dominator of 73% of the heap. So the
+        // 2,000 session default alone permits about 3.3 GB.
+        val budget = 4L * 1024 * 1024
+        val repository = InMemoryVerificationSessionRepository(maxRetainedBytes = budget)
+
+        repeat(20) { index ->
+            repository.create(
+                session("heavy-$index").copy(
+                    retentionDate = null,
+                    presentedRawData = Verification2Session.PresentedRawData(
+                        vpToken = mapOf("query" to listOf("e".repeat(200_000))),
+                        state = null,
+                    ),
+                )
+            )
+        }
+
+        assertTrue(
+            repository.retainedBytes <= budget,
+            "the store must stay inside its byte budget, holding ${repository.retainedBytes} of $budget",
+        )
+        assertTrue(repository.size < 20, "heavy sessions must be evicted, still holding ${repository.size}")
+        assertTrue(repository.unexpiredEvictions > 0, "evicting a live session must be reported")
+    }
+
+    @Test
+    fun `light sessions are kept up to the count ceiling rather than the byte budget`() = runTest {
+        // The counterpart: a deployment presenting small credentials should not lose sessions early just
+        // because a byte budget exists.
+        val repository = InMemoryVerificationSessionRepository(maxSessions = 50)
+
+        repeat(50) { index -> repository.create(session("light-$index").copy(retentionDate = null)) }
+
+        assertEquals(50, repository.size, "small sessions must not be evicted below the count ceiling")
+        assertEquals(0L, repository.unexpiredEvictions)
+    }
+
+    @Test
+    fun `deleting a session releases its share of the budget`() = runTest {
+        val repository = InMemoryVerificationSessionRepository()
+        repository.create(
+            session("accounted").copy(
+                presentedRawData = Verification2Session.PresentedRawData(
+                    vpToken = mapOf("query" to listOf("e".repeat(100_000))),
+                    state = null,
+                ),
+            )
+        )
+        val withSession = repository.retainedBytes
+
+        assertTrue(repository.delete("accounted"))
+
+        assertTrue(
+            repository.retainedBytes < withSession,
+            "deleting must give the budget back, still accounting ${repository.retainedBytes} of $withSession",
+        )
+    }
+
     /** Enough creations to cross the internal sweep interval. */
     private val SWEEP_TRIGGER = 200
 
