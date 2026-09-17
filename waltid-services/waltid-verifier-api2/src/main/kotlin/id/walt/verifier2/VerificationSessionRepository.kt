@@ -3,7 +3,6 @@ package id.walt.verifier2
 import id.walt.commons.web.WebException
 import io.klogging.noCoLogger
 import id.walt.verifier2.data.Verification2Session
-import kotlinx.serialization.json.Json
 import kotlin.time.Clock
 
 private val log = noCoLogger("InMemoryVerificationSessionRepository")
@@ -213,12 +212,21 @@ class VerificationSessionCorruptedException(message: String, cause: Throwable? =
     }
 }
 
-private val repositoryJson = Json {
-    encodeDefaults = true
-    ignoreUnknownKeys = true
-}
-
-fun Verification2Session.copyForStorage(): Verification2Session =
-    repositoryJson.decodeFromString(repositoryJson.encodeToString(Verification2Session.serializer(), this))
+/**
+ * Gives a snapshot its own copy of the session's mutable fields, without re-materialising its contents.
+ *
+ * This used to serialise the session to JSON text and parse it back, which is what made a byte-array claim
+ * ruinous. `JsonByteArray` in waltid-crypto is a flyweight - a lazy list over the bytes backed by 256 interned
+ * primitives - so building the tree costs nothing per byte. Parsing that text back allocates a `JsonLiteral`
+ * and a `String` per element instead. Measured on a 224 KiB portrait: sharing the flyweight is free, while a
+ * parsed copy costs **16.8 MiB**, a 76x amplification - and every stored snapshot then retained it. That is
+ * what exhausted the heap of a verifier doing 15 requests a minute, and it happened up to four times per
+ * update because [update] retries.
+ *
+ * `copy()` is sufficient: everything reachable is either immutable - [JsonElement],
+ * [Verification2Session.PresentedRawData], `Verifier2PolicyResults`, and the read-only collections - or a
+ * top-level `var`, which `copy()` gives each snapshot its own of. Nothing mutates nested session state in place.
+ */
+fun Verification2Session.copyForStorage(): Verification2Session = copy()
 
 private fun VerificationSessionSnapshot.copyForCaller() = copy(session = session.copyForStorage())
