@@ -36,13 +36,21 @@ Android uses `id.walt.wallet2.mobile.test`; iOS uses
 and the SQLCipher runtime in a simulator-only UIKit app. Tests run off the main
 thread while UIKit services the application lifecycle. Each launch writes its
 own log and test-result marker; a process ID or incomplete test output cannot
-count as completion. The host stays alive until the runner collects its result
-and stops it, avoiding an exit during launch acknowledgment. Launch and test
-execution share a 180-second deadline; setup and cleanup commands have separate
-30-second limits. A timeout fails the phase without retrying it, and preserves
+count as completion. After launch acknowledgment, the runner matches the logged
+PID to the launched process and collects the result. It then releases that
+specific host through a per-launch file; the host exits itself, and the runner
+verifies that the process is gone before accepting the phase. An early exit
+without completion fails, preserving the Kotlin diagnostics. Launch and test
+execution share a 180-second deadline; setup, exit verification and forced cleanup
+of incomplete live hosts have separate 30-second limits. A timeout fails the phase without retrying it, and preserves
 available command output and the host log. The runner uses Android SDK
 tools or Xcode’s `xcrun simctl` for installation and launch. These are test
 hosts, not distributable demo apps.
+
+The CI entrypoint also runs two negative controls in the actual simulator host:
+an empty test selection and a deliberately invalid recovery phase. It requires
+both to be rejected, with the expected Kotlin output and verified process exit.
+Their logs and JUnit results are retained alongside the successful recovery phases.
 
 ## Unattended local-loss checks
 
