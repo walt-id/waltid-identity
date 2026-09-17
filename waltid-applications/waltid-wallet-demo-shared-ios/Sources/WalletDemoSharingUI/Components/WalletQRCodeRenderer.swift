@@ -6,7 +6,7 @@ public enum WalletQRCodeRenderer {
     public static func proximityImage(payload: String) -> UIImage? {
         guard payload.hasPrefix(proximityQrPrefix),
               payload.utf8.count <= maximumProximityPayloadBytes,
-              payload.unicodeScalars.allSatisfy({ $0.value <= 0x7F }) else {
+              payload.unicodeScalars.allSatisfy({ (0x21...0x7E).contains($0.value) }) else {
             return nil
         }
         guard let encoded = WalletDemoCreateProximityQRCode(payload) else {

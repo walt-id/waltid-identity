@@ -51,7 +51,7 @@ internal data class QrCodeRaster(
 internal fun encodeProximityQrCodeRaster(payload: String): QrCodeRaster {
     validateProximityQrCodePayload(payload)
     val creatorOptions = CreatorOptions(BarcodeFormat.QRCode).apply {
-        options = "ecLevel=L"
+        options = "ecLevel=1"
     }
     val barcode = Barcode(payload, creatorOptions)
     val writerOptions = WriterOptions().apply {
@@ -63,10 +63,11 @@ internal fun encodeProximityQrCodeRaster(payload: String): QrCodeRaster {
 
     // ZXing-C++ 3.1.1's Kotlin Image.data accessor incorrectly frees this borrowed pixel buffer.
     // Keep ownership explicit here until that wrapper defect is fixed upstream.
+    // The pinned writer returns a tightly packed, one-byte-per-pixel luminance Image.
     return try {
         val width = ZXing_Image_width(image)
         val height = ZXing_Image_height(image)
-        val luminance = ZXing_Image_data(image)?.readBytes(width * height) ?: throw OutOfMemoryError()
+        val luminance = ZXing_Image_data(image)?.readBytes(width * height) ?: error("ZXing-C++ returned no QR image data")
         QrCodeRaster(luminance, width, height)
     } finally {
         ZXing_Image_delete(image)

@@ -27,6 +27,7 @@ class ProximityQrCodeEncoderAndroidTest {
 
     @Test
     fun rejectsNonMdocNonAsciiAndOversizePayloads() {
+        for (control in listOf("\u0000", "\n", "\t", "\u007f")) assertFails { encodeProximityQrCode("mdoc:A${control}B") }
         assertFails { encodeProximityQrCode("https://example.com") }
         assertFails { encodeProximityQrCode("mdoc:é") }
         assertFails { encodeProximityQrCode("mdoc:" + "A".repeat(4_000)) }

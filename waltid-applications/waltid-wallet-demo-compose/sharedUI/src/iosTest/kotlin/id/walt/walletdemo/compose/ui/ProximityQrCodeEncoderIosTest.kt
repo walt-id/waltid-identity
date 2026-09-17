@@ -33,6 +33,7 @@ class ProximityQrCodeEncoderIosTest {
 
     @Test
     fun rejectsNonMdocNonAsciiAndOversizePayloads() {
+        for (control in listOf("\u0000", "\n", "\t", "\u007f")) assertFails { encodeProximityQrCodeRaster("mdoc:A${control}B") }
         assertFails { encodeProximityQrCodeRaster("https://example.com") }
         assertFails { encodeProximityQrCodeRaster("mdoc:é") }
         assertFails { encodeProximityQrCodeRaster("mdoc:" + "A".repeat(4_000)) }
