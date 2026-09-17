@@ -3,16 +3,14 @@ package id.walt.certificate.x509.profile
 import id.walt.certificate.x509.TestKeyUtil
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.profile.EtsiWrpAcX509CertificateProfile.profileWrpAccessCertificate
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class EtsiWrpAcX509CertificateProfileTest {
 
@@ -86,7 +84,7 @@ class EtsiWrpAcX509CertificateProfileTest {
                 profileWrpAccessCertificate(
                     subjectKey = subjectKey,
                     subjectDn = "CN=Example Relying Party,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT",
-                    policyOid =  EtsiWalletRelyingPartyX509CertificateProfile.NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON,
+                    policyOid = EtsiWalletRelyingPartyX509CertificateProfile.NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON,
                     contactEmail = "relying-party@example.com",
                 )
             }
@@ -125,6 +123,31 @@ class EtsiWrpAcX509CertificateProfileTest {
         val result = validator.validate(cert)
         assertFalse(result.valid)
         assertTrue(result.log.any { it.validatorId == "${EtsiWrpAcX509CertificateProfile.ID}.issuerDn" })
+    }
+
+    @Test
+    fun shouldRejectCriticalSubjectKeyIdentifierExtension() = runTest {
+        val (rootKey, rootCert) = rootCa("wrpac-ncp-n-root")
+        val subjectKey = TestKeyUtil.genEcKey("wrpac-ncp-n-subject")
+        val cert = X509CertificateUtil.createCertificate(rootKey, rootCert, sigAlg) {
+            profileWrpAccessCertificate(
+                subjectKey = subjectKey,
+                subjectDn = "CN=Jane Doe,GivenName=Jane,Surname=Doe,SerialNumber=RP-12345,C=AT",
+                policyOid = EtsiWalletRelyingPartyX509CertificateProfile.NORMALIZED_CERT_POLICY_NATURAL_PERSON,
+                contactEmail = "relying-party@example.com",
+                caIssuerUri = "https://ca.example.com/root.crt",
+                crlDistributionPointUri = "https://ca.example.com/crl",
+            )
+            extensionSubjectKeyIdentifier {
+                critical = true
+            }
+        }
+
+        validator.validate(cert).also { result ->
+            assertFalse(result.valid)
+            val notCriticalErrors = result.log.filter { it.validatorId == "etsi-wrpac.extensionNotCritical" }
+            assertEquals(1, notCriticalErrors.size)
+        }
     }
 
     companion object {
