@@ -72,7 +72,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -112,45 +111,14 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
     private val defaultCredentialIssuanceMode: IssuanceMode = IssuanceMode.SYNC,
     private val defaultDeferredCredentialIntervalSeconds: Long = 30L,
+    private val deferredCredentialTransactionStore: DeferredCredentialTransactionStore = InMemoryDeferredCredentialTransactionStore(),
+    val deferredFlowService: DeferredFlowService = DeferredFlowService(deferredCredentialTransactionStore),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
     }
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
-    private val deferredCredentialRequests = ConcurrentHashMap<String, DeferredCredentialRequestState>()
-
-    suspend fun registerDeferredCredentialRequest(
-        sessionId: String,
-        transactionId: String = UUID.randomUUID().toString(),
-        intervalSeconds: Long = 30L,
-        response: CredentialResponseHttp? = null,
-        requestParameters: JsonObject = JsonObject(emptyMap()),
-        dpopProofHeaderValues: List<String> = emptyList(),
-        requestId: String = "",
-        createdAtEpochSeconds: Long = Clock.System.now().epochSeconds,
-    ): String {
-        deferredCredentialRequests[transactionId] = DeferredCredentialRequestState(
-            sessionId = sessionId,
-            intervalSeconds = intervalSeconds,
-            response = response,
-            requestParameters = requestParameters,
-            dpopProofHeaderValues = dpopProofHeaderValues,
-            requestId = requestId,
-            createdAtEpochSeconds = createdAtEpochSeconds,
-        )
-        return transactionId
-    }
-
-    private data class DeferredCredentialRequestState(
-        val sessionId: String,
-        val intervalSeconds: Long = 30L,
-        val response: CredentialResponseHttp? = null,
-        val requestParameters: JsonObject = JsonObject(emptyMap()),
-        val dpopProofHeaderValues: List<String> = emptyList(),
-        val requestId: String = "",
-        val createdAtEpochSeconds: Long = Clock.System.now().epochSeconds,
-    )
 
     suspend fun processPushedAuthorizationRequest(
         parameters: Map<String, List<String>>,
@@ -961,13 +929,13 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val shouldStartDeferredFlow = defaultCredentialIssuanceMode == IssuanceMode.DEFERRED && !consumeRequest
         if (shouldStartDeferredFlow) {
             val intervalSeconds = defaultDeferredCredentialIntervalSeconds.coerceAtLeast(1L)
-            val transactionId = registerDeferredCredentialRequest(
+            val transactionId = deferredFlowService.register(
                 sessionId = sessionId,
                 intervalSeconds = intervalSeconds,
                 requestParameters = requestParameters,
                 dpopProofHeaderValues = dpopProofHeaderValues,
                 requestId = requestId,
-            )
+            ).transactionId
             return CredentialResponseHttp(
                 status = 202,
                 payload = mapOf(
@@ -1423,13 +1391,24 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 ),
             )
 
-        val deferredState = deferredCredentialRequests[transactionId]
+        val deferredState = deferredFlowService.get(transactionId)
             ?: return oauth2Provider.writeCredentialError(
                 CredentialError(
                     CredentialErrorCodes.INVALID_TRANSACTION_ID,
                     "Deferred credential request contains an invalid transaction_id",
                 ),
             )
+
+        if (deferredState.status == DeferredCredentialTransactionStatus.CONSUMED ||
+            deferredState.status == DeferredCredentialTransactionStatus.EXPIRED
+        ) {
+            return oauth2Provider.writeCredentialError(
+                CredentialError(
+                    CredentialErrorCodes.INVALID_TRANSACTION_ID,
+                    "Deferred credential request contains an invalid transaction_id",
+                ),
+            )
+        }
 
         if (deferredState.sessionId != sessionId || observedSession.sessionId != sessionId) {
             return oauth2Provider.writeCredentialError(
@@ -1449,7 +1428,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             )
         }
 
-        val isIssued = deferredState.response != null || Clock.System.now().epochSeconds - deferredState.createdAtEpochSeconds >= deferredState.intervalSeconds
+        val isIssued = deferredFlowService.isReady(deferredState)
         if (!isIssued) {
             return CredentialResponseHttp(
                 status = 202,
@@ -1461,8 +1440,12 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             )
         }
 
+        if (deferredState.status != DeferredCredentialTransactionStatus.READY) {
+            deferredFlowService.markReady(transactionId)
+        }
+
         if (deferredState.response != null) {
-            deferredCredentialRequests.remove(transactionId)
+            deferredFlowService.remove(transactionId)
             return deferredState.response
         }
 
@@ -1486,7 +1469,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 },
                 consumeRequest = true,
             )
-            deferredCredentialRequests.remove(transactionId)
+            deferredFlowService.consume(transactionId)
+            deferredFlowService.remove(transactionId)
             requestResponse
         } else {
             val issuedCredential = JsonObject(
@@ -1501,7 +1485,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 ),
                 headers = mapOf("Cache-Control" to "no-store"),
             )
-            deferredCredentialRequests.remove(transactionId)
+            deferredFlowService.consume(transactionId)
+            deferredFlowService.remove(transactionId)
             issuedResponse
         }
 

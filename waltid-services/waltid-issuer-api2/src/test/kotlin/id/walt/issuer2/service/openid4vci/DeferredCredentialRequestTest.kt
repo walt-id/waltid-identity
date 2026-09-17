@@ -77,7 +77,7 @@ class DeferredCredentialRequestTest {
         val sessionId = "session-123"
         val session = issuanceSession(sessionId)
         val service = protocolService(session)
-        val transactionId = service.registerDeferredCredentialRequest(sessionId = sessionId, intervalSeconds = 7L)
+        val transactionId = service.deferredFlowService.register(sessionId = sessionId, intervalSeconds = 7L).transactionId
 
         val response = service.processDeferredCredentialRequest(
             authorizationHeaders = listOf(jwtWithSub(sessionId)),
@@ -122,7 +122,7 @@ class DeferredCredentialRequestTest {
     fun `deferred credential request resolves to a credential after the 30 second interval`() = runTest {
         val sessionId = "session-789"
         val service = protocolService(issuanceSession(sessionId))
-        val transactionId = service.registerDeferredCredentialRequest(
+        val transactionId = service.deferredFlowService.register(
             sessionId = sessionId,
             intervalSeconds = 30L,
             requestParameters = buildJsonObject {
@@ -130,7 +130,7 @@ class DeferredCredentialRequestTest {
             },
             requestId = "request-3",
             createdAtEpochSeconds = Clock.System.now().epochSeconds - 31,
-        )
+        ).transactionId
 
         val response = service.processDeferredCredentialRequest(
             authorizationHeaders = listOf(jwtWithSub(sessionId)),
@@ -147,7 +147,7 @@ class DeferredCredentialRequestTest {
     fun `deferred resume does not re-trigger deferred mode when issuer is globally configured as deferred`() = runTest {
         val sessionId = "session-resume"
         val service = protocolService(issuanceSession(sessionId), IssuanceMode.DEFERRED)
-        val transactionId = service.registerDeferredCredentialRequest(
+        val transactionId = service.deferredFlowService.register(
             sessionId = sessionId,
             intervalSeconds = 30L,
             requestParameters = buildJsonObject {
@@ -155,7 +155,7 @@ class DeferredCredentialRequestTest {
             },
             requestId = "request-resume",
             createdAtEpochSeconds = Clock.System.now().epochSeconds - 31,
-        )
+        ).transactionId
 
         val response = service.processDeferredCredentialRequest(
             authorizationHeaders = listOf(jwtWithSub(sessionId)),
@@ -189,7 +189,7 @@ class DeferredCredentialRequestTest {
     fun `deferred credential request is removed after use and a repeated call returns invalid transaction id`() = runTest {
         val sessionId = "session-consumed"
         val service = protocolService(issuanceSession(sessionId))
-        val transactionId = service.registerDeferredCredentialRequest(
+        val transactionId = service.deferredFlowService.register(
             sessionId = sessionId,
             intervalSeconds = 30L,
             requestParameters = buildJsonObject {
@@ -197,7 +197,7 @@ class DeferredCredentialRequestTest {
             },
             requestId = "request-consumed",
             createdAtEpochSeconds = Clock.System.now().epochSeconds - 31,
-        )
+        ).transactionId
 
         val firstResponse = service.processDeferredCredentialRequest(
             authorizationHeaders = listOf(jwtWithSub(sessionId)),
@@ -240,7 +240,7 @@ class DeferredCredentialRequestTest {
     fun `deferred credential request rejects when the issuance session is no longer active`() = runTest {
         val sessionId = "session-closed"
         val service = protocolService(issuanceSession(sessionId).copy(status = IssuanceSessionStatus.UNSUCCESSFUL, isClosed = true))
-        val transactionId = service.registerDeferredCredentialRequest(sessionId = sessionId, intervalSeconds = 30L)
+        val transactionId = service.deferredFlowService.register(sessionId = sessionId, intervalSeconds = 30L).transactionId
 
         val response = service.processDeferredCredentialRequest(
             authorizationHeaders = listOf(jwtWithSub(sessionId)),
