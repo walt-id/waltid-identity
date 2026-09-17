@@ -27,6 +27,8 @@ import kotlin.test.assertNotEquals
 class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
 
     companion object {
+        private const val FORBIDDEN_MESSAGE = "Should return 403 Forbidden"
+
         private val accountA = EmailAccountRequest(
             name = "Security Test User A",
             email = "security-a-${randomString(8)}@walt.id",
@@ -67,7 +69,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
         
         val response = evilWallet.httpClient.get("/wallet-api/wallet/${walletB.walletId}/dids")
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test
@@ -77,7 +79,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
         
         val response = evilWallet.httpClient.get("/wallet-api/wallet/${walletB.walletId}/keys")
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test
@@ -87,7 +89,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
         
         val response = evilWallet.httpClient.get("/wallet-api/wallet/${walletB.walletId}/eventlog")
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test
@@ -99,7 +101,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
             setBody(KeyGenerationRequest("jwk", KeyType.Ed25519))
         }
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test
@@ -109,7 +111,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
         
         val response = evilWallet.createDidRaw("jwk")
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test
@@ -119,7 +121,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
         
         val response = evilWallet.listCredentialsRaw()
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test
@@ -129,7 +131,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
         
         val response = evilWallet.httpClient.get("/wallet-api/wallet/${walletB.walletId}/categories")
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test
@@ -141,7 +143,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
             setBody(mapOf("name" to "malicious-category"))
         }
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test
@@ -153,7 +155,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
             setBody("openid-credential-offer://example.com?credential_offer=test")
         }
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test
@@ -163,7 +165,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
         
         val response = evilWallet.resolvePresentationRequestRaw("openid4vp://example.com?request=test")
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test
@@ -173,7 +175,7 @@ class PrivilegeEscalationIntegrationTest : AbstractIntegrationTest() {
         
         val response = evilWallet.matchCredentialsForPresentationDefinitionRaw("{}")
         response.expectError()
-        assertEquals(HttpStatusCode.Forbidden, response.status, "Should return 403 Forbidden")
+        assertEquals(HttpStatusCode.Forbidden, response.status, FORBIDDEN_MESSAGE)
     }
 
     @Test

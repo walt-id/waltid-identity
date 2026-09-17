@@ -78,6 +78,8 @@ enum class Issuer2RouteSurface {
     }
 }
 
+private const val MISSING_CALL_ID_MESSAGE = "Missing call ID"
+
 class OpenId4VciController(
     private val metadataService: MetadataService,
     private val protocolService: OpenId4VciProtocolService,
@@ -126,7 +128,7 @@ class OpenId4VciController(
 
             if (Issuer2RouteSurface.CREDENTIAL_OFFER_BY_REFERENCE in surfaces)
                 get("credential-offer", OpenId4VciRoutesDocs.credentialOffer()) {
-                    val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                    val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val sessionId = requireNotNull(call.parameters["id"]) { "Missing credential offer id" }
                     call.respond(
                         offerService.getCredentialOffer(sessionId, requestId)
@@ -136,7 +138,7 @@ class OpenId4VciController(
 
             if (Issuer2RouteSurface.AUTHORIZATION_CODE in surfaces) {
                 post("par", OpenId4VciRoutesDocs.pushedAuthorizationRequest()) {
-                    val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                    val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val parameters = try {
                         call.receiveParameters().toMap()
                     } catch (_: ContentTransformationException) {
@@ -152,7 +154,7 @@ class OpenId4VciController(
                 }
 
                 get("authorize", OpenId4VciRoutesDocs.authorize()) {
-                    val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                    val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val response = protocolService.processAuthorizeRequest(
                         parameters = call.parameters.toMap(),
                         requestId = requestId,
@@ -174,7 +176,7 @@ class OpenId4VciController(
                     onCallRespond { call ->
                         val authorizationRequestEnvelope = call.parameters["internalAuthReq"]
                             ?: return@onCallRespond
-                        val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                        val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                         protocolService.processExternalLoginInterception(
                             externalAuthorizationRequest = call.response.headers.allValues().toMap()["Location"]?.firstOrNull(),
                             authorizationRequestEnvelope = authorizationRequestEnvelope,
@@ -191,7 +193,7 @@ class OpenId4VciController(
                     }
 
                     get("external/oauth/callback", OpenId4VciRoutesDocs.externalOAuthCallback()) {
-                        val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                        val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                         val principal = call.principal<OAuthAccessTokenResponse.OAuth2>()
                         val idToken = principal?.extraParameters?.get("id_token")
                         val state = call.request.queryParameters["state"]
@@ -216,7 +218,7 @@ class OpenId4VciController(
 
             if (Issuer2RouteSurface.ISSUANCE in surfaces) {
                 post("token", OpenId4VciRoutesDocs.token()) {
-                    val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                    val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val parameters = try {
                         call.receiveParameters().toMap()
                     } catch (_: ContentTransformationException) {
@@ -232,14 +234,14 @@ class OpenId4VciController(
                 }
 
                 post("nonce", OpenId4VciRoutesDocs.nonce()) {
-                    val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                    val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val response = protocolService.processNonceRequest(requestId)
                     response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                     call.respond(HttpStatusCode.fromValue(response.status), response.payload)
                 }
 
                 post("credential", OpenId4VciRoutesDocs.credential()) {
-                    val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                    val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
                     val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
                     val response =
