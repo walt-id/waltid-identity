@@ -32,6 +32,19 @@ import kotlin.time.Duration.Companion.seconds
 
 class ProximityCoordinatorTest {
     @Test
+    fun `wallet shutdown closes the session and permanently rejects new admission`() = runTest {
+        val coordinator = ProximityCoordinator(Wallet("deleting"), RecordingTransportFactory(
+            BleProximityAvailability.Unavailable("ble_powered_off", "Bluetooth is off")),
+            sessionDispatcher = StandardTestDispatcher(testScheduler))
+        val session = coordinator.start(ProximityConfiguration())
+        coordinator.shutdown()
+        assertIs<ProximityState.Cancelled>(session.state.value)
+        assertFailsWith<IllegalStateException> { coordinator.start(ProximityConfiguration()) }
+        coordinator.shutdown() // idempotent without holding the admission lock while closing.
+    }
+
+
+    @Test
     fun `closing or cancelling before the worker starts releases the wallet for a fresh session`() = runTest {
         for (dispatchCancel in listOf(false, true)) {
             val factory = RecordingTransportFactory(

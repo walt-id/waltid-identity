@@ -55,6 +55,14 @@ internal class ProximityCoordinator(
 ) {
     private val activeMutex = Mutex()
     private var active: ProximitySessionImpl? = null
+    private var closed = false
+
+    /** Permanently closes admission before wallet material is removed. Never await under activeMutex. */
+    suspend fun shutdown() {
+        val closing = activeMutex.withLock { closed = true; active }
+        closing?.close()
+    }
+
 
     suspend fun capabilities(
         configuration: ProximityConfiguration,
@@ -107,6 +115,7 @@ internal class ProximityCoordinator(
     ): ProximitySession {
         val owned = configuration.snapshot()
         return activeMutex.withLock {
+            check(!closed) { "This wallet has been closed for deletion" }
             check(active == null) { "A proximity presentation session is already active for this wallet" }
             val initialCapabilities = capabilities(owned)
             val session = ProximitySessionImpl(

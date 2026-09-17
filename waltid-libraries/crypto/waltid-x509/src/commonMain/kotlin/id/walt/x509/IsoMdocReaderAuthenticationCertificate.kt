@@ -14,6 +14,7 @@ import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.ex
 import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
+import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
 import id.walt.certificate.x509.model.GeneralName
 import kotlinx.io.bytestring.ByteString
 import kotlin.time.Clock
@@ -29,7 +30,8 @@ const val MdocReaderAuthentication23220EkuOid: String = "1.0.23220.4.1.6"
 /**
  * Validates an mdoc reader-authentication leaf certificate against the ISO/IEC 18013-5 profile.
  *
- * This validates certificate contents only. Call [validateMdocReaderAuthenticationCertificateChain]
+ * This validates the unconditional certificate fields only. For an application-identified IACA issuer,
+ * also call [validateIacaIssuedMdocReaderCertificateContact]. Call [validateMdocReaderAuthenticationCertificateChain]
  * to additionally establish an RFC 5280-style path to an explicit application trust anchor.
  */
 @Throws(X509ValidationException::class)
@@ -171,6 +173,17 @@ fun validateMdocReaderAuthenticationCertificateChain(
     trustAnchors: List<CertificateDer>,
     now: Instant = Clock.System.now(),
 ) {
+    validatedMdocReaderAuthenticationCertificatePath(leaf, chain, trustAnchors, now)
+}
+
+/** Returns the validated leaf-first path, including the selected explicit trust anchor. */
+@Throws(X509ValidationException::class)
+fun validatedMdocReaderAuthenticationCertificatePath(
+    leaf: CertificateDer,
+    chain: List<CertificateDer>,
+    trustAnchors: List<CertificateDer>,
+    now: Instant = Clock.System.now(),
+): List<CertificateDer> {
     requireProfile(trustAnchors.isNotEmpty(), "At least one explicit reader trust anchor is required")
     requireProfile(leaf !in trustAnchors, "A reader end-entity certificate cannot be its own trust anchor")
     validateMdocReaderAuthenticationCertificateProfile(leaf, now)
@@ -190,7 +203,7 @@ fun validateMdocReaderAuthenticationCertificateChain(
         "Reader certificate issuer and authority key identifier do not exactly match an available CA",
     )
 
-    validateCertificateChainWithExplicitTrust(
+    return validateCertificateChainWithExplicitTrust(
         leaf = leaf,
         chain = chain,
         trustAnchors = trustAnchors,
@@ -198,6 +211,19 @@ fun validateMdocReaderAuthenticationCertificateChain(
         now = now,
         additionalProcessedCriticalExtensionOids = setOf(EXTENDED_KEY_USAGE_OID),
     )
+}
+
+/**
+ * Checks Table B.6 issuer contact information for a reader whose validated direct issuer is
+ * application-identified as an IACA. This content check does not identify or trust the issuer.
+ */
+@Throws(X509ValidationException::class)
+fun validateIacaIssuedMdocReaderCertificateContact(certificate: CertificateDer) {
+    val contact = parseIsoCertificate(certificate, "reader certificate").data.extensionIssuerAltName
+    requireProfile(contact != null && !contact.critical && contact.alternativeNames.any {
+        it.value.isNotBlank() && (it.type == GeneralName.NameType.rfc822Name ||
+            it.type == GeneralName.NameType.uniformResourceIdentifier)
+    }, "IACA-issued reader requires non-critical issuerAlternativeName with an email or URI contact")
 }
 
 /** Returns the common name from a reader certificate that has already passed profile validation. */

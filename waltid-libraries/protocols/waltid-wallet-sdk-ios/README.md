@@ -203,11 +203,21 @@ Use `ProximityCRLRevocationEvaluator` when the application supplies a complete-C
 ```swift
 let crlStatus = try ProximityCRLRevocationEvaluator(
     issuerCertificatesDER: [readerCA],
-    scope: .readerCertificateAndIssuingAuthorities,
+    scope: .validatedPath,
     fetcher: applicationCRLFetcher
 )
 // Supply crlStatus to ProximityReaderTrustConfiguration(revocationPolicy: .check(crlStatus)).
 ```
+
+The `.validatedPath` scope checks certificates below the selected configured anchor on the
+actual direct or RICAL-validated path. Install it through the configured trust evaluator;
+standalone raw evidence returns indeterminate for this scope. The separately explicit
+`.readerCertificateAndIssuingAuthorities` scope retains terminal-authority status checking.
+
+Set `requiredIACAIssuerCertificateDER` when the application identifies a required IACA direct
+issuer. That exact issuer must be on the validated path and the reader must include the
+conditional non-critical email/URI issuer contact extension. Generic imported CAs do not
+supply that role. Without this context, conditional IACA validation is outside the checked scope.
 
 `ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
 `ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,
@@ -223,7 +233,10 @@ accepts DER and certificate-only PEM Reader CAs plus static signed RICAL bundle
 entries. It rejects private keys, PKCS#12/PFX, unknown bundle semantics,
 duplicates, invalid or expired trust material, and files larger than 1 MiB.
 Apply one immutable snapshot to a new session with `settings.applying(to:)`;
-changes made while a session is active apply only to the next session.
+changes made while a session is active apply only to the next session. Applying settings
+replaces the trust evaluator; install application CRL/IACA/custom policy afterward. Decoding
+stored data checks structure, not current trust. Service references remain live in a snapshot;
+collection data is detached. Demo imports do not install a CRL network client.
 
 ## Protected keys
 

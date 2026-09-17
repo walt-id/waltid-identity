@@ -262,12 +262,14 @@ class ProximityReaderTrustTest {
             val subCa = createCa(rootKey, root, subCaKey, "RICAL reader sub CA")
             val reader = createReader(subCaKey, subCa, readerKey, MdocReaderAuthenticationEkuOid)
             val rootInfo = root.ricalInfo(isTrustAnchor = true, name = "Root authority")
-            val subCaInfo = subCa.ricalInfo(isTrustAnchor = false, name = "Bottom authority")
+            for (intermediateAnchor in listOf(false, true)) {
+            val subCaInfo = subCa.ricalInfo(isTrustAnchor = intermediateAnchor, name = "Bottom authority")
+            for (infos in listOf(listOf(rootInfo, subCaInfo), listOf(subCaInfo, rootInfo))) {
             val rical = Rical(
                 version = "1.0",
                 provider = "test-provider",
                 date = Clock.System.now() - 1.days,
-                certificateInfos = listOf(rootInfo, subCaInfo),
+                certificateInfos = infos,
                 type = "org.iso.18013.5.1.reader_authentication",
             )
 
@@ -282,6 +284,8 @@ class ProximityReaderTrustTest {
             )
 
             assertEquals(subCaInfo, assertIs<RicalReaderPathResult.Valid>(result).authority)
+            }
+            }
         } finally {
             runtime.close()
         }
@@ -347,7 +351,7 @@ class ProximityReaderTrustTest {
             )
             assertEquals(existing.readerPolicy, der.resultingSettings.readerPolicy)
             assertEquals(1, der.readerAuthorities.size)
-            assertEquals("ISO mdoc Reader CA", der.readerAuthorities.single().profile)
+            assertEquals("X.509 CA certificate", der.readerAuthorities.single().profile)
             assertTrue(
                 Regex("(?:[0-9A-F]{2}:){31}[0-9A-F]{2}")
                     .matches(der.readerAuthorities.single().sha256Fingerprint),

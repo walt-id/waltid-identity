@@ -13,6 +13,8 @@ import id.walt.mdoc.proximity.RicalEvaluationState
 import id.walt.mdoc.proximity.RicalPolicy
 import id.walt.mdoc.proximity.RicalProvider
 import id.walt.mdoc.proximity.RicalProviderResult
+import id.walt.mdoc.proximity.RicalReaderPathValidator
+import id.walt.mdoc.proximity.RicalReaderPathResult
 import id.walt.mdoc.proximity.RicalReaderTrustEvaluator
 import id.walt.mdoc.proximity.RicalSignatureValidator
 import id.walt.mdoc.proximity.RicalTrustConstraint
@@ -21,7 +23,8 @@ import id.walt.mdoc.proximity.X509RicalReaderPathValidator
 import id.walt.mdoc.proximity.X509RicalSignatureValidator
 import id.walt.x509.CertificateDer
 import id.walt.x509.mdocReaderAuthenticationCommonName
-import id.walt.x509.validateMdocReaderAuthenticationCertificateChain
+import id.walt.x509.validateIacaIssuedMdocReaderCertificateContact
+import id.walt.x509.validatedMdocReaderAuthenticationCertificatePath
 import id.walt.x509.validateMdocReaderAuthenticationCertificateProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -248,6 +251,13 @@ public data class ProximityReaderTrustConfiguration(
     /** Revocation behavior for a reader chain trusted by a direct Reader CA anchor. */
     public val revocationPolicy: ProximityReaderRevocationPolicy =
         ProximityReaderRevocationPolicy.NotChecked,
+    /**
+     * Optional application-identified IACA direct issuer, encoded as unpadded Base64URL DER.
+     * When set, require that exact validated issuer and its Table B.6 reader contact extension.
+     * This requirement supplies issuer-role context, not an additional trust anchor. Invalid DER
+     * is reported as an invalid certificate path during evaluation, including through Swift.
+     */
+    public val requiredIacaIssuerCertificateDerBase64Url: String? = null,
 ) {
     init {
         require(trustAnchors.isNotEmpty() || ricalProviders.isNotEmpty()) {
@@ -289,18 +299,15 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
             mdocReaderAuthenticationCommonName(leaf)
         }.getOrElse { return invalidPathDecision() }
 
-        ownedConfiguration.trustAnchors.firstOrNull { anchor ->
-            runCatching {
-                validateMdocReaderAuthenticationCertificateChain(
-                    leaf = leaf,
-                    chain = chain.drop(1),
-                    trustAnchors = listOf(anchor.certificateDerBase64Url.trustCertificateDer()),
-                    now = evaluatedAt,
+        for (anchor in ownedConfiguration.trustAnchors) {
+            val path = runCatching {
+                validatedMdocReaderAuthenticationCertificatePath(
+                    leaf, chain.drop(1), listOf(anchor.certificateDerBase64Url.trustCertificateDer()), evaluatedAt,
                 )
-            }.isSuccess
-        }?.let { anchor ->
+            }.getOrNull() ?: continue
             return decisionForValidatedPath(
                 evidence = ownedEvidence,
+                path = path,
                 displayName = anchor.displayName ?: readerName,
                 rical = ProximityRicalState.NotEvaluated,
                 establishesTrust = true,
@@ -322,6 +329,7 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
                     )
                     is RicalMatch.Valid -> decisionForValidatedPath(
                         evidence = ownedEvidence,
+                        path = matched.path,
                         displayName = matched.displayName ?: readerName,
                         rical = ProximityRicalState.Matched,
                         establishesTrust = matched.establishesTrust,
@@ -344,6 +352,7 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
         evidence: ProximityReaderEvidence,
         evaluatedAt: Instant,
     ): RicalAttempt {
+        var validatedPath: List<CertificateDer> = emptyList()
         val evaluator = RicalReaderTrustEvaluator(
             provider = RicalProvider {
                 when (val result = configuration.provider.current()) {
@@ -373,7 +382,13 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
                 ) == true
             },
             now = { evaluatedAt },
-            pathValidator = X509RicalReaderPathValidator { evaluatedAt },
+            pathValidator = RicalReaderPathValidator { reader, rical ->
+                X509RicalReaderPathValidator { evaluatedAt }.validate(reader, rical).also { result ->
+                    if (result is RicalReaderPathResult.Valid) {
+                        validatedPath = result.validatedPath.map { CertificateDer(it.copy()) }
+                    }
+                }
+            },
         )
         val result = try {
             evaluator.evaluateDetailed(evidence.toRicalEvidence())
@@ -395,6 +410,7 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
                     RicalMatch.Valid(
                         result.decision.displayName,
                         result.decision.state == ReaderTrustState.TRUSTED,
+                        validatedPath,
                     )
                 }
             )
@@ -450,45 +466,58 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
 
     private suspend fun decisionForValidatedPath(
         evidence: ProximityReaderEvidence,
+        path: List<CertificateDer>,
         displayName: String,
         rical: ProximityRicalState,
         establishesTrust: Boolean,
-    ): ProximityReaderTrustDecision = when (val revocation = evaluateRevocation(evidence)) {
-        is EvaluatedRevocation.Good -> ProximityReaderTrustDecision(
-            state = if (establishesTrust) ProximityReaderTrustState.Trusted
-                else ProximityReaderTrustState.ValidButUntrusted,
-            certificatePath = ProximityReaderCertificatePathState.Valid,
-            revocation = revocation.state,
-            rical = rical,
-            displayName = displayName,
-            reason = if (establishesTrust) null
-                else "RICAL evidence is valid but the active policy does not establish reader trust",
-        )
-        is EvaluatedRevocation.Revoked -> ProximityReaderTrustDecision(
-            state = ProximityReaderTrustState.Revoked,
-            certificatePath = ProximityReaderCertificatePathState.Valid,
-            revocation = ProximityReaderRevocationState.Revoked,
-            rical = rical,
-            displayName = displayName,
-            reason = revocation.reason ?: "Reader authentication certificate is revoked",
-        )
-        is EvaluatedRevocation.Indeterminate -> ProximityReaderTrustDecision(
-            state = ProximityReaderTrustState.ValidButUntrusted,
-            certificatePath = ProximityReaderCertificatePathState.Valid,
-            revocation = ProximityReaderRevocationState.Indeterminate,
-            rical = rical,
-            displayName = displayName,
-            reason = revocation.reason,
-        )
+    ): ProximityReaderTrustDecision {
+        ownedConfiguration.requiredIacaIssuerCertificateDerBase64Url?.let { issuer ->
+            val requiredIssuer = runCatching { issuer.trustCertificateDer() }.getOrElse { return invalidPathDecision() }
+            if (path.getOrNull(1) != requiredIssuer ||
+                runCatching { validateIacaIssuedMdocReaderCertificateContact(path.first()) }.isFailure) {
+                return invalidPathDecision()
+            }
+        }
+        return when (val revocation = evaluateRevocation(evidence, path)) {
+            is EvaluatedRevocation.Good -> ProximityReaderTrustDecision(
+                state = if (establishesTrust) ProximityReaderTrustState.Trusted
+                    else ProximityReaderTrustState.ValidButUntrusted,
+                certificatePath = ProximityReaderCertificatePathState.Valid,
+                revocation = revocation.state,
+                rical = rical,
+                displayName = displayName,
+                reason = if (establishesTrust) null
+                    else "RICAL evidence is valid but the active policy does not establish reader trust",
+            )
+            is EvaluatedRevocation.Revoked -> ProximityReaderTrustDecision(
+                state = ProximityReaderTrustState.Revoked,
+                certificatePath = ProximityReaderCertificatePathState.Valid,
+                revocation = ProximityReaderRevocationState.Revoked,
+                rical = rical,
+                displayName = displayName,
+                reason = revocation.reason ?: "Reader authentication certificate is revoked",
+            )
+            is EvaluatedRevocation.Indeterminate -> ProximityReaderTrustDecision(
+                state = ProximityReaderTrustState.ValidButUntrusted,
+                certificatePath = ProximityReaderCertificatePathState.Valid,
+                revocation = ProximityReaderRevocationState.Indeterminate,
+                rical = rical,
+                displayName = displayName,
+                reason = revocation.reason,
+            )
+    }
     }
 
     private suspend fun evaluateRevocation(
         evidence: ProximityReaderEvidence,
+        path: List<CertificateDer>,
     ): EvaluatedRevocation = when (val policy = ownedConfiguration.revocationPolicy) {
         ProximityReaderRevocationPolicy.NotChecked ->
             EvaluatedRevocation.Good(ProximityReaderRevocationState.NotChecked)
         is ProximityReaderRevocationPolicy.Check -> try {
-            when (val result = policy.evaluator.evaluate(evidence.snapshot())) {
+            when (val result = if (policy.evaluator is ProximityCrlRevocationEvaluator) {
+                policy.evaluator.evaluateValidatedPath(evidence.snapshot(), path)
+            } else policy.evaluator.evaluate(evidence.snapshot())) {
                 ProximityCertificateRevocationResult.Good ->
                     EvaluatedRevocation.Good(ProximityReaderRevocationState.Good)
                 is ProximityCertificateRevocationResult.Revoked ->
@@ -498,7 +527,9 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Throwable) {
+        } catch (_: NotImplementedError) {
+            EvaluatedRevocation.Indeterminate("Reader certificate revocation is unsupported by the provider")
+        } catch (_: Exception) {
             EvaluatedRevocation.Indeterminate("Reader certificate revocation status is unavailable")
         }
     }
@@ -515,6 +546,7 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
         data class Valid(
             override val displayName: String?,
             val establishesTrust: Boolean,
+            val path: List<CertificateDer>,
         ) : RicalMatch
 
         data class Revoked(

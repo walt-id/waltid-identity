@@ -303,6 +303,8 @@ public protocol ProximityReaderRevocationEvaluator: Sendable {
 public enum ProximityCRLScope: Sendable, Equatable {
     /// Check the reader certificate against its direct issuer's CRL.
     case readerCertificate
+    /// Check certificates below the configured anchor through the configured reader-trust evaluator.
+    case validatedPath
     /// Also check issuing authorities, including the terminal self-signed authority.
     case readerCertificateAndIssuingAuthorities
 }
@@ -516,15 +518,21 @@ public struct ProximityReaderTrustConfiguration: Sendable {
     /// Revocation behavior for reader chains trusted by direct Reader CA anchors.
     public let revocationPolicy: ProximityReaderRevocationPolicy
 
+    /// Application-identified IACA direct issuer; also requires the conditional reader contact extension.
+    /// This certificate supplies issuer-role context and does not add trust.
+    public let requiredIACAIssuerCertificateDER: Data?
+
     /// Creates immutable application-owned reader-trust configuration.
     /// - Parameters:
     ///   - trustAnchors: Explicit Reader CA trust anchors.
     ///   - ricalProviders: Ordered RICAL provider policies.
+    ///   - requiredIACAIssuerCertificateDER: Optional exact IACA direct issuer required on the validated path.
     ///   - revocationPolicy: Revocation behavior for directly anchored reader chains.
     public init(
         trustAnchors: [ProximityReaderTrustAnchor] = [],
         ricalProviders: [ProximityRICALConfiguration] = [],
-        revocationPolicy: ProximityReaderRevocationPolicy = .notChecked
+        revocationPolicy: ProximityReaderRevocationPolicy = .notChecked,
+        requiredIACAIssuerCertificateDER: Data? = nil
     ) {
         precondition(!trustAnchors.isEmpty || !ricalProviders.isEmpty)
         precondition(Set(trustAnchors.map(\.certificateDER)).count == trustAnchors.count)
@@ -532,6 +540,7 @@ public struct ProximityReaderTrustConfiguration: Sendable {
         self.trustAnchors = trustAnchors
         self.ricalProviders = ricalProviders
         self.revocationPolicy = revocationPolicy
+        self.requiredIACAIssuerCertificateDER = requiredIACAIssuerCertificateDER
     }
 }
 

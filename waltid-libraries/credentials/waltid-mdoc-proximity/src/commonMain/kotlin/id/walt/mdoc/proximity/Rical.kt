@@ -201,7 +201,10 @@ sealed interface RicalReaderPathResult {
     data object NoMatch : RicalReaderPathResult
     data object Invalid : RicalReaderPathResult
     data object Revoked : RicalReaderPathResult
-    data class Valid(val authority: RicalCertificateInfo) : RicalReaderPathResult
+    data class Valid(
+        val authority: RicalCertificateInfo,
+        val validatedPath: List<ImmutableBytes> = emptyList(),
+    ) : RicalReaderPathResult
 }
 
 /**
@@ -329,7 +332,7 @@ class RicalReaderTrustEvaluator(
                 ?: return invalid("Reader path selected an authority outside the active RICAL")
         }
         if (!constraintEvaluator.accepts(
-                signed.rical.certificateInfos.single { it.subjectKeyIdentifier == authority.subjectKeyIdentifier }.trustConstraints,
+                authority.trustConstraints,
                 evidence,
             )) {
             return noMatchingAuthority()

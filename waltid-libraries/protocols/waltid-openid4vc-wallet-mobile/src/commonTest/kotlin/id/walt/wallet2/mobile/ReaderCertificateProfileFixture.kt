@@ -2,6 +2,7 @@ package id.walt.wallet2.mobile
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Companion.extensionCrlDistributionPoints
 import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.extensionExtendedKeyUsage
 import id.walt.certificate.x509.extension.KeyUsageExtension
@@ -69,6 +70,13 @@ internal class ReaderCertificateProfileFixture private constructor(
             values[i] = Der.container(0x30, fields)
         }
         when (case) {
+            "contact-uri", "contact-email", "contact-dns", "contact-critical" -> extensions { values ->
+                val tag = when (case) { "contact-email" -> 0x81; "contact-dns" -> 0x82; else -> 0x86 }
+                val fields = mutableListOf(Der(6, byteArrayOf(0x55, 0x1d, 18)))
+                if (case == "contact-critical") fields += Der(1, byteArrayOf(0xff.toByte()))
+                fields += Der(4, Der.container(0x30, listOf(Der(tag, "https://issuer.example/contact".encodeToByteArray()))).encode())
+                values += Der.container(0x30, fields)
+            }
             "01" -> tbs.removeAt(1) // Required serial number.
             "02" -> tbs[2] = Der.container(0x30, listOf(Der(6, byteArrayOf(0x2a, 0x86.toByte(), 0x48, 0xce.toByte(), 0x3d, 4, 3, 3))))
             "05" -> {
@@ -118,15 +126,26 @@ internal class ReaderCertificateProfileFixture private constructor(
 
     companion object {
         private val certificateAlgorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
-        suspend fun create(runtime: CryptoRuntime): ReaderCertificateProfileFixture {
+        suspend fun create(
+            runtime: CryptoRuntime,
+            rootHasCrl: Boolean = true,
+            parent: ReaderCertificateProfileFixture? = null,
+        ): ReaderCertificateProfileFixture {
             suspend fun key(id: String) = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
-                KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                KeyId(id + if (parent == null) "" else "-intermediate"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             ))
             val rootKey = key("profile-reader-root")
             val readerKey = key("profile-reader-leaf")
-            val root = X509CertificateUtil.createSelfSignedCertificate(rootKey, certificateAlgorithm) {
+            val root = if (parent != null) X509CertificateUtil.createCertificate(parent.rootKey, parent.root, certificateAlgorithm) {
+                subjectDn = "CN=Profile reader intermediate"
+                subjectPublicKey(rootKey)
+                extensionSubjectKeyIdentifier()
+                extensionBasicConstraints { cA = true }
+                extensionCrlDistributionPoints { addUriDistributionPoint("https://reader.example/intermediate-crl") }
+                extensionKeyUsage { critical = true; addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign, KeyUsageExtension.KeyUsage.cRLSign) }
+            } else X509CertificateUtil.createSelfSignedCertificate(rootKey, certificateAlgorithm) {
                 subjectDn = "CN=Profile reader root"
-                extensionCrlDistributionPoints { addUriDistributionPoint("https://reader.example/ca-crl") }
+                if (rootHasCrl) extensionCrlDistributionPoints { addUriDistributionPoint("https://reader.example/ca-crl") }
                 extensionKeyUsage { critical = true; addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign, KeyUsageExtension.KeyUsage.cRLSign) }
             }
             val leaf = X509CertificateUtil.createCertificate(rootKey, root, certificateAlgorithm) {

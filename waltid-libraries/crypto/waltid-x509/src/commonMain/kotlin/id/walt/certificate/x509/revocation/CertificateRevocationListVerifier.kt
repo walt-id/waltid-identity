@@ -74,10 +74,9 @@ class CertificateRevocationListVerifier(
             CrlFailure.INVALID_ISSUER,
         )
         val key = issuer.restoreSubjectPublicKey(cryptoRuntime)
-        val verifier = key.capabilities.verifier
-        requireCrl(verifier != null, CrlFailure.UNAVAILABLE)
+        val verifier = key.capabilities.verifier ?: throw CrlValidationException(CrlFailure.UNAVAILABLE)
         requireCrl(
-            verifier!!.verify(crl.tbs.toByteArray(), crl.signature.toByteArray(), crl.algorithm),
+            verifier.verify(crl.tbs.toByteArray(), crl.signature.toByteArray(), crl.algorithm),
             CrlFailure.INVALID_SIGNATURE,
         )
         val serial = normaliseSerial(certificate.data.serialNumberRaw.toByteArray())
@@ -87,7 +86,10 @@ class CertificateRevocationListVerifier(
         throw cancelled
     } catch (failure: CrlValidationException) {
         CrlCertificateStatus.Indeterminate(failure.reason)
-    } catch (_: Throwable) {
+    } catch (_: NotImplementedError) {
+        // Unsupported platform extension/provider operation. Other Errors must propagate.
+        CrlCertificateStatus.Indeterminate(CrlFailure.UNAVAILABLE)
+    } catch (_: Exception) {
         CrlCertificateStatus.Indeterminate(CrlFailure.UNAVAILABLE)
     }
 }

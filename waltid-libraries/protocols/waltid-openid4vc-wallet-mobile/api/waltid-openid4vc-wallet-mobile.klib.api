@@ -318,6 +318,7 @@ final enum class id.walt.wallet2.mobile/ProximityCredentialStatus : kotlin/Enum<
 final enum class id.walt.wallet2.mobile/ProximityCrlScope : kotlin/Enum<id.walt.wallet2.mobile/ProximityCrlScope> { // id.walt.wallet2.mobile/ProximityCrlScope|null[0]
     enum entry ReaderCertificate // id.walt.wallet2.mobile/ProximityCrlScope.ReaderCertificate|null[0]
     enum entry ReaderCertificateAndIssuingAuthorities // id.walt.wallet2.mobile/ProximityCrlScope.ReaderCertificateAndIssuingAuthorities|null[0]
+    enum entry ValidatedPath // id.walt.wallet2.mobile/ProximityCrlScope.ValidatedPath|null[0]
 
     final val entries // id.walt.wallet2.mobile/ProximityCrlScope.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/ProximityCrlScope> // id.walt.wallet2.mobile/ProximityCrlScope.entries.<get-entries>|<get-entries>#static(){}[0]
@@ -3275,8 +3276,10 @@ final class id.walt.wallet2.mobile/ProximityReaderTrustAnchorPreview { // id.wal
 }
 
 final class id.walt.wallet2.mobile/ProximityReaderTrustConfiguration { // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration|null[0]
-    constructor <init>(kotlin.collections/List<id.walt.wallet2.mobile/ProximityReaderTrustAnchor> = ..., kotlin.collections/List<id.walt.wallet2.mobile/ProximityRicalConfiguration> = ..., id.walt.wallet2.mobile/ProximityReaderRevocationPolicy = ...) // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.<init>|<init>(kotlin.collections.List<id.walt.wallet2.mobile.ProximityReaderTrustAnchor>;kotlin.collections.List<id.walt.wallet2.mobile.ProximityRicalConfiguration>;id.walt.wallet2.mobile.ProximityReaderRevocationPolicy){}[0]
+    constructor <init>(kotlin.collections/List<id.walt.wallet2.mobile/ProximityReaderTrustAnchor> = ..., kotlin.collections/List<id.walt.wallet2.mobile/ProximityRicalConfiguration> = ..., id.walt.wallet2.mobile/ProximityReaderRevocationPolicy = ..., kotlin/String? = ...) // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.<init>|<init>(kotlin.collections.List<id.walt.wallet2.mobile.ProximityReaderTrustAnchor>;kotlin.collections.List<id.walt.wallet2.mobile.ProximityRicalConfiguration>;id.walt.wallet2.mobile.ProximityReaderRevocationPolicy;kotlin.String?){}[0]
 
+    final val requiredIacaIssuerCertificateDerBase64Url // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.requiredIacaIssuerCertificateDerBase64Url|{}requiredIacaIssuerCertificateDerBase64Url[0]
+        final fun <get-requiredIacaIssuerCertificateDerBase64Url>(): kotlin/String? // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.requiredIacaIssuerCertificateDerBase64Url.<get-requiredIacaIssuerCertificateDerBase64Url>|<get-requiredIacaIssuerCertificateDerBase64Url>(){}[0]
     final val revocationPolicy // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.revocationPolicy|{}revocationPolicy[0]
         final fun <get-revocationPolicy>(): id.walt.wallet2.mobile/ProximityReaderRevocationPolicy // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.revocationPolicy.<get-revocationPolicy>|<get-revocationPolicy>(){}[0]
     final val ricalProviders // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.ricalProviders|{}ricalProviders[0]
@@ -3287,7 +3290,8 @@ final class id.walt.wallet2.mobile/ProximityReaderTrustConfiguration { // id.wal
     final fun component1(): kotlin.collections/List<id.walt.wallet2.mobile/ProximityReaderTrustAnchor> // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.component1|component1(){}[0]
     final fun component2(): kotlin.collections/List<id.walt.wallet2.mobile/ProximityRicalConfiguration> // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.component2|component2(){}[0]
     final fun component3(): id.walt.wallet2.mobile/ProximityReaderRevocationPolicy // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.component3|component3(){}[0]
-    final fun copy(kotlin.collections/List<id.walt.wallet2.mobile/ProximityReaderTrustAnchor> = ..., kotlin.collections/List<id.walt.wallet2.mobile/ProximityRicalConfiguration> = ..., id.walt.wallet2.mobile/ProximityReaderRevocationPolicy = ...): id.walt.wallet2.mobile/ProximityReaderTrustConfiguration // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.copy|copy(kotlin.collections.List<id.walt.wallet2.mobile.ProximityReaderTrustAnchor>;kotlin.collections.List<id.walt.wallet2.mobile.ProximityRicalConfiguration>;id.walt.wallet2.mobile.ProximityReaderRevocationPolicy){}[0]
+    final fun component4(): kotlin/String? // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.component4|component4(){}[0]
+    final fun copy(kotlin.collections/List<id.walt.wallet2.mobile/ProximityReaderTrustAnchor> = ..., kotlin.collections/List<id.walt.wallet2.mobile/ProximityRicalConfiguration> = ..., id.walt.wallet2.mobile/ProximityReaderRevocationPolicy = ..., kotlin/String? = ...): id.walt.wallet2.mobile/ProximityReaderTrustConfiguration // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.copy|copy(kotlin.collections.List<id.walt.wallet2.mobile.ProximityReaderTrustAnchor>;kotlin.collections.List<id.walt.wallet2.mobile.ProximityRicalConfiguration>;id.walt.wallet2.mobile.ProximityReaderRevocationPolicy;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityReaderTrustConfiguration.toString|toString(){}[0]
