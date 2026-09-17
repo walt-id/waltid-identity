@@ -7,6 +7,8 @@ import id.walt.issuer2.testsupport.assertJwtVcJsonCredentialPayload
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.issuer2.testsupport.createCredentialOffer
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
+import id.walt.issuer2.config.Issuer2ServiceConfig
+import id.walt.issuer2.config.IssuanceMode
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
@@ -38,7 +40,9 @@ class Issuer2DeferredCredentialIntegrationTest {
 
     @Test
     fun shouldIssueDeferredCredentialEndToEnd() = testApplication {
-        installIssuer2WithConfigFiles()
+        installIssuer2WithConfigFiles { config ->
+            config.copy(credentialIssuanceMode = IssuanceMode.DEFERRED)
+        }
         val client = apiClient()
         val wallet1 = Issuer2WalletFlowDriver(client)
         val wallet2 = Issuer2WalletFlowDriver(
