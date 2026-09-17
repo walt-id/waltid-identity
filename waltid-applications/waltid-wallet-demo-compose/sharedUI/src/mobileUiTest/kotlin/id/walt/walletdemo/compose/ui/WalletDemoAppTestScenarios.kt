@@ -208,17 +208,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) {
             onAllNodesWithTag(WalletUiTestTags.claimGroup("About this credential")).fetchSemanticsNodes().isNotEmpty()
         }
-        // Async details can arrive before the card-opening and detail-fade transitions finish.
-        mainClock.advanceTimeBy(1_000)
-        waitForIdle()
         onAllNodesWithText("Example Credential").assertCountEquals(1)
-        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential"))
-            .performScrollTo()
-            .assertIsDisplayed()
-        onAllNodesWithTag(WalletUiTestTags.claim("system.format")).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential")).performClick()
-        onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claim("system.format")).performScrollTo().assertIsDisplayed()
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
         onNodeWithText("Street address").performScrollTo().assertIsDisplayed()
@@ -258,6 +248,14 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithTag(WalletUiTestTags.claimImageViewer(artifactPath)).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.claimImage(artifactPath)).assertIsDisplayed()
+        // Deferred images add captions when decoded. Visit them before scrolling to metadata below.
+        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential"))
+            .performScrollTo()
+            .assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.claim("system.format")).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential")).performClick()
+        onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim("system.format")).performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Raw credential data").assertCountEquals(0)
         onNodeWithTag("wallet.detailsBack").performClick()
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
