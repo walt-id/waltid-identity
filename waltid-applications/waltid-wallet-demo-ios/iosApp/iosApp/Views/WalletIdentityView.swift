@@ -125,7 +125,7 @@ final class WalletIdentityScreenModel: ObservableObject {
                     })
                 }
                 let discovery = try await service.discoverRecovery()
-                recoveryUnavailableReasons = discovery.failures.map { "\($0.providerName): \($0.reason)" }
+                recoveryUnavailableReasons = discovery.failures.map { "\($0.providerName): \($0.message)" }
                 for candidate in discovery.candidates where candidate.reference.recordID == identity.id {
                     choices.append(Choice(title: "Delete recovery record", detail: candidate.providerName, destructive: true) { [service] in
                         _ = try await service.deleteRecovery(candidate)
@@ -200,7 +200,7 @@ final class WalletIdentityScreenModel: ObservableObject {
 
     private func addRecoveryChoices() async throws {
         let discovery = try await service.discoverRecovery()
-        recoveryUnavailableReasons += discovery.failures.map { "\($0.providerName): \($0.reason)" }
+        recoveryUnavailableReasons += discovery.failures.map { "\($0.providerName): \($0.message)" }
         for candidate in discovery.candidates {
             let options: [SigningIdentityRestorationOption]
             do { options = try await service.restorationOptions(candidate) }

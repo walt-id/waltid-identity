@@ -4,7 +4,7 @@ import Foundation
 public enum SigningIdentityKeyPolicy: Sendable {
     /// Permits recovery when explicitly selected.
     case generalPurpose
-    /// Prohibits retaining or exporting a signing secret for recovery.
+    /// Prohibits backup and custody through this manager; does not change key exportability.
     case backupAndCustodyDisabled
     /// Requires observed hardware generation and prohibits recovery export.
     case hardwareGenerated
@@ -315,7 +315,7 @@ public struct SigningIdentityCreationOption: Sendable {
     public let storage: SigningIdentityKeyStorage
     /// Native signing authorization policy.
     public let authorization: WalletKeyUseAuthorizationPolicy
-    /// Recovery provider display name, or nil for a device-bound option.
+    /// Recovery provider display name, or nil for an option without recovery.
     public let recoveryProviderName: String?
     /// Provider protection and delivery route, or nil when recovery is disabled.
     public let recoveryAvailability: WalletRecoveryAvailability?
@@ -616,4 +616,6 @@ public struct SigningIdentityRecoveryProviderFailure: Sendable {
     public let providerName: String
     /// Stable failure category without private provider diagnostics.
     public let reason: SigningIdentityFailure
+    /// Safe explanation, including an unmet provider prerequisite when available.
+    public let message: String
 }

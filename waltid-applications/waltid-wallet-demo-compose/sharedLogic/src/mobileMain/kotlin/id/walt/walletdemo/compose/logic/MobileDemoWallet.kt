@@ -61,7 +61,7 @@ internal class MobileDemoWallet(
                 is SigningIdentityRecoveryState.Recovered -> "The original signing key and DID were restored on this installation."
                 is SigningIdentityRecoveryState.RemovalRequested -> "Recovery record deletion requested; removal from other devices is not verified."
             } + discovery.failures.joinToString("", prefix = if (discovery.failures.isEmpty()) "" else "\n") {
-                "${it.providerName}: ${it.reason}\n"
+                "${it.providerName}: ${it.message}\n"
             }, choices)
     }
 
@@ -87,7 +87,7 @@ internal class MobileDemoWallet(
             }
         }
         val discovery = mobileWallet.signingIdentity.discoverRecovery()
-        val recoveryUnavailableReasons = discovery.failures.map { "${it.providerName}: ${it.reason}" }.toMutableList()
+        val recoveryUnavailableReasons = discovery.failures.map { "${it.providerName}: ${it.message}" }.toMutableList()
         for (candidate in discovery.candidates) {
             val options = try { mobileWallet.signingIdentity.restorationOptions(candidate) }
             catch (cause: CancellationException) { throw cause }

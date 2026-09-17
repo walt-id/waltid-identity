@@ -1454,8 +1454,10 @@ final class id.walt.wallet2.mobile.identity/SigningIdentityRecoveryDiscovery { /
 }
 
 final class id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure { // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure|null[0]
-    constructor <init>(kotlin/String, kotlin/String, id.walt.wallet2.mobile.identity/SigningIdentityFailure) // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.<init>|<init>(kotlin.String;kotlin.String;id.walt.wallet2.mobile.identity.SigningIdentityFailure){}[0]
+    constructor <init>(kotlin/String, kotlin/String, id.walt.wallet2.mobile.identity/SigningIdentityFailure, kotlin/String) // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.<init>|<init>(kotlin.String;kotlin.String;id.walt.wallet2.mobile.identity.SigningIdentityFailure;kotlin.String){}[0]
 
+    final val message // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.message|{}message[0]
+        final fun <get-message>(): kotlin/String // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.message.<get-message>|<get-message>(){}[0]
     final val providerId // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.providerId|{}providerId[0]
         final fun <get-providerId>(): kotlin/String // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.providerId.<get-providerId>|<get-providerId>(){}[0]
     final val providerName // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.providerName|{}providerName[0]
@@ -1466,7 +1468,8 @@ final class id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailu
     final fun component1(): kotlin/String // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.component1|component1(){}[0]
     final fun component2(): kotlin/String // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.component2|component2(){}[0]
     final fun component3(): id.walt.wallet2.mobile.identity/SigningIdentityFailure // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.component3|component3(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., id.walt.wallet2.mobile.identity/SigningIdentityFailure = ...): id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.copy|copy(kotlin.String;kotlin.String;id.walt.wallet2.mobile.identity.SigningIdentityFailure){}[0]
+    final fun component4(): kotlin/String // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., id.walt.wallet2.mobile.identity/SigningIdentityFailure = ..., kotlin/String = ...): id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.copy|copy(kotlin.String;kotlin.String;id.walt.wallet2.mobile.identity.SigningIdentityFailure;kotlin.String){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile.identity/SigningIdentityRecoveryProviderFailure.toString|toString(){}[0]

@@ -5,7 +5,6 @@ package id.walt.wallet2.mobile.identity
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
-
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
@@ -38,6 +37,7 @@ class SigningIdentityManagerTest {
             assertIs<RecoveryAvailability.Available>(statuses[1].availability)
             val options = assertIs<SigningIdentityCreationOptions.Available>(fixture.wallet.signingIdentity.creationOptions(SigningIdentityIntent.Recoverable))
             assertTrue((listOf(options.recommended) + options.alternatives).all { it.providerId == "transfer" })
+            assertEquals("Fixture unavailable", fixture.wallet.signingIdentity.discoverRecovery().failures.single().message)
             cloud.available = true
             assertTrue(fixture.wallet.signingIdentity.recoveryProviderStatuses().all { it.availability is RecoveryAvailability.Available })
         }
@@ -536,7 +536,7 @@ class SigningIdentityManagerTest {
             authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None))).use { fixture ->
             val discovery = fixture.wallet.signingIdentity.discoverRecovery()
             assertEquals(listOf("healthy"), discovery.candidates.map { it.reference.providerId })
-            assertEquals(listOf(SigningIdentityRecoveryProviderFailure("broken", broken.displayName, SigningIdentityFailure.ProviderUnavailable)), discovery.failures)
+            assertEquals(listOf(SigningIdentityRecoveryProviderFailure("broken", broken.displayName, SigningIdentityFailure.ProviderUnavailable, "The recovery service could not be reached. Try again.")), discovery.failures)
             broken.availabilityFailure = CancellationException("cancelled")
             assertFailsWith<CancellationException> { fixture.wallet.signingIdentity.discoverRecovery() }
         }

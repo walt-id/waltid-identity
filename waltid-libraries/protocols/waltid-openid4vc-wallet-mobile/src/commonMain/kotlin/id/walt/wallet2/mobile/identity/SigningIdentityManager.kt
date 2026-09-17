@@ -221,7 +221,7 @@ public class SigningIdentityManager internal constructor(
     }
 
     /** Credential bindings inherit the identity's retained restriction. A recoverable identity cannot
-     * become device-bound merely because a later issuance request asks for that property. */
+     * acquire a backup/custody restriction merely because a later issuance request asks for it. */
     internal suspend fun requireKeyPolicy(keyId: String, policy: SigningIdentityKeyPolicy): Unit = mutex.withLock {
         if (policy == SigningIdentityKeyPolicy.GeneralPurpose) return@withLock
         val record = journal.read()
@@ -301,8 +301,9 @@ public class SigningIdentityManager internal constructor(
         val failures = mutableListOf<SigningIdentityRecoveryProviderFailure>()
         for (provider in providers.values) {
             try {
-                if (provider.availability() !is RecoveryAvailability.Available) {
-                    failures += SigningIdentityRecoveryProviderFailure(provider.id, provider.displayName, SigningIdentityFailure.ProviderUnavailable)
+                val availability = provider.availability()
+                if (availability is RecoveryAvailability.Unavailable) {
+                    failures += SigningIdentityRecoveryProviderFailure(provider.id, provider.displayName, SigningIdentityFailure.ProviderUnavailable, availability.reason)
                     continue
                 }
                 candidates += provider.list().distinct().filter { it.length in 1..256 }.map {
@@ -310,7 +311,14 @@ public class SigningIdentityManager internal constructor(
                 }
             } catch (cause: CancellationException) { throw cause }
             catch (cause: Exception) {
-                failures += SigningIdentityRecoveryProviderFailure(provider.id, provider.displayName, providerFailure(cause))
+                val reason = providerFailure(cause)
+                val message = when (reason) {
+                    SigningIdentityFailure.ProviderInteractionRequired -> "Unlock or sign in to this recovery provider, then retry."
+                    SigningIdentityFailure.ProviderConflict -> "The provider contains conflicting recovery records."
+                    SigningIdentityFailure.ProviderRejected -> "The provider rejected recovery discovery. Check its access settings."
+                    else -> "The recovery service could not be reached. Try again."
+                }
+                failures += SigningIdentityRecoveryProviderFailure(provider.id, provider.displayName, reason, message)
             }
         }
         SigningIdentityRecoveryDiscovery(candidates, failures)
