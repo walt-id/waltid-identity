@@ -96,8 +96,33 @@ interface VerificationSessionRepository {
  */
 const val DEFAULT_MAX_IN_MEMORY_SESSIONS: Int = 2_000
 
+/**
+ * Budget for what the store may hold, in bytes of estimated retained size.
+ *
+ * A session count cannot bound memory, because a session's cost is set by the credential presented to it. A
+ * heap dump of six presentations of an mdoc carrying a 230 KB portrait measured **1.64 MiB retained per
+ * session**, with this store named as the dominator of 73% of the heap - so the 2,000 session ceiling alone
+ * permits about 3.3 GB. Bytes are the unit that actually bounds the store; the count remains as a second guard
+ * for deployments whose sessions are small.
+ */
+const val DEFAULT_MAX_IN_MEMORY_BYTES: Long = 256L * 1024 * 1024
+
+/**
+ * Ratio between the presented evidence's text length and what holding the session costs.
+ *
+ * Calibrated from that dump: a device response of ~307,000 base64 characters retained ~1.64 MiB, so the parsed
+ * form costs roughly six times its encoded text. An estimate is enough - the budget only has to be right to
+ * within a small factor to turn "unbounded" into "bounded", and measuring the real retained size would mean
+ * serialising the session, which is exactly the cost that made storing one expensive in the first place.
+ */
+private const val RETAINED_BYTES_PER_EVIDENCE_CHAR = 6L
+
+/** What an empty session costs before any credential is presented to it. */
+private const val BASE_SESSION_BYTES = 8L * 1024
+
 class InMemoryVerificationSessionRepository(
     private val maxSessions: Int = DEFAULT_MAX_IN_MEMORY_SESSIONS,
+    private val maxRetainedBytes: Long = DEFAULT_MAX_IN_MEMORY_BYTES,
 ) : VerificationSessionRepository {
 
     /**
@@ -106,32 +131,28 @@ class InMemoryVerificationSessionRepository(
      * [Verification2Session.persistenceExpirationDate] gives a used session [DEFAULT_RETENTION_YEARS] years,
      * and a finished session is never read again - while the only eviction was the lazy one in [get], for the
      * single id being looked up. So every completed verification stayed in this map for a decade: at 15
-     * requests per minute that is ~900 sessions an hour, each tens of kilobytes, until the heap ran out.
+     * requests per minute that is ~900 sessions an hour, each carrying the credentials presented to it, until
+     * the heap ran out.
      *
-     * Access-ordered so that reaching the ceiling discards the least recently touched session rather than one
-     * that is mid-flow. An in-memory store cannot honour a ten-year retention promise; a deployment that needs
+     * Access-ordered so that reaching a limit discards the least recently touched session rather than one that
+     * is mid-flow. An in-memory store cannot honour a ten-year retention promise; a deployment that needs
      * retention needs a persistent repository, and [unexpiredEvictions] is the signal that it does.
      */
-    private val sessions = object : LinkedHashMap<String, VerificationSessionSnapshot>(64, 0.75f, true) {
-        override fun removeEldestEntry(
-            eldest: MutableMap.MutableEntry<String, VerificationSessionSnapshot>,
-        ): Boolean = (size > maxSessions).also { evicting ->
-            if (evicting) {
-                unexpiredEvictions++
-                log.warn {
-                    "In-memory verification session store reached its $maxSessions session ceiling; " +
-                            "discarding '${eldest.key}'. Configure a persistent repository if sessions must be retained."
-                }
-            }
-        }
-    }
+    private val sessions = LinkedHashMap<String, VerificationSessionSnapshot>(64, 0.75f, true)
 
-    /** Sessions dropped because the ceiling was reached rather than because they expired. */
+    /** Estimated retained bytes per stored session, so the budget can be enforced without re-measuring. */
+    private val weights = HashMap<String, Long>()
+    private var totalWeight = 0L
+
+    /** Sessions dropped because a limit was reached rather than because they expired. */
     var unexpiredEvictions: Long = 0L
         private set
 
-    /** Visible so the sweep and the ceiling can be asserted; the map itself stays private. */
+    /** Visible so the sweep and the limits can be asserted; the map itself stays private. */
     val size: Int get() = synchronized(sessions) { sessions.size }
+
+    /** Estimated retained bytes currently held. */
+    val retainedBytes: Long get() = synchronized(sessions) { totalWeight }
 
     /**
      * Amortised sweep: expired sessions are the ones that should go first, and finding them is O(size), so it
@@ -139,11 +160,46 @@ class InMemoryVerificationSessionRepository(
      */
     private var createsSinceSweep = 0
 
+    private fun Verification2Session.estimatedRetainedBytes(): Long {
+        val evidenceChars = presentedRawData?.vpToken?.values
+            ?.sumOf { tokens -> tokens.sumOf { it.length.toLong() } }
+            ?: 0L
+        return BASE_SESSION_BYTES + evidenceChars * RETAINED_BYTES_PER_EVIDENCE_CHAR
+    }
+
+    private fun removeLocked(id: String) {
+        sessions.remove(id)
+        weights.remove(id)?.let { totalWeight -= it }
+    }
+
+    private fun putLocked(id: String, snapshot: VerificationSessionSnapshot) {
+        weights.put(id, snapshot.session.estimatedRetainedBytes())?.let { totalWeight -= it }
+        totalWeight += weights.getValue(id)
+        sessions[id] = snapshot
+        enforceLimitsLocked(keep = id)
+    }
+
+    /** Evicts least-recently-used sessions until both limits hold, never the session just written. */
+    private fun enforceLimitsLocked(keep: String) {
+        while (sessions.size > maxSessions || totalWeight > maxRetainedBytes) {
+            val eldest = sessions.keys.firstOrNull { it != keep } ?: break
+            unexpiredEvictions++
+            log.warn {
+                "In-memory verification session store is over its limits " +
+                        "(${sessions.size} sessions, ${totalWeight / 1024} KiB estimated, " +
+                        "ceilings $maxSessions and ${maxRetainedBytes / 1024} KiB); discarding '$eldest'. " +
+                        "Configure a persistent repository if sessions must be retained."
+            }
+            removeLocked(eldest)
+        }
+    }
+
     private fun dropExpiredLocked() {
         val now = Clock.System.now()
-        sessions.entries.removeIf { entry ->
-            entry.value.session.persistenceExpirationDate()?.let { it < now } == true
-        }
+        sessions.entries
+            .filter { entry -> entry.value.session.persistenceExpirationDate()?.let { it < now } == true }
+            .map { it.key }
+            .forEach(::removeLocked)
     }
 
     override suspend fun create(session: Verification2Session): VerificationSessionSnapshot = synchronized(sessions) {
@@ -152,7 +208,7 @@ class InMemoryVerificationSessionRepository(
             dropExpiredLocked()
         }
         if (sessions.containsKey(session.id)) throw DuplicateVerificationSessionException(session.id)
-        VerificationSessionSnapshot(session.copyForStorage(), 0).also { sessions[session.id] = it }
+        VerificationSessionSnapshot(session.copyForStorage(), 0).also { putLocked(session.id, it) }
             .copyForCaller()
     }
 
@@ -161,7 +217,7 @@ class InMemoryVerificationSessionRepository(
             // No expiry date means the verifier is configured to retain indefinitely, so the session stays.
             val expiresAt = snapshot.session.persistenceExpirationDate()
             if (expiresAt != null && expiresAt < Clock.System.now()) {
-                sessions.remove(sessionId)
+                removeLocked(sessionId)
                 null
             } else snapshot.copyForCaller()
         }
@@ -177,12 +233,13 @@ class InMemoryVerificationSessionRepository(
             throw StaleVerificationSessionException(sessionId, expectedVersion, current.version)
         }
         check(session.id == sessionId) { "Session id cannot be changed" }
-        VerificationSessionSnapshot(session.copyForStorage(), current.version + 1).also { sessions[sessionId] = it }
+        VerificationSessionSnapshot(session.copyForStorage(), current.version + 1)
+            .also { putLocked(sessionId, it) }
             .copyForCaller()
     }
 
     override suspend fun delete(sessionId: String): Boolean = synchronized(sessions) {
-        sessions.remove(sessionId) != null
+        (sessionId in sessions).also { if (it) removeLocked(sessionId) }
     }
 }
 
