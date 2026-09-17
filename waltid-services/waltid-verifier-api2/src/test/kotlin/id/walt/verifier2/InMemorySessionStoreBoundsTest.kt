@@ -11,6 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -100,6 +101,28 @@ class InMemorySessionStoreBoundsTest {
         }
 
         assertNotNull(repository.get("live"), "a valid session must survive a sweep")
+    }
+
+    @Test
+    fun `storing a session shares its contents instead of re-parsing them`() = runTest {
+        // The store used to serialise each session to JSON and parse it back, which re-materialised every
+        // element of a byte-array claim: a 224 KiB portrait measured 16.8 MiB once parsed, against nothing at
+        // all when the flyweight is shared. Identity is the deterministic way to assert no round trip happened -
+        // a re-parsed session would be structurally equal but a different instance.
+        val repository = InMemoryVerificationSessionRepository()
+        val original = session("shared")
+
+        val created = repository.create(original)
+        val fetched = assertNotNull(repository.get("shared"))
+
+        assertSame(original.setup, created.session.setup, "creating must not re-serialise the session")
+        assertSame(original.setup, fetched.session.setup, "reading must not re-serialise the session")
+        assertSame(
+            original.setup,
+            repository.update("shared") { status = Verification2Session.VerificationSessionStatus.SUCCESSFUL }
+                .session.setup,
+            "updating must not re-serialise the session",
+        )
     }
 
     /** Enough creations to cross the internal sweep interval. */
