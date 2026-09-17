@@ -263,28 +263,32 @@ class ProximityReaderTrustTest {
             val reader = createReader(subCaKey, subCa, readerKey, MdocReaderAuthenticationEkuOid)
             val rootInfo = root.ricalInfo(isTrustAnchor = true, name = "Root authority")
             for (intermediateAnchor in listOf(false, true)) {
-            val subCaInfo = subCa.ricalInfo(isTrustAnchor = intermediateAnchor, name = "Bottom authority")
-            for (infos in listOf(listOf(rootInfo, subCaInfo), listOf(subCaInfo, rootInfo))) {
-            val rical = Rical(
-                version = "1.0",
-                provider = "test-provider",
-                date = Clock.System.now() - 1.days,
-                certificateInfos = infos,
-                type = "org.iso.18013.5.1.reader_authentication",
-            )
-
-            val result = X509RicalReaderPathValidator().validate(
-                ReaderAuthenticationEvidence(
-                    scope = ReaderAuthenticationScope.WholeRequest,
-                    certificateChainDer = listOf(reader, subCa).map {
-                        ImmutableBytes.of(it.encodedDer.toByteArray())
-                    },
-                ),
-                rical,
-            )
-
-            assertEquals(subCaInfo, assertIs<RicalReaderPathResult.Valid>(result).authority)
-            }
+                val subCaInfo = subCa.ricalInfo(isTrustAnchor = intermediateAnchor, name = "Bottom authority")
+                for (infos in listOf(listOf(rootInfo, subCaInfo), listOf(subCaInfo, rootInfo))) {
+                    val rical = Rical(
+                        version = "1.0",
+                        provider = "test-provider",
+                        date = Clock.System.now() - 1.days,
+                        certificateInfos = infos,
+                        type = "org.iso.18013.5.1.reader_authentication",
+                    )
+                    val result = X509RicalReaderPathValidator().validate(
+                        ReaderAuthenticationEvidence(
+                            scope = ReaderAuthenticationScope.WholeRequest,
+                            certificateChainDer = listOf(reader, subCa).map {
+                                ImmutableBytes.of(it.encodedDer.toByteArray())
+                            },
+                        ),
+                        rical,
+                    )
+                    val valid = assertIs<RicalReaderPathResult.Valid>(result)
+                    assertEquals(subCaInfo, valid.authority)
+                    assertEquals(
+                        listOf(reader, subCa, root).map { ImmutableBytes.of(it.encodedDer.toByteArray()) },
+                        valid.validatedPath,
+                        "The lower constraint authority must not shorten the highest applicable anchor path",
+                    )
+                }
             }
         } finally {
             runtime.close()
