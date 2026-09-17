@@ -1131,22 +1131,36 @@ class WalletDemoAppTestScenarios(
         switch.assertIsOn().assertIsEnabled()
         onNodeWithTag(WalletUiTestTags.ProximityQr).performScrollTo().assertIsDisplayed()
 
-        // The journey switch writes Settings; changing Settings updates this same open journey.
+        // Opening Settings ends the journey; changed preferences apply to an explicit fresh start.
+        val closesBeforeSettings = backend.closedSessions
         onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { backend.closedSessions == closesBeforeSettings + 1 }
+        assertTrue(!proximity.state.value.active)
+        onAllNodesWithTag(WalletUiTestTags.ProximityScreen).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performScrollTo().performClick()
         switch.performScrollTo().assertIsOn().performClick()
         switch.assertIsOff()
         onNodeWithText("Done").assertIsDisplayed().performClick()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        onAllNodesWithTag(WalletUiTestTags.ProximityScreen).assertCountEquals(0)
+        assertEquals(WalletDemoProximityApprovalMode.AskEachTime, settings.proximityApprovalMode())
+        onNodeWithTag(WalletUiTestTags.ProximityStartButton).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+        waitUntil(timeoutMillis = 5_000) { proximity.state.value.sessionState is ProximityState.EngagementReady }
         onNodeWithTag(WalletUiTestTags.ProximityScreen).assertIsDisplayed()
         waitUntil(timeoutMillis = 5_000) { proximity.state.value.approvalMode == WalletDemoProximityApprovalMode.AskEachTime && !proximity.state.value.refreshingEngagement }
         switch.performScrollTo().assertIsOff().performClick()
         waitUntil(timeoutMillis = 5_000) { proximity.state.value.approvalMode == WalletDemoProximityApprovalMode.PrepareSharing && !proximity.state.value.refreshingEngagement }
-        // A connection profile changed in Settings must replace this open journey as well.
+        // Transport changes in Settings also require a fresh journey, retaining the saved approval mode.
+        val closesBeforeTransportSettings = backend.closedSessions
         onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { backend.closedSessions == closesBeforeTransportSettings + 1 }
+        assertTrue(!proximity.state.value.active)
         onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.SettingsProximityNfcV2Direct).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        onAllNodesWithTag(WalletUiTestTags.ProximityScreen).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.ProximityStartButton).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
         waitUntil(timeoutMillis = 5_000) {
             proximity.state.value.sessionState is ProximityState.EngagementReady &&
                 proximity.state.value.engagementChoices == listOf(ProximityEngagementMethod.Nfc)
@@ -1936,6 +1950,8 @@ private class PreferenceProximityBackend : ProximityPresentationBackend {
     val firstClose = CompletableDeferred<Unit>()
     lateinit var latestState: MutableStateFlow<ProximityState>
     private var starts = 0
+    var closedSessions = 0
+        private set
 
     override suspend fun proximityPresentationCapabilities(configuration: ProximityConfiguration): ProximityCapabilities {
         val available = ProximityTransportCapability(implemented = true, profilePermitted = true, selected = true, runtime = ProximityRuntimeObservation.Available)
@@ -1955,7 +1971,10 @@ private class PreferenceProximityBackend : ProximityPresentationBackend {
                 else listOf(ProximityEngagement.Qr("mdoc:preference-$starts"), ProximityEngagement.Nfc)))
                 .also { latestState = it }
             override suspend fun dispatch(action: ProximityAction): ProximityActionResult = ProximityActionResult.Accepted
-            override suspend fun close() { if (first) firstClose.await() }
+            override suspend fun close() {
+                if (first) firstClose.await()
+                closedSessions += 1
+            }
         }
     }
 }
