@@ -51,7 +51,7 @@ internal class RecoveryWorkflow(
     suspend fun restore(expected: WalletIdentity, storage: IdentityKeyStorage) = session { test ->
         assertEquals(WalletIdentityState.Absent, test.wallet.identities.state())
         assertNull(test.keys.getCrypto2Key(expected.keyId, setOf(KeyUsage.SIGN)))
-        val candidate = test.wallet.identities.recoveryCandidates().single { it.reference.recordId == expected.id }
+        val candidate = test.wallet.identities.discoverRecovery().candidates.single { it.reference.recordId == expected.id }
         val options = test.wallet.identities.restorationOptions(candidate)
         if (expected.storage == IdentityKeyStorage.NativeStorage) {
             assertTrue(options.none { it.storage == IdentityKeyStorage.EncryptedDatabase },

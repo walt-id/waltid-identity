@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.logic
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.identity.*
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.CancellationException
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
@@ -46,7 +47,8 @@ internal class MobileDemoWallet(
             val recovery = recoveryChoice(option.providerName, option.recoveryAvailability.scope)
             choices += WalletDemoIdentityChoice(id, recovery.title, recovery.detail, true)
         }
-        for (candidate in mobileWallet.identities.recoveryCandidates().filter { it.reference.recordId == identity.id }) {
+        val discovery = mobileWallet.identities.discoverRecovery()
+        for (candidate in discovery.candidates.filter { it.reference.recordId == identity.id }) {
             val id = Uuid.random().toString()
             identityChoices[id] = IdentityAction.Delete(candidate)
             choices += WalletDemoIdentityChoice(id, "Delete recovery record", candidate.providerName, true, destructive = true)
@@ -58,6 +60,8 @@ internal class MobileDemoWallet(
                     "Recovery record accepted locally; delivery to another device is not confirmed." else "Recovery submission confirmed by provider."
                 is IdentityRecoveryState.Recovered -> "The original signing key and DID were restored on this installation."
                 is IdentityRecoveryState.RemovalRequested -> "Recovery record deletion requested; removal from other devices is not verified."
+            } + discovery.failures.joinToString("", prefix = if (discovery.failures.isEmpty()) "" else "\n") {
+                "${it.providerName}: ${it.reason}\n"
             }, choices)
     }
 
@@ -82,8 +86,16 @@ internal class MobileDemoWallet(
                 }
             }
         }
-        for (candidate in mobileWallet.identities.recoveryCandidates()) {
-            for (option in mobileWallet.identities.restorationOptions(candidate)) {
+        val discovery = mobileWallet.identities.discoverRecovery()
+        val recoveryUnavailableReasons = discovery.failures.map { "${it.providerName}: ${it.reason}" }.toMutableList()
+        for (candidate in discovery.candidates) {
+            val options = try { mobileWallet.identities.restorationOptions(candidate) }
+            catch (cause: CancellationException) { throw cause }
+            catch (cause: Exception) {
+                recoveryUnavailableReasons += "${candidate.providerName}: Could not read this recovery record. Try again."
+                continue
+            }
+            for (option in options) {
                 val id = Uuid.random().toString()
                 setupActions[id] = IdentityAction.Restore(option)
                 choices += WalletDemoKeySetupOption(id,
@@ -92,11 +104,6 @@ internal class MobileDemoWallet(
                     storageChoice(option.storage, true), option.authorization.approvalChoice(), restoring = true)
             }
         }
-        val recoveryUnavailableReasons = if (state == WalletIdentityState.Absent) {
-            mobileWallet.identities.recoveryProviderStatuses().mapNotNull { provider ->
-                (provider.availability as? RecoveryAvailability.Unavailable)?.let { "${provider.displayName}: ${it.reason}" }
-            }
-        } else emptyList()
         identityChoices.clear()
         identityChoices.putAll(setupActions)
         return WalletDemoIdentitySetup.Choose(choices, if (state is WalletIdentityState.Unavailable)

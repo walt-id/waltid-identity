@@ -76,7 +76,7 @@ class WalletIdentitiesTest {
             assertEquals(1, sourceNotifications)
             var destinationNotifications = 0
             Fixture(provider = source.provider, onRegistryChanged = { destinationNotifications++ }).use { destination ->
-                val restore = destination.wallet.identities.restorationOptions(destination.wallet.identities.recoveryCandidates().single()).single()
+                val restore = destination.wallet.identities.restorationOptions(destination.wallet.identities.discoverRecovery().candidates.single()).single()
                 val restored = assertIs<IdentityOperationResult.Active>(destination.wallet.identities.restore(restore)).identity
                 assertEquals(original.publicJwk, restored.publicJwk)
                 assertEquals(1, destinationNotifications)
@@ -119,7 +119,7 @@ class WalletIdentitiesTest {
             val original = assertIs<IdentityOperationResult.Active>(source.wallet.identities.create(
                 assertIs<IdentityOptions.Available>(source.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended)).identity
             Fixture(provider = source.provider).use { destination ->
-                val candidate = destination.wallet.identities.recoveryCandidates().single()
+                val candidate = destination.wallet.identities.discoverRecovery().candidates.single()
                 val option = destination.wallet.identities.restorationOptions(candidate).single()
                 val record = source.provider.records.remove(original.id)!!
                 assertEquals(IdentityFailure.ProviderUnavailable,
@@ -139,7 +139,7 @@ class WalletIdentitiesTest {
                 assertTrue(destination.queries.selectAll().executeAsList().isEmpty())
                 source.provider.cancelRetrieve = false
                 val restarted = destination.reopen()
-                val retry = restarted.identities.restorationOptions(restarted.identities.recoveryCandidates().single()).single()
+                val retry = restarted.identities.restorationOptions(restarted.identities.discoverRecovery().candidates.single()).single()
                 assertEquals(original.publicJwk, assertIs<IdentityOperationResult.Active>(restarted.identities.restore(retry)).identity.publicJwk)
             }
         }
@@ -150,7 +150,7 @@ class WalletIdentitiesTest {
             val original = assertIs<IdentityOperationResult.Active>(source.wallet.identities.create(
                 assertIs<IdentityOptions.Available>(source.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended)).identity
             Fixture(provider = source.provider).use { destination ->
-                val option = destination.wallet.identities.restorationOptions(destination.wallet.identities.recoveryCandidates().single()).single()
+                val option = destination.wallet.identities.restorationOptions(destination.wallet.identities.discoverRecovery().candidates.single()).single()
                 assertIs<IdentityOperationResult.Active>(destination.wallet.identities.restore(option))
                 // Emulate process death after key import/journaling but before active binding was committed.
                 val stored = recordJson.decodeFromString<IdentityRecord>(destination.queries.selectIdentityRecord("default").executeAsOne().payload)
@@ -162,7 +162,7 @@ class WalletIdentitiesTest {
                 assertEquals(WalletIdentityState.Absent, restarted.identities.state())
                 assertTrue(destination.queries.selectAll().executeAsList().isEmpty())
                 assertNotNull(source.provider.records[original.id])
-                val retry = restarted.identities.restorationOptions(restarted.identities.recoveryCandidates().single()).single()
+                val retry = restarted.identities.restorationOptions(restarted.identities.discoverRecovery().candidates.single()).single()
                 assertEquals(original.publicJwk, assertIs<IdentityOperationResult.Active>(restarted.identities.restore(retry)).identity.publicJwk)
             }
         }
@@ -210,7 +210,7 @@ class WalletIdentitiesTest {
             val option = assertIs<IdentityOptions.Available>(original.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended
             val expected = assertIs<IdentityOperationResult.Active>(original.wallet.identities.create(option)).identity
             Fixture(provider = original.provider).use { destination ->
-                val candidate = destination.wallet.identities.recoveryCandidates().single()
+                val candidate = destination.wallet.identities.discoverRecovery().candidates.single()
                 val restore = destination.wallet.identities.restorationOptions(candidate).single()
                 val restored = assertIs<IdentityOperationResult.Active>(destination.wallet.identities.restore(restore)).identity
                 assertEquals(expected.did, restored.did)
@@ -251,7 +251,7 @@ class WalletIdentitiesTest {
             val record = recordJson.decodeFromString<RecoveryRecord>(fixture.provider.records.values.single().decodeToString())
             assertIs<RecoverySecret.Exported>(record.secret)
             Fixture(provider = fixture.provider).use { destination ->
-                val option = destination.wallet.identities.restorationOptions(destination.wallet.identities.recoveryCandidates().single()).single()
+                val option = destination.wallet.identities.restorationOptions(destination.wallet.identities.discoverRecovery().candidates.single()).single()
                 assertEquals(created.publicJwk, assertIs<IdentityOperationResult.Active>(destination.wallet.identities.restore(option)).identity.publicJwk)
             }
         }
@@ -262,7 +262,7 @@ class WalletIdentitiesTest {
             val created = assertIs<IdentityOperationResult.Active>(original.wallet.identities.create(
                 assertIs<IdentityOptions.Available>(original.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended)).identity
             Fixture(provider = original.provider).use { destination ->
-                val candidate = destination.wallet.identities.recoveryCandidates().single()
+                val candidate = destination.wallet.identities.discoverRecovery().candidates.single()
                 val option = destination.wallet.identities.restorationOptions(candidate).single()
                 original.provider.records[created.id] = "{}".encodeToByteArray()
                 assertTrue(destination.wallet.identities.restorationOptions(candidate).isEmpty())
@@ -287,7 +287,7 @@ class WalletIdentitiesTest {
                 fixture.wallet.identities.backupOptions(created.id).single()))
             assertContentEquals(originalRecovery, provider.records.getValue(created.id))
             assertEquals(RecoveryReceipt.ConfirmedByProvider, fixture.wallet.identities.deleteRecovery(
-                fixture.wallet.identities.recoveryCandidates().single()))
+                fixture.wallet.identities.discoverRecovery().candidates.single()))
             assertTrue(provider.records.isEmpty())
             val active = assertIs<WalletIdentityState.Active>(fixture.wallet.identities.state()).identity
             assertEquals(created.keyId, active.keyId)
@@ -349,7 +349,7 @@ class WalletIdentitiesTest {
                 original.copy(version = 2),
             )
             Fixture(provider = source.provider).use { destination ->
-                val candidate = destination.wallet.identities.recoveryCandidates().single()
+                val candidate = destination.wallet.identities.discoverRecovery().candidates.single()
                 for (record in invalid) {
                     source.provider.records[identity.id] = record.encode()
                     assertTrue(destination.wallet.identities.restorationOptions(candidate).isEmpty())
@@ -432,7 +432,7 @@ class WalletIdentitiesTest {
             )) {
                 source.provider.records[original.id] = record.copy(constraints = restricted).encode()
                 Fixture(provider = source.provider).use { destination ->
-                    val candidate = destination.wallet.identities.recoveryCandidates().single()
+                    val candidate = destination.wallet.identities.discoverRecovery().candidates.single()
                     assertTrue(destination.wallet.identities.restorationOptions(candidate).isEmpty())
                     assertTrue(destination.queries.selectAll().executeAsList().isEmpty())
                 }
@@ -525,7 +525,41 @@ class WalletIdentitiesTest {
         healthy.records["recoverable-identity"] = byteArrayOf(1)
         Fixture(IdentityConfiguration(recoveryProviders = listOf(broken, healthy),
             authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None))).use { fixture ->
-            assertEquals(listOf("healthy"), fixture.wallet.identities.recoveryCandidates().map { it.reference.providerId })
+            val discovery = fixture.wallet.identities.discoverRecovery()
+            assertEquals(listOf("healthy"), discovery.candidates.map { it.reference.providerId })
+            assertEquals(listOf(IdentityRecoveryProviderFailure("broken", broken.displayName, IdentityFailure.ProviderUnavailable)), discovery.failures)
+            broken.availabilityFailure = CancellationException("cancelled")
+            assertFailsWith<CancellationException> { fixture.wallet.identities.discoverRecovery() }
+        }
+    }
+
+    @Test fun `execution availability errors are safe and do not activate a key`() = runTest {
+        Fixture().use { fixture ->
+            val manager = fixture.wallet.identities
+            val option = assertIs<IdentityOptions.Available>(manager.creationOptions(IdentityIntent.Recoverable)).recommended
+            fixture.provider.availabilityFailure = IllegalStateException("private details")
+            assertEquals(IdentityFailure.ProviderUnavailable, assertIs<IdentityOperationResult.Failed>(manager.create(option)).reason)
+            assertEquals(WalletIdentityState.Absent, manager.state())
+            fixture.provider.availabilityFailure = null
+            val identity = assertIs<IdentityOperationResult.Active>(manager.create(option)).identity
+            val backup = manager.backupOptions(identity.id).single()
+            fixture.provider.availabilityFailure = IllegalStateException("private details")
+            assertEquals(IdentityFailure.ProviderUnavailable, assertIs<IdentityOperationResult.Failed>(manager.backup(backup)).reason)
+            assertEquals(identity, assertIs<WalletIdentityState.Active>(manager.state()).identity)
+        }
+    }
+
+    @Test fun `candidate retrieval failures are typed and cancellation propagates`() = runTest {
+        Fixture().use { fixture ->
+            val manager = fixture.wallet.identities
+            manager.create(assertIs<IdentityOptions.Available>(manager.creationOptions(IdentityIntent.Recoverable)).recommended)
+            val candidate = manager.discoverRecovery().candidates.single()
+            fixture.provider.retrieveFailure = IdentityProviderFailure.InteractionRequired
+            assertEquals(IdentityProviderFailure.InteractionRequired,
+                assertFailsWith<IdentityProviderException> { manager.restorationOptions(candidate) }.failure)
+            fixture.provider.retrieveFailure = null
+            fixture.provider.cancelRetrieve = true
+            assertFailsWith<CancellationException> { manager.restorationOptions(candidate) }
         }
     }
 

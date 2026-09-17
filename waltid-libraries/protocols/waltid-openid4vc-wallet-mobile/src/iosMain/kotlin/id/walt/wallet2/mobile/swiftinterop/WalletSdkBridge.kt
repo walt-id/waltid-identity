@@ -108,8 +108,8 @@ public class WalletSdkBridge private constructor(
         walletBridgeCall { operations.identities.transferToCustody(option) }
 
     /** Discovers safe backup references from registered providers. */
-    public suspend fun identityRecoveryCandidates(): WalletBridgeResult<List<RecoveryCandidate>> =
-        walletBridgeCall { operations.identities.recoveryCandidates() }
+    public suspend fun identityRecoveryDiscovery(): WalletBridgeResult<IdentityRecoveryDiscovery> =
+        walletBridgeCall { operations.identities.discoverRecovery() }
 
     /** Validates a backup and offers supported restoration destinations. */
     public suspend fun identityRestorationOptions(candidate: RecoveryCandidate): WalletBridgeResult<List<IdentityRestorationOption>> =

@@ -93,10 +93,13 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
         case .failed(let failed): return .failed(failure(failed.reason))
         }
     }
-    func recoveryCandidates() async throws -> [WalletIdentityRecoveryCandidate] {
-        try value(await bridge.identityRecoveryCandidates(), as: [WalletCore.RecoveryCandidate].self).map {
+    func discoverRecovery() async throws -> WalletIdentityRecoveryDiscovery {
+        let discovery = try value(await bridge.identityRecoveryDiscovery(), as: WalletCore.IdentityRecoveryDiscovery.self)
+        return .init(candidates: discovery.candidates.map {
             .init(reference: Self.reference($0.reference), providerName: $0.providerName, handle: KMPIdentityHandle($0))
-        }
+        }, failures: discovery.failures.map {
+            .init(providerID: $0.providerId, providerName: $0.providerName, reason: failure($0.reason))
+        })
     }
     func restorationOptions(_ candidate: WalletIdentityRecoveryCandidate) async throws -> [WalletIdentityRestorationOption] {
         try value(await bridge.identityRestorationOptions(candidate: handle(candidate.handle, as: WalletCore.RecoveryCandidate.self)),

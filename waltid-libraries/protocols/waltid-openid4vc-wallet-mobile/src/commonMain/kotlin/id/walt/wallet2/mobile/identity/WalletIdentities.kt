@@ -101,7 +101,12 @@ public class WalletIdentities internal constructor(
 
     /** Creates P-256 and did:jwk. No provider is selected and no backup is made by default. */
     public suspend fun create(option: IdentityCreationOption): IdentityOperationResult = mutex.withLock {
-        if (option.owner !== owner || !valid(option)) return@withLock failed(IdentityFailure.StaleOption)
+        if (option.owner !== owner) return@withLock failed(IdentityFailure.StaleOption)
+        val valid = try { valid(option) }
+        catch (cause: CancellationException) { throw cause }
+        catch (cause: IdentityProviderException) { return@withLock failed(providerFailure(cause)) }
+        catch (cause: Exception) { return@withLock failed(classify(cause)) }
+        if (!valid) return@withLock failed(IdentityFailure.StaleOption)
         if (currentState() !is WalletIdentityState.Absent) return@withLock failed(IdentityFailure.ExistingIdentity)
         val id = Uuid.random().toString()
         val keyId = "wallet_identity_${Uuid.random()}"
@@ -193,10 +198,10 @@ public class WalletIdentities internal constructor(
             return@withLock failed(IdentityFailure.UnsupportedPolicy)
         if (liveKey(record) == null) return@withLock failed(IdentityFailure.KeyUnavailable)
         val provider = providers[option.providerId] ?: return@withLock failed(IdentityFailure.ProviderUnavailable)
-        if (provider.availability() != option.recoveryAvailability) return@withLock failed(IdentityFailure.StaleOption)
         val identity = requireNotNull(record.identity)
         val reference = IdentityBackupReference(provider.id, identity.id)
         try {
+            if (providerAvailability(provider) != option.recoveryAvailability) return@withLock failed(IdentityFailure.StaleOption)
             val recovery = recoveryRecord(record) ?: return@withLock failed(IdentityFailure.UnsupportedPolicy)
             val receipt = submit(provider, reference.recordId, recovery, record)
             val updated = identity.copy(recovery = IdentityRecoveryState.Submitted(reference, receipt))
@@ -282,16 +287,25 @@ public class WalletIdentities internal constructor(
         catch (cause: Exception) { IdentityCustodyResult.Failed(providerFailure(cause)) }
     }
 
-    /** Lists safe references only. A reference is not proof that its record is valid or restorable. */
-    public suspend fun recoveryCandidates(): List<RecoveryCandidate> = mutex.withLock {
-        availableProviders().flatMap { (provider, _) ->
+    /** Discovers safe references and failures from the same attempt. No secret leaves discovery. */
+    public suspend fun discoverRecovery(): IdentityRecoveryDiscovery = mutex.withLock {
+        val candidates = mutableListOf<RecoveryCandidate>()
+        val failures = mutableListOf<IdentityRecoveryProviderFailure>()
+        for (provider in providers.values) {
             try {
-                provider.list().distinct().filter { it.length in 1..256 }.map {
+                if (provider.availability() !is RecoveryAvailability.Available) {
+                    failures += IdentityRecoveryProviderFailure(provider.id, provider.displayName, IdentityFailure.ProviderUnavailable)
+                    continue
+                }
+                candidates += provider.list().distinct().filter { it.length in 1..256 }.map {
                     RecoveryCandidate(owner, IdentityBackupReference(provider.id, it), provider.displayName)
                 }
             } catch (cause: CancellationException) { throw cause }
-            catch (_: Exception) { emptyList() }
+            catch (cause: Exception) {
+                failures += IdentityRecoveryProviderFailure(provider.id, provider.displayName, providerFailure(cause))
+            }
         }
+        IdentityRecoveryDiscovery(candidates, failures)
     }
 
     /** Deletes a selected backup through its owning provider. Other device copies may remain outside its control. */
@@ -311,8 +325,13 @@ public class WalletIdentities internal constructor(
     public suspend fun restorationOptions(candidate: RecoveryCandidate): List<IdentityRestorationOption> = mutex.withLock {
         if (candidate.owner !== owner || configuration.policy != IdentityKeyPolicy.GeneralPurpose) return@withLock emptyList()
         val provider = providers[candidate.reference.providerId] ?: return@withLock emptyList()
-        if (provider.availability() !is RecoveryAvailability.Available) return@withLock emptyList()
-        val bytes = provider.retrieve(candidate.reference.recordId)?.copyBytes() ?: return@withLock emptyList()
+        val bytes = try {
+            if (providerAvailability(provider) !is RecoveryAvailability.Available)
+                throw IdentityProviderException(IdentityProviderFailure.TemporarilyUnavailable)
+            provider.retrieve(candidate.reference.recordId)?.copyBytes() ?: return@withLock emptyList()
+        } catch (cause: CancellationException) { throw cause }
+        catch (cause: IdentityProviderException) { throw cause }
+        catch (_: Exception) { throw IdentityProviderException(IdentityProviderFailure.TemporarilyUnavailable) }
         try {
             val record = decodeRecovery(bytes, candidate.reference.recordId)
             authorizations.flatMap { authorization -> supportedStorage(importing = true, authorization)
@@ -379,9 +398,10 @@ public class WalletIdentities internal constructor(
         val recovering = intent == IdentityIntent.Recoverable
         if (recovering && configuration.policy != IdentityKeyPolicy.GeneralPurpose)
             return IdentityOptions.Unavailable(listOf("The configured identity policy prohibits recovery-secret backup"))
+        val available = if (recovering) availableProviders() else emptyList()
         val options = authorizations.flatMap { authorization ->
             val storage = supportedStorage(recovering, authorization, attestation)
-            if (recovering) availableProviders().flatMap { (provider, availability) ->
+            if (recovering) available.flatMap { (provider, availability) ->
                 storage.map { IdentityCreationOption(owner, it, authorization, provider.displayName, provider.id, availability, attestation) }
             } else storage.map { IdentityCreationOption(owner, it, authorization, null, null, null, attestation) }
         }
@@ -422,7 +442,7 @@ public class WalletIdentities internal constructor(
     private suspend fun valid(option: IdentityCreationOption): Boolean =
         option.authorization in authorizations && option.storage in supportedStorage(option.recoverable, option.authorization, option.attestation) &&
             (!option.recoverable || (configuration.policy == IdentityKeyPolicy.GeneralPurpose &&
-                providers[option.providerId]?.availability() == option.recoveryAvailability))
+                providers[option.providerId]?.let { providerAvailability(it) } == option.recoveryAvailability))
 
     /** Reports each configured recovery provider, including its unmet prerequisites. */
     public suspend fun recoveryProviderStatuses(): List<IdentityRecoveryProviderStatus> = providers.values.map { provider ->
@@ -431,6 +451,12 @@ public class WalletIdentities internal constructor(
         catch (_: Exception) { RecoveryAvailability.Unavailable("The recovery service could not be reached. Try again.") }
         IdentityRecoveryProviderStatus(provider.id, provider.displayName, availability)
     }
+
+    private suspend fun providerAvailability(provider: IdentityRecoveryProvider): RecoveryAvailability = try {
+        provider.availability()
+    } catch (cause: CancellationException) { throw cause }
+    catch (cause: IdentityProviderException) { throw cause }
+    catch (_: Exception) { throw IdentityProviderException(IdentityProviderFailure.TemporarilyUnavailable) }
 
     private suspend fun availableProviders(): List<Pair<IdentityRecoveryProvider, RecoveryAvailability.Available>> =
         recoveryProviderStatuses().mapNotNull { status ->

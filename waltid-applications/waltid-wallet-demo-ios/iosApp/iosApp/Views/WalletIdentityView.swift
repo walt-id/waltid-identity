@@ -124,7 +124,9 @@ final class WalletIdentityScreenModel: ObservableObject {
                         try Self.check(await service.backup(option))
                     })
                 }
-                for candidate in try await service.recoveryCandidates() where candidate.reference.recordID == identity.id {
+                let discovery = try await service.discoverRecovery()
+                recoveryUnavailableReasons = discovery.failures.map { "\($0.providerName): \($0.reason)" }
+                for candidate in discovery.candidates where candidate.reference.recordID == identity.id {
                     choices.append(Choice(title: "Delete recovery record", detail: candidate.providerName, destructive: true) { [service] in
                         _ = try await service.deleteRecovery(candidate)
                     })
@@ -146,10 +148,6 @@ final class WalletIdentityScreenModel: ObservableObject {
                 })
             case .absent:
                 identity = nil
-                recoveryUnavailableReasons = try await service.recoveryProviderStatuses().compactMap { provider in
-                    if case .unavailable(let reason) = provider.availability { return "\(provider.displayName): \(reason)" }
-                    return nil
-                }
                 for intent in [WalletIdentityIntent.withoutRecovery, .recoverable] {
                     if case .available(let recommended, let alternatives) = try await service.creationOptions(intent: intent) {
                         for option in [recommended] + alternatives {
@@ -201,8 +199,17 @@ final class WalletIdentityScreenModel: ObservableObject {
     }
 
     private func addRecoveryChoices() async throws {
-        for candidate in try await service.recoveryCandidates() {
-            for option in try await service.restorationOptions(candidate) {
+        let discovery = try await service.discoverRecovery()
+        recoveryUnavailableReasons += discovery.failures.map { "\($0.providerName): \($0.reason)" }
+        for candidate in discovery.candidates {
+            let options: [WalletIdentityRestorationOption]
+            do { options = try await service.restorationOptions(candidate) }
+            catch is CancellationError { throw CancellationError() }
+            catch {
+                recoveryUnavailableReasons.append("\(candidate.providerName): Could not read this recovery record. Try again.")
+                continue
+            }
+            for option in options {
                 setupOptions.append(SetupOption(
                     recovery: Selection(id: "restore:\(candidate.reference)", title: "Restore from \(candidate.providerName)",
                         detail: "Restore the original signing key and DID. Credentials are not included.\n\(option.did)"),

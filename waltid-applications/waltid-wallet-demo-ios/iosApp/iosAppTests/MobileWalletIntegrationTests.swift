@@ -938,7 +938,7 @@ final class WalletIdentityRecoveryIntegrationTests: XCTestCase {
             XCTAssertEqual(created.securityLevel, .software)
             XCTAssertTrue(created.did.hasPrefix("did:jwk:"))
             let destinationService = await destination.identities
-            let candidates = try await destinationService.recoveryCandidates()
+            let candidates = try await destinationService.discoverRecovery().candidates
             let candidate = try XCTUnwrap(candidates.first)
             let restoreOptions = try await destinationService.restorationOptions(candidate)
             let restore = try XCTUnwrap(restoreOptions.first { $0.storage == .nativeStorage })
@@ -1054,7 +1054,7 @@ final class WalletIdentityBackupIntegrationTests: XCTestCase {
             identity: .init(authorization: .explicit(.none), keychain: .init(), recoveryProviders: [provider])))
         do {
             let service = await wallet.identities
-            let candidates = try await service.recoveryCandidates()
+            let candidates = try await service.discoverRecovery().candidates
             let candidate = try XCTUnwrap(candidates.first)
             let options = try await service.restorationOptions(candidate)
             let option = try XCTUnwrap(options.first { $0.storage == .nativeStorage })
