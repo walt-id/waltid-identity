@@ -163,3 +163,21 @@ public sealed interface IdentityOperationResult {
      */
     public data class Failed(public val reason: IdentityFailure) : IdentityOperationResult
 }
+
+/** One recovery discovery attempt, including routes that failed without hiding healthy candidates.
+ * @property candidates Safe references discovered through available providers.
+ * @property failures Provider failures from the same attempt. */
+public data class IdentityRecoveryDiscovery(
+    public val candidates: List<RecoveryCandidate>,
+    public val failures: List<IdentityRecoveryProviderFailure>,
+)
+
+/** Redacted provider failure; no private record or native diagnostic is exposed.
+ * @property providerId Stable configured provider identifier.
+ * @property providerName Provider name for display.
+ * @property reason Stable failure category. */
+public data class IdentityRecoveryProviderFailure(
+    public val providerId: String,
+    public val providerName: String,
+    public val reason: IdentityFailure,
+)

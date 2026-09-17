@@ -35,7 +35,7 @@ class WalletIdentityRecoveryDeviceTest {
                 if (storage == IdentityKeyStorage.Hardware) assertEquals(KeyOrigin.IMPORTED, created.keyFacts.origin)
                 val reopened = factory.create(originalConfiguration)
                 assertEquals(created, assertIs<WalletIdentityState.Active>(reopened.identities.state()).identity)
-                val candidate = destination.identities.recoveryCandidates().single()
+                val candidate = destination.identities.discoverRecovery().candidates.single()
                 val restore = destination.identities.restorationOptions(candidate).single { it.storage == storage }
                 val restored = assertIs<IdentityOperationResult.Active>(destination.identities.restore(restore)).identity
                 assertEquals(created.id, restored.id)

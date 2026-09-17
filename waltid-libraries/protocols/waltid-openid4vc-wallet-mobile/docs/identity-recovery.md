@@ -47,7 +47,7 @@ silent change in authorization, hardware requirements or recovery intent.
 | `creationOptions()` / `create()` | Select and execute a supported new identity configuration. |
 | `resumePending()` / `cancelPending()` | Retry or cancel pending local setup. Already submitted provider records are deleted only explicitly. |
 | `backupOptions()` / `backup()` | Back up a retained recovery secret or an existing exportable software key. |
-| `recoveryCandidates()` / `restorationOptions()` / `restore()` | Discover, validate and recover the original identity. |
+| `discoverRecovery()` / `restorationOptions()` / `restore()` | Discover candidates and per-provider failures in one snapshot, validate each candidate independently, and recover the original identity. |
 | `deleteRecovery()` | Request deletion of one selected provider record. |
 | `custodyOptions()` / `transferToCustody()` | Copy an exportable key to an explicitly selected custodian. |
 

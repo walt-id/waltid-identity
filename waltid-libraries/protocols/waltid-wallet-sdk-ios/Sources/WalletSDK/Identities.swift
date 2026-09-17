@@ -478,7 +478,7 @@ public actor WalletIdentityService {
         try await core.transferToCustody(option)
     }
     /// Lists references to discoverable recovery records without exposing secrets.
-    public func recoveryCandidates() async throws -> [WalletIdentityRecoveryCandidate] { try await core.recoveryCandidates() }
+    public func discoverRecovery() async throws -> WalletIdentityRecoveryDiscovery { try await core.discoverRecovery() }
     /// Validates a recovery record before offering supported signing destinations.
     /// - Parameter candidate: Recovery reference issued by this service.
     public func restorationOptions(_ candidate: WalletIdentityRecoveryCandidate) async throws -> [WalletIdentityRestorationOption] {
@@ -505,7 +505,7 @@ protocol WalletIdentityCore: Sendable {
     func backup(_ option: WalletIdentityBackupOption) async throws -> WalletIdentityOperationResult
     func custodyOptions(identityID: String) async throws -> [WalletIdentityCustodyOption]
     func transferToCustody(_ option: WalletIdentityCustodyOption) async throws -> WalletIdentityCustodyResult
-    func recoveryCandidates() async throws -> [WalletIdentityRecoveryCandidate]
+    func discoverRecovery() async throws -> WalletIdentityRecoveryDiscovery
     func restorationOptions(_ candidate: WalletIdentityRecoveryCandidate) async throws -> [WalletIdentityRestorationOption]
     func restore(_ option: WalletIdentityRestorationOption) async throws -> WalletIdentityOperationResult
 }
@@ -525,7 +525,7 @@ struct UnavailableWalletIdentityCore: WalletIdentityCore {
     func backup(_ option: WalletIdentityBackupOption) async throws -> WalletIdentityOperationResult { throw unavailable() }
     func custodyOptions(identityID: String) async throws -> [WalletIdentityCustodyOption] { throw unavailable() }
     func transferToCustody(_ option: WalletIdentityCustodyOption) async throws -> WalletIdentityCustodyResult { throw unavailable() }
-    func recoveryCandidates() async throws -> [WalletIdentityRecoveryCandidate] { throw unavailable() }
+    func discoverRecovery() async throws -> WalletIdentityRecoveryDiscovery { throw unavailable() }
     func restorationOptions(_ candidate: WalletIdentityRecoveryCandidate) async throws -> [WalletIdentityRestorationOption] { throw unavailable() }
     func restore(_ option: WalletIdentityRestorationOption) async throws -> WalletIdentityOperationResult { throw unavailable() }
 }
@@ -598,4 +598,17 @@ public enum WalletIdentityCustodyResult: Sendable {
     /// No verified custody reference was recorded; remote keys are never deleted automatically.
     /// - Parameter reason: Stable failure category.
     case failed(WalletIdentityFailure)
+}
+
+/// Candidates and redacted provider failures from one discovery attempt.
+public struct WalletIdentityRecoveryDiscovery: Sendable {
+    public let candidates: [WalletIdentityRecoveryCandidate]
+    public let failures: [WalletIdentityRecoveryProviderFailure]
+}
+
+/// A recovery provider that failed while other providers could still be discovered.
+public struct WalletIdentityRecoveryProviderFailure: Sendable {
+    public let providerID: String
+    public let providerName: String
+    public let reason: WalletIdentityFailure
 }
