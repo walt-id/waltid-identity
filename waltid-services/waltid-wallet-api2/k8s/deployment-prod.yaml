@@ -6,8 +6,16 @@ data:
   web.conf: |
     webHost = "0.0.0.0"
     webPort = 3000
+  _features.conf: |
+    enabledFeatures = [
+        auth
+        wallet2-persistence
+    ]
+  wallet2-persistence.conf: |
+    jdbcUrl = "jdbc:sqlite:/waltid-wallet-api2/data/wallet2.db"
+    driverClassName = "org.sqlite.JDBC"
   wallet-service.conf: |
-    publicBaseUrl = "https://wallet-api2.demo.walt.id"
+    publicBaseUrl = "https://wallet2.demo.walt.id"
     attestationConfig {
       attesterUrl = "https://wallet-provider.eudiw.dev/wallet-instance-attestation/jwk"
       requestBody {
@@ -67,6 +75,18 @@ spec:
               mountPath: "/waltid-wallet-api2/config/wallet-service.conf"
               subPath: wallet-service.conf
               readOnly: true
+            - name: wallet2-web-config
+              mountPath: "/waltid-wallet-api2/config/_features.conf"
+              subPath: _features.conf
+              readOnly: true
+            - name: wallet2-auth-config
+              mountPath: "/waltid-wallet-api2/config/auth.conf"
+              subPath: auth.conf
+              readOnly: true
+            - name: wallet2-web-config
+              mountPath: "/waltid-wallet-api2/config/wallet2-persistence.conf"
+              subPath: wallet2-persistence.conf
+              readOnly: true
             - mountPath: "/waltid-wallet-api2/data/"
               name: wallet-data
           ports:
@@ -76,6 +96,9 @@ spec:
         - name: wallet2-web-config
           configMap:
             name: wallet2-web-config
+        - name: wallet2-auth-config
+          secret:
+            secretName: wallet2-auth-secret
         - name: wallet-data
           persistentVolumeClaim:
             claimName: wallet-api2-data-volume-claim
@@ -93,26 +116,142 @@ spec:
   selector:
     app: wallet-api2
 ---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: wallet-demo-compose-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wallet-demo-compose-web
+  template:
+    metadata:
+      labels:
+        app: wallet-demo-compose-web
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: wallet-demo-compose-web
+          image: waltid/wallet-demo-compose-web:__DEFAULT_IMAGE_TAG__
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: WALLET_API2_PUBLIC_URL
+              value: "https://wallet2.demo.walt.id"
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /branding.json
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /branding.json
+              port: http
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: wallet-demo-compose-web
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: wallet-demo-compose-web
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: wallet-api2-ingress
+  name: wallet2-ingress
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - wallet-api2.demo.walt.id
-      secretName: wallet-api2-tls-secret
+        - wallet2.demo.walt.id
+      secretName: wallet2-tls-secret
   rules:
-    - host: wallet-api2.demo.walt.id
+    - host: wallet2.demo.walt.id
       http:
         paths:
-          - path: /
+          # No trailing slashes: the SPA calls `GET /wallet` and `POST /wallet` as well as
+          # /wallet/<id>/..., and a `/wallet/` prefix would not match the bare path.
+          - path: /wallet
             pathType: Prefix
             backend:
               service:
                 name: wallet-api2
+                port:
+                  name: http
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api2
+                port:
+                  name: http
+          - path: /transaction-data-profiles
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api2
+                port:
+                  name: http
+          - path: /swagger
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api2
+                port:
+                  name: http
+          - path: /api.json
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: wallet-api2
+                port:
+                  name: http
+          - path: /livez
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api2
+                port:
+                  name: http
+          - path: /features
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api2
+                port:
+                  name: http
+          - path: /debug
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api2
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-demo-compose-web
                 port:
                   name: http

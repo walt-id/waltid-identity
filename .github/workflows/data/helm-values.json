@@ -130,14 +130,30 @@
         "tag": "latest"
       }
     },
+    "configFiles": {
+      "auth.conf": "signingKey = __DEFAULT_WALLET2_AUTH_SIGNING_KEY__\ntokenExpiry = \"PT24H\""
+    },
     "ingress": {
-      "host": "wallet-api2.test.waltid.cloud",
+      "host": "wallet2.test.waltid.cloud"
+    }
+  },
+  "wallet2": {
+    "env": {
+      "WALLET_API2_PUBLIC_URL": "https://wallet2.test.waltid.cloud"
+    },
+    "api": {
+      "image": {
+        "tag": "latest"
+      }
+    },
+    "ingress": {
+      "host": "wallet2.test.waltid.cloud",
       "clusterIssuer": "letsencrypt-prod",
       "tls": [
         {
-          "secretName": "wallet-api2-tls-secret",
+          "secretName": "wallet2-tls-secret",
           "hosts": [
-            "wallet-api2.test.waltid.cloud"
+            "wallet2.test.waltid.cloud"
           ]
         }
       ]
