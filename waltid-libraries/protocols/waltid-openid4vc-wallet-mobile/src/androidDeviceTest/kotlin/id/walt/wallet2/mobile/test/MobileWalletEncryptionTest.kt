@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile.test
 
-import id.walt.wallet2.mobile.identity.IdentityOperationResult
-import id.walt.wallet2.mobile.identity.WalletIdentity
+import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
+import id.walt.wallet2.mobile.identity.SigningIdentity
 
 import android.content.Context
 import android.content.ContextWrapper
@@ -196,8 +196,8 @@ class MobileWalletEncryptionTest {
         )
         val wallet = factory.create(config)
 
-        val bootstrap = wallet.identities.initialize().activeIdentity()
-        val reopenedBootstrap = factory.create(config).identities.initialize().activeIdentity()
+        val bootstrap = wallet.signingIdentity.initialize().activeIdentity()
+        val reopenedBootstrap = factory.create(config).signingIdentity.initialize().activeIdentity()
 
         assertEquals(bootstrap, reopenedBootstrap)
         assertEquals(listOf("$walletId:$databaseName", "$walletId:$databaseName"), provider.requestedKeys)
@@ -226,10 +226,10 @@ class MobileWalletEncryptionTest {
 
         val wallet = factory.create(config)
 
-        val bootstrap = wallet.identities.initialize().activeIdentity()
+        val bootstrap = wallet.signingIdentity.initialize().activeIdentity()
         val credentials = wallet.credentials()
         val reopenedWallet = factory.create(config)
-        val reopenedBootstrap = reopenedWallet.identities.initialize().activeIdentity()
+        val reopenedBootstrap = reopenedWallet.signingIdentity.initialize().activeIdentity()
         val reopenedCredentials = reopenedWallet.credentials()
 
         assertTrue(bootstrap.did.startsWith("did:"), "Custom credential stores should keep Android platform signing keys")
@@ -338,5 +338,5 @@ class MobileWalletEncryptionTest {
     }
 }
 
-private fun IdentityOperationResult.activeIdentity(): WalletIdentity =
-    kotlin.test.assertIs<IdentityOperationResult.Active>(this).identity
+private fun SigningIdentityOperationResult.activeIdentity(): SigningIdentity =
+    kotlin.test.assertIs<SigningIdentityOperationResult.Active>(this).identity

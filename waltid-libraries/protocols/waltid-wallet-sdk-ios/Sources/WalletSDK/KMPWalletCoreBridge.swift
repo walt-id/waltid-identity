@@ -15,7 +15,7 @@ func parseWalletISO8601Date(_ value: String) -> Date? {
 
 final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     let bridge: WalletSdkBridge
-    var identityCore: any WalletIdentityCore { KMPWalletIdentityCore(bridge: bridge) }
+    var signingIdentityCore: any SigningIdentityCore { KMPSigningIdentityCore(bridge: bridge) }
     private let nfcHost = IOSNfcHostPlatformAdapter()
 
     init(configuration: WalletConfiguration) async throws {
@@ -94,7 +94,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
                 redirectUri: request.redirectURI.absoluteString,
                 keyId: request.keyID,
                 did: request.did,
-                keyPolicy: request.keyPolicy.toKMPIdentityPolicy()
+                keyPolicy: request.keyPolicy.toKMPSigningIdentityPolicy()
             )
         )
         let value = try Self.successValue(
@@ -1184,7 +1184,7 @@ private extension WalletConfiguration {
                 reason: keyUseAuthorizationPrompt.message,
                 cancelText: keyUseAuthorizationPrompt.cancelText
             ),
-            identity: identity.toKMPIdentityConfiguration()
+            signingIdentity: signingIdentity.toKMPSigningIdentityConfiguration()
         )
     }
 }

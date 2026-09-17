@@ -34,7 +34,7 @@ public actor Wallet {
     }
 
     /// Signing identity creation and recovery. Options are issued and validated by the shared core.
-    public var identities: WalletIdentityService { WalletIdentityService(core: bridge.identityCore) }
+    public var signingIdentity: SigningIdentityManager { SigningIdentityManager(core: bridge.signingIdentityCore) }
 
     /// Emits wallet issuance and presentation progress events.
     ///

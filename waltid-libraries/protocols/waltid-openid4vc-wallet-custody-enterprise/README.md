@@ -7,11 +7,11 @@ val custodian = EnterpriseIdentityKeyCustodian(
     httpClient = authenticatedClient,
     kmsResourceUrl = Url("https://enterprise.example/v1/org.kms"),
 )
-val identity = IdentityConfiguration(keyCustodians = listOf(custodian))
+val signingIdentity = SigningIdentityConfiguration(keyCustodians = listOf(custodian))
 ```
 
 After creating the wallet with this identity configuration, select an option from
-`wallet.identities.custodyOptions(identityId)` and pass it to `transferToCustody(option)`.
+`wallet.signingIdentity.custodyOptions(identityId)` and pass it to `copyToCustody(option)`.
 The destination receives an additional private-key copy. The SDK checks the returned public key,
 retains local signing, and records the destination reference separately from recovery status.
 

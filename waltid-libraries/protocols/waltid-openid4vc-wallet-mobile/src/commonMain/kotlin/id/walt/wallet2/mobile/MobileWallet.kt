@@ -216,7 +216,7 @@ public class MobileWallet internal constructor(
     private val proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
-    createIdentityService: ((suspend () -> Unit) -> id.walt.wallet2.mobile.identity.WalletIdentities)? = null,
+    createSigningIdentityManager: ((suspend () -> Unit) -> id.walt.wallet2.mobile.identity.SigningIdentityManager)? = null,
 ) {
     private val eventStream = MobileWalletEventStream()
     /**
@@ -282,11 +282,11 @@ public class MobileWallet internal constructor(
         httpClient = issuanceHttpClient,
     )
 
-    private val identityService = createIdentityService?.invoke(::syncDigitalCredentialRegistration)
+    private val signingIdentityManager = createSigningIdentityManager?.invoke(::syncDigitalCredentialRegistration)
 
     /** Signing identity creation, backup and restoration; recovery integrations are explicitly configured. */
-    public val identities: id.walt.wallet2.mobile.identity.WalletIdentities
-        get() = checkNotNull(identityService) { "Identity lifecycle requires the persistent mobile wallet factory" }
+    public val signingIdentity: id.walt.wallet2.mobile.identity.SigningIdentityManager
+        get() = checkNotNull(signingIdentityManager) { "Identity lifecycle requires the persistent mobile wallet factory" }
 
 
     /** Checks whether a key-use authorization request is supported without creating or persisting a key. */
@@ -389,15 +389,15 @@ public class MobileWallet internal constructor(
         redirectUri: String,
         keyId: String? = null,
         did: String? = null,
-        keyPolicy: id.walt.wallet2.mobile.identity.IdentityKeyPolicy = id.walt.wallet2.mobile.identity.IdentityKeyPolicy.GeneralPurpose,
+        keyPolicy: id.walt.wallet2.mobile.identity.SigningIdentityKeyPolicy = id.walt.wallet2.mobile.identity.SigningIdentityKeyPolicy.GeneralPurpose,
     ): WalletIssuanceSessionRequest {
-        val active = if (keyId == null || did == null) identityService?.state() else null
-        val identity = (active as? id.walt.wallet2.mobile.identity.WalletIdentityState.Active)?.identity
-        check(identityService == null || active == null || identity != null) { "The wallet requires an active signing identity" }
+        val active = if (keyId == null || did == null) signingIdentityManager?.state() else null
+        val identity = (active as? id.walt.wallet2.mobile.identity.SigningIdentityState.Active)?.identity
+        check(signingIdentityManager == null || active == null || identity != null) { "The wallet requires an active signing identity" }
         val selectedKeyId = keyId ?: identity?.keyId ?: keyStore.getDefaultKeyMaterial()?.keyId
             ?: error("No holder key is available for credential issuance")
-        if (keyPolicy != id.walt.wallet2.mobile.identity.IdentityKeyPolicy.GeneralPurpose) {
-            requireNotNull(identityService) { "Restricted holder-key policy requires a managed signing identity" }
+        if (keyPolicy != id.walt.wallet2.mobile.identity.SigningIdentityKeyPolicy.GeneralPurpose) {
+            requireNotNull(signingIdentityManager) { "Restricted holder-key policy requires a managed signing identity" }
                 .requireKeyPolicy(selectedKeyId, keyPolicy)
         }
         val selectedDid = did ?: identity?.did ?: didStore.getDefaultDid()

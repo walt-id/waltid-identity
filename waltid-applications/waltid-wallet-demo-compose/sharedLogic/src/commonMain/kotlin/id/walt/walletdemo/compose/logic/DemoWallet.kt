@@ -6,7 +6,7 @@ interface DemoWallet {
     suspend fun identitySetup(): WalletDemoIdentitySetup? = null
     suspend fun chooseIdentity(choiceId: String): Unit = error("Identity choices are unavailable")
     suspend fun cancelIdentity(identityId: String): Unit = error("Identity recovery is unavailable")
-    suspend fun resumeIdentity(identityId: String): Unit = error("Identity recovery is unavailable")
+    suspend fun resumeSigningIdentity(identityId: String): Unit = error("Identity recovery is unavailable")
 
     suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult
     suspend fun signingProtectionAvailability(

@@ -62,7 +62,7 @@ public data class MobileWalletConfig(
     public val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
     public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
     /** Signing identity lifecycle and opt-in recovery integrations. */
-    public val identity: id.walt.wallet2.mobile.identity.IdentityConfiguration = id.walt.wallet2.mobile.identity.IdentityConfiguration(),
+    public val signingIdentity: id.walt.wallet2.mobile.identity.SigningIdentityConfiguration = id.walt.wallet2.mobile.identity.SigningIdentityConfiguration(),
 )
 
 /**
@@ -220,9 +220,9 @@ internal fun createSqlDelightMobileWallet(
     val issuanceSessionStore = SqlDelightIssuanceSessionStore(queries)
     return MobileWallet(
         walletId = config.walletId,
-        createIdentityService = { onActive ->
-            id.walt.wallet2.mobile.identity.WalletIdentities(
-                config.walletId, config.identity, config.defaultKeyUseAuthorizationPolicy, config.keyUseAuthorizationPrompt,
+        createSigningIdentityManager = { onActive ->
+            id.walt.wallet2.mobile.identity.SigningIdentityManager(
+                config.walletId, config.signingIdentity, config.defaultKeyUseAuthorizationPolicy, config.keyUseAuthorizationPrompt,
                 keyStore, didStore, keyProvider, queries, didService, onActive,
             )
         },

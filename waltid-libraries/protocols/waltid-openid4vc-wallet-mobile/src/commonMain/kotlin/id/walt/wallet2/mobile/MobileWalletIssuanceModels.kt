@@ -51,5 +51,5 @@ public data class MobileWalletIssuanceRequest(
     public val redirectUri: String = "openid://",
     public val keyId: String? = null,
     public val did: String? = null,
-    public val keyPolicy: id.walt.wallet2.mobile.identity.IdentityKeyPolicy = id.walt.wallet2.mobile.identity.IdentityKeyPolicy.GeneralPurpose,
+    public val keyPolicy: id.walt.wallet2.mobile.identity.SigningIdentityKeyPolicy = id.walt.wallet2.mobile.identity.SigningIdentityKeyPolicy.GeneralPurpose,
 )

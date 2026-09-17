@@ -44,7 +44,7 @@ public class EnterpriseIdentityKeyCustodian(
     /** Imports under the stable logical key ID and verifies the destination public key.
      * @param identity Original identity whose signing key is copied.
      * @param privateKey Original P-256 private JWK; never included in receipts or error messages. */
-    override suspend fun importKey(identity: WalletIdentity, privateKey: EncodedKey.Jwk): IdentityCustodyReceipt {
+    override suspend fun importKey(identity: SigningIdentity, privateKey: EncodedKey.Jwk): IdentityCustodyReceipt {
         require(identity.keyId.matches(Regex("[A-Za-z0-9_-]{1,256}"))) { "Unsupported KMS key resource identifier" }
         val resource = "$kmsResourceUrl.${identity.keyId}"
         val privateBytes = privateKey.data.toByteArray()

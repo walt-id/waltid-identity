@@ -29,41 +29,41 @@ internal class RecoveryWorkflow(
     private val provider: IdentityRecoveryProvider,
     private val open: suspend () -> RecoveryTestWallet,
 ) {
-    suspend fun prepare(storage: IdentityKeyStorage): WalletIdentity = session { test ->
+    suspend fun prepare(storage: SigningIdentityKeyStorage): SigningIdentity = session { test ->
         assertIs<RecoveryAvailability.Available>(provider.availability(), "Recovery provider prerequisite missing")
         assertTrue(provider.list().isEmpty(), "Use a fresh test namespace")
-        assertEquals(WalletIdentityState.Absent, test.wallet.identities.state())
-        val options = assertIs<IdentityOptions.Available>(test.wallet.identities.creationOptions(IdentityIntent.Recoverable))
+        assertEquals(SigningIdentityState.Absent, test.wallet.signingIdentity.state())
+        val options = assertIs<SigningIdentityCreationOptions.Available>(test.wallet.signingIdentity.creationOptions(SigningIdentityIntent.Recoverable))
         val option = (listOf(options.recommended) + options.alternatives).single { it.storage == storage }
-        val identity = assertIs<IdentityOperationResult.Active>(test.wallet.identities.create(option)).identity
-        assertEquals(RecoveryReceipt.AcceptedLocally, assertIs<IdentityRecoveryState.Submitted>(identity.recovery).receipt)
+        val identity = assertIs<SigningIdentityOperationResult.Active>(test.wallet.signingIdentity.create(option)).identity
+        assertEquals(RecoveryReceipt.AcceptedLocally, assertIs<SigningIdentityRecoveryState.Submitted>(identity.recovery).receipt)
         test.verify(identity)
         identity
     }
 
-    suspend fun loseLocalState(expected: WalletIdentity) = session { test ->
+    suspend fun loseLocalState(expected: SigningIdentity) = session { test ->
         test.verify(expected)
         test.deleteLocalState(expected)
         // Deleting local wallet state must preserve the independently stored recovery record.
         assertNotNull(provider.retrieve(expected.id))
     }
 
-    suspend fun restore(expected: WalletIdentity, storage: IdentityKeyStorage) = session { test ->
-        assertEquals(WalletIdentityState.Absent, test.wallet.identities.state())
+    suspend fun restore(expected: SigningIdentity, storage: SigningIdentityKeyStorage) = session { test ->
+        assertEquals(SigningIdentityState.Absent, test.wallet.signingIdentity.state())
         assertNull(test.keys.getCrypto2Key(expected.keyId, setOf(KeyUsage.SIGN)))
-        val candidate = test.wallet.identities.discoverRecovery().candidates.single { it.reference.recordId == expected.id }
-        val options = test.wallet.identities.restorationOptions(candidate)
-        if (expected.storage == IdentityKeyStorage.NativeStorage) {
-            assertTrue(options.none { it.storage == IdentityKeyStorage.EncryptedDatabase },
+        val candidate = test.wallet.signingIdentity.discoverRecovery().candidates.single { it.reference.recordId == expected.id }
+        val options = test.wallet.signingIdentity.restorationOptions(candidate)
+        if (expected.storage == SigningIdentityKeyStorage.NativeStorage) {
+            assertTrue(options.none { it.storage == SigningIdentityKeyStorage.EncryptedDatabase },
                 "Native-storage recovery must not offer a weaker database-storage destination")
         }
         val option = options.single { it.storage == storage }
-        val restored = assertIs<IdentityOperationResult.Active>(test.wallet.identities.restore(option)).identity
-        assertIs<IdentityRecoveryState.Recovered>(restored.recovery)
+        val restored = assertIs<SigningIdentityOperationResult.Active>(test.wallet.signingIdentity.restore(option)).identity
+        assertIs<SigningIdentityRecoveryState.Recovered>(restored.recovery)
         test.verify(expected, storage)
     }
 
-    suspend fun verify(expected: WalletIdentity, storage: IdentityKeyStorage) = session { it.verify(expected, storage) }
+    suspend fun verify(expected: SigningIdentity, storage: SigningIdentityKeyStorage) = session { it.verify(expected, storage) }
 
     suspend fun cleanup() {
         session { it.wallet.deleteWallet() }
@@ -87,15 +87,15 @@ internal class RecoveryTestWallet private constructor(
 ) {
     fun close() = driver.close()
 
-    suspend fun deleteLocalState(expected: WalletIdentity) {
+    suspend fun deleteLocalState(expected: SigningIdentity) {
         val key = assertIs<StorableKey>(keys.getCrypto2Key(expected.keyId, setOf(KeyUsage.SIGN)))
         val managed = key.storedKey as? StoredKey.Managed
         wallet.deleteWallet()
         if (managed != null) assertIs<PlatformManagedKeyRestoration.Missing>(nativeKeys.restoreManagedKey(managed))
     }
 
-    suspend fun verify(expected: WalletIdentity, storage: IdentityKeyStorage = expected.storage) {
-        val actual = assertIs<WalletIdentityState.Active>(wallet.identities.state()).identity
+    suspend fun verify(expected: SigningIdentity, storage: SigningIdentityKeyStorage = expected.storage) {
+        val actual = assertIs<SigningIdentityState.Active>(wallet.signingIdentity.state()).identity
         assertEquals(expected.id, actual.id)
         assertEquals(expected.keyId, actual.keyId)
         assertEquals(expected.did, actual.did)
@@ -104,14 +104,14 @@ internal class RecoveryTestWallet private constructor(
         assertEquals(expected.authorization, actual.authorization)
         assertEquals(KeyOrigin.IMPORTED, actual.keyFacts.origin)
         val key = assertIs<StorableKey>(keys.getCrypto2Key(expected.keyId, setOf(KeyUsage.SIGN)))
-        if (storage == IdentityKeyStorage.EncryptedDatabase) {
+        if (storage == SigningIdentityKeyStorage.EncryptedDatabase) {
             assertIs<StoredKey.Software>(key.storedKey)
             assertEquals(KeySecurityLevel.SOFTWARE, actual.keyFacts.securityLevel)
             assertEquals(KeyProtectionLevel.SOFTWARE, actual.keyFacts.protection)
         } else {
             val managed = assertIs<StoredKey.Managed>(key.storedKey)
             assertEquals(nativeKeys.keyFacts(managed), actual.keyFacts)
-            if (storage == IdentityKeyStorage.Hardware) assertEquals(KeyProtectionLevel.HARDWARE, actual.keyFacts.protection)
+            if (storage == SigningIdentityKeyStorage.HardwareBacked) assertEquals(KeyProtectionLevel.HARDWARE, actual.keyFacts.protection)
         }
         if (storage == expected.storage) assertEquals(expected.keyFacts, actual.keyFacts)
         val public = CryptoRuntime(defaultSoftwareKeyProviders()).restore(StoredKey.Software(
@@ -134,8 +134,8 @@ internal class RecoveryTestWallet private constructor(
             deleteDatabase: (String) -> Unit,
         ): RecoveryTestWallet {
             require(runId.matches(Regex("[a-f0-9-]{36}")))
-            val config = MobileWalletConfig(walletId = "wal749-recovery-$runId", identity = IdentityConfiguration(
-                recoveryProviders = listOf(provider), authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
+            val config = MobileWalletConfig(walletId = "wal749-recovery-$runId", signingIdentity = SigningIdentityConfiguration(
+                recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
             lateinit var driver: SqlDriver
             val wallet = createEncryptedSqlDelightMobileWallet(config, ClientIdTrustConfiguration(), databaseKeys, nativeKeys,
                 openEncryptedDriver = { name, key, local, walletId -> openDriver(name, key, local, walletId).also { driver = it } },

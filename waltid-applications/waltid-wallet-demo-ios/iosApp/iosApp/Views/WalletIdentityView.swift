@@ -73,17 +73,17 @@ final class WalletIdentityScreenModel: ObservableObject {
         else if let next = Step(rawValue: step.rawValue + 1) { step = next }
     }
 
-    @Published private(set) var identity: WalletIdentity?
+    @Published private(set) var identity: SigningIdentity?
     @Published private(set) var choices: [Choice] = []
     @Published private(set) var message: String?
     @Published private(set) var busy = false
     @Published private(set) var refreshing = false
     @Published private(set) var loadFailed = false
     @Published private(set) var recoveryUnavailableReasons: [String] = []
-    private let service: WalletIdentityService
+    private let service: SigningIdentityManager
     private let onActivated: @MainActor () -> Void
 
-    init(service: WalletIdentityService, onActivated: @escaping @MainActor () -> Void) {
+    init(service: SigningIdentityManager, onActivated: @escaping @MainActor () -> Void) {
         self.service = service
         self.onActivated = onActivated
     }
@@ -148,7 +148,7 @@ final class WalletIdentityScreenModel: ObservableObject {
                 })
             case .absent:
                 identity = nil
-                for intent in [WalletIdentityIntent.withoutRecovery, .recoverable] {
+                for intent in [SigningIdentityIntent.withoutRecovery, .recoverable] {
                     if case .available(let recommended, let alternatives) = try await service.creationOptions(intent: intent) {
                         for option in [recommended] + alternatives {
                             let recovery = option.recoveryProviderName.map { provider in
@@ -202,7 +202,7 @@ final class WalletIdentityScreenModel: ObservableObject {
         let discovery = try await service.discoverRecovery()
         recoveryUnavailableReasons += discovery.failures.map { "\($0.providerName): \($0.reason)" }
         for candidate in discovery.candidates {
-            let options: [WalletIdentityRestorationOption]
+            let options: [SigningIdentityRestorationOption]
             do { options = try await service.restorationOptions(candidate) }
             catch is CancellationError { throw CancellationError() }
             catch {
@@ -220,14 +220,14 @@ final class WalletIdentityScreenModel: ObservableObject {
         }
     }
 
-    private static func check(_ result: WalletIdentityOperationResult) throws {
+    private static func check(_ result: SigningIdentityOperationResult) throws {
         if case .failed(let reason) = result { throw WalletError.invalidInput("Identity operation failed: \(reason)") }
     }
-    static func storage(_ storage: WalletIdentityStorage) -> String { storageChoice(storage).title }
+    static func storage(_ storage: SigningIdentityKeyStorage) -> String { storageChoice(storage).title }
 
-    static func storageChoice(_ storage: WalletIdentityStorage) -> Selection {
+    static func storageChoice(_ storage: SigningIdentityKeyStorage) -> Selection {
         switch storage {
-        case .hardware: Selection(id: "hardware", title: "Secure Enclave",
+        case .hardwareBacked: Selection(id: "hardware", title: "Secure Enclave",
             detail: "Generates and uses the key inside the Secure Enclave. This key cannot be restored on another device.")
         case .nativeStorage: Selection(id: "native", title: "Keychain",
             detail: "Stores the key in the iOS Keychain. Signing runs outside the Secure Enclave.")
@@ -408,7 +408,7 @@ struct WalletIdentityView: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
-    private func recoveryDescription(_ state: WalletIdentityRecoveryState) -> String {
+    private func recoveryDescription(_ state: SigningIdentityRecoveryState) -> String {
         switch state {
         case .disabled: "No recovery backup submitted."
         case .submitted(_, let receipt): receipt == .acceptedLocally ? "Recovery record accepted locally; delivery to another device is not confirmed." : "Recovery submission confirmed by provider."

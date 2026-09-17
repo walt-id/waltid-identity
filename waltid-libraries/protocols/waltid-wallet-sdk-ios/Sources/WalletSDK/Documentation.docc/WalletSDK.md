@@ -16,7 +16,7 @@ let wallet = try await Wallet(
     configuration: WalletConfiguration(walletID: "consumer-wallet")
 )
 
-guard case .active(let identity) = try await wallet.identities.initialize() else {
+guard case .active(let identity) = try await wallet.signingIdentity.initialize() else {
     // Show pending setup or an unavailable identity before continuing.
     return
 }
@@ -110,9 +110,9 @@ reset; plaintext-to-encrypted migration is not performed.
 ### Signing identity
 
 - <doc:IdentityRecovery>
-- ``WalletIdentityService``
-- ``WalletIdentityConfiguration``
-- ``WalletIdentityRecoveryProvider``
+- ``SigningIdentityManager``
+- ``SigningIdentityConfiguration``
+- ``IdentityRecoveryProvider``
 
 ### Integration Guides
 
@@ -139,7 +139,7 @@ reset; plaintext-to-encrypted migration is not performed.
 - ``Credential``
 - ``StoredCredential``
 - ``StoredDid``
-- ``WalletIdentity``
+- ``SigningIdentity``
 - ``PresentationResult``
 - ``ProximityReaderTrustSettings``
 - ``ProximityReaderTrustSettingsCodec``

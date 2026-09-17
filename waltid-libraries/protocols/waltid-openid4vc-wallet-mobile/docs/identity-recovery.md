@@ -1,6 +1,8 @@
 # Signing identities and recovery
 
-The mobile SDK owns P-256 identity creation, persistence and recovery. New identities use `did:jwk`.
+A signing identity binds a signing key to its DID and records how that key is protected and recovered.
+
+The mobile SDK owns P-256 signing identity creation, persistence and recovery. New identities use `did:jwk`.
 An existing `did:key` or `did:jwk` is retained exactly after matching its public key. The SDK never
 repairs missing material by generating a different key under the old identity.
 
@@ -11,27 +13,27 @@ it. Its origin is still **imported**: the recovery secret existed outside that h
 
 ## API
 
-Use `wallet.identities` for the whole lifecycle. `initialize()` reopens the selected identity or
+Use `wallet.signingIdentity` for the whole lifecycle. `initialize()` reopens the selected identity or
 creates the recommended identity without recovery using configured defaults. Pending, ambiguous or
 unavailable identities are returned explicitly; they never trigger replacement generation.
 
 ```kotlin
-when (val result = wallet.identities.initialize()) {
-    is IdentityOperationResult.Active -> openWallet(result.identity)
-    is IdentityOperationResult.Pending -> showPendingSetup(result.identityId)
-    is IdentityOperationResult.Failed -> showFailure(result.reason)
+when (val result = wallet.signingIdentity.initialize()) {
+    is SigningIdentityOperationResult.Active -> openWallet(result.identity)
+    is SigningIdentityOperationResult.Pending -> showPendingSetup(result.identityId)
+    is SigningIdentityOperationResult.Failed -> showFailure(result.reason)
 }
 ```
 
 Apps offering choices request complete options and pass back the selected object:
 
 ```kotlin
-when (val options = wallet.identities.creationOptions(IdentityIntent.Recoverable)) {
-    is IdentityOptions.Available -> showChoices(listOf(options.recommended) + options.alternatives)
-    is IdentityOptions.Unavailable -> showUnavailable(options.reasons)
+when (val options = wallet.signingIdentity.creationOptions(SigningIdentityIntent.Recoverable)) {
+    is SigningIdentityCreationOptions.Available -> showChoices(listOf(options.recommended) + options.alternatives)
+    is SigningIdentityCreationOptions.Unavailable -> showUnavailable(options.reasons)
 }
 // After the user selects one of those objects:
-val result = wallet.identities.create(selectedOption)
+val result = wallet.signingIdentity.create(selectedOption)
 ```
 
 Options have no public constructor, copy method or serializer. They belong to the wallet instance
@@ -49,14 +51,14 @@ silent change in authorization, hardware requirements or recovery intent.
 | `backupOptions()` / `backup()` | Back up a retained recovery secret or an existing exportable software key. |
 | `discoverRecovery()` / `restorationOptions()` / `restore()` | Discover candidates and per-provider failures in one snapshot, validate each candidate independently, and recover the original identity. |
 | `deleteRecovery()` | Request deletion of one selected provider record. |
-| `custodyOptions()` / `transferToCustody()` | Copy an exportable key to an explicitly selected custodian. |
+| `custodyOptions()` / `copyToCustody()` | Copy an exportable key to an explicitly selected custodian. |
 
-`WalletIdentity` contains only public information. Storage destination, origin, observed security
+`SigningIdentity` contains only public information. Storage destination, origin, observed security
 level, authorization, native attestation and recovery status are separate facts. Unknown security
 levels are never treated as proof of a particular hardware tier.
 
 The unreleased mobile SDK's old `bootstrap` API is removed. It could select independent first
-key/DID rows and create keys outside this lifecycle. Use `identities.initialize()` for convenience,
+key/DID rows and create keys outside this lifecycle. Use `signingIdentity.initialize()` for convenience,
 or explicit options for onboarding. Other algorithms remain available in the crypto SDK; this
 identity lifecycle creates P-256 keys.
 
@@ -64,22 +66,21 @@ identity lifecycle creates P-256 keys.
 
 ```kotlin
 val configuration = MobileWalletConfig(
-    identity = IdentityConfiguration(
-        policy = IdentityKeyPolicy.GeneralPurpose,
+    signingIdentity = SigningIdentityConfiguration(
+        policy = SigningIdentityKeyPolicy.GeneralPurpose,
         recoveryProviders = listOf(myRecoveryProvider),
     ),
 )
 ```
 
 By default there is no recovery provider and no backup. Authorization inherits the wallet's default
-current-biometric-set policy. `IdentityAuthorization.Explicit(...)` overrides that policy for new
+current-biometric-set policy. `SigningIdentityAuthorization.Explicit(...)` overrides that policy for new
 identities. `alternativeAuthorizations` is an explicit allowlist for user choices, not an automatic fallback order.
 `initialize()` never selects one of these alternatives in place of the primary authorization.
 Software signing is offered only for an explicitly permitted `None` authorization; database
 protection and app authentication remain separate from native signing authorization.
 
-`GeneralPurpose` permits recovery. `DeviceBound` prohibits secret backup/export through the identity
-service. `HardwareGenerated` additionally requires observed hardware and generated origin. These are
+`GeneralPurpose` permits recovery. `BackupAndCustodyDisabled` prohibits secret backup and custody through the manager. It does not make an otherwise exportable key physically non-exportable. `HardwareGenerated` additionally requires observed hardware and generated origin. These are
 host constraints, not certification labels. Stored constraints also apply when backup is enabled
 later or a missing key is repaired. An active key's immutable native policy is not changed in place.
 Portable records retain minimum storage and authorization requirements; a restore option must satisfy
@@ -91,7 +92,7 @@ not turn an explicitly chosen encrypted-database option into a native key. Hosts
 must use `HardwareGenerated` or select an offered hardware option; a software option is always labeled.
 
 `localRecoveryMaterial` defaults to retaining the additional recovery record in the encrypted local
-journal. `DiscardAfterSubmission` removes that additional record after the required confirmation. It does
+journal. `DiscardAfterConfirmation` removes that additional record after the required confirmation. It does
 not erase an operational software private key and does not make an imported key hardware-generated.
 Discarding the last local recovery record of a non-exportable native key prevents later backup to
 another provider unless a recovery record can still be retrieved elsewhere. The service retrieves
@@ -182,7 +183,7 @@ the original key. `RemovalRequested` never proves that all cloud, offline or pre
 copies disappeared. Deleting a wallet locally does not silently delete its remote recovery record.
 
 Providers can throw `IdentityProviderException` with `TemporarilyUnavailable`, `InteractionRequired`,
-`Rejected`, `Conflict`, or `ConfirmationPending`. Swift integrations use `WalletIdentityProviderError`.
+`Rejected`, `Conflict`, or `ConfirmationPending`. Swift integrations use `IdentityProviderError`.
 Pending results and persisted pending state expose the reason; retry never changes the original key.
 Unknown provider errors remain unavailable and their messages are not exposed by the lifecycle.
 
@@ -209,7 +210,7 @@ This unreleased SDK requires a fresh wallet database for existing development in
 New-format identities retain their exact key/DID association across restart and recovery.
 
 Set `MobileWalletIssuanceRequest.keyPolicy` (Swift: `IssuanceRequest.keyPolicy`) when a host or issuer
-profile requires `DeviceBound` or `HardwareGenerated`. Before starting issuance, the SDK checks that
+profile requires `BackupAndCustodyDisabled` or `HardwareGenerated`. Before starting issuance, the SDK checks that
 the selected key is the active identity and already retains the required restriction. A later request
 cannot relabel a general-purpose or recoverable identity as device-bound. The default is
 `GeneralPurpose`; apps remain responsible for interpreting issuer/profile requirements.
@@ -256,7 +257,7 @@ Add `waltid-openid4vc-wallet-custody-enterprise` or the Swift `WalletSDKEnterpri
 then register `EnterpriseIdentityKeyCustodian` in `keyCustodians`. Neither integration is a base-SDK
 dependency or default registration. Hosts supply the authenticated HTTPS KMS resource and client settings.
 
-The service offers only policy-compatible custody options. `transferToCustody()` imports the original
+The service offers only policy-compatible custody options. `copyToCustody()` imports the original
 private JWK under its stable key ID, compares the returned public key, and records a public destination
 reference. It retains the local signing key and does not change recovery status. Retries are idempotent;
 a different key at the destination is a conflict and is never overwritten automatically.

@@ -57,11 +57,11 @@ let wallet = try await Wallet(
 
 ### Bootstrap DID State
 
-Call ``WalletIdentityService/initialize()`` before issuance or presentation
+Call ``SigningIdentityManager/initialize()`` before issuance or presentation
 flows that need wallet key material.
 
 ```swift
-guard case .active(let identity) = try await wallet.identities.initialize() else {
+guard case .active(let identity) = try await wallet.signingIdentity.initialize() else {
     // Show pending setup or an unavailable identity before continuing.
     return
 }
@@ -87,5 +87,5 @@ The Apple adapter retains a per-key LocalAuthentication context for that interva
 Keychain metadata does not expose the interval for independent readback. Timed reuse is recent
 provider authentication, not consent for issuance, presentation, or another wallet action.
 
-Use the returned ``WalletIdentity/did`` when a verifier flow needs an
+Use the returned ``SigningIdentity/did`` when a verifier flow needs an
 explicit wallet DID.

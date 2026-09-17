@@ -29,7 +29,7 @@ internal fun WalletScreen(
 ) {
     val setup = state.session as? WalletSessionState.IdentitySetup
     if (setup != null) {
-        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeIdentity, controller::cancelIdentity, controller::refreshIdentityChoices, refreshing = state.identityBusy)
+        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeSigningIdentity, controller::cancelIdentity, controller::refreshIdentityChoices, refreshing = state.identityBusy)
         return
     }
     val openAuthorizationRequest = rememberAuthorizationRequestOpener()

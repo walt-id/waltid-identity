@@ -12,20 +12,20 @@ class IdentityRecordCompatibilityTest {
         val reference = IdentityBackupReference("fixture-provider", "fixture-identity")
         val recovery = RecoveryRecord(identityId = reference.recordId, keyId = "fixture-key", did = "did:jwk:fixture",
             publicJwk = "{}", secret = RecoverySecret.Derived("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "fixture-identity"),
-            constraints = RecoveryConstraints(IdentityKeyStorage.Hardware, KeyUseAuthorizationPolicy.None, RecoveryConfirmation.LocalAcceptance))
-        val identity = WalletIdentity(reference.recordId, recovery.keyId, recovery.did, recovery.publicJwk,
-            IdentityKeyStorage.Hardware, KeyUseAuthorizationPolicy.None, PlatformKeyFacts(),
-            IdentityRecoveryState.Submitted(reference, RecoveryReceipt.AcceptedLocally))
+            constraints = RecoveryConstraints(SigningIdentityKeyStorage.HardwareBacked, KeyUseAuthorizationPolicy.None, RecoveryConfirmation.LocalAcceptance))
+        val identity = SigningIdentity(reference.recordId, recovery.keyId, recovery.did, recovery.publicJwk,
+            SigningIdentityKeyStorage.HardwareBacked, KeyUseAuthorizationPolicy.None, PlatformKeyFacts(),
+            SigningIdentityRecoveryState.Submitted(reference, RecoveryReceipt.AcceptedLocally))
         val preparing = IdentityRecord(id = reference.recordId, keyId = recovery.keyId, phase = IdentityPhase.Preparing,
-            storage = IdentityKeyStorage.Hardware, requirements = WalletKeyRequirements(identitySpec, identityUsages),
-            policy = IdentityKeyPolicy.DeviceBound)
+            storage = SigningIdentityKeyStorage.HardwareBacked, requirements = WalletKeyRequirements(identitySpec, identityUsages),
+            policy = SigningIdentityKeyPolicy.BackupAndCustodyDisabled)
         val records = mapOf(
             "preparing" to recordJson.encodeToString(preparing),
             "awaiting-backup" to recordJson.encodeToString(preparing.copy(phase = IdentityPhase.AwaitingBackup,
-                policy = IdentityKeyPolicy.GeneralPurpose, identity = identity, recovery = recovery, backup = reference,
-                pendingReason = IdentityFailure.ProviderInteractionRequired)),
+                policy = SigningIdentityKeyPolicy.GeneralPurpose, identity = identity, recovery = recovery, backup = reference,
+                pendingReason = SigningIdentityFailure.ProviderInteractionRequired)),
             "active-submitted" to recordJson.encodeToString(preparing.copy(phase = IdentityPhase.Active,
-                policy = IdentityKeyPolicy.GeneralPurpose, identity = identity, recovery = recovery, backup = reference)),
+                policy = SigningIdentityKeyPolicy.GeneralPurpose, identity = identity, recovery = recovery, backup = reference)),
             "derived-recovery" to recordJson.encodeToString(recovery),
             "exported-recovery" to recordJson.encodeToString(recovery.copy(secret = RecoverySecret.Exported("{}"))),
         )

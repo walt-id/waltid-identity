@@ -19,7 +19,7 @@ final class WalletE2EUI {
         }
     }
 
-    func launch(environment: [String: String] = [:], initializeIdentity: Bool = true) {
+    func launch(environment: [String: String] = [:], initializeSigningIdentity: Bool = true) {
         app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
             app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] ?? "disabled"
         for (key, value) in environment {
@@ -27,7 +27,7 @@ final class WalletE2EUI {
         }
         app.launch()
         unlockWallet()
-        if initializeIdentity { completeKeySetupIfNeeded() }
+        if initializeSigningIdentity { completeKeySetupIfNeeded() }
     }
 
     func launch(attestation: [String: String]) {

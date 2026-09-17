@@ -20,7 +20,7 @@ final class WalletE2EUI {
         }
     }
 
-    func launch(attestation: [String: String] = [:], environment: [String: String] = [:], initializeIdentity: Bool = true) {
+    func launch(attestation: [String: String] = [:], environment: [String: String] = [:], initializeSigningIdentity: Bool = true) {
         app.launchEnvironment["E2E_WALLET_ID"] = app.launchEnvironment["E2E_WALLET_ID"] ?? "e2e-\(UUID().uuidString)"
         app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
             app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] ?? "disabled"
@@ -35,7 +35,7 @@ final class WalletE2EUI {
         }
         app.launch()
         unlockWallet()
-        if initializeIdentity && app.launchEnvironment["E2E_MOCK_WALLET"] != "1" {
+        if initializeSigningIdentity && app.launchEnvironment["E2E_MOCK_WALLET"] != "1" {
             completeKeySetupIfNeeded()
         }
     }

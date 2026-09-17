@@ -100,7 +100,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
     // assertions cover shared-storage wiring; protected extension signing remains device coverage.
     hostConfiguration.defaultKeyUseAuthorizationPolicy = .none
     let hostWallet = try await Wallet(configuration: hostConfiguration)
-    let hostBootstrap = try await initializeIdentity(hostWallet)
+    let hostBootstrap = try await initializeSigningIdentity(hostWallet)
     let hostCredentials = try await hostWallet.credentials()
 
     // `providerWallet(walletID:)` is the extension's own entry point, and does not bootstrap.
@@ -127,7 +127,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
     // load the persisted key. Run on a throwaway instance rather than on `providerWallet`, which must
     // stay un-bootstrapped for the assertions above to mean anything.
     let bootstrapProbeWallet = try await Wallet(configuration: hostConfiguration)
-    let probedResolution = try await initializeIdentity(bootstrapProbeWallet)
+    let probedResolution = try await initializeSigningIdentity(bootstrapProbeWallet)
     XCTAssertEqual(
         probedResolution.keyID,
         hostBootstrap.keyID,
@@ -171,7 +171,7 @@ public func assertProviderResolvesThePublishedWalletID(
     // This assertion covers publishing the selected wallet identifier, not biometric enforcement.
     hostConfiguration.defaultKeyUseAuthorizationPolicy = .none
     let hostWallet = try await Wallet(configuration: hostConfiguration)
-    _ = try await initializeIdentity(hostWallet)
+    _ = try await initializeSigningIdentity(hostWallet)
 
     XCTAssertEqual(
         try namespace.activeWalletID(),
@@ -266,8 +266,8 @@ private func assertSigningKeyIsUsableFromSharedAccessGroup(
     )
 }
 
-private func initializeIdentity(_ wallet: Wallet) async throws -> WalletIdentity {
-    guard case .active(let identity) = try await wallet.identities.initialize() else {
+private func initializeSigningIdentity(_ wallet: Wallet) async throws -> SigningIdentity {
+    guard case .active(let identity) = try await wallet.signingIdentity.initialize() else {
         throw WalletError.invalidInput("Expected an active test identity")
     }
     return identity

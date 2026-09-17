@@ -63,12 +63,12 @@ class MobileWalletFactoryTest {
             val provider = FakePlatformManagedKeyProvider()
             val config = MobileWalletConfig()
             val original = wallet(config, database, provider)
-            val identity = assertIs<IdentityOperationResult.Active>(original.identities.initialize()).identity
+            val identity = assertIs<SigningIdentityOperationResult.Active>(original.signingIdentity.initialize()).identity
             assertEquals(KeyUseAuthorizationPolicy.BiometricCurrentSet, identity.authorization)
             assertTrue(identity.did.startsWith("did:jwk:"))
             assertStoredDidContainsPublicMaterialOnly(database, identity.did)
             val reopened = wallet(config, database, provider)
-            assertEquals(identity, assertIs<IdentityOperationResult.Active>(reopened.identities.initialize()).identity)
+            assertEquals(identity, assertIs<SigningIdentityOperationResult.Active>(reopened.signingIdentity.initialize()).identity)
             assertEquals(1, provider.generateCount)
             val key = assertNotNull(SqlDelightKeyStore(provider, database.queries).getCrypto2Key(identity.keyId))
             val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
@@ -83,8 +83,8 @@ class MobileWalletFactoryTest {
     fun `identity creation uses the configured DID service`() = runTest {
         database().use { database ->
             val didService = RecordingDidService()
-            val result = wallet(MobileWalletConfig(), database, FakePlatformManagedKeyProvider(), didService).identities.initialize()
-            assertIs<IdentityOperationResult.Active>(result)
+            val result = wallet(MobileWalletConfig(), database, FakePlatformManagedKeyProvider(), didService).signingIdentity.initialize()
+            assertIs<SigningIdentityOperationResult.Active>(result)
             assertEquals(listOf("jwk"), didService.registeredMethods)
         }
     }
@@ -95,8 +95,8 @@ class MobileWalletFactoryTest {
             val provider = FakePlatformManagedKeyProvider().apply {
                 preflightResult = KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled)
             }
-            val result = wallet(MobileWalletConfig(), database, provider).identities.initialize()
-            assertEquals(IdentityFailure.UnsupportedPolicy, assertIs<IdentityOperationResult.Failed>(result).reason)
+            val result = wallet(MobileWalletConfig(), database, provider).signingIdentity.initialize()
+            assertEquals(SigningIdentityFailure.UnsupportedPolicy, assertIs<SigningIdentityOperationResult.Failed>(result).reason)
             assertEquals(0, provider.generateCount)
             assertTrue(database.queries.selectAll().executeAsList().isEmpty())
         }
@@ -108,8 +108,8 @@ class MobileWalletFactoryTest {
             val provider = FakePlatformManagedKeyProvider().apply {
                 generateFailure = KeyUseAuthorizationException(KeyUseAuthorizationFailure.AuthorizationNotCompleted, "Test cancellation")
             }
-            val result = wallet(MobileWalletConfig(), database, provider).identities.initialize()
-            assertEquals(IdentityFailure.AuthorizationNotCompleted, assertIs<IdentityOperationResult.Failed>(result).reason)
+            val result = wallet(MobileWalletConfig(), database, provider).signingIdentity.initialize()
+            assertEquals(SigningIdentityFailure.AuthorizationNotCompleted, assertIs<SigningIdentityOperationResult.Failed>(result).reason)
             assertEquals(1, provider.generateCount)
             assertTrue(database.queries.selectAll().executeAsList().isEmpty())
         }

@@ -1055,7 +1055,7 @@ final class WalletIdentitySetupUITests: XCTestCase {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         let environment = ["E2E_WALLET_ID": "recovery-ui-\(UUID().uuidString)"]
-        ui.launch(environment: environment, initializeIdentity: false)
+        ui.launch(environment: environment, initializeSigningIdentity: false)
         let next = app.buttons["wallet.keySetupContinue"]
         XCTAssertTrue(next.waitForExistence(timeout: 30))
         ui.tapButton(identifier: "wallet.keySetupChoice.recovery.1", fallbackLabel: "Back up with iCloud Keychain recovery")
@@ -1082,7 +1082,7 @@ final class WalletIdentitySetupUITests: XCTestCase {
         app.alerts.buttons["wallet.settingsResetConfirm"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["wallet.pinInput"].waitForExistence(timeout: 30))
         app.terminate()
-        ui.launch(environment: environment, initializeIdentity: false)
+        ui.launch(environment: environment, initializeSigningIdentity: false)
         XCTAssertTrue(next.waitForExistence(timeout: 30))
         let restore = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", did)).firstMatch
         for _ in 0..<20 {
@@ -1145,7 +1145,7 @@ final class WalletIdentitySetupUITests: XCTestCase {
     func testNativeIdentitySetupAndProtectionDetails() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        ui.launch(initializeIdentity: false)
+        ui.launch(initializeSigningIdentity: false)
         let create = app.buttons["wallet.keySetupContinue"]
         XCTAssertTrue(create.waitForExistence(timeout: 20))
         let setup = XCTAttachment(screenshot: app.screenshot())

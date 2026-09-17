@@ -4,7 +4,7 @@ import WalletSDK
 
 /// Optional Enterprise KMS import integration. It gives the KMS an additional private-key copy;
 /// it does not preserve a recovery record, configure remote signing, or synchronize credentials.
-public actor EnterpriseIdentityKeyCustodian: WalletIdentityKeyCustodian {
+public actor EnterpriseIdentityKeyCustodian: IdentityKeyCustodian {
     /// Stable integration identifier.
     public nonisolated let id: String
     /// Destination label shown before explicit selection.
@@ -37,66 +37,66 @@ public actor EnterpriseIdentityKeyCustodian: WalletIdentityKeyCustodian {
     /// - Parameters:
     ///   - identity: Original identity and stable key ID.
     ///   - privateJWK: Secret P-256 JWK; never logged or returned in the receipt.
-    public func importKey(identity: WalletIdentity, privateJWK: Data) async throws -> WalletIdentityCustodyReceipt {
+    public func importKey(identity: SigningIdentity, privateJWK: Data) async throws -> IdentityCustodyReceipt {
         guard identity.keyID.range(of: "^[A-Za-z0-9_-]{1,256}$", options: .regularExpression) != nil,
               let resource = URL(string: "\(resourceURL.absoluteString).\(identity.keyID)") else {
-            throw WalletIdentityProviderError.rejected
+            throw IdentityProviderError.rejected
         }
         let endpoint = resource.appendingPathComponent("kms-service-api/keys/import/jwk")
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request = try await authorize(request)
-        guard request.url == endpoint && request.httpMethod == "POST" else { throw WalletIdentityProviderError.rejected }
+        guard request.url == endpoint && request.httpMethod == "POST" else { throw IdentityProviderError.rejected }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = privateJWK
         let session = URLSession(configuration: configuration, delegate: RefuseRedirects(), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         do {
             let (stream, response) = try await session.bytes(for: request)
-            guard let http = response as? HTTPURLResponse else { throw WalletIdentityProviderError.rejected }
+            guard let http = response as? HTTPURLResponse else { throw IdentityProviderError.rejected }
             switch http.statusCode {
             case 200, 201: break
-            case 401: throw WalletIdentityProviderError.interactionRequired
-            case 403: throw WalletIdentityProviderError.rejected
-            case 409: throw WalletIdentityProviderError.conflict
-            case 429, 500...599: throw WalletIdentityProviderError.temporarilyUnavailable
-            default: throw WalletIdentityProviderError.rejected
+            case 401: throw IdentityProviderError.interactionRequired
+            case 403: throw IdentityProviderError.rejected
+            case 409: throw IdentityProviderError.conflict
+            case 429, 500...599: throw IdentityProviderError.temporarilyUnavailable
+            default: throw IdentityProviderError.rejected
             }
             var body = Data()
             for try await byte in stream {
-                guard body.count < 65_536 else { throw WalletIdentityProviderError.rejected }
+                guard body.count < 65_536 else { throw IdentityProviderError.rejected }
                 body.append(byte)
             }
             defer { body.resetBytes(in: 0..<body.count) }
             guard let view = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any],
                   let key = view["key"] as? [String: Any], let jwk = key["jwk"] as? [String: Any] else {
-                throw WalletIdentityProviderError.rejected
+                throw IdentityProviderError.rejected
             }
             let members = ["kty", "crv", "x", "y"]
             var publicKey: [String: String] = [:]
             for member in members {
-                guard let value = jwk[member] as? String else { throw WalletIdentityProviderError.rejected }
+                guard let value = jwk[member] as? String else { throw IdentityProviderError.rejected }
                 publicKey[member] = value
             }
             guard publicKey["kty"] == "EC", publicKey["crv"] == "P-256",
                   let expected = (try? JSONSerialization.jsonObject(with: privateJWK)) as? [String: Any],
                   expected["kty"] as? String == "EC", expected["crv"] as? String == "P-256" else {
-                throw WalletIdentityProviderError.rejected
+                throw IdentityProviderError.rejected
             }
             for coordinate in ["x", "y"] {
                 guard let actual = publicKey[coordinate].flatMap(Self.coordinate),
                       let original = (expected[coordinate] as? String).flatMap(Self.coordinate) else {
-                    throw WalletIdentityProviderError.rejected
+                    throw IdentityProviderError.rejected
                 }
-                guard actual == original else { throw WalletIdentityProviderError.conflict }
+                guard actual == original else { throw IdentityProviderError.conflict }
             }
             let publicData = try JSONSerialization.data(withJSONObject: publicKey, options: [.sortedKeys])
             return .init(keyReference: resource.absoluteString, publicJWK: String(decoding: publicData, as: UTF8.self))
         } catch is CancellationError { throw CancellationError() }
-        catch let error as WalletIdentityProviderError { throw error }
+        catch let error as IdentityProviderError { throw error }
         catch {
             try Task.checkCancellation()
-            throw WalletIdentityProviderError.temporarilyUnavailable
+            throw IdentityProviderError.temporarilyUnavailable
         }
     }
     private static func coordinate(_ value: String) -> Data? {

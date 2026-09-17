@@ -58,7 +58,7 @@ suspend fun createAndroidDemoMobileWallet(
         ).create(
             MobileWalletConfig(
                 walletId = config.walletId,
-                identity = id.walt.wallet2.mobile.identity.IdentityConfiguration(
+                signingIdentity = id.walt.wallet2.mobile.identity.SigningIdentityConfiguration(
                     recoveryProviders = listOf(
                         id.walt.wallet2.recovery.blockstore.BlockStoreIdentityRecovery(context, "wallet-demo"),
                         id.walt.wallet2.recovery.blockstore.BlockStoreIdentityRecovery(context, "wallet-demo",

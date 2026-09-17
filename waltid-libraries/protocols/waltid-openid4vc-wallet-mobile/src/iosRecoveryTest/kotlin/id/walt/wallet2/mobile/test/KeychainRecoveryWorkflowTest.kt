@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile.test
 
-import id.walt.wallet2.mobile.identity.IdentityKeyStorage
-import id.walt.wallet2.mobile.identity.WalletIdentity
+import id.walt.wallet2.mobile.identity.SigningIdentityKeyStorage
+import id.walt.wallet2.mobile.identity.SigningIdentity
 import id.walt.wallet2.persistence.encryption.IosDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.IosPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
@@ -25,15 +25,15 @@ class KeychainRecoveryWorkflowTest {
             RecoveryTestWallet.open(runId, provider, IosDatabaseEncryptionKeyProvider(), IosPlatformKeyProvider(),
                 drivers::createEncryptedDriver, drivers::deleteDatabase)
         }
-        fun expected() = Json.decodeFromString<WalletIdentity>(Base64.decode(argument("recoveryExpected")).decodeToString())
+        fun expected() = Json.decodeFromString<SigningIdentity>(Base64.decode(argument("recoveryExpected")).decodeToString())
         when (argument("recoveryPhase")) {
             "prepare" -> {
-                val identity = workflow.prepare(IdentityKeyStorage.valueOf(argument("recoveryStorage")))
+                val identity = workflow.prepare(SigningIdentityKeyStorage.valueOf(argument("recoveryStorage")))
                 println("RECOVERY_CHECKPOINT=" + Base64.encode(Json.encodeToString(identity).encodeToByteArray()))
             }
             "lose-local" -> workflow.loseLocalState(expected())
-            "restore" -> workflow.restore(expected(), IdentityKeyStorage.valueOf(argument("recoveryStorage")))
-            "verify" -> workflow.verify(expected(), IdentityKeyStorage.valueOf(argument("recoveryStorage")))
+            "restore" -> workflow.restore(expected(), SigningIdentityKeyStorage.valueOf(argument("recoveryStorage")))
+            "verify" -> workflow.verify(expected(), SigningIdentityKeyStorage.valueOf(argument("recoveryStorage")))
             "cleanup" -> workflow.cleanup()
             else -> error("Unknown recovery phase")
         }

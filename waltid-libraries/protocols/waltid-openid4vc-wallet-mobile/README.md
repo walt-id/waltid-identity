@@ -37,7 +37,7 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 ## Signing identity and recovery
 
-Use `wallet.identities.initialize()` for the default P-256 / `did:jwk` identity,
+Use `wallet.signingIdentity.initialize()` for the default P-256 / `did:jwk` identity,
 or request SDK-issued creation and restoration options for explicit configuration.
 Recovery providers are optional dependencies and registrations. The base SDK enables no backup.
 

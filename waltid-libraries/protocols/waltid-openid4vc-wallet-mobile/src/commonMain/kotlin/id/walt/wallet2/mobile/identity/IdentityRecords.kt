@@ -24,15 +24,15 @@ internal data class IdentityRecord(
     val keyId: String,
     val nativeAlias: String = keyId,
     val phase: IdentityPhase,
-    val storage: IdentityKeyStorage,
+    val storage: SigningIdentityKeyStorage,
     val requirements: WalletKeyRequirements,
-    val policy: IdentityKeyPolicy,
-    val identity: WalletIdentity? = null,
+    val policy: SigningIdentityKeyPolicy,
+    val identity: SigningIdentity? = null,
     val recovery: RecoveryRecord? = null,
     val backup: IdentityBackupReference? = null,
     val recoveryAvailability: RecoveryAvailability.Available? = null,
     val recoveryConfirmation: RecoveryConfirmation = RecoveryConfirmation.LocalAcceptance,
-    val pendingReason: IdentityFailure = IdentityFailure.ProviderUnavailable,
+    val pendingReason: SigningIdentityFailure = SigningIdentityFailure.ProviderUnavailable,
     val previous: IdentityRecord? = null,
     val previousKey: id.walt.crypto2.keys.StoredKey.Managed? = null,
 )
@@ -94,14 +94,14 @@ internal sealed interface RecoverySecret {
 /** Portable minimums, independent of the original device's alias, access group or attestation. */
 @Serializable
 internal data class RecoveryConstraints(
-    val storage: IdentityKeyStorage,
+    val storage: SigningIdentityKeyStorage,
     val authorization: id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy,
     val confirmation: RecoveryConfirmation,
 ) {
-    fun permits(storage: IdentityKeyStorage, authorization: id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy): Boolean =
+    fun permits(storage: SigningIdentityKeyStorage, authorization: id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy): Boolean =
         authorization == this.authorization && when (this.storage) {
-            IdentityKeyStorage.Hardware -> storage == IdentityKeyStorage.Hardware
-            IdentityKeyStorage.NativeStorage -> storage != IdentityKeyStorage.EncryptedDatabase
-            IdentityKeyStorage.EncryptedDatabase -> true
+            SigningIdentityKeyStorage.HardwareBacked -> storage == SigningIdentityKeyStorage.HardwareBacked
+            SigningIdentityKeyStorage.NativeStorage -> storage != SigningIdentityKeyStorage.EncryptedDatabase
+            SigningIdentityKeyStorage.EncryptedDatabase -> true
         }
 }
