@@ -78,15 +78,17 @@ let addressInput = "";
 const ecosystems = ["ethereum", "tezos", "flow", "near", "algorand"];
 
 const currentWallet = useCurrentWallet()
+const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
 
 async function addWallet() {
     console.log(`addWallet: ${addressInput} - ${selectedEcosystem.value}`);
-    await $fetch(`/wallet-api/wallet/${currentWallet.value}/web3accounts/link`, {
+    await $fetch(`${apiBase}/wallet-api/wallet/${currentWallet.value}/web3accounts/link`, {
         method: "POST",
         body: {
             address: addressInput,
             ecosystem: selectedEcosystem.value,
         },
+        credentials: 'include',
     })
         .then((data) => {
             store.closeModal();

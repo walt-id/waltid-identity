@@ -226,8 +226,9 @@ import {useTitle} from "@vueuse/core";
 import {ref} from "vue";
 
 const currentWallet = useCurrentWallet();
+const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
 const { data: dids, pending: pendingDids } = await useLazyAsyncData(() =>
-  $fetch(`/wallet-api/wallet/${currentWallet.value}/dids`),
+  $fetch(`${apiBase}/wallet-api/wallet/${currentWallet.value}/dids`, { credentials: 'include' }),
 );
 
 const selectedDid: Ref<Object | null> = ref(null);
@@ -259,7 +260,8 @@ console.log("issuanceUrl: ", issuanceUrl);
 
 //TODO: entra batch issuing (+mixed batch issuing)
 const { data: manifest } = useLazyFetch(
-  `/wallet-api/wallet/${currentWallet.value}/manifest/extract?offer=${request}`,
+  `${apiBase}/wallet-api/wallet/${currentWallet.value}/manifest/extract?offer=${request}`,
+  { credentials: 'include' },
 );
 // credential display values
 const issuerHost = computed(() =>
@@ -295,10 +297,11 @@ async function acceptCredential() {
   console.log("Issue to: " + did);
   try {
     await $fetch(
-      `/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequest?did=${did}`,
+      `${apiBase}/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequest?did=${did}`,
       {
         method: "POST",
         body: request,
+        credentials: 'include',
       },
     );
     navigateTo(`/wallet/${currentWallet.value}`);

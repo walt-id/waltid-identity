@@ -222,6 +222,35 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
+    fun `normalized request URL preserves outer client_id alongside a signed request object`() {
+        // Regression test for PTRID-753: AuthorizationRequestResolver.requireMatchingClientId
+        // requires client_id at the top level whenever request/request_uri is present. The
+        // reconstructed URL must carry it over from the original scanned request, not just the
+        // signed request object itself.
+        val service = OpenId4VpPresentationService(
+            credentialService = mockk(relaxed = true),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        )
+        val requestObject = unsecuredJwt(
+            AuthorizationRequest(
+                clientId = "verifier2",
+                responseMode = OpenID4VPResponseMode.DIRECT_POST,
+                responseUri = "https://verifier.example/response",
+                nonce = "nonce-123",
+                dcqlQuery = query,
+            ),
+        )
+
+        val resolvedRequest = runBlocking {
+            resolveNormalizedRequestUrl(service, "openid4vp://authorize?client_id=verifier2&request=$requestObject")
+        }
+        val resolvedUrl = Url(resolvedRequest)
+
+        assertEquals("verifier2", resolvedUrl.parameters["client_id"])
+        assertEquals(requestObject, resolvedUrl.parameters["request"])
+    }
+
+    @Test
     fun `normalized request URL rejects unsupported transaction data types`() {
         val service = OpenId4VpPresentationService(mockk(relaxed = true))
         val request = authorizationRequest(
