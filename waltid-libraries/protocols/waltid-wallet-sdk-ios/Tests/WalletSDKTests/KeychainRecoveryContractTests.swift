@@ -1,4 +1,4 @@
-#if os(iOS)
+#if os(iOS) && WALLET_SDK_APP_HOST_TESTS
 import Foundation
 import XCTest
 import WalletSDK

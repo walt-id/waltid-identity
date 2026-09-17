@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
@@ -33,7 +34,6 @@ import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder

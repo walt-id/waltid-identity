@@ -3,7 +3,6 @@ package id.walt.crypto2.signum
 import id.walt.crypto2.keys.HardwarePreference
 import id.walt.crypto2.keys.KeyProtectionLevel
 import id.walt.crypto2.keys.KeyOrigin
-
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm

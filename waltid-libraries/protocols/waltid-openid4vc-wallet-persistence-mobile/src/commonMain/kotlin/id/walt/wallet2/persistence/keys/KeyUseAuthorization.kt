@@ -1,7 +1,6 @@
 package id.walt.wallet2.persistence.keys
 
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
-
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage

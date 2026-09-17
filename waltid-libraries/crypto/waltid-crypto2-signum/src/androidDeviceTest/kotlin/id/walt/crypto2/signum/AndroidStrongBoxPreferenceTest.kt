@@ -5,7 +5,6 @@ import id.walt.crypto2.keys.HardwarePreference
 import id.walt.crypto2.keys.KeyProtectionLevel
 import id.walt.crypto2.keys.KeyOrigin
 import id.walt.crypto2.keys.KeySecurityLevel
-
 import android.content.pm.PackageManager
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec

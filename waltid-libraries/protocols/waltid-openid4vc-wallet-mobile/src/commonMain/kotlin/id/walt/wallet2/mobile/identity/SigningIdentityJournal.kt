@@ -1,6 +1,5 @@
 package id.walt.wallet2.mobile.identity
 
-import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import kotlin.time.Clock

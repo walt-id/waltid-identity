@@ -4,7 +4,6 @@ import id.walt.crypto2.keys.KeyProtectionLevel
 import id.walt.crypto2.keys.KeyAttestation
 import id.walt.crypto2.keys.KeyOrigin
 import id.walt.crypto2.keys.KeySecurityLevel
-
 import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EncodedKey

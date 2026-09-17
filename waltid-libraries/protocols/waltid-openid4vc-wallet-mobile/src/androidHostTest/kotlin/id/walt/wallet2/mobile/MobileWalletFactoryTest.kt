@@ -2,18 +2,15 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.wallet2.mobile.identity.*
 import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.wallet2.persistence.keys.WalletKeyProtection
-
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.ProviderId
 import id.walt.crypto2.keys.SoftwareKey

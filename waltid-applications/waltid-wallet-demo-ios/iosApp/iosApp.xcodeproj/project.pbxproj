@@ -57,6 +57,8 @@
 		E2E00017AAAA000100000017 /* synthetic-verification-document.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E2E00007AAAA000000000007 /* synthetic-verification-document.jpg */; };
 		E2E00018AAAA000100000018 /* synthetic-verification-document.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E2E00007AAAA000000000007 /* synthetic-verification-document.jpg */; };
 		E2E00019AAAA000100000019 /* synthetic-signature.png in Resources */ = {isa = PBXBuildFile; fileRef = E2E00006AAAA000000000006 /* synthetic-signature.png */; };
+		A74900000000000000000021 /* KeychainRecoveryContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A74900000000000000000020 /* KeychainRecoveryContractTests.swift */; };
+		A74900000000000000000023 /* WalletPersistenceSnippetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A74900000000000000000022 /* WalletPersistenceSnippetsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -165,6 +167,8 @@
 		E2E00006AAAA000000000006 /* synthetic-signature.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "synthetic-signature.png"; sourceTree = "<group>"; };
 		E2E00007AAAA000000000007 /* synthetic-verification-document.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "synthetic-verification-document.jpg"; sourceTree = "<group>"; };
 		E2E00014AAAA000000000014 /* MockWalletUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWalletUITests.swift; sourceTree = "<group>"; };
+		A74900000000000000000020 /* KeychainRecoveryContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = KeychainRecoveryContractTests.swift; path = "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/KeychainRecoveryContractTests.swift"; sourceTree = SOURCE_ROOT; };
+		A74900000000000000000022 /* WalletPersistenceSnippetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletPersistenceSnippetsTests.swift; path = "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/WalletPersistenceSnippetsTests.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -306,6 +310,8 @@
 				E2E00010AAAA000000000010 /* iosAppUITests */,
 				E2E00011AAAA000000000011 /* Credential image test fixtures */,
 				D6B7A34B2FD94CC3009C69E7 /* iosAppTests */,
+				A74900000000000000000022 /* WalletPersistenceSnippetsTests.swift */,
+				A74900000000000000000020 /* KeychainRecoveryContractTests.swift */,
 				71E100062FDAE00000000006 /* iosAppEnterpriseTests */,
 				D690444B2FDAA5D2009AB1FB /* ../../mobile-e2e-fixtures/ios/TestHelpers */,
 				A75200000000000000000032 /* ../../mobile-e2e-fixtures/ios/IdentityDocumentTests */,
@@ -683,6 +689,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A74900000000000000000023 /* WalletPersistenceSnippetsTests.swift in Sources */,
+				A74900000000000000000021 /* KeychainRecoveryContractTests.swift in Sources */,
 				A75200000000000000000031 /* SharedWalletConfigurationAssertions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1083,6 +1091,7 @@
 		D6B7A3502FD94CC3009C69E7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				OTHER_SWIFT_FLAGS = "$(inherited) -D WALLET_SDK_APP_HOST_TESTS";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1108,6 +1117,7 @@
 		D6B7A3512FD94CC3009C69E7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				OTHER_SWIFT_FLAGS = "$(inherited) -D WALLET_SDK_APP_HOST_TESTS";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

@@ -2,7 +2,6 @@ package id.walt.crypto2.signum
 
 import id.walt.crypto2.keys.HardwarePreference
 import id.walt.crypto2.keys.KeyProtectionLevel
-
 import android.security.keystore.KeyProperties
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import id.walt.crypto2.algorithms.DigestAlgorithm

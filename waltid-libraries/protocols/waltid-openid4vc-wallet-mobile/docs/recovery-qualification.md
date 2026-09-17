@@ -1,4 +1,41 @@
-# Device qualification — 2026-09-16
+# Recovery qualification
+
+## Cleanup verification — September 17, 2026
+
+The signing-identity cleanup was verified from PR head `7be8419520859a45bea55180d36cd8635f3c9d37`
+plus the cleanup commits. The following results were rerun for the cleanup; the September 16
+operator-assisted security transitions below are historical evidence, not rerun claims.
+
+| Boundary | Current result |
+| --- | --- |
+| Shared mobile manager and SQLite | 170 Android host tests passed, including pending reasons, partial discovery, cancellation, journal validation/rollback, legacy bytes and new exported-JWK recovery |
+| Persistence and neutral/native policy mapping | 27 persistence, 28 Signum Android host and 16 Signum JVM tests passed |
+| Enterprise custody | 7 Kotlin tests and 5 Swift iOS integration tests passed, including matching synthetic HTTP fixtures and typed partial discovery |
+| Swift facade and native contracts | 44 strict-concurrency macOS and 45 iOS package tests passed; all 5 Keychain/persistence-example cases passed in the entitled iOS app host |
+| Compose and SwiftUI consumers | 146 shared-logic and 64 shared-UI host tests passed; native iOS identity setup/protection UI test passed |
+| Android process recovery | Block Store contracts and all 18 phases across database → database, native → native and database → native passed |
+| iOS process recovery | Keychain contract, bidirectional Kotlin/Swift adapter exchange and all 18 phases across the same three routes passed |
+| Test runner | 27 Python recovery-tooling tests passed; missing, stale, empty-suite and incomplete results remain failures |
+| Physical Android | 17 selected native backend/StrongBox policy tests passed on Android 12 with TEE and no StrongBox; no tests skipped |
+| Physical iOS | 4 selected ordinary-Keychain backup/recovery and Secure Enclave generation tests passed on iOS 27.0; no tests skipped |
+| Build/API/docs | Both WalletCore XCFramework architectures, Compose iOS compilation, native demo build, 7 affected ABI checks, Kotlin Dokka, strict Swift DocC coverage and snippet consistency passed |
+
+The Swift package's standalone iOS process rejected synchronizable Keychain access and could not
+open the managed-key persistence examples. The same tests pass in the entitled app host. Their
+source files are now also compiled by `iosAppTests` with `WALLET_SDK_APP_HOST_TESTS`; these native
+cases run there, while the portable examples remain in the macOS package suite. Example wallets
+are deleted after each test so different database-key owners cannot interfere.
+
+The earlier missing iOS cleanup-result symptom did not recur in the complete cleanup runs.
+The host flushes C streams before its completion marker, and the runner still requires a completed
+selected test. Passing runs do not establish the root cause of the earlier incomplete receipt.
+
+This cleanup does not requalify interactive authentication, biometric enrollment changes, cloud
+transport or physical device-to-device transfer. It preserves the native engines and supported
+policies. **WAL-1207 remains open:** the retained custom iOS authorization path does not satisfy
+its Signum-only requirement or prove physical combined-factor, zero-reuse signing through Signum.
+
+## Device qualification — September 16, 2026
 
 These are recorded observations for WAL-749, not a claim that every supported
 policy, device or OS version has been qualified. The initial checks used an

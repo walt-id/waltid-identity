@@ -2,7 +2,6 @@ package id.walt.crypto2.signum
 
 import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.HardwarePreference
-
 import android.content.Intent
 import android.os.Bundle
 import androidx.fragment.app.FragmentActivity

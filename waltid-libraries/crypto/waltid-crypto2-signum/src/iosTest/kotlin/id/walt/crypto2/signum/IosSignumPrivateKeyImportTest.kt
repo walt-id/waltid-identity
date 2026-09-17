@@ -1,7 +1,6 @@
 package id.walt.crypto2.signum
 
 import id.walt.crypto2.keys.HardwarePreference
-
 import kotlin.test.Test
 import kotlin.test.assertFalse
 
