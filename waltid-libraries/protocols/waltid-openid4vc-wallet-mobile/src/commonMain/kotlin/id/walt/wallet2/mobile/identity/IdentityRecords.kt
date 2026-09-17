@@ -37,7 +37,44 @@ internal data class IdentityRecord(
     val pendingReason: SigningIdentityFailure = SigningIdentityFailure.ProviderUnavailable,
     val previous: IdentityRecord? = null,
     val previousKey: id.walt.crypto2.keys.StoredKey.Managed? = null,
-)
+) {
+    init { validate() }
+
+    fun validate() {
+        require(version == 1 && id.isNotBlank() && keyId.isNotBlank() && nativeAlias.isNotBlank()) { "Invalid identity journal header" }
+        if (phase != IdentityPhase.Preparing) requireNotNull(identity) { "Established journal phase requires identity metadata" }
+        if (phase == IdentityPhase.AwaitingBackup) {
+            requireNotNull(backup) { "Pending backup requires a destination" }
+            requireNotNull(recovery) { "Pending backup requires its original record" }
+        }
+        identity?.let { require(it.id == id && it.keyId == keyId && it.storage == storage) { "Journal identity mismatch" } }
+        recovery?.let {
+            require(it.identityId == id && it.keyId == keyId) { "Journal recovery mismatch" }
+            identity?.let { identity -> require(it.did == identity.did && it.publicJwk == identity.publicJwk) { "Journal key binding mismatch" } }
+        }
+        backup?.let { require(it.recordId == id) { "Journal backup identifier mismatch" } }
+        require((previous == null) == (previousKey == null)) { "Rollback requires both the previous identity and descriptor" }
+        previous?.let {
+            require(phase == IdentityPhase.Preparing && it.phase == IdentityPhase.Active && it.previous == null && it.previousKey == null) {
+                "Rollback predecessor must be a single active record"
+            }
+            require(it.id == id && it.keyId == keyId && previousKey?.id?.value == keyId) { "Rollback identity mismatch" }
+        }
+    }
+
+    fun prepared(identity: SigningIdentity, recovery: RecoveryRecord? = this.recovery): IdentityRecord {
+        check(phase == IdentityPhase.Preparing)
+        return copy(identity = identity, recovery = recovery)
+    }
+
+    fun awaitingBackup(reason: SigningIdentityFailure): IdentityRecord {
+        check(phase == IdentityPhase.Preparing || phase == IdentityPhase.AwaitingBackup)
+        return copy(phase = IdentityPhase.AwaitingBackup, pendingReason = reason)
+    }
+
+    fun activated(recovery: RecoveryRecord?, confirmation: RecoveryConfirmation): IdentityRecord =
+        copy(phase = IdentityPhase.Active, recovery = recovery, recoveryConfirmation = confirmation, previous = null, previousKey = null)
+}
 
 @Serializable
 internal enum class IdentityPhase { Preparing, AwaitingBackup, Active }

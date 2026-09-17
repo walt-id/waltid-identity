@@ -695,7 +695,7 @@ sealed interface id.walt.wallet2.mobile.identity/SigningIdentityOperationResult 
     }
 
     final class Pending : id.walt.wallet2.mobile.identity/SigningIdentityOperationResult { // id.walt.wallet2.mobile.identity/SigningIdentityOperationResult.Pending|null[0]
-        constructor <init>(kotlin/String, id.walt.wallet2.mobile.identity/SigningIdentityFailure = ...) // id.walt.wallet2.mobile.identity/SigningIdentityOperationResult.Pending.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.identity.SigningIdentityFailure){}[0]
+        constructor <init>(kotlin/String, id.walt.wallet2.mobile.identity/SigningIdentityFailure) // id.walt.wallet2.mobile.identity/SigningIdentityOperationResult.Pending.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.identity.SigningIdentityFailure){}[0]
 
         final val identityId // id.walt.wallet2.mobile.identity/SigningIdentityOperationResult.Pending.identityId|{}identityId[0]
             final fun <get-identityId>(): kotlin/String // id.walt.wallet2.mobile.identity/SigningIdentityOperationResult.Pending.identityId.<get-identityId>|<get-identityId>(){}[0]
@@ -829,7 +829,7 @@ sealed interface id.walt.wallet2.mobile.identity/SigningIdentityState { // id.wa
     }
 
     final class Pending : id.walt.wallet2.mobile.identity/SigningIdentityState { // id.walt.wallet2.mobile.identity/SigningIdentityState.Pending|null[0]
-        constructor <init>(kotlin/String, id.walt.wallet2.mobile.identity/SigningIdentityFailure = ...) // id.walt.wallet2.mobile.identity/SigningIdentityState.Pending.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.identity.SigningIdentityFailure){}[0]
+        constructor <init>(kotlin/String, id.walt.wallet2.mobile.identity/SigningIdentityFailure) // id.walt.wallet2.mobile.identity/SigningIdentityState.Pending.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.identity.SigningIdentityFailure){}[0]
 
         final val identityId // id.walt.wallet2.mobile.identity/SigningIdentityState.Pending.identityId|{}identityId[0]
             final fun <get-identityId>(): kotlin/String // id.walt.wallet2.mobile.identity/SigningIdentityState.Pending.identityId.<get-identityId>|<get-identityId>(){}[0]

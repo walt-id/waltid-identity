@@ -54,17 +54,18 @@ import kotlin.uuid.Uuid
  * Keep one writable wallet instance per database. Provider extensions may read established identities.
  */
 public class SigningIdentityManager internal constructor(
-    private val walletId: String,
+    walletId: String,
     private val configuration: SigningIdentityConfiguration,
     private val defaultAuthorization: KeyUseAuthorizationPolicy,
     private val prompt: KeyUseAuthorizationPrompt,
     private val keys: SqlDelightKeyStore,
     private val dids: WalletDidStore,
     private val native: PlatformManagedKeyProvider,
-    private val queries: WalletPersistenceQueries,
+    queries: WalletPersistenceQueries,
     private val didService: Crypto2DidService,
     private val onActive: suspend () -> Unit,
 ) {
+    private val journal = SigningIdentityJournal(walletId, queries)
     private val owner = Any()
     private val mutex = Mutex()
     private val software = CryptoRuntime(defaultSoftwareKeyProviders())
@@ -127,7 +128,7 @@ public class SigningIdentityManager internal constructor(
             backup = option.providerId?.let { IdentityBackupReference(it, id) },
             recoveryAvailability = option.recoveryAvailability, recoveryConfirmation = configuration.recoveryConfirmation,
         )
-        reserve(preparing)
+        journal.reserve(preparing)
         try {
             val key = createKey(preparing, material)
             MobileDidSupport.ensureInitialized()
@@ -140,13 +141,13 @@ public class SigningIdentityManager internal constructor(
             ) }
             val identity = describe(preparing, registered.did, publicJwk, key)
             proveOriginalKey(key, publicJwk)
-            val prepared = preparing.copy(identity = identity, recovery = recovery)
-            write(prepared)
+            val prepared = preparing.prepared(identity, recovery)
+            journal.write(prepared)
             dids.addDid(WalletDidEntry(registered.did, registered.didDocument.toJsonObject()))
             finish(prepared)
         } catch (cause: Throwable) {
             // Once backup submission can have happened, retain the journal for idempotent retry.
-            if (read()?.phase == IdentityPhase.Preparing) cleanup(read() ?: preparing, material != null, cause)
+            if (journal.read()?.phase == IdentityPhase.Preparing) cleanup(journal.read() ?: preparing, material != null, cause)
             if (cause is CancellationException) throw cause
             failed(classify(cause))
         }
@@ -154,7 +155,7 @@ public class SigningIdentityManager internal constructor(
 
     /** Retries a persisted backup submission, or removes an interrupted pre-activation key operation. */
     public suspend fun resumePending(identityId: String): SigningIdentityOperationResult = mutex.withLock {
-        val record = read()?.takeIf { it.id == identityId } ?: return@withLock failed(SigningIdentityFailure.StaleOption)
+        val record = journal.read()?.takeIf { it.id == identityId } ?: return@withLock failed(SigningIdentityFailure.StaleOption)
         when (record.phase) {
             IdentityPhase.Active -> when (val state = currentState()) {
                 is SigningIdentityState.Active -> SigningIdentityOperationResult.Active(state.identity)
@@ -179,14 +180,14 @@ public class SigningIdentityManager internal constructor(
      * and can be deleted separately; cancellation never silently destroys a recovery copy.
      */
     public suspend fun cancelPending(identityId: String): Unit = mutex.withLock {
-        val record = read() ?: return@withLock
+        val record = journal.read() ?: return@withLock
         require(record.id == identityId && record.phase != IdentityPhase.Active) { "No matching pending identity" }
         cleanup(record, imported = record.backup != null, cause = null)
     }
 
     /** Offers backup for an existing retained recovery secret or an explicitly exportable software key. */
     public suspend fun backupOptions(identityId: String): List<SigningIdentityBackupOption> = mutex.withLock {
-        val record = read()?.takeIf { it.id == identityId && it.phase == IdentityPhase.Active } ?: return@withLock emptyList()
+        val record = journal.read()?.takeIf { it.id == identityId && it.phase == IdentityPhase.Active } ?: return@withLock emptyList()
         if (!permitsRecovery(record) || liveKey(record) == null) return@withLock emptyList()
         val recoverable = record.recovery != null || record.backup?.providerId in providers ||
             keys.getCrypto2Key(record.keyId)?.capabilities?.privateKeyExporter != null
@@ -199,7 +200,7 @@ public class SigningIdentityManager internal constructor(
     /** Submits the same identity to an explicitly selected provider; it never invents a seed for an existing key. */
     public suspend fun backup(option: SigningIdentityBackupOption): SigningIdentityOperationResult = mutex.withLock {
         if (option.owner !== owner) return@withLock failed(SigningIdentityFailure.StaleOption)
-        val record = read()?.takeIf { it.id == option.identityId && it.phase == IdentityPhase.Active }
+        val record = journal.read()?.takeIf { it.id == option.identityId && it.phase == IdentityPhase.Active }
             ?: return@withLock failed(SigningIdentityFailure.StaleOption)
         if (record.policy != SigningIdentityKeyPolicy.GeneralPurpose || configuration.policy != SigningIdentityKeyPolicy.GeneralPurpose)
             return@withLock failed(SigningIdentityFailure.UnsupportedPolicy)
@@ -212,7 +213,7 @@ public class SigningIdentityManager internal constructor(
             val recovery = recoveryRecord(record) ?: return@withLock failed(SigningIdentityFailure.UnsupportedPolicy)
             val receipt = submit(provider, reference.recordId, recovery, record)
             val updated = identity.copy(recovery = SigningIdentityRecoveryState.Submitted(reference, receipt))
-            write(record.copy(identity = updated, recovery = retained(recovery), backup = reference,
+            journal.write(record.copy(identity = updated, recovery = retained(recovery), backup = reference,
                 recoveryAvailability = option.recoveryAvailability, recoveryConfirmation = requiredConfirmation(record)))
             SigningIdentityOperationResult.Active(updated)
         } catch (cause: CancellationException) { throw cause }
@@ -223,7 +224,7 @@ public class SigningIdentityManager internal constructor(
      * become device-bound merely because a later issuance request asks for that property. */
     internal suspend fun requireKeyPolicy(keyId: String, policy: SigningIdentityKeyPolicy): Unit = mutex.withLock {
         if (policy == SigningIdentityKeyPolicy.GeneralPurpose) return@withLock
-        val record = read()
+        val record = journal.read()
         require(record != null && record.keyId == keyId && record.phase == IdentityPhase.Active && liveKey(record) != null) {
             "The selected holder key is not an active managed identity"
         }
@@ -263,7 +264,7 @@ public class SigningIdentityManager internal constructor(
 
     /** Offers registered custody destinations only when the current policy permits private-key export. */
     public suspend fun custodyOptions(identityId: String): List<SigningIdentityCustodyOption> = mutex.withLock {
-        val record = read()?.takeIf { it.id == identityId && it.phase == IdentityPhase.Active }
+        val record = journal.read()?.takeIf { it.id == identityId && it.phase == IdentityPhase.Active }
             ?: return@withLock emptyList()
         if (!permitsRecovery(record) || liveKey(record) == null) return@withLock emptyList()
         if (record.recovery == null && record.backup?.providerId !in providers &&
@@ -274,7 +275,7 @@ public class SigningIdentityManager internal constructor(
     /** Gives an explicit custodian an additional copy of the key. The local key is retained;
      * this does not create a recovery record or enable remote signing. */
     public suspend fun copyToCustody(option: SigningIdentityCustodyOption): SigningIdentityCustodyResult = mutex.withLock {
-        val record = read()?.takeIf { it.id == option.identityId && it.phase == IdentityPhase.Active }
+        val record = journal.read()?.takeIf { it.id == option.identityId && it.phase == IdentityPhase.Active }
         if (option.owner !== owner || record == null) return@withLock SigningIdentityCustodyResult.Failed(SigningIdentityFailure.StaleOption)
         if (!permitsRecovery(record)) return@withLock SigningIdentityCustodyResult.Failed(SigningIdentityFailure.UnsupportedPolicy)
         val key = liveKey(record) ?: return@withLock SigningIdentityCustodyResult.Failed(SigningIdentityFailure.KeyUnavailable)
@@ -288,7 +289,7 @@ public class SigningIdentityManager internal constructor(
             if (observed != key.capabilities.publicKeyExporter?.exportPublicKey()?.toSpkiDer(key.spec))
                 return@withLock SigningIdentityCustodyResult.Failed(SigningIdentityFailure.ProviderConflict)
             val reference = IdentityCustodyReference(custodian.id, receipt.keyReference)
-            write(record.copy(identity = record.identity.copy(custody = (record.identity.custody + reference).distinct())))
+            journal.write(record.copy(identity = record.identity.copy(custody = (record.identity.custody + reference).distinct())))
             SigningIdentityCustodyResult.Imported(reference)
         } catch (cause: CancellationException) { throw cause }
         catch (cause: Exception) { SigningIdentityCustodyResult.Failed(providerFailure(cause)) }
@@ -320,9 +321,9 @@ public class SigningIdentityManager internal constructor(
         require(candidate.owner === owner) { "Recovery reference belongs to another wallet instance" }
         val provider = requireNotNull(providers[candidate.reference.providerId]) { "Recovery provider is no longer registered" }
         val receipt = provider.delete(candidate.reference.recordId)
-        val record = read()
+        val record = journal.read()
         if (record?.backup == candidate.reference && record.phase == IdentityPhase.Active) {
-            write(record.copy(identity = requireNotNull(record.identity).copy(
+            journal.write(record.copy(identity = requireNotNull(record.identity).copy(
                 recovery = SigningIdentityRecoveryState.RemovalRequested(candidate.reference, receipt))))
         }
         receipt
@@ -365,7 +366,7 @@ public class SigningIdentityManager internal constructor(
             if (!fingerprint(bytes).contentEquals(option.fingerprint)) return@withLock failed(SigningIdentityFailure.StaleOption)
             val recovery = decodeRecovery(bytes, option.reference.recordId)
             if (!recovery.constraints.permits(option.storage, option.authorization)) return@withLock failed(SigningIdentityFailure.UnsupportedPolicy)
-            val previous = read()
+            val previous = journal.read()
             val previousKey = previous?.let { repairableKey(it, recovery) }
             if (previous != null && previousKey == null) return@withLock failed(SigningIdentityFailure.ExistingIdentity)
             if (previous == null && currentState() !is SigningIdentityState.Absent) return@withLock failed(SigningIdentityFailure.ExistingIdentity)
@@ -375,19 +376,19 @@ public class SigningIdentityManager internal constructor(
                 policy = configuration.policy, recovery = recovery, backup = option.reference,
                 recoveryConfirmation = recovery.constraints.confirmation,
                 previous = previous, previousKey = previousKey)
-            reserve(preparing)
+            journal.reserve(preparing)
             try {
                 if (previousKey != null) keys.removeKey(previousKey.id.value)
                 val key = createKey(preparing, recovery.privateKey())
                 proveOriginalKey(key, recovery.publicJwk)
                 val identity = describe(preparing, recovery.did, recovery.publicJwk, key).copy(
                     recovery = SigningIdentityRecoveryState.Recovered(option.reference))
-                val prepared = preparing.copy(identity = identity)
-                write(prepared)
+                val prepared = preparing.prepared(identity)
+                journal.write(prepared)
                 dids.addDid(WalletDidEntry(recovery.did, didService.resolve(recovery.did).getOrThrow()))
                 activate(prepared)
             } catch (cause: Throwable) {
-                cleanup(read() ?: preparing, imported = true, cause)
+                cleanup(journal.read() ?: preparing, imported = true, cause)
                 if (cause is CancellationException) throw cause
                 failed(classify(cause))
             }
@@ -516,11 +517,11 @@ public class SigningIdentityManager internal constructor(
     private suspend fun finish(record: IdentityRecord): SigningIdentityOperationResult {
         if (record.backup == null) return activate(record)
         if (!permitsRecovery(record)) return failed(SigningIdentityFailure.UnsupportedPolicy)
-        val pending = record.copy(phase = IdentityPhase.AwaitingBackup)
-        write(pending)
-        val provider = providers[record.backup.providerId] ?: return SigningIdentityOperationResult.Pending(record.id)
+        val pending = record.awaitingBackup(SigningIdentityFailure.ProviderUnavailable)
+        journal.write(pending)
+        val provider = providers[record.backup.providerId] ?: return SigningIdentityOperationResult.Pending(record.id, pending.pendingReason)
         return try {
-            if (provider.availability() != record.recoveryAvailability) return SigningIdentityOperationResult.Pending(record.id)
+            if (provider.availability() != record.recoveryAvailability) return SigningIdentityOperationResult.Pending(record.id, pending.pendingReason)
             val recovery = requireNotNull(record.recovery)
             val receipt = submit(provider, record.backup.recordId, recovery, record)
             activate(record.copy(identity = requireNotNull(record.identity).copy(
@@ -528,7 +529,7 @@ public class SigningIdentityManager internal constructor(
         } catch (cause: CancellationException) { throw cause }
         catch (cause: Exception) {
             val reason = providerFailure(cause)
-            write(pending.copy(pendingReason = reason))
+            journal.write(pending.copy(pendingReason = reason))
             SigningIdentityOperationResult.Pending(record.id, reason)
         }
     }
@@ -555,18 +556,11 @@ public class SigningIdentityManager internal constructor(
             record.recoveryConfirmation == RecoveryConfirmation.ProviderConfirmation) RecoveryConfirmation.ProviderConfirmation
         else RecoveryConfirmation.LocalAcceptance
 
-    private fun activate(record: IdentityRecord): SigningIdentityOperationResult.Active {
-        val identity = requireNotNull(record.identity)
-        queries.transaction {
-            write(record.copy(phase = IdentityPhase.Active, recovery = retained(record.recovery),
-                recoveryConfirmation = requiredConfirmation(record), previous = null, previousKey = null))
-            queries.setActiveIdentity(walletId, identity.id, identity.keyId, identity.did)
-        }
-        return SigningIdentityOperationResult.Active(identity)
-    }
+    private fun activate(record: IdentityRecord): SigningIdentityOperationResult.Active =
+        SigningIdentityOperationResult.Active(journal.activate(record, retained(record.recovery), requiredConfirmation(record)))
 
     private suspend fun currentState(): SigningIdentityState {
-        val record = read()
+        val record = journal.read()
         if (record == null) {
             val didEntries = dids.listDids().toList()
             val keyEntries = keys.listKeys().toList()
@@ -628,15 +622,8 @@ public class SigningIdentityManager internal constructor(
         try {
             if (!keys.removeKey(record.keyId) && record.storage != SigningIdentityKeyStorage.EncryptedDatabase)
                 native.deleteUncommittedKey(WalletKeyCreationRequest(KeyId(record.keyId), record.requirements, prompt, record.nativeAlias), imported)
-            if (record.previous == null) {
-                record.identity?.let { dids.removeDid(it.did) }
-                queries.deleteIdentityRecord(walletId)
-            } else {
-                record.previousKey?.let { key -> queries.insert(key.id.value,
-                    kotlin.time.Clock.System.now().toEpochMilliseconds(),
-                    id.walt.crypto2.serialization.StoredKeyCodec.encodeToString(key)) }
-                write(record.previous)
-            }
+            if (record.previous == null) record.identity?.let { dids.removeDid(it.did) }
+            journal.rollback(record)
         } catch (cleanupFailure: Throwable) {
             if (cause != null) cause.addSuppressed(cleanupFailure) else throw cleanupFailure
         }
@@ -657,16 +644,6 @@ public class SigningIdentityManager internal constructor(
         catch (_: Exception) { null }
     }
 
-    private fun reserve(record: IdentityRecord) = queries.transaction {
-        check(read() == record.previous) { "Identity state changed while reserving the operation" }
-        check(keys.storedKey(record.keyId) == record.previousKey) { "Recovery key ID already exists or changed" }
-        write(record)
-    }
-
-    private fun read(): IdentityRecord? = queries.selectIdentityRecord(walletId).executeAsOneOrNull()?.let {
-        recordJson.decodeFromString<IdentityRecord>(it.payload).also { record -> require(record.version == 1) }
-    }
-    private fun write(record: IdentityRecord) = queries.putIdentityRecord(walletId, record.phase.name, recordJson.encodeToString(record))
     private fun softwareDescriptor(id: String, material: EncodedKey.Jwk) =
         StoredKey.Software(StoredKey.CURRENT_VERSION, KeyId(id), identitySpec, identityUsages, material)
     private suspend fun publicJwk(key: Key): String = requireNotNull(key.capabilities.publicKeyExporter)
