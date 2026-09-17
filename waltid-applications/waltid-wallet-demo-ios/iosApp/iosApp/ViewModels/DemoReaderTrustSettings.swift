@@ -1,12 +1,12 @@
 import Foundation
 import WalletSDK
 
-protocol DemoReaderTrustSettingsPersistence: AnyObject {
+protocol DemoReaderTrustSettingsPersistence: AnyObject, Sendable {
     func loadEncodedSettings() throws -> String?
     func saveEncodedSettings(_ encoded: String) throws
 }
 
-final class UserDefaultsDemoReaderTrustSettingsPersistence: DemoReaderTrustSettingsPersistence {
+final class UserDefaultsDemoReaderTrustSettingsPersistence: DemoReaderTrustSettingsPersistence, @unchecked Sendable {
     private let defaults: UserDefaults?
 
     init(appGroupIdentifier: String) {
@@ -26,11 +26,16 @@ final class UserDefaultsDemoReaderTrustSettingsPersistence: DemoReaderTrustSetti
     static let settingsKey = "id.walt.walletdemo.sharing.readerTrustSettings"
 }
 
-final class InMemoryDemoReaderTrustSettingsPersistence: DemoReaderTrustSettingsPersistence {
-    var encodedSettings: String?
+final class InMemoryDemoReaderTrustSettingsPersistence: DemoReaderTrustSettingsPersistence, @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: String?
+    var encodedSettings: String? {
+        get { lock.lock(); defer { lock.unlock() }; return stored }
+        set { lock.lock(); defer { lock.unlock() }; stored = newValue }
+    }
 
     init(settings: ProximityReaderTrustSettings? = nil) {
-        encodedSettings = try? settings.map(ProximityReaderTrustSettingsCodec.encode)
+        stored = try? settings.map(ProximityReaderTrustSettingsCodec.encode)
     }
 
     func loadEncodedSettings() throws -> String? { encodedSettings }
@@ -54,6 +59,12 @@ enum ReaderTrustImportFileSelection: Equatable {
 }
 
 enum ReaderTrustImportFileLoader {
+    static func loadOffMain(_ result: Result<[URL], Error>) async throws -> ReaderTrustImportFileSelection {
+        let selected = try await Task.detached { try load(result) }.value
+        try Task.checkCancellation()
+        return selected
+    }
+
     static func load(
         _ result: Result<[URL], Error>
     ) throws -> ReaderTrustImportFileSelection {
@@ -77,7 +88,9 @@ enum ReaderTrustImportFileLoader {
         if let fileSize, fileSize > ProximityReaderTrustSettingsCodec.maximumImportBytes {
             throw ReaderTrustFileImportError.fileTooLarge
         }
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let data = try handle.read(upToCount: ProximityReaderTrustSettingsCodec.maximumImportBytes + 1) ?? Data()
         guard data.count <= ProximityReaderTrustSettingsCodec.maximumImportBytes else {
             throw ReaderTrustFileImportError.fileTooLarge
         }
@@ -104,71 +117,93 @@ final class DemoReaderTrustSettingsController: ObservableObject {
     @Published private(set) var importInProgress = false
     @Published private(set) var errorMessage: String?
 
+    @Published private(set) var loading = true
     private let persistence: any DemoReaderTrustSettingsPersistence
+    private var loadTask: Task<Void, Never>?
+    private var saveTask: Task<Void, Never>?
+    private var importGeneration = 0
+    private var pendingWrites = 0
+
 
     init(persistence: any DemoReaderTrustSettingsPersistence) {
         self.persistence = persistence
-        do {
-            if let encoded = try persistence.loadEncodedSettings() {
-                settings = try ProximityReaderTrustSettingsCodec.decode(encoded)
-            } else {
-                settings = ProximityReaderTrustSettings()
+        settings = ProximityReaderTrustSettings()
+        loadTask = Task { [weak self, persistence] in
+            do {
+                let settings = try await Task.detached {
+                    try persistence.loadEncodedSettings().map(ProximityReaderTrustSettingsCodec.decode)
+                        ?? ProximityReaderTrustSettings()
+                }.value
+                self?.settings = settings
+            } catch {
+                self?.errorMessage = "Stored Reader Authentication settings were invalid and were not loaded: \(error.localizedDescription)"
             }
-        } catch {
-            settings = ProximityReaderTrustSettings()
-            errorMessage = "Stored Reader Authentication settings were invalid and were not loaded: \(error.localizedDescription)"
+            self?.loading = false
         }
     }
 
-    /// Read exactly once when a new proximity session starts.
-    func sessionSnapshot() -> ProximityReaderTrustSettings { settings }
+    /// Read once; a pending load must never substitute the default reader policy.
+    func sessionSnapshot() throws -> ProximityReaderTrustSettings {
+        guard !loading else { throw WalletError.invalidInput("Reader Authentication settings are still loading") }
+        return settings
+    }
+
+    func awaitPendingOperations() async {
+        await loadTask?.value
+        await saveTask?.value
+    }
 
     func setReaderPolicy(_ policy: ProximityStoredReaderPolicy) {
-        persist(settings.updatingReaderPolicy(policy))
+        persist { $0.updatingReaderPolicy(policy) }
     }
 
     func prepareImport(sourceName: String, data: Data) async {
-        guard !importInProgress else { return }
+        guard !importInProgress, !loading else { return }
+        importGeneration += 1
+        let generation = importGeneration
         importInProgress = true
         pendingImport = nil
         errorMessage = nil
-        defer { importInProgress = false }
+        defer { if generation == importGeneration { importInProgress = false } }
         do {
-            pendingImport = try await ProximityReaderTrustSettingsCodec.prepareImport(
+            let preview = try await ProximityReaderTrustSettingsCodec.prepareImport(
                 sourceName: sourceName,
                 data: data,
                 existing: settings
             )
+            try Task.checkCancellation()
+            guard generation == importGeneration else { return }
+            pendingImport = preview
         } catch is CancellationError {
             return
         } catch {
-            errorMessage = error.localizedDescription
+            if generation == importGeneration { errorMessage = error.localizedDescription }
         }
     }
 
     func confirmImport() {
         guard let pendingImport else { return }
-        if persist(pendingImport.resultingSettings) {
-            self.pendingImport = nil
-        }
+        guard !importInProgress else { return }
+        persist { _ in pendingImport.resultingSettings }
     }
 
     func cancelImport() {
+        importGeneration += 1
+        importInProgress = pendingWrites > 0
         pendingImport = nil
     }
 
     func removeReaderAuthority(id: String) {
-        persist(settings.removingReaderTrustAnchor(id: id))
+        persist { $0.removingReaderTrustAnchor(id: id) }
     }
 
     func removeRICALProvider(id: String) {
-        persist(settings.removingRICALProvider(id: id))
+        persist { $0.removingRICALProvider(id: id) }
     }
 
     func reset() {
-        if persist(ProximityReaderTrustSettings()) {
-            pendingImport = nil
-        }
+        cancelImport()
+        persist { _ in ProximityReaderTrustSettings() }
     }
 
     func dismissError() {
@@ -176,23 +211,34 @@ final class DemoReaderTrustSettingsController: ObservableObject {
     }
 
     func reportImportError(_ message: String) {
-        importInProgress = false
+        importInProgress = pendingWrites > 0
         pendingImport = nil
         errorMessage = message
     }
 
-    @discardableResult
-    private func persist(_ newSettings: ProximityReaderTrustSettings) -> Bool {
-        do {
-            try persistence.saveEncodedSettings(
-                ProximityReaderTrustSettingsCodec.encode(newSettings)
-            )
-            settings = newSettings
-            errorMessage = nil
-            return true
-        } catch {
-            errorMessage = "Reader Authentication settings could not be saved: \(error.localizedDescription)"
-            return false
+    private func persist(_ update: @escaping (ProximityReaderTrustSettings) -> ProximityReaderTrustSettings) {
+        cancelImport()
+        pendingWrites += 1
+        importInProgress = true
+        let previous = saveTask
+        saveTask = Task { [weak self, loadTask] in
+            await loadTask?.value
+            await previous?.value
+            guard let self else { return }
+            let newSettings = update(settings)
+            do {
+                let persistence = persistence
+                try await Task.detached {
+                    try persistence.saveEncodedSettings(ProximityReaderTrustSettingsCodec.encode(newSettings))
+                }.value
+                settings = newSettings
+                pendingImport = nil
+                errorMessage = nil
+            } catch {
+                errorMessage = "Reader Authentication settings could not be saved: \(error.localizedDescription)"
+            }
+            pendingWrites -= 1
+            importInProgress = pendingWrites > 0
         }
     }
 }

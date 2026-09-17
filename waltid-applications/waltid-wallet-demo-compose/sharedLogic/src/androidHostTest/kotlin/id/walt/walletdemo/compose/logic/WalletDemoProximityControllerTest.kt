@@ -29,6 +29,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -43,6 +44,62 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalletDemoProximityControllerTest {
+    @Test
+    fun `reset drains a late startup and its asynchronous close even after settings dismissal`() = runTest {
+        val startGate = CompletableDeferred<Unit>()
+        val closeGate = CompletableDeferred<Unit>()
+        val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026), closeGate = closeGate)
+        val controller = controller(FakeBackend(session, startGate = startGate))
+        controller.start()
+        advanceUntilIdle()
+        controller.dismiss() // Opening Settings has already hidden the presentation route.
+        var deleted = false
+        val reset = launch { controller.closeAndAwait(); deleted = true }
+        advanceUntilIdle()
+        assertFalse(deleted)
+        startGate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(deleted)
+        assertEquals(1, session.closeCalls)
+        closeGate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(deleted)
+        reset.join()
+    }
+
+    @Test
+    fun `pending decision excludes duplicate and conflicting actions and ignores an old rejection`() = runTest {
+        val oldReview = review()
+        val gate = CompletableDeferred<Unit>()
+        val error = ProximityError(ProximityErrorCategory.Internal, "late", "Late rejection", ProximityRecovery.StartNewSession)
+        val session = FakeSession(ProximityState.ReviewRequired(oldReview), ProximityActionResult.Rejected(error), dispatchGate = gate)
+        val controller = controller(FakeBackend(session))
+        controller.start()
+        advanceUntilIdle()
+        controller.selectCredential(0, "credential-a")
+        controller.approve()
+        controller.approve()
+        controller.decline()
+        advanceUntilIdle()
+        assertEquals(1, session.actions.size)
+        assertFalse(controller.state.value.canApprove)
+        session.mutableState.value = ProximityState.ReviewRequired(review())
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertNull(controller.state.value.actionError)
+        assertNull(controller.state.value.pendingReviewId)
+        controller.selectCredential(0, "credential-a")
+        controller.approve()
+        advanceUntilIdle()
+        assertEquals(2, session.actions.size)
+        assertEquals(error, controller.state.value.actionError)
+        assertTrue(controller.state.value.canApprove) // A current rejected decision is retryable.
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+
     @Test
     fun `selected runtime permission is resolved before the SDK session starts`() = runTest {
         var capabilities = blockedCapabilities
@@ -407,6 +464,8 @@ private class FakeBackend(
 private class FakeSession(
     initialState: ProximityState,
     private val actionResult: ProximityActionResult = ProximityActionResult.Accepted,
+    private val closeGate: CompletableDeferred<Unit>? = null,
+    private val dispatchGate: CompletableDeferred<Unit>? = null,
 ) : ProximitySession {
     val mutableState = MutableStateFlow(initialState)
     override val state: StateFlow<ProximityState> = mutableState
@@ -416,6 +475,7 @@ private class FakeSession(
 
     override suspend fun dispatch(action: ProximityAction): ProximityActionResult {
         actions += action
+        dispatchGate?.await()
         if (action == ProximityAction.Cancel && actionResult == ProximityActionResult.Accepted) {
             mutableState.value = ProximityState.Cancelled
         }
@@ -424,6 +484,7 @@ private class FakeSession(
 
     override suspend fun close() {
         closeCalls += 1
+        closeGate?.await()
     }
 }
 

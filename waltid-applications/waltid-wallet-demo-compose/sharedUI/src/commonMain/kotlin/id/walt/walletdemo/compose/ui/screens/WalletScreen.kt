@@ -22,6 +22,8 @@ internal fun WalletScreen(
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
     sharingSettingsContent: (@Composable () -> Unit)? = null,
+    onOpenSettings: () -> Unit = {},
+    onResetWallet: () -> Unit = { controller.resetWallet() },
 ) {
     val uriHandler = LocalUriHandler.current
     var showingSettings by remember { mutableStateOf(false) }
@@ -40,7 +42,7 @@ internal fun WalletScreen(
             onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
             onBack = { showingSettings = false },
             onLock = controller::lock,
-            onResetWallet = controller::resetWallet,
+            onResetWallet = onResetWallet,
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
@@ -57,7 +59,7 @@ internal fun WalletScreen(
             } else {
                 WalletHeader(
                     state = state,
-                    onSettings = { showingSettings = true },
+                    onSettings = { onOpenSettings(); showingSettings = true },
                     onDismissStatus = controller::dismissStatus,
                     onToggleStatusExpanded = controller::toggleStatusExpanded,
                 )

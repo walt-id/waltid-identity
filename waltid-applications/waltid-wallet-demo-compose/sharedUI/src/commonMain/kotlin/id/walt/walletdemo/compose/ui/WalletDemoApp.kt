@@ -45,6 +45,8 @@ internal fun WalletDemoAppHost(
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
     sharingSettingsContent: (@Composable () -> Unit)? = null,
+    onOpenSettings: () -> Unit = {},
+    onResetWallet: () -> Unit = { controller.resetWallet() },
 ) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
@@ -99,6 +101,8 @@ internal fun WalletDemoAppHost(
                         onStartProximityPresentation = onStartProximityPresentation,
                         presentationContent = presentationContent,
                         sharingSettingsContent = sharingSettingsContent,
+                        onOpenSettings = onOpenSettings,
+                        onResetWallet = onResetWallet,
                     )
                 }
             }

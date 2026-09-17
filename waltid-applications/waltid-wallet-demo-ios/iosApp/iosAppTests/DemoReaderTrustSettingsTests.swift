@@ -5,26 +5,30 @@ import XCTest
 
 final class DemoReaderTrustSettingsTests: XCTestCase {
     @MainActor
-    func testPolicyPersistsWithCanonicalCodecAndLoadsInNewController() throws {
+    func testPolicyPersistsWithCanonicalCodecAndLoadsInNewController() async throws {
         let persistence = InMemoryDemoReaderTrustSettingsPersistence()
         let first = DemoReaderTrustSettingsController(persistence: persistence)
+        await first.awaitPendingOperations()
 
         first.setReaderPolicy(.requireTrusted)
+        await first.awaitPendingOperations()
 
         let encoded = try XCTUnwrap(persistence.encodedSettings)
         XCTAssertTrue(encoded.contains("\"version\":1"))
         XCTAssertTrue(encoded.contains("\"readerPolicy\":\"require_trusted\""))
         let reloaded = DemoReaderTrustSettingsController(persistence: persistence)
+        await reloaded.awaitPendingOperations()
         XCTAssertEqual(reloaded.settings.readerPolicy, .requireTrusted)
         XCTAssertNil(reloaded.errorMessage)
     }
 
     @MainActor
-    func testInvalidStoredSettingsFailClosedToDefaultsWithVisibleError() {
+    func testInvalidStoredSettingsFailClosedToDefaultsWithVisibleError() async {
         let persistence = InMemoryDemoReaderTrustSettingsPersistence()
         persistence.encodedSettings = "{\"version\":99}"
 
         let controller = DemoReaderTrustSettingsController(persistence: persistence)
+        await controller.awaitPendingOperations()
 
         XCTAssertEqual(controller.settings, ProximityReaderTrustSettings())
         XCTAssertNotNil(controller.errorMessage)
@@ -34,6 +38,7 @@ final class DemoReaderTrustSettingsTests: XCTestCase {
     func testInvalidFileImportProducesRecoverableErrorWithoutChangingSettings() async {
         let persistence = InMemoryDemoReaderTrustSettingsPersistence()
         let controller = DemoReaderTrustSettingsController(persistence: persistence)
+        await controller.awaitPendingOperations()
 
         await controller.prepareImport(
             sourceName: "not-a-certificate.der",
@@ -50,7 +55,9 @@ final class DemoReaderTrustSettingsTests: XCTestCase {
     func testPublicCAImportRequiresReviewAndCancelDoesNotPersist() async throws {
         let persistence = InMemoryDemoReaderTrustSettingsPersistence()
         let controller = DemoReaderTrustSettingsController(persistence: persistence)
+        await controller.awaitPendingOperations()
         controller.setReaderPolicy(.requireTrusted)
+        await controller.awaitPendingOperations()
         let certificate = try XCTUnwrap(Data(base64Encoded: Self.testReaderCaDerBase64))
 
         await controller.prepareImport(
@@ -91,6 +98,7 @@ final class DemoReaderTrustSettingsTests: XCTestCase {
             data: certificate
         )
         controller.confirmImport()
+        await controller.awaitPendingOperations()
 
         XCTAssertNil(controller.pendingImport)
         XCTAssertEqual(controller.settings.trustAnchors.count, 1)

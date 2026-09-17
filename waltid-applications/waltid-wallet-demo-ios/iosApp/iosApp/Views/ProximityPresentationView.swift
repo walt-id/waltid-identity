@@ -642,9 +642,8 @@ final class ProximityScreenPolicy: ObservableObject {
         }
     }
 
-    deinit {
-        MainActor.assumeIsolated { restore() }
-    }
+    // PresentView explicitly restores on disappearance and all lifecycle/state exits.
+    // Deallocation may happen off MainActor and must not touch UIKit.
 }
 
 private extension ProximityRemediationAction {

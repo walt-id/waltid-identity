@@ -3,26 +3,32 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import id.walt.wallet2.mobile.ProximityReaderTrustSettingsCodec
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
-import platform.Foundation.NSData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.cinterop.reinterpret
+import platform.Foundation.NSInputStream
 import platform.Foundation.NSURL
-import platform.Foundation.dataWithContentsOfURL
 import platform.UIKit.UIApplication
 import platform.UIKit.UIDocumentPickerDelegateProtocol
 import platform.UIKit.UIDocumentPickerViewController
 import platform.UniformTypeIdentifiers.UTTypeItem
 import platform.darwin.NSObject
-import platform.posix.memcpy
 
 @Composable
 internal actual fun rememberReaderTrustImportPicker(
     onResult: (ReaderTrustImportPickerResult) -> Unit,
 ): ReaderTrustImportPicker {
-    val delegate = remember { ReaderTrustDocumentPickerDelegate() }
+    val scope = rememberCoroutineScope()
+    val delegate = remember(scope) { ReaderTrustDocumentPickerDelegate(scope) }
     delegate.onResult = onResult
     return remember(delegate) {
         ReaderTrustImportPicker {
@@ -42,7 +48,8 @@ internal actual fun rememberReaderTrustImportPicker(
     }
 }
 
-private class ReaderTrustDocumentPickerDelegate : NSObject(), UIDocumentPickerDelegateProtocol {
+private class ReaderTrustDocumentPickerDelegate(private val scope: CoroutineScope) : NSObject(), UIDocumentPickerDelegateProtocol {
+    private var readJob: Job? = null
     var onResult: (ReaderTrustImportPickerResult) -> Unit = {}
 
     override fun documentPicker(
@@ -58,44 +65,42 @@ private class ReaderTrustDocumentPickerDelegate : NSObject(), UIDocumentPickerDe
             )
             return
         }
-        runCatching {
-            require(url.startAccessingSecurityScopedResource()) {
-                "The selected file could not be accessed"
-            }
-            try {
-                val data = requireNotNull(NSData.dataWithContentsOfURL(url)) {
-                    "The selected file could not be opened"
+        readJob?.cancel()
+        readJob = scope.launch {
+            val result = withContext(Dispatchers.Default) { runCatching {
+                val accessGranted = url.startAccessingSecurityScopedResource()
+                try {
+                    val stream = NSInputStream(uRL = url)
+                    stream.open()
+                    val buffer = ByteArray(ProximityReaderTrustSettingsCodec.MaximumImportBytes + 1)
+                    val size = try {
+                        var size = 0
+                        buffer.usePinned { pinned ->
+                            while (size < buffer.size) {
+                                val count = stream.read(pinned.addressOf(size).reinterpret(), (buffer.size - size).toULong()).toInt()
+                                require(count >= 0) { "The selected file could not be read" }
+                                if (count == 0) break
+                                size += count
+                            }
+                        }
+                        size
+                    } finally { stream.close() }
+                    require(size <= ProximityReaderTrustSettingsCodec.MaximumImportBytes) { "The imported file exceeds 1 MiB" }
+                    ReaderTrustImportFile(url.lastPathComponent ?: "reader-trust-import", buffer.copyOf(size))
+                } finally {
+                    if (accessGranted) url.stopAccessingSecurityScopedResource()
                 }
-                require(
-                    data.length <=
-                        ProximityReaderTrustSettingsCodec.MaximumImportBytes.toULong()
-                ) {
-                    "The imported file exceeds 1 MiB"
-                }
-                ReaderTrustImportFile(
-                    name = url.lastPathComponent?.takeIf { it.isNotBlank() }
-                        ?: "reader-trust-import",
-                    bytes = data.toByteArray(),
-                )
-            } finally {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }.fold(
-            onSuccess = { onResult(ReaderTrustImportPickerResult.Selected(it)) },
-            onFailure = { onResult(ReaderTrustImportPickerResult.Failed(it)) },
-        )
+            } }
+            result.fold(
+                onSuccess = { onResult(ReaderTrustImportPickerResult.Selected(it)) },
+                onFailure = { onResult(ReaderTrustImportPickerResult.Failed(it)) },
+            )
+        }
     }
 
     override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
+        readJob?.cancel()
         onResult(ReaderTrustImportPickerResult.Cancelled)
-    }
-}
-
-private fun NSData.toByteArray(): ByteArray = ByteArray(length.toInt()).also { result ->
-    if (result.isNotEmpty()) {
-        result.usePinned { pinned ->
-            memcpy(pinned.addressOf(0), bytes, length)
-        }
     }
 }
 

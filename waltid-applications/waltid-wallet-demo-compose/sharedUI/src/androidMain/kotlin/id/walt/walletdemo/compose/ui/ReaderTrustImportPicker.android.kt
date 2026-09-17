@@ -6,6 +6,11 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import id.walt.wallet2.mobile.ProximityReaderTrustSettingsCodec
@@ -15,15 +20,19 @@ import java.io.ByteArrayOutputStream
 internal actual fun rememberReaderTrustImportPicker(
     onResult: (ReaderTrustImportPickerResult) -> Unit,
 ): ReaderTrustImportPicker {
+    val scope = rememberCoroutineScope()
+    val currentResult = rememberUpdatedState(onResult)
     val resolver = LocalContext.current.contentResolver
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) {
             onResult(ReaderTrustImportPickerResult.Cancelled)
         } else {
-            runCatching { resolver.readReaderTrustFile(uri) }.fold(
-                onSuccess = { onResult(ReaderTrustImportPickerResult.Selected(it)) },
-                onFailure = { onResult(ReaderTrustImportPickerResult.Failed(it)) },
+            scope.launch {
+            withContext(Dispatchers.IO) { runCatching { resolver.readReaderTrustFile(uri) } }.fold(
+                onSuccess = { currentResult.value(ReaderTrustImportPickerResult.Selected(it)) },
+                onFailure = { currentResult.value(ReaderTrustImportPickerResult.Failed(it)) },
             )
+            }
         }
     }
     return remember(launcher) {
