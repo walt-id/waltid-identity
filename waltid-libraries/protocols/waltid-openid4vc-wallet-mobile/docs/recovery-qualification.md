@@ -15,7 +15,7 @@ operator-assisted security transitions below are historical evidence, not rerun 
 | Compose and SwiftUI consumers | 146 shared-logic and 64 shared-UI host tests passed; native iOS identity setup/protection UI test passed |
 | Android process recovery | Block Store contracts and all 18 phases across database → database, native → native and database → native passed |
 | iOS process recovery | Keychain contract, bidirectional Kotlin/Swift adapter exchange and all 18 phases across the same three routes passed |
-| Test runner | 27 Python recovery-tooling tests passed; missing, stale, empty-suite and incomplete results remain failures |
+| Test runner | 29 recovery-tooling tests passed, including native output capture with closed standard descriptors; missing, stale, empty-suite and incomplete results remain failures |
 | Physical Android | 17 selected native backend/StrongBox policy tests passed on Android 12 with TEE and no StrongBox; no tests skipped |
 | Physical iOS | 4 selected ordinary-Keychain backup/recovery and Secure Enclave generation tests passed on iOS 27.0; no tests skipped |
 | Build/API/docs | Both WalletCore XCFramework architectures, Compose iOS compilation, native demo build, 7 affected ABI checks, Kotlin Dokka, strict Swift DocC coverage and snippet consistency passed |
@@ -26,9 +26,15 @@ source files are now also compiled by `iosAppTests` with `WALLET_SDK_APP_HOST_TE
 cases run there, while the portable examples remain in the macOS package suite. Example wallets
 are deleted after each test so different database-key owners cannot interfere.
 
-The earlier missing iOS cleanup-result symptom did not recur in the complete cleanup runs.
-The host flushes C streams before its completion marker, and the runner still requires a completed
-selected test. Passing runs do not establish the root cause of the earlier incomplete receipt.
+After the local cleanup runs passed, hosted recovery again produced a C completion marker without
+Kotlin test results. The descriptor mismatch was reproduced deterministically: Darwin `freopen`
+can assign `stdout` a descriptor other than 1, while Kotlin/Native writes directly to descriptor 1.
+With stdin closed, the old host captured its C marker but lost the Kotlin-style write. The host now
+opens the log and explicitly redirects descriptors 1 and 2 with `dup2`, without reopening the C
+streams. Native regression cases cover all eight combinations of open/closed standard descriptors
+and failure to open the log. The full Keychain contract, bidirectional exchange and 18 recovery
+phases passed again with this fix; the runner still requires a completed selected test, not exit zero
+alone. Hosted confirmation of the fix remains pending.
 
 This cleanup does not requalify interactive authentication, biometric enrollment changes, cloud
 transport or physical device-to-device transfer. It preserves the native engines and supported
