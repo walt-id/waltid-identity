@@ -19,12 +19,15 @@ class SimulatorHostTest(unittest.TestCase):
         self.run = "24000119-bb78-4601-a5b2-51988fa88fa2"
         self.log = self.container / "Documents" / (self.run + ".log")
         self.calls = []
+        self.now = 0
+        self.durations = {}
         self.output = None
         self.pid = "RECOVERY_HOST_PID=71536\n"
         self.stopped = "RECOVERY_HOST_STOPPED=71536\n"
 
         def simctl(*arguments, env=None, timeout=30):
             self.calls.append((arguments, env, timeout))
+            self.now += self.durations.get(arguments[0], 0)
             if arguments[0] == "get_app_container":
                 return str(self.container) + "\n"
             if arguments[0] == "launch":
@@ -36,8 +39,13 @@ class SimulatorHostTest(unittest.TestCase):
         self.addCleanup(patch.stopall)
         patch.object(host, "simctl", side_effect=simctl).start()
         patch.object(host.uuid, "uuid4", return_value=self.run).start()
+        patch.object(host.time, "monotonic", side_effect=lambda: self.now).start()
+        patch.object(host.time, "sleep", side_effect=self.advance_time).start()
         self.wait_for_exit = patch.object(host, "wait_for_exit").start()
         self.process_is_running = patch.object(host, "process_is_running", return_value=True).start()
+
+    def advance_time(self, seconds):
+        self.now += seconds
 
     def test_completed_host_returns_output_from_the_selected_simulator(self):
         self.output = "[  PASSED  ] 1 tests.\nRECOVERY_TEST_EXIT=0\n"
@@ -54,13 +62,13 @@ class SimulatorHostTest(unittest.TestCase):
     def test_pid_alone_and_stale_log_cannot_pass(self):
         (self.container / "Documents/previous-run.log").write_text("[  PASSED  ] 1 tests.\nRECOVERY_TEST_EXIT=0\n")
         with self.assertRaisesRegex(RuntimeError, "did not report completion"):
-            host.run_test("simulator-id", [], timeout=0)
+            host.run_test("simulator-id", [], timeout=1)
         self.assertEqual(("terminate", "simulator-id", host.PACKAGE), self.calls[-1][0])
 
     def test_partial_passing_output_requires_completion(self):
         self.output = "[  PASSED  ] 1 tests.\n"
         with self.assertRaisesRegex(RuntimeError, r"PASSED[\s\S]+did not report completion"):
-            host.run_test("simulator-id", [], timeout=0)
+            host.run_test("simulator-id", [], timeout=1)
 
     def test_process_exit_without_completion_fails_without_terminate_rpc(self):
         self.output = "[  FAILED  ] example\n"
@@ -77,19 +85,46 @@ class SimulatorHostTest(unittest.TestCase):
 
     def test_launch_longer_than_thirty_seconds_still_collects_completion(self):
         output = "[  PASSED  ] 1 tests.\nRECOVERY_TEST_EXIT=0\n"
-        with patch.object(host.time, "monotonic", side_effect=[0, 45]), \
-                patch.object(host.time, "sleep", side_effect=lambda _: self.log.write_text(self.pid + output)) as sleep:
+        self.durations["launch"] = 45
+        with patch.object(host.time, "sleep", side_effect=lambda _: self.log.write_text(self.pid + output)) as sleep:
             self.assertEqual(self.pid + output + self.stopped, host.run_test("simulator-id", []))
             sleep.assert_called_once()
         self.assertEqual(180, self.calls[1][2])
 
     def test_launch_does_not_reset_the_completion_deadline(self):
         self.output = "test started\n"
-        with patch.object(host.time, "monotonic", side_effect=[0, 180]), \
-                patch.object(host.time, "sleep") as sleep:
-            with self.assertRaisesRegex(RuntimeError, r"test started[\s\S]+including launch"):
+        self.durations["launch"] = 180
+        with patch.object(host.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, r"test started[\s\S]+including container discovery and launch"):
                 host.run_test("simulator-id", [])
             sleep.assert_not_called()
+
+    def test_slow_container_discovery_uses_the_phase_budget_and_leaves_only_the_remainder_for_launch(self):
+        self.durations["get_app_container"] = 45
+        self.output = "[  PASSED  ] 1 tests.\nRECOVERY_TEST_EXIT=0\n"
+        self.assertEqual(self.pid + self.output + self.stopped, host.run_test("simulator-id", []))
+        self.assertEqual(180, self.calls[0][2])
+        self.assertEqual(135, self.calls[1][2])
+
+    def test_container_discovery_cannot_exhaust_the_budget_then_launch(self):
+        self.durations["get_app_container"] = 180
+        with self.assertRaisesRegex(RuntimeError, "exhausted.*budget during container discovery"):
+            host.run_test("simulator-id", [])
+        self.assertEqual(["get_app_container"], [call[0][0] for call in self.calls])
+
+    def test_container_discovery_timeout_does_not_launch_or_terminate_a_host(self):
+        with patch.object(host, "simctl", side_effect=RuntimeError("simctl get_app_container timed out")) as simctl:
+            with self.assertRaisesRegex(RuntimeError, "get_app_container timed out"):
+                host.run_test("simulator-id", [])
+            simctl.assert_called_once_with("get_app_container", "simulator-id", host.PACKAGE, "data", timeout=180)
+
+    def test_container_discovery_and_launch_do_not_reset_the_completion_deadline(self):
+        self.durations.update(get_app_container=45, launch=135)
+        self.output = "[  PASSED  ] 1 tests.\n"  # A test line alone is not completion.
+        with self.assertRaisesRegex(RuntimeError, "did not report completion"):
+            host.run_test("simulator-id", [])
+        self.assertEqual(135, self.calls[1][2])
+        self.assertEqual("terminate", self.calls[-1][0][0])
 
     def test_launch_timeout_retains_the_host_log_and_stops_the_app(self):
         def launch_timeout(*arguments, **kwargs):
