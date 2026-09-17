@@ -20,8 +20,8 @@ import kotlin.test.*
 class EnterpriseIdentityKeyCustodianTest {
     private val jwk = """{"kty":"EC","crv":"P-256","x":"_owZzgkFGR68KYqSRXklMfJvDOziRgY56Lw5y39waoI","y":"anebTPlpuKDlOcf2L7PTCtaqj4DjDx0Siq_WiiznLqA","d":"885_2uV-GjENh_HrvebzKL4Kmc28rfTWWJzyneS4_9I"}"""
     private val key get() = EncodedKey.Jwk(BinaryData(jwk.encodeToByteArray()), true)
-    private val identity = WalletIdentity("identity", "key-1", "did:jwk:fixture", "{}",
-        IdentityKeyStorage.EncryptedDatabase, KeyUseAuthorizationPolicy.None, PlatformKeyFacts())
+    private val identity = SigningIdentity("identity", "key-1", "did:jwk:fixture", "{}",
+        SigningIdentityKeyStorage.EncryptedDatabase, KeyUseAuthorizationPolicy.None, PlatformKeyFacts())
     private val url = Url("https://enterprise.example/v1/org.kms")
 
     @Test fun importsOriginalKeyAndReturnsOnlyPublicReceipt() = runTest {

@@ -5,7 +5,7 @@ public struct WalletConfiguration: Sendable {
     /// Stable local wallet identifier used by the underlying wallet store.
     public var walletID: String
     /// Signing identity lifecycle and opt-in recovery integrations.
-    public var identity: WalletIdentityConfiguration
+    public var signingIdentity: SigningIdentityConfiguration
 
     /// Default authorization policy for newly created wallet signing keys.
     public var defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
@@ -56,7 +56,7 @@ public struct WalletConfiguration: Sendable {
     ///   - defaultKeyUseAuthorizationPolicy: Default authorization policy for newly
     ///     created wallet signing keys.
     ///   - keyUseAuthorizationPrompt: Prompt text used for protected signing operations.
-    ///   - identity: Signing identity constraints and optional recovery providers.
+    ///   - signingIdentity: Signing identity constraints and optional recovery providers.
     public init(
         walletID: String = "default",
         attestation: WalletAttestationConfiguration? = nil,
@@ -68,10 +68,10 @@ public struct WalletConfiguration: Sendable {
         crossProcessAccess: WalletCrossProcessAccess? = nil,
         defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .biometricCurrentSet,
         keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init(),
-        identity: WalletIdentityConfiguration = .init()
+        signingIdentity: SigningIdentityConfiguration = .init()
     ) {
         self.walletID = walletID
-        self.identity = identity
+        self.signingIdentity = signingIdentity
         self.defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy
         self.keyUseAuthorizationPrompt = keyUseAuthorizationPrompt
         self.attestation = attestation
@@ -732,7 +732,7 @@ public struct IssuanceRequest: Equatable, Sendable {
     /// Optional holder DID URL used when the credential requires DID binding.
     public let did: String?
     /// Minimum host/issuer policy required of the identity's retained key policy.
-    public let keyPolicy: WalletIdentityPolicy
+    public let keyPolicy: SigningIdentityKeyPolicy
 
     /// Creates an issuance request.
     ///
@@ -749,7 +749,7 @@ public struct IssuanceRequest: Equatable, Sendable {
         redirectURI: URL,
         keyID: String? = nil,
         did: String? = nil,
-        keyPolicy: WalletIdentityPolicy = .generalPurpose
+        keyPolicy: SigningIdentityKeyPolicy = .generalPurpose
     ) {
         self.offer = offer
         self.clientID = clientID

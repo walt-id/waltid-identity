@@ -59,65 +59,65 @@ public class WalletSdkBridge private constructor(
     public val events: Flow<MobileWalletEvent> = eventFlow
 
     /** Reopens the selected identity or creates the configured default through the shared lifecycle. */
-    public suspend fun initializeIdentity(): WalletBridgeResult<IdentityOperationResult> =
-        walletBridgeCall { operations.identities.initialize() }
+    public suspend fun initializeSigningIdentity(): WalletBridgeResult<SigningIdentityOperationResult> =
+        walletBridgeCall { operations.signingIdentity.initialize() }
 
     /** Reports current provider prerequisites, including unavailable integrations. */
-    public suspend fun identityRecoveryProviderStatuses(): WalletBridgeResult<List<IdentityRecoveryProviderStatus>> =
-        walletBridgeCall { operations.identities.recoveryProviderStatuses() }
+    public suspend fun signingIdentityRecoveryProviderStatuses(): WalletBridgeResult<List<IdentityRecoveryProviderStatus>> =
+        walletBridgeCall { operations.signingIdentity.recoveryProviderStatuses() }
 
     /** Enumerates complete SDK-owned identity choices. */
-    public suspend fun identityCreationOptions(intent: IdentityIntent = IdentityIntent.WithoutRecovery,
-        attestation: IdentityAttestationRequest = IdentityAttestationRequest.None): WalletBridgeResult<IdentityOptions> =
-        walletBridgeCall { operations.identities.creationOptions(intent, attestation) }
+    public suspend fun signingIdentityCreationOptions(intent: SigningIdentityIntent = SigningIdentityIntent.WithoutRecovery,
+        attestation: SigningIdentityAttestationRequest = SigningIdentityAttestationRequest.None): WalletBridgeResult<SigningIdentityCreationOptions> =
+        walletBridgeCall { operations.signingIdentity.creationOptions(intent, attestation) }
 
     /** Creates the identity described by an SDK-issued option. */
-    public suspend fun createIdentity(option: IdentityCreationOption): WalletBridgeResult<IdentityOperationResult> =
-        walletBridgeCall { operations.identities.create(option) }
+    public suspend fun createSigningIdentity(option: SigningIdentityCreationOption): WalletBridgeResult<SigningIdentityOperationResult> =
+        walletBridgeCall { operations.signingIdentity.create(option) }
 
     /** Reads the active, pending or unavailable identity state. */
-    public suspend fun identityState(): WalletBridgeResult<WalletIdentityState> =
-        walletBridgeCall { operations.identities.state() }
+    public suspend fun signingIdentityState(): WalletBridgeResult<SigningIdentityState> =
+        walletBridgeCall { operations.signingIdentity.state() }
 
     /** Requests deletion without claiming that every synchronized copy has disappeared. */
-    public suspend fun deleteIdentityRecovery(candidate: RecoveryCandidate): WalletBridgeResult<RecoveryReceipt> =
-        walletBridgeCall { operations.identities.deleteRecovery(candidate) }
+    public suspend fun deleteSigningIdentityRecovery(candidate: SigningIdentityRecoveryCandidate): WalletBridgeResult<RecoveryReceipt> =
+        walletBridgeCall { operations.signingIdentity.deleteRecovery(candidate) }
 
     /** Resumes an interrupted identity operation. */
-    public suspend fun resumeIdentity(identityId: String): WalletBridgeResult<IdentityOperationResult> =
-        walletBridgeCall { operations.identities.resumePending(identityId) }
+    public suspend fun resumeSigningIdentity(identityId: String): WalletBridgeResult<SigningIdentityOperationResult> =
+        walletBridgeCall { operations.signingIdentity.resumePending(identityId) }
 
     /** Cancels pending local setup without deleting an already submitted provider record. */
-    public suspend fun cancelPendingIdentity(identityId: String): WalletBridgeResult<Unit> =
-        walletBridgeCall { operations.identities.cancelPending(identityId) }
+    public suspend fun cancelPendingSigningIdentity(identityId: String): WalletBridgeResult<Unit> =
+        walletBridgeCall { operations.signingIdentity.cancelPending(identityId) }
 
     /** Offers backup only for an existing exportable key or retained recovery secret. */
-    public suspend fun identityBackupOptions(identityId: String): WalletBridgeResult<List<IdentityBackupOption>> =
-        walletBridgeCall { operations.identities.backupOptions(identityId) }
+    public suspend fun signingIdentityBackupOptions(identityId: String): WalletBridgeResult<List<SigningIdentityBackupOption>> =
+        walletBridgeCall { operations.signingIdentity.backupOptions(identityId) }
 
     /** Submits a selected identity backup. */
-    public suspend fun backupIdentity(option: IdentityBackupOption): WalletBridgeResult<IdentityOperationResult> =
-        walletBridgeCall { operations.identities.backup(option) }
+    public suspend fun backupSigningIdentity(option: SigningIdentityBackupOption): WalletBridgeResult<SigningIdentityOperationResult> =
+        walletBridgeCall { operations.signingIdentity.backup(option) }
 
     /** Lists explicitly configured private-key custodians under the current export policy. */
-    public suspend fun identityCustodyOptions(identityId: String): WalletBridgeResult<List<IdentityCustodyOption>> =
-        walletBridgeCall { operations.identities.custodyOptions(identityId) }
+    public suspend fun signingIdentityCustodyOptions(identityId: String): WalletBridgeResult<List<SigningIdentityCustodyOption>> =
+        walletBridgeCall { operations.signingIdentity.custodyOptions(identityId) }
 
     /** Imports a copy into an explicit custodian without claiming portable recovery. */
-    public suspend fun transferIdentityToCustody(option: IdentityCustodyOption): WalletBridgeResult<IdentityCustodyResult> =
-        walletBridgeCall { operations.identities.transferToCustody(option) }
+    public suspend fun copySigningIdentityToCustody(option: SigningIdentityCustodyOption): WalletBridgeResult<SigningIdentityCustodyResult> =
+        walletBridgeCall { operations.signingIdentity.copyToCustody(option) }
 
     /** Discovers safe backup references from registered providers. */
-    public suspend fun identityRecoveryDiscovery(): WalletBridgeResult<IdentityRecoveryDiscovery> =
-        walletBridgeCall { operations.identities.discoverRecovery() }
+    public suspend fun signingIdentityRecoveryDiscovery(): WalletBridgeResult<SigningIdentityRecoveryDiscovery> =
+        walletBridgeCall { operations.signingIdentity.discoverRecovery() }
 
     /** Validates a backup and offers supported restoration destinations. */
-    public suspend fun identityRestorationOptions(candidate: RecoveryCandidate): WalletBridgeResult<List<IdentityRestorationOption>> =
-        walletBridgeCall { operations.identities.restorationOptions(candidate) }
+    public suspend fun signingIdentityRestorationOptions(candidate: SigningIdentityRecoveryCandidate): WalletBridgeResult<List<SigningIdentityRestorationOption>> =
+        walletBridgeCall { operations.signingIdentity.restorationOptions(candidate) }
 
     /** Restores the exact original signing identity. */
-    public suspend fun restoreIdentity(option: IdentityRestorationOption): WalletBridgeResult<IdentityOperationResult> =
-        walletBridgeCall { operations.identities.restore(option) }
+    public suspend fun restoreSigningIdentity(option: SigningIdentityRestorationOption): WalletBridgeResult<SigningIdentityOperationResult> =
+        walletBridgeCall { operations.signingIdentity.restore(option) }
 
     /** Checks whether a key-use authorization request is supported without creating a key. */
     public suspend fun keyUseAuthorizationPreflight(
@@ -281,7 +281,7 @@ public class WalletSdkBridge private constructor(
 }
 
 internal interface WalletSdkBridgeOperations {
-    val identities: WalletIdentities get() = error("Identity lifecycle is not supplied by this test double")
+    val signingIdentity: SigningIdentityManager get() = error("Identity lifecycle is not supplied by this test double")
     fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
         error("Digital Credentials are not implemented by this test bridge")
 
@@ -351,7 +351,7 @@ internal interface WalletSdkBridgeOperations {
 internal class MobileWalletSdkBridgeOperations(
     private val wallet: MobileWallet,
 ) : WalletSdkBridgeOperations {
-    override val identities: WalletIdentities get() = wallet.identities
+    override val signingIdentity: SigningIdentityManager get() = wallet.signingIdentity
 
     override fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
         wallet.digitalCredentialCapabilities()

@@ -609,7 +609,7 @@ class WalletViewModel: ObservableObject {
                 message: "Authorize wallet signing",
                 cancelText: "Cancel"
             ),
-            identity: .init(alternativeAuthorizations: signingProtectionMode.allows(.none) ? [.none] : [],
+            signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.allows(.none) ? [.none] : [],
                 keychain: .init(accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup),
                 recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
                     accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)])
@@ -1458,7 +1458,7 @@ class WalletViewModel: ObservableObject {
         signingProtection: WalletDemoSigningProtection,
         requiredAppliedSigningProtection: WalletDemoSigningProtection? = nil
     ) async throws {
-        if let service = try await walletClient.identityService() {
+        if let service = try await walletClient.signingIdentityManager() {
             let model = identityScreen ?? WalletIdentityScreenModel(service: service) { [weak self] in
                 guard let self else { return }
                 self.bootstrap(signingProtection: self.selectedSigningProtection)

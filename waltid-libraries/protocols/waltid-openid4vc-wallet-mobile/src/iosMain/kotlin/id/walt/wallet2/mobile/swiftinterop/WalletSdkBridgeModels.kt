@@ -78,7 +78,7 @@ public data class WalletBridgeConfiguration(
         WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
     public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
     /** Shared identity policy and trusted, explicitly registered recovery providers. */
-    public val identity: id.walt.wallet2.mobile.identity.IdentityConfiguration = id.walt.wallet2.mobile.identity.IdentityConfiguration(),
+    public val signingIdentity: id.walt.wallet2.mobile.identity.SigningIdentityConfiguration = id.walt.wallet2.mobile.identity.SigningIdentityConfiguration(),
 )
 
 /**
@@ -255,7 +255,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         transactionDataProfiles = transactionDataProfiles,
         defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy.toCorePolicy(),
         keyUseAuthorizationPrompt = keyUseAuthorizationPrompt,
-        identity = identity,
+        signingIdentity = signingIdentity,
         crossProcessAccess = appGroupIdentifier?.let { appGroup ->
             MobileWalletCrossProcessAccess(
                 appGroupIdentifier = appGroup,

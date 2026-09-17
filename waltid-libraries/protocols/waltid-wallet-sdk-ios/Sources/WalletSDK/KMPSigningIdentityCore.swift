@@ -2,26 +2,26 @@ import Foundation
 #if canImport(WalletCore) && os(iOS)
 @preconcurrency import WalletCore
 
-private final class KMPIdentityHandle<Value: AnyObject>: WalletIdentityHandle, @unchecked Sendable {
+private final class KMPSigningIdentityHandle<Value: AnyObject>: SigningIdentityHandle, @unchecked Sendable {
     let value: Value
     init(_ value: Value) { self.value = value }
 }
 
-struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
+struct KMPSigningIdentityCore: SigningIdentityCore, @unchecked Sendable {
     let bridge: WalletSdkBridge
     private func value<T>(_ result: any WalletBridgeResult, as type: T.Type) throws -> T {
         try KMPWalletCoreBridge.successValue(result, as: type, operation: "identity lifecycle")
     }
-    private func handle<T: AnyObject>(_ handle: any WalletIdentityHandle, as type: T.Type) throws -> T {
-        guard let value = (handle as? KMPIdentityHandle<T>)?.value else { throw WalletError.internalFailure("Invalid identity option") }
+    private func handle<T: AnyObject>(_ handle: any SigningIdentityHandle, as type: T.Type) throws -> T {
+        guard let value = (handle as? KMPSigningIdentityHandle<T>)?.value else { throw WalletError.internalFailure("Invalid identity option") }
         return value
     }
 
-    func initialize() async throws -> WalletIdentityOperationResult {
-        try operation(value(await bridge.initializeIdentity(), as: (any WalletCore.IdentityOperationResult).self))
+    func initialize() async throws -> SigningIdentityOperationResult {
+        try operation(value(await bridge.initializeSigningIdentity(), as: (any WalletCore.SigningIdentityOperationResult).self))
     }
     func recoveryProviderStatuses() async throws -> [WalletRecoveryProviderStatus] {
-        let statuses = try value(await bridge.identityRecoveryProviderStatuses(), as: [WalletCore.IdentityRecoveryProviderStatus].self)
+        let statuses = try value(await bridge.signingIdentityRecoveryProviderStatuses(), as: [WalletCore.IdentityRecoveryProviderStatus].self)
         return statuses.map { status in
             let state: WalletRecoveryAvailability
             switch onEnum(of: status.availability) {
@@ -31,28 +31,28 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
             return .init(id: status.id, displayName: status.displayName, availability: state)
         }
     }
-    func creationOptions(intent: WalletIdentityIntent, attestation: WalletIdentityAttestationRequest) async throws -> WalletIdentityOptions {
-        let request: any WalletCore.IdentityAttestationRequest
+    func creationOptions(intent: SigningIdentityIntent, attestation: SigningIdentityAttestationRequest) async throws -> SigningIdentityCreationOptions {
+        let request: any WalletCore.SigningIdentityAttestationRequest
         switch attestation {
-        case .none: request = WalletCore.IdentityAttestationRequestNone.shared
+        case .none: request = WalletCore.SigningIdentityAttestationRequestNone.shared
         case .native(let challenge):
             guard (1...128).contains(challenge.count) else { throw WalletError.invalidInput("Native attestation challenge must contain 1 to 128 bytes") }
-            request = WalletCore.IdentityAttestationRequestNative(challenge: Waltid_crypto2BinaryData(bytes: challenge.toKotlinByteArray()))
+            request = WalletCore.SigningIdentityAttestationRequestNative(challenge: Waltid_crypto2BinaryData(bytes: challenge.toKotlinByteArray()))
         }
-        let options = try value(await bridge.identityCreationOptions(intent: intent == .withoutRecovery ? .withoutRecovery : .recoverable,
+        let options = try value(await bridge.signingIdentityCreationOptions(intent: intent == .withoutRecovery ? .withoutRecovery : .recoverable,
                                                                      attestation: request),
-                                as: (any WalletCore.IdentityOptions).self)
+                                as: (any WalletCore.SigningIdentityCreationOptions).self)
         switch onEnum(of: options) {
         case .available(let choices): return .available(recommended: creation(choices.recommended), alternatives: choices.alternatives.map(creation))
         case .unavailable(let unavailable): return .unavailable(reasons: unavailable.reasons)
         }
     }
-    func create(_ option: WalletIdentityCreationOption) async throws -> WalletIdentityOperationResult {
-        try operation(value(await bridge.createIdentity(option: handle(option.handle, as: WalletCore.IdentityCreationOption.self)),
-                            as: (any WalletCore.IdentityOperationResult).self))
+    func create(_ option: SigningIdentityCreationOption) async throws -> SigningIdentityOperationResult {
+        try operation(value(await bridge.createSigningIdentity(option: handle(option.handle, as: WalletCore.SigningIdentityCreationOption.self)),
+                            as: (any WalletCore.SigningIdentityOperationResult).self))
     }
-    func state() async throws -> WalletIdentityState {
-        let state = try value(await bridge.identityState(), as: (any WalletCore.WalletIdentityState).self)
+    func state() async throws -> SigningIdentityState {
+        let state = try value(await bridge.signingIdentityState(), as: (any WalletCore.SigningIdentityState).self)
         switch onEnum(of: state) {
         case .absent: return .absent
         case .active(let active): return .active(Self.identity(active.identity))
@@ -60,77 +60,77 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
         case .unavailable(let unavailable): return .unavailable(identityID: unavailable.identityId, reason: failure(unavailable.reason))
         }
     }
-    func deleteRecovery(_ candidate: WalletIdentityRecoveryCandidate) async throws -> WalletRecoveryReceipt {
-        let receipt = try value(await bridge.deleteIdentityRecovery(candidate: handle(candidate.handle, as: WalletCore.RecoveryCandidate.self)),
+    func deleteRecovery(_ candidate: SigningIdentityRecoveryCandidate) async throws -> WalletRecoveryReceipt {
+        let receipt = try value(await bridge.deleteSigningIdentityRecovery(candidate: handle(candidate.handle, as: WalletCore.SigningIdentityRecoveryCandidate.self)),
                                 as: WalletCore.RecoveryReceipt.self)
         return receipt == .acceptedLocally ? .acceptedLocally : .confirmedByProvider
     }
-    func resumePending(identityID: String) async throws -> WalletIdentityOperationResult {
-        try operation(value(await bridge.resumeIdentity(identityId: identityID), as: (any WalletCore.IdentityOperationResult).self))
+    func resumePending(identityID: String) async throws -> SigningIdentityOperationResult {
+        try operation(value(await bridge.resumeSigningIdentity(identityId: identityID), as: (any WalletCore.SigningIdentityOperationResult).self))
     }
     func cancelPending(identityID: String) async throws {
-        _ = try value(await bridge.cancelPendingIdentity(identityId: identityID), as: Any.self)
+        _ = try value(await bridge.cancelPendingSigningIdentity(identityId: identityID), as: Any.self)
     }
-    func backupOptions(identityID: String) async throws -> [WalletIdentityBackupOption] {
-        try value(await bridge.identityBackupOptions(identityId: identityID), as: [WalletCore.IdentityBackupOption].self).map {
-            .init(identityID: $0.identityId, recoveryAvailability: availability($0.recoveryAvailability), providerName: $0.providerName, handle: KMPIdentityHandle($0))
+    func backupOptions(identityID: String) async throws -> [SigningIdentityBackupOption] {
+        try value(await bridge.signingIdentityBackupOptions(identityId: identityID), as: [WalletCore.SigningIdentityBackupOption].self).map {
+            .init(identityID: $0.identityId, recoveryAvailability: availability($0.recoveryAvailability), providerName: $0.providerName, handle: KMPSigningIdentityHandle($0))
         }
     }
-    func backup(_ option: WalletIdentityBackupOption) async throws -> WalletIdentityOperationResult {
-        try operation(value(await bridge.backupIdentity(option: handle(option.handle, as: WalletCore.IdentityBackupOption.self)),
-                            as: (any WalletCore.IdentityOperationResult).self))
+    func backup(_ option: SigningIdentityBackupOption) async throws -> SigningIdentityOperationResult {
+        try operation(value(await bridge.backupSigningIdentity(option: handle(option.handle, as: WalletCore.SigningIdentityBackupOption.self)),
+                            as: (any WalletCore.SigningIdentityOperationResult).self))
     }
-    func custodyOptions(identityID: String) async throws -> [WalletIdentityCustodyOption] {
-        try value(await bridge.identityCustodyOptions(identityId: identityID), as: [WalletCore.IdentityCustodyOption].self).map {
-            .init(identityID: $0.identityId, custodianName: $0.custodianName, handle: KMPIdentityHandle($0))
+    func custodyOptions(identityID: String) async throws -> [SigningIdentityCustodyOption] {
+        try value(await bridge.signingIdentityCustodyOptions(identityId: identityID), as: [WalletCore.SigningIdentityCustodyOption].self).map {
+            .init(identityID: $0.identityId, custodianName: $0.custodianName, handle: KMPSigningIdentityHandle($0))
         }
     }
-    func transferToCustody(_ option: WalletIdentityCustodyOption) async throws -> WalletIdentityCustodyResult {
-        let result = try value(await bridge.transferIdentityToCustody(option: handle(option.handle, as: WalletCore.IdentityCustodyOption.self)),
-                               as: (any WalletCore.IdentityCustodyResult).self)
+    func copyToCustody(_ option: SigningIdentityCustodyOption) async throws -> SigningIdentityCustodyResult {
+        let result = try value(await bridge.doCopySigningIdentityToCustody(option: handle(option.handle, as: WalletCore.SigningIdentityCustodyOption.self)),
+                               as: (any WalletCore.SigningIdentityCustodyResult).self)
         switch onEnum(of: result) {
         case .imported(let imported): return .imported(Self.custodyReference(imported.reference))
         case .failed(let failed): return .failed(failure(failed.reason))
         }
     }
-    func discoverRecovery() async throws -> WalletIdentityRecoveryDiscovery {
-        let discovery = try value(await bridge.identityRecoveryDiscovery(), as: WalletCore.IdentityRecoveryDiscovery.self)
+    func discoverRecovery() async throws -> SigningIdentityRecoveryDiscovery {
+        let discovery = try value(await bridge.signingIdentityRecoveryDiscovery(), as: WalletCore.SigningIdentityRecoveryDiscovery.self)
         return .init(candidates: discovery.candidates.map {
-            .init(reference: Self.reference($0.reference), providerName: $0.providerName, handle: KMPIdentityHandle($0))
+            .init(reference: Self.reference($0.reference), providerName: $0.providerName, handle: KMPSigningIdentityHandle($0))
         }, failures: discovery.failures.map {
             .init(providerID: $0.providerId, providerName: $0.providerName, reason: failure($0.reason))
         })
     }
-    func restorationOptions(_ candidate: WalletIdentityRecoveryCandidate) async throws -> [WalletIdentityRestorationOption] {
-        try value(await bridge.identityRestorationOptions(candidate: handle(candidate.handle, as: WalletCore.RecoveryCandidate.self)),
-                  as: [WalletCore.IdentityRestorationOption].self).map {
-            .init(did: $0.did, storage: Self.storage($0.storage), authorization: toSwiftAuthorizationPolicy($0.authorization), handle: KMPIdentityHandle($0))
+    func restorationOptions(_ candidate: SigningIdentityRecoveryCandidate) async throws -> [SigningIdentityRestorationOption] {
+        try value(await bridge.signingIdentityRestorationOptions(candidate: handle(candidate.handle, as: WalletCore.SigningIdentityRecoveryCandidate.self)),
+                  as: [WalletCore.SigningIdentityRestorationOption].self).map {
+            .init(did: $0.did, storage: Self.storage($0.storage), authorization: toSwiftAuthorizationPolicy($0.authorization), handle: KMPSigningIdentityHandle($0))
         }
     }
-    func restore(_ option: WalletIdentityRestorationOption) async throws -> WalletIdentityOperationResult {
-        try operation(value(await bridge.restoreIdentity(option: handle(option.handle, as: WalletCore.IdentityRestorationOption.self)),
-                            as: (any WalletCore.IdentityOperationResult).self))
+    func restore(_ option: SigningIdentityRestorationOption) async throws -> SigningIdentityOperationResult {
+        try operation(value(await bridge.restoreSigningIdentity(option: handle(option.handle, as: WalletCore.SigningIdentityRestorationOption.self)),
+                            as: (any WalletCore.SigningIdentityOperationResult).self))
     }
 
-    private func creation(_ option: WalletCore.IdentityCreationOption) -> WalletIdentityCreationOption {
-        let attestation: WalletIdentityAttestationRequest
+    private func creation(_ option: WalletCore.SigningIdentityCreationOption) -> SigningIdentityCreationOption {
+        let attestation: SigningIdentityAttestationRequest
         switch onEnum(of: option.attestation) {
         case .none: attestation = .none
         case .native(let request): attestation = .native(challenge: Self.bytes(request.challenge))
         }
         return .init(attestation: attestation, storage: Self.storage(option.storage), authorization: toSwiftAuthorizationPolicy(option.authorization),
-                     recoveryProviderName: option.recoveryProviderName, recoveryAvailability: option.recoveryAvailability.map(availability), handle: KMPIdentityHandle(option))
+                     recoveryProviderName: option.recoveryProviderName, recoveryAvailability: option.recoveryAvailability.map(availability), handle: KMPSigningIdentityHandle(option))
     }
-    private func operation(_ result: any WalletCore.IdentityOperationResult) -> WalletIdentityOperationResult {
+    private func operation(_ result: any WalletCore.SigningIdentityOperationResult) -> SigningIdentityOperationResult {
         switch onEnum(of: result) {
         case .active(let active): return .active(Self.identity(active.identity))
         case .pending(let pending): return .pending(identityID: pending.identityId, reason: failure(pending.reason))
         case .failed(let failed): return .failed(failure(failed.reason))
         }
     }
-    fileprivate static func identity(_ value: WalletCore.WalletIdentity) -> WalletIdentity {
-        let origin: WalletIdentityKeyOrigin = value.keyFacts.origin == .generated ? .generated : value.keyFacts.origin == .imported ? .imported : .unknown
-        let level: WalletIdentitySecurityLevel
+    fileprivate static func identity(_ value: WalletCore.SigningIdentity) -> SigningIdentity {
+        let origin: KeyOrigin = value.keyFacts.origin == .generated ? .generated : value.keyFacts.origin == .imported ? .imported : .unknown
+        let level: KeySecurityLevel
         switch value.keyFacts.securityLevel {
         case .software: level = .software
         case .trustedEnvironment: level = .trustedEnvironment
@@ -144,7 +144,7 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
         case .nativeAttributes: authorizationEvidence = .nativeAttributes
         case .creationRecord: authorizationEvidence = .creationRecord
         }
-        let recovery: WalletIdentityRecoveryState
+        let recovery: SigningIdentityRecoveryState
         switch onEnum(of: value.recovery) {
         case .disabled: recovery = .disabled
         case .removalRequested(let removed): recovery = .removalRequested(reference: reference(removed.reference),
@@ -159,19 +159,19 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
                      attestation: value.keyFacts.attestation.map { .init(format: $0.format,
                          statement: bytes($0.statement), certificateChain: $0.certificateChain.map(bytes)) }, recovery: recovery, custody: value.custody.map(custodyReference))
     }
-    private static func custodyReference(_ value: WalletCore.IdentityCustodyReference) -> WalletIdentityCustodyReference {
+    private static func custodyReference(_ value: WalletCore.IdentityCustodyReference) -> IdentityCustodyReference {
         .init(custodianID: value.custodianId, keyReference: value.keyReference)
     }
     private static func bytes(_ value: Waltid_crypto2BinaryData) -> Data {
         let bytes = value.toByteArray()
         return Data((0..<bytes.size).map { UInt8(bitPattern: bytes.get(index: $0)) })
     }
-    private static func reference(_ value: WalletCore.IdentityBackupReference) -> WalletIdentityBackupReference {
+    private static func reference(_ value: WalletCore.IdentityBackupReference) -> IdentityBackupReference {
         .init(providerID: value.providerId, recordID: value.recordId)
     }
-    private static func storage(_ value: WalletCore.IdentityKeyStorage) -> WalletIdentityStorage {
+    private static func storage(_ value: WalletCore.SigningIdentityKeyStorage) -> SigningIdentityKeyStorage {
         switch value {
-        case .hardware: return .hardware
+        case .hardwareBacked: return .hardwareBacked
         case .nativeStorage: return .nativeStorage
         case .encryptedDatabase: return .encryptedDatabase
         }
@@ -191,7 +191,7 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
         }
         return .available(protection: protection, scope: scope)
     }
-    private func failure(_ value: WalletCore.IdentityFailure) -> WalletIdentityFailure {
+    private func failure(_ value: WalletCore.SigningIdentityFailure) -> SigningIdentityFailure {
         switch value {
         case .unsupportedPolicy: return .unsupportedPolicy
         case .staleOption: return .staleOption
@@ -209,23 +209,23 @@ struct KMPWalletIdentityCore: WalletIdentityCore, @unchecked Sendable {
     }
 }
 
-extension WalletIdentityPolicy {
-    func toKMPIdentityPolicy() -> WalletCore.IdentityKeyPolicy {
+extension SigningIdentityKeyPolicy {
+    func toKMPSigningIdentityPolicy() -> WalletCore.SigningIdentityKeyPolicy {
         switch self {
         case .generalPurpose: return .generalPurpose
-        case .deviceBound: return .deviceBound
+        case .backupAndCustodyDisabled: return .backupAndCustodyDisabled
         case .hardwareGenerated: return .hardwareGenerated
         }
     }
 }
 
-extension WalletIdentityConfiguration {
-    func toKMPIdentityConfiguration() -> WalletCore.IdentityConfiguration {
-        let policy = self.policy.toKMPIdentityPolicy()
-        let authorization: any WalletCore.IdentityAuthorization
+extension SigningIdentityConfiguration {
+    func toKMPSigningIdentityConfiguration() -> WalletCore.SigningIdentityConfiguration {
+        let policy = self.policy.toKMPSigningIdentityPolicy()
+        let authorization: any WalletCore.SigningIdentityAuthorization
         switch self.authorization {
-        case .walletDefault: authorization = WalletCore.IdentityAuthorizationWalletDefault.shared
-        case .explicit(let selected): authorization = WalletCore.IdentityAuthorizationExplicit(policy: selected.toKMPNativeAuthorization())
+        case .walletDefault: authorization = WalletCore.SigningIdentityAuthorizationWalletDefault.shared
+        case .explicit(let selected): authorization = WalletCore.SigningIdentityAuthorizationExplicit(policy: selected.toKMPNativeAuthorization())
         }
         let platform: any Waltid_crypto2PlatformKeyConfiguration
         if let keychain {
@@ -239,11 +239,11 @@ extension WalletIdentityConfiguration {
             }
             platform = Waltid_crypto2PlatformKeyConfigurationIosKeychain(accessibility: accessibility, accessGroup: keychain.accessGroup)
         } else { platform = Waltid_crypto2PlatformKeyConfigurationDefault.shared }
-        return WalletCore.IdentityConfiguration(recoveryProviders: recoveryProviders.map(KMPRecoveryProvider.init), keyCustodians: keyCustodians.map(KMPCustodian.init), authorization: authorization,
+        return WalletCore.SigningIdentityConfiguration(recoveryProviders: recoveryProviders.map(KMPRecoveryProvider.init), keyCustodians: keyCustodians.map(KMPCustodian.init), authorization: authorization,
                                                 policy: policy, platform: platform,
                                                 alternativeAuthorizations: alternativeAuthorizations.map { $0.toKMPNativeAuthorization() },
                                                 recoveryConfirmation: recoveryConfirmation == .localAcceptance ? .localAcceptance : .providerConfirmation,
-                                                localRecoveryMaterial: localRecoveryMaterial == .retain ? .retain : .discardAfterSubmission)
+                                                localRecoveryMaterial: localRecoveryMaterial == .retain ? .retain : .discardAfterConfirmation)
     }
 }
 
@@ -268,7 +268,7 @@ private extension WalletKeyUseAuthorizationPolicy {
 
 private func identityProviderCall<T>(_ operation: () async throws -> T) async throws -> T {
     do { return try await operation() }
-    catch let error as WalletIdentityProviderError {
+    catch let error as IdentityProviderError {
         let failure: WalletCore.IdentityProviderFailure
         switch error {
         case .temporarilyUnavailable: failure = .temporarilyUnavailable
@@ -284,8 +284,8 @@ private func identityProviderCall<T>(_ operation: () async throws -> T) async th
 }
 
 private final class KMPRecoveryProvider: WalletCore.IdentityRecoveryProvider, @unchecked Sendable {
-    private let provider: any WalletIdentityRecoveryProvider
-    init(_ provider: any WalletIdentityRecoveryProvider) { self.provider = provider }
+    private let provider: any IdentityRecoveryProvider
+    init(_ provider: any IdentityRecoveryProvider) { self.provider = provider }
     var id: String { provider.id }
     var displayName: String { provider.displayName }
     func __availability() async throws -> any WalletCore.RecoveryAvailability {
@@ -319,15 +319,15 @@ private final class KMPRecoveryProvider: WalletCore.IdentityRecoveryProvider, @u
     }
 }
 private final class KMPCustodian: WalletCore.IdentityKeyCustodian, @unchecked Sendable {
-    private let custodian: any WalletIdentityKeyCustodian
-    init(_ custodian: any WalletIdentityKeyCustodian) { self.custodian = custodian }
+    private let custodian: any IdentityKeyCustodian
+    init(_ custodian: any IdentityKeyCustodian) { self.custodian = custodian }
     var id: String { custodian.id }
     var displayName: String { custodian.displayName }
-    func __importKey(identity: WalletCore.WalletIdentity, privateKey: Waltid_crypto2EncodedKeyJwk) async throws -> WalletCore.IdentityCustodyReceipt {
+    func __importKey(identity: WalletCore.SigningIdentity, privateKey: Waltid_crypto2EncodedKeyJwk) async throws -> WalletCore.IdentityCustodyReceipt {
         let bytes = privateKey.data.toByteArray()
         let data = Data((0..<bytes.size).map { UInt8(bitPattern: bytes.get(index: $0)) })
         let receipt = try await identityProviderCall {
-            try await custodian.importKey(identity: KMPWalletIdentityCore.identity(identity), privateJWK: data)
+            try await custodian.importKey(identity: KMPSigningIdentityCore.identity(identity), privateJWK: data)
         }
         return .init(keyReference: receipt.keyReference, publicJwk: receipt.publicJWK)
     }

@@ -10,7 +10,7 @@ the local wallet.
 ### Review and Present to a Verifier
 
 Pass the verifier request URL and, when needed, the DID returned by
-``WalletIdentityService/initialize()``.
+``SigningIdentityManager/initialize()``.
 
 ```swift
 let previewResult = try await wallet.previewPresentation(request: authorizationRequestURL)

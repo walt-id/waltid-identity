@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile.test
 
-import id.walt.wallet2.mobile.identity.IdentityOperationResult
-import id.walt.wallet2.mobile.identity.WalletIdentity
+import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
+import id.walt.wallet2.mobile.identity.SigningIdentity
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
@@ -61,7 +61,7 @@ class EnterpriseMobileWalletIntegrationTest {
         val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
 
         val wallet1 = createWallet(walletId, offer.attestation)
-        val bootstrapResult = wallet1.identities.initialize().activeIdentity()
+        val bootstrapResult = wallet1.signingIdentity.initialize().activeIdentity()
         wallet1.receiveCredential(offer.offerUrl, offer.txCode)
 
         val wallet2 = createWallet(walletId, offer.attestation)
@@ -85,7 +85,7 @@ class EnterpriseMobileWalletIntegrationTest {
             walletId = "android-enterprise-receive-${scenario.id}-${UUID.randomUUID()}",
             attestation = offer.attestation,
         )
-        wallet.identities.initialize().activeIdentity()
+        wallet.signingIdentity.initialize().activeIdentity()
 
         val credentialIds = wallet.receiveCredential(offer.offerUrl, offer.txCode)
 
@@ -105,7 +105,7 @@ class EnterpriseMobileWalletIntegrationTest {
             walletId = "android-enterprise-present-${scenario.id}-${UUID.randomUUID()}",
             attestation = offer.attestation,
         )
-        val bootstrapResult = wallet.identities.initialize().activeIdentity()
+        val bootstrapResult = wallet.signingIdentity.initialize().activeIdentity()
 
         val credentialIds = wallet.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(credentialIds.isNotEmpty(), "Should receive ${scenario.displayName}")
@@ -176,5 +176,5 @@ class EnterpriseMobileWalletIntegrationTest {
         }
 }
 
-private fun IdentityOperationResult.activeIdentity(): WalletIdentity =
-    kotlin.test.assertIs<IdentityOperationResult.Active>(this).identity
+private fun SigningIdentityOperationResult.activeIdentity(): SigningIdentity =
+    kotlin.test.assertIs<SigningIdentityOperationResult.Active>(this).identity

@@ -18,7 +18,7 @@ internal class LazyDemoWallet(
     override suspend fun identitySetup(): WalletDemoIdentitySetup? = wallet().identitySetup()
     override suspend fun chooseIdentity(choiceId: String) = wallet().chooseIdentity(choiceId)
     override suspend fun cancelIdentity(identityId: String) = wallet().cancelIdentity(identityId)
-    override suspend fun resumeIdentity(identityId: String) = wallet().resumeIdentity(identityId)
+    override suspend fun resumeSigningIdentity(identityId: String) = wallet().resumeSigningIdentity(identityId)
 
     override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult =
         wallet().bootstrap(signingProtection)

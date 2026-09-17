@@ -14,41 +14,45 @@ import id.walt.wallet2.persistence.keys.PlatformKeyFacts
  * @property recovery Latest known backup or restoration state.
  * @property custody Additional private-key custodians, independent of recovery. */
 @kotlinx.serialization.Serializable
-public data class WalletIdentity(
+public data class SigningIdentity(
     public val id: String,
     public val keyId: String,
     public val did: String,
     public val publicJwk: String,
-    public val storage: IdentityKeyStorage,
+    public val storage: SigningIdentityKeyStorage,
     public val authorization: KeyUseAuthorizationPolicy,
     public val keyFacts: PlatformKeyFacts,
-    public val recovery: IdentityRecoveryState = IdentityRecoveryState.Disabled,
+    public val recovery: SigningIdentityRecoveryState = SigningIdentityRecoveryState.Disabled,
     public val custody: List<IdentityCustodyReference> = emptyList(),
 )
 
 /** Backup status says what is known, separately from native signing-key protection. */
 @kotlinx.serialization.Serializable
-public sealed interface IdentityRecoveryState {
+public sealed interface SigningIdentityRecoveryState {
     /** No recovery secret has been submitted. */
     @kotlinx.serialization.Serializable
-    public data object Disabled : IdentityRecoveryState
+    @kotlinx.serialization.SerialName("id.walt.wallet2.mobile.identity.IdentityRecoveryState.Disabled")
+    public data object Disabled : SigningIdentityRecoveryState
     /** Deletion was submitted; OS local acceptance does not prove removal from the cloud or other devices.
      * @property reference Record for which deletion was requested.
      * @property receipt Evidence returned by the provider. */
     @kotlinx.serialization.Serializable
-    public data class RemovalRequested(public val reference: IdentityBackupReference, public val receipt: RecoveryReceipt) : IdentityRecoveryState
+    @kotlinx.serialization.SerialName("id.walt.wallet2.mobile.identity.IdentityRecoveryState.RemovalRequested")
+    public data class RemovalRequested(public val reference: IdentityBackupReference, public val receipt: RecoveryReceipt) : SigningIdentityRecoveryState
     /** This installation retrieved and successfully restored the original signing key.
      * @property reference Record used for restoration. */
     @kotlinx.serialization.Serializable
-    public data class Recovered(public val reference: IdentityBackupReference) : IdentityRecoveryState
+    @kotlinx.serialization.SerialName("id.walt.wallet2.mobile.identity.IdentityRecoveryState.Recovered")
+    public data class Recovered(public val reference: IdentityBackupReference) : SigningIdentityRecoveryState
     /** A provider accepted the record; the receipt states the actual delivery evidence.
      * @property reference Submitted record.
      * @property receipt Evidence returned by the provider. */
     @kotlinx.serialization.Serializable
+    @kotlinx.serialization.SerialName("id.walt.wallet2.mobile.identity.IdentityRecoveryState.Submitted")
     public data class Submitted(
         public val reference: IdentityBackupReference,
         public val receipt: RecoveryReceipt,
-    ) : IdentityRecoveryState
+    ) : SigningIdentityRecoveryState
 }
 
 /** Complete SDK-issued creation option. It cannot be constructed, copied or deserialized by callers.
@@ -57,40 +61,40 @@ public sealed interface IdentityRecoveryState {
  * @property recoveryProviderName Selected backup provider's display name, or null for no backup.
  * @property recoveryAvailability Provider protection and route, or null when recovery is disabled.
  * @property attestation Native evidence requested at creation. */
-public class IdentityCreationOption internal constructor(
+public class SigningIdentityCreationOption internal constructor(
     internal val owner: Any,
-    public val storage: IdentityKeyStorage,
+    public val storage: SigningIdentityKeyStorage,
     public val authorization: KeyUseAuthorizationPolicy,
     public val recoveryProviderName: String?,
     internal val providerId: String?,
     public val recoveryAvailability: RecoveryAvailability.Available?,
-    public val attestation: IdentityAttestationRequest,
+    public val attestation: SigningIdentityAttestationRequest,
 ) {
     /** Whether this option retains a secret from which the same key can be recovered. */
     public val recoverable: Boolean get() = providerId != null
 }
 
 /** Complete creation choices, or explicit reasons why the current requirements cannot be met. */
-public sealed interface IdentityOptions {
+public sealed interface SigningIdentityCreationOptions {
     /** Supported choices, ordered by configured preference.
      * @property recommended Preferred complete choice.
      * @property alternatives Other supported choices requiring explicit selection.
      */
     public class Available internal constructor(
-        public val recommended: IdentityCreationOption,
-        public val alternatives: List<IdentityCreationOption>,
-    ) : IdentityOptions
+        public val recommended: SigningIdentityCreationOption,
+        public val alternatives: List<SigningIdentityCreationOption>,
+    ) : SigningIdentityCreationOptions
     /** No complete choice meets current requirements.
      * @property reasons Human-readable unmet requirements.
      */
-    public data class Unavailable(public val reasons: List<String>) : IdentityOptions
+    public data class Unavailable(public val reasons: List<String>) : SigningIdentityCreationOptions
 }
 
 /** SDK-issued backup choice for an existing exportable identity.
  * @property identityId Identity whose signing secret will be backed up.
  * @property providerName Selected provider's display name.
  * @property recoveryAvailability Provider protection and route, rechecked before submission. */
-public class IdentityBackupOption internal constructor(
+public class SigningIdentityBackupOption internal constructor(
     internal val owner: Any,
     public val identityId: String,
     public val providerName: String,
@@ -101,7 +105,7 @@ public class IdentityBackupOption internal constructor(
 /** A record discovered through a configured provider; executable recovery options require validation.
  * @property reference Provider and record identifiers, without a signing secret.
  * @property providerName Configured provider's display name. */
-public class RecoveryCandidate internal constructor(
+public class SigningIdentityRecoveryCandidate internal constructor(
     internal val owner: Any,
     public val reference: IdentityBackupReference,
     public val providerName: String,
@@ -111,73 +115,73 @@ public class RecoveryCandidate internal constructor(
  * @property did Exact original DID to restore.
  * @property storage Destination signing backend.
  * @property authorization Required private-key authorization on this installation. */
-public class IdentityRestorationOption internal constructor(
+public class SigningIdentityRestorationOption internal constructor(
     internal val owner: Any,
     public val did: String,
-    public val storage: IdentityKeyStorage,
+    public val storage: SigningIdentityKeyStorage,
     public val authorization: KeyUseAuthorizationPolicy,
     internal val reference: IdentityBackupReference,
     internal val fingerprint: ByteArray,
 )
 
 /** Identity availability is distinct from whether credential data exists in the wallet. */
-public sealed interface WalletIdentityState {
+public sealed interface SigningIdentityState {
     /** No identity or conflicting unassociated key/DID exists. */
-    public data object Absent : WalletIdentityState
+    public data object Absent : SigningIdentityState
     /** The identity is active and available for signing.
      * @property identity Established signing identity.
      */
-    public data class Active(public val identity: WalletIdentity) : WalletIdentityState
+    public data class Active(public val identity: SigningIdentity) : SigningIdentityState
     /** An interrupted setup must be resumed or cancelled before activation.
      * @property reason Why the operation needs attention before retry.
      * @property identityId Identifier of the journaled operation's identity.
      */
-    public data class Pending(public val identityId: String, public val reason: IdentityFailure = IdentityFailure.ProviderUnavailable) : WalletIdentityState
+    public data class Pending(public val identityId: String, public val reason: SigningIdentityFailure = SigningIdentityFailure.ProviderUnavailable) : SigningIdentityState
     /** Existing state requires attention; a replacement is never generated automatically.
      * @property identityId Known identity identifier, or null for unassociated state.
      * @property reason Stable failure category.
      */
-    public data class Unavailable(public val identityId: String?, public val reason: IdentityFailure) : WalletIdentityState
+    public data class Unavailable(public val identityId: String?, public val reason: SigningIdentityFailure) : SigningIdentityState
 }
 
 /** Stable failure categories; callers do not need native error-message parsing. */
-public enum class IdentityFailure {
+public enum class SigningIdentityFailure {
     UnsupportedPolicy, StaleOption, KeyUnavailable, InvalidRecoveryRecord,
     AuthorizationNotCompleted, NativeOperationFailed, ProviderUnavailable, ExistingIdentity,
     ProviderInteractionRequired, ProviderRejected, ProviderConflict, ProviderConfirmationPending,
 }
 
 /** Creation and restore share one lifecycle result. Pending operations are resumable. */
-public sealed interface IdentityOperationResult {
+public sealed interface SigningIdentityOperationResult {
     /** The identity is active and available for signing.
      * @property identity Established signing identity.
      */
-    public data class Active(public val identity: WalletIdentity) : IdentityOperationResult
+    public data class Active(public val identity: SigningIdentity) : SigningIdentityOperationResult
     /** An interrupted setup must be resumed or cancelled before activation.
      * @property reason Why the operation needs attention before retry.
      * @property identityId Identifier of the journaled operation's identity.
      */
-    public data class Pending(public val identityId: String, public val reason: IdentityFailure = IdentityFailure.ProviderUnavailable) : IdentityOperationResult
+    public data class Pending(public val identityId: String, public val reason: SigningIdentityFailure = SigningIdentityFailure.ProviderUnavailable) : SigningIdentityOperationResult
     /** The operation could not complete.
      * @property reason Stable failure category.
      */
-    public data class Failed(public val reason: IdentityFailure) : IdentityOperationResult
+    public data class Failed(public val reason: SigningIdentityFailure) : SigningIdentityOperationResult
 }
 
 /** One recovery discovery attempt, including routes that failed without hiding healthy candidates.
  * @property candidates Safe references discovered through available providers.
  * @property failures Provider failures from the same attempt. */
-public data class IdentityRecoveryDiscovery(
-    public val candidates: List<RecoveryCandidate>,
-    public val failures: List<IdentityRecoveryProviderFailure>,
+public data class SigningIdentityRecoveryDiscovery(
+    public val candidates: List<SigningIdentityRecoveryCandidate>,
+    public val failures: List<SigningIdentityRecoveryProviderFailure>,
 )
 
 /** Redacted provider failure; no private record or native diagnostic is exposed.
  * @property providerId Stable configured provider identifier.
  * @property providerName Provider name for display.
  * @property reason Stable failure category. */
-public data class IdentityRecoveryProviderFailure(
+public data class SigningIdentityRecoveryProviderFailure(
     public val providerId: String,
     public val providerName: String,
-    public val reason: IdentityFailure,
+    public val reason: SigningIdentityFailure,
 )

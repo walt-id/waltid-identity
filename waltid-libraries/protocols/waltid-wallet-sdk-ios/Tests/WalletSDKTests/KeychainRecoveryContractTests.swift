@@ -29,7 +29,7 @@ final class KeychainRecoveryContractTests: XCTestCase {
                 do {
                     _ = try await provider.store(recordID: recordID, data: Data([1]))
                     XCTFail("Different data must not replace an existing record")
-                } catch let error as WalletIdentityProviderError { XCTAssertEqual(error, .conflict) }
+                } catch let error as IdentityProviderError { XCTAssertEqual(error, .conflict) }
                 let retained = try await reopened.retrieve(recordID: recordID)
                 XCTAssertEqual(retained, data)
                 _ = try await provider.delete(recordID: recordID)

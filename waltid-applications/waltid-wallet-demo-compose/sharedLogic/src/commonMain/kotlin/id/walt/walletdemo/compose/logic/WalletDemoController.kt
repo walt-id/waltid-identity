@@ -1478,7 +1478,7 @@ class WalletDemoController(
 
     fun chooseIdentity(choiceId: String) = runIdentityChoice { wallet.chooseIdentity(choiceId) }
     fun cancelIdentity(identityId: String) = runIdentityChoice { wallet.cancelIdentity(identityId) }
-    fun resumeIdentity(identityId: String) = runIdentityChoice { wallet.resumeIdentity(identityId) }
+    fun resumeSigningIdentity(identityId: String) = runIdentityChoice { wallet.resumeSigningIdentity(identityId) }
     fun refreshIdentityChoices() {
         val session = _state.value.session as? WalletSessionState.IdentitySetup ?: return
         if (_state.value.identityBusy) return

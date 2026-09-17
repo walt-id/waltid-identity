@@ -28,26 +28,26 @@ internal class MobileDemoWallet(
     private val isIos: Boolean = false,
 ) : DemoWallet {
     private sealed interface IdentityAction {
-        data class Create(val option: IdentityCreationOption) : IdentityAction
-        data class Backup(val option: IdentityBackupOption) : IdentityAction
-        data class Delete(val candidate: RecoveryCandidate) : IdentityAction
-        data class Restore(val option: IdentityRestorationOption) : IdentityAction
+        data class Create(val option: SigningIdentityCreationOption) : IdentityAction
+        data class Backup(val option: SigningIdentityBackupOption) : IdentityAction
+        data class Delete(val candidate: SigningIdentityRecoveryCandidate) : IdentityAction
+        data class Restore(val option: SigningIdentityRestorationOption) : IdentityAction
     }
     private val identityChoices = mutableMapOf<String, IdentityAction>()
 
     override suspend fun identityDetails(): WalletDemoIdentityDetails? {
-        val identity = checkNotNull((mobileWallet.identities.state() as? WalletIdentityState.Active)?.identity) {
+        val identity = checkNotNull((mobileWallet.signingIdentity.state() as? SigningIdentityState.Active)?.identity) {
             "The wallet has no active signing key."
         }
         identityChoices.clear()
         val choices = mutableListOf<WalletDemoIdentityChoice>()
-        for (option in mobileWallet.identities.backupOptions(identity.id)) {
+        for (option in mobileWallet.signingIdentity.backupOptions(identity.id)) {
             val id = Uuid.random().toString()
             identityChoices[id] = IdentityAction.Backup(option)
             val recovery = recoveryChoice(option.providerName, option.recoveryAvailability.scope)
             choices += WalletDemoIdentityChoice(id, recovery.title, recovery.detail, true)
         }
-        val discovery = mobileWallet.identities.discoverRecovery()
+        val discovery = mobileWallet.signingIdentity.discoverRecovery()
         for (candidate in discovery.candidates.filter { it.reference.recordId == identity.id }) {
             val id = Uuid.random().toString()
             identityChoices[id] = IdentityAction.Delete(candidate)
@@ -55,11 +55,11 @@ internal class MobileDemoWallet(
         }
         return WalletDemoIdentityDetails(storageChoice(identity.storage, false).title, identity.keyFacts.origin.name,
             identity.authorization.identityDescription(), when (val recovery = identity.recovery) {
-                IdentityRecoveryState.Disabled -> "No recovery backup submitted."
-                is IdentityRecoveryState.Submitted -> if (recovery.receipt == RecoveryReceipt.AcceptedLocally)
+                SigningIdentityRecoveryState.Disabled -> "No recovery backup submitted."
+                is SigningIdentityRecoveryState.Submitted -> if (recovery.receipt == RecoveryReceipt.AcceptedLocally)
                     "Recovery record accepted locally; delivery to another device is not confirmed." else "Recovery submission confirmed by provider."
-                is IdentityRecoveryState.Recovered -> "The original signing key and DID were restored on this installation."
-                is IdentityRecoveryState.RemovalRequested -> "Recovery record deletion requested; removal from other devices is not verified."
+                is SigningIdentityRecoveryState.Recovered -> "The original signing key and DID were restored on this installation."
+                is SigningIdentityRecoveryState.RemovalRequested -> "Recovery record deletion requested; removal from other devices is not verified."
             } + discovery.failures.joinToString("", prefix = if (discovery.failures.isEmpty()) "" else "\n") {
                 "${it.providerName}: ${it.reason}\n"
             }, choices)
@@ -67,13 +67,13 @@ internal class MobileDemoWallet(
 
     override suspend fun identitySetup(): WalletDemoIdentitySetup? {
         val setupActions = mutableMapOf<String, IdentityAction>()
-        val state = mobileWallet.identities.state()
-        if (state is WalletIdentityState.Active) return null
-        if (state is WalletIdentityState.Pending) return WalletDemoIdentitySetup.Pending(state.identityId)
+        val state = mobileWallet.signingIdentity.state()
+        if (state is SigningIdentityState.Active) return null
+        if (state is SigningIdentityState.Pending) return WalletDemoIdentitySetup.Pending(state.identityId)
         val choices = mutableListOf<WalletDemoKeySetupOption>()
-        if (state == WalletIdentityState.Absent) {
-            for (intent in IdentityIntent.entries) {
-                val options = mobileWallet.identities.creationOptions(intent) as? IdentityOptions.Available ?: continue
+        if (state == SigningIdentityState.Absent) {
+            for (intent in SigningIdentityIntent.entries) {
+                val options = mobileWallet.signingIdentity.creationOptions(intent) as? SigningIdentityCreationOptions.Available ?: continue
                 for (option in listOf(options.recommended) + options.alternatives) {
                     val id = Uuid.random().toString()
                     setupActions[id] = IdentityAction.Create(option)
@@ -86,10 +86,10 @@ internal class MobileDemoWallet(
                 }
             }
         }
-        val discovery = mobileWallet.identities.discoverRecovery()
+        val discovery = mobileWallet.signingIdentity.discoverRecovery()
         val recoveryUnavailableReasons = discovery.failures.map { "${it.providerName}: ${it.reason}" }.toMutableList()
         for (candidate in discovery.candidates) {
-            val options = try { mobileWallet.identities.restorationOptions(candidate) }
+            val options = try { mobileWallet.signingIdentity.restorationOptions(candidate) }
             catch (cause: CancellationException) { throw cause }
             catch (cause: Exception) {
                 recoveryUnavailableReasons += "${candidate.providerName}: Could not read this recovery record. Try again."
@@ -106,7 +106,7 @@ internal class MobileDemoWallet(
         }
         identityChoices.clear()
         identityChoices.putAll(setupActions)
-        return WalletDemoIdentitySetup.Choose(choices, if (state is WalletIdentityState.Unavailable)
+        return WalletDemoIdentitySetup.Choose(choices, if (state is SigningIdentityState.Unavailable)
             "The existing signing key is unavailable. Restore its original key to use credentials bound to it."
             else null, recoveryStorageNotice = if (isIos)
                 "The Secure Enclave cannot restore a key. Recoverable keys use Keychain or the encrypted wallet database." else null,
@@ -119,39 +119,39 @@ internal class MobileDemoWallet(
         else WalletDemoKeyChoice("backup:$provider", "Back up with $provider",
             "Save a recovery secret for the same signing key and DID. Credentials are not included. Cloud delivery depends on the provider and is not confirmed by a local save.")
 
-    private fun storageChoice(storage: IdentityKeyStorage, recoverable: Boolean): WalletDemoKeyChoice = when (storage) {
-        IdentityKeyStorage.Hardware -> WalletDemoKeyChoice(storage.name,
+    private fun storageChoice(storage: SigningIdentityKeyStorage, recoverable: Boolean): WalletDemoKeyChoice = when (storage) {
+        SigningIdentityKeyStorage.HardwareBacked -> WalletDemoKeyChoice(storage.name,
             if (isIos) "Secure Enclave" else "Hardware required",
             if (isIos) "Generates and uses the key inside the Secure Enclave. This key cannot be restored on another device."
             else if (recoverable) "Imports the recoverable key into secure hardware for signing. Its recovery secret also exists outside that hardware."
             else "Generates and uses the key inside secure hardware. Setup fails if hardware protection is unavailable.")
-        IdentityKeyStorage.NativeStorage -> WalletDemoKeyChoice(storage.name,
+        SigningIdentityKeyStorage.NativeStorage -> WalletDemoKeyChoice(storage.name,
             if (isIos) "Keychain" else "Android Keystore",
             if (isIos) "Stores the key in the iOS Keychain. Signing runs outside the Secure Enclave."
             else "The operating system manages the key. Hardware protection is not required.")
-        IdentityKeyStorage.EncryptedDatabase -> WalletDemoKeyChoice(storage.name, "Encrypted wallet database",
+        SigningIdentityKeyStorage.EncryptedDatabase -> WalletDemoKeyChoice(storage.name, "Encrypted wallet database",
             "Stores the key in the encrypted wallet database and signs in software. No hardware protection or system signing prompt.")
     }
 
     override suspend fun chooseIdentity(choiceId: String) {
         val result = when (val action = identityChoices.remove(choiceId) ?: error("Refresh identity choices before trying again")) {
-            is IdentityAction.Backup -> mobileWallet.identities.backup(action.option)
-            is IdentityAction.Delete -> { mobileWallet.identities.deleteRecovery(action.candidate); return }
-            is IdentityAction.Create -> mobileWallet.identities.create(action.option)
-            is IdentityAction.Restore -> mobileWallet.identities.restore(action.option)
+            is IdentityAction.Backup -> mobileWallet.signingIdentity.backup(action.option)
+            is IdentityAction.Delete -> { mobileWallet.signingIdentity.deleteRecovery(action.candidate); return }
+            is IdentityAction.Create -> mobileWallet.signingIdentity.create(action.option)
+            is IdentityAction.Restore -> mobileWallet.signingIdentity.restore(action.option)
         }
         checkIdentityResult(result)
     }
 
-    override suspend fun cancelIdentity(identityId: String) = mobileWallet.identities.cancelPending(identityId)
-    override suspend fun resumeIdentity(identityId: String) { checkIdentityResult(mobileWallet.identities.resumePending(identityId)) }
+    override suspend fun cancelIdentity(identityId: String) = mobileWallet.signingIdentity.cancelPending(identityId)
+    override suspend fun resumeSigningIdentity(identityId: String) { checkIdentityResult(mobileWallet.signingIdentity.resumePending(identityId)) }
 
-    private fun checkIdentityResult(result: IdentityOperationResult) {
-        if (result is IdentityOperationResult.Failed) error("Identity operation failed: ${result.reason}")
+    private fun checkIdentityResult(result: SigningIdentityOperationResult) {
+        if (result is SigningIdentityOperationResult.Failed) error("Identity operation failed: ${result.reason}")
     }
 
     override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult =
-        (mobileWallet.identities.state() as? WalletIdentityState.Active)?.identity.let { selected ->
+        (mobileWallet.signingIdentity.state() as? SigningIdentityState.Active)?.identity.let { selected ->
             val result = requireNotNull(selected) { "Select a signing identity before opening the wallet" }
             // Registration projects credential data; keep it outside the SDK identity lifecycle.
             mobileWallet.refreshDigitalCredentialRegistration()

@@ -18,16 +18,16 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
             }
         let wallet = try await Wallet(configuration: .init(walletID: "custody-contract-\(UUID())",
             persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
-            identity: .init(authorization: .explicit(.none), keyCustodians: [adapter])))
+            signingIdentity: .init(authorization: .explicit(.none), keyCustodians: [adapter])))
         do {
-            let identities = await wallet.identities
+            let identities = await wallet.signingIdentity
             guard case .available(let recommended, let alternatives) = try await identities.creationOptions(),
                   let option = ([recommended] + alternatives).first(where: { $0.storage == .encryptedDatabase }),
                   case .active(let original) = try await identities.create(option) else { throw FixtureFailure.unexpectedState("Software identity unavailable") }
             let choices = try await identities.custodyOptions(identityID: original.id)
             let custody = try XCTUnwrap(choices.first)
             for _ in 0..<2 {
-                guard case .imported(let receipt) = try await identities.transferToCustody(custody) else { throw FixtureFailure.unexpectedState("Custody failed") }
+                guard case .imported(let receipt) = try await identities.copyToCustody(custody) else { throw FixtureFailure.unexpectedState("Custody failed") }
                 XCTAssertEqual(receipt.keyReference, "https://enterprise.example/v1/org.kms.\(original.keyID)")
             }
             guard case .active(let active) = try await identities.state() else { throw FixtureFailure.unexpectedState("Local identity lost") }
@@ -40,7 +40,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
     }
 
     func testAdapterFailuresReachTheSharedCustodyResult() async throws {
-        let cases: [(String, WalletIdentityFailure)] = [("401", .providerInteractionRequired), ("409", .providerConflict),
+        let cases: [(String, SigningIdentityFailure)] = [("401", .providerInteractionRequired), ("409", .providerConflict),
             ("503", .providerUnavailable), ("malformed", .providerRejected), ("oversized", .providerRejected), ("mismatch", .providerConflict)]
         for (scenario, expected) in cases {
             let configuration = URLSessionConfiguration.ephemeral
@@ -54,15 +54,15 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
                 }
             let wallet = try await Wallet(configuration: .init(walletID: "custody-errors-\(UUID())",
                 persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
-            identity: .init(authorization: .explicit(.none), keyCustodians: [adapter])))
+            signingIdentity: .init(authorization: .explicit(.none), keyCustodians: [adapter])))
             do {
-                let identities = await wallet.identities
+                let identities = await wallet.signingIdentity
                 guard case .available(let recommended, let alternatives) = try await identities.creationOptions(),
                       let option = ([recommended] + alternatives).first(where: { $0.storage == .encryptedDatabase }),
                       case .active(let identity) = try await identities.create(option) else { throw FixtureFailure.unexpectedState("Identity unavailable") }
                 let options = try await identities.custodyOptions(identityID: identity.id)
                 let choice = try XCTUnwrap(options.first)
-                guard case .failed(let actual) = try await identities.transferToCustody(choice) else { throw FixtureFailure.unexpectedState("Expected failure") }
+                guard case .failed(let actual) = try await identities.copyToCustody(choice) else { throw FixtureFailure.unexpectedState("Expected failure") }
                 XCTAssertEqual(actual, expected, scenario)
                 guard case .active(let active) = try await identities.state() else { throw FixtureFailure.unexpectedState("Lost local identity") }
                 XCTAssertTrue(active.custody.isEmpty)
@@ -75,9 +75,9 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
         let provider = FailingRecoveryFixture()
         let wallet = try await Wallet(configuration: .init(walletID: "provider-error-\(UUID())",
             persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
-            identity: .init(authorization: .explicit(.none), recoveryProviders: [provider])))
+            signingIdentity: .init(authorization: .explicit(.none), recoveryProviders: [provider])))
         do {
-            let identities = await wallet.identities
+            let identities = await wallet.signingIdentity
             guard case .available(let recommended, let alternatives) = try await identities.creationOptions(intent: .recoverable),
                   let selected = ([recommended] + alternatives).first(where: { $0.storage == .encryptedDatabase }),
                   case .pending(let id, let reason) = try await identities.create(selected) else { throw FixtureFailure.unexpectedState("Expected pending setup") }
@@ -127,7 +127,7 @@ private final class CustodyProtocolFixture: URLProtocol, @unchecked Sendable {
     override func stopLoading() {}
 }
 
-private actor FailingRecoveryFixture: WalletIdentityRecoveryProvider {
+private actor FailingRecoveryFixture: IdentityRecoveryProvider {
     nonisolated let id = "failing-contract"
     nonisolated let displayName = "Test provider"
     private var fail = true
@@ -136,7 +136,7 @@ private actor FailingRecoveryFixture: WalletIdentityRecoveryProvider {
     func availability() async throws -> WalletRecoveryAvailability { .available(protection: .applicationEncrypted, scope: .custom) }
     func list() async throws -> [String] { Array(records.keys) }
     func store(recordID: String, data: Data) async throws -> WalletRecoveryReceipt {
-        if fail { throw WalletIdentityProviderError.conflict }
+        if fail { throw IdentityProviderError.conflict }
         records[recordID] = data
         return .acceptedLocally
     }

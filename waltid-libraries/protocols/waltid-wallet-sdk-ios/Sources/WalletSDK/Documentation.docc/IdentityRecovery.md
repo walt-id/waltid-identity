@@ -8,15 +8,15 @@ It never replaces a missing key or rebinds existing credentials automatically.
 
 ### Defaults
 
-`try await wallet.identities.initialize()` reopens the selected identity or creates a
+`try await wallet.signingIdentity.initialize()` reopens the selected identity or creates a
 P-256 / `did:jwk` identity without recovery with the configured authorization. Handle
-``WalletIdentityOperationResult/pending(identityID:reason:)`` and failure before continuing.
+``SigningIdentityOperationResult/pending(identityID:reason:)`` and failure before continuing.
 Recovery integrations are absent by default. Alternatives require explicit selection.
 
 ### Explicit choices
 
 ```swift
-let identities = await wallet.identities
+let identities = await wallet.signingIdentity
 switch try await identities.creationOptions(intent: .recoverable) {
 case .available(let recommended, let alternatives):
     // Present the public metadata for these SDK-issued choices to the user.
@@ -41,12 +41,12 @@ Add the `WalletSDKKeychainRecovery` product and register its provider explicitly
 import WalletSDK
 import WalletSDKKeychainRecovery
 
-let configuration = WalletConfiguration(identity: .init(
+let configuration = WalletConfiguration(signingIdentity: .init(
     recoveryProviders: [KeychainIdentityRecovery(namespace: "my-wallet")]
 ))
 ```
 
-Apps can replace this integration with ``WalletIdentityRecoveryProvider``. Providers
+Apps can replace this integration with ``IdentityRecoveryProvider``. Providers
 receive secret bytes and must protect them, scope access, and reject conflicting records.
 The SDK verifies local readback before accepting submission. OS acknowledgment does not
 prove cloud delivery, restoration on another device, or deletion of other device copies.
@@ -55,16 +55,16 @@ Deleting wallet data and deleting provider recovery records are separate actions
 ### Optional Enterprise custody
 
 Add the `WalletSDKEnterpriseCustody` product and register its `EnterpriseIdentityKeyCustodian`
-in ``WalletIdentityConfiguration/keyCustodians``. Hosts supply the HTTPS KMS resource and an
-authorizer for a body-free request. Select an option from ``WalletIdentityService/custodyOptions(identityID:)``
-and pass it to ``WalletIdentityService/transferToCustody(_:)`` to import the original signing key.
+in ``SigningIdentityConfiguration/keyCustodians``. Hosts supply the HTTPS KMS resource and an
+authorizer for a body-free request. Select an option from ``SigningIdentityManager/custodyOptions(identityID:)``
+and pass it to ``SigningIdentityManager/copyToCustody(_:)`` to import the original signing key.
 The SDK verifies the destination public key and records a public reference. The local key remains
 available and recovery status stays unchanged. This integration does not store an identity recovery
 record or configure remote signing. Device-bound and hardware-generated policies prohibit custody.
 
 ### Authorization evidence
 
-``WalletIdentity/authorizationEvidence`` distinguishes native attribute inspection from an SDK
+``SigningIdentity/authorizationEvidence`` distinguishes native attribute inspection from an SDK
 creation record bound to the native entry. iOS access-control flags and ACL-protected accessibility
 cannot be independently read back through the public Security API. The SDK rejects unowned keys,
 policy changes and replaced native entries; creation records are not attestation.
@@ -76,7 +76,7 @@ configuration and failure types apply to both implementations.
 
 ### Scope and assurance
 
-``WalletIdentityPolicy`` expresses application constraints, not EUDI, HAIP or eIDAS
+``SigningIdentityKeyPolicy`` expresses application constraints, not EUDI, HAIP or eIDAS
 certification. ``IssuanceRequest/keyPolicy`` requires the selected identity to already retain
 the requested restriction before issuance starts; apps interpret issuer/profile requirements. Imported keys retain imported origin even when a platform supports
 hardware execution. Native key evidence is not an OpenID4VCI key-attestation JWT.

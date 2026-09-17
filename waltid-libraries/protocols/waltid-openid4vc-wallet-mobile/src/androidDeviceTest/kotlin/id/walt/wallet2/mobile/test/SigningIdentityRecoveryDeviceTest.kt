@@ -10,41 +10,41 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.uuid.Uuid
 
-class WalletIdentityRecoveryDeviceTest {
+class SigningIdentityRecoveryDeviceTest {
     @Test fun hardwareImportAndSoftwareRecoverySurviveEncryptedDatabaseReopen() = runTest {
         val factory = MobileWalletFactory(InstrumentationRegistry.getInstrumentation().targetContext)
-        for (storage in listOf(IdentityKeyStorage.Hardware, IdentityKeyStorage.EncryptedDatabase)) {
+        for (storage in listOf(SigningIdentityKeyStorage.HardwareBacked, SigningIdentityKeyStorage.EncryptedDatabase)) {
             val provider = LocalRecoveryFixture()
             fun configuration() = MobileWalletConfig(walletId = "wal749-test-${Uuid.random()}",
-                identity = IdentityConfiguration(recoveryProviders = listOf(provider),
-                    authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
+                signingIdentity = SigningIdentityConfiguration(recoveryProviders = listOf(provider),
+                    authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
             val originalConfiguration = configuration()
             val original = factory.create(originalConfiguration)
             val destination = factory.create(configuration())
             var destinationDeleted = false
             try {
-                val options = assertIs<IdentityOptions.Available>(original.identities.creationOptions(IdentityIntent.Recoverable))
+                val options = assertIs<SigningIdentityCreationOptions.Available>(original.signingIdentity.creationOptions(SigningIdentityIntent.Recoverable))
                 val selected = (listOf(options.recommended) + options.alternatives).singleOrNull { it.storage == storage }
-                if (selected == null && storage == IdentityKeyStorage.Hardware) {
+                if (selected == null && storage == SigningIdentityKeyStorage.HardwareBacked) {
                     println("Hardware recovery unavailable; software recovery is tested independently")
                     continue
                 }
                 requireNotNull(selected)
-                val created = assertIs<IdentityOperationResult.Active>(original.identities.create(selected)).identity
+                val created = assertIs<SigningIdentityOperationResult.Active>(original.signingIdentity.create(selected)).identity
                 println("Identity destination=$storage security=${created.keyFacts.securityLevel} origin=${created.keyFacts.origin}")
-                if (storage == IdentityKeyStorage.Hardware) assertEquals(KeyOrigin.IMPORTED, created.keyFacts.origin)
+                if (storage == SigningIdentityKeyStorage.HardwareBacked) assertEquals(KeyOrigin.IMPORTED, created.keyFacts.origin)
                 val reopened = factory.create(originalConfiguration)
-                assertEquals(created, assertIs<WalletIdentityState.Active>(reopened.identities.state()).identity)
-                val candidate = destination.identities.discoverRecovery().candidates.single()
-                val restore = destination.identities.restorationOptions(candidate).single { it.storage == storage }
-                val restored = assertIs<IdentityOperationResult.Active>(destination.identities.restore(restore)).identity
+                assertEquals(created, assertIs<SigningIdentityState.Active>(reopened.signingIdentity.state()).identity)
+                val candidate = destination.signingIdentity.discoverRecovery().candidates.single()
+                val restore = destination.signingIdentity.restorationOptions(candidate).single { it.storage == storage }
+                val restored = assertIs<SigningIdentityOperationResult.Active>(destination.signingIdentity.restore(restore)).identity
                 assertEquals(created.id, restored.id)
                 assertEquals(created.keyId, restored.keyId)
                 assertEquals(created.did, restored.did)
                 assertEquals(created.publicJwk, restored.publicJwk)
                 destination.deleteWallet()
                 destinationDeleted = true
-                assertIs<WalletIdentityState.Active>(original.identities.state())
+                assertIs<SigningIdentityState.Active>(original.signingIdentity.state())
             } finally {
                 if (!destinationDeleted) destination.deleteWallet()
                 original.deleteWallet()

@@ -2,7 +2,7 @@ import Foundation
 import WalletSDK
 
 protocol WalletClient {
-    func identityService() async throws -> WalletIdentityService?
+    func signingIdentityManager() async throws -> SigningIdentityManager?
     func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult
     func signingProtectionAvailability(
         _ signingProtection: WalletDemoSigningProtection
@@ -29,7 +29,7 @@ protocol WalletClient {
 }
 
 extension WalletClient {
-    func identityService() async throws -> WalletIdentityService? { nil }
+    func signingIdentityManager() async throws -> SigningIdentityManager? { nil }
 }
 
 final class SDKWalletClient: WalletClient {
@@ -40,10 +40,10 @@ final class SDKWalletClient: WalletClient {
         self.configuration = configuration
     }
 
-    func identityService() async throws -> WalletIdentityService? { try await wallet().identities }
+    func signingIdentityManager() async throws -> SigningIdentityManager? { try await wallet().signingIdentity }
 
     func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult {
-        let service = try await wallet().identities
+        let service = try await wallet().signingIdentity
         guard case .active(let identity) = try await service.state() else {
             throw WalletError.invalidInput("Select a signing identity before opening the wallet")
         }

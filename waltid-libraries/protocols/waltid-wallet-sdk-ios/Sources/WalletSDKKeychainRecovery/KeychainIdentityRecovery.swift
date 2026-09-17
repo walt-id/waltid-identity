@@ -10,7 +10,7 @@ public enum SynchronizableKeychainAccessibility: Sendable {
 
 /// Optional iOS recovery adapter. Local Keychain acceptance does not prove iCloud delivery;
 /// cloud synchronization still depends on the user's iCloud Keychain configuration.
-public actor KeychainIdentityRecovery: WalletIdentityRecoveryProvider {
+public actor KeychainIdentityRecovery: IdentityRecoveryProvider {
     public nonisolated let id: String
     public nonisolated let displayName = "iCloud Keychain recovery"
     private let service: String
@@ -46,21 +46,21 @@ public actor KeychainIdentityRecovery: WalletIdentityRecoveryProvider {
         let status = SecItemCopyMatching(request as CFDictionary, &result)
         if status == errSecItemNotFound { return [] }
         try check(status)
-        guard let records = result as? [[String: Any]] else { throw WalletIdentityProviderError.rejected }
+        guard let records = result as? [[String: Any]] else { throw IdentityProviderError.rejected }
         return try records.map {
-            guard let account = $0[kSecAttrAccount as String] as? String else { throw WalletIdentityProviderError.rejected }
+            guard let account = $0[kSecAttrAccount as String] as? String else { throw IdentityProviderError.rejected }
             return account
         }
     }
 
     public func store(recordID: String, data: Data) async throws -> WalletRecoveryReceipt {
-        guard (1...4096).contains(data.count) else { throw WalletIdentityProviderError.rejected }
+        guard (1...4096).contains(data.count) else { throw IdentityProviderError.rejected }
         var request = try query(recordID: recordID)
         request[kSecAttrAccessible as String] = accessibility == .whenUnlocked ? kSecAttrAccessibleWhenUnlocked : kSecAttrAccessibleAfterFirstUnlock
         request[kSecValueData as String] = data
         let status = SecItemAdd(request as CFDictionary, nil)
         if status == errSecDuplicateItem {
-            guard try read(recordID: recordID) == data else { throw WalletIdentityProviderError.conflict }
+            guard try read(recordID: recordID) == data else { throw IdentityProviderError.conflict }
         } else { try check(status) }
         return .acceptedLocally
     }
@@ -81,7 +81,7 @@ public actor KeychainIdentityRecovery: WalletIdentityRecoveryProvider {
         let status = SecItemCopyMatching(request as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
         try check(status)
-        guard let data = result as? Data, (1...4096).contains(data.count) else { throw WalletIdentityProviderError.rejected }
+        guard let data = result as? Data, (1...4096).contains(data.count) else { throw IdentityProviderError.rejected }
         return data
     }
 
@@ -92,7 +92,7 @@ public actor KeychainIdentityRecovery: WalletIdentityRecoveryProvider {
         return result
     }
     private func query(recordID: String) throws -> [String: Any] {
-        guard recordID.range(of: "^[A-Za-z0-9._-]{1,128}$", options: .regularExpression) != nil else { throw WalletIdentityProviderError.rejected }
+        guard recordID.range(of: "^[A-Za-z0-9._-]{1,128}$", options: .regularExpression) != nil else { throw IdentityProviderError.rejected }
         var result = query()
         result[kSecAttrAccount as String] = recordID
         return result
@@ -100,10 +100,10 @@ public actor KeychainIdentityRecovery: WalletIdentityRecoveryProvider {
     private func check(_ status: OSStatus) throws {
         switch status {
         case errSecSuccess: return
-        case errSecInteractionNotAllowed, errSecAuthFailed, errSecUserCanceled: throw WalletIdentityProviderError.interactionRequired
-        case errSecMissingEntitlement, errSecParam: throw WalletIdentityProviderError.rejected
-        case errSecDuplicateItem: throw WalletIdentityProviderError.conflict
-        default: throw WalletIdentityProviderError.temporarilyUnavailable
+        case errSecInteractionNotAllowed, errSecAuthFailed, errSecUserCanceled: throw IdentityProviderError.interactionRequired
+        case errSecMissingEntitlement, errSecParam: throw IdentityProviderError.rejected
+        case errSecDuplicateItem: throw IdentityProviderError.conflict
+        default: throw IdentityProviderError.temporarilyUnavailable
         }
     }
 }

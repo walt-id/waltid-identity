@@ -3,7 +3,7 @@ import Foundation
 @available(macOS 10.15, *)
 protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
-    var identityCore: any WalletIdentityCore { get }
+    var signingIdentityCore: any SigningIdentityCore { get }
 
     func keyUseAuthorizationPreflight(
         keyType: WalletKeyType,
@@ -175,5 +175,5 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
 
 @available(macOS 10.15, *)
 extension WalletCoreBridge {
-    var identityCore: any WalletIdentityCore { UnavailableWalletIdentityCore() }
+    var signingIdentityCore: any SigningIdentityCore { UnavailableSigningIdentityCore() }
 }
