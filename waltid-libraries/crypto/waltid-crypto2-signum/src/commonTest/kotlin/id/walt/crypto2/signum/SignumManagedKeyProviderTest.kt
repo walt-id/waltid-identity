@@ -3,7 +3,6 @@ package id.walt.crypto2.signum
 import id.walt.crypto2.keys.HardwarePreference
 import id.walt.crypto2.keys.KeyProtectionLevel
 import id.walt.crypto2.keys.KeyAttestation
-
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1

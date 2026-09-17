@@ -61,7 +61,7 @@ python3 scripts/qualify-wallet-recovery.py local-loss \
 Start the intended emulator/simulator first and supply its exact serial/UDID;
 `booted` is not a stable identifier for resumable runs. Use a fresh output
 directory per configuration. Android supports `EncryptedDatabase`,
-`NativeStorage` and `Hardware` when offered by the device. iOS restoration
+`NativeStorage` and `HardwareBacked` when offered by the device. iOS restoration
 supports `EncryptedDatabase` and `NativeStorage`; Secure Enclave recovery is
 unsupported. An unavailable provider or unsupported selection fails the run; a
 skipped/empty test suite cannot count as recovery evidence.
@@ -161,3 +161,21 @@ configured default simulator type is unavailable.
 Host runner regressions: `python3 -m unittest discover -s scripts/tests -p
 'test_*recovery*.py'`. SDK lifecycle regressions:
 `:waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:testAndroidHostTest`.
+
+### Kotlin / Swift Keychain interoperability
+
+The iOS recovery CI script also runs a bidirectional exchange in the entitled UIKit test host.
+Kotlin writes synthetic record bytes, the actual optional Swift adapter reads and idempotently
+stores them, then Swift writes a second record for a fresh Kotlin process to read and delete.
+The host compiles the existing Swift adapter against the SDK's portable contracts into test-only
+static objects; no new SDK product or Kotlin runtime is embedded. The runner requires both a
+completed selected Kotlin test and `RECOVERY_INTEROP_EXIT=0` when this exchange is requested.
+
+Swift package host tests exercise portable facade contracts. Native Keychain and managed-database
+integration tests require an entitled iOS app host; a standalone package test process does not
+provide the same Keychain environment.
+
+The native demo's `iosAppTests` target references the existing Swift Keychain contract and
+persistence-example sources directly. `WALLET_SDK_APP_HOST_TESTS` enables their iOS cases only
+in that entitled target; the portable persistence examples still run with `swift test` on macOS.
+No test bodies or adapter implementations are copied into the demo.

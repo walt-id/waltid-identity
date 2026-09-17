@@ -28,6 +28,15 @@ python3 scripts/ios_simulator_test.py --device "$simulator" --output "$output" -
   --ktest_filter=id.walt.wallet2.recovery.keychain.KeychainIdentityRecoveryTest.compatibleAccessibilityClassesPreserveTheRecordContract \
   --require-keychain
 
+# Both actual adapters use the same entitled host's Keychain: Kotlin write -> Swift read/write -> Kotlin read.
+namespace="interop-$(uuidgen | tr '[:upper:]' '[:lower:]')"
+python3 scripts/ios_simulator_test.py --device "$simulator" --output "$output/interop-write" -- \
+  --ktest_filter=id.walt.wallet2.mobile.test.KeychainRecoveryWorkflowTest.exchangesRecordsWithTheSwiftAdapter \
+  --interopNamespace="$namespace" --interopPhase=write --swiftRecoveryExchange="$namespace"
+python3 scripts/ios_simulator_test.py --device "$simulator" --output "$output/interop-read" -- \
+  --ktest_filter=id.walt.wallet2.mobile.test.KeychainRecoveryWorkflowTest.exchangesRecordsWithTheSwiftAdapter \
+  --interopNamespace="$namespace" --interopPhase=read
+
 for pair in EncryptedDatabase:EncryptedDatabase NativeStorage:NativeStorage EncryptedDatabase:NativeStorage; do
   storage=${pair%:*}
   destination=${pair#*:}

@@ -184,8 +184,8 @@ def main():
     parser.add_argument("--apk", type=Path)
     parser.add_argument("--app", type=Path)
     parser.add_argument("--output", type=Path, required=True, help="Dedicated run directory, preserved across invocations")
-    parser.add_argument("--storage", choices=["EncryptedDatabase", "NativeStorage", "Hardware"], default="EncryptedDatabase")
-    parser.add_argument("--restore-storage", choices=["EncryptedDatabase", "NativeStorage", "Hardware"],
+    parser.add_argument("--storage", choices=["EncryptedDatabase", "NativeStorage", "HardwareBacked"], default="EncryptedDatabase")
+    parser.add_argument("--restore-storage", choices=["EncryptedDatabase", "NativeStorage", "HardwareBacked"],
                         help="Destination storage; defaults to --storage")
     args = parser.parse_args()
     if (args.platform == "android" and not args.apk) or (args.platform == "ios-simulator" and not args.app):

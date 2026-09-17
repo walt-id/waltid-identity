@@ -44,6 +44,8 @@ def run_test(device, arguments, timeout=180):
             if completed:
                 if completed[1] != "0":
                     failure = "Recovery host reported a nonzero test exit"
+                elif any(arg.startswith("--swiftRecoveryExchange=") for arg in arguments) and "RECOVERY_INTEROP_EXIT=0\n" not in output:
+                    failure = "Swift recovery exchange did not report successful completion"
                 break
             if time.monotonic() >= deadline:
                 failure = f"Recovery host did not report completion within {timeout:g} seconds (including launch)"

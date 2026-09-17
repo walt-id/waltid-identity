@@ -47,7 +47,7 @@ public sealed interface SigningIdentityAuthorization {
 public enum class SigningIdentityKeyPolicy {
     /** Permits recoverable signing identities; credential eligibility is evaluated separately. */
     GeneralPurpose,
-    /** Prohibits backup/export of the signing secret. */
+    /** Prohibits backup and custody through this manager; does not change the key's exportability. */
     @kotlinx.serialization.SerialName("DeviceBound")
     BackupAndCustodyDisabled,
     /** Requires generation in observed hardware and prohibits signing-secret backup/export. */

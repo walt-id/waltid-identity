@@ -8,8 +8,6 @@ import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.utils.ShaUtils
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.toPublicJwk
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest

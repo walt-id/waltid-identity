@@ -3,6 +3,7 @@
 #import <unistd.h>
 
 extern int main(int argc, char **argv);
+extern int32_t waltRecoveryKeychainExchange(const char *namespace);
 static int testArgc;
 static char **testArgv;
 
@@ -24,6 +25,15 @@ static char **testArgv;
         setbuf(stdout, NULL);
         setbuf(stderr, NULL);
         int result = main(testArgc, testArgv);
+        if (result == 0) {
+            for (NSString *argument in NSProcessInfo.processInfo.arguments) {
+                if ([argument hasPrefix:@"--swiftRecoveryExchange="]) {
+                    result = waltRecoveryKeychainExchange([argument substringFromIndex:24].UTF8String);
+                    printf("\nRECOVERY_INTEROP_EXIT=%d\n", result);
+                }
+            }
+        }
+        fflush(NULL);
         printf("\nRECOVERY_TEST_EXIT=%d\n", result);
         fflush(stdout);
         // Let the runner collect the result and terminate the app after launch is acknowledged.

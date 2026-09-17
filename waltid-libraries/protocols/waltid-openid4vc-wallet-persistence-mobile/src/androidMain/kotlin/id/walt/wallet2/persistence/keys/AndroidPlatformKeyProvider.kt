@@ -11,7 +11,6 @@ import id.walt.crypto2.keys.reuseSeconds
 import id.walt.crypto2.keys.toAuthorizationFailure
 import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.HardwarePreference
-
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex

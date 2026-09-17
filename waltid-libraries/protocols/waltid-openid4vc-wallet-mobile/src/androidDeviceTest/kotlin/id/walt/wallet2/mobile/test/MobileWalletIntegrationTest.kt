@@ -2,7 +2,6 @@ package id.walt.wallet2.mobile.test
 
 import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.wallet2.mobile.identity.SigningIdentity
-
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.certificate.x509.X509CertificateUtil

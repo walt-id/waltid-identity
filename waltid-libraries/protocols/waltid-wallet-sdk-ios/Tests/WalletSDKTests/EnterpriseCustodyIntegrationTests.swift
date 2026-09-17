@@ -1,11 +1,42 @@
 #if os(iOS)
 import Foundation
 import XCTest
-import WalletSDK
+@testable import WalletSDK
 import WalletSDKEnterpriseCustody
 
 final class EnterpriseCustodyIntegrationTests: XCTestCase {
     enum FixtureFailure: Error { case unexpectedState(String) }
+    // Matches Kotlin's synthetic private JWK, endpoint, and HTTP failure matrix.
+    func testMatchesKotlinEnterpriseFixtures() async throws {
+        let jwk = #"{"kty":"EC","crv":"P-256","x":"_owZzgkFGR68KYqSRXklMfJvDOziRgY56Lw5y39waoI","y":"anebTPlpuKDlOcf2L7PTCtaqj4DjDx0Siq_WiiznLqA","d":"885_2uV-GjENh_HrvebzKL4Kmc28rfTWWJzyneS4_9I"}"#
+        let identity = SigningIdentity(id: "identity", keyID: "key-1", did: "did:jwk:fixture", publicJWK: "{}",
+            storage: .encryptedDatabase, authorization: .none, origin: .imported, securityLevel: .software,
+            authorizationEvidence: .unknown, attestation: nil, recovery: .disabled, custody: [])
+        let cases: [(String, IdentityProviderError?)] = [("201", nil), ("301", .rejected), ("401", .interactionRequired),
+            ("403", .rejected), ("409", .conflict), ("429", .temporarilyUnavailable), ("503", .temporarilyUnavailable)]
+        for (scenario, expected) in cases {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [CustodyProtocolFixture.self]
+            let adapter = EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
+                configuration: configuration) { request in
+                    XCTAssertNil(request.httpBody)
+                    var request = request
+                    request.setValue("fixture", forHTTPHeaderField: "Authorization")
+                    request.setValue(scenario, forHTTPHeaderField: "X-Test-Scenario")
+                    request.setValue(jwk, forHTTPHeaderField: "X-Test-Expected-Body")
+                    return request
+                }
+            do {
+                let receipt = try await adapter.importKey(identity: identity, privateJWK: Data(jwk.utf8))
+                XCTAssertNil(expected)
+                XCTAssertEqual(receipt.keyReference, "https://enterprise.example/v1/org.kms.key-1")
+                let publicKey = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(receipt.publicJWK.utf8)) as? [String: String])
+                XCTAssertNil(publicKey["d"])
+                XCTAssertEqual(publicKey["x"], "_owZzgkFGR68KYqSRXklMfJvDOziRgY56Lw5y39waoI")
+            } catch let error as IdentityProviderError { XCTAssertEqual(error, expected) }
+        }
+    }
+
     func testOptionalAdapterImportsOriginalIdentityAndPreservesRecoveryState() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [CustodyProtocolFixture.self]
@@ -71,6 +102,28 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
         }
     }
 
+    func testRecoveryDiscoveryKeepsHealthyCandidatesAndTypedProviderFailures() async throws {
+        let healthy = FailingRecoveryFixture(id: "healthy")
+        let broken = FailingRecoveryFixture(id: "broken")
+        await healthy.allowStore()
+        await broken.failListing()
+        let wallet = try await Wallet(configuration: .init(walletID: "discovery-contract-\(UUID())",
+            persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
+            signingIdentity: .init(authorization: .explicit(.none), recoveryProviders: [healthy, broken])))
+        do {
+            let manager = await wallet.signingIdentity
+            guard case .available(let recommended, let alternatives) = try await manager.creationOptions(intent: .recoverable),
+                  let option = ([recommended] + alternatives).first(where: { $0.storage == .encryptedDatabase && $0.recoveryProviderName == "healthy" }),
+                  case .active = try await manager.create(option) else { throw FixtureFailure.unexpectedState("Expected healthy creation route") }
+            let discovery = try await manager.discoverRecovery()
+            XCTAssertEqual(discovery.candidates.map { $0.reference.providerID }, ["healthy"])
+            XCTAssertEqual(discovery.failures.map { $0.providerID }, ["broken"])
+            XCTAssertEqual(discovery.failures.first?.reason, .providerInteractionRequired)
+            XCTAssertEqual(discovery.failures.first?.message, "Unlock or sign in to this recovery provider, then retry.")
+            try await wallet.deleteLocalData()
+        } catch { try? await wallet.deleteLocalData(); throw error }
+    }
+
     func testSwiftProviderFailureSurvivesKotlinBridgeAndPendingRetry() async throws {
         let provider = FailingRecoveryFixture()
         let wallet = try await Wallet(configuration: .init(walletID: "provider-error-\(UUID())",
@@ -112,6 +165,10 @@ private final class CustodyProtocolFixture: URLProtocol, @unchecked Sendable {
                     body.append(contentsOf: buffer.prefix(count))
                 }
             }
+            if let expected = request.value(forHTTPHeaderField: "X-Test-Expected-Body") {
+                XCTAssertEqual(request.url?.absoluteString, "https://enterprise.example/v1/org.kms.key-1/kms-service-api/keys/import/jwk")
+                XCTAssertEqual(String(decoding: body, as: UTF8.self), expected)
+            }
             var jwk = try JSONSerialization.jsonObject(with: body) as! [String: Any]
             let scenario = request.value(forHTTPHeaderField: "X-Test-Scenario") ?? "success"
             if scenario == "mismatch" { jwk["x"] = jwk["y"] }
@@ -128,13 +185,19 @@ private final class CustodyProtocolFixture: URLProtocol, @unchecked Sendable {
 }
 
 private actor FailingRecoveryFixture: IdentityRecoveryProvider {
-    nonisolated let id = "failing-contract"
-    nonisolated let displayName = "Test provider"
+    nonisolated let id: String
+    nonisolated var displayName: String { id }
     private var fail = true
+    private var listingFailed = false
+    init(id: String = "failing-contract") { self.id = id }
+    func failListing() { listingFailed = true }
     private var records: [String: Data] = [:]
     func allowStore() { fail = false }
     func availability() async throws -> WalletRecoveryAvailability { .available(protection: .applicationEncrypted, scope: .custom) }
-    func list() async throws -> [String] { Array(records.keys) }
+    func list() async throws -> [String] {
+        if listingFailed { throw IdentityProviderError.interactionRequired }
+        return Array(records.keys)
+    }
     func store(recordID: String, data: Data) async throws -> WalletRecoveryReceipt {
         if fail { throw IdentityProviderError.conflict }
         records[recordID] = data

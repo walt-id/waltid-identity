@@ -1,5 +1,6 @@
 package id.walt.wallet2.persistence.stores
 
+import id.walt.crypto2.keys.Key as StoredKeyMaterial
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.KeyId
@@ -8,7 +9,6 @@ import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.toPublicJwk
-import id.walt.crypto2.keys.Key as StoredKeyMaterial
 import id.walt.crypto2.keys.KeyEncodingFormat
 import id.walt.crypto2.providers.CryptoOperation
 import id.walt.crypto2.providers.CryptoRequirement

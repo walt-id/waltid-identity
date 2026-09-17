@@ -1,8 +1,17 @@
+#if !os(iOS) || WALLET_SDK_APP_HOST_TESTS
 import Foundation
 import XCTest
 @testable import WalletSDK
 
 final class WalletPersistenceSnippetsTests: XCTestCase {
+    // The examples share an app wallet ID but demonstrate incompatible database-key owners.
+    // Remove each example's database and key before the next one opens that same wallet.
+    private func deleteAfterTest(_ wallet: Wallet) {
+        #if os(iOS)
+        addTeardownBlock { try await wallet.deleteLocalData() }
+        #endif
+    }
+
     func testProvidedDatabaseKeySnippetCompiles() async throws {
         // doc-snippet:start swift-provided-database-key
         struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
@@ -26,6 +35,7 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
         )
         // doc-snippet:end swift-provided-database-key
 
+        deleteAfterTest(wallet)
         let configuration = await wallet.configuration
         XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
     }
@@ -62,6 +72,7 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
         )
         // doc-snippet:end swift-custom-credential-store
 
+        deleteAfterTest(wallet)
         let configuration = await wallet.configuration
         XCTAssertNotNil(configuration.persistence.credentialStore)
     }
@@ -79,6 +90,7 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
         )
         // doc-snippet:end swift-full-store-overrides
 
+        deleteAfterTest(wallet)
         let configuration = await wallet.configuration
         XCTAssertNotNil(configuration.persistence.credentialStore)
         XCTAssertNotNil(configuration.persistence.didStore)
@@ -98,6 +110,7 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
         )
         // doc-snippet:end swift-combined-persistence
 
+        deleteAfterTest(wallet)
         let configuration = await wallet.configuration
         XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
         XCTAssertNotNil(configuration.persistence.credentialStore)
@@ -177,3 +190,5 @@ private extension WalletDatabaseKeyConfiguration {
         }
     }
 }
+
+#endif

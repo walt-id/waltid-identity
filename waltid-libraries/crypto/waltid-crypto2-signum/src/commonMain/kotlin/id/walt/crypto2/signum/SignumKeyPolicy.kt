@@ -4,7 +4,6 @@ import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.HardwarePreference
 import id.walt.crypto2.keys.KeyProtectionLevel
 import id.walt.crypto2.keys.KeyAttestation
-
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.keys.KeyUsage
 import kotlinx.serialization.Serializable

@@ -53,7 +53,7 @@ Only general-purpose identities can submit or restore this format through the se
 is not evidence that an issuer permits credential-key migration. The record retains its minimum
 storage destination and explicit authorization policy. Hardware requires hardware on restoration;
 native storage cannot become database storage. Authorization must match an explicitly permitted
-current host option. Native aliases, access groups and old device attestations are not portable policy. Hardware-generated/device-bound
+current host option. Native aliases, access groups and old device attestations are not portable policy. `HardwareGenerated` and `BackupAndCustodyDisabled`
 host policies prohibit the operation independently of the record's cryptographic validity.
 
 ## Legacy derivation reader

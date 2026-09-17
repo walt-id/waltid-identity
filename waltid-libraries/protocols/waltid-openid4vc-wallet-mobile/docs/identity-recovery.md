@@ -170,7 +170,7 @@ Block Store defaults to cloud mode requiring its end-to-end-encryption availabil
 `DeviceTransfer` is a separate mode with cloud backup disabled. Records are bounded to 4096 bytes;
 Block Store permits 16 records per app. Stable namespace, app/signing identity, OS backup settings
 and account prerequisites matter. A provider failure leaves creation pending rather than silently
-activating a device-bound identity.
+activating an identity without its required backup.
 
 Synchronizable Keychain recovery exposes only compatible `whenUnlocked` / `afterFirstUnlock`
 accessibility classes. Device-only classes cannot be selected for synchronized records. Keychain
@@ -212,7 +212,7 @@ New-format identities retain their exact key/DID association across restart and 
 Set `MobileWalletIssuanceRequest.keyPolicy` (Swift: `IssuanceRequest.keyPolicy`) when a host or issuer
 profile requires `BackupAndCustodyDisabled` or `HardwareGenerated`. Before starting issuance, the SDK checks that
 the selected key is the active identity and already retains the required restriction. A later request
-cannot relabel a general-purpose or recoverable identity as device-bound. The default is
+cannot relabel a general-purpose or recoverable identity as prohibiting backup and custody. The default is
 `GeneralPurpose`; apps remain responsible for interpreting issuer/profile requirements.
 
 Credential synchronization and reissuance are separate. Restoring an identity does not change a

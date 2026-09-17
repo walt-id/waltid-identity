@@ -34,9 +34,12 @@ init.write_text("""gradle.projectsEvaluated {
     def binary = target.binaries.getTest('DEBUG')
     binary.linkerOpts('-sectcreate', '__TEXT', '__entitlements',
         System.getenv('RECOVERY_TEST_ENTITLEMENTS'), '-L' + System.getenv('RECOVERY_TEST_SWIFT_LIBS'),
-        System.getenv('RECOVERY_TEST_HOST_OBJECT'), '-e', '_waltTestMain', '-framework', 'UIKit')
+        System.getenv('RECOVERY_TEST_HOST_OBJECT'),
+        System.getenv('RECOVERY_TEST_SWIFT_EXCHANGE'), System.getenv('RECOVERY_TEST_SWIFT_ADAPTER'),
+        System.getenv('RECOVERY_TEST_SWIFT_SDK'), '-framework', 'Foundation', '-framework', 'Security', '-e', '_waltTestMain', '-framework', 'UIKit')
     binary.linkTaskProvider.configure {
-        inputs.files(System.getenv('RECOVERY_TEST_ENTITLEMENTS'), System.getenv('RECOVERY_TEST_HOST_OBJECT'))
+        inputs.files(System.getenv('RECOVERY_TEST_ENTITLEMENTS'), System.getenv('RECOVERY_TEST_HOST_OBJECT'),
+            System.getenv('RECOVERY_TEST_SWIFT_EXCHANGE'), System.getenv('RECOVERY_TEST_SWIFT_ADAPTER'), System.getenv('RECOVERY_TEST_SWIFT_SDK'))
     }
 }
 """)
@@ -46,8 +49,22 @@ sdk = subprocess.check_output(["xcrun", "--sdk", "iphonesimulator", "--show-sdk-
 subprocess.run(["xcrun", "--sdk", "iphonesimulator", "clang", "-target", "arm64-apple-ios16.0-simulator",
                 "-isysroot", sdk, "-fobjc-arc", "-c", str(root / "scripts/recovery-simulator-host.m"),
                 "-o", str(host_object)], check=True)
+# Build only test-host static objects from the real Swift sources. Without a WalletCore search
+# path the SDK compiles its portable contracts, avoiding a second Kotlin runtime in this host.
+swift_sdk = output / "libWalletSDK.a"
+swift_adapter = output / "libWalletSDKKeychainRecovery.a"
+swift_exchange = output / "recovery-keychain-interop.o"
+swift = ["xcrun", "--sdk", "iphonesimulator", "swiftc", "-target", "arm64-apple-ios16.0-simulator",
+         "-sdk", sdk, "-I", str(output), "-parse-as-library", "-strict-concurrency=complete"]
+sources = root / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources"
+for module, library in (("WalletSDK", swift_sdk), ("WalletSDKKeychainRecovery", swift_adapter)):
+    subprocess.run(swift + ["-module-name", module, "-emit-module", "-emit-module-path", str(output / (module + ".swiftmodule")),
+        "-emit-library", "-static", "-o", str(library)] + [str(p) for p in sorted((sources / module).glob("*.swift"))], check=True)
+subprocess.run(swift + ["-emit-object", "-o", str(swift_exchange), str(root / "scripts/recovery-keychain-interop.swift")], check=True)
 env = dict(os.environ, RECOVERY_TEST_ENTITLEMENTS=str(entitlements),
            RECOVERY_TEST_HOST_OBJECT=str(host_object),
+           RECOVERY_TEST_SWIFT_EXCHANGE=str(swift_exchange), RECOVERY_TEST_SWIFT_ADAPTER=str(swift_adapter),
+           RECOVERY_TEST_SWIFT_SDK=str(swift_sdk),
            RECOVERY_TEST_SWIFT_LIBS=developer + "/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator")
 log = output / "build.log"
 with log.open("w") as stream:

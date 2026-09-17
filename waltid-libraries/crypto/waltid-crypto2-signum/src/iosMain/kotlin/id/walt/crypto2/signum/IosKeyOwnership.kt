@@ -6,7 +6,6 @@ import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.HardwarePreference
 import id.walt.crypto2.keys.KeychainAccessibility
 import id.walt.crypto2.keys.KeyOrigin
-
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.serialization.BinaryData

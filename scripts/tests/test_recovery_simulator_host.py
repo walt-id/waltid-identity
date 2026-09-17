@@ -96,6 +96,11 @@ class SimulatorHostTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, r"assertion failed[\s\S]+nonzero[\s\S]+cannot stop"):
                 host.run_test("simulator-id", [])
 
+    def test_requested_swift_exchange_requires_its_own_completion(self):
+        self.log.write_text("[  PASSED  ] 1 tests.\nRECOVERY_TEST_EXIT=0\n")
+        with self.assertRaisesRegex(RuntimeError, "Swift recovery exchange"):
+            host.run_test("simulator-id", ["--swiftRecoveryExchange=fixture"])
+
     def test_empty_or_failed_kotlin_suite_cannot_pass(self):
         for output in ("RECOVERY_TEST_EXIT=0\n", "[  PASSED  ] 0 tests.\n",
                        "[  PASSED  ] 1 tests.\n[  FAILED  ] 1 tests.\n"):

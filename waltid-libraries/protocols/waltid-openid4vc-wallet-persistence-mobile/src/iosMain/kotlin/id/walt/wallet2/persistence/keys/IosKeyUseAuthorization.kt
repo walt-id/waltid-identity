@@ -4,7 +4,6 @@ package id.walt.wallet2.persistence.keys
 
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
-
 import kotlinx.cinterop.*
 import platform.Foundation.NSError
 import platform.LocalAuthentication.*

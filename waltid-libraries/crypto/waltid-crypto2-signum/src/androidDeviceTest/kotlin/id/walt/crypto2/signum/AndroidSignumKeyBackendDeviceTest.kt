@@ -2,7 +2,6 @@ package id.walt.crypto2.signum
 
 import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.HardwarePreference
-
 import android.app.KeyguardManager
 import android.os.Build
 import android.security.keystore.KeyPermanentlyInvalidatedException

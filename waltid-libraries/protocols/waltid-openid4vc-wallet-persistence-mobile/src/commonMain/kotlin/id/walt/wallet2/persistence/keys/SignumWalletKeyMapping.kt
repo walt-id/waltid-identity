@@ -4,22 +4,14 @@ import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationFailure
 import id.walt.crypto2.keys.KeyUseAuthorizationException
 import id.walt.crypto2.keys.PlatformKeyFacts
-import id.walt.crypto2.keys.reuseSeconds
-
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.HardwarePreference
-import id.walt.crypto2.keys.KeyAttestation
 import id.walt.crypto2.keys.KeyAuthorizationEvidence
 import id.walt.crypto2.keys.KeyEncodingFormat
-import id.walt.crypto2.keys.KeyOrigin
-import id.walt.crypto2.keys.KeyProtectionLevel
-import id.walt.crypto2.keys.KeySecurityLevel
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.KeychainAccessibility
 import id.walt.crypto2.keys.ManagedKey
-import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.PrivateKeyExporter
 import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.keys.StoredKey

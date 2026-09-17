@@ -2,7 +2,6 @@ package id.walt.crypto2.signum
 
 import id.walt.crypto2.keys.KeyProtectionLevel
 import id.walt.crypto2.keys.KeyAttestation
-
 import at.asitplus.signum.indispensable.ECCurve
 import at.asitplus.signum.supreme.sign.EphemeralKey
 import id.walt.crypto2.algorithms.DigestAlgorithm
