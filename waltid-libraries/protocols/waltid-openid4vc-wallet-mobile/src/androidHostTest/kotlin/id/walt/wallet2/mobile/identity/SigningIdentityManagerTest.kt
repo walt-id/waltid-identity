@@ -644,9 +644,50 @@ class SigningIdentityManagerTest {
         }
     }
 
+    @Test fun `failed native repair rolls back the original journal and descriptor atomically`() = runTest {
+        val native = NativeFixture()
+        Fixture(native = native).use { fixture ->
+            val manager = fixture.wallet.signingIdentity
+            val choices = assertIs<SigningIdentityCreationOptions.Available>(manager.creationOptions(SigningIdentityIntent.Recoverable))
+            val selected = (listOf(choices.recommended) + choices.alternatives).single { it.storage == SigningIdentityKeyStorage.NativeStorage }
+            val identity = assertIs<SigningIdentityOperationResult.Active>(manager.create(selected)).identity
+            val originalRecord = fixture.queries.selectIdentityRecord("default").executeAsOne().payload
+            val originalKey = fixture.queries.selectByKeyId(identity.keyId).executeAsOne().stored_key
+            val restore = manager.restorationOptions(manager.discoverRecovery().candidates.single()).single { it.storage == selected.storage }
+            native.outcome = NativeFixture.Outcome.Invalidated
+            native.failImport = true
+            assertIs<SigningIdentityOperationResult.Failed>(manager.restore(restore))
+            assertEquals(originalRecord, fixture.queries.selectIdentityRecord("default").executeAsOne().payload)
+            assertEquals(originalKey, fixture.queries.selectByKeyId(identity.keyId).executeAsOne().stored_key)
+            assertEquals(identity.id, fixture.queries.selectActiveIdentity("default").executeAsOne().identity_id)
+            native.failImport = false
+            assertEquals(identity.publicJwk, assertIs<SigningIdentityOperationResult.Active>(manager.restore(restore)).identity.publicJwk)
+        }
+    }
+
+    @Test fun `malformed journal phases and nested rollback predecessors cannot be adopted`() = runTest {
+        Fixture(native = NativeFixture()).use { fixture ->
+            val manager = fixture.wallet.signingIdentity
+            val choices = assertIs<SigningIdentityCreationOptions.Available>(manager.creationOptions(SigningIdentityIntent.Recoverable))
+            manager.create((listOf(choices.recommended) + choices.alternatives).single { it.storage == SigningIdentityKeyStorage.NativeStorage })
+            val original = fixture.queries.selectIdentityRecord("default").executeAsOne()
+            val record = recordJson.decodeFromString<IdentityRecord>(original.payload)
+            assertFailsWith<IllegalArgumentException> { record.copy(identity = null) }
+            assertFailsWith<IllegalArgumentException> { record.copy(phase = IdentityPhase.AwaitingBackup, recovery = null) }
+            assertFailsWith<IllegalArgumentException> { record.copy(phase = IdentityPhase.AwaitingBackup, backup = null) }
+            val key = StoredKeyCodec.decodeFromString(fixture.queries.selectByKeyId(record.keyId).executeAsOne().stored_key) as StoredKey.Managed
+            val preparation = record.copy(phase = IdentityPhase.Preparing, previous = record, previousKey = key)
+            assertFailsWith<IllegalArgumentException> { preparation.copy(previous = preparation) }
+            fixture.queries.putIdentityRecord("default", IdentityPhase.Preparing.name, original.payload)
+            assertFailsWith<IllegalArgumentException> { fixture.reopen().signingIdentity.state() }
+            assertNull(fixture.queries.selectActiveIdentity("default").executeAsOneOrNull())
+        }
+    }
+
     private class NativeFixture : PlatformManagedKeyProvider {
         enum class Outcome { Available, Missing, Invalidated, TemporarilyUnavailable }
         var outcome = Outcome.Available
+        var failImport = false
         var imports = 0
         private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         private val handles = mutableMapOf<String, ManagedKey>()
@@ -657,6 +698,7 @@ class SigningIdentityManagerTest {
         override fun supportsPrivateKeyImport(requirements: WalletKeyRequirements) = requirements.protection == WalletKeyProtection.NativeStorage
         override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey = error("This fixture tests imports")
         override suspend fun importManagedKey(request: WalletKeyCreationRequest, material: EncodedKey.Jwk): ManagedKey {
+            check(!failImport) { "Fixture import failure" }
             imports++
             val key = runtime.restore(StoredKey.Software(StoredKey.CURRENT_VERSION, request.id, identitySpec, identityUsages, material))
             val descriptor = StoredKey.Managed(StoredKey.CURRENT_VERSION, request.id, identitySpec, identityUsages,
@@ -677,6 +719,7 @@ class SigningIdentityManagerTest {
             Outcome.Invalidated -> PlatformManagedKeyRestoration.Invalidated(KeyUseAuthorizationPolicy.None)
             Outcome.TemporarilyUnavailable -> throw KeyUseAuthorizationException(KeyUseAuthorizationFailure.ProtectedKeyUnavailable, "Temporarily unavailable")
         }
+        override suspend fun deleteUncommittedKey(request: WalletKeyCreationRequest, imported: Boolean) { handles.remove(request.nativeAlias) }
         override suspend fun deleteManagedKey(stored: StoredKey.Managed) { handles.remove(stored.providerData.toByteArray().decodeToString()) }
     }
 

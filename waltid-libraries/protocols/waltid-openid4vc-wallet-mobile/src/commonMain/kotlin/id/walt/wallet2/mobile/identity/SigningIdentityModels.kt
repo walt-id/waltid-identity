@@ -136,7 +136,7 @@ public sealed interface SigningIdentityState {
      * @property reason Why the operation needs attention before retry.
      * @property identityId Identifier of the journaled operation's identity.
      */
-    public data class Pending(public val identityId: String, public val reason: SigningIdentityFailure = SigningIdentityFailure.ProviderUnavailable) : SigningIdentityState
+    public data class Pending(public val identityId: String, public val reason: SigningIdentityFailure) : SigningIdentityState
     /** Existing state requires attention; a replacement is never generated automatically.
      * @property identityId Known identity identifier, or null for unassociated state.
      * @property reason Stable failure category.
@@ -161,7 +161,7 @@ public sealed interface SigningIdentityOperationResult {
      * @property reason Why the operation needs attention before retry.
      * @property identityId Identifier of the journaled operation's identity.
      */
-    public data class Pending(public val identityId: String, public val reason: SigningIdentityFailure = SigningIdentityFailure.ProviderUnavailable) : SigningIdentityOperationResult
+    public data class Pending(public val identityId: String, public val reason: SigningIdentityFailure) : SigningIdentityOperationResult
     /** The operation could not complete.
      * @property reason Stable failure category.
      */
