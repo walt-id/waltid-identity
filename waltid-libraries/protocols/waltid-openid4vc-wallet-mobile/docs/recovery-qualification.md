@@ -34,7 +34,15 @@ opens the log and explicitly redirects descriptors 1 and 2 with `dup2`, without 
 streams. Native regression cases cover all eight combinations of open/closed standard descriptors
 and failure to open the log. The full Keychain contract, bidirectional exchange and 18 recovery
 phases passed again with this fix; the runner still requires a completed selected test, not exit zero
-alone. Hosted confirmation of the fix remains pending.
+alone. Hosted runs at `19ace51c3d` and `3390b82c1e` confirmed that output capture.
+
+The latter run then exposed a separate lifecycle problem: the Keychain contract passed,
+but the runner's `simctl terminate` command timed out. The host now exits after a per-launch
+release from the runner, which verifies process disappearance before accepting the phase.
+Two fresh local simulator runs each completed 23 distinct processes: the existing 21 checks
+and two negative controls proving rejection of an empty selection and a real Kotlin failure.
+The updated runner also passed 34 tooling tests. Hosted artifacts retain the negative-control
+logs, per-phase PID/exit evidence and individual Compose iOS test results for independent review.
 
 This cleanup does not requalify interactive authentication, biometric enrollment changes, cloud
 transport or physical device-to-device transfer. It preserves the native engines and supported
