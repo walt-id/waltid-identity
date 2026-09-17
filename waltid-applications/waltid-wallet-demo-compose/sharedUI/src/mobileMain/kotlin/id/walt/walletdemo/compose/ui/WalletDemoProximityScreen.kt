@@ -106,6 +106,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.delay
 import id.walt.walletdemo.compose.ui.resources.*
+import id.walt.walletdemo.compose.ui.resources.proximity_qr_accessibility
+import id.walt.walletdemo.compose.ui.resources.proximity_verifier
 import org.jetbrains.compose.resources.stringResource
 
 /** Mobile-only host that adds the shared proximity journey to the regular Compose demo. */
@@ -118,6 +120,7 @@ fun MobileWalletDemoApp(
 ) {
     val walletState by controller.state.collectAsState()
     val proximity by proximityController.state.collectAsState()
+    val trustSettings by readerTrustSettingsController.state.collectAsState()
     val hostActions = rememberProximityHostActions()
     val credentials = (walletState.session as? WalletSessionState.Ready)
         ?.credentials
@@ -146,7 +149,9 @@ fun MobileWalletDemoApp(
     WalletDemoAppHost(
         controller = controller,
         branding = branding,
-        onStartProximityPresentation = proximityController::start,
+        onStartProximityPresentation = (proximityController::start).takeUnless { trustSettings.loading },
+        onOpenSettings = proximityController::dismiss,
+        onResetWallet = { controller.resetWallet { proximityController.closeAndAwait() } },
         presentationContent = if (proximity.active) {
             {
                 WalletDemoProximityScreen(
@@ -369,7 +374,7 @@ private fun WalletDemoProximityReview(
                     }
                 }
             } else SharingActionsRow(
-                enabled = true,
+                enabled = state.pendingReviewId == null,
                 selectionComplete = state.canApprove,
                 onSubmit = onApprove,
                 onCancel = onCancel,
@@ -524,6 +529,7 @@ private fun EngagementContent(
             state.connectedRoute?.let { ProximityConnectionDetails(it) }
         }
     }
+    val qrAccessibility = stringResource(Res.string.proximity_qr_accessibility)
     val qr = (state.sessionState as? ProximityState.EngagementReady)?.engagements
         ?.filterIsInstance<ProximityEngagement.Qr>()?.singleOrNull()
     if (method == ProximityEngagementMethod.Qr) {
@@ -536,7 +542,7 @@ private fun EngagementContent(
                     if (constraints.maxWidth >= qrCode.width + 8 && constraints.maxHeight >= qrCode.height + 8) {
                         Surface(color = Color.White, shape = RoundedCornerShape(16.dp)) {
                             QrCodeCanvas(qrCode, Modifier.fillMaxSize()
-                                .semantics { contentDescription = "Device engagement QR code" }
+                                .semantics { contentDescription = qrAccessibility }
                                 .testTag(WalletUiTestTags.ProximityQr))
                         }
                     } else {
@@ -686,7 +692,7 @@ private fun ReaderMetadataCard(
     }
     if (suppliedAuthentications.isEmpty()) {
         ReviewMetadataSection(
-            title = "Verifier",
+            title = stringResource(Res.string.proximity_verifier),
             modifier = Modifier.testTag(WalletUiTestTags.ProximityReaderSection),
         ) {
             Text(
@@ -722,7 +728,7 @@ private fun ReaderMetadataCard(
     }
 
     ExpandableMetadataCard(
-        title = "Verifier",
+        title = stringResource(Res.string.proximity_verifier),
         expanded = expanded,
         onToggle = { expanded = !expanded },
         modifier = Modifier.testTag(WalletUiTestTags.ProximityReaderSection),

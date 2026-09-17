@@ -14,11 +14,13 @@ struct PresentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.walletDemoBranding) private var branding
     @ObservedObject var viewModel: WalletViewModel
+    @ObservedObject private var readerTrustSettings: DemoReaderTrustSettingsController
     @ObservedObject private var proximityPresentation: ProximityPresentationViewModel
     @StateObject private var proximityScreenPolicy = ProximityScreenPolicy()
 
     init(viewModel: WalletViewModel) {
         _viewModel = ObservedObject(wrappedValue: viewModel)
+        _readerTrustSettings = ObservedObject(wrappedValue: viewModel.readerTrustSettings)
         _proximityPresentation = ObservedObject(wrappedValue: viewModel.proximityPresentation)
     }
 
@@ -62,6 +64,7 @@ struct PresentView: View {
             }
         }
         .onAppear(perform: updateProximityScreenPolicy)
+        .onDisappear { proximityScreenPolicy.restore() }
         .onChange(of: proximityPresentation.displayedEngagement == .qr) { _ in
             updateProximityScreenPolicy()
         }
@@ -144,7 +147,7 @@ struct PresentView: View {
                     .tint(branding.primary)
                     .disabled(
                         !viewModel.isReady || viewModel.isLoading || viewModel.credentials.isEmpty
-                            || viewModel.presentationReview != nil
+                            || viewModel.presentationReview != nil || readerTrustSettings.loading
                     )
                     .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
                 }
@@ -234,7 +237,7 @@ struct PresentView: View {
             } else if proximityPresentation.review != nil {
                 ReviewActions(
                     selectionComplete: proximityPresentation.canApprove,
-                    isLoading: false,
+                    isLoading: proximityPresentation.pendingReviewID != nil,
                     onSubmit: { proximityPresentation.approve() },
                     onReject: proximityPresentation.decline,
                     onCancel: proximityPresentation.cancel,

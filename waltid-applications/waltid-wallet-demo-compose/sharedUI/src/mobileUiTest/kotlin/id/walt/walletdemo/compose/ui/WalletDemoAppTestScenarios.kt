@@ -1492,8 +1492,12 @@ class WalletDemoAppTestScenarios(
             preferredEngagement = ProximityEngagementMethod.Qr,
         ))
         var cancelled = false
+        var settingsOpened = false
         setWalletContent {
-            WalletDemoAppHost(controller, presentationContent = {
+            WalletDemoAppHost(controller, onOpenSettings = {
+                settingsOpened = true
+                proximity.value = WalletDemoProximityUiState()
+            }, presentationContent = {
                 WalletDemoProximityScreen(proximity.value, emptyMap(),
                     WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                     onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
@@ -1525,6 +1529,11 @@ class WalletDemoAppTestScenarios(
         capture("qr-prepare")
         onNodeWithTag(WalletUiTestTags.ProximityCancel).assertIsDisplayed().performClick()
         assertTrue(cancelled)
+        onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
+        assertTrue(settingsOpened)
+        assertTrue(!proximity.value.active)
+        onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
     }
 
     private fun ComposeUiTest.awaitTaggedNode(tag: String) {

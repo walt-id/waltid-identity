@@ -49,6 +49,7 @@ struct ProximityDocumentSelection: Equatable {
 @MainActor
 final class ProximityPresentationViewModel: ObservableObject {
     @Published private(set) var active = false
+    @Published private(set) var pendingReviewID: ProximityReviewID?
     @Published private(set) var sessionState: ProximityState?
     @Published private(set) var selections: [ProximityDocumentSelection] = []
     @Published private(set) var continueAfterResponse = false
@@ -119,7 +120,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     var canApprove: Bool {
-        guard let review else { return false }
+        guard pendingReviewID == nil, let review else { return false }
         return Set(selections.map(\.requestIndex)) == Set(review.documents.map(\.requestIndex))
             && selections.allSatisfy { selected in
                 !selected.disclosedElements.isEmpty && review.documents.first(where: { $0.requestIndex == selected.requestIndex })?
@@ -203,7 +204,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         automaticPermissionAttempted: Bool = false
     ) {
         observationTask?.cancel()
-        observationTask = Task { [weak self] in
+        observationTask = Task { [weak self, cleanupTask] in
             guard let self else { return }
             do {
                 await cleanupTask?.value
@@ -265,6 +266,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     func selectCredential(requestIndex: Int, credentialID: String) {
+        guard pendingReviewID == nil else { return }
         do {
             guard let document = review?.documents.first(where: { $0.requestIndex == requestIndex }),
                   let credential = document.credentialOptions.first(where: { $0.credentialID == credentialID }) else {
@@ -437,8 +439,21 @@ final class ProximityPresentationViewModel: ObservableObject {
         }
     }
 
+    func closeAndAwait() async {
+        let starting = observationTask
+        let hostAction = hostActionTask
+        let revoking = preparedSharing
+        dismiss()
+        await starting?.value
+        await hostAction?.value
+        await revoking?.revoke()
+        await cleanupTask?.value
+    }
+
     func dismiss() {
         sessionGeneration &+= 1
+        let starting = observationTask
+        let hostAction = hostActionTask
         observationTask?.cancel()
         observationTask = nil
         hostActionTask?.cancel()
@@ -453,8 +468,8 @@ final class ProximityPresentationViewModel: ObservableObject {
         let revoking = preparedSharing
         preparedSharing = nil
         recentPlan = nil
-        if let revoking { Task { await revoking.revoke() } }
         active = false
+        pendingReviewID = nil
         refreshingEngagementChoices = []
         sessionState = nil
         selections = []
@@ -462,7 +477,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         hostActionInProgress = nil
         actionErrorMessage = nil
         startupFailed = false
-        scheduleClose(closing)
+        scheduleClose(closing, starting: starting, hostAction: hostAction, revoking: revoking)
     }
 
     func restart() {
@@ -517,17 +532,17 @@ final class ProximityPresentationViewModel: ObservableObject {
         let previousMethod = displayedEngagement == .qr ? ProximityEngagementMethod.qr : nil
         sessionGeneration &+= 1
         let generation = sessionGeneration
-        observationTask?.cancel()
-        hostActionTask?.cancel()
+        let starting = observationTask
+        let hostAction = hostActionTask
+        starting?.cancel()
+        hostAction?.cancel()
         let closing = session
         session = nil
         effectiveConfiguration = configuration
         let previousApproval = preparedSharing
         if case .prepared(let sharing) = configuration.approval { preparedSharing = sharing }
         else { preparedSharing = nil }
-        if let previousApproval, previousApproval !== preparedSharing {
-            Task { await previousApproval.revoke() }
-        }
+        let revoking = previousApproval !== preparedSharing ? previousApproval : nil
         pendingConfiguration = configuration
         active = true
         refreshingEngagementChoices = preserveEngagement ? previousChoices : []
@@ -540,7 +555,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         actionErrorMessage = nil
         startupFailed = false
         hostActionInProgress = action
-        scheduleClose(closing)
+        scheduleClose(closing, starting: starting, hostAction: hostAction, revoking: revoking)
         observationTask = Task { [weak self, cleanupTask] in
             await cleanupTask?.value
             guard let self, !Task.isCancelled, active, sessionGeneration == generation else { return }
@@ -553,33 +568,48 @@ final class ProximityPresentationViewModel: ObservableObject {
         }
     }
 
-    private func scheduleClose(_ closing: (any DemoProximityPresentationSession)?) {
-        guard let closing else { return }
+    private func scheduleClose(
+        _ closing: (any DemoProximityPresentationSession)?,
+        starting: Task<Void, Never>? = nil,
+        hostAction: Task<Void, Never>? = nil,
+        revoking: ProximityPreparedSharing? = nil
+    ) {
+        guard closing != nil || starting != nil || hostAction != nil || revoking != nil else { return }
         let previous = cleanupTask
         cleanupTask = Task {
             await previous?.value
-            await closing.close()
+            await starting?.value
+            await hostAction?.value
+            await revoking?.revoke()
+            await closing?.close()
         }
     }
 
     private func dispatch(_ action: ProximityAction) {
         guard let session else { return }
+        let reviewID: ProximityReviewID?
+        switch action {
+        case let .approve(id, _), let .decline(id): reviewID = id
+        default: reviewID = nil
+        }
+        if reviewID != nil, pendingReviewID != nil { return }
+        if let reviewID { pendingReviewID = reviewID }
         actionErrorMessage = nil
         let generation = sessionGeneration
         Task { [weak self] in
-            let result: ProximityActionResult
             do {
-                result = try await session.dispatch(action)
+                let result = try await session.dispatch(action)
+                guard let self, active, sessionGeneration == generation else { return }
+                guard reviewID == nil || review?.reviewID == reviewID else { return }
+                if case .rejected(let error) = result {
+                    pendingReviewID = nil
+                    actionErrorMessage = error.message
+                }
             } catch {
-                guard let self else { return }
-                guard active, sessionGeneration == generation else { return }
+                guard let self, active, sessionGeneration == generation else { return }
+                guard reviewID == nil || review?.reviewID == reviewID else { return }
+                pendingReviewID = nil
                 actionErrorMessage = Self.demoSessionFailureMessage
-                return
-            }
-            guard let self else { return }
-            guard active, sessionGeneration == generation else { return }
-            if case .rejected(let error) = result {
-                actionErrorMessage = error.message
             }
         }
     }
@@ -587,6 +617,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     private func publish(_ state: ProximityState) {
         let previousReviewID = review?.reviewID
         sessionState = state
+        if review?.reviewID != pendingReviewID { pendingReviewID = nil }
         actionErrorMessage = nil
         switch state {
         case .preparing: break
@@ -611,6 +642,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     private func replaceSelection(_ selection: ProximityDocumentSelection) {
+        guard pendingReviewID == nil else { return }
         selections = (selections.filter { $0.requestIndex != selection.requestIndex } + [selection])
             .sorted { $0.requestIndex < $1.requestIndex }
         actionErrorMessage = nil
