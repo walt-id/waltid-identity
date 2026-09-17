@@ -179,9 +179,11 @@ public data class SigningIdentityRecoveryDiscovery(
 /** Redacted provider failure; no private record or native diagnostic is exposed.
  * @property providerId Stable configured provider identifier.
  * @property providerName Provider name for display.
- * @property reason Stable failure category. */
+ * @property reason Stable failure category.
+ * @property message Safe explanation, retaining any unmet provider prerequisite. */
 public data class SigningIdentityRecoveryProviderFailure(
     public val providerId: String,
     public val providerName: String,
     public val reason: SigningIdentityFailure,
+    public val message: String,
 )

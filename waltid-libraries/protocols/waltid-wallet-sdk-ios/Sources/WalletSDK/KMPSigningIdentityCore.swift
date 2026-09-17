@@ -98,7 +98,7 @@ struct KMPSigningIdentityCore: SigningIdentityCore, @unchecked Sendable {
         return .init(candidates: discovery.candidates.map {
             .init(reference: Self.reference($0.reference), providerName: $0.providerName, handle: KMPSigningIdentityHandle($0))
         }, failures: discovery.failures.map {
-            .init(providerID: $0.providerId, providerName: $0.providerName, reason: failure($0.reason))
+            .init(providerID: $0.providerId, providerName: $0.providerName, reason: failure($0.reason), message: $0.message)
         })
     }
     func restorationOptions(_ candidate: SigningIdentityRecoveryCandidate) async throws -> [SigningIdentityRestorationOption] {
