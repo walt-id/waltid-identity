@@ -20,6 +20,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -37,6 +38,7 @@ import id.walt.walletdemo.compose.logic.DemoPinStore
 import id.walt.walletdemo.compose.logic.WalletDemoKeyChoice
 import id.walt.walletdemo.compose.logic.WalletDemoKeySetupOption
 import id.walt.walletdemo.compose.logic.WalletDemoIdentitySetup
+import id.walt.walletdemo.compose.logic.WalletDemoIdentityDetails
 import id.walt.walletdemo.compose.ui.screens.IdentitySetupScreen
 import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
@@ -1154,14 +1156,32 @@ class WalletDemoAppTestScenarios(
 
     fun settingsConfirmsAndAppliesSigningProtectionChange() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val identityDetailsRequested = CompletableDeferred<Unit>()
+        val identityDetailsResponse = CompletableDeferred<WalletDemoIdentityDetails?>()
+        val delayedWallet = object : DemoWallet by wallet {
+            override suspend fun identityDetails(): WalletDemoIdentityDetails? {
+                identityDetailsRequested.complete(Unit)
+                return identityDetailsResponse.await()
+            }
+        }
         val pinStore = InMemoryDemoPinStore()
-        val controller = WalletDemoController(wallet, pinStore)
+        val controller = WalletDemoController(delayedWallet, pinStore)
 
         setWalletContent { WalletDemoApp(controller) }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { identityDetailsRequested.isCompleted }
+        onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.SigningProtectionNone).assertCountEquals(0)
+
+        identityDetailsResponse.complete(null)
+        // Identity details load on the controller's dispatcher, outside Compose's idle tracking.
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodes(hasTestTag(WalletUiTestTags.SigningProtectionNone) and isEnabled())
+                .fetchSemanticsNodes().size == 1
+        }
         onNodeWithTag(WalletUiTestTags.SigningProtectionNone)
             .performScrollTo()
             .performClick()
