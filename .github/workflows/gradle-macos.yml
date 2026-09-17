@@ -52,7 +52,7 @@ jobs:
 
       - name: Compile iOS targets and run Kotlin iOS simulator tests
         timeout-minutes: 40
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
+        uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -83,7 +83,7 @@ jobs:
         # One XCFramework assemble is shared by the native demo, Compose demo, and (via artifact)
         # SDK DocC. Cold Konan cache is ~27 min; both demo suites can add ~11 min each.
         timeout-minutes: 80
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
+        uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -100,6 +100,27 @@ jobs:
           test-report-require-tests: ${{ (github.event_name == 'workflow_dispatch' || inputs.run-native) && 'true' || 'false' }}
           test-result-artifact-name: wallet-core-consumer-test-results
 
+      # Outside the timed composite action so its deadline cannot skip diagnostics.
+      - name: Retain WalletCore build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wallet-core-build-diagnostics
+          path: |
+            ios-ci-diagnostics/**
+            waltid-identity/build/reports/profile/**
+          retention-days: 7
+
+      - name: Retain incomplete WalletCore test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wallet-core-incomplete-test-results
+          path: |
+            waltid-identity/waltid-applications/**/TestResults*
+            waltid-identity/build/proximity-tests/**
+          retention-days: 7
+
       - name: Upload WalletCore XCFramework
         uses: actions/upload-artifact@v4
         with:
@@ -109,6 +130,7 @@ jobs:
           retention-days: 1
 
   enterprise-ios-mobile-tests:
+    timeout-minutes: 90
     if: ${{ github.event_name == 'workflow_dispatch' || inputs.run-enterprise }}
     runs-on: macos-26
     steps:
@@ -121,13 +143,32 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
+      - name: Select Enterprise Xcode toolchain
+        run: |
+          test -d "$XCODE_DEVELOPER_DIR"
+          sudo xcode-select -s "$XCODE_DEVELOPER_DIR"
+          echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> "$GITHUB_ENV"
+          xcodebuild -version
+
+      - name: Cache Enterprise Kotlin Native dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          # Match the consumer lane's ios-build-setup cache, without its build-property edits.
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            konan-${{ runner.os }}-${{ runner.arch }}-
+            konan-${{ runner.os }}-
+
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests
         continue-on-error: true
-        timeout-minutes: 50
+        timeout-minutes: 75
         run: |
-          ./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest \
-            --no-configuration-cache \
+          python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
+            --output-dir "$GITHUB_WORKSPACE/ios-ci-diagnostics" enterprise \
+            ./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest \
+            --no-configuration-cache --profile \
             -Penterprise.ios.destination="${IOS_SIMULATOR_DESTINATION}"
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
@@ -199,8 +240,20 @@ jobs:
             waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-results/**
           retention-days: 7
 
-      - name: Fail if Enterprise iOS mobile tests failed
-        if: always() && steps.enterprise_ios_mobile_tests.outcome == 'failure'
+      - name: Retain Enterprise iOS build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: enterprise-ios-build-diagnostics
+          path: |
+            ios-ci-diagnostics/**
+            build/reports/profile/**
+            waltid-identity/build/reports/profile/**
+            waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-ci-diagnostics/**
+          retention-days: 7
+
+      - name: Require successful Enterprise iOS tests and reports
+        if: always() && (steps.enterprise_ios_mobile_tests.outcome != 'success' || steps.enterprise_ios_test_report.outputs.has_report != 'true')
         run: |
-          echo "::error::Enterprise iOS mobile platform tests failed"
+          echo "::error::Enterprise iOS tests did not complete successfully with a test report"
           exit 1
