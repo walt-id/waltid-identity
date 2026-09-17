@@ -2,6 +2,7 @@ package id.waltid.openid4vci.wallet.token
 
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
+import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.clientauth.CLIENT_ASSERTION_TYPE_JWT_BEARER
@@ -47,16 +48,35 @@ typealias TokenResponseHeadersHandler = suspend (Headers) -> Unit
 /** Builds fresh client-attestation headers for each token HTTP request. */
 typealias ClientAttestationHeadersFactory = suspend () -> ClientAttestationHeaders
 
-/** Sanitized token endpoint failure that never retains the response body. */
+/**
+ * Stands in for a body that carries no OAuth `error`, so the failure is attributable without
+ * repeating an arbitrary response body.
+ */
+private const val NON_OAUTH_ERROR_BODY = "response body is not an OAuth error object"
+
+/**
+ * Sanitized token endpoint failure that never retains the response body.
+ *
+ * [oauthErrorDescription] is written by the token endpoint, which for a wallet is a third-party
+ * issuer, so it is deliberately kept out of [message]: anything in the message can end up in a
+ * response this process returns to its own client. Callers that trust their token endpoint - the
+ * license client talking to walt.id, for example - read the property explicitly.
+ *
+ * A response that is not an OAuth error object is reported through [nonOAuthErrorBody] rather than
+ * echoed, so an opaque server-side failure stays distinguishable from a rejected grant.
+ */
 class TokenRequestException(
     val statusCode: Int,
     val oauthError: String? = null,
+    val oauthErrorDescription: String? = null,
+    val nonOAuthErrorBody: Boolean = false,
     cause: Throwable? = null,
 ) : Exception(
     buildString {
         append("Token request failed with HTTP ")
         append(statusCode)
         oauthError?.let { append(" (").append(it).append(')') }
+        if (nonOAuthErrorBody) append(" (").append(NON_OAUTH_ERROR_BODY).append(')')
     },
     cause,
 )
@@ -444,9 +464,10 @@ class TokenRequestBuilder(
                 onResponseHeaders = onResponseHeaders,
             )
 
-            if (!response.status.isSuccess()) {
-                val oauthError = response.oauthError()
-                val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
+                if (!response.status.isSuccess()) {
+                    val errorResponse = response.oauthError()
+                    val oauthError = errorResponse?.error
+                    val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
                 if (
                     attempt == 0 &&
                     dpopProofFactory != null &&
@@ -464,7 +485,15 @@ class TokenRequestBuilder(
                 ) {
                     return@repeat
                 }
-                throw TokenRequestException(response.status.value, oauthError)
+                    throw TokenRequestException(
+                        statusCode = response.status.value,
+                        oauthError = oauthError,
+                        oauthErrorDescription = errorResponse?.description,
+                        // A body that is not an OAuth error object means the request failed before the
+                        // grant was ever evaluated, so name that instead of leaving a bare status code
+                        // that reads like a rejected grant.
+                        nonOAuthErrorBody = errorResponse == null,
+                    )
             }
 
             return response.decodeTokenResponse().also { tokenResponse ->
@@ -543,17 +572,20 @@ class TokenRequestBuilder(
         return send(location).also { onResponseHeaders(it.headers) }
     }
 
-    private suspend fun HttpResponse.oauthError(): String? {
-        if (headers[HttpHeaders.WWWAuthenticate]?.contains(USE_DPOP_NONCE, ignoreCase = true) == true) {
-            return USE_DPOP_NONCE
+private suspend fun HttpResponse.oauthError(): OAuthError? {
+    if (headers[HttpHeaders.WWWAuthenticate]?.contains(USE_DPOP_NONCE, ignoreCase = true) == true) {
+        return OAuthError(USE_DPOP_NONCE)
+    }
+    return try {
+        val body = Json.parseToJsonElement(bodyAsText()).jsonObject
+        body["error"]?.jsonPrimitive?.contentOrNull?.let { error ->
+            OAuthError(error, body["error_description"]?.jsonPrimitive?.contentOrNull)
         }
-        return try {
-            Json.parseToJsonElement(bodyAsText()).jsonObject["error"]?.jsonPrimitive?.contentOrNull
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            null
-        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
+    }
     }
 
     private fun isSameOrigin(source: String, target: String): Boolean {

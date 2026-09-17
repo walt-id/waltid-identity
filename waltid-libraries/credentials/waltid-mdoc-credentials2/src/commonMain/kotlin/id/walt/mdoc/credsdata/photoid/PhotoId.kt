@@ -2,9 +2,13 @@ package id.walt.mdoc.credsdata
 
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnum
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnumSerializer
+import id.walt.mdoc.encoding.PortraitCaptureDateSerializer
+import id.walt.mdoc.encoding.PortraitCaptureTimestampSerializer
 import id.walt.mdoc.encoding.ByteArrayBase64UrlSerializer
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -81,7 +85,9 @@ data class PhotoId(
     val ageOver68: Boolean? = null,
 
     @SerialName("age_birth_year") val ageBirthYear: UInt? = null,
-    @SerialName("portrait_capture_date") val portraitCaptureDate: LocalDate? = null, // tdate
+    /** Legacy date input; issuance interprets it as midnight UTC. JSON keeps its date-only form. */
+    @Serializable(with = PortraitCaptureDateSerializer::class)
+    @SerialName("portrait_capture_date") val portraitCaptureDate: LocalDate? = null,
     @SerialName("birthplace") val birthPlace: String? = null,
     @SerialName("name_at_birth") val nameAtBirth: String? = null,
     @SerialName("resident_address_unicode") val residentAddressUnicode: String? = null,
@@ -112,7 +118,7 @@ data class PhotoId(
 
     override fun toNamespaces(): Map<String, Map<String, Any>> =
         namespacesOf(
-            "org.iso.23220.1" to mapOf(
+            MdocNamespaces.PERSON to mapOf(
                 "family_name" to familyNameUnicode,
                 //"family_name_viz",
                 "given_name" to givenNameUnicode,
@@ -224,7 +230,7 @@ data class PhotoId(
                 "age_over_98",
                 "age_over_99",*/
                 "age_birth_year" to ageBirthYear,
-                "portrait_capture_date" to portraitCaptureDate,
+                "portrait_capture_date" to portraitCaptureDate?.atStartOfDayIn(TimeZone.UTC),
                 "birthplace" to birthPlace,
                 "name_at_birth" to nameAtBirth,
                 "resident_address" to residentAddressUnicode,
@@ -239,7 +245,7 @@ data class PhotoId(
                 "family_name_latin1" to familyNameLatin1,
                 "given_name_latin1" to givenNameLatin1
             ),
-            "org.iso.23220.photoid.1" to mapOf(
+            MdocNamespaces.PHOTO_ID to mapOf(
                 "person_id" to personId,
                 "birth_country" to birthCountry,
                 "birth_state" to birthState,
@@ -288,7 +294,7 @@ data class PhotoId(
                     "expiry_date" to localDate,
                     "portrait" to byteArray,
                     "sex" to IsoSexEnumSerializer,
-                    "portrait_capture_date" to localDate,
+                    "portrait_capture_date" to PortraitCaptureTimestampSerializer,
                     "age_in_year" to uint,
                     "age_birth_year" to uint,
                     "age_over_12" to boolean,
@@ -304,7 +310,7 @@ data class PhotoId(
                     "age_over_68" to boolean,
 
                     ),
-                "org.iso.23220.photoid.1"
+                MdocNamespaces.PHOTO_ID
             )
 
             MdocsCborSerializer.register(
@@ -314,7 +320,7 @@ data class PhotoId(
                     "expiry_date" to localDate,
                     "portrait" to byteArray,
                     "sex" to IsoSexEnumSerializer,
-                    "portrait_capture_date" to localDate,
+                    "portrait_capture_date" to PortraitCaptureTimestampSerializer,
                     "age_in_year" to uint,
                     "age_birth_year" to uint,
                     "age_over_12" to boolean,
@@ -330,7 +336,7 @@ data class PhotoId(
                     "age_over_68" to boolean,
 
                     ),
-                "org.iso.23220.1"
+                MdocNamespaces.PERSON
             )
         }
 

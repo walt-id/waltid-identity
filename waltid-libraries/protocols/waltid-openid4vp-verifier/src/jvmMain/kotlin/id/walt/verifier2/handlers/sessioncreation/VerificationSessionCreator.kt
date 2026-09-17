@@ -25,6 +25,8 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.deviceretrieval.UseCase
+import id.walt.openid4vp.clientidprefix.ClientIdPrefix
+import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vp.policies.*
@@ -48,6 +50,7 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.uuid.Uuid
 import id.walt.crypto2.keys.Key as Crypto2Key
 
@@ -55,12 +58,14 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 /**
  * The OpenID4VP `redirect_uri` Client Identifier Prefix.
  *
- * Deliberately restated rather than shared with `ClientIdPrefix.REDIRECT_URI`: that enum lives in
- * `waltid-openid4vp-clientidprefix`, a wallet-side client-authentication module the verifier neither
- * depends on nor should. Adding a module dependency to share one string literal would be a worse
- * trade than repeating it here.
+ * Taken from the shared [ClientIdPrefix] vocabulary rather than restated. This module used to keep
+ * its own copy on the grounds that `waltid-openid4vp-clientidprefix` was wallet-only and a module
+ * dependency was too high a price for one string literal. That module also owns the canonical
+ * `x509_hash` derivation ([X509Hash.hashOfCertificate]), which the verifier needs in order to
+ * produce and validate its own `client_id`, so the dependency now carries real weight and the
+ * duplicate literal has no justification left.
  */
-private const val REDIRECT_URI_CLIENT_ID_PREFIX = "redirect_uri"
+private val REDIRECT_URI_CLIENT_ID_PREFIX = ClientIdPrefix.REDIRECT_URI.value
 
 object VerificationSessionCreator {
 
@@ -111,6 +116,7 @@ object VerificationSessionCreator {
         key: Key? = null,
         x5c: List<String>? = null,
         typeRegistry: TransactionDataTypeRegistry? = null,
+        retention: Duration? = null,
     ): Verification2Session = createVerificationSessionInternal(
         setup = setup,
         clientId = clientId,
@@ -119,6 +125,7 @@ object VerificationSessionCreator {
         urlHost = urlHost,
         key = key,
         x5c = x5c,
+        retention = retention,
         crypto2Key = null,
         crypto2JwsAlgorithm = null,
         crypto2CoseAlgorithm = null,
@@ -138,6 +145,7 @@ object VerificationSessionCreator {
         coseAlgorithm: Int,
         signingKeyReference: String? = null,
         typeRegistry: TransactionDataTypeRegistry? = null,
+        retention: Duration? = null,
     ): Verification2Session = createVerificationSessionInternal(
         setup = setup,
         clientId = clientId,
@@ -151,6 +159,7 @@ object VerificationSessionCreator {
         crypto2CoseAlgorithm = coseAlgorithm,
         signingKeyReference = signingKeyReference,
         typeRegistry = typeRegistry,
+        retention = retention,
     )
 
     private suspend fun createVerificationSessionInternal(
@@ -176,6 +185,8 @@ object VerificationSessionCreator {
         crypto2CoseAlgorithm: Int?,
         signingKeyReference: String?,
         typeRegistry: TransactionDataTypeRegistry?,
+        /** Verifier-level retention, overridden by the request and ignored when it is not finite. */
+        retention: Duration? = null,
     ): Verification2Session {
         require(key == null || crypto2Key == null) { "Provide either a v1 or crypto2 verifier signing key" }
         val signingKey = crypto2Key?.let {
@@ -225,6 +236,7 @@ object VerificationSessionCreator {
             isAnnexC = isAnnexC,
             responseUri = responseUri,
         )
+        requireConsistentX509HashClientId(effectiveClientId, x5c)
 
         // Preserve OpenID4VP 1.0 algorithms while also advertising fully specified identifiers.
         val supportedJwsAlgorithms = JsonArray(
@@ -465,7 +477,14 @@ object VerificationSessionCreator {
 
         val now = Clock.System.now()
         val expiration = setup.core.expirationDate
-        val retentionDate = now.plus(10, DateTimeUnit.YEAR, TimeZone.UTC)
+        // Per-session first, then whatever the verifier is configured to retain for, then the historical
+        // default. A configured retention of Duration.INFINITE means keep indefinitely, which
+        // persistenceExpirationDate() expresses as null - no expiry date, so nothing ever discards it.
+        val retentionDate = when {
+            setup.core.retentionDate != null -> setup.core.retentionDate
+            retention != null -> retention.takeIf { it.isFinite() }?.let { now.plus(it) }
+            else -> now.plus(DEFAULT_RETENTION_YEARS, DateTimeUnit.YEAR, TimeZone.UTC)
+        }
 
         val signedAuthorizationRequest = if (isSignedRequest) {
             val requestSigningKey = requireNotNull(signingKey)
@@ -706,6 +725,30 @@ object VerificationSessionCreator {
                 "cross-device flows"
         }
         return "$REDIRECT_URI_CLIENT_ID_PREFIX:$destination"
+    }
+
+    /**
+     * OpenID4VP 1.0 §5.9.3: an `x509_hash` client identifier *is* the base64url-encoded SHA-256 hash
+     * of the DER encoding of the leaf certificate in `x5c`. The two are therefore not independent
+     * settings, and nothing downstream of session creation can catch them disagreeing: the request
+     * is signed and handed out happily, and the mismatch only surfaces inside the wallet as
+     * `X509HashMismatch`, with no trace on the verifier side. Rejecting it here turns a silent
+     * interop failure into a configuration error at the point the operator can act on it.
+     */
+    private fun requireConsistentX509HashClientId(clientId: String?, x5c: List<String>?) {
+        val prefix = "${ClientIdPrefix.X509_HASH.value}:"
+        val configuredHash = clientId?.takeIf { it.startsWith(prefix) }?.removePrefix(prefix) ?: return
+        val leafCertificate = requireNotNull(x5c?.firstOrNull()) {
+            "An $prefix client_id is derived from the leaf certificate, so x5c must be configured"
+        }
+        val leafDer = runCatching { Base64.decode(leafCertificate) }.getOrElse {
+            throw IllegalArgumentException("The x5c leaf certificate is not valid base64: ${it.message}", it)
+        }
+        val expectedHash = X509Hash.hashOfCertificate(leafDer)
+        require(configuredHash == expectedHash) {
+            "client_id '$clientId' does not match the configured certificate chain. " +
+                "The expected client_id for this x5c leaf is '$prefix$expectedHash'."
+        }
     }
 
     private sealed interface VerifierSigningKey {

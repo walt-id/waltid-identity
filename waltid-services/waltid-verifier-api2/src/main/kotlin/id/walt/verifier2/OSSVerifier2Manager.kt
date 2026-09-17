@@ -65,6 +65,7 @@ object OSSVerifier2Manager {
                 jwsAlgorithm = it.jwsAlgorithm,
                 coseAlgorithm = it.coseAlgorithm,
                 signingKeyReference = it.reference,
+                retention = config.sessionRetention,
             )
         } ?: VerificationSessionCreator.createVerificationSession(
             setup = setup,
@@ -74,6 +75,7 @@ object OSSVerifier2Manager {
             urlHost = urlHost,
             key = inlineLegacyKey,
             x5c = x5c,
+            retention = config.sessionRetention,
         )
     }
 

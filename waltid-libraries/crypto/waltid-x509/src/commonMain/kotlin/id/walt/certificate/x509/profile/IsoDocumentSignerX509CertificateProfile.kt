@@ -11,11 +11,11 @@ import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Compani
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateExtensionsAreNotCritical
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateSerialNumber
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateSignatureAlgorithm
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateValidityTime
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateVersion
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateExtensionsAreNotCritical
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateSerialNumber
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateVersionV3
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
@@ -144,22 +144,9 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
         subjectKey: Key,
         subjectDn: String,
     ) {
+        profileDocumentSignerCertificate()
         this.subjectDn = subjectDn
-        val now = Clock.System.now()
-        validity = X509Certificate.Validity(
-            notBefore = now,
-            notAfter = now + maxValidityTime
-        )
         subjectPublicKey(subjectKey)
-        extensionSubjectKeyIdentifier()
-        extensionKeyUsage {
-            critical = true
-            addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
-        }
-        extensionExtendedKeyUsage {
-            critical = true
-            addKeyUsage(ExtendedKeyUsageExtension.KeyUsage.mdlDS)
-        }
         extensionIssuerAltName {
             require(issuerEmailAddress != null || issuerUri != null) { "Either issuerEmailAddress or issuerUri must be set" }
             if (issuerEmailAddress != null) {
@@ -189,22 +176,9 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
         subjectKey: Crypto1Key,
         subjectDn: String,
     ) {
+        profileDocumentSignerCertificate()
         this.subjectDn = subjectDn
-        val now = Clock.System.now()
-        validity = X509Certificate.Validity(
-            notBefore = now,
-            notAfter = now + maxValidityTime
-        )
         subjectPublicKey(subjectKey)
-        extensionSubjectKeyIdentifier()
-        extensionKeyUsage {
-            critical = true
-            addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
-        }
-        extensionExtendedKeyUsage {
-            critical = true
-            addKeyUsage(ExtendedKeyUsageExtension.KeyUsage.mdlDS)
-        }
         extensionIssuerAltName {
             require(issuerEmailAddress != null || issuerUri != null) { "Either issuerEmailAddress or issuerUri must be set" }
             if (issuerEmailAddress != null) {
@@ -226,11 +200,29 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
         }
     }
 
+    fun X509CertificateDataBuilder.profileDocumentSignerCertificate() {
+        val now = Clock.System.now()
+        validity = X509Certificate.Validity(
+            notBefore = now,
+            notAfter = now + maxValidityTime
+        )
+        extensionSubjectKeyIdentifier()
+        extensionKeyUsage {
+            critical = true
+            addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
+        }
+        extensionExtendedKeyUsage {
+            critical = true
+            addKeyUsage(ExtendedKeyUsageExtension.KeyUsage.mdlDS)
+        }
+    }
+
+
     override suspend fun validate(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-        validateVersion(context, x509Certificate)
+        validateVersionV3(context, x509Certificate)
         validateSerialNumber(context, x509Certificate)
         validateValidityTime(context, x509Certificate, maxValidityTime)
         validateSubjectDn(context, x509Certificate)

@@ -13,6 +13,8 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.mdoc.dataelement.DataElement as LegacyMdocDataElement
+import id.walt.mdoc.encoding.mapPortraitCaptureDate
+import id.walt.mdoc.encoding.PortraitCaptureDateMapping
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.Status
@@ -55,6 +57,7 @@ object MdocCredentialSigner {
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
         authorizedTransactionDataTypes: List<String>? = null,
+        signedAt: Instant? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -65,6 +68,7 @@ object MdocCredentialSigner {
         credentialRequest = credentialRequest,
         credentialData = credentialData,
         issuerSigningKey = IssuerSigningKey.Legacy(issuerKey),
+        signedAt = signedAt,
         issuerCertificate = issuerCertificate,
         docType = docType,
         validFrom = validFrom,
@@ -90,6 +94,7 @@ object MdocCredentialSigner {
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
         authorizedTransactionDataTypes: List<String>? = null,
+        signedAt: Instant? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -100,6 +105,7 @@ object MdocCredentialSigner {
         credentialRequest = credentialRequest,
         credentialData = credentialData,
         issuerSigningKey = IssuerSigningKey.Crypto2(issuerKey, signatureAlgorithm),
+        signedAt = signedAt,
         issuerCertificate = issuerCertificate,
         docType = docType,
         validFrom = validFrom,
@@ -116,6 +122,7 @@ object MdocCredentialSigner {
         credentialRequest: CredentialRequest,
         credentialData: JsonObject,
         issuerSigningKey: IssuerSigningKey,
+        signedAt: Instant?,
         issuerCertificate: List<CoseCertificate>,
         docType: String,
         validFrom: Instant?,
@@ -142,19 +149,24 @@ object MdocCredentialSigner {
 
         val effectiveValueMappingFunction =
             { docTypeValue: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement ->
-                mDocNameSpacesDataMappingConfig
-                    ?.get(namespace)
-                    ?.entriesConfigMap
-                    ?.get(elementIdentifier)
-                    ?.executeMapping(elementValueJson)
-                    ?.toKotlinxCborElement()
-                    ?: valueMappingFunction(docTypeValue, namespace, elementIdentifier, elementValueJson)
+                when (val portrait = mapPortraitCaptureDate(namespace, elementIdentifier, elementValueJson)) {
+                    PortraitCaptureDateMapping.Omit -> null
+                    is PortraitCaptureDateMapping.Mapped -> portrait.value
+                    PortraitCaptureDateMapping.NotApplicable -> mDocNameSpacesDataMappingConfig
+                        ?.get(namespace)
+                        ?.entriesConfigMap
+                        ?.get(elementIdentifier)
+                        ?.executeMapping(elementValueJson)
+                        ?.toKotlinxCborElement()
+                        ?: valueMappingFunction(docTypeValue, namespace, elementIdentifier, elementValueJson)
+                }
             }
 
         val issuanceData = MdocIssuer.MdocUniversalIssuanceData(namespaces)
         val keyAuthorizations = authorizedTransactionDataTypes.toKeyAuthorizations()
         val issuedCredential = when (issuerSigningKey) {
             is IssuerSigningKey.Legacy -> MdocIssuer.issueUniversal(
+                signedAt = signedAt,
                 issuerKey = issuerSigningKey.key,
                 issuerCertificate = issuerCertificate,
                 holderKey = holderKey,
@@ -168,6 +180,7 @@ object MdocCredentialSigner {
             )
 
             is IssuerSigningKey.Crypto2 -> MdocIssuer.issueUniversal(
+                signedAt = signedAt,
                 issuerKey = issuerSigningKey.key,
                 signatureAlgorithm = issuerSigningKey.algorithm,
                 issuerCertificate = issuerCertificate,

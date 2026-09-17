@@ -40,7 +40,7 @@ label_match() {
     --arg docs_label "$DOCS_LABEL" '
       . as $pr_labels
       | {
-          force_all: any($force_all[]; . as $label | ($pr_labels | index($label)) != null),
+          force_all: any($force_all[]; . as $force_label | ($pr_labels | index($force_label)) != null),
           docs: (($pr_labels | index($docs_label)) != null)
         }
       | if .force_all then "force_all"
@@ -89,7 +89,9 @@ case "$EVENT_NAME" in
       exit 0
     fi
 
-    case "$(label_match)" in
+    # Keep parsing outside the case expression so errexit propagates jq errors.
+    matched_labels="$(label_match)"
+    case "$matched_labels" in
       force_all)
         set_all_lanes true
         REASON="ci:macos or ci:mobile label"

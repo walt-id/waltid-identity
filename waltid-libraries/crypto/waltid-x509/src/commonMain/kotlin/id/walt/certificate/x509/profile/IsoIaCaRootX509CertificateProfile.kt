@@ -13,11 +13,11 @@ import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionK
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateExtensionsAreNotCritical
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateSerialNumber
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateSignatureAlgorithm
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateValidityTime
-import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateVersion
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateExtensionsAreNotCritical
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateSerialNumber
+import id.walt.certificate.x509.profile.X509CertificateProfileValidationUtil.validateVersionV3
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
@@ -109,7 +109,16 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         issuerEmailAddress: String?,
         issuerUri: String?
     ) {
+        profileIaCaRootCertificate()
         this.subjectDn = issuerDn
+        require(issuerEmailAddress?.isNotBlank() == true || issuerUri?.isNotBlank() == true) { "Issuer email address or issuer uri is required" }
+        extensionIssuerAltName {
+            issuerEmailAddress?.also { addEmail(it) }
+            issuerUri?.also { addUri(it) }
+        }
+    }
+
+    fun X509CertificateDataBuilder.profileIaCaRootCertificate() {
         subjectPublicKeySelfSigned()
         val now = Clock.System.now()
         validity = X509Certificate.Validity(
@@ -127,18 +136,13 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
             addKeyUsage(KeyUsageExtension.KeyUsage.cRLSign)
         }
         extensionSubjectKeyIdentifier()
-        require(issuerEmailAddress?.isNotBlank() == true || issuerUri?.isNotBlank() == true) { "Issuer email address or issuer uri is required" }
-        extensionIssuerAltName {
-            issuerEmailAddress?.also { addEmail(it) }
-            issuerUri?.also { addUri(it) }
-        }
     }
 
     override suspend fun validate(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-        validateVersion(context, x509Certificate)
+        validateVersionV3(context, x509Certificate)
         validateSerialNumber(context, x509Certificate)
         validateSignatureAlgorithm(context, x509Certificate, allowedSignatureAlgorithmsOid)
         validateIssuerDn(context, x509Certificate)

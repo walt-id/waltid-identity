@@ -20,6 +20,12 @@ import kotlin.test.assertTrue
  */
 class IssuerOnboardingIntegrationTest : AbstractIntegrationTest() {
 
+    companion object {
+        private const val ONBOARD_ISSUER_PATH = "/onboard/issuer"
+        private const val ISSUER_KEY_MESSAGE = "Response should contain issuerKey"
+        private const val ISSUER_DID_MESSAGE = "Response should contain issuerDid"
+    }
+
     @Test
     fun shouldOnboardIssuerWithEd25519Key() = runTest {
         val client = environment.testHttpClient()
@@ -34,14 +40,14 @@ class IssuerOnboardingIntegrationTest : AbstractIntegrationTest() {
             })
         }
         
-        val response = client.post("/onboard/issuer") {
+        val response = client.post(ONBOARD_ISSUER_PATH) {
             setBody(onboardingRequest)
         }
         response.expectSuccess()
         
         val result = response.body<JsonObject>()
-        assertNotNull(result["issuerKey"]?.jsonObject, "Response should contain issuerKey")
-        assertNotNull(result["issuerDid"]?.jsonPrimitive?.content, "Response should contain issuerDid")
+        assertNotNull(result["issuerKey"]?.jsonObject, ISSUER_KEY_MESSAGE)
+        assertNotNull(result["issuerDid"]?.jsonPrimitive?.content, ISSUER_DID_MESSAGE)
         
         val issuerDid = result["issuerDid"]!!.jsonPrimitive.content
         assertTrue(issuerDid.startsWith("did:jwk:"), "Issuer DID should be a did:jwk")
@@ -61,14 +67,14 @@ class IssuerOnboardingIntegrationTest : AbstractIntegrationTest() {
             })
         }
         
-        val response = client.post("/onboard/issuer") {
+        val response = client.post(ONBOARD_ISSUER_PATH) {
             setBody(onboardingRequest)
         }
         response.expectSuccess()
         
         val result = response.body<JsonObject>()
-        assertNotNull(result["issuerKey"]?.jsonObject, "Response should contain issuerKey")
-        assertNotNull(result["issuerDid"]?.jsonPrimitive?.content, "Response should contain issuerDid")
+        assertNotNull(result["issuerKey"]?.jsonObject, ISSUER_KEY_MESSAGE)
+        assertNotNull(result["issuerDid"]?.jsonPrimitive?.content, ISSUER_DID_MESSAGE)
     }
 
     @Test
@@ -85,14 +91,14 @@ class IssuerOnboardingIntegrationTest : AbstractIntegrationTest() {
             })
         }
         
-        val response = client.post("/onboard/issuer") {
+        val response = client.post(ONBOARD_ISSUER_PATH) {
             setBody(onboardingRequest)
         }
         response.expectSuccess()
         
         val result = response.body<JsonObject>()
-        assertNotNull(result["issuerKey"]?.jsonObject, "Response should contain issuerKey")
-        assertNotNull(result["issuerDid"]?.jsonPrimitive?.content, "Response should contain issuerDid")
+        assertNotNull(result["issuerKey"]?.jsonObject, ISSUER_KEY_MESSAGE)
+        assertNotNull(result["issuerDid"]?.jsonPrimitive?.content, ISSUER_DID_MESSAGE)
     }
 
     @Test
@@ -109,14 +115,14 @@ class IssuerOnboardingIntegrationTest : AbstractIntegrationTest() {
             })
         }
         
-        val response = client.post("/onboard/issuer") {
+        val response = client.post(ONBOARD_ISSUER_PATH) {
             setBody(onboardingRequest)
         }
         response.expectSuccess()
         
         val result = response.body<JsonObject>()
-        assertNotNull(result["issuerKey"]?.jsonObject, "Response should contain issuerKey")
-        assertNotNull(result["issuerDid"]?.jsonPrimitive?.content, "Response should contain issuerDid")
+        assertNotNull(result["issuerKey"]?.jsonObject, ISSUER_KEY_MESSAGE)
+        assertNotNull(result["issuerDid"]?.jsonPrimitive?.content, ISSUER_DID_MESSAGE)
     }
 
     @Test
@@ -133,14 +139,14 @@ class IssuerOnboardingIntegrationTest : AbstractIntegrationTest() {
             })
         }
         
-        val response = client.post("/onboard/issuer") {
+        val response = client.post(ONBOARD_ISSUER_PATH) {
             setBody(onboardingRequest)
         }
         response.expectSuccess()
         
         val result = response.body<JsonObject>()
-        assertNotNull(result["issuerKey"]?.jsonObject, "Response should contain issuerKey")
-        assertNotNull(result["issuerDid"]?.jsonPrimitive?.content, "Response should contain issuerDid")
+        assertNotNull(result["issuerKey"]?.jsonObject, ISSUER_KEY_MESSAGE)
+        assertNotNull(result["issuerDid"]?.jsonPrimitive?.content, ISSUER_DID_MESSAGE)
         
         val issuerDid = result["issuerDid"]!!.jsonPrimitive.content
         assertTrue(issuerDid.startsWith("did:key:"), "Issuer DID should be a did:key")
@@ -160,7 +166,7 @@ class IssuerOnboardingIntegrationTest : AbstractIntegrationTest() {
             })
         }
         
-        val response = client.post("/onboard/issuer") {
+        val response = client.post(ONBOARD_ISSUER_PATH) {
             setBody(onboardingRequest)
         }
         response.expectSuccess()
