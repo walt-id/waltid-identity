@@ -89,7 +89,7 @@ public class WalletIdentities internal constructor(
      */
     public suspend fun initialize(): IdentityOperationResult = when (val state = state()) {
         is WalletIdentityState.Active -> IdentityOperationResult.Active(state.identity).notifyActive()
-        is WalletIdentityState.Pending -> IdentityOperationResult.Pending(state.identityId)
+        is WalletIdentityState.Pending -> IdentityOperationResult.Pending(state.identityId, state.reason)
         is WalletIdentityState.Unavailable -> failed(state.reason)
         WalletIdentityState.Absent -> when (val options = creationOptions()) {
             is IdentityOptions.Available -> (listOf(options.recommended) + options.alternatives)
@@ -285,9 +285,12 @@ public class WalletIdentities internal constructor(
     /** Lists safe references only. A reference is not proof that its record is valid or restorable. */
     public suspend fun recoveryCandidates(): List<RecoveryCandidate> = mutex.withLock {
         availableProviders().flatMap { (provider, _) ->
-            provider.list().distinct().filter { it.length in 1..256 }.map {
-                RecoveryCandidate(owner, IdentityBackupReference(provider.id, it), provider.displayName)
-            }
+            try {
+                provider.list().distinct().filter { it.length in 1..256 }.map {
+                    RecoveryCandidate(owner, IdentityBackupReference(provider.id, it), provider.displayName)
+                }
+            } catch (cause: CancellationException) { throw cause }
+            catch (_: Exception) { emptyList() }
         }
     }
 
