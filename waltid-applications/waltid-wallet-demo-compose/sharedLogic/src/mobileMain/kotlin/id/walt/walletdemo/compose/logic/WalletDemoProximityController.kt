@@ -10,7 +10,6 @@ import id.walt.wallet2.mobile.ProximityApproval
 import id.walt.wallet2.mobile.ProximityPreparationResult
 import id.walt.wallet2.mobile.ProximityPreparedSharing
 import id.walt.wallet2.mobile.ProximitySharingPlan
-import id.walt.wallet2.mobile.ProximityReviewId
 import id.walt.wallet2.mobile.ProximityCapabilities
 import id.walt.wallet2.mobile.ProximityBleBearerPolicy
 import id.walt.wallet2.mobile.ProximityBleConfiguration
@@ -27,6 +26,7 @@ import id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration
 import id.walt.wallet2.mobile.ProximityRemediationAction
 import id.walt.wallet2.mobile.ProximityRetrievalOptions
 import id.walt.wallet2.mobile.ProximityReview
+import id.walt.wallet2.mobile.ProximityReviewId
 import id.walt.wallet2.mobile.ProximityRecovery
 import id.walt.wallet2.mobile.ProximityReaderTrustSettings
 import id.walt.wallet2.mobile.ProximitySession
