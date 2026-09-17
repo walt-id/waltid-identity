@@ -1,5 +1,6 @@
 package id.walt.certificate.x509.revocation
 
+import at.asitplus.signum.indispensable.asn1.Asn1Exception
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
@@ -86,6 +87,8 @@ class CertificateRevocationListVerifier(
         throw cancelled
     } catch (failure: CrlValidationException) {
         CrlCertificateStatus.Indeterminate(failure.reason)
+    } catch (_: Asn1Exception) {
+        CrlCertificateStatus.Indeterminate(CrlFailure.INVALID_DER)
     } catch (_: NotImplementedError) {
         // Unsupported platform extension/provider operation. Other Errors must propagate.
         CrlCertificateStatus.Indeterminate(CrlFailure.UNAVAILABLE)

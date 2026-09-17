@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import at.asitplus.signum.indispensable.asn1.Asn1Exception
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Companion.extensionCrlDistributionPoints
@@ -150,6 +151,8 @@ public class ProximityCrlRevocationEvaluator internal constructor(
         else indeterminate()
     } catch (cancelled: CancellationException) {
         throw cancelled
+    } catch (_: Asn1Exception) {
+        indeterminate()
     } catch (_: NotImplementedError) {
         // Platform ASN.1 adapters can report unsupported input this way.
         indeterminate()
@@ -226,6 +229,9 @@ public class ProximityCrlRevocationEvaluator internal constructor(
         fun parseCrlCertificate(encoded: String): X509Certificate = try {
             require(encoded.length in 1..87_382)
             X509CertificateUtil.parseCertificateDerEncoded(ByteString(crlBase64.decode(encoded)))
+        } catch (error: Asn1Exception) {
+            // Signum parse exceptions extend Throwable directly, rather than Exception.
+            throw IllegalArgumentException("Invalid CRL issuer certificate", error)
         } catch (error: NotImplementedError) {
             // Preserve recoverable Swift construction for unsupported ASN.1 input only.
             throw IllegalArgumentException("Unsupported CRL issuer certificate", error)
