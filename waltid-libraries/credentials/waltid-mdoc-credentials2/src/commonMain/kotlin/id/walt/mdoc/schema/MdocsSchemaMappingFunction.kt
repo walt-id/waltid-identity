@@ -2,6 +2,8 @@
 
 package id.walt.mdoc.schema
 
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.encoding.toMdocTDateString
 import id.walt.mdoc.schema.MdocsSchema.MdocsDatatype.*
@@ -14,6 +16,24 @@ import kotlin.time.Instant
 
 object MdocsSchemaMappingFunction {
 
+    /**
+     * Reads a `BYTES` element from either representation.
+     *
+     * Byte strings used to be represented as a JSON array holding one entry per byte. That cost a `JsonLiteral`
+     * plus a `String` plus its backing array for every single byte - on the order of 80 bytes of heap to carry
+     * one byte of payload - so a 230 KB portrait became roughly 460,000 objects and tens of megabytes of tree,
+     * per copy. A verifier retaining a handful of such sessions exhausted a 768 MiB heap. They are written as a
+     * single base64url string now, which is one object regardless of size.
+     *
+     * The array form is still accepted, because credential data persisted or sent by existing clients carries
+     * it. base64url rather than standard base64: it is what OpenID4VP and ISO 18013-5 use elsewhere, and it
+     * survives being placed in a URL without further escaping.
+     */
+    private fun JsonElement.decodeSchemaBytes(): ByteArray = when (this) {
+        is JsonArray -> map { it.jsonPrimitive.int.toByte() }.toByteArray()
+        else -> jsonPrimitive.content.decodeFromBase64Url()
+    }
+
     fun JsonElement.decodeByScheme(schemaType: MdocsSchemaType): Any {
         return when (schemaType.type) {
             // Basic types:
@@ -22,7 +42,7 @@ object MdocsSchemaMappingFunction {
             LONG -> jsonPrimitive.long
             UINT -> jsonPrimitive.long.toUInt()
             BOOLEAN -> jsonPrimitive.boolean
-            BYTES -> jsonArray.map { it.jsonPrimitive.int.toByte() }.toByteArray()
+            BYTES -> decodeSchemaBytes()
             DATE -> LocalDate.parse(jsonPrimitive.content)
             DATETIME -> Instant.parse(jsonPrimitive.content)
 
@@ -42,7 +62,7 @@ object MdocsSchemaMappingFunction {
             LONG -> CborInteger(jsonPrimitive.long)
             UINT -> CborInteger(jsonPrimitive.long.toULong())
             BOOLEAN -> CborBoolean(jsonPrimitive.boolean)
-            BYTES -> CborByteString(jsonArray.map { it.jsonPrimitive.int.toByte() }.toByteArray())
+            BYTES -> CborByteString(decodeSchemaBytes())
 
             // Applying CBOR tags directly!
             DATE -> CborString(jsonPrimitive.content, 1004u)
@@ -87,7 +107,7 @@ object MdocsSchemaMappingFunction {
             INT, LONG -> JsonPrimitive((this as CborInteger).long)
             UINT -> JsonPrimitive((this as CborInteger).absoluteValue.toUInt())
             BOOLEAN -> JsonPrimitive((this as CborBoolean).value)
-            BYTES -> JsonArray((this as CborByteString).toByteArray().map { JsonPrimitive(it) })
+            BYTES -> JsonPrimitive((this as CborByteString).toByteArray().encodeToBase64Url())
             ARRAY -> JsonArray((this as CborArray).map { it.schemafulToJsonElement(schemaType.generic!!) })
             MAP -> JsonObject((this as CborMap).entries.associate { (k, v) ->
                 (k as CborString).value to v.schemafulToJsonElement(schemaType.generic!!)
