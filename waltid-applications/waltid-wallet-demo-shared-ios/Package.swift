@@ -8,6 +8,7 @@ import PackageDescription
 // before credential data leaves the device.
 let package = Package(
     name: "WalletDemoIdentityDocumentSupport",
+    defaultLocalization: "en",
     platforms: [
         .iOS("15.4"),
     ],
@@ -58,7 +59,8 @@ let package = Package(
                 .linkedFramework("CoreGraphics"),
             ]
         ),
-    ]
+    ],
+    cxxLanguageStandard: .cxx17
 )
 
 // No test target here on purpose: WalletSDK links WalletCore.xcframework, which has no macOS slice,

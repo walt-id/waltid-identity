@@ -19,7 +19,7 @@ internal fun validateProximityQrCodePayload(payload: String) {
         "Device engagement QR payload must use the mdoc scheme"
     }
     require(payload.all { it.code in ASCII_RANGE }) {
-        "Device engagement QR payload must contain only ASCII text"
+        "Device engagement QR payload must contain only printable ASCII without whitespace"
     }
     require(payload.encodeToByteArray().size <= MAXIMUM_PROXIMITY_PAYLOAD_BYTES) {
         "Device engagement QR payload exceeds the $MAXIMUM_PROXIMITY_PAYLOAD_BYTES-byte limit"
@@ -48,7 +48,7 @@ internal fun QrCodeCanvas(qrCode: ImageBitmap, modifier: Modifier = Modifier) {
     }
 }
 
-private val ASCII_RANGE = 0..0x7F
+private val ASCII_RANGE = 0x21..0x7E
 private const val PROXIMITY_QR_PREFIX = "mdoc:"
 private const val MAXIMUM_PROXIMITY_PAYLOAD_BYTES = 2_953
 private const val QR_QUIET_ZONE_MODULES = 4

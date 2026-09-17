@@ -380,15 +380,15 @@ public enum ReviewActionPresentation {
     case proximity
 
     var submitTitle: String {
-        "Share"
+        String(localized: "Share", bundle: .module)
     }
 
     var rejectTitle: String {
-        self == .sharing ? "Reject" : "Decline"
+        self == .sharing ? String(localized: "Reject", bundle: .module) : String(localized: "Decline", bundle: .module)
     }
 
     var cancelTitle: String? {
-        self == .sharing ? nil : "Cancel"
+        self == .sharing ? nil : String(localized: "Cancel", bundle: .module)
     }
 
     var submitAccessibilityIdentifier: String {
@@ -450,11 +450,11 @@ public struct ReviewActions: View {
             .disabled(isLoading || !selectionComplete)
             .accessibilityIdentifier(presentation.submitAccessibilityIdentifier)
 
-        // By default this says "Cancel review" where a protocol-level Reject also exists, so the two
+        // By default this says String(localized: "Cancel review", bundle: .module) where a protocol-level Reject also exists, so the two
         // ways of declining cannot be mistaken for each other. Transports may supply a more precise label.
-        Button(presentation.cancelTitle ?? (onReject == nil ? "Cancel" : "Cancel review"), action: onCancel)
+        Button(presentation.cancelTitle ?? (onReject == nil ? String(localized: "Cancel", bundle: .module) : String(localized: "Cancel review", bundle: .module)), action: onCancel)
             .buttonStyle(.bordered)
-            .disabled(isLoading)
+            .disabled(isLoading && presentation != .proximity)
             .accessibilityIdentifier(presentation.cancelAccessibilityIdentifier)
 
         if let onReject {
