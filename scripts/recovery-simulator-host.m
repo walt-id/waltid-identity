@@ -1,6 +1,7 @@
 // Give Kotlin/Native tests a UIKit lifecycle and an explicit, per-launch completion record.
 #import <UIKit/UIKit.h>
 #import <unistd.h>
+#include "recovery-host-output.h"
 
 extern int main(int argc, char **argv);
 extern int32_t waltRecoveryKeychainExchange(const char *namespace);
@@ -21,9 +22,7 @@ static char **testArgv;
         if (![[NSUUID alloc] initWithUUIDString:run]) exit(2);
         NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
         NSString *path = [documents stringByAppendingPathComponent:[run stringByAppendingString:@".log"]];
-        if (!freopen(path.UTF8String, "w", stdout) || dup2(fileno(stdout), fileno(stderr)) < 0) exit(2);
-        setbuf(stdout, NULL);
-        setbuf(stderr, NULL);
+        if (redirectRecoveryOutput(path.UTF8String) < 0) exit(2);
         int result = main(testArgc, testArgv);
         if (result == 0) {
             for (NSString *argument in NSProcessInfo.processInfo.arguments) {
