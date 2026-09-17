@@ -208,9 +208,6 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) {
             onAllNodesWithTag(WalletUiTestTags.claimGroup("About this credential")).fetchSemanticsNodes().isNotEmpty()
         }
-        // Async details can arrive before the card-opening and detail-fade transitions finish.
-        mainClock.advanceTimeBy(1_000)
-        waitForIdle()
         onAllNodesWithText("Example Credential").assertCountEquals(1)
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
