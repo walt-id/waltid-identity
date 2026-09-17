@@ -3,6 +3,31 @@ import XCTest
 import WalletSDK
 
 final class ProximityCRLBridgeTests: XCTestCase {
+    func testMalformedRequiredIacaIssuerFailsClosedThroughSwiftBridge() async throws {
+        let evaluator = ProximityConfiguredReaderTrustEvaluator(configuration: .init(
+            trustAnchors: [.init(certificateDER: ProximityCRLFixtures.issuerWithoutCdp)],
+            requiredIACAIssuerCertificateDER: Data([0x30, 0])))
+        let result = try await evaluator.evaluate(.init(scope: .wholeRequest,
+            certificateChainDER: [ProximityCRLFixtures.profileReader]))
+        XCTAssertEqual(result.certificatePath, .invalid)
+    }
+
+    func testValidatedPathAndIacaContextSurviveTheRealSwiftBridge() async throws {
+        let root = ProximityCRLFixtures.issuerWithoutCdp
+        let anchor = ProximityReaderTrustAnchor(certificateDER: root)
+        let fetcher = RecordingCRLFetcher(.available(der: ProximityCRLFixtures.good))
+        let crl = try ProximityCRLRevocationEvaluator(issuerCertificatesDER: [root], scope: .validatedPath, fetcher: fetcher)
+        let evaluator = ProximityConfiguredReaderTrustEvaluator(configuration: .init(
+            trustAnchors: [anchor], revocationPolicy: .check(crl), requiredIACAIssuerCertificateDER: root))
+        let valid = try await evaluator.evaluate(.init(scope: .wholeRequest, certificateChainDER: [ProximityCRLFixtures.profileReader]))
+        XCTAssertEqual(valid.state, .trusted)
+        XCTAssertEqual(valid.revocation, .good)
+        let missingContact = try await evaluator.evaluate(.init(scope: .wholeRequest, certificateChainDER: [ProximityCRLFixtures.profileReaderWithoutContact]))
+        XCTAssertEqual(missingContact.certificatePath, .invalid)
+        let requests = await fetcher.requests
+        XCTAssertEqual(requests.count, 1) // No anchor CRL lookup and no lookup after profile failure.
+    }
+
     func testConfiguredScopeAndFoundationTransportReachSharedVerifier() async throws {
         for (der, scope, expected) in [
             (ProximityCRLFixtures.good, ProximityCRLScope.readerCertificateAndIssuingAuthorities,

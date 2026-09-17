@@ -27,6 +27,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import id.walt.walletdemo.compose.ui.resources.*
 import id.walt.wallet2.mobile.ProximityReaderPolicy
 import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 
@@ -35,6 +37,7 @@ internal fun DemoReaderTrustSettings(
     controller: DemoReaderTrustSettingsController,
 ) {
     val state by controller.state.collectAsState()
+    val validatingLabel = stringResource(Res.string.reader_trust_validating)
     val picker = rememberReaderTrustImportPicker { result ->
         handleReaderTrustImportPickerResult(controller, result)
     }
@@ -45,12 +48,12 @@ internal fun DemoReaderTrustSettings(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         HorizontalDivider()
-        Text("Reader Authentication", fontWeight = FontWeight.SemiBold)
+        Text(stringResource(Res.string.reader_trust_reader_authentication), fontWeight = FontWeight.SemiBold)
         Text(
-            "Choose which readers may reach disclosure review and manage public Reader CA or qualification RICAL trust material.",
+            stringResource(Res.string.reader_trust_choose_which_readers_may_reach_disclosure_review_and_manage_public_rea),
         )
         ReaderPolicyChoice(
-            title = "Allow anonymous or untrusted readers",
+            title = stringResource(Res.string.reader_trust_allow_anonymous_or_untrusted_readers),
             selected = state.settings.readerPolicy ==
                 ProximityReaderPolicy.AllowAnonymousOrUntrusted,
             tag = WalletUiTestTags.SettingsReaderPolicyAllowUntrusted,
@@ -59,7 +62,7 @@ internal fun DemoReaderTrustSettings(
             },
         )
         ReaderPolicyChoice(
-            title = "Require a trusted reader",
+            title = stringResource(Res.string.reader_trust_require_a_trusted_reader),
             selected = state.settings.readerPolicy == ProximityReaderPolicy.RequireTrusted,
             tag = WalletUiTestTags.SettingsReaderPolicyRequireTrusted,
             onSelect = { controller.setReaderPolicy(ProximityReaderPolicy.RequireTrusted) },
@@ -67,41 +70,41 @@ internal fun DemoReaderTrustSettings(
         if (state.settings.readerPolicy == ProximityReaderPolicy.RequireTrusted &&
             state.settings.trustAnchors.isEmpty() && state.settings.ricalProviders.isEmpty()
         ) {
-            Text("No trust material is configured, so all readers will be rejected.")
+            Text(stringResource(Res.string.reader_trust_no_trust_material_is_configured_so_all_readers_will_be_rejected))
         }
 
-        Text("Reader CA trust anchors", fontWeight = FontWeight.SemiBold)
-        if (state.settings.trustAnchors.isEmpty()) Text("None configured")
+        Text(stringResource(Res.string.reader_trust_reader_ca_trust_anchors), fontWeight = FontWeight.SemiBold)
+        if (state.settings.trustAnchors.isEmpty()) Text(stringResource(Res.string.reader_trust_none_configured))
         state.settings.trustAnchors.forEach { anchor ->
             TrustMaterialRow(
                 title = anchor.displayName,
-                detail = "Configured Reader CA",
+                detail = stringResource(Res.string.reader_trust_configured_reader_ca),
                 onRemove = { controller.removeReaderAuthority(anchor.certificateDerBase64Url) },
             )
         }
-        Text("Qualification RICAL providers", fontWeight = FontWeight.SemiBold)
-        if (state.settings.ricalProviders.isEmpty()) Text("None configured")
+        Text(stringResource(Res.string.reader_trust_qualification_rical_providers), fontWeight = FontWeight.SemiBold)
+        if (state.settings.ricalProviders.isEmpty()) Text(stringResource(Res.string.reader_trust_none_configured))
         state.settings.ricalProviders.forEach { provider ->
             TrustMaterialRow(
                 title = provider.providerId,
-                detail = if (provider.establishReaderTrust) "Establishes reader trust" else "Evidence only",
+                detail = if (provider.establishReaderTrust) stringResource(Res.string.reader_trust_establishes_reader_trust) else stringResource(Res.string.reader_trust_evidence_only),
                 onRemove = { controller.removeRicalProvider(provider.providerId) },
             )
         }
 
         Button(
             onClick = picker::launch,
-            enabled = !state.importInProgress,
+            enabled = !state.importInProgress && !state.loading,
             modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.SettingsReaderTrustImport),
         ) {
             if (state.importInProgress) {
                 CircularProgressIndicator(
                     modifier = Modifier.semantics {
-                        contentDescription = "Validating reader trust material"
+                        contentDescription = validatingLabel
                     }
                 )
             }
-            else Text("Import Reader CA or trust bundle")
+            else Text(stringResource(Res.string.reader_trust_import_reader_ca_or_trust_bundle))
         }
         OutlinedButton(
             onClick = controller::reset,
@@ -110,7 +113,7 @@ internal fun DemoReaderTrustSettings(
                 state.settings.readerPolicy != ProximityReaderPolicy.AllowAnonymousOrUntrusted,
             modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.SettingsReaderTrustReset),
         ) {
-            Text("Reset Reader Authentication settings")
+            Text(stringResource(Res.string.reader_trust_reset_reader_authentication_settings))
         }
         state.error?.let { error ->
             Text(
@@ -126,39 +129,39 @@ internal fun DemoReaderTrustSettings(
         AlertDialog(
             modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImportReview),
             onDismissRequest = controller::cancelImport,
-            title = { Text("Review reader trust import") },
+            title = { Text(stringResource(Res.string.reader_trust_review_reader_trust_import)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(preview.sourceName)
                     preview.readerAuthorities.forEach { authority ->
                         Text(
-                            "${authority.displayName}\nSubject: ${authority.subject}\n" +
-                                "Issuer: ${authority.issuer}\nSHA-256: ${authority.sha256Fingerprint}\n" +
-                                "Valid: ${authority.validFrom} – ${authority.validUntil}\n" +
-                                "Profile: ${authority.profile}"
+                            stringResource(Res.string.reader_trust_certificate_details, authority.displayName,
+                                authority.subject, authority.issuer, authority.sha256Fingerprint,
+                                authority.validFrom.toString(), authority.validUntil.toString())
                         )
                     }
                     preview.ricalProviders.forEach { provider ->
                         Text(
-                            "${provider.providerId}\nType: ${provider.type}\nIssued: ${provider.issuedAt}\n" +
-                                "Next update: ${provider.nextUpdate ?: "Not specified"}\n" +
-                                "Valid until: ${provider.validUntil ?: "Not specified"}"
+                            stringResource(Res.string.reader_trust_rical_details, provider.providerId, provider.type,
+                                provider.issuedAt.toString(), provider.nextUpdate?.toString() ?: stringResource(Res.string.reader_trust_unspecified),
+                                provider.validUntil?.toString() ?: stringResource(Res.string.reader_trust_unspecified))
                         )
                     }
-                    Text(preview.policyEffect, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(if (preview.resultingSettings.readerPolicy == ProximityReaderPolicy.RequireTrusted)
+                        Res.string.reader_trust_effect_require else Res.string.reader_trust_effect_allow), fontWeight = FontWeight.SemiBold)
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = controller::confirmImport,
                     modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImportConfirm),
-                ) { Text("Import") }
+                ) { Text(stringResource(Res.string.reader_trust_import)) }
             },
             dismissButton = {
                 TextButton(
                     onClick = controller::cancelImport,
                     modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImportCancel),
-                ) { Text("Cancel") }
+                ) { Text(stringResource(Res.string.reader_trust_cancel)) }
             },
         )
     }
@@ -216,6 +219,6 @@ private fun TrustMaterialRow(
             Text(title)
             Text(detail)
         }
-        TextButton(onClick = onRemove) { Text("Remove") }
+        TextButton(onClick = onRemove) { Text(stringResource(Res.string.reader_trust_remove)) }
     }
 }

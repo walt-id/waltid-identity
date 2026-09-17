@@ -381,7 +381,7 @@ internal fun SharingActionsRow(
         }
         TextButton(
             onClick = onCancel,
-            enabled = enabled,
+            enabled = enabled || presentation == ReviewActionPresentation.Proximity,
             modifier = Modifier.testTag(presentation.cancelTestTag),
         ) {
             Text(cancelLabel)

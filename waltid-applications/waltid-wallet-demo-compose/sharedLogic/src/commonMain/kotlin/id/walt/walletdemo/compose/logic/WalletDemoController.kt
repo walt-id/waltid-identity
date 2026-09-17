@@ -462,10 +462,10 @@ class WalletDemoController(
         }
     }
 
-    fun resetWallet() {
+    fun resetWallet(beforeDelete: suspend () -> Unit = {}) {
         cancelActiveWalletWork()
         scope.launch(dispatcher) {
-            val deleted = runCatching { wallet.deleteWallet() }
+            val deleted = runCatching { beforeDelete(); wallet.deleteWallet() }
             deleted.exceptionOrNull()?.let { error ->
                 setOperationError(WalletDisplayText.ResetWalletFailed, error, _state.value.selectedTab)
                 return@launch

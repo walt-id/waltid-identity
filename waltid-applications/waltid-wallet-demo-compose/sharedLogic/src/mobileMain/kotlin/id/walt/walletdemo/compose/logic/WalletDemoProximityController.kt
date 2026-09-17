@@ -12,6 +12,7 @@ import id.walt.wallet2.mobile.ProximityErrorCategory
 import id.walt.wallet2.mobile.ProximityHostActionResult
 import id.walt.wallet2.mobile.ProximityRemediationAction
 import id.walt.wallet2.mobile.ProximityReview
+import id.walt.wallet2.mobile.ProximityReviewId
 import id.walt.wallet2.mobile.ProximityRecovery
 import id.walt.wallet2.mobile.ProximitySession
 import id.walt.wallet2.mobile.ProximityState
@@ -52,12 +53,13 @@ data class WalletDemoProximityUiState(
     val continueAfterResponse: Boolean = false,
     val hostActionInProgress: ProximityRemediationAction? = null,
     val actionError: ProximityError? = null,
+    val pendingReviewId: ProximityReviewId? = null,
 ) {
     val review: ProximityReview?
         get() = (sessionState as? ProximityState.ReviewRequired)?.review
 
     val canApprove: Boolean
-        get() = review?.let { current ->
+        get() = pendingReviewId == null && review?.let { current ->
             selections.map { it.requestIndex }.toSet() == current.documents.map { it.requestIndex }.toSet() &&
                 selections.all { it.disclosedElements.isNotEmpty() }
         } == true
@@ -96,6 +98,7 @@ class WalletDemoProximityController(
     val state: StateFlow<WalletDemoProximityUiState> = mutableState.asStateFlow()
 
     private var session: ProximitySession? = null
+    private var closingJob: Job? = null
     private var pendingConfiguration: ProximityConfiguration? = null
     private var sessionJob: Job? = null
     private var hostActionJob: Job? = null
@@ -116,8 +119,11 @@ class WalletDemoProximityController(
         startGeneration: Long,
     ) {
         sessionJob?.cancel()
+        val cleanup = closingJob
         sessionJob = scope.launch(dispatcher) {
             try {
+                cleanup?.join()
+                if (!isCurrent(startGeneration)) return@launch
                 val capabilities = wallet.proximityPresentationCapabilities(configuration)
                 if (!isCurrent(startGeneration)) return@launch
                 publish(ProximityState.CheckingPrerequisites(capabilities))
@@ -152,6 +158,7 @@ class WalletDemoProximityController(
     }
 
     fun selectCredential(requestIndex: Int, credentialId: String) {
+        if (mutableState.value.pendingReviewId != null) return
         val review = mutableState.value.review ?: return
         val document = review.documents.singleOrNull { it.requestIndex == requestIndex } ?: return
         val credential = document.credentialOptions.singleOrNull { it.credentialId == credentialId } ?: return
@@ -166,6 +173,7 @@ class WalletDemoProximityController(
     }
 
     fun toggleElement(requestIndex: Int, element: ProximityElementReference) {
+        if (mutableState.value.pendingReviewId != null) return
         val current = mutableState.value
         val review = current.review ?: return
         val selection = current.selections.singleOrNull { it.requestIndex == requestIndex } ?: return
@@ -297,17 +305,32 @@ class WalletDemoProximityController(
         }
     }
 
+    suspend fun closeAndAwait() {
+        dismiss()
+        withContext(NonCancellable) { closingJob?.join() }
+    }
+
     fun dismiss() {
         generation += 1
-        sessionJob?.cancel()
+        val starting = sessionJob
+        val hostAction = hostActionJob
+        starting?.cancel()
+        hostAction?.cancel()
         sessionJob = null
-        hostActionJob?.cancel()
         hostActionJob = null
         val closing = session
         session = null
         pendingConfiguration = null
         mutableState.value = WalletDemoProximityUiState()
-        if (closing != null) scope.launch(dispatcher) { closing.close() }
+        val previous = closingJob
+        closingJob = scope.launch(dispatcher) {
+            withContext(NonCancellable) {
+                previous?.join()
+                starting?.join()
+                hostAction?.join()
+                closing?.close()
+            }
+        }
     }
 
     /** Closes a terminal session before starting a fresh capability check and exchange. */
@@ -319,13 +342,25 @@ class WalletDemoProximityController(
 
     private fun dispatch(action: ProximityAction) {
         val currentSession = session ?: return
+        val reviewId = when (action) {
+            is ProximityAction.Approve -> action.reviewId
+            is ProximityAction.Decline -> action.reviewId
+            else -> null
+        }
+        if (reviewId != null && mutableState.value.pendingReviewId != null) return
         val actionGeneration = generation
-        mutableState.update { it.copy(actionError = null) }
+        mutableState.update { it.copy(actionError = null, pendingReviewId = reviewId ?: it.pendingReviewId) }
         scope.launch(dispatcher) {
-            val result = currentSession.dispatch(action)
+            val result = try { currentSession.dispatch(action) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { ProximityActionResult.Rejected(demoSessionFailure) }
             if (generation != actionGeneration || !mutableState.value.active) return@launch
+            if (reviewId != null && mutableState.value.review?.reviewId != reviewId) return@launch
             mutableState.update {
-                it.copy(actionError = (result as? ProximityActionResult.Rejected)?.error)
+                it.copy(
+                    pendingReviewId = if (result is ProximityActionResult.Rejected) null else it.pendingReviewId,
+                    actionError = (result as? ProximityActionResult.Rejected)?.error,
+                )
             }
         }
     }
@@ -340,6 +375,9 @@ class WalletDemoProximityController(
                 ?.takeIf { current.review?.reviewId != it.reviewId }
             current.copy(
                 sessionState = sessionState,
+                pendingReviewId = current.pendingReviewId.takeIf {
+                    (sessionState as? ProximityState.ReviewRequired)?.review?.reviewId == it
+                },
                 selections = reviewForNewExchange?.defaultSelections() ?: current.selections,
                 continueAfterResponse = if (reviewForNewExchange != null) false else current.continueAfterResponse,
                 actionError = null,

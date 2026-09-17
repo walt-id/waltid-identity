@@ -14,6 +14,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** App-private persistence boundary for the canonical Reader Authentication settings JSON. */
 interface DemoReaderTrustSettingsStore {
@@ -49,6 +56,7 @@ internal class PersistentDemoReaderTrustSettingsStore(
 data class DemoReaderTrustSettingsUiState(
     val settings: ProximityReaderTrustSettings,
     val importInProgress: Boolean = false,
+    val loading: Boolean = false,
     val pendingImport: ProximityReaderTrustImportPreview? = null,
     val error: String? = null,
 )
@@ -58,35 +66,46 @@ class DemoReaderTrustSettingsController(
     private val store: DemoReaderTrustSettingsStore,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main,
+    private val workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    private val mutableState = MutableStateFlow(
-        runCatching { DemoReaderTrustSettingsUiState(store.load()) }.getOrElse { error ->
-            DemoReaderTrustSettingsUiState(
-                settings = ProximityReaderTrustSettings(),
-                error = "Stored Reader Authentication settings were invalid and were not loaded: " +
-                    (error.message ?: "unknown error"),
-            )
+    private val mutableState = MutableStateFlow(DemoReaderTrustSettingsUiState(ProximityReaderTrustSettings(), loading = true))
+    private val writes = Mutex()
+    private var importJob: Job? = null
+    private var pendingWrites = 0
+    private val loadJob = scope.launch(dispatcher) {
+        try {
+            val settings = withContext(workerDispatcher) { store.load() }
+            mutableState.value = DemoReaderTrustSettingsUiState(settings)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (error: Exception) {
+            mutableState.update { it.copy(loading = false, error = "Stored Reader Authentication settings were invalid and were not loaded: ${error.message}") }
         }
-    )
+    }
     val state: StateFlow<DemoReaderTrustSettingsUiState> = mutableState.asStateFlow()
 
     /** Read once by a new proximity session; later settings changes cannot mutate that snapshot. */
-    fun sessionSnapshot(): ProximityReaderTrustSettings = mutableState.value.settings
+    fun sessionSnapshot(): ProximityReaderTrustSettings {
+        check(!mutableState.value.loading) { "Reader Authentication settings are still loading" }
+        return mutableState.value.settings
+    }
 
     fun setReaderPolicy(policy: ProximityReaderPolicy) {
-        persist(mutableState.value.settings.copy(readerPolicy = policy))
+        persist { it.copy(readerPolicy = policy) }
     }
 
     fun prepareImport(sourceName: String, bytes: ByteArray) {
-        if (mutableState.value.importInProgress) return
+        if (mutableState.value.importInProgress || mutableState.value.loading) return
         mutableState.update { it.copy(importInProgress = true, pendingImport = null, error = null) }
-        scope.launch(dispatcher) {
+        val ownedBytes = bytes.copyOf()
+        val existing = mutableState.value.settings
+        importJob = scope.launch(dispatcher) {
             try {
-                val preview = ProximityReaderTrustSettingsCodec.prepareImport(
+                val preview = withContext(workerDispatcher) { ProximityReaderTrustSettingsCodec.prepareImport(
                     sourceName = sourceName,
-                    bytes = bytes,
-                    existing = mutableState.value.settings,
-                )
+                    bytes = ownedBytes,
+                    existing = existing,
+                ) }
+                currentCoroutineContext().ensureActive()
                 mutableState.update {
                     it.copy(importInProgress = false, pendingImport = preview, error = null)
                 }
@@ -106,35 +125,28 @@ class DemoReaderTrustSettingsController(
 
     fun confirmImport() {
         val preview = mutableState.value.pendingImport ?: return
-        persist(preview.resultingSettings)
+        persist { preview.resultingSettings }
     }
 
     fun cancelImport() {
-        mutableState.update { it.copy(importInProgress = false, pendingImport = null, error = null) }
+        importJob?.cancel()
+        importJob = null
+        mutableState.update { it.copy(importInProgress = pendingWrites > 0, pendingImport = null, error = null) }
     }
 
     fun removeReaderAuthority(certificateDerBase64Url: String) {
-        persist(
-            mutableState.value.settings.copy(
-                trustAnchors = mutableState.value.settings.trustAnchors.filterNot {
-                    it.certificateDerBase64Url == certificateDerBase64Url
-                }
-            )
-        )
+        persist { settings -> settings.copy(trustAnchors = settings.trustAnchors.filterNot {
+            it.certificateDerBase64Url == certificateDerBase64Url
+        }) }
     }
 
     fun removeRicalProvider(providerId: String) {
-        persist(
-            mutableState.value.settings.copy(
-                ricalProviders = mutableState.value.settings.ricalProviders.filterNot {
-                    it.providerId == providerId
-                }
-            )
-        )
+        persist { settings -> settings.copy(ricalProviders = settings.ricalProviders.filterNot { it.providerId == providerId }) }
     }
 
     fun reset() {
-        persist(ProximityReaderTrustSettings())
+        cancelImport()
+        persist { ProximityReaderTrustSettings() }
     }
 
     fun dismissError() {
@@ -147,16 +159,32 @@ class DemoReaderTrustSettingsController(
         }
     }
 
-    private fun persist(settings: ProximityReaderTrustSettings) {
-        try {
-            store.save(settings)
-            mutableState.value = DemoReaderTrustSettingsUiState(settings)
-        } catch (error: Throwable) {
-            mutableState.update {
-                it.copy(error = error.message ?: "Reader Authentication settings could not be saved")
+    private fun persist(update: (ProximityReaderTrustSettings) -> ProximityReaderTrustSettings) {
+        cancelImport()
+        pendingWrites += 1
+        mutableState.update { it.copy(importInProgress = true) }
+        scope.launch(dispatcher) {
+            try {
+                loadJob.join()
+                writes.withLock {
+                    // Once a save begins, publish its outcome even if the owning route closes.
+                    withContext(NonCancellable) {
+                        val settings = update(mutableState.value.settings)
+                        withContext(workerDispatcher) { store.save(settings) }
+                        mutableState.update { it.copy(settings = settings, pendingImport = null, error = null) }
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                mutableState.update { it.copy(error = error.message ?: "Reader Authentication settings could not be saved") }
+            } finally {
+                pendingWrites -= 1
+                mutableState.update { it.copy(importInProgress = pendingWrites > 0) }
             }
         }
     }
+
 }
 
 internal const val READER_TRUST_SETTINGS_KEY =

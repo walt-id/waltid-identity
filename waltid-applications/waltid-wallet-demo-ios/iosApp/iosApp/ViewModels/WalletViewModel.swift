@@ -298,7 +298,6 @@ class WalletViewModel: ObservableObject {
     }
 
     func resetWallet() {
-        proximityPresentation.dismiss()
         receiveTask?.cancel()
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
@@ -307,6 +306,7 @@ class WalletViewModel: ObservableObject {
         Task {
             cancelActiveWalletOperations()
             do {
+                await proximityPresentation.closeAndAwait()
                 try await walletClient.deleteLocalData()
                 pinStore.clear()
                 clearWalletState()

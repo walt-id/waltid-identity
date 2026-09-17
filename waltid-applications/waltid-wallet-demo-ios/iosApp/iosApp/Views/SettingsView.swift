@@ -205,6 +205,7 @@ struct SettingsView: View {
 private struct ReaderTrustSettingsView: View {
     @ObservedObject var controller: DemoReaderTrustSettingsController
     @State private var importing = false
+    @State private var importTask: Task<Void, Never>?
     @State private var confirmReset = false
 
     var body: some View {
@@ -262,7 +263,7 @@ private struct ReaderTrustSettingsView: View {
                 Button("Import Reader CA or trust bundle") {
                     importing = true
                 }
-                .disabled(controller.importInProgress)
+                .disabled(controller.importInProgress || controller.loading)
                 .accessibilityIdentifier(WalletAccessibilityID.readerTrustImport)
                 Text("Accepted: DER or certificate-only PEM Reader CAs, and versioned walt.id JSON trust bundles. Private keys and PKCS#12 files are rejected.")
                     .font(.footnote)
@@ -285,6 +286,7 @@ private struct ReaderTrustSettingsView: View {
             }
         }
         .navigationTitle("Reader Authentication")
+        .onDisappear { importTask?.cancel(); controller.cancelImport() }
         .fileImporter(
             isPresented: $importing,
             allowedContentTypes: [.data],
@@ -321,8 +323,8 @@ private struct ReaderTrustSettingsView: View {
 
     private func policyChoice(
         _ policy: ProximityStoredReaderPolicy,
-        title: String,
-        detail: String
+        title: LocalizedStringKey,
+        detail: LocalizedStringKey
     ) -> some View {
         Button {
             controller.setReaderPolicy(policy)
@@ -349,7 +351,7 @@ private struct ReaderTrustSettingsView: View {
 
     private func configuredMaterialRow(
         title: String,
-        detail: String,
+        detail: LocalizedStringKey,
         remove: @escaping () -> Void
     ) -> some View {
         HStack {
@@ -366,17 +368,16 @@ private struct ReaderTrustSettingsView: View {
     }
 
     private func handleImportResult(_ result: Result<[URL], Error>) {
-        do {
-            switch try ReaderTrustImportFileLoader.load(result) {
-            case .cancelled:
-                return
-            case let .selected(sourceName, data):
-                Task {
+        importTask?.cancel()
+        importTask = Task {
+            do {
+                switch try await ReaderTrustImportFileLoader.loadOffMain(result) {
+                case .cancelled: return
+                case let .selected(sourceName, data):
                     await controller.prepareImport(sourceName: sourceName, data: data)
                 }
-            }
-        } catch {
-            controller.reportImportError(error.localizedDescription)
+            } catch is CancellationError { return }
+            catch { controller.reportImportError(error.localizedDescription) }
         }
     }
 
@@ -407,9 +408,11 @@ private struct ReaderTrustImportReviewView: View {
                     reviewDetail("File", preview.sourceName)
                     reviewDetail(
                         "Kind",
-                        preview.kind == .readerCA ? "Reader CA" : "Trust bundle"
+                        preview.kind == .readerCA ? String(localized: "Reader CA") : String(localized: "Trust bundle")
                     )
-                    Text(preview.policyEffect)
+                    Text(preview.resultingSettings.readerPolicy == .requireTrusted
+                        ? String(localized: "Only readers trusted by the configured material may reach holder consent")
+                        : String(localized: "Untrusted readers may still reach holder consent"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -418,7 +421,8 @@ private struct ReaderTrustImportReviewView: View {
                         ForEach(preview.readerAuthorities) { authority in
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(authority.displayName).font(.headline)
-                                reviewDetail("Profile", authority.profile)
+                                reviewDetail("Type", String(localized: "X.509 CA certificate"))
+                                reviewDetail("Role", String(localized: "Reader trust anchor"))
                                 reviewDetail("Subject", authority.subject)
                                 reviewDetail("Issuer", authority.issuer)
                                 reviewDate("Valid from", authority.validFrom)
@@ -439,8 +443,8 @@ private struct ReaderTrustImportReviewView: View {
                                 reviewDetail(
                                     "Trust effect",
                                     provider.establishesReaderTrust
-                                        ? "May establish reader trust"
-                                        : "Evidence only"
+                                        ? String(localized: "May establish reader trust")
+                                        : String(localized: "Evidence only")
                                 )
                             }
                         }
