@@ -1,9 +1,15 @@
 package id.walt.verifier2
 
 import id.walt.commons.web.WebException
+import io.klogging.noCoLogger
 import id.walt.verifier2.data.Verification2Session
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
+
+private val log = noCoLogger("InMemoryVerificationSessionRepository")
+
+/** Creations between expiry sweeps: the sweep is O(size), so it must not run on every create. */
+private const val SWEEP_EVERY = 128
 
 data class VerificationSessionSnapshot(
     val session: Verification2Session,
@@ -81,10 +87,71 @@ interface VerificationSessionRepository {
     }
 }
 
-class InMemoryVerificationSessionRepository : VerificationSessionRepository {
-    private val sessions = mutableMapOf<String, VerificationSessionSnapshot>()
+/**
+ * Default ceiling on retained sessions.
+ *
+ * Deliberately a count rather than a byte budget, because a session carries its policy results and the
+ * credentials that were presented - roughly tens of kilobytes each - so a few thousand is already a
+ * substantial slice of a default heap. Sessions are normally consumed within minutes, so this is far more
+ * history than a flow needs; it exists to stop unbounded growth, not to serve as storage.
+ */
+const val DEFAULT_MAX_IN_MEMORY_SESSIONS: Int = 2_000
+
+class InMemoryVerificationSessionRepository(
+    private val maxSessions: Int = DEFAULT_MAX_IN_MEMORY_SESSIONS,
+) : VerificationSessionRepository {
+
+    /**
+     * Bounded and swept, because nothing else ever removed a session.
+     *
+     * [Verification2Session.persistenceExpirationDate] gives a used session [DEFAULT_RETENTION_YEARS] years,
+     * and a finished session is never read again - while the only eviction was the lazy one in [get], for the
+     * single id being looked up. So every completed verification stayed in this map for a decade: at 15
+     * requests per minute that is ~900 sessions an hour, each tens of kilobytes, until the heap ran out.
+     *
+     * Access-ordered so that reaching the ceiling discards the least recently touched session rather than one
+     * that is mid-flow. An in-memory store cannot honour a ten-year retention promise; a deployment that needs
+     * retention needs a persistent repository, and [unexpiredEvictions] is the signal that it does.
+     */
+    private val sessions = object : LinkedHashMap<String, VerificationSessionSnapshot>(64, 0.75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, VerificationSessionSnapshot>,
+        ): Boolean = (size > maxSessions).also { evicting ->
+            if (evicting) {
+                unexpiredEvictions++
+                log.warn {
+                    "In-memory verification session store reached its $maxSessions session ceiling; " +
+                            "discarding '${eldest.key}'. Configure a persistent repository if sessions must be retained."
+                }
+            }
+        }
+    }
+
+    /** Sessions dropped because the ceiling was reached rather than because they expired. */
+    var unexpiredEvictions: Long = 0L
+        private set
+
+    /** Visible so the sweep and the ceiling can be asserted; the map itself stays private. */
+    val size: Int get() = synchronized(sessions) { sessions.size }
+
+    /**
+     * Amortised sweep: expired sessions are the ones that should go first, and finding them is O(size), so it
+     * runs on a fraction of creations rather than on every one.
+     */
+    private var createsSinceSweep = 0
+
+    private fun dropExpiredLocked() {
+        val now = Clock.System.now()
+        sessions.entries.removeIf { entry ->
+            entry.value.session.persistenceExpirationDate()?.let { it < now } == true
+        }
+    }
 
     override suspend fun create(session: Verification2Session): VerificationSessionSnapshot = synchronized(sessions) {
+        if (++createsSinceSweep >= SWEEP_EVERY || sessions.size >= maxSessions) {
+            createsSinceSweep = 0
+            dropExpiredLocked()
+        }
         if (sessions.containsKey(session.id)) throw DuplicateVerificationSessionException(session.id)
         VerificationSessionSnapshot(session.copyForStorage(), 0).also { sessions[session.id] = it }
             .copyForCaller()
