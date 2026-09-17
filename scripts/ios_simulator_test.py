@@ -34,36 +34,72 @@ def run_test(device, arguments, timeout=180):
     deadline = time.monotonic() + timeout
     launch = ""
     failure = None
+    stopped = False
     try:
         # Launch is part of the phase budget, not a separate short command timeout.
         launch = simctl("launch", "--terminate-running-process", device, PACKAGE, *arguments,
                         env=dict(os.environ, SIMCTL_CHILD_RECOVERY_HOST_RUN=run), timeout=timeout)
+        launched = re.search(r"^" + re.escape(PACKAGE) + r": (\d+)\s*$", launch, re.MULTILINE)
+        if not launched or int(launched[1]) <= 1:
+            raise RuntimeError("Simulator did not acknowledge a recovery host PID")
         while True:
             output = log.read_text(errors="replace") if log.exists() else ""
+            pid = re.search(r"^RECOVERY_HOST_PID=(\d+)\n", output, re.MULTILINE)
+            if pid and pid[1] != launched[1]:
+                raise RuntimeError("Recovery host PID does not match the acknowledged launch")
             completed = re.search(r"^RECOVERY_TEST_EXIT=(-?\d+)\n", output, re.MULTILINE)
             if completed:
                 if completed[1] != "0":
                     failure = "Recovery host reported a nonzero test exit"
                 elif any(arg.startswith("--swiftRecoveryExchange=") for arg in arguments) and "RECOVERY_INTEROP_EXIT=0\n" not in output:
                     failure = "Swift recovery exchange did not report successful completion"
+                if not pid:
+                    raise RuntimeError("Recovery host completed without identifying its PID")
+                Path(str(log) + ".release").touch()
+                wait_for_exit(int(pid[1]))
+                stopped = True
+                break
+            if pid and not process_is_running(int(pid[1])):
+                stopped = True
+                failure = "Recovery host exited without reporting completion"
                 break
             if time.monotonic() >= deadline:
                 failure = f"Recovery host did not report completion within {timeout:g} seconds (including launch)"
                 break
             time.sleep(0.25)
     except (RuntimeError, OSError) as error:
-        failure = str(error)
+        failure = (failure + "\n" if failure else "") + str(error)
     finally:
-        # The UIKit host remains alive after reporting completion so it cannot exit
-        # before the simulator acknowledges launch. Always stop this isolated app.
-        try:
-            simctl("terminate", device, PACKAGE)
-        except (RuntimeError, OSError) as error:
-            failure = (failure + "\n" if failure else "") + "Host cleanup failed: " + str(error)
+        # Incomplete/crashed launches cannot use the completion handshake. Failure
+        # cleanup must never turn their missing evidence into a passing phase.
+        if not stopped:
+            try:
+                simctl("terminate", device, PACKAGE)
+            except (RuntimeError, OSError) as error:
+                failure = (failure + "\n" if failure else "") + "Host cleanup failed: " + str(error)
+    if stopped:
+        with log.open("a") as stream:
+            stream.write(f"RECOVERY_HOST_STOPPED={pid[1]}\n")
     output = log.read_text(errors="replace") if log.exists() else ""
     if failure:
         raise RuntimeError(launch + output + "\n" + failure)
     return output
+
+
+def process_is_running(pid):
+    try:
+        os.kill(pid, 0)  # Simulator apps are local processes; this only probes existence.
+        return True
+    except ProcessLookupError:
+        return False
+
+
+def wait_for_exit(pid, timeout=30):
+    deadline = time.monotonic() + timeout
+    while process_is_running(pid):
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f"Recovery host {pid} did not exit after release")
+        time.sleep(0.1)
 
 
 def passed_one_test(output):

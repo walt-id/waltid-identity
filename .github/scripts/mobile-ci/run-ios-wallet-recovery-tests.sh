@@ -24,6 +24,7 @@ xcrun simctl bootstatus "$simulator" -b
 
 app="$output/host/RecoveryTests.app"
 xcrun simctl install "$simulator" "$app"
+python3 scripts/check-ios-recovery-runner.py --device "$simulator" --output "$output/runner-controls"
 python3 scripts/ios_simulator_test.py --device "$simulator" --output "$output" -- \
   --ktest_filter=id.walt.wallet2.recovery.keychain.KeychainIdentityRecoveryTest.compatibleAccessibilityClassesPreserveTheRecordContract \
   --require-keychain

@@ -31,9 +31,9 @@
         "waltid-libraries/*/*/build.gradle.kts",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
-        "scripts/qualify-wallet-recovery.py",
-        "scripts/build-recovery-simulator-host.py",
-        "scripts/tests/test_qualify_wallet_recovery.py",
+        "scripts/*recovery*",
+        "scripts/ios_simulator_test.py",
+        "scripts/tests/test_*recovery*",
         ".github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh",
         "*/src/recoveryTest/*",
         "*/src/iosRecoveryTest/*"
