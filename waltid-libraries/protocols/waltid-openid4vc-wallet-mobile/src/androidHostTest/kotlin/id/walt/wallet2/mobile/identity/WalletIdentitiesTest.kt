@@ -518,6 +518,28 @@ class WalletIdentitiesTest {
         }
     }
 
+
+    @Test fun `discovery survives one provider list outage`() = runTest {
+        val broken = MemoryRecovery("broken").apply { listFailure = IdentityProviderFailure.TemporarilyUnavailable }
+        val healthy = MemoryRecovery("healthy")
+        healthy.records["recoverable-identity"] = byteArrayOf(1)
+        Fixture(IdentityConfiguration(recoveryProviders = listOf(broken, healthy),
+            authorization = IdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None))).use { fixture ->
+            assertEquals(listOf("healthy"), fixture.wallet.identities.recoveryCandidates().map { it.reference.providerId })
+        }
+    }
+
+    @Test fun `initialize preserves pending failure after restart`() = runTest {
+        Fixture().use { fixture ->
+            fixture.provider.failure = IdentityProviderFailure.InteractionRequired
+            val option = assertIs<IdentityOptions.Available>(fixture.wallet.identities.creationOptions(IdentityIntent.Recoverable)).recommended
+            assertEquals(IdentityFailure.ProviderInteractionRequired,
+                assertIs<IdentityOperationResult.Pending>(fixture.wallet.identities.create(option)).reason)
+            assertEquals(IdentityFailure.ProviderInteractionRequired,
+                assertIs<IdentityOperationResult.Pending>(fixture.reopen().identities.initialize()).reason)
+        }
+    }
+
     private class MemoryCustodian : IdentityKeyCustodian {
         override val id = "test-custodian"
         override val displayName = "Test custodian"
@@ -565,7 +587,11 @@ class WalletIdentitiesTest {
             return if (available) RecoveryAvailability.Available(RecoveryProtection.ApplicationEncrypted, RecoveryScope.Custom)
                 else RecoveryAvailability.Unavailable("Fixture unavailable")
         }
-        override suspend fun list() = records.keys.toList()
+        var listFailure: IdentityProviderFailure? = null
+        override suspend fun list(): List<String> {
+            listFailure?.let { throw IdentityProviderException(it) }
+            return records.keys.toList()
+        }
         override suspend fun store(recordId: String, record: IdentityRecoveryData): RecoveryReceipt {
             failure?.let { throw IdentityProviderException(it) }
             check(!failStore)
