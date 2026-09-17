@@ -1,6 +1,7 @@
 package id.walt.certificate.x509.signum
 
 import at.asitplus.signum.indispensable.asn1.Asn1BitString
+import at.asitplus.signum.indispensable.asn1.Asn1Exception
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.extension.Extension
 import id.walt.certificate.x509.signum.dn.toDistinguishedName
@@ -52,9 +53,12 @@ class SignumX509Certificate(
             )
 
         override val extensions: Map<String, Extension>
-            get() =
+            get() = try {
                 certificate.tbsCertificate.extensions?.map {
                     SignumExtensionFactory.parseExtension(it)
                 }?.associateBy { it.oid } ?: emptyMap()
+            } catch (error: Asn1Exception) {
+                throw IllegalArgumentException("Invalid certificate extension", error)
+            }
     }
 }
