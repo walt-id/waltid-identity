@@ -617,6 +617,7 @@ object OIDC : AuthenticationMethod("oidc") {
         if (payload.containsKey("nonce")) {
             throw IllegalArgumentException("Logout Token must not contain a nonce.")
         }
+        // NOSONAR: this is the OIDC Back-Channel Logout spec-defined event identifier, not a network endpoint
         if (payload["events"]?.jsonObject?.containsKey("http://schemas.openid.net/event/backchannel-logout") != true) {
             throw IllegalArgumentException("Token is not a back-channel logout event token.")
         }
