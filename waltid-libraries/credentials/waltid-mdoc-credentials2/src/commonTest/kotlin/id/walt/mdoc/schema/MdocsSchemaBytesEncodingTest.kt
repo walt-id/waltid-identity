@@ -2,6 +2,7 @@ package id.walt.mdoc.schema
 
 import id.walt.mdoc.schema.MdocsSchema.MdocsDatatype
 import id.walt.mdoc.schema.MdocsSchema.MdocsSchemaType
+import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -10,6 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -100,5 +102,58 @@ class MdocsSchemaBytesEncodingTest {
 
         assertEquals(0, toCborBytes(toJson(empty)).toByteArray().size)
         assertContentEquals(empty, toCborBytes(JsonArray(emptyList())).toByteArray())
+    }
+
+    @Test
+    fun `the legacy array form can be refused for deployments that have migrated`() {
+        // Reading stored data must keep working, so refusing is opt-in: a deployment whose clients all send
+        // base64url can turn it on to keep it that way.
+        val legacy: JsonElement = buildJsonArray { payload.forEach { add(JsonPrimitive(it)) } }
+
+        val refused = assertFailsWith<IllegalArgumentException> {
+            with(MdocsSchemaMappingFunction) {
+                legacy.schemafulJsonToCborElement(bytesType, ByteArrayInputPolicy.REJECT)
+            }
+        }
+
+        assertTrue(
+            refused.message!!.contains("base64url"),
+            "the refusal has to say what to send instead, was: ${refused.message}",
+        )
+        assertTrue(
+            refused.message!!.contains("${payload.size}"),
+            "and how large the offending value was, was: ${refused.message}",
+        )
+    }
+
+    @Test
+    fun `base64url is accepted under both policies`() {
+        val encoded = toJson(payload)
+
+        with(MdocsSchemaMappingFunction) {
+            assertContentEquals(
+                payload,
+                assertIs<CborByteString>(encoded.schemafulJsonToCborElement(bytesType, ByteArrayInputPolicy.WARN))
+                    .toByteArray(),
+            )
+            assertContentEquals(
+                payload,
+                assertIs<CborByteString>(encoded.schemafulJsonToCborElement(bytesType, ByteArrayInputPolicy.REJECT))
+                    .toByteArray(),
+            )
+        }
+    }
+
+    @Test
+    fun `refusing bytes does not refuse a legitimate array claim`() {
+        // ARRAY is a schema type of its own; only BYTES sent as an array is the deprecated form.
+        val arrayType = MdocsSchemaType(MdocsDatatype.ARRAY, MdocsDatatype.INT)
+        val claim: JsonElement = buildJsonArray { listOf(1, 2, 3).forEach { add(JsonPrimitive(it)) } }
+
+        val cbor = with(MdocsSchemaMappingFunction) {
+            claim.schemafulJsonToCborElement(arrayType, ByteArrayInputPolicy.REJECT)
+        }
+
+        assertEquals(3, assertIs<CborArray>(cbor).size)
     }
 }
